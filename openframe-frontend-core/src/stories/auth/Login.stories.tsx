@@ -71,20 +71,43 @@ export const Filled: Story = {
   render: () => <LoginPage email="roman@mail.com" />,
 };
 
-/** The generic providers, which need nothing typed and render above the email field. */
+/** The generic providers, which need nothing typed. */
 const SSO_PROVIDERS: AuthSsoProvider[] = ['google', 'microsoft', 'apple'];
 
-/** Providers above the email field, before anything is typed. */
+/** Generic providers under the email field, before anything is typed. */
 export const SSO: Story = {
   render: () => <LoginPage ssoProviders={SSO_PROVIDERS} />,
 };
 
-/** Discovery resolved a tenant that has its own SSO: its options appear under the email. */
-export const CustomSso: Story = {
-  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} customSsoProviders={['openframe']} />,
+/** The email resolved an organization with no SSO of its own: its OpenFrame login, then the generic providers. */
+export const TenantWithoutCustomSso: Story = {
+  render: () => (
+    <LoginPage
+      email="maya@acme.co"
+      ssoProviders={SSO_PROVIDERS}
+      tenantMethods={{ name: 'Acme IT', providers: ['openframe'] }}
+    />
+  ),
 };
 
-/** Discovery resolved a tenant with none configured — the empty array is the answer, not silence. */
-export const NoCustomSso: Story = {
-  render: () => <LoginPage email="roman@mail.com" ssoProviders={SSO_PROVIDERS} customSsoProviders={[]} />,
+/** The email resolved an organization with its own SSO: only its methods, its providers tagged with its name. */
+export const TenantCustomSso: Story = {
+  render: () => (
+    <LoginPage
+      email="roman@northwind.com"
+      ssoProviders={[]}
+      tenantMethods={{ name: 'Northwind', providers: ['openframe', 'google'] }}
+    />
+  ),
+};
+
+/** No account for the email: the notice under the field, the generic providers still offered. */
+export const NoAccount: Story = {
+  render: () => (
+    <LoginPage
+      email="dan@gmail.com"
+      ssoProviders={SSO_PROVIDERS}
+      notice="No OpenFrame account is linked to this email. Ask your organization's administrator for an invitation."
+    />
+  ),
 };
