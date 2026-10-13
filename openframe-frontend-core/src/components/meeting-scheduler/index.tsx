@@ -39,7 +39,7 @@
  * `SCHEDULER_FLOW_PRESETS` and the `detailsFirst` branches below.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { completeFormRescue } from '../../hooks/use-form-rescue';
@@ -58,7 +58,13 @@ import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../util
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
 import { Alert, AlertDescription, Button } from '../ui';
-import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
+import {
+  BookingForm,
+  BookingFormSkeleton,
+  DEFAULT_SUBMIT_LABEL,
+  type BookingFieldRow,
+  type BookingFormProps,
+} from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
 import { SchedulerModalHeader, SchedulerModalHeaderSkeleton } from './modal-header';
@@ -422,16 +428,18 @@ const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border
 const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
 const NOOP = () => undefined;
 
-/** Continue on the right; Cancel beside it on a phone, where the window has no X to leave by. */
-function ModalFooter({
-  onCancel,
-  canContinue,
-  onContinue,
-}: {
-  onCancel?: () => void;
-  canContinue: boolean;
-  onContinue: () => void;
-}) {
+/** The modal's form draws the name pair first and the email under it, as its design does. */
+const MODAL_FIELD_ROWS: BookingFieldRow[] = [[{ name: 'firstName' }, { name: 'lastName' }], [{ name: 'email' }]];
+
+const MODAL_PRIMARY_CLASS = 'flex-1 content-md:min-w-[15.5rem] content-md:flex-none';
+
+/**
+ * The action row under the card: the step's primary on the right and, on a
+ * phone, Cancel beside it (the window has no X there). On the calendar the
+ * primary is Continue; on the form it is the form's own submit, drawn here and
+ * wired to the form by id so the actions sit under the card, not inside it.
+ */
+function ModalFooter({ onCancel, primary }: { onCancel?: () => void; primary: ReactNode }) {
   return (
     <div className="flex gap-[var(--spacing-system-l)] content-md:justify-end">
       {onCancel && (
@@ -439,13 +447,7 @@ function ModalFooter({
           Cancel
         </Button>
       )}
-      <Button
-        disabled={!canContinue}
-        onClick={onContinue}
-        className="flex-1 content-md:min-w-[15.5rem] content-md:flex-none"
-      >
-        Continue
-      </Button>
+      {primary}
     </div>
   );
 }
@@ -484,6 +486,7 @@ export function HubSpotMeetingScheduler({
   const detailsFirst = flow === 'details-first';
   // The modal arrangement is slot-first's only: details-first keeps the card.
   const modal = layout === 'modal' && !detailsFirst;
+  const modalFormId = useId();
 
   // Zone resolution happens POST-mount (Intl) unless the embedder pins one —
   // the initial (server) render stays deterministic; time labels appear once
@@ -807,7 +810,14 @@ export function HubSpotMeetingScheduler({
           <SchedulerModalHeaderSkeleton />
           <SlotPickerSkeleton monthOffset={monthOffset} layout="modal" />
         </div>
-        <ModalFooter onCancel={onBack} canContinue={false} onContinue={NOOP} />
+        <ModalFooter
+          onCancel={onBack}
+          primary={
+            <Button disabled onClick={NOOP} className={MODAL_PRIMARY_CLASS}>
+              Continue
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -900,14 +910,15 @@ export function HubSpotMeetingScheduler({
             <div className={cn(MODAL_STEP_CLASS, 'gap-[var(--spacing-system-m)]')}>
               {summary && <p className="text-ods-text-primary text-h4">{summary}</p>}
               <DetailsForm
+                fieldRows={MODAL_FIELD_ROWS}
                 {...detailsFormProps}
                 availability={availability}
                 meetingId={meetingId}
                 startTimeMs={selectedSlot}
                 durationMs={durationMs}
                 timezone={timezone}
-                submitLabel={preset.submitLabel}
-                footerNote={preset.footerNote}
+                formId={modalFormId}
+                hideSubmit
                 isSubmitting={isSubmitting}
                 onSubmit={handleSubmit}
                 honeypotInputProps={honeypotInputProps}
@@ -956,8 +967,31 @@ export function HubSpotMeetingScheduler({
         {step === 'slot' && (
           <ModalFooter
             onCancel={onBack}
-            canContinue={selectedSlot != null && durationMs != null}
-            onContinue={() => setStep('details')}
+            primary={
+              <Button
+                disabled={selectedSlot == null || durationMs == null}
+                onClick={() => setStep('details')}
+                className={MODAL_PRIMARY_CLASS}
+              >
+                Continue
+              </Button>
+            }
+          />
+        )}
+        {step === 'details' && (
+          <ModalFooter
+            onCancel={onBack}
+            primary={
+              <Button
+                type="submit"
+                form={modalFormId}
+                loading={isSubmitting}
+                disabled={isSubmitting}
+                className={MODAL_PRIMARY_CLASS}
+              >
+                {preset.submitLabel}
+              </Button>
+            }
           />
         )}
       </div>

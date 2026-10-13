@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HubSpotMeetingScheduler, type HubSpotMeetingSchedulerProps } from '../components/meeting-scheduler';
 import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
-import { availabilityWith } from './fixtures/meeting-booking';
+import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
 
 /** A slot two hours from now, on the hour — inside the month the calendar opens on. */
 const SLOT_MS = Math.ceil((Date.now() + 2 * 3_600_000) / 3_600_000) * 3_600_000;
@@ -87,6 +87,22 @@ describe('HubSpotMeetingScheduler — modal layout', () => {
     unmount();
     render(scheduler());
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+  });
+
+  it('on the form the footer carries Cancel and the submit, and the submit posts the form', async () => {
+    book.mockResolvedValue({ ok: true, confirmation: { title: 'Call', startTimeMs: SLOT_MS, durationMs: 1_800_000 } });
+    render(scheduler({ onBack: vi.fn() }));
+    fireEvent.click(await timeChip());
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await screen.findByLabelText(/^Email/);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    // The submit is wired to the form by id, not nested in it: it sits in the footer under the card.
+    const submit = screen.getByRole('button', { name: 'Confirm Booking' });
+    expect(submit).toHaveAttribute('form');
+    fillIdentity();
+    fireEvent.click(submit);
+    await waitFor(() => expect(book).toHaveBeenCalledTimes(1));
+    expect(book).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.co', startTimeMs: SLOT_MS }));
   });
 
   it('the card layout is untouched: a time click still opens the form at once', async () => {

@@ -397,6 +397,12 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /** The form element's id, so a host can submit it from a button outside it
+   *  (`<button form={id}>`): the modal layout keeps its actions in a footer
+   *  under the card. */
+  formId?: string;
+  /** Leave the submit button out: the host draws one of its own (see `formId`). */
+  hideSubmit?: boolean;
   /** Per-field display overrides, keyed by field name — see `BookingFieldCopy`. */
   fieldCopy?: Record<string, BookingFieldCopy>;
   /** Email domains this form refuses, with the message it shows — see `DeniedEmailDomains`.
@@ -441,6 +447,8 @@ export function BookingForm({
   submitLabel,
   footerNote,
   fieldRows,
+  formId,
+  hideSubmit = false,
   fieldCopy,
   deniedEmailDomains,
   consent,
@@ -685,7 +693,7 @@ export function BookingForm({
 
   // Opted out of HubSpot's collected-forms script — see HUBSPOT_DO_NOT_COLLECT_FORM_PROPS.
   return (
-    <form onSubmit={submit} className={FORM_STACK} noValidate {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
+    <form id={formId} onSubmit={submit} className={FORM_STACK} noValidate {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
       <HoneypotField {...honeypotInputProps} />
 
       {/* Email first, name pair below — the order the desktop and mobile mocks
@@ -806,7 +814,7 @@ export function BookingForm({
       {/* Two shapes, not one with a placeholder: without a note this must stay
           the bare `flex` row it has always been, or the submit slides from the
           left edge to the right on every existing slot-first booking. */}
-      {footerNote ? (
+      {hideSubmit ? null : footerNote ? (
         <div className={FOOTER_ROW_CLASS}>
           <p className="text-ods-text-secondary text-h6">{footerNote}</p>
           {submitButton}
