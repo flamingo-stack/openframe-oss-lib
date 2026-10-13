@@ -44,13 +44,12 @@ public class MeController {
                         "displayName", principal.getDisplayName(),
                         "roles", principal.getRoles(),
                         "tenantId", principal.getTenantId(),
-                        "isSuperUser", isSuperUser(principal)
+                        "isSuperUser", isSuperTenant(principal.getTenantId())
                 )
         ));
     }
 
-    private boolean isSuperUser(AuthPrincipal principal) {
-        return superTenantId != null && !superTenantId.isBlank()
-                && superTenantId.equals(principal.getTenantId());
+    private boolean isSuperTenant(String tenantId) {
+        return !superTenantId.isBlank() && superTenantId.equals(tenantId);
     }
 }
