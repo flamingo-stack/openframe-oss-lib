@@ -36,7 +36,6 @@ pub use cli::run;
 pub mod executor;
 
 use crate::clients::build_agent_http_client;
-use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
@@ -316,10 +315,6 @@ impl Client {
             machine_id_service.clone(),
         );
 
-        // Initialize tool agent file client
-        let tool_agent_file_client =
-            ToolAgentFileClient::new(download_client.clone(), http_url.clone());
-
         // Initialize tool API client
         let tool_api_client = ToolApiClient::new(
             download_client.clone(),
@@ -440,7 +435,6 @@ impl Client {
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
             github_download_service.clone(),
-            tool_agent_file_client.clone(),
             tool_api_client,
             tool_command_params_resolver.clone(),
             tool_url_params_resolver.clone(),
@@ -468,7 +462,6 @@ impl Client {
         // Initialize tool agent update service
         let tool_agent_update_service = ToolAgentUpdateService::new(
             github_download_service.clone(),
-            tool_agent_file_client.clone(),
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),

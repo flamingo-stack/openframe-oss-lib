@@ -1,4 +1,3 @@
-use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::tool_api_client::ToolApiClient;
 use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
@@ -38,7 +37,6 @@ const TOOL_COMMAND_TIMEOUT_SECS: u64 = 300;
 #[derive(Clone)]
 pub struct ToolInstallationService {
     github_download_service: GithubDownloadService,
-    tool_agent_file_client: ToolAgentFileClient,
     tool_api_client: ToolApiClient,
     command_params_resolver: ToolCommandParamsResolver,
     url_params_resolver: ToolUrlParamsResolver,
@@ -57,7 +55,6 @@ impl ToolInstallationService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         github_download_service: GithubDownloadService,
-        tool_agent_file_client: ToolAgentFileClient,
         tool_api_client: ToolApiClient,
         command_params_resolver: ToolCommandParamsResolver,
         url_params_resolver: ToolUrlParamsResolver,
@@ -78,7 +75,6 @@ impl ToolInstallationService {
 
         Self {
             github_download_service,
-            tool_agent_file_client,
             tool_api_client,
             command_params_resolver,
             url_params_resolver,
@@ -485,11 +481,7 @@ impl ToolInstallationService {
                         resolved_config.service_name.clone(),
                     )
                 }
-                None => {
-                    self.download_from_artifactory(tool_agent_id, &default_agent_path)
-                        .await?;
-                    (None, InstallationType::Standard, None, None)
-                }
+                None => anyhow::bail!("No download configurations for tool {}", tool_agent_id),
             };
 
         let file_path = self.resolve_executable_path(
@@ -547,15 +539,6 @@ impl ToolInstallationService {
                         }
                     }
                     let asset_bytes = match asset.source {
-                        AssetSource::Artifactory => {
-                            info!("Downloading artifactory asset: {}", asset.id);
-                            self.tool_agent_file_client
-                                .get_tool_agent_file(asset.id.clone())
-                                .await
-                                .with_context(|| {
-                                    format!("Failed to download artifactory asset: {}", asset.id)
-                                })?
-                        }
                         AssetSource::ToolApi => {
                             let path = asset.path.as_deref().with_context(|| {
                                 format!("No uri path for tool {} asset {}", tool_agent_id, asset.id)
@@ -971,23 +954,6 @@ impl ToolInstallationService {
                 .directory_manager
                 .get_tool_executable_path(tool_agent_id, executable_path),
         }
-    }
-
-    async fn download_from_artifactory(&self, tool_agent_id: &str, path: &Path) -> Result<()> {
-        if path.exists() {
-            info!("Agent already exists at {}, skipping", path.display());
-            return Ok(());
-        }
-        info!("Downloading from Artifactory: {}", tool_agent_id);
-        let bytes = self
-            .tool_agent_file_client
-            .get_tool_agent_file(tool_agent_id.to_string())
-            .await
-            .with_context(|| format!("Failed to download: {}", tool_agent_id))?;
-        File::create(path).await?.write_all(&bytes).await?;
-        self.set_executable_permissions(path).await?;
-        info!("Saved to {}", path.display());
-        Ok(())
     }
 
     #[allow(unused_variables)] // path used only by unix permission set

@@ -51,7 +51,7 @@ public class ToolInstallationMessage implements DeliveryPayload {
     }
 
     public enum AssetSource {
-        ARTIFACTORY, TOOL_API, GITHUB
+        TOOL_API, GITHUB
     }
 
 }
