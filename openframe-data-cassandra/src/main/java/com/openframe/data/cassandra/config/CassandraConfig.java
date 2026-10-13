@@ -3,6 +3,7 @@ package com.openframe.data.cassandra.config;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverConfigLoader;
+import com.datastax.oss.driver.api.core.type.codec.registry.CodecRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +14,8 @@ import org.springframework.data.cassandra.config.AbstractCassandraConfiguration;
 import org.springframework.data.cassandra.config.CqlSessionFactoryBean;
 import org.springframework.data.cassandra.config.SchemaAction;
 import org.springframework.data.cassandra.core.convert.CassandraConverter;
+import org.springframework.data.cassandra.core.convert.CassandraCustomConversions;
+import org.springframework.data.cassandra.core.convert.MappingCassandraConverter;
 import org.springframework.data.cassandra.core.convert.SchemaFactory;
 import org.springframework.data.cassandra.core.mapping.CassandraMappingContext;
 import org.springframework.data.cassandra.repository.config.EnableCassandraRepositories;
@@ -64,20 +67,22 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         return contactPoints;
     }
 
+    /**
+     * Nothing to run while the session factory is created: the context must come up without Cassandra (the AOT
+     * cache training run). {@link CassandraSchemaInitializer} runs {@link SchemaAction#CREATE_IF_NOT_EXISTS} at start.
+     */
     @Override
     public SchemaAction getSchemaAction() {
-        return SchemaAction.CREATE_IF_NOT_EXISTS;
+        return SchemaAction.NONE;
     }
 
     @Override
     public CqlSessionFactoryBean cassandraSession() {
-        logger.info("Initializing Cassandra session with contact points: {}, port: {}, datacenter: {}, keyspace: {}",
-                contactPoints, port, localDatacenter, keyspaceName);
-
         // Create keyspace (and TTL-bearing tables that Spring Data can't express via annotations) before connecting / before SchemaAction runs.
-        ensureKeyspaceExists();
-
-        CqlSessionFactoryBean bean = super.cassandraSession();
+        CqlSessionFactoryBean bean = new LazyCqlSessionFactoryBean(this::ensureKeyspaceExists,
+                session -> new CassandraSessionLogger(session).logSessionDetails());
+        bean.setContactPoints(contactPoints);
+        bean.setPort(port);
         bean.setKeyspaceName(keyspaceName);
         bean.setLocalDatacenter(localDatacenter);
         bean.setSessionBuilderConfigurer(builder -> {
@@ -103,6 +108,8 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
      * This runs before CqlSessionFactoryBean connects to the keyspace.
      */
     private void ensureKeyspaceExists() {
+        logger.info("Initializing Cassandra session with contact points: {}, port: {}, datacenter: {}, keyspace: {}",
+                contactPoints, port, localDatacenter, keyspaceName);
         logger.info("Ensuring keyspace '{}' exists with replication factor {}", keyspaceName, replicationFactor);
 
         try (CqlSession session = CqlSession.builder()
@@ -132,9 +139,23 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
         }
     }
 
+    /**
+     * Same converter as the parent's, without asking the session for its codec registry: that would connect while the
+     * bean is created. The driver config registers no codecs, so the session's registry is the default one.
+     */
+    @Override
     @Bean
-    public CassandraSessionLogger cassandraSessionLogger(CqlSession session) {
-        return new CassandraSessionLogger(session);
+    public CassandraConverter cassandraConverter() {
+        MappingCassandraConverter converter = new MappingCassandraConverter(requireBeanOfType(CassandraMappingContext.class));
+        converter.setCodecRegistry(CodecRegistry.DEFAULT);
+        converter.setUserTypeResolver(userTypeResolver(getRequiredSession()));
+        converter.setCustomConversions(requireBeanOfType(CassandraCustomConversions.class));
+        return converter;
+    }
+
+    @Bean
+    public CassandraSchemaInitializer cassandraSchemaInitializer(CqlSession session, CassandraConverter converter) {
+        return new CassandraSchemaInitializer(session, converter, SchemaAction.CREATE_IF_NOT_EXISTS);
     }
 
     @Bean
