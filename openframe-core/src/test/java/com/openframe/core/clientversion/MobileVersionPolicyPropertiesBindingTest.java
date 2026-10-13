@@ -33,6 +33,7 @@ class MobileVersionPolicyPropertiesBindingTest {
     void bind_allKeysConfigured_everyFieldBound() {
         // setup
         TestPropertyValues.of(
+                PREFIX + "enabled=true",
                 PREFIX + "min-bundle-version=1.0.120",
                 PREFIX + "ios.latest-version=1.0.2",
                 PREFIX + "ios.store-url=" + IOS_STORE_URL,
@@ -47,9 +48,10 @@ class MobileVersionPolicyPropertiesBindingTest {
 
         // verifications
         assertThat(properties)
-                .extracting(MobileVersionPolicyProperties::getMinBundleVersion,
+                .extracting(MobileVersionPolicyProperties::isEnabled,
+                        MobileVersionPolicyProperties::getMinBundleVersion,
                         MobileVersionPolicyProperties::isEnforceMissingHeader)
-                .containsExactly("1.0.120", true);
+                .containsExactly(true, "1.0.120", true);
         assertThat(properties.getIos())
                 .extracting(PlatformPolicy::getLatestVersion, PlatformPolicy::getStoreUrl)
                 .containsExactly("1.0.2", IOS_STORE_URL);
@@ -68,9 +70,10 @@ class MobileVersionPolicyPropertiesBindingTest {
 
         // verifications
         assertThat(properties)
-                .extracting(MobileVersionPolicyProperties::getMinBundleVersion,
+                .extracting(MobileVersionPolicyProperties::isEnabled,
+                        MobileVersionPolicyProperties::getMinBundleVersion,
                         MobileVersionPolicyProperties::isEnforceMissingHeader)
-                .containsExactly(null, false);
+                .containsExactly(false, null, false);
         assertThat(properties.getIos())
                 .extracting(PlatformPolicy::getLatestVersion, PlatformPolicy::getStoreUrl)
                 .containsExactly(null, null);

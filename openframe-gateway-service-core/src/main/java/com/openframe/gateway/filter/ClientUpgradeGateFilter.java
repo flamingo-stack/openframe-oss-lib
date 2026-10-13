@@ -50,7 +50,7 @@ public class ClientUpgradeGateFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
-        if (isExempt(request)) {
+        if (!properties.isEnabled() || isExempt(request)) {
             return chain.filter(exchange);
         }
         String header = request.getHeaders().getFirst(X_OPENFRAME_CLIENT);

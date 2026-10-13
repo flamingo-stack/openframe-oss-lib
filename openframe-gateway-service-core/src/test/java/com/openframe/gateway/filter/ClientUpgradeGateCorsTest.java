@@ -24,6 +24,7 @@ class ClientUpgradeGateCorsTest {
     @BeforeEach
     void setUp() {
         MobileVersionPolicyProperties properties = new MobileVersionPolicyProperties();
+        properties.setEnabled(true);
         properties.setMinBundleVersion("1.0.120");
         GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(new SimpleMeterRegistry());
         ClientUpgradeGateFilter filter = new ClientUpgradeGateFilter(properties, metrics, new ObjectMapper());

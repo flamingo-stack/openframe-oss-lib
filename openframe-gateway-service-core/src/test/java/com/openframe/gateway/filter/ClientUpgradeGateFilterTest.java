@@ -42,6 +42,7 @@ class ClientUpgradeGateFilterTest {
     @BeforeEach
     void setUp() {
         properties = new MobileVersionPolicyProperties();
+        properties.setEnabled(true);
         properties.setMinBundleVersion(MIN_BUNDLE_VERSION);
         properties.getIos().setStoreUrl(IOS_STORE_URL);
         properties.getAndroid().setStoreUrl(ANDROID_STORE_URL);
@@ -147,6 +148,36 @@ class ClientUpgradeGateFilterTest {
         assertThat(exchange.getResponse().getStatusCode()).isEqualTo(HttpStatus.UPGRADE_REQUIRED);
         assertThat(exchange.getResponse().getBodyAsString().block())
                 .isEqualTo("{\"code\":\"CLIENT_UPGRADE_REQUIRED\",\"minBundleVersion\":\"1.0.120\"}");
+    }
+
+    @Test
+    void filter_featureDisabled_oldBundleForwarded() {
+        // setup
+        properties.setEnabled(false);
+        MockServerWebExchange exchange = exchange(MockServerHttpRequest.get(API_PATH)
+                .header(HEADER, "ios/1.0.1 bundle/1.0.100"));
+
+        // execution
+        filter.filter(exchange, chain).block();
+
+        // verifications
+        assertThat(forwarded).isTrue();
+        assertThat(exchange.getResponse().getStatusCode()).isNull();
+        assertThat(registry.find(UPGRADE_COUNTER).counters()).isEmpty();
+    }
+
+    @Test
+    void filter_featureDisabledAndEnforceFlagOn_headerlessRequestForwarded() {
+        // setup
+        properties.setEnabled(false);
+        properties.setEnforceMissingHeader(true);
+        MockServerWebExchange exchange = exchange(MockServerHttpRequest.get(API_PATH));
+
+        // execution
+        filter.filter(exchange, chain).block();
+
+        // verifications
+        assertThat(forwarded).isTrue();
     }
 
     @Test

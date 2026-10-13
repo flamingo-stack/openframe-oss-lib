@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "openframe.mobile.version-policy")
 public class MobileVersionPolicyProperties {
 
+    private boolean enabled;
     private String minBundleVersion;
     private PlatformPolicy ios = new PlatformPolicy();
     private PlatformPolicy android = new PlatformPolicy();

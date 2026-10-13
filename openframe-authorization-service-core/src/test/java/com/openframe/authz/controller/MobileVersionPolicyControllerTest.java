@@ -7,10 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class MobileVersionPolicyControllerTest {
 
@@ -27,6 +29,7 @@ class MobileVersionPolicyControllerTest {
     @BeforeEach
     void setUp() {
         properties = new MobileVersionPolicyProperties();
+        properties.setEnabled(true);
         controller = new MobileVersionPolicyController(properties);
     }
 
@@ -51,6 +54,20 @@ class MobileVersionPolicyControllerTest {
         Map<?, ?> body = objectMapper.convertValue(response.getBody(), Map.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(body).isEqualTo(expected);
+    }
+
+    @Test
+    void versionPolicy_featureDisabled_throwsNotFound() {
+        // setup
+        properties.setEnabled(false);
+        properties.setMinBundleVersion(MIN_BUNDLE_VERSION);
+
+        // execution
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> controller.versionPolicy());
+
+        // verifications
+        assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(ex.getMessage()).contains("404 NOT_FOUND");
     }
 
     @Test

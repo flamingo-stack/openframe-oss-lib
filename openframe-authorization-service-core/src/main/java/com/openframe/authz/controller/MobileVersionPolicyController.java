@@ -7,11 +7,13 @@ import com.openframe.core.clientversion.MobileVersionPolicyProperties.PlatformPo
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 
@@ -27,6 +29,9 @@ public class MobileVersionPolicyController {
 
     @GetMapping(value = "/version-policy", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<MobileVersionPolicyResponse> versionPolicy() {
+        if (!properties.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         CacheControl cacheControl = CacheControl.maxAge(CACHE_MAX_AGE).cachePublic();
         MobileVersionPolicyResponse response = toMobileVersionPolicyResponse();
         log.debug("Mobile version policy served: minBundleVersion={}", response.getMinBundleVersion());
