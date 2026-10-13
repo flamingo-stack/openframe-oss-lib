@@ -1,6 +1,6 @@
 package com.openframe.client.service.rmm.watchdog;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;

@@ -1,7 +1,8 @@
 package com.openframe.test.helpers.ai;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.test.data.dto.ai.MessageData;
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,7 +45,7 @@ public final class ProviderErrorClassifier {
     private static final Pattern REQUEST_ID_TOKEN = Pattern.compile(
             "\"request_id\"\\s*:\\s*\"([^\"]+)\"");
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new JsonMapper();
 
     private ProviderErrorClassifier() {
     }
@@ -130,6 +131,6 @@ public final class ProviderErrorClassifier {
     }
 
     private static String text(JsonNode node) {
-        return node != null && node.isTextual() ? node.asText() : null;
+        return node != null && node.isString() ? node.asString() : null;
     }
 }

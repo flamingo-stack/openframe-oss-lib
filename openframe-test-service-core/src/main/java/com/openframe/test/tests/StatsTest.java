@@ -1,7 +1,8 @@
 package com.openframe.test.tests;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -26,7 +27,7 @@ import static com.openframe.test.helpers.RequestSpecHelper.setBaseUrl;
 public class StatsTest extends BaseTest {
 
     public static List<String> getDomains() throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
+        ObjectMapper mapper = new JsonMapper();
         try (InputStream is = StatsTest.class.getResourceAsStream("/openframe.all.tenants.json")) {
             List<Map<String, String>> tenants = mapper.readValue(is, new TypeReference<>() {
             });

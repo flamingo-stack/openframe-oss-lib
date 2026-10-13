@@ -1,7 +1,6 @@
 package com.openframe.client.listener.rmm;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.rmm.MachinePackageManagersService;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -12,6 +11,7 @@ import io.nats.client.Message;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -83,7 +83,7 @@ public class MachinePackageManagersListener extends AbstractJetStreamPushListene
             packageManagersService.apply(machineId, packageManagers);
 
             message.ack();
-        } catch (JsonProcessingException | IllegalArgumentException permanentlyBad) {
+        } catch (JacksonException | IllegalArgumentException permanentlyBad) {
             log.warn("Dropping malformed package-managers report subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
         } catch (Exception e) {

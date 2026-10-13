@@ -1,7 +1,8 @@
 package com.openframe.notification.spec;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openframe.core.jackson.Jackson2Compatibility;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,7 +13,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 
 public final class Attrs {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = Jackson2Compatibility.jsonMapper();
 
     private final Map<String, String> values;
 
