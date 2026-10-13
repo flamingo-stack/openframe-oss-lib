@@ -14,6 +14,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.Connection;
@@ -59,7 +61,8 @@ class MySqlGapBackfillIT {
         connectorName = "it-fleet-" + runId + "_v1";
         topicPrefix = "it.fleet." + runId;
         database = "fleet_" + runId;
-        debeziumService = new DebeziumService(new VersionedConnectorNameStrategy(), null, new GapRecoveryProperties());
+        ObjectProvider<ConnectorRecreator> noRecreator = new StaticListableBeanFactory().getBeanProvider(ConnectorRecreator.class);
+        debeziumService = new DebeziumService(new VersionedConnectorNameStrategy(), null, new GapRecoveryProperties(), noRecreator);
         ReflectionTestUtils.setField(debeziumService, "debeziumUrl", CONNECT_URL);
         ReflectionTestUtils.setField(debeziumService, "connectTimeout", Duration.ofSeconds(5));
         ReflectionTestUtils.setField(debeziumService, "readTimeout", Duration.ofSeconds(60));
@@ -86,7 +89,9 @@ class MySqlGapBackfillIT {
         Instant gapFrom = Instant.now().minus(Duration.ofMinutes(30));
         List<SnapshotCondition> conditions = dialect.gapConditions(config, backfill, gapFrom);
         Map<String, Object> hostSideConfig = hostSideConfig();
-        SnapshotSignalPublisher publisher = new SnapshotSignalPublisher(objectMapper);
+        GapRecoveryProperties signalProperties = new GapRecoveryProperties();
+        signalProperties.setBackfillExpiry(Duration.ofHours(2));
+        SnapshotSignalPublisher publisher = new SnapshotSignalPublisher(objectMapper, signalProperties);
 
         // execution
         publisher.publishIncrementalSnapshot(hostSideConfig, conditions);
