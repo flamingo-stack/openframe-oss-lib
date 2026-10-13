@@ -32,9 +32,9 @@ export const EP = {
   // The active agents' public identities (name, icon, audience): where the assistant's
   // identity comes from on a platform that configured none of its own.
   aiAgents: `${CONTENT}/ai-agents`,
-  // The questions an "ask" surface offers (the FAQ's card): `?count&section&exclude`.
-  // `section` is the surface's topic, any string the hub's chat config knows.
-  askPrompts: `${CONTENT}/quick-actions/questions`,
+  // The questions an "ask" surface offers (the FAQ's card): `?count&topic&exclude`.
+  // `topic` is the surface's topic, any FAQ topic the hub knows.
+  askPrompts: `${CONTENT}/faqs/questions`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
