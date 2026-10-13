@@ -4,6 +4,10 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.debezium.naming.ConnectorNameStrategy;
+import com.openframe.debezium.recovery.gap.BackfillDispatcher;
+import com.openframe.debezium.recovery.gap.CheckpointRecorder;
+import com.openframe.debezium.recovery.gap.ConnectorRecreator;
+import com.openframe.debezium.util.ConnectorSpecs;
 import com.openframe.debezium.service.ConnectorRecoveryManager;
 import com.openframe.debezium.service.DebeziumService;
 import jakarta.annotation.PostConstruct;
@@ -15,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -28,17 +33,26 @@ public class DebeziumHealthCheckScheduler {
     private final IntegratedToolService integratedToolService;
     private final TenantIdProvider tenantIdProvider;
     private final ConnectorNameStrategy nameStrategy;
+    private final ConnectorRecreator connectorRecreator;
+    private final CheckpointRecorder checkpointRecorder;
+    private final BackfillDispatcher backfillDispatcher;
 
     public DebeziumHealthCheckScheduler(DebeziumService debeziumService,
                                         ConnectorRecoveryManager recoveryManager,
                                         @Autowired(required = false) IntegratedToolService integratedToolService,
                                         TenantIdProvider tenantIdProvider,
-                                        ConnectorNameStrategy nameStrategy) {
+                                        ConnectorNameStrategy nameStrategy,
+                                        @Autowired(required = false) ConnectorRecreator connectorRecreator,
+                                        @Autowired(required = false) CheckpointRecorder checkpointRecorder,
+                                        @Autowired(required = false) BackfillDispatcher backfillDispatcher) {
         this.debeziumService = debeziumService;
         this.recoveryManager = recoveryManager;
         this.integratedToolService = integratedToolService;
         this.tenantIdProvider = tenantIdProvider;
         this.nameStrategy = nameStrategy;
+        this.connectorRecreator = connectorRecreator;
+        this.checkpointRecorder = checkpointRecorder;
+        this.backfillDispatcher = backfillDispatcher;
     }
 
     @PostConstruct
@@ -63,6 +77,23 @@ public class DebeziumHealthCheckScheduler {
         }
 
         recoveryManager.checkAndRecoverAll();
+
+        if (connectorRecreator != null) {
+            runGapRecovery();
+        }
+    }
+
+    private void runGapRecovery() {
+        try {
+            checkpointRecorder.recordAll();
+        } catch (Exception e) {
+            log.error("Failed to record connector checkpoints", e);
+        }
+        try {
+            backfillDispatcher.dispatchPending();
+        } catch (Exception e) {
+            log.error("Failed to dispatch pending backfills", e);
+        }
     }
 
     private void reconcileMissingConnectors() {
@@ -90,10 +121,41 @@ public class DebeziumHealthCheckScheduler {
 
             if (!missing.isEmpty()) {
                 log.warn("Found {} missing connectors — reconciling: {}", missing.size(), missing);
-                debeziumService.reconcileMissingConnectors(tools, missing);
+                Set<String> restorable = restorableFromCheckpoint(missing);
+                restorable.forEach(base -> restoreFromCheckpoint(base, tools, actualConnectors));
+                Set<String> fresh = missing.stream()
+                        .filter(base -> !restorable.contains(base))
+                        .collect(Collectors.toSet());
+                debeziumService.reconcileMissingConnectors(tools, fresh);
             }
         } catch (Exception e) {
             log.error("Failed to reconcile missing connectors", e);
         }
+    }
+
+    private Set<String> restorableFromCheckpoint(Set<String> missing) {
+        if (connectorRecreator == null) return Set.of();
+        return missing.stream()
+                .filter(connectorRecreator::hasFreshCheckpoint)
+                .collect(Collectors.toSet());
+    }
+
+    private void restoreFromCheckpoint(String baseName, List<IntegratedTool> tools, List<String> actualConnectors) {
+        String newName = nameStrategy.resolveNextName(baseName, actualConnectors);
+        Map<String, Object> spec = specOf(baseName, tools);
+        try {
+            connectorRecreator.restoreFromCheckpoint(baseName, newName, spec);
+        } catch (Exception e) {
+            log.error("Failed to restore connector '{}' from checkpoint", baseName, e);
+        }
+    }
+
+    private static Map<String, Object> specOf(String baseName, List<IntegratedTool> tools) {
+        return tools.stream()
+                .filter(IntegratedTool::isEnabled)
+                .flatMap(ConnectorSpecs::specStreamOf)
+                .filter(spec -> baseName.equals(ConnectorSpecs.nameOf(spec)))
+                .findFirst()
+                .orElseThrow();
     }
 }
