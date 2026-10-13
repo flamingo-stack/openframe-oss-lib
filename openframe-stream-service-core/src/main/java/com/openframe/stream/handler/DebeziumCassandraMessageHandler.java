@@ -18,7 +18,7 @@ import java.time.Instant;
 @Slf4j
 @Component
 @ConditionalOnClass(CassandraRepository.class)
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "cassandra")
 public class DebeziumCassandraMessageHandler
         extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
@@ -39,7 +39,7 @@ public class DebeziumCassandraMessageHandler
 
     @Override
     public Destination getDestination() {
-        return Destination.CASSANDRA_EVENT_LOG;
+        return Destination.EVENT_LOG;
     }
 
     /**
