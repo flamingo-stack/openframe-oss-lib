@@ -47,6 +47,9 @@ public class ConnectorRecoveryManager {
     private static final String TRIGGER_MAX_ATTEMPTS = "max-attempts";
     private static final String TRIGGER_NO_STATUS = "no-status";
     private static final String TRIGGER_HISTORY_LOST = "history-lost";
+    // GAP_UNFILLED is owned by gap recovery and must not be resolved by a healthy tick.
+    private static final Set<ConnectorAlertType> RECOVERY_ALERT_TYPES =
+            Set.of(ConnectorAlertType.MAX_RETRIES_EXCEEDED, ConnectorAlertType.NON_RECOVERABLE_ERROR);
     private static final String NO_STATUS_MSG = "Connector registered but Kafka Connect reports no status";
 
     private static final Set<String> NON_RECOVERABLE_ERROR_PATTERNS = Set.of(
@@ -237,8 +240,9 @@ public class ConnectorRecoveryManager {
             log.error("{} Recreation limit reached: base='{}' trigger={}", DebeziumLog.PREFIX, base, trigger);
             return false;
         }
+        boolean discardOffsets = TRIGGER_HISTORY_LOST.equals(trigger) || recreationTracker.hasRecentRecreation(base);
         return lookupSpecForBase(base)
-                .map(spec -> performRecreation(failedName, base, spec, reason, trigger))
+                .map(spec -> performRecreation(failedName, base, spec, reason, trigger, discardOffsets))
                 .orElseGet(() -> {
                     log.warn("{} Recreation skipped — no source config: base='{}'", DebeziumLog.PREFIX, base);
                     return false;
@@ -252,7 +256,7 @@ public class ConnectorRecoveryManager {
     }
 
     private boolean performRecreation(String failedName, String base, Map<String, Object> spec,
-                                      String reason, String trigger) {
+                                      String reason, String trigger, boolean discardOffsets) {
         List<String> existingBefore = debeziumService.listConnectors();
         String newName = nameStrategy.resolveNextName(base, existingBefore);
 
@@ -268,7 +272,7 @@ public class ConnectorRecoveryManager {
         }
 
         try {
-            createNextVersion(failedName, base, newName, spec, trigger);
+            createNextVersion(failedName, base, newName, spec, discardOffsets);
         } catch (Exception e) {
             log.error("{} Recreation failed: base='{}' new='{}' trigger={}",
                     DebeziumLog.PREFIX, base, newName, trigger, e);
@@ -288,7 +292,7 @@ public class ConnectorRecoveryManager {
     }
 
     private void createNextVersion(String failedName, String base, String newName,
-                                   Map<String, Object> spec, String trigger) {
+                                   Map<String, Object> spec, boolean discardOffsets) {
         if (connectorRecreator == null) {
             Map<String, Object> config = ConnectorSpecs.configOf(spec);
             debeziumService.createConnector(newName, config);
@@ -300,7 +304,7 @@ public class ConnectorRecoveryManager {
                 .newName(newName)
                 .spec(spec)
                 .lastKnownOffsets(lastKnownOffsets)
-                .historyLost(TRIGGER_HISTORY_LOST.equals(trigger))
+                .discardOffsets(discardOffsets)
                 .build();
         connectorRecreator.recreate(request);
     }
@@ -346,7 +350,7 @@ public class ConnectorRecoveryManager {
             return;
         }
         try {
-            if (connectorAlertRepository.findByConnectorNameAndResolvedFalse(connectorName).isPresent()) {
+            if (connectorAlertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(connectorName, RECOVERY_ALERT_TYPES).isPresent()) {
                 log.debug("Active alert already exists for connector '{}'", connectorName);
                 return;
             }
@@ -370,7 +374,7 @@ public class ConnectorRecoveryManager {
             return;
         }
         try {
-            connectorAlertRepository.findByConnectorNameAndResolvedFalse(connectorName)
+            connectorAlertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(connectorName, RECOVERY_ALERT_TYPES)
                     .ifPresent(alert -> {
                         alert.setResolved(true);
                         alert.setResolvedAt(Instant.now());

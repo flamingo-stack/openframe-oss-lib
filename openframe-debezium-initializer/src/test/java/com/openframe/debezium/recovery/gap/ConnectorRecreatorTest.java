@@ -27,6 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -54,9 +55,11 @@ class ConnectorRecreatorTest {
     @Mock private SourceDialect sourceDialect;
     @Mock private ConnectorCheckpointRepository checkpointRepository;
     @Mock private ConnectorBackfillRepository backfillRepository;
+    @Mock private UnfilledGapAlerts gapAlerts;
 
     @Captor private ArgumentCaptor<ConnectorBackfill> backfillCaptor;
     @Captor private ArgumentCaptor<ConnectorOffsets> offsetsCaptor;
+    @Captor private ArgumentCaptor<Instant> instantCaptor;
 
     private ConnectorRecreator recreator;
     private ConnectorOffsets offsets;
@@ -67,7 +70,7 @@ class ConnectorRecreatorTest {
         properties.setMargin(MARGIN);
         properties.setFallbackLookback(FALLBACK_LOOKBACK);
         properties.setCheckpointMaxAge(CHECKPOINT_MAX_AGE);
-        recreator = new ConnectorRecreator(debeziumService, sourceDialects, checkpointRepository, backfillRepository, properties);
+        recreator = new ConnectorRecreator(debeziumService, sourceDialects, checkpointRepository, backfillRepository, properties, gapAlerts);
         Map<String, Object> entry = Map.of("partition", Map.of("server_id", "shared.meshcentral"), "offset", Map.of("sec", 1L));
         offsets = new ConnectorOffsets(List.of(entry));
     }
@@ -161,17 +164,36 @@ class ConnectorRecreatorTest {
     }
 
     @Test
-    void recreate_historyLostOnUnsupportedSource_createdWithoutBackfill() {
+    void recreate_historyLostOnUnsupportedSource_createdWithoutBackfillAndGapAlerted() {
         // setup
         when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
         when(sourceDialects.supports(CONFIG)).thenReturn(false);
         RecreationRequest request = request(offsets, true);
+        Instant expectedGapFrom = Instant.now().minus(FALLBACK_LOOKBACK);
 
         // execution
         recreator.recreate(request);
 
         // verifications
         verify(debeziumService).createConnector(NEW_NAME, CONFIG);
+        verify(backfillRepository, never()).save(any(ConnectorBackfill.class));
+        verify(gapAlerts).raise(eq(NEW_NAME), instantCaptor.capture(), eq("No source dialect for the connector class"));
+        assertThat(instantCaptor.getValue()).isCloseTo(expectedGapFrom, within(5, ChronoUnit.SECONDS));
+    }
+
+    @Test
+    void recreate_resumeAfterHandoverFails_newVersionDeletedAndErrorRaised() {
+        // setup
+        when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
+        doThrow(new HttpClientErrorException(HttpStatus.CONFLICT)).when(debeziumService).resumeConnector(NEW_NAME);
+        RecreationRequest request = request(offsets, false);
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> recreator.recreate(request));
+
+        // verifications
+        assertThat(ex.getMessage()).contains("Failed to resume handed-over connector " + NEW_NAME);
+        verify(debeziumService).deleteConnector(NEW_NAME);
         verify(backfillRepository, never()).save(any(ConnectorBackfill.class));
     }
 
@@ -287,13 +309,13 @@ class ConnectorRecreatorTest {
         when(sourceDialects.dialectFor(CONFIG)).thenReturn(sourceDialect);
     }
 
-    private RecreationRequest request(ConnectorOffsets lastKnown, boolean historyLost) {
+    private RecreationRequest request(ConnectorOffsets lastKnown, boolean discardOffsets) {
         return RecreationRequest.builder()
                 .baseName(BASE)
                 .newName(NEW_NAME)
                 .spec(SPEC)
                 .lastKnownOffsets(lastKnown)
-                .historyLost(historyLost)
+                .discardOffsets(discardOffsets)
                 .build();
     }
 
