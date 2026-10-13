@@ -29,6 +29,7 @@ public class ConnectorRecreator {
     private final ConnectorCheckpointRepository checkpointRepository;
     private final ConnectorBackfillRepository backfillRepository;
     private final GapRecoveryProperties properties;
+    private final UnfilledGapAlerts gapAlerts;
 
     public boolean isHistoryLost(ConnectorStatus status) {
         return sourceDialects.isHistoryLost(status.getFailureTraces());
@@ -50,7 +51,7 @@ public class ConnectorRecreator {
                 .newName(newName)
                 .spec(spec)
                 .lastKnownOffsets(offsets)
-                .historyLost(false)
+                .discardOffsets(false)
                 .build();
         log.warn("{} Restoring missing connector from checkpoint: base='{}' new='{}'",
                 DebeziumLog.PREFIX, baseName, newName);
@@ -82,20 +83,30 @@ public class ConnectorRecreator {
     }
 
     private boolean canHandOver(RecreationRequest request) {
-        return !request.isHistoryLost() && !request.getLastKnownOffsets().isEmpty();
+        return !request.isDiscardOffsets() && !request.getLastKnownOffsets().isEmpty();
     }
 
     private void handOver(RecreationRequest request, Map<String, Object> recreationConfig) {
         String newName = request.getNewName();
         debeziumService.createStoppedConnector(newName, recreationConfig);
         boolean offsetsCarried = carryOffsets(newName, request.getLastKnownOffsets());
-        debeziumService.resumeConnector(newName);
+        resumeOrDiscard(newName);
         if (offsetsCarried) {
             log.warn("{} Offsets handed over: base='{}' new='{}'", DebeziumLog.PREFIX, request.getBaseName(), newName);
             return;
         }
         Map<String, Object> config = ConnectorSpecs.configOf(request.getSpec());
         scheduleBackfill(request, config);
+    }
+
+    // A version left STOPPED looks healthy to every check, so drop it and let the next tick recreate it.
+    private void resumeOrDiscard(String connectorName) {
+        try {
+            debeziumService.resumeConnector(connectorName);
+        } catch (Exception e) {
+            debeziumService.deleteConnector(connectorName);
+            throw new IllegalStateException("Failed to resume handed-over connector " + connectorName, e);
+        }
     }
 
     private boolean carryOffsets(String connectorName, ConnectorOffsets offsets) {
@@ -110,11 +121,11 @@ public class ConnectorRecreator {
     }
 
     private void scheduleBackfill(RecreationRequest request, Map<String, Object> config) {
+        Instant gapFrom = gapFrom(request.getLastKnownOffsets(), config);
         if (!sourceDialects.supports(config)) {
-            log.error("{} Gap left unfilled — no source dialect: base='{}'", DebeziumLog.PREFIX, request.getBaseName());
+            gapAlerts.raise(request.getNewName(), gapFrom, "No source dialect for the connector class");
             return;
         }
-        Instant gapFrom = gapFrom(request.getLastKnownOffsets(), config);
         ConnectorBackfill backfill = ConnectorBackfill.builder()
                 .baseName(request.getBaseName())
                 .connectorName(request.getNewName())
@@ -128,11 +139,15 @@ public class ConnectorRecreator {
     }
 
     private Instant gapFrom(ConnectorOffsets offsets, Map<String, Object> config) {
-        SourceDialect dialect = sourceDialects.dialectFor(config);
-        if (!dialect.hasSourceTime(offsets)) {
+        if (!hasSourceTime(offsets, config)) {
             return Instant.now().minus(properties.getFallbackLookback());
         }
+        SourceDialect dialect = sourceDialects.dialectFor(config);
         Instant lastSourceTime = dialect.sourceTime(offsets);
         return lastSourceTime.minus(properties.getMargin());
+    }
+
+    private boolean hasSourceTime(ConnectorOffsets offsets, Map<String, Object> config) {
+        return sourceDialects.supports(config) && sourceDialects.dialectFor(config).hasSourceTime(offsets);
     }
 }

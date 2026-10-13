@@ -5,11 +5,14 @@ import com.openframe.debezium.dto.ConnectorOffsets;
 import com.openframe.debezium.dto.ConnectorStatus;
 import com.openframe.debezium.naming.ConnectorNameStrategy;
 import com.openframe.debezium.recovery.RecreationTracker;
+import com.openframe.debezium.recovery.gap.ConnectorRecreator;
 import com.openframe.debezium.recovery.gap.GapRecoveryProperties;
+import com.openframe.debezium.recovery.gap.RecreationRequest;
 import com.openframe.debezium.util.ConnectorSpecs;
 import com.openframe.debezium.util.DebeziumLog;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
@@ -44,18 +47,23 @@ public class DebeziumService {
     private static final String PATH_RESTART = "/restart";
     private static final String PATH_OFFSETS = "/offsets";
     private static final String PATH_RESUME = "/resume";
+    private static final String PATH_STOP = "/stop";
 
     private final ConnectorNameStrategy nameStrategy;
     private final RecreationTracker recreationTracker;
     private final GapRecoveryProperties gapRecoveryProperties;
+    // Resolved lazily: the recreator itself depends on this service.
+    private final ObjectProvider<ConnectorRecreator> connectorRecreator;
     private RestTemplate restTemplate;
 
     public DebeziumService(ConnectorNameStrategy nameStrategy,
                            @Autowired(required = false) RecreationTracker recreationTracker,
-                           @Autowired(required = false) GapRecoveryProperties gapRecoveryProperties) {
+                           @Autowired(required = false) GapRecoveryProperties gapRecoveryProperties,
+                           ObjectProvider<ConnectorRecreator> connectorRecreator) {
         this.nameStrategy = nameStrategy;
         this.recreationTracker = recreationTracker;
         this.gapRecoveryProperties = gapRecoveryProperties;
+        this.connectorRecreator = connectorRecreator;
     }
 
     @Value("${openframe.debezium.base-url}")
@@ -103,7 +111,7 @@ public class DebeziumService {
 
         // Base already has a version. Decide how to propagate the incoming config.
         if (nameStrategy.supportsRecreation()) {
-            recreateOnConfigDrift(baseName, config, existing);
+            recreateOnConfigDrift(baseName, spec, existing);
         } else {
             tryUpdateExistingIdentityConnector(baseName, config, existing);
         }
@@ -152,7 +160,8 @@ public class DebeziumService {
      *       under {@code currentName} until the window rolls.</li>
      * </ul>
      */
-    private void recreateOnConfigDrift(String baseName, Map<String, Object> incomingConfig, List<String> existing) {
+    private void recreateOnConfigDrift(String baseName, Map<String, Object> spec, List<String> existing) {
+        Map<String, Object> incomingConfig = ConnectorSpecs.configOf(spec);
         Optional<String> currentNameOpt = nameStrategy.currentVersion(baseName, existing);
         if (currentNameOpt.isEmpty()) {
             log.warn("{} Versioned base '{}' has versions but currentVersion() empty — skipping",
@@ -188,13 +197,47 @@ public class DebeziumService {
             }
         }
         try {
-            createConnector(newName, recreationConfig(incomingConfig));
+            createDriftVersion(baseName, currentName, newName, spec);
         } catch (Exception e) {
             log.error("{} Drift-driven recreation failed: base='{}' new='{}'", DebeziumLog.PREFIX, baseName, newName, e);
             return;
         }
         nameStrategy.staleVersions(baseName, newName, existing)
                 .forEach(this::deleteConnector);
+    }
+
+    // The old version is stopped before its offsets are read, so the new one resumes exactly where it ended;
+    // a stale read only replays events, it never skips them.
+    private void createDriftVersion(String baseName, String currentName, String newName, Map<String, Object> spec) {
+        ConnectorRecreator recreator = connectorRecreator.getIfAvailable();
+        if (recreator == null) {
+            Map<String, Object> config = ConnectorSpecs.configOf(spec);
+            createConnector(newName, recreationConfig(config));
+            return;
+        }
+        stopConnector(currentName);
+        try {
+            ConnectorOffsets offsets = recreator.lastKnownOffsets(baseName, currentName);
+            RecreationRequest request = RecreationRequest.builder()
+                    .baseName(baseName)
+                    .newName(newName)
+                    .spec(spec)
+                    .lastKnownOffsets(offsets)
+                    .discardOffsets(false)
+                    .build();
+            recreator.recreate(request);
+        } catch (Exception e) {
+            resumeQuietly(currentName);
+            throw e;
+        }
+    }
+
+    private void resumeQuietly(String connectorName) {
+        try {
+            resumeConnector(connectorName);
+        } catch (Exception e) {
+            log.error("{} Failed to resume connector '{}' after an aborted recreate", DebeziumLog.PREFIX, connectorName, e);
+        }
     }
 
     /**
@@ -263,6 +306,12 @@ public class DebeziumService {
     public void alterConnectorOffsets(String connectorName, ConnectorOffsets offsets) {
         restTemplate.patchForObject(offsetsUrl(connectorName), jsonEntity(offsets), String.class);
         log.info("Connector '{}' offsets altered", connectorName);
+    }
+
+    public void stopConnector(String connectorName) {
+        String url = connectorUrl(connectorName) + PATH_STOP;
+        restTemplate.put(url, jsonEntity(null));
+        log.info("Connector '{}' stopped", connectorName);
     }
 
     public void resumeConnector(String connectorName) {

@@ -46,6 +46,7 @@ class BackfillDispatcherTest {
     @Mock private SourceDialects sourceDialects;
     @Mock private SourceDialect sourceDialect;
     @Mock private SnapshotSignalPublisher signalPublisher;
+    @Mock private UnfilledGapAlerts gapAlerts;
 
     @Captor private ArgumentCaptor<ConnectorBackfill> backfillCaptor;
 
@@ -58,7 +59,7 @@ class BackfillDispatcherTest {
         properties.setBackfillExpiry(EXPIRY);
         ConnectorNameStrategy nameStrategy = new VersionedConnectorNameStrategy();
         dispatcher = new BackfillDispatcher(backfillRepository, debeziumService, nameStrategy,
-                toolConnectorSpecs, sourceDialects, signalPublisher, properties);
+                toolConnectorSpecs, sourceDialects, signalPublisher, properties, gapAlerts);
         backfill = ConnectorBackfill.builder()
                 .baseName(BASE)
                 .connectorName(BASE + "_v4")
@@ -118,6 +119,7 @@ class BackfillDispatcherTest {
         verify(signalPublisher, never()).publishIncrementalSnapshot(any(), any());
         verify(backfillRepository).save(backfillCaptor.capture());
         assertThat(backfillCaptor.getValue().getStatus()).isEqualTo(ConnectorBackfillStatus.EXPIRED);
+        verify(gapAlerts).raise(BASE + "_v4", GAP_FROM, "Backfill not requested before expiry");
     }
 
     @Test
@@ -134,6 +136,7 @@ class BackfillDispatcherTest {
         verify(signalPublisher, never()).publishIncrementalSnapshot(any(), any());
         verify(backfillRepository).save(backfillCaptor.capture());
         assertThat(backfillCaptor.getValue().getStatus()).isEqualTo(ConnectorBackfillStatus.EXPIRED);
+        verify(gapAlerts).raise(BASE + "_v4", GAP_FROM, "No Kafka signal channel in the connector config");
     }
 
     @Test

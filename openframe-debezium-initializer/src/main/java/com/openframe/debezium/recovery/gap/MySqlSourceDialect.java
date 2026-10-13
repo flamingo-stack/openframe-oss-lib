@@ -5,8 +5,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -18,8 +16,6 @@ public class MySqlSourceDialect extends SourceDialect {
     private static final String KEY_TABLES = "table.include.list";
     private static final String OFFSET_TIME_KEY = "ts_sec";
     private static final String FROM_PLACEHOLDER = "{from}";
-    private static final DateTimeFormatter SQL_TIMESTAMP =
-            DateTimeFormatter.ofPattern("''yyyy-MM-dd HH:mm:ss''").withZone(ZoneOffset.UTC);
     private static final List<String> HISTORY_LOST_MARKERS = List.of(
             "is no longer available on the server",
             "Could not find first log file name in binary log index file",
@@ -37,11 +33,12 @@ public class MySqlSourceDialect extends SourceDialect {
     }
 
     // A table without a backfill filter is re-read whole, so only small tables may stay unlisted.
+    // FROM_UNIXTIME renders the bound in the snapshot session's time zone, as TIMESTAMP columns are compared.
     @Override
     public List<SnapshotCondition> gapConditions(Map<String, Object> config,
                                                 Map<String, String> backfill,
                                                 Instant gapFrom) {
-        String from = SQL_TIMESTAMP.format(gapFrom);
+        String from = "FROM_UNIXTIME(" + gapFrom.getEpochSecond() + ")";
         String tables = ConnectorSpecs.stringOf(config, KEY_TABLES);
         return splitList(tables).stream()
                 .map(table -> conditionFor(table, backfill, from))

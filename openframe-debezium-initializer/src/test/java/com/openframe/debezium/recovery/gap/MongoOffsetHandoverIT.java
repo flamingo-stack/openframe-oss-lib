@@ -22,6 +22,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Duration;
@@ -65,14 +67,17 @@ class MongoOffsetHandoverIT {
         topicPrefix = "it.handover." + runId;
         collection = "events_" + runId;
         GapRecoveryProperties properties = new GapRecoveryProperties();
-        debeziumService = new DebeziumService(new VersionedConnectorNameStrategy(), null, properties);
+        StaticListableBeanFactory beans = new StaticListableBeanFactory();
+        ObjectProvider<ConnectorRecreator> recreatorProvider = beans.getBeanProvider(ConnectorRecreator.class);
+        debeziumService = new DebeziumService(new VersionedConnectorNameStrategy(), null, properties, recreatorProvider);
         ReflectionTestUtils.setField(debeziumService, "debeziumUrl", CONNECT_URL);
         ReflectionTestUtils.setField(debeziumService, "connectTimeout", Duration.ofSeconds(5));
         ReflectionTestUtils.setField(debeziumService, "readTimeout", Duration.ofSeconds(60));
         debeziumService.init();
         SourceDialects dialects = new SourceDialects(List.of(new MongoSourceDialect()));
         recreator = new ConnectorRecreator(debeziumService, dialects, mock(ConnectorCheckpointRepository.class),
-                backfillRepository, properties);
+                backfillRepository, properties, mock(UnfilledGapAlerts.class));
+        beans.addBean("connectorRecreator", recreator);
         mongoClient = MongoClients.create(HOST_MONGO);
         config = connectorConfig();
     }
@@ -103,7 +108,7 @@ class MongoOffsetHandoverIT {
                 .newName(baseName + "_v2")
                 .spec(Map.of("name", baseName, "config", config))
                 .lastKnownOffsets(lastKnown)
-                .historyLost(false)
+                .discardOffsets(false)
                 .build();
 
         // execution
@@ -120,6 +125,43 @@ class MongoOffsetHandoverIT {
                 .extracting(this::eventId)
                 .containsOnly(beforeOutage.toHexString(), duringOutage.toHexString(), afterRecreate.toHexString())
                 .contains(duringOutage.toHexString());
+        verifyNoInteractions(backfillRepository);
+    }
+
+    @Test
+    void createOrUpdate_configDriftWhileOldVersionLags_newVersionResumesFromOldPositionWithoutSnapshot() {
+        // setup
+        MongoCollection<Document> events = mongoClient.getDatabase("meshcentral").getCollection(collection);
+        ObjectId streamed = new ObjectId();
+        ObjectId notYetStreamed = new ObjectId();
+        ObjectId afterRecreate = new ObjectId();
+        Object[] initialSpecs = {Map.of("name", baseName, "config", config)};
+        debeziumService.createOrUpdateDebeziumConnector(initialSpecs);
+        awaitRunning(baseName + "_v1");
+        events.insertOne(new Document("_id", streamed));
+        awaitRecords(1);
+        awaitOffsets(baseName + "_v1");
+        debeziumService.stopConnector(baseName + "_v1");
+        events.insertOne(new Document("_id", notYetStreamed));
+        Map<String, Object> driftedConfig = new HashMap<>(config);
+        driftedConfig.put("heartbeat.interval.ms", "5000");
+        Object[] driftedSpecs = {Map.of("name", baseName, "config", driftedConfig)};
+
+        // execution
+        debeziumService.createOrUpdateDebeziumConnector(driftedSpecs);
+
+        // verifications
+        awaitRunning(baseName + "_v2");
+        events.insertOne(new Document("_id", afterRecreate));
+        List<JsonNode> delivered = awaitRecords(3);
+        assertThat(delivered)
+                .extracting(record -> record.path("op").asText())
+                .containsOnly("c");
+        assertThat(delivered)
+                .extracting(this::eventId)
+                .containsOnly(streamed.toHexString(), notYetStreamed.toHexString(), afterRecreate.toHexString())
+                .contains(notYetStreamed.toHexString(), afterRecreate.toHexString());
+        assertThat(debeziumService.listConnectors()).doesNotContain(baseName + "_v1");
         verifyNoInteractions(backfillRepository);
     }
 

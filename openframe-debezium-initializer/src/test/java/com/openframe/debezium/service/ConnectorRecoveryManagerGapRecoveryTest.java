@@ -1,6 +1,7 @@
 package com.openframe.debezium.service;
 
 import com.openframe.data.document.connector.ConnectorAlert;
+import com.openframe.data.document.connector.ConnectorAlertType;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.repository.connector.ConnectorAlertRepository;
 import com.openframe.data.service.IntegratedToolService;
@@ -20,6 +21,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +40,9 @@ class ConnectorRecoveryManagerGapRecoveryTest {
     private static final String HISTORY_LOST_TRACE = "com.mongodb.MongoCommandException: error 286 (ChangeStreamHistoryLost)";
     private static final Map<String, Object> CONFIG = Map.of("connector.class", "io.debezium.connector.mongodb.MongoDbConnector");
     private static final Map<String, Object> SPEC = Map.of("name", BASE, "config", CONFIG);
+    private static final String CONFIG_ERROR_TRACE = "org.apache.kafka.common.config.ConfigException: bad value";
+    private static final Set<ConnectorAlertType> RECOVERY_ALERT_TYPES =
+            Set.of(ConnectorAlertType.MAX_RETRIES_EXCEEDED, ConnectorAlertType.NON_RECOVERABLE_ERROR);
 
     @Mock private DebeziumService debeziumService;
     @Mock private ConnectorAlertRepository alertRepository;
@@ -79,7 +85,7 @@ class ConnectorRecoveryManagerGapRecoveryTest {
         verify(debeziumService, never()).restartConnectorWithFailedTasks(FAILED);
         verify(connectorRecreator).recreate(requestCaptor.capture());
         assertThat(requestCaptor.getValue())
-                .extracting(RecreationRequest::getNewName, RecreationRequest::isHistoryLost, RecreationRequest::getLastKnownOffsets)
+                .extracting(RecreationRequest::getNewName, RecreationRequest::isDiscardOffsets, RecreationRequest::getLastKnownOffsets)
                 .containsExactly(NEXT, true, offsets);
         verify(debeziumService).deleteConnector(FAILED);
         verify(alertRepository, never()).save(any(ConnectorAlert.class));
@@ -177,6 +183,67 @@ class ConnectorRecoveryManagerGapRecoveryTest {
 
         // verifications
         verify(debeziumService).restartConnectorWithFailedTasks(FAILED);
+    }
+
+    @Test
+    void checkAndRecover_nonRecoverableFirstInWindow_offsetsHandedOver() {
+        // setup
+        stubNonRecoverableRecreation();
+        when(recreationTracker.hasRecentRecreation(BASE)).thenReturn(false);
+
+        // execution
+        manager.checkAndRecover(FAILED);
+
+        // verifications
+        verify(connectorRecreator).recreate(requestCaptor.capture());
+        assertThat(requestCaptor.getValue())
+                .extracting(RecreationRequest::getNewName, RecreationRequest::isDiscardOffsets)
+                .containsExactly(NEXT, false);
+    }
+
+    @Test
+    void checkAndRecover_nonRecoverableRecreatedWithinWindow_offsetsDiscarded() {
+        // setup
+        stubNonRecoverableRecreation();
+        when(recreationTracker.hasRecentRecreation(BASE)).thenReturn(true);
+
+        // execution
+        manager.checkAndRecover(FAILED);
+
+        // verifications
+        verify(connectorRecreator).recreate(requestCaptor.capture());
+        assertThat(requestCaptor.getValue())
+                .extracting(RecreationRequest::getNewName, RecreationRequest::isDiscardOffsets, RecreationRequest::getLastKnownOffsets)
+                .containsExactly(NEXT, true, offsets);
+    }
+
+    @Test
+    void checkAndRecover_healthyWithOpenGapAlert_onlyRecoveryAlertsResolved() {
+        // setup
+        ConnectorStatus healthy = new ConnectorStatus();
+        ConnectorStatus.Connector connector = new ConnectorStatus.Connector();
+        connector.setState("RUNNING");
+        healthy.setConnector(connector);
+        healthy.setTasks(List.of());
+        when(debeziumService.getConnectorStatus(FAILED)).thenReturn(healthy);
+        when(alertRepository.findByConnectorNameAndErrorTypeInAndResolvedFalse(FAILED, RECOVERY_ALERT_TYPES))
+                .thenReturn(Optional.empty());
+
+        // execution
+        manager.checkAndRecover(FAILED);
+
+        // verifications
+        verify(alertRepository, never()).save(any(ConnectorAlert.class));
+    }
+
+    private void stubNonRecoverableRecreation() {
+        failedTask.setTrace(CONFIG_ERROR_TRACE);
+        when(debeziumService.getConnectorStatus(FAILED)).thenReturn(failedStatus);
+        when(connectorRecreator.isHistoryLost(failedStatus)).thenReturn(false);
+        when(recreationTracker.canRecreate(BASE)).thenReturn(true);
+        when(integratedToolService.getAllTools()).thenReturn(List.of(tool()));
+        when(debeziumService.listConnectors()).thenReturn(List.of(FAILED));
+        when(connectorRecreator.lastKnownOffsets(BASE, FAILED)).thenReturn(offsets);
     }
 
     private void stubHistoryLostRecreation() {

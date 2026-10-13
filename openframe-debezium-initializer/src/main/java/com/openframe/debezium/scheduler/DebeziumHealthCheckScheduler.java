@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.IntegratedToolService;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.debezium.naming.ConnectorNameStrategy;
+import com.openframe.debezium.recovery.RecreationTracker;
 import com.openframe.debezium.recovery.gap.BackfillDispatcher;
 import com.openframe.debezium.recovery.gap.CheckpointRecorder;
 import com.openframe.debezium.recovery.gap.ConnectorRecreator;
@@ -36,6 +37,7 @@ public class DebeziumHealthCheckScheduler {
     private final ConnectorRecreator connectorRecreator;
     private final CheckpointRecorder checkpointRecorder;
     private final BackfillDispatcher backfillDispatcher;
+    private final RecreationTracker recreationTracker;
 
     public DebeziumHealthCheckScheduler(DebeziumService debeziumService,
                                         ConnectorRecoveryManager recoveryManager,
@@ -44,7 +46,8 @@ public class DebeziumHealthCheckScheduler {
                                         ConnectorNameStrategy nameStrategy,
                                         @Autowired(required = false) ConnectorRecreator connectorRecreator,
                                         @Autowired(required = false) CheckpointRecorder checkpointRecorder,
-                                        @Autowired(required = false) BackfillDispatcher backfillDispatcher) {
+                                        @Autowired(required = false) BackfillDispatcher backfillDispatcher,
+                                        @Autowired(required = false) RecreationTracker recreationTracker) {
         this.debeziumService = debeziumService;
         this.recoveryManager = recoveryManager;
         this.integratedToolService = integratedToolService;
@@ -53,6 +56,7 @@ public class DebeziumHealthCheckScheduler {
         this.connectorRecreator = connectorRecreator;
         this.checkpointRecorder = checkpointRecorder;
         this.backfillDispatcher = backfillDispatcher;
+        this.recreationTracker = recreationTracker;
     }
 
     @PostConstruct
@@ -140,10 +144,18 @@ public class DebeziumHealthCheckScheduler {
                 .collect(Collectors.toSet());
     }
 
+    // Rate-limited like every other recreate; the checkpoint keeps the position, so waiting loses no events.
     private void restoreFromCheckpoint(String baseName, List<IntegratedTool> tools, List<String> actualConnectors) {
-        String newName = nameStrategy.resolveNextName(baseName, actualConnectors);
-        Map<String, Object> spec = specOf(baseName, tools);
         try {
+            if (recreationTracker != null && !recreationTracker.canRecreate(baseName)) {
+                log.warn("Restore of connector '{}' deferred — recreation limit reached", baseName);
+                return;
+            }
+            String newName = nameStrategy.resolveNextName(baseName, actualConnectors);
+            Map<String, Object> spec = specOf(baseName, tools);
+            if (recreationTracker != null) {
+                recreationTracker.record(baseName);
+            }
             connectorRecreator.restoreFromCheckpoint(baseName, newName, spec);
         } catch (Exception e) {
             log.error("Failed to restore connector '{}' from checkpoint", baseName, e);

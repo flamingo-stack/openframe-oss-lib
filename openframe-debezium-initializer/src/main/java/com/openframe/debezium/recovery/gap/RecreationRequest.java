@@ -14,5 +14,5 @@ public class RecreationRequest {
     private final String newName;
     private final Map<String, Object> spec;
     private final ConnectorOffsets lastKnownOffsets;
-    private final boolean historyLost;
+    private final boolean discardOffsets;
 }
