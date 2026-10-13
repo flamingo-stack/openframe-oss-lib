@@ -498,8 +498,11 @@ export function FaqSection({
   const titleNode = heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading;
   const headingNode =
     showTopic && topic ? (
+      // The host's heading may arrive from a server component, still streaming: React cannot check such a
+      // node when it sits in a list of siblings and warns about a missing key. So it is the ONLY child of its
+      // own wrapper, and the two siblings here are this component's own elements.
       <div className="space-y-1">
-        {titleNode}
+        <div>{titleNode}</div>
         <p className="text-ods-text-muted text-h6">{topic}</p>
       </div>
     ) : (
