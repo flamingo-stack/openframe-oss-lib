@@ -1,7 +1,8 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { type ButtonHTMLAttributes, type HTMLAttributes, forwardRef } from 'react';
+import { type ButtonHTMLAttributes, type HTMLAttributes, type MouseEvent, type ReactNode, forwardRef } from 'react';
+import Link from '../embed-shims/next-link';
 import { cn } from '../utils/cn';
 import { Button } from './ui/button';
 
@@ -10,9 +11,62 @@ interface PaginationProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   className?: string;
+  /**
+   * The address of a page of this list. With it every enabled control is a real
+   * link (`<a href>`), so a crawler that runs no script can reach every page of
+   * the list, and a person can open a page in a new tab. A plain click still
+   * changes the page in place through `onPageChange`. Without it the controls
+   * are buttons.
+   */
+  getPageHref?: (page: number) => string;
 }
 
-const Pagination = ({ currentPage, totalPages, onPageChange, className }: PaginationProps) => {
+/** A click the browser should handle itself: a new tab, a new window, a download. */
+function opensElsewhere(event: MouseEvent<HTMLAnchorElement>): boolean {
+  return event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+}
+
+const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageHref }: PaginationProps) => {
+  /** One control: a link to its page when the list has addresses and the control is enabled, else a button. */
+  const control = (
+    page: number,
+    props: { variant: 'accent' | 'outline'; className: string; disabled?: boolean; label: string; current?: boolean },
+    children: ReactNode,
+  ) => {
+    if (getPageHref && !props.disabled) {
+      return (
+        <Button variant={props.variant} size="icon" className={props.className} asChild>
+          <Link
+            href={getPageHref(page)}
+            prefetch={false}
+            aria-label={props.label}
+            aria-current={props.current ? 'page' : undefined}
+            onClick={event => {
+              if (opensElsewhere(event)) return;
+              event.preventDefault();
+              onPageChange(page);
+            }}
+          >
+            {children}
+          </Link>
+        </Button>
+      );
+    }
+    return (
+      <Button
+        variant={props.variant}
+        size="icon"
+        onClick={() => onPageChange(page)}
+        disabled={props.disabled}
+        aria-label={props.label}
+        aria-current={props.current ? 'page' : undefined}
+        className={props.className}
+      >
+        {children}
+      </Button>
+    );
+  };
+
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages = [];
@@ -68,16 +122,16 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
     <nav role="navigation" aria-label="pagination" className={cn('mx-auto flex w-full justify-center', className)}>
       <ul className="flex flex-row items-center gap-1">
         <li>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            aria-label="Go to previous page"
-            className="!h-10 !w-10 content-md:!h-10 content-md:!w-10"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+          {control(
+            currentPage - 1,
+            {
+              variant: 'outline',
+              className: '!h-10 !w-10 content-md:!h-10 content-md:!w-10',
+              disabled: currentPage === 1,
+              label: 'Go to previous page',
+            },
+            <ChevronLeft className="h-4 w-4" />,
+          )}
         </li>
 
         {pageNumbers.map((page, index) => {
@@ -95,32 +149,34 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
 
           return (
             <li key={page}>
-              <Button
-                variant={currentPage === page ? 'accent' : 'outline'}
-                size="icon"
-                onClick={() => onPageChange(page)}
-                className="!h-9 !w-9 content-md:!h-9 content-md:!w-9"
-                aria-label={`Page ${page}`}
-                aria-current={currentPage === page ? 'page' : undefined}
-              >
-                {page}
-              </Button>
+              {control(
+                page,
+                {
+                  variant: currentPage === page ? 'accent' : 'outline',
+                  className: '!h-9 !w-9 content-md:!h-9 content-md:!w-9',
+                  label: `Page ${page}`,
+                  current: currentPage === page,
+                },
+                page,
+              )}
             </li>
           );
         })}
 
         <li>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            aria-label="Go to next page"
-            className="!h-10 !w-10 content-md:!h-10 content-md:!w-10"
-          >
-            <ChevronRight className="h-4 w-4" />
-            <span className="sr-only">Next page</span>
-          </Button>
+          {control(
+            currentPage + 1,
+            {
+              variant: 'outline',
+              className: '!h-10 !w-10 content-md:!h-10 content-md:!w-10',
+              disabled: currentPage === totalPages,
+              label: 'Go to next page',
+            },
+            <>
+              <ChevronRight className="h-4 w-4" />
+              <span className="sr-only">Next page</span>
+            </>,
+          )}
         </li>
       </ul>
     </nav>
