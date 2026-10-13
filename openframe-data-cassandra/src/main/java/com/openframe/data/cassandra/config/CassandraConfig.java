@@ -69,7 +69,7 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
     /**
      * Nothing to run while the session factory is created: the context must come up without Cassandra (the AOT
-     * cache training run). {@link CassandraSchemaInitializer} runs {@link SchemaAction#CREATE_IF_NOT_EXISTS} at start.
+     * cache training run). {@link CassandraSchemaInitializer} creates what is missing at start.
      */
     @Override
     public SchemaAction getSchemaAction() {
@@ -155,7 +155,7 @@ public class CassandraConfig extends AbstractCassandraConfiguration {
 
     @Bean
     public CassandraSchemaInitializer cassandraSchemaInitializer(CqlSession session, CassandraConverter converter) {
-        return new CassandraSchemaInitializer(session, converter, SchemaAction.CREATE_IF_NOT_EXISTS);
+        return new CassandraSchemaInitializer(session, converter);
     }
 
     @Bean

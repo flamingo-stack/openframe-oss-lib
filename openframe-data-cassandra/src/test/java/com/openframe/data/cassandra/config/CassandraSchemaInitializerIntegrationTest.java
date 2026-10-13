@@ -7,7 +7,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.cassandra.config.CqlSessionFactoryBean;
-import org.springframework.data.cassandra.config.SchemaAction;
 import org.springframework.data.cassandra.core.convert.MappingCassandraConverter;
 import org.springframework.data.cassandra.core.mapping.CassandraMappingContext;
 
@@ -35,7 +34,7 @@ class CassandraSchemaInitializerIntegrationTest extends BaseCassandraIntegration
         mappingContext.afterPropertiesSet();
         MappingCassandraConverter converter = new MappingCassandraConverter(mappingContext);
         converter.afterPropertiesSet();
-        initializer = new CassandraSchemaInitializer(session, converter, SchemaAction.CREATE_IF_NOT_EXISTS);
+        initializer = new CassandraSchemaInitializer(session, converter);
     }
 
     @AfterEach
