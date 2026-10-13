@@ -485,7 +485,7 @@ export function FaqSection({
 
   return (
     <>
-      <section id={id} className={className ?? 'space-y-10'}>
+      <section id={id} data-faq-topic={topic} className={className ?? 'space-y-10'}>
         {!aside && headingNode}
         <GroupedFaqList
           groups={groups}

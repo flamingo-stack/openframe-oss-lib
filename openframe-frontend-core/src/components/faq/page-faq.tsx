@@ -35,6 +35,12 @@ export interface PageFaqProps {
   heading?: React.ReactNode;
   /** True inside a page that already provides the container: no width or side padding of its own. */
   contained?: boolean;
+  /**
+   * Print the topic in small text under the heading ("Topic: pricing"), so
+   * whoever edits the FAQs can see which topic a page asks for. Default off.
+   * The block always carries it as `data-faq-topic` too.
+   */
+  showTopic?: boolean;
   /** Emit FAQPage JSON-LD for the page's own questions. Default true: they are this page's. */
   emitJsonLd?: boolean;
   jsonLd?: FaqSchemaOptions;
@@ -73,18 +79,29 @@ export function PageFaq({
   title = DEFAULT_TITLE,
   heading,
   contained = false,
+  showTopic = false,
   emitJsonLd = true,
   jsonLd,
   ask,
   className,
 }: PageFaqProps) {
+  const headingNode = heading ?? <SectionHeading title={title} punctuation={null} />;
   return (
     <FaqSection
       id={PAGE_FAQ_SECTION_ID}
       topic={topic}
       initialFaqs={initialFaqs}
       apiBaseUrl={apiBaseUrl}
-      heading={heading ?? <SectionHeading title={title} punctuation={null} />}
+      heading={
+        showTopic ? (
+          <div className="space-y-2">
+            {headingNode}
+            <p className="text-ods-text-secondary text-h6">Topic: {topic}</p>
+          </div>
+        ) : (
+          headingNode
+        )
+      }
       emitJsonLd={emitJsonLd}
       jsonLd={jsonLd}
       ask={ask}
