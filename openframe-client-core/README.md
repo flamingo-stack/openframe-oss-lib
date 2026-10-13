@@ -100,7 +100,7 @@ mvn test
 
 ## Tool Agent Binaries
 
-No tool agent binaries are bundled. The openframe-client downloads each tool from the GitHub release named by the agent configuration's download configurations.
+No tool agent binaries are bundled. The openframe-client installs each tool from its download configurations: the binary from the GitHub release they name, and generated assets such as the mesh `.msh` from the tool API.
 
 ## Design Patterns
 

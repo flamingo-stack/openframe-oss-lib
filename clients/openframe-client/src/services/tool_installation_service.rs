@@ -111,6 +111,15 @@ impl ToolInstallationService {
         let effective_version = tool_installation_message.effective_version().to_string();
         let run_args_clone = tool_installation_message.run_command_args.clone();
         let reinstall = tool_installation_message.reinstall;
+        let download_configs = tool_installation_message
+            .download_configurations
+            .as_ref()
+            .with_context(|| format!("No download configurations for tool {}", tool_agent_id))?;
+        let resolved_config = self
+            .github_download_service
+            .find_config_for_current_os(download_configs)
+            .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
+            .with_version_override(&version_clone, &effective_version);
         let mut reinstall_dir_cleared = false;
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
@@ -362,28 +371,11 @@ impl ToolInstallationService {
 
         let default_agent_path = self.directory_manager.get_agent_path(tool_agent_id);
 
-        let resolved_config = match &tool_installation_message.download_configurations {
-            Some(configs) => {
-                let config = self
-                    .github_download_service
-                    .find_config_for_current_os(configs)
-                    .with_context(|| {
-                        format!("No download config for current OS: {}", tool_agent_id)
-                    })?;
-                Some(config.with_version_override(&version_clone, &effective_version))
-            }
-            None => None,
-        };
-
         let stop_executable_path = default_agent_path.to_string_lossy().to_string();
-        let stop_installation = match resolved_config
-            .as_ref()
-            .map(|c| c.installation_type)
-            .unwrap_or(InstallationType::Standard)
-        {
+        let stop_installation = match resolved_config.installation_type {
             InstallationType::Service => resolved_config
-                .as_ref()
-                .and_then(|c| c.service_name.clone())
+                .service_name
+                .clone()
                 .or_else(|| tool_installation_message.service_name.clone())
                 .map(|service_name| Installation::Service {
                     service_name,
@@ -391,7 +383,7 @@ impl ToolInstallationService {
                 }),
             InstallationType::GuiApp => Some(Installation::GuiApp {
                 executable_path: stop_executable_path,
-                bundle_id: resolved_config.as_ref().and_then(|c| c.bundle_id.clone()),
+                bundle_id: resolved_config.bundle_id.clone(),
             }),
             InstallationType::Standard => Some(Installation::Standard {
                 executable_path: Some(stop_executable_path),
@@ -462,27 +454,17 @@ impl ToolInstallationService {
         }
 
         // Download and install the tool
-        let (executable_path, installation_type, bundle_id, config_service_name) =
-            match resolved_config {
-                Some(resolved_config) => {
-                    let exec_path = self
-                        .install_from_download_config(
-                            &resolved_config,
-                            tool_agent_id,
-                            &tool_folder_path,
-                            &default_agent_path,
-                        )
-                        .await?;
-
-                    (
-                        exec_path,
-                        resolved_config.installation_type,
-                        resolved_config.bundle_id.clone(),
-                        resolved_config.service_name.clone(),
-                    )
-                }
-                None => anyhow::bail!("No download configurations for tool {}", tool_agent_id),
-            };
+        let executable_path = self
+            .install_from_download_config(
+                &resolved_config,
+                tool_agent_id,
+                &tool_folder_path,
+                &default_agent_path,
+            )
+            .await?;
+        let installation_type = resolved_config.installation_type;
+        let bundle_id = resolved_config.bundle_id.clone();
+        let config_service_name = resolved_config.service_name.clone();
 
         let file_path = self.resolve_executable_path(
             tool_agent_id,
