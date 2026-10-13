@@ -229,7 +229,7 @@ const COLUMN_DIVIDER = 'border-b border-ods-border content-md:border-b-0 content
  */
 const MODAL_ROW_CLASS = 'flex min-w-0 flex-col content-md:flex-row content-md:items-start';
 const MODAL_CALENDAR_W = 'content-md:w-[19rem] content-md:shrink-0';
-const MODAL_COLUMN_BOX = 'p-[var(--spacing-system-l)]';
+const MODAL_COLUMN_BOX = 'p-[var(--spacing-system-m)]';
 const MODAL_COLUMN_DIVIDER = 'border-b border-ods-border content-md:border-b-0 content-md:border-r';
 /** The calendar column's height: its heading, the month header and six week rows. */
 const MODAL_TIMES_H = 'content-md:h-[21.5rem]';

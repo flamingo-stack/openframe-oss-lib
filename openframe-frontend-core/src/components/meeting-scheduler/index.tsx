@@ -419,7 +419,7 @@ function isNativelyBookable(availability: MeetingAvailability): boolean {
  */
 const MODAL_STACK_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
 const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
-const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-l)]';
+const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
 const NOOP = () => undefined;
 
 /** Continue on the right; Cancel beside it on a phone, where the window has no X to leave by. */
@@ -877,7 +877,7 @@ export function HubSpotMeetingScheduler({
             <BackButton
               onClick={modalBack}
               className={cn(
-                'px-[var(--spacing-system-l)] pt-[var(--spacing-system-l)]',
+                'px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]',
                 step === 'slot' && 'content-md:hidden',
               )}
             />
@@ -918,7 +918,7 @@ export function HubSpotMeetingScheduler({
           ) : (
             <>
               {bookingError === 'SLOT_TAKEN' && (
-                <Alert variant="warning" className="mx-[var(--spacing-system-l)] mt-[var(--spacing-system-l)] w-auto">
+                <Alert variant="warning" className="mx-[var(--spacing-system-m)] mt-[var(--spacing-system-m)] w-auto">
                   <AlertDescription>
                     That time was just taken — pick another slot below. (If you already submitted, check your email for
                     a confirmation before rebooking.)

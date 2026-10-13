@@ -29,7 +29,7 @@ export interface SchedulerModalHeaderProps {
   showTimezone?: boolean;
 }
 
-const ROW_CLASS = 'border-b border-ods-border p-[var(--spacing-system-l)]';
+const ROW_CLASS = 'border-b border-ods-border p-[var(--spacing-system-m)]';
 const STRIP_CLASS = cn(ROW_CLASS, 'flex items-center justify-between gap-[var(--spacing-system-m)]');
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
 
