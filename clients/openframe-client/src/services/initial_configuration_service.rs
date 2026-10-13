@@ -56,6 +56,22 @@ impl InitialConfigurationService {
         Ok(config.tags)
     }
 
+    pub fn get_remote_access_mode(&self) -> Result<Option<String>> {
+        let config = self.get()?;
+        Ok(config.remote_access_mode)
+    }
+
+    /// Clears the pending mode only if it is still `sent`, so a newer `auth` value is not lost.
+    pub fn clear_remote_access_mode(&self, sent: &str) -> Result<()> {
+        let mut config = self.get()?;
+        if config.remote_access_mode.as_deref() != Some(sent) {
+            return Ok(());
+        }
+        config.remote_access_mode = None;
+        self.save(&config)
+            .context("Failed to save initial configuration without the remote access mode")
+    }
+
     /// True once a usable configuration exists on disk — the awaiting-auth gate's
     /// release condition. Requires a parseable file with a non-empty server host
     /// so a partially written file cannot release the gate.

@@ -77,6 +77,7 @@ use crate::services::package_manager::report_publisher::PackageManagerReportPubl
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
+use crate::services::remote_access_mode_service::RemoteAccessModeService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
 use crate::services::shared_token_service::SharedTokenService;
@@ -196,6 +197,7 @@ pub struct Client {
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
     initial_key_service: Arc<InitialKeyService>,
+    remote_access_mode_service: Arc<RemoteAccessModeService>,
     deactivation_service: Arc<DeactivationService>,
 }
 
@@ -328,6 +330,14 @@ impl Client {
         );
 
         let initial_key_service = Arc::new(InitialKeyService::new(
+            http_client.clone(),
+            http_url.clone(),
+            initial_configuration_service.clone(),
+            config_service.clone(),
+            deactivation_service.clone(),
+        ));
+
+        let remote_access_mode_service = Arc::new(RemoteAccessModeService::new(
             http_client.clone(),
             http_url.clone(),
             initial_configuration_service.clone(),
@@ -658,6 +668,7 @@ impl Client {
             agent_configuration_service: config_service,
             installed_tools_service,
             initial_key_service,
+            remote_access_mode_service,
             deactivation_service,
         })
     }
@@ -707,6 +718,8 @@ impl Client {
         self.auth_processor.process().await?;
 
         self.token_refresh_run_manager.start();
+
+        self.remote_access_mode_service.clone().start();
 
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
