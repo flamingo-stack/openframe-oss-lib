@@ -7,6 +7,7 @@ import com.openframe.client.exception.AgentRegistrationSecretValidationException
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.*;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
+import com.openframe.client.service.delivery.ClientFeatureFlagsDeliveryService;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.core.exception.ErrorCode;
@@ -78,7 +79,7 @@ class AgentRegistrationServiceTest {
     private ToolConnectionService toolConnectionService;
 
     @Mock
-    private AgentRegistrationClientFeatureFlagsService agentRegistrationClientFeatureFlagsService;
+    private ClientFeatureFlagsDeliveryService clientFeatureFlagsDeliveryService;
 
     @Captor
     private ArgumentCaptor<OAuthClient> oauthClientCaptor;
@@ -109,7 +110,7 @@ class AgentRegistrationServiceTest {
                 registrationTagAssignmentService,
                 installedAgentService,
                 toolConnectionService,
-                agentRegistrationClientFeatureFlagsService
+                clientFeatureFlagsDeliveryService
         );
         request = createTestRequest();
     }

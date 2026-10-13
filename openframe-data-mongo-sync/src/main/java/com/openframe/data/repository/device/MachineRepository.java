@@ -17,6 +17,8 @@ import java.util.Optional;
 public interface MachineRepository extends MongoRepository<Machine, String>, CustomMachineRepository{
     Optional<Machine> findByMachineId(String machineId);
 
+    boolean existsByMachineId(String machineId);
+
     List<Machine> findByHostnameContainingIgnoreCase(String hostname);
 
     List<Machine> findByTypeAndHostnameContainingIgnoreCase(DeviceType deviceType, String hostname);

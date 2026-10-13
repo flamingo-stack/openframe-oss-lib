@@ -1,4 +1,4 @@
-package com.openframe.client.service.agentregistration;
+package com.openframe.client.service.delivery;
 
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
@@ -14,12 +14,12 @@ import java.util.Map;
 
 import static java.util.Objects.requireNonNullElse;
 
-// a machine that registers gets the tenant's current flags as a delivery: a rollout that ran before it existed never
-// reaches it, and an agent holding the same set answers DONE at once
+// one machine gets the tenant's current flags as its own delivery, on registration and whenever it asks: a rollout
+// that ran before it existed or while it was away never reaches it, and an agent holding the same set answers DONE
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class AgentRegistrationClientFeatureFlagsService {
+public class ClientFeatureFlagsDeliveryService {
 
     private final OpenFrameClientConfigurationService clientConfigurationService;
     private final DeliveryProperties deliveryProperties;
@@ -34,8 +34,8 @@ public class AgentRegistrationClientFeatureFlagsService {
             Map<String, Boolean> flags = requireNonNullElse(configuration.getFeatureFlags(), Map.of());
             deliveryDispatcher.dispatch(ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags));
         } catch (RuntimeException e) {
-            // the registration itself must not fail on this: the next release reaches the machine anyway
-            log.error("Failed to hand the client feature flags to the delivery engine on registration: machineId={}", machineId, e);
+            // the registration must not fail on this: the next release reaches the machine anyway
+            log.error("Failed to hand the client feature flags to the delivery engine: machineId={}", machineId, e);
         }
     }
 }
