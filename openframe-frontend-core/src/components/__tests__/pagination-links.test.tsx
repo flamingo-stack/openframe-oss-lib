@@ -9,7 +9,7 @@ const href = (page: number) => (page <= 1 ? '/blog' : `/blog?page=${page}`);
 
 describe('Pagination without page addresses (the behaviour every caller had)', () => {
   it('draws buttons only and changes the page on click', () => {
-    const onPageChange = vi.fn();
+    const onPageChange = vi.fn<(page: number) => void>();
     render(<Pagination currentPage={2} totalPages={9} onPageChange={onPageChange} />);
 
     expect(screen.queryAllByRole('link')).toHaveLength(0);
@@ -32,9 +32,10 @@ describe('Pagination with page addresses', () => {
   it('draws every enabled control as a link to its page, with the same names', () => {
     render(<Pagination currentPage={3} totalPages={9} onPageChange={() => {}} getPageHref={href} />);
 
-    const links = Object.fromEntries(
-      screen.getAllByRole('link').map(link => [link.getAttribute('aria-label'), link.getAttribute('href')]),
-    );
+    const links: Record<string, string | null> = {};
+    for (const link of screen.getAllByRole('link')) {
+      links[link.getAttribute('aria-label') ?? ''] = link.getAttribute('href');
+    }
     expect(links).toEqual({
       'Go to previous page': '/blog?page=2',
       'Page 1': '/blog',
