@@ -43,7 +43,9 @@ pub use delivery::{
 };
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
-pub use feature_flags::{Feature, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState};
+pub use feature_flags::{
+    Feature, FeatureFlag, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState,
+};
 pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;

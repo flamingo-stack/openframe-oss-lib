@@ -1,11 +1,14 @@
 use super::*;
+use serde_json::{json, Value};
 use tempfile::TempDir;
 
 const MACHINE: &str = "machine-1";
+const VERSION: &str = "1.5.1";
 
 fn handler() -> (FeatureFlagsHandler, TempDir) {
     let dir = tempfile::tempdir().unwrap();
-    let service = FeatureFlagsService::load(dir.path().join("feature_flags.json"));
+    let service =
+        FeatureFlagsService::load(dir.path().join("feature_flags.json"), VERSION.to_string());
     (FeatureFlagsHandler::new(Arc::new(service)), dir)
 }
 
@@ -18,12 +21,16 @@ fn delivery(sequence: Option<i64>) -> DeliveryRef {
     }
 }
 
-fn message(flags: serde_json::Value) -> FeatureFlagsMessage {
-    serde_json::from_value(serde_json::json!({ "flags": flags })).unwrap()
+fn tool_installation(value: bool, min_version: &str) -> FeatureFlagsMessage {
+    message(json!({ "delivery-tool-installation": { "value": value, "minVersion": min_version } }))
+}
+
+fn message(flags: Value) -> FeatureFlagsMessage {
+    serde_json::from_value(json!({ "flags": flags })).unwrap()
 }
 
 #[test]
-fn subject_is_machine_scoped() {
+fn the_subject_is_machine_scoped() {
     assert_eq!(
         FeatureFlagsHandler::subject("abc123"),
         "machine.abc123.feature-flags"
@@ -35,11 +42,7 @@ async fn flags_without_a_sequence_fail() {
     let (handler, _dir) = handler();
 
     let outcome = handler
-        .run(
-            MACHINE,
-            &delivery(None),
-            message(serde_json::json!({ "delivery-tool-installation": true })),
-        )
+        .run(MACHINE, &delivery(None), tool_installation(true, "1.0.0"))
         .await;
 
     assert!(matches!(outcome, Outcome::Failed(_)));
@@ -47,46 +50,47 @@ async fn flags_without_a_sequence_fail() {
 }
 
 #[tokio::test]
-async fn a_changed_set_requires_a_restart_and_an_unchanged_one_does_not() {
-    let (handler, _dir) = handler();
+async fn an_applicable_change_restarts_and_anything_else_is_done() {
+    let cases = [
+        (
+            tool_installation(false, "1.0.0"),
+            Outcome::Done,
+            "switched off, as running",
+        ),
+        (
+            tool_installation(true, "2.0.0"),
+            Outcome::Done,
+            "for a newer client",
+        ),
+        (
+            tool_installation(true, "1.0.0"),
+            Outcome::RestartRequired,
+            "switched on for this client",
+        ),
+    ];
+    for (message, expected, why) in cases {
+        let (handler, _dir) = handler();
 
-    let unchanged = handler
-        .run(
-            MACHINE,
-            &delivery(Some(1)),
-            message(serde_json::json!({ "delivery-tool-installation": false })),
-        )
-        .await;
-    let changed = handler
-        .run(
-            MACHINE,
-            &delivery(Some(2)),
-            message(serde_json::json!({ "delivery-tool-installation": true })),
-        )
-        .await;
+        let outcome = handler.run(MACHINE, &delivery(Some(1)), message).await;
 
-    assert_eq!(unchanged, Outcome::Done);
-    assert_eq!(changed, Outcome::RestartRequired);
+        assert_eq!(outcome, expected, "{why}");
+    }
 }
 
 #[tokio::test]
-async fn stale_or_repeated_sequence_is_done_without_applying() {
+async fn a_stale_or_repeated_sequence_is_done_without_applying() {
     let (handler, _dir) = handler();
     handler
         .run(
             MACHINE,
             &delivery(Some(5)),
-            message(serde_json::json!({ "delivery-tool-installation": true })),
+            tool_installation(true, "1.0.0"),
         )
         .await;
 
     for stale in [5, 4] {
         let outcome = handler
-            .run(
-                MACHINE,
-                &delivery(Some(stale)),
-                message(serde_json::json!({})),
-            )
+            .run(MACHINE, &delivery(Some(stale)), message(json!({})))
             .await;
 
         assert_eq!(outcome, Outcome::Done, "sequence {stale}");
@@ -102,7 +106,7 @@ async fn a_reregistered_machine_applies_a_lower_sequence() {
         .run(
             MACHINE,
             &delivery(Some(50)),
-            message(serde_json::json!({ "delivery-tool-installation": true })),
+            tool_installation(true, "1.0.0"),
         )
         .await;
 
@@ -110,7 +114,7 @@ async fn a_reregistered_machine_applies_a_lower_sequence() {
         .run(
             "machine-2",
             &delivery(Some(3)),
-            message(serde_json::json!({ "delivery-tool-installation": true })),
+            tool_installation(true, "1.0.0"),
         )
         .await;
 

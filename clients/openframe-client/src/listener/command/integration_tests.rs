@@ -9,7 +9,8 @@ use tokio::time::{timeout, Duration};
 
 use super::{CommandContext, CommandListener, FeatureFlagsHandler};
 use crate::clients::AuthClient;
-use crate::models::{DeliveryResult, DeliveryResultMessage, FeatureFlagsState};
+use crate::config::update_config::DEV_CLIENT_VERSION;
+use crate::models::{DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState};
 use crate::platform::DirectoryManager;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
@@ -30,6 +31,7 @@ const MACHINE: &str = "it-machine";
 const BOUND: Duration = Duration::from_secs(10);
 const QUIET: Duration = Duration::from_millis(500);
 const PROBE: &str = "probe";
+const VERSION: &str = "1.5.1";
 
 struct Agent {
     _server: NatsServer,
@@ -44,10 +46,15 @@ struct Agent {
     store: Arc<ResultStore>,
     flush: Arc<Notify>,
     flags_path: PathBuf,
+    version: String,
 }
 
 impl Agent {
     async fn start() -> Option<(Self, CommandContext)> {
+        Self::start_as(VERSION).await
+    }
+
+    async fn start_as(version: &str) -> Option<(Self, CommandContext)> {
         let server = NatsServer::start()?;
         let dir = tempfile::tempdir().unwrap();
         let directories = DirectoryManager::with_custom_dirs(
@@ -114,6 +121,7 @@ impl Agent {
         let mut agent = Self {
             _server: server,
             flags_path: directories.secured_dir().join("feature_flags.json"),
+            version: version.to_string(),
             _dir: dir,
             tester,
             results,
@@ -125,11 +133,11 @@ impl Agent {
             store,
             flush,
         };
-        let context = agent.launch().await;
+        let (context, _service) = agent.launch().await;
         Some((agent, context))
     }
 
-    async fn launch(&mut self) -> CommandContext {
+    async fn launch(&mut self) -> (CommandContext, Arc<FeatureFlagsService>) {
         let context = CommandContext::new(
             self.manager.clone(),
             self.config.clone(),
@@ -139,13 +147,21 @@ impl Agent {
             self.store.clone(),
             self.flush.clone(),
         );
-        let service = Arc::new(FeatureFlagsService::load(self.flags_path.clone()));
-        CommandListener::new(FeatureFlagsHandler::new(service), context.clone())
+        let service = Arc::new(FeatureFlagsService::load(
+            self.flags_path.clone(),
+            self.version.clone(),
+        ));
+        CommandListener::new(FeatureFlagsHandler::new(service.clone()), context.clone())
             .start()
             .await
             .unwrap();
         self.until_listening().await;
-        context
+        (context, service)
+    }
+
+    async fn launch_as(&mut self, version: &str) -> (CommandContext, Arc<FeatureFlagsService>) {
+        self.version = version.to_string();
+        self.launch().await
     }
 
     async fn until_listening(&mut self) {
@@ -222,6 +238,15 @@ impl Agent {
     }
 }
 
+fn entry(value: bool, min_version: &str) -> serde_json::Value {
+    json!({ "value": value, "minVersion": min_version })
+}
+
+async fn expect_no_restart(context: &CommandContext) {
+    let requested = timeout(QUIET, context.restart_requested()).await;
+    assert!(requested.is_err(), "a restart was requested");
+}
+
 fn command(
     dispatch_id: &str,
     sequence: Option<i64>,
@@ -248,7 +273,7 @@ async fn unchanged_flags_are_acked_done_and_persisted() {
         .send(command(
             "d1",
             Some(1),
-            json!({ "delivery-tool-installation": false }),
+            json!({ "delivery-tool-installation": entry(false, "1.0.0") }),
         ))
         .await;
 
@@ -269,7 +294,7 @@ async fn changed_flags_restart_and_the_next_process_reports_done() {
         .send(command(
             "d2",
             Some(2),
-            json!({ "delivery-tool-installation": true }),
+            json!({ "delivery-tool-installation": entry(true, "1.0.0") }),
         ))
         .await;
 
@@ -307,7 +332,7 @@ async fn commands_after_a_requested_restart_are_left_to_the_backend_retry() {
         .send(command(
             "d3",
             Some(3),
-            json!({ "delivery-tool-installation": true }),
+            json!({ "delivery-tool-installation": entry(true, "1.0.0") }),
         ))
         .await;
     timeout(BOUND, context.restart_requested())
@@ -318,7 +343,7 @@ async fn commands_after_a_requested_restart_are_left_to_the_backend_retry() {
         .send(command(
             "d4",
             Some(4),
-            json!({ "delivery-tool-installation": false }),
+            json!({ "delivery-tool-installation": entry(false, "1.0.0") }),
         ))
         .await;
 
@@ -339,7 +364,7 @@ async fn stale_sequence_is_done_without_applying() {
         .send(command(
             "d6",
             Some(4),
-            json!({ "delivery-tool-installation": false }),
+            json!({ "delivery-tool-installation": entry(false, "1.0.0") }),
         ))
         .await;
 
@@ -380,13 +405,13 @@ async fn a_message_without_delivery_gets_no_answer() {
     };
 
     agent
-        .send(json!({ "flags": { "delivery-tool-installation": true } }))
+        .send(json!({ "flags": { "delivery-tool-installation": entry(true, "1.0.0") } }))
         .await;
     agent
         .send(command(
             "d8",
             Some(8),
-            json!({ "delivery-tool-installation": false }),
+            json!({ "delivery-tool-installation": entry(false, "1.0.0") }),
         ))
         .await;
 
@@ -415,11 +440,108 @@ async fn flags_without_a_sequence_fail() {
         .send(command(
             "d9",
             None,
-            json!({ "delivery-tool-installation": true }),
+            json!({ "delivery-tool-installation": entry(true, "1.0.0") }),
         ))
         .await;
 
     agent.expect("d9", DeliveryResult::Acked).await;
     let failed = agent.expect("d9", DeliveryResult::Failed).await;
     assert!(failed.error.unwrap().contains("sequence"));
+}
+
+#[tokio::test]
+async fn a_flag_for_a_newer_client_is_stored_without_a_restart_and_turns_on_after_the_update() {
+    let Some((mut agent, context)) = Agent::start_as("1.5.9").await else {
+        return;
+    };
+
+    agent
+        .send(command(
+            "d20",
+            Some(20),
+            json!({ "delivery-tool-installation": entry(true, "1.6.0") }),
+        ))
+        .await;
+
+    agent.expect("d20", DeliveryResult::Acked).await;
+    agent.expect("d20", DeliveryResult::Done).await;
+    expect_no_restart(&context).await;
+    assert!(agent
+        .persisted()
+        .flags
+        .contains_key("delivery-tool-installation"));
+
+    let (_updated, service) = agent.launch_as("1.6.0").await;
+
+    assert!(service
+        .flags()
+        .is_enabled(Feature::DeliveryToolInstallation));
+    agent.expect_silence("d20").await;
+}
+
+#[tokio::test]
+async fn a_rollback_below_the_min_version_runs_with_the_flag_off() {
+    let Some((mut agent, context)) = Agent::start().await else {
+        return;
+    };
+    agent
+        .send(command(
+            "d21",
+            Some(21),
+            json!({ "delivery-tool-installation": entry(true, "1.5.0") }),
+        ))
+        .await;
+    timeout(BOUND, context.restart_requested())
+        .await
+        .expect("restart was never requested");
+
+    let (_rolled_back, service) = agent.launch_as("1.4.0").await;
+
+    assert!(!service
+        .flags()
+        .is_enabled(Feature::DeliveryToolInstallation));
+}
+
+#[tokio::test]
+async fn a_dev_build_applies_a_true_flag_whatever_its_min_version() {
+    let Some((mut agent, context)) = Agent::start_as(DEV_CLIENT_VERSION).await else {
+        return;
+    };
+
+    agent
+        .send(command(
+            "d22",
+            Some(22),
+            json!({ "delivery-tool-installation": entry(true, "99.0.0") }),
+        ))
+        .await;
+
+    agent.expect("d22", DeliveryResult::Acked).await;
+    timeout(BOUND, context.restart_requested())
+        .await
+        .expect("restart was never requested");
+}
+
+#[tokio::test]
+async fn invalid_flag_entries_are_done_without_a_restart() {
+    let Some((mut agent, context)) = Agent::start().await else {
+        return;
+    };
+
+    agent
+        .send(command(
+            "d23",
+            Some(23),
+            json!({
+                "delivery-tool-installation": true,
+                "delivery-client-uninstall": { "value": true },
+                "delivery-client-update": { "value": true, "minVersion": "latest" }
+            }),
+        ))
+        .await;
+
+    agent.expect("d23", DeliveryResult::Acked).await;
+    agent.expect("d23", DeliveryResult::Done).await;
+    expect_no_restart(&context).await;
+    assert!(agent.persisted().flags.is_empty());
 }

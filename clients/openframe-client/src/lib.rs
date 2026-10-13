@@ -378,6 +378,7 @@ impl Client {
 
         let feature_flags_service = Arc::new(FeatureFlagsService::load(
             directory_manager.secured_dir().join("feature_flags.json"),
+            env!("OPENFRAME_VERSION").to_string(),
         ));
 
         // Initialize tool run manager
@@ -751,13 +752,38 @@ impl Client {
                 &crate::service::Service::get_install_location(),
                 cli::RESTART_SERVICE_SUBCOMMAND,
             ) {
-                Ok(pid) => {
-                    info!(pid, "Service restart handed to a detached process");
-                    tokio::time::sleep(Duration::from_secs(SELF_RESTART_HANDOFF_SECS)).await;
-                    warn!(
-                        "Service was not restarted within {}s, exiting instead",
-                        SELF_RESTART_HANDOFF_SECS
+                Ok(mut child) => {
+                    info!(
+                        pid = child.id(),
+                        "Service restart handed to a detached process"
                     );
+                    let finished = tokio::time::timeout(
+                        Duration::from_secs(SELF_RESTART_HANDOFF_SECS),
+                        tokio::task::spawn_blocking(move || child.wait()),
+                    )
+                    .await;
+                    match finished {
+                        Ok(Ok(Ok(status))) => warn!(
+                            %status,
+                            "Detached restart finished but did not stop this process, exiting instead"
+                        ),
+                        Ok(Ok(Err(e))) => {
+                            warn!(
+                                "Cannot wait for the detached restart, exiting instead: {:#}",
+                                e
+                            )
+                        }
+                        Ok(Err(e)) => {
+                            warn!(
+                                "Cannot wait for the detached restart, exiting instead: {:#}",
+                                e
+                            )
+                        }
+                        Err(_) => warn!(
+                            "Detached restart still running after {}s, exiting instead",
+                            SELF_RESTART_HANDOFF_SECS
+                        ),
+                    }
                 }
                 Err(e) => warn!(
                     "Cannot hand the service restart off, exiting instead: {:#}",

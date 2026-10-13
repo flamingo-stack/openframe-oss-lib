@@ -1,9 +1,10 @@
 use anyhow::Result;
 use std::path::Path;
+use std::process::Child;
 
 /// Spawn `<install_path> <subcommand>` detached, so it survives the service manager stopping
 /// our own `com.openframe.client` service. macOS + Windows only.
-pub fn spawn_detached(install_path: &Path, subcommand: &str) -> Result<u32> {
+pub fn spawn_detached(install_path: &Path, subcommand: &str) -> Result<Child> {
     #[cfg(target_os = "macos")]
     {
         spawn_detached_macos(install_path, subcommand)
@@ -22,7 +23,7 @@ pub fn spawn_detached(install_path: &Path, subcommand: &str) -> Result<u32> {
 /// Detached child in its own session (setsid) so it outlives launchd stopping our own
 /// `com.openframe.client` service — no launchd job/plist needed.
 #[cfg(target_os = "macos")]
-fn spawn_detached_macos(install_path: &Path, subcommand: &str) -> Result<u32> {
+fn spawn_detached_macos(install_path: &Path, subcommand: &str) -> Result<Child> {
     use anyhow::Context;
     use std::os::unix::process::CommandExt;
     use std::process::{Command, Stdio};
@@ -45,12 +46,12 @@ fn spawn_detached_macos(install_path: &Path, subcommand: &str) -> Result<u32> {
     }
     .with_context(|| format!("Failed to spawn detached `{subcommand}` process"))?;
 
-    Ok(child.id())
+    Ok(child)
 }
 
 /// Detached child (inherits LocalSystem) so it survives the SCM stopping our service.
 #[cfg(target_os = "windows")]
-fn spawn_detached_windows(install_path: &Path, subcommand: &str) -> Result<u32> {
+fn spawn_detached_windows(install_path: &Path, subcommand: &str) -> Result<Child> {
     use anyhow::Context;
     use std::os::windows::process::CommandExt;
     use std::process::Command;
@@ -64,5 +65,5 @@ fn spawn_detached_windows(install_path: &Path, subcommand: &str) -> Result<u32> 
         .spawn()
         .with_context(|| format!("Failed to spawn detached `{subcommand}` process"))?;
 
-    Ok(child.id())
+    Ok(child)
 }

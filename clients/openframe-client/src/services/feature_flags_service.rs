@@ -3,14 +3,17 @@ use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
 
 use anyhow::{Context, Result};
-use serde_json::Value;
 use tracing::{info, warn};
 
-use crate::models::{DeliveryRef, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState};
+use crate::models::{
+    DeliveryRef, FeatureFlag, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState,
+};
 use crate::utils::fs::atomic_write;
+use crate::utils::version_comparator::parse_version;
 
 pub struct FeatureFlagsService {
     path: PathBuf,
+    version: String,
     running: FeatureFlags,
     state: Mutex<FeatureFlagsState>,
 }
@@ -22,7 +25,7 @@ pub enum FlagsApplied {
 }
 
 impl FeatureFlagsService {
-    pub fn load(path: PathBuf) -> Self {
+    pub fn load(path: PathBuf, version: String) -> Self {
         let state = match std::fs::read(&path) {
             Ok(bytes) => match serde_json::from_slice::<FeatureFlagsState>(&bytes) {
                 Ok(state) => state,
@@ -37,10 +40,17 @@ impl FeatureFlagsService {
                 FeatureFlagsState::default()
             }
         };
-        let running = FeatureFlags::from_flags(&state.flags);
-        info!(sequence = state.sequence, flags = ?state.flags, "Feature flags loaded");
+        let running = FeatureFlags::resolve(&state.flags, &version);
+        info!(
+            version,
+            sequence = state.sequence,
+            flags = ?state.flags,
+            effective = ?running,
+            "Feature flags loaded"
+        );
         Self {
             path,
+            version,
             running,
             state: Mutex::new(state),
         }
@@ -72,16 +82,16 @@ impl FeatureFlagsService {
     ) -> Result<FlagsApplied> {
         let mut flags = BTreeMap::new();
         for (name, value) in message.flags {
-            match value {
-                Value::Bool(enabled) => {
-                    flags.insert(name, enabled);
+            match serde_json::from_value::<FeatureFlag>(value.clone()) {
+                Ok(flag) if parse_version(&flag.min_version).is_some() => {
+                    flags.insert(name, flag);
                 }
-                other => {
-                    warn!(flag = %name, value = %other, "Ignoring feature flag with a non-boolean value")
+                _ => {
+                    warn!(flag = %name, %value, "Ignoring feature flag without a boolean value and a semver minVersion")
                 }
             }
         }
-        let applied = if FeatureFlags::from_flags(&flags) == self.running {
+        let applied = if FeatureFlags::resolve(&flags, &self.version) == self.running {
             FlagsApplied::Unchanged
         } else {
             FlagsApplied::RestartRequired

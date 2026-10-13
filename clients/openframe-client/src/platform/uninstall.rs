@@ -93,9 +93,9 @@ fn remove_update_temp_files(install_path: &Path) {
 /// Self-uninstall stops the `com.openframe.client` service (our own process), so it must run
 /// out-of-process. macOS + Windows only — Linux client self-uninstall is unsupported.
 pub fn spawn_detached_uninstall(install_path: &Path) -> Result<()> {
-    let pid =
+    let child =
         crate::platform::detached_process::spawn_detached(install_path, UNINSTALL_SUBCOMMAND)?;
-    info!("Self-uninstall process launched (PID: {})", pid);
+    info!("Self-uninstall process launched (PID: {})", child.id());
     Ok(())
 }
 

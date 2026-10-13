@@ -209,4 +209,4 @@ and the subject in `send()`, and keep the helpers.
   environment is not caught here — check the NATS config when you add a subject.
 - Process-level effects (the service manager restarting the client, `exit`) are
   out of reach; tests stop at the signal the code raises.
-- Each test starts its own server; the 7 tests of the example suite take about a second in total. Fine for dozens of tests, not thousands.
+- Each test starts its own server; the example suite (11 tests) takes about a second in total. Fine for dozens of tests, not thousands.
