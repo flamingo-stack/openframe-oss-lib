@@ -5,7 +5,9 @@ import io.nats.client.Options;
 import io.nats.spring.boot.autoconfigure.NatsAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
@@ -63,6 +65,22 @@ class LazyNatsConnectionAutoConfigurationTest {
                 assertThat(context.getBean(Connection.class).getStatus()).isEqualTo(Connection.Status.CONNECTED);
             });
         }
+    }
+
+    @Test
+    void natsAutoConfigurationExcluded_noConnectionEvenWithAServerSet() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(ExcludesNats.class)
+                .withPropertyValues("nats.spring.server=" + UNREACHABLE)
+                .run(context -> {
+                    assertThat(context).hasNotFailed().doesNotHaveBean(Connection.class).doesNotHaveBean(NatsConnectionStarter.class);
+                });
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @ImportAutoConfiguration(classes = {LazyNatsConnectionAutoConfiguration.class, NatsAutoConfiguration.class},
+            exclude = NatsAutoConfiguration.class)
+    static class ExcludesNats {
     }
 
     @Test

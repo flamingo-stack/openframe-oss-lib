@@ -12,16 +12,18 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.util.StringUtils;
 
 /**
  * Replaces the {@code natsConnection} of {@link NatsAutoConfiguration}, which connects while the bean is created
  * (its bean backs off, being {@code @ConditionalOnMissingBean}). Same options from {@code nats.spring.*}, same
- * listeners, and like it no connection when no server is set.
+ * listeners, and like it no connection when no server is set. Off when {@link NatsAutoConfiguration} is excluded.
  */
 @Slf4j
 @AutoConfiguration(before = NatsAutoConfiguration.class)
 @ConditionalOnClass({Connection.class, NatsAutoConfiguration.class})
+@Conditional(OnNatsAutoConfigurationNotExcluded.class)
 @EnableConfigurationProperties(NatsProperties.class)
 public class LazyNatsConnectionAutoConfiguration {
 
