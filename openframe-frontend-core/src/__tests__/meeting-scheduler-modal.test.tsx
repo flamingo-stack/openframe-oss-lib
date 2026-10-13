@@ -99,7 +99,10 @@ describe('HubSpotMeetingScheduler — modal layout', () => {
     // The submit is wired to the form by id, not nested in it: it sits in the footer under the card.
     const submit = screen.getByRole('button', { name: 'Confirm Booking' });
     expect(submit).toHaveAttribute('form');
+    // Disabled until every answer would pass validation.
+    expect(submit).toBeDisabled();
     fillIdentity();
+    await waitFor(() => expect(submit).not.toBeDisabled());
     fireEvent.click(submit);
     await waitFor(() => expect(book).toHaveBeenCalledTimes(1));
     expect(book).toHaveBeenCalledWith(expect.objectContaining({ email: 'a@b.co', startTimeMs: SLOT_MS }));

@@ -487,6 +487,8 @@ export function HubSpotMeetingScheduler({
   // The modal arrangement is slot-first's only: details-first keeps the card.
   const modal = layout === 'modal' && !detailsFirst;
   const modalFormId = useId();
+  // The modal's submit sits outside the form and follows what the form reports.
+  const [modalFormValid, setModalFormValid] = useState(false);
 
   // Zone resolution happens POST-mount (Intl) unless the embedder pins one —
   // the initial (server) render stays deterministic; time labels appear once
@@ -919,6 +921,7 @@ export function HubSpotMeetingScheduler({
                 timezone={timezone}
                 formId={modalFormId}
                 hideSubmit
+                onValidityChange={setModalFormValid}
                 isSubmitting={isSubmitting}
                 onSubmit={handleSubmit}
                 honeypotInputProps={honeypotInputProps}
@@ -986,7 +989,7 @@ export function HubSpotMeetingScheduler({
                 type="submit"
                 form={modalFormId}
                 loading={isSubmitting}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !modalFormValid}
                 className={MODAL_PRIMARY_CLASS}
               >
                 {preset.submitLabel}

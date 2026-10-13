@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import type { Control, Path, UseFormRegister } from 'react-hook-form';
@@ -403,6 +403,10 @@ export interface BookingFormProps {
   formId?: string;
   /** Leave the submit button out: the host draws one of its own (see `formId`). */
   hideSubmit?: boolean;
+  /** Whether the answers would pass validation as they stand, reported on every
+   *  change: a host drawing its own submit keeps it disabled until this says
+   *  true. The form's own button never needs it - its click validates. */
+  onValidityChange?: (valid: boolean) => void;
   /** Per-field display overrides, keyed by field name — see `BookingFieldCopy`. */
   fieldCopy?: Record<string, BookingFieldCopy>;
   /** Email domains this form refuses, with the message it shows — see `DeniedEmailDomains`.
@@ -449,6 +453,7 @@ export function BookingForm({
   fieldRows,
   formId,
   hideSubmit = false,
+  onValidityChange,
   fieldCopy,
   deniedEmailDomains,
   consent,
@@ -514,6 +519,19 @@ export function BookingForm({
   const [consented, setConsented] = useState(initialValues?.[HOST_CONSENT_KEY] === true);
   const [consentError, setConsentError] = useState<string | null>(null);
   const consentMissing = Boolean(consent) && !consented;
+
+  // Live validity for a host-drawn submit. `watch()` re-renders on every
+  // change; the parse is the same schema the submit runs, so the two can never
+  // disagree. Reported only when asked for, and only when it changes.
+  const watchedValues = watch();
+  const liveValid = onValidityChange ? schema.safeParse(watchedValues).success && !consentMissing : false;
+  const lastValidRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!onValidityChange) return;
+    if (lastValidRef.current === liveValid) return;
+    lastValidRef.current = liveValid;
+    onValidityChange(liveValid);
+  });
 
   // The seeded availability is refetched immediately on mount, so the link's
   // consent set can change WHILE this form is open. Reconcile rather than
