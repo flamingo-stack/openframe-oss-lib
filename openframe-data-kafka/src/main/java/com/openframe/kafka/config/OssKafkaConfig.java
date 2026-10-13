@@ -1,7 +1,7 @@
 package com.openframe.kafka.config;
 
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration;
+import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.kafka.annotation.EnableKafka;
 
 /**

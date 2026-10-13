@@ -28,7 +28,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
+            <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
@@ -94,12 +94,12 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>mongodb</artifactId>
+            <artifactId>testcontainers-mongodb</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

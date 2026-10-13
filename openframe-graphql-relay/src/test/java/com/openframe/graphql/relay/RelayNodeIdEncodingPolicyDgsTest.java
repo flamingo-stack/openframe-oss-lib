@@ -1,7 +1,8 @@
 package com.openframe.graphql.relay;
 
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.netflix.graphql.dgs.autoconfig.DgsAutoConfiguration;
+import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
@@ -43,7 +44,7 @@ class RelayNodeIdEncodingPolicyDgsTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({DgsAutoConfiguration.class, RelayAutoConfiguration.class})
+    @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class, RelayAutoConfiguration.class})
     @Import(RelayNodeIdWiringDgsTest.RelayNodesDataFetcher.class)
     static class RawIdsGraphQlApp {
 

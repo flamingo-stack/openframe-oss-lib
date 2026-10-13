@@ -3,7 +3,6 @@ package com.openframe.data.cassandra.config;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +15,6 @@ public class CassandraSessionLogger {
         this.session = session;
     }
 
-    @PostConstruct
     public void logSessionDetails() {
         try {
             if (session != null) {

@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -143,7 +143,7 @@ class SessionConfigIT {
     }
 
     @Configuration
-    @ImportAutoConfiguration(RedisAutoConfiguration.class)
+    @ImportAutoConfiguration(DataRedisAutoConfiguration.class)
     static class RedisSessionStore {
     }
 }
