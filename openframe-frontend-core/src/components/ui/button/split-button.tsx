@@ -99,6 +99,11 @@ interface SplitButtonIconAction {
   openInNewTab?: boolean;
   prefetch?: boolean;
   disabled?: boolean;
+  /**
+   * Wraps the icon half (a ref-forwarding `<button>`) in something that takes it
+   * as its trigger: a menu, a popover. `SplitDropdownButton` is the menu form.
+   */
+  wrap?: (half: React.ReactElement) => React.ReactNode;
 }
 
 interface SplitButtonProps {
@@ -125,7 +130,7 @@ interface SplitButtonProps {
   iconAction: SplitButtonIconAction;
 }
 
-interface HalfOptions {
+interface HalfOptions extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'onClick' | 'children'> {
   variant: SplitButtonVariant;
   size: SplitButtonSize;
   side: 'main' | 'icon';
@@ -142,22 +147,27 @@ interface HalfOptions {
   children: React.ReactNode;
 }
 
-function Half({
-  variant,
-  size,
-  side,
-  soloOnMobile,
-  href,
-  openInNewTab,
-  prefetch,
-  onClick,
-  disabled,
-  grow,
-  type = 'button',
-  ariaLabel,
-  children,
-}: HalfOptions) {
-  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && 'flex-1');
+const Half = React.forwardRef<HTMLButtonElement, HalfOptions>(function HalfImpl(
+  {
+    variant,
+    size,
+    side,
+    soloOnMobile,
+    href,
+    openInNewTab,
+    prefetch,
+    onClick,
+    disabled,
+    grow,
+    type = 'button',
+    ariaLabel,
+    children,
+    className,
+    ...rest
+  },
+  ref,
+) {
+  const classes = cn(splitHalfVariants({ variant, size, side, soloOnMobile }), grow && 'flex-1', className);
 
   if (href) {
     return (
@@ -177,12 +187,21 @@ function Half({
     );
   }
 
+  // `rest` and the ref are what a wrapping trigger (a menu) puts on its child.
   return (
-    <button type={type} className={classes} disabled={disabled} aria-label={ariaLabel} onClick={onClick}>
+    <button
+      ref={ref}
+      {...rest}
+      type={type}
+      className={classes}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
       {children}
     </button>
   );
-}
+});
 
 const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function SplitButtonImpl(
   {
@@ -207,6 +226,22 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
   ref,
 ) {
   const soloOnMobile = !!iconAction.openInNewTab;
+  const iconHalf = (
+    <Half
+      variant={variant}
+      size={size}
+      side="icon"
+      soloOnMobile={soloOnMobile}
+      href={iconAction.href}
+      openInNewTab={iconAction.openInNewTab}
+      prefetch={iconAction.prefetch}
+      onClick={iconAction.onClick}
+      disabled={disabled || iconAction.disabled}
+      ariaLabel={iconAction['aria-label']}
+    >
+      <span className="inline-flex items-center">{iconAction.icon}</span>
+    </Half>
+  );
 
   return (
     <div
@@ -233,20 +268,7 @@ const SplitButton = React.forwardRef<HTMLDivElement, SplitButtonProps>(function 
         <span>{children}</span>
         {rightIcon && <span className="inline-flex items-center">{rightIcon}</span>}
       </Half>
-      <Half
-        variant={variant}
-        size={size}
-        side="icon"
-        soloOnMobile={soloOnMobile}
-        href={iconAction.href}
-        openInNewTab={iconAction.openInNewTab}
-        prefetch={iconAction.prefetch}
-        onClick={iconAction.onClick}
-        disabled={disabled || iconAction.disabled}
-        ariaLabel={iconAction['aria-label']}
-      >
-        <span className="inline-flex items-center">{iconAction.icon}</span>
-      </Half>
+      {iconAction.wrap ? iconAction.wrap(iconHalf) : iconHalf}
     </div>
   );
 });

@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import { Button, type ButtonProps } from './button';
+import { SplitButton, type SplitButtonProps } from './button/split-button';
 
 export interface DropdownButtonProps {
   /** Button label rendered next to the chevron. */
@@ -152,6 +153,54 @@ export function DropdownButton({
       onCloseAutoFocus={onCloseAutoFocus}
       triggerAriaLabel={resolvedAriaLabel}
       customTrigger={trigger}
+    />
+  );
+}
+
+export interface SplitDropdownButtonProps extends Omit<SplitButtonProps, 'iconAction'> {
+  /** Items of the chevron half's menu (one flat group). */
+  items?: ActionsMenuItem[];
+  /** Grouped items. Takes precedence over `items`. */
+  groups?: ActionsMenuGroup[];
+  /** The chevron half's accessible name ("More download options"). */
+  menuAriaLabel: string;
+  align?: 'start' | 'center' | 'end';
+  side?: 'top' | 'right' | 'bottom' | 'left';
+}
+
+/**
+ * A button with its alternatives behind a chevron (Figma `button-action`): the
+ * main half does the default action, the chevron half opens an `ActionsMenu` of
+ * the others. Two click targets on one surface, built from `SplitButton` and
+ * `ActionsMenuDropdown`, so its skin and its menu are the house ones.
+ */
+export function SplitDropdownButton({
+  items,
+  groups,
+  menuAriaLabel,
+  align = 'end',
+  side = 'bottom',
+  ...button
+}: SplitDropdownButtonProps) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <SplitButton
+      {...button}
+      iconAction={{
+        'aria-label': menuAriaLabel,
+        icon: <Chevron02DownIcon className={cn('transition-transform duration-fast', open && 'rotate-180')} />,
+        wrap: half => (
+          <ActionsMenuDropdown
+            groups={groups ?? [{ items: items ?? [] }]}
+            open={open}
+            onOpenChange={setOpen}
+            align={align}
+            side={side}
+            triggerAriaLabel={menuAriaLabel}
+            customTrigger={half}
+          />
+        ),
+      }}
     />
   );
 }
