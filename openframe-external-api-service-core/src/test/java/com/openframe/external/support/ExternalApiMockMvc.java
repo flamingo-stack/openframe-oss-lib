@@ -1,19 +1,18 @@
 package com.openframe.external.support;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.external.config.ExternalApiJacksonConfig;
 import com.openframe.external.exception.GlobalExceptionHandler;
 import com.openframe.external.web.ApiCallerArgumentResolver;
 import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.StringHttpMessageConverter;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.validation.beanvalidation.MethodValidationPostProcessor;
+import tools.jackson.databind.cfg.DateTimeFeature;
 
 import java.util.Arrays;
 
@@ -52,18 +51,18 @@ public final class ExternalApiMockMvc {
                 .setMessageConverters(
                         new ByteArrayHttpMessageConverter(),
                         new StringHttpMessageConverter(),
-                        new MappingJackson2HttpMessageConverter(objectMapper()))
+                        new JacksonJsonHttpMessageConverter(objectMapper()))
                 .setValidator(validator)
                 .defaultRequest(get("/").header(X_USER_ID, USER_ID).header(X_API_KEY_ID, API_KEY_ID))
                 .build();
     }
 
     /** ObjectMapper with the module's customizer applied, for building request bodies and reading responses. */
-    public static ObjectMapper objectMapper() {
+    public static JsonMapper objectMapper() {
         // Same defaults Spring Boot's Jackson auto-configuration applies before the customizers run.
-        Jackson2ObjectMapperBuilder builder = Jackson2ObjectMapperBuilder.json()
-                .featuresToDisable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS,
-                        SerializationFeature.WRITE_DURATIONS_AS_TIMESTAMPS);
+        JsonMapper.Builder builder = JsonMapper.builder()
+                .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS,
+                        DateTimeFeature.WRITE_DURATIONS_AS_TIMESTAMPS);
         new ExternalApiJacksonConfig().externalApiInstantMillisCustomizer().customize(builder);
         return builder.build();
     }
