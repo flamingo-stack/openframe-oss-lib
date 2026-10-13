@@ -81,13 +81,7 @@ public class PinotQueryBuilder {
 
     private final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN);
 
-    /**
-     * Creates a query builder for the given table, scoped to a specific tenant.
-     * The {@code tenantId} is mandatory — every query built by this instance
-     * automatically includes a {@code tenantId = '...'} filter as its first condition.
-     *
-     * @throws PinotQueryException if {@code tenantId} is null or blank
-     */
+    // tenantId is mandatory: every query automatically gets a tenantId filter as its first condition
     public PinotQueryBuilder(String tableName, String tenantId) {
         validateTableName(tableName);
         validateTenantId(tenantId);
@@ -148,12 +142,7 @@ public class PinotQueryBuilder {
         return where(dateCondition);
     }
 
-    /**
-     * Inclusive timestamp range on a millisecond-epoch column. Both bounds are
-     * optional and independent: only {@code from}, only {@code to}, or both. The
-     * {@code Instant} values are converted to epoch millis to match the numeric
-     * {@code eventTimestamp} column.
-     */
+    // Inclusive range on a millisecond-epoch column; both bounds optional, converted to epoch millis
     public PinotQueryBuilder whereTimestampRange(String field, Instant from, Instant to) {
         validateFieldName(field);
         if (from != null) {

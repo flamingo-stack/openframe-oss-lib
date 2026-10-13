@@ -23,16 +23,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Manages health checking and auto-recovery for Debezium connectors.
- * Checks both connector and task states, applies exponential backoff,
- * and triggers KIP-745 restarts.
- *
- * When a non-default {@link ConnectorNameStrategy} is in scope together with a
- * {@link RecreationTracker} bean (SaaS shared cluster), exhausted retries and
- * non-recoverable errors lead to recreation under a new versioned name with
- * removal of the stale versions, instead of just raising an alert.
- */
+// With a non-default ConnectorNameStrategy and a RecreationTracker bean (SaaS shared cluster),
+// exhausted retries and non-recoverable errors trigger recreation under a new versioned name instead of just an alert.
 @Slf4j
 @Component
 public class ConnectorRecoveryManager {
@@ -74,9 +66,6 @@ public class ConnectorRecoveryManager {
         this.integratedToolService = integratedToolService;
     }
 
-    /**
-     * Check all connectors and recover any that are in a failed state.
-     */
     public void checkAndRecoverAll() {
         List<String> connectors = debeziumService.listConnectors();
         if (connectors.isEmpty()) {
@@ -94,9 +83,6 @@ public class ConnectorRecoveryManager {
         backoffStates.keySet().removeIf(name -> !live.contains(name));
     }
 
-    /**
-     * Check a single connector's health and attempt recovery if failed.
-     */
     public void checkAndRecover(String connectorName) {
         try {
             ConnectorStatus status = debeziumService.getConnectorStatus(connectorName);
@@ -129,15 +115,8 @@ public class ConnectorRecoveryManager {
         }
     }
 
-    /**
-     * A 404 on {@code /status} is ambiguous: the connector may have been deleted
-     * between the list and the status call (a benign race), or it may be
-     * registered in the config topic while Kafka Connect never assigned tasks or
-     * wrote a status record — a "No status found" state where CDC is silently
-     * dead. The presence of a live config distinguishes the two: config present
-     * means the connector is stuck, not gone, so recreate it under a fresh
-     * versioned name with a clean offset namespace.
-     */
+    // A 404 is ambiguous (deleted vs. stuck with no status); config presence distinguishes
+    // the two, so a present config triggers recreation under a fresh versioned name.
     private void handleMissingStatus(String connectorName) {
         if (debeziumService.getConnectorConfig(connectorName) == null) {
             log.debug("Connector '{}' gone (no status, no config) — skipping", connectorName);
@@ -151,12 +130,8 @@ public class ConnectorRecoveryManager {
         createAlert(connectorName, ConnectorAlertType.NON_RECOVERABLE_ERROR, NO_STATUS_MSG, 0);
     }
 
-    /**
-     * Healthy-path cleanup: drop the in-memory backoff entry and resolve any
-     * open Mongo alert. Called every healthy tick (idempotent on both sides),
-     * which survives JVM restart where {@code backoffStates} is empty but a
-     * pre-restart alert is still open.
-     */
+    // Idempotent on both sides so it survives JVM restart where backoffStates is empty
+    // but a pre-restart alert is still open.
     private void clearFailureState(String connectorName) {
         backoffStates.remove(connectorName);
         resolveAlert(connectorName);
@@ -206,12 +181,7 @@ public class ConnectorRecoveryManager {
         }
     }
 
-    /**
-     * Attempt to recreate a connector under a new versioned name when the active
-     * strategy supports recreation and a {@link RecreationTracker} is present.
-     *
-     * @return true if recreation was attempted (caller should NOT raise an alert).
-     */
+    // Returns true if recreation was attempted (caller should NOT raise an alert).
     private boolean tryRecreate(String failedName, String reason, String trigger) {
         if (!isRecreationEnabled()) return false;
 
@@ -286,11 +256,7 @@ public class ConnectorRecoveryManager {
         return BACKOFF_INCREMENT_MS * (consecutiveFailures + 1);
     }
 
-    /**
-     * Check if any failure trace matches a known non-recoverable error pattern.
-     * These errors require manual intervention (config fix, class deployment, etc.)
-     * and restarting the connector will not resolve them.
-     */
+    // These errors require manual intervention and restarting will not resolve them.
     private boolean isNonRecoverable(ConnectorStatus status) {
         for (String trace : status.getFailureTraces()) {
             for (String pattern : NON_RECOVERABLE_ERROR_PATTERNS) {

@@ -9,17 +9,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsWebFilter;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
-/**
- * Configuration to disable CORS restrictions for SaaS Gateway.
- * <p>
- * When enabled (openframe.gateway.disable-cors=true), this creates a permissive
- * CORS filter that allows all origins with credentials support.
- * </p>
- * <p>
- * This is safe for SaaS deployment where frontend and backend are on the same domain,
- * but should NOT be used for OSS deployment where different origins need proper CORS.
- * </p>
- */
+// SaaS-only: permissive CORS is safe because frontend and backend share a domain; never enable for OSS multi-origin deployments.
 @Slf4j
 @Configuration
 @ConditionalOnProperty(

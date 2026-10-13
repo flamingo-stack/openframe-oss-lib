@@ -8,12 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * Flattened view of the AI agent's {@code messageData} union. The GraphQL query selects the fields the
- * harness needs across several concrete types (TextData, ExecutedToolData, ApprovalRequestData,
- * ErrorData, AskData, ContextCompactionEndData) via inline fragments; {@code type} discriminates, and
- * fields not present on a given variant stay null.
- */
+// Flattened GraphQL messageData union; type discriminates, fields absent from a variant stay null
 @Data
 @Builder
 @NoArgsConstructor

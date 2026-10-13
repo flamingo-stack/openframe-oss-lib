@@ -221,10 +221,7 @@ public class ScriptScheduleDataFetcher {
         return scheduleService.get(rawScheduleId);
     }
 
-    /**
-     * Unassign ALL currently-assigned devices matching the Selected-Devices filter/search (the
-     * "Remove N Devices" action). With no filter this clears the whole assignment.
-     */
+    /** With no filter, clears the whole assignment (the "Remove N Devices" action). */
     @DgsMutation
     public ScriptScheduleResponse removeAllDevicesFromSchedule(@InputArgument @NotBlank String scheduleId,
                                                                @InputArgument @Valid DeviceFilterInput filter,
@@ -238,11 +235,7 @@ public class ScriptScheduleDataFetcher {
         return scheduleService.get(rawScheduleId);
     }
 
-    /**
-     * Switch a schedule to CRITERIA device selection and store its rule (the "Select Devices by
-     * Criteria" → Save Devices action). Targets are then resolved live, so devices registered later
-     * that match the rule are picked up automatically.
-     */
+    // Targets resolve live against the stored rule, so devices registered later are picked up automatically.
     @DgsMutation
     public ScriptScheduleResponse setScheduleDeviceCriteria(@InputArgument @NotBlank String scheduleId,
                                                             @InputArgument @Valid ScheduleDeviceCriteriaInput criteria,

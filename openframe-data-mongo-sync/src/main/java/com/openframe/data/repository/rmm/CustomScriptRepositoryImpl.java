@@ -28,22 +28,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * MongoTemplate-backed implementation of {@link CustomScriptRepository}.
- *
- * <p>Cursor pagination is implemented on {@code _id}: descending by default
- * ({@code newest first}), with the cursor comparison flipped when paginating
- * backward. The query is tenant-scoped, hitting the existing
- * {@code (tenantId, name)} compound index for the tenant prefix plus a natural
- * {@code _id} sort.
- *
- * <p>The cursor value is parsed into a Mongo {@link ObjectId} before being
- * applied to the query — comparing a String against a BSON {@code ObjectId}
- * field does not match correctly under Mongo's type-bracketing rules. An
- * invalid cursor (anything that is not a valid 24-char hex {@code ObjectId})
- * is logged and treated as "no cursor", returning the first page rather than
- * an opaque server error.
- */
+// MongoTemplate-backed implementation of CustomScriptRepository using _id-based cursor pagination.
 @Slf4j
 @Repository
 @RequiredArgsConstructor

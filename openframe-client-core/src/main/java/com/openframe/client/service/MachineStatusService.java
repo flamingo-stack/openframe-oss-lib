@@ -90,11 +90,7 @@ public class MachineStatusService {
         }
     }
 
-    /**
-     * A heartbeat that changes nothing but lastSeen stays out of {@code save}: nothing that reaches Pinot has changed,
-     * and {@code save} would make the publishing aspect emit a duplicate message for every heartbeat. A connectivity
-     * flip is a real change and goes through {@code save}.
-     */
+    // bypasses save so a no-op heartbeat doesn't trigger a duplicate publishing-aspect message
     private void touchPresence(Machine machine, TelemetryStatus telemetry, Instant eventTimestamp) {
         if (machine.getTelemetryStatus() != telemetry) {
             machine.setTelemetryStatus(telemetry);

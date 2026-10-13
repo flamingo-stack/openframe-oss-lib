@@ -16,10 +16,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
 
-/**
- * GraphQL Date scalar configuration for handling date values in yyyy-MM-dd format.
- * Provides automatic parsing and validation of date inputs.
- */
 @DgsScalar(name = "Date")
 @Component
 public class DateScalarConfig implements Coercing<LocalDate, String> {

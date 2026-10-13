@@ -10,15 +10,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
-/**
- * DGS argument resolver that lets data fetchers declare {@code @AuthenticationPrincipal AuthPrincipal}
- * exactly like the REST controllers do (e.g. {@code /me}).
- * <p>
- * The MVC {@code AuthPrincipalArgumentResolver} in openframe-security-core only covers Spring MVC
- * controllers; the DGS/graphql invocation path needs its own resolver. This mirrors that logic:
- * the request principal is a JWT, converted to {@link AuthPrincipal}. Resolves to {@code null} for
- * unauthenticated (or non-JWT) requests, so fetchers can guard as needed.
- */
+// Resolves @AuthenticationPrincipal AuthPrincipal for DGS data fetchers, mirroring the MVC resolver.
 @Component
 public class DgsAuthPrincipalArgumentResolver implements ArgumentResolver {
 

@@ -11,13 +11,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
-/**
- * Internal notes by technicians on a ticket.
- * Separate from Dialog/Messages - simple text entries.
- *
- * From design: shows author avatar, name, timestamp, and text content.
- * Notes can be edited and deleted.
- */
+// Separate from Dialog/Messages: notes are simple editable/deletable text entries, not chat messages.
 @Data
 @Builder
 @NoArgsConstructor
@@ -31,17 +25,12 @@ public class TicketNote implements TenantScoped {
     private String tenantId;
     @Indexed
     private String ticketId;
-    /**
-     * Note content (plain text or markdown).
-     */
     private String content;
-    /**
-     * Author - technician who created the note (User ID).
-     * Author name resolved via DataLoader.
-     */
+    // Author name resolved via DataLoader, not stored here.
     private String authorId;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate
     private Instant updatedAt;
 }
+

@@ -128,11 +128,7 @@ public class AssignmentDataFetcher {
         return TicketStatus.fromKind(ticket.getStatusKind()).name();
     }
 
-    /**
-     * The lifecycle status drives the chip the assigned-ticket lists render: the kind selects the
-     * canonical styling, and a custom column takes its name and colour from the definition. The
-     * legacy string next to it cannot stand in — it reports every custom column as TECH_REQUIRED.
-     */
+    // Lifecycle status drives the chip the assigned-ticket lists render; the legacy string above cannot stand in for it.
     @DgsData(parentType = "Ticket", field = "statusKind")
     public TicketStatusKind ticketStatusKind(DgsDataFetchingEnvironment dfe) {
         Ticket ticket = dfe.getSource();
@@ -194,3 +190,4 @@ public class AssignmentDataFetcher {
         return Collections.unmodifiableMap(types);
     }
 }
+

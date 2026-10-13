@@ -4,19 +4,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
 
-/**
- * Mapping between Fleet MDM activity types and their human-readable messages.
- * Based on Fleet MDM activity types documentation.
- */
+// Mapping between Fleet MDM activity types and their human-readable messages, based on Fleet MDM activity types documentation.
 public final class FleetActivityTypeMapping {
     
     private FleetActivityTypeMapping() {
         // Utility class
     }
     
-    /**
-     * Map of Fleet MDM activity types to human-readable messages
-     */
     public static final Map<String, String> ACTIVITY_TYPE_MESSAGES = createActivityTypeMessages();
     
     private static Map<String, String> createActivityTypeMessages() {
@@ -195,23 +189,12 @@ public final class FleetActivityTypeMapping {
         return messages;
     }
     
-    /**
-     * Get human-readable message for Fleet MDM activity type
-     * 
-     * @param activityType Fleet MDM activity type
-     * @return Human-readable message wrapped in Optional, empty if activity type is not found
-     */
     public static Optional<String> getMessage(String activityType) {
         return Optional.ofNullable(ACTIVITY_TYPE_MESSAGES.get(activityType));
     }
     
-    /**
-     * Check if activity type is supported
-     * 
-     * @param activityType Fleet MDM activity type
-     * @return true if activity type is supported, false otherwise
-     */
     public static boolean isSupported(String activityType) {
         return ACTIVITY_TYPE_MESSAGES.containsKey(activityType);
     }
 }
+

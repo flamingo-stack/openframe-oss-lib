@@ -11,12 +11,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
 
-/**
- * Removes steps the onboarding enums no longer declare from the stored {@code completedSteps}:
- * {@code COMPANY_TEAM} (tenant) and {@code CUSTOMERS_SETUP} / {@code DEVICE_MANAGEMENT} (user).
- * A document still holding one cannot deserialise into a {@code Set<enum>}, so this ships with the
- * enum change. Raw collections for the same reason; idempotent; rollback would re-break reads.
- */
+// Documents still holding a retired step name fail Set<enum> deserialization; this ships with the enum change.
 @Slf4j
 @ChangeUnit(id = "prune-retired-onboarding-steps", order = "011", author = "openframe")
 public class PruneRetiredOnboardingStepsChangeUnit {
