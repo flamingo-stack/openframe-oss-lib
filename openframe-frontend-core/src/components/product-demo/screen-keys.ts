@@ -15,6 +15,7 @@ export const PRODUCT_SCREEN_LABELS = {
   'tickets-board': 'Ticket board',
   logs: 'Logs with a log open',
   knowledge: 'Knowledge base',
+  scripts: 'Script library and schedules',
 } as const;
 
 export type ProductScreenKey = keyof typeof PRODUCT_SCREEN_LABELS;
