@@ -170,9 +170,9 @@ function Example({
 /** A text placeholder in its line's own box (`text-h…` on the line), so a placeholder line is the loaded line's height. */
 function LineBar({ line, width }: { line: string; width: string }) {
   return (
-    <p className={line}>
-      <Skeleton className={cn('inline-block h-[0.7em] rounded align-middle', width)} />
-    </p>
+    <div className={line}>
+      <span className={cn('inline-block h-[0.7em] animate-pulse rounded bg-ods-border align-middle', width)} />
+    </div>
   );
 }
 
@@ -208,12 +208,12 @@ function JobHeadSkeleton() {
   return (
     <>
       <Skeleton className="size-9 shrink-0 rounded-lg" />
-      <span className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <LineBar line="text-h4" width="w-32" />
-        <span className="mt-0.5">
+        <div className="mt-0.5">
           <LineBar line="text-h6" width="w-40" />
-        </span>
-      </span>
+        </div>
+      </div>
     </>
   );
 }

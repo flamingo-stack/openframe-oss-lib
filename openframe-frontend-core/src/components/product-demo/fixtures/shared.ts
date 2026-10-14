@@ -39,6 +39,7 @@ export const DEMO_DEVICES = {
   buildServer: { id: 'device-build', hostname: 'BUILD-SRV-01', os: 'LINUX', organization: 'acme' },
   jenSurface: { id: 'device-jen', hostname: 'JEN-SURFACE', os: 'WINDOWS', organization: 'acme' },
   priyaXps: { id: 'device-priya', hostname: 'PRIYA-XPS', os: 'WINDOWS', organization: 'northbridge' },
+  warehouse: { id: 'device-warehouse', hostname: 'WAREHOUSE-PC03', os: 'WINDOWS', organization: 'acme' },
 } as const;
 
 /**

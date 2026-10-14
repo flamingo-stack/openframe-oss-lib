@@ -1,200 +1,186 @@
-import {
-  applyTimeSlot,
-  DEFAULT_SCHEDULE_FORM_VALUES,
-  EMPTY_SCHEDULE_SCRIPT_ROW,
-  type ScheduleFormData,
-  type ScheduleScriptSearchResult,
-  type ScheduleTimeSlot,
-  type ScriptScheduleTableRow,
-  type ScriptTableRow,
-} from '../../features/scripts';
+import type { ScriptExecutionSource, ScriptExecutionStatus, ScriptExecutionTableRow } from '../../features/scripts';
 import type { DemoCast } from '../cast';
-import { type DemoPersonKey, demoDay } from './shared';
+import { DEMO_DEVICES, DEMO_ORGANIZATIONS, demoDay } from './shared';
 
-/** The "New Script Schedule" form, filled in. */
-export interface ScheduleFormFixture {
-  /** What the form opens with. */
-  values: ScheduleFormData;
-  /** A fixed reading of the Time dropdown: the evening's late slots. */
-  timeSlots: ScheduleTimeSlot[];
-  /** What "Select Script" offers: the library. */
-  scripts: ScheduleScriptSearchResult[];
+/** The script the page's Mingo conversation writes, and the schedule that runs it. */
+export interface DemoScript {
+  name: string;
+  /** Lowercase shell id. */
+  shellType: string;
+  /** The script's source, as the editor holds it. */
+  code: string;
+  /** Who wrote it and who approved it. */
+  provenance: { author: string; approver: string };
+  /** The schedule that runs it, as one line. */
+  schedule: { repeat: string; time: string; deviceCount: number };
 }
 
 export interface ScriptsFixture {
-  /** The script library, newest first. */
-  scripts: ScriptTableRow[];
-  /** The schedules that run scripts from it. */
-  schedules: ScriptScheduleTableRow[];
-  /** One of those schedules as the form that makes it. */
-  scheduleForm: ScheduleFormFixture;
+  script: DemoScript;
+  /** The schedule's first night, newest first (the Execution History's default order). */
+  executions: ScriptExecutionTableRow[];
+  /** The run whose output the picture opens. */
+  openExecutionId: string;
 }
-
-const WINDOWS = ['windows'];
-const MAC = ['darwin'];
-const UNIX = ['darwin', 'linux'];
-
-interface DemoScript {
-  id: string;
-  name: string;
-  description: string;
-  shellType: string;
-  supportedPlatforms: string[];
-  author: DemoPersonKey;
-}
-
-const SCRIPTS: DemoScript[] = [
-  {
-    id: 'script-clear-temp',
-    name: 'Clear temp files',
-    description: 'Empties the user and system temp folders and reports the space freed.',
-    shellType: 'powershell',
-    supportedPlatforms: WINDOWS,
-    author: 'dana',
-  },
-  {
-    id: 'script-restart-spooler',
-    name: 'Restart print spooler',
-    description: 'Stops the spooler, clears stuck jobs and starts it again.',
-    shellType: 'cmd',
-    supportedPlatforms: WINDOWS,
-    author: 'alex',
-  },
-  {
-    id: 'script-disk-report',
-    name: 'Disk health report',
-    description: 'Reads SMART status and free space on every drive.',
-    shellType: 'bash',
-    supportedPlatforms: UNIX,
-    author: 'sara',
-  },
-  {
-    id: 'script-map-printers',
-    name: 'Map office printers',
-    description: 'Adds the front desk and second floor printers for the signed-in user.',
-    shellType: 'powershell',
-    supportedPlatforms: WINDOWS,
-    author: 'roman',
-  },
-  {
-    id: 'script-rotate-admin',
-    name: 'Rotate local admin password',
-    description: 'Sets a new random password and stores it in the client vault.',
-    shellType: 'bash',
-    supportedPlatforms: MAC,
-    author: 'dana',
-  },
-];
-
-/** A schedule runs one script of the library: its name, description and platforms are that script's. */
-function schedule(
-  id: string,
-  scriptId: string,
-  timing: Pick<ScriptScheduleTableRow, 'startsAt' | 'trigger' | 'repeat'>,
-  deviceCount: number,
-): ScriptScheduleTableRow {
-  const script = SCRIPTS.find(item => item.id === scriptId);
-  if (!script) throw new Error(`Unknown demo script "${scriptId}"`);
-  return {
-    id,
-    name: script.name,
-    description: script.description,
-    supportedPlatforms: script.supportedPlatforms,
-    deviceCount,
-    href: '#',
-    ...timing,
-  };
-}
-
-const TONIGHT_11_PM: ScheduleTimeSlot = { value: '23:00', label: '11:00 PM' };
-
-const TIME_SLOTS: ScheduleTimeSlot[] = [
-  { value: '22:00', label: '10:00 PM' },
-  { value: '22:30', label: '10:30 PM' },
-  TONIGHT_11_PM,
-  { value: '23:30', label: '11:30 PM' },
-];
 
 /**
- * "Nightly temp cleanup": the library's "Clear temp files" on Windows, every
- * day at 11 PM from the demo day on.
+ * "Clear temp files", the script Mingo writes in the conversation beside the
+ * picture: it empties the Windows temp folder, every user's and the update
+ * download cache, then prints how much space it freed and how it exited. Short lines, so the picture
+ * never cuts one in its narrow column.
  */
-function buildScheduleForm(): ScheduleFormFixture {
-  const script = SCRIPTS[0];
+const CLEAR_TEMP_FILES = `$ErrorActionPreference = 'Ignore'
+$paths = "$env:windir\\Temp",
+  'C:\\Users\\*\\AppData\\Local\\Temp',
+  "$env:windir\\SoftwareDistribution\\Download"
+$before = (Get-PSDrive C).Free
+foreach ($path in $paths) {
+  $items = Get-ChildItem $path -Recurse -Force
+  "Cleaning $path ($($items.Count) items)"
+  $items | Remove-Item -Recurse -Force
+}
+$freed = (Get-PSDrive C).Free - $before
+'Freed {0:N1} GB' -f ($freed / 1GB)
+'Exit code: 0'
+exit 0`;
+
+/** The folders the script empties, in the order it prints them. */
+function cleanupLines([system, users, updates]: readonly [number, number, number]): string[] {
+  return [
+    `Cleaning C:\\Windows\\Temp (${system} items)`,
+    `Cleaning C:\\Users\\*\\AppData\\Local\\Temp (${users.toLocaleString('en-US')} items)`,
+    `Cleaning C:\\Windows\\SoftwareDistribution\\Download (${updates} items)`,
+  ];
+}
+
+/** What the script prints on a device: one line per folder, then the space freed and the exit code. */
+function cleanupOutput(counts: readonly [number, number, number], freedGb: string): string {
+  return [...cleanupLines(counts), `Freed ${freedGb} GB`, 'Exit code: 0'].join('\n');
+}
+
+const DAY = new Intl.DateTimeFormat('en-US', { dateStyle: 'short' });
+const TIME = new Intl.DateTimeFormat('en-US', { timeStyle: 'short' });
+
+/**
+ * A time on the demo day, in the table's own `date time` rendering. Built on
+ * the local calendar day, so it reads the same in every timezone: the
+ * schedule fires at 11:00 PM on the devices' clock (the time its summary
+ * states beside the table), and the conversation's test ran minutes before.
+ */
+function onDemoDay(hours: number, minutes: number): string {
   const day = demoDay();
-  return {
-    values: {
-      ...DEFAULT_SCHEDULE_FORM_VALUES,
-      name: 'Nightly temp cleanup',
-      scheduledDate: day,
-      scheduledTime: TONIGHT_11_PM.value,
-      // The start the form holds is the one it was opened with, so it stays legal whatever today is.
-      startAtStored: applyTimeSlot(day, TONIGHT_11_PM.value).toISOString(),
-      repeatEnabled: true,
-      repeatInterval: 1,
-      repeatUnit: 'day',
-      supportedPlatforms: script.supportedPlatforms,
-      scripts: [
-        {
-          ...EMPTY_SCHEDULE_SCRIPT_ROW,
-          scriptId: script.id,
-          name: script.name,
-          supportedPlatforms: script.supportedPlatforms,
-          timeoutSeconds: 90,
-        },
-      ],
-    },
-    timeSlots: TIME_SLOTS,
-    scripts: SCRIPTS.map(item => ({ id: item.id, name: item.name, supportedPlatforms: item.supportedPlatforms })),
-  };
+  const at = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hours, minutes);
+  return `${DAY.format(at)} ${TIME.format(at)}`;
+}
+
+interface DemoExecution {
+  executionId: string;
+  device: keyof typeof DEMO_DEVICES;
+  /** Hour and minute it was dispatched. */
+  at: readonly [number, number];
+  status: ScriptExecutionStatus;
+  source: ScriptExecutionSource;
+  result: string;
 }
 
 /**
- * The product's Scripts pages: the library a team keeps, and the schedules
- * that run it across a fleet (every night, every week, or the moment a device
- * comes back online).
+ * The first night of "Nightly temp cleanup" on the Windows fleet: devices pick
+ * the run up as they check in, so dispatch times are minutes apart. One run is
+ * still going and one failed (it ran past its 90-second timeout), the failure
+ * Mingo promised to report. The oldest row is the conversation's own test on
+ * RECEPTION-01, the one Mingo dispatched.
+ */
+const RUN: readonly DemoExecution[] = [
+  {
+    executionId: 'c4f1e7a2-93b0-4d6e-8a15-6e2b9f04d731',
+    device: 'jenSurface',
+    at: [23, 4],
+    status: 'RUNNING',
+    source: 'SCHEDULED',
+    result: cleanupLines([254, 1377, 40])[0],
+  },
+  {
+    executionId: '9a2d5c18-4e7f-4b31-b0c6-d85e1a3f6290',
+    device: 'samT14',
+    at: [23, 3],
+    status: 'FAILED',
+    source: 'SCHEDULED',
+    result: [cleanupLines([230, 906, 51])[0], 'Execution timed out after 90 seconds'].join('\n\n'),
+  },
+  {
+    executionId: '1e8b47d3-c25a-4f90-9e3d-07b6a2c51f84',
+    device: 'warehouse',
+    at: [23, 2],
+    status: 'SUCCESS',
+    source: 'SCHEDULED',
+    result: cleanupOutput([412, 2184, 63], '2.7'),
+  },
+  {
+    executionId: '6f30a9c5-1b84-47e2-a3d9-52c8e7b0f416',
+    device: 'leoThinkPad',
+    at: [23, 1],
+    status: 'SUCCESS',
+    source: 'SCHEDULED',
+    result: cleanupOutput([288, 1530, 41], '1.9'),
+  },
+  {
+    executionId: 'b7d26e04-8f1c-4a53-9b7e-3c0f5a9d82e1',
+    device: 'priyaXps',
+    at: [23, 1],
+    status: 'SUCCESS',
+    source: 'SCHEDULED',
+    result: cleanupOutput([241, 1102, 37], '1.4'),
+  },
+  {
+    executionId: '2c95f8b1-6d07-4e4a-8f2b-a13e9c6d70b5',
+    device: 'frontDesk',
+    at: [23, 0],
+    status: 'SUCCESS',
+    source: 'SCHEDULED',
+    result: cleanupOutput([507, 2650, 72], '2.2'),
+  },
+  {
+    executionId: 'e05b3a7f-d4c8-49e1-b6a0-8f2d17c9e358',
+    device: 'reception',
+    at: [22, 51],
+    status: 'SUCCESS',
+    source: 'AI_ASSISTANT',
+    result: cleanupOutput([596, 3418, 88], '3.2'),
+  },
+];
+
+/** The run the picture opens: a finished one, so its output ends in what it freed. */
+const OPEN_EXECUTION = RUN[2];
+
+/**
+ * The scripts screen's story, picking up where the page's Mingo conversation
+ * ends: the script it wrote, and the first night its schedule ran.
  */
 export function buildScriptsFixture(cast: DemoCast): ScriptsFixture {
+  const alex = cast.person('alex');
   return {
-    scripts: SCRIPTS.map(script => {
-      const author = cast.person(script.author);
+    script: {
+      name: 'Clear temp files',
+      shellType: 'powershell',
+      code: CLEAR_TEMP_FILES,
+      provenance: { author: 'Mingo', approver: alex.name },
+      schedule: { repeat: 'Every day', time: '11:00 PM', deviceCount: 213 },
+    },
+    executions: RUN.map(run => {
+      const device = DEMO_DEVICES[run.device];
       return {
-        id: script.id,
-        name: script.name,
-        description: script.description,
-        shellType: script.shellType,
-        supportedPlatforms: script.supportedPlatforms,
-        author: { name: author.name, initials: author.initials, image: author.avatarUrl },
-        href: '#',
+        id: run.executionId,
+        executionId: run.executionId,
+        timestamp: onDemoDay(...run.at),
+        status: run.status,
+        machineName: device.hostname,
+        organization: DEMO_ORGANIZATIONS[device.organization].name,
+        // Every run is on behalf of Alex: the schedule is his, and the test ran because he asked.
+        initiator: { name: alex.name, initials: alex.initials, image: alex.avatarUrl },
+        source: run.source,
+        result: run.result,
       };
     }),
-    schedules: [
-      schedule(
-        'schedule-clear-temp',
-        'script-clear-temp',
-        { startsAt: { date: '10/06/2026', time: '11:00 PM' }, repeat: 'Every day' },
-        213,
-      ),
-      schedule(
-        'schedule-disk-report',
-        'script-disk-report',
-        { startsAt: { date: '10/11/2026', time: '6:00 AM' }, repeat: 'Every week' },
-        48,
-      ),
-      schedule('schedule-map-printers', 'script-map-printers', { trigger: 'Device Online' }, 36),
-      schedule(
-        'schedule-rotate-admin',
-        'script-rotate-admin',
-        { startsAt: { date: '11/01/2026', time: '2:00 AM' }, repeat: 'Every month' },
-        27,
-      ),
-      schedule(
-        'schedule-restart-spooler',
-        'script-restart-spooler',
-        { startsAt: { date: '10/07/2026', time: '7:30 AM' }, repeat: 'Every day' },
-        12,
-      ),
-    ],
-    scheduleForm: buildScheduleForm(),
+    openExecutionId: OPEN_EXECUTION.executionId,
   };
 }
