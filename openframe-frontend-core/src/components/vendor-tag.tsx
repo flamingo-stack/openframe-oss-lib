@@ -1,6 +1,20 @@
 'use client';
 
-import { AlertTriangle, Boxes, Clock, Code, Database, DollarSign, FileCode, Hand, type LucideIcon, PauseCircle, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  Boxes,
+  Clock,
+  Code,
+  Database,
+  DollarSign,
+  FileCode,
+  Hand,
+  type LucideIcon,
+  PauseCircle,
+  Plug,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '../utils/cn';
 import { formatClassification } from '../utils/format';
@@ -52,13 +66,19 @@ const CLASSIFICATION_ICONS: Readonly<Record<string, { Icon: LucideIcon; tile: st
  * OpenFrame mark and its one word; a lifecycle value reads in the warning colour; an
  * enriched value carries its icon; any other value is its title-cased label.
  */
-function classificationTag(value: string, text?: string, accentColor?: string): { text: string; icon: ReactNode; textColor?: string } {
+function classificationTag(
+  value: string,
+  text?: string,
+  accentColor?: string,
+): { text: string; icon: ReactNode; textColor?: string } {
   const copy = vendorClassificationCopy(value);
   if (copy?.group === 'openframe') {
     return {
       text: text || copy.word || copy.label,
       textColor: undefined,
-      icon: <OpenframeLogoIcon secondaryColor="currentColor" color="currentColor" className="h-4 w-4 text-ods-accent" />,
+      icon: (
+        <OpenframeLogoIcon secondaryColor="currentColor" color="currentColor" className="h-4 w-4 text-ods-accent" />
+      ),
     };
   }
   const enriched = CLASSIFICATION_ICONS[value];
