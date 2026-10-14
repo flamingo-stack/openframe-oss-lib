@@ -33,6 +33,17 @@ export function UnifiedPagination({
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
+  /**
+   * The address of a page of this list: the current URL with `page` set. Page 1
+   * is the list's own address (no `page`), so the first page has one URL.
+   */
+  const pageHref = (page: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page <= 1) params.delete('page');
+    else params.set('page', page.toString());
+    return withQuery(pathname, params.toString());
+  };
+
   const handlePageChange = (page: number) => {
     // Preserve current scroll position
     const currentScrollY = window.scrollY;
@@ -42,13 +53,12 @@ export function UnifiedPagination({
       onPageChange(page);
     }
 
-    // Update URL for bookmarking without navigation — unless the caller owns
-    // the URL (`syncUrl={false}`), in which case a second writer here would
-    // race the caller's own param write.
+    // Update the address bar in place (a bookmark, a shared link), unless the
+    // caller owns the URL (`syncUrl={false}`): a second writer here would race
+    // the caller's own param write. The address is the one the page's link
+    // carries (`pageHref`), so a click and a new-tab open land on the same URL.
     if (syncUrl) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('page', page.toString());
-      window.history.replaceState(null, '', withQuery(pathname, params.toString()));
+      window.history.replaceState(null, '', pageHref(page));
     }
 
     // Restore scroll position after a brief delay to allow content to render
@@ -79,7 +89,13 @@ export function UnifiedPagination({
 
   return (
     <div className={className}>
-      <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+      {/* Real links only while this component owns `?page=`: a caller that owns the URL names its own parameter. */}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={handlePageChange}
+        getPageHref={syncUrl ? pageHref : undefined}
+      />
     </div>
   );
 }

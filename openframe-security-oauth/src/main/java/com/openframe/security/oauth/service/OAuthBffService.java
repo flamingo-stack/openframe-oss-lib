@@ -1,6 +1,7 @@
 package com.openframe.security.oauth.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.nimbusds.jwt.JWTParser;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
@@ -60,7 +61,7 @@ public class OAuthBffService {
 
     private static final String INVALID_GRANT = "invalid_grant";
     private static final Pattern OAUTH_ERROR_CODE = Pattern.compile("[a-z0-9_]{1,40}");
-    private static final ObjectMapper ERROR_BODY_MAPPER = new ObjectMapper();
+    private static final ObjectMapper ERROR_BODY_MAPPER = new JsonMapper();
 
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
@@ -281,7 +282,7 @@ public class OAuthBffService {
         try {
             var node = ERROR_BODY_MAPPER.readTree(body);
             for (String field : new String[]{"message", "error", "detail"}) {
-                if (node.hasNonNull(field)) return node.get(field).asText();
+                if (node.hasNonNull(field)) return node.get(field).asString();
             }
         } catch (Exception ignored) {
         }
@@ -426,7 +427,7 @@ public class OAuthBffService {
 
     private String extractOAuthErrorCode(String body) {
         try {
-            String error = ERROR_BODY_MAPPER.readTree(body).path("error").asText(null);
+            String error = ERROR_BODY_MAPPER.readTree(body).path("error").asString(null);
             return error != null && OAUTH_ERROR_CODE.matcher(error).matches() ? error : null;
         } catch (Exception e) {
             return null;

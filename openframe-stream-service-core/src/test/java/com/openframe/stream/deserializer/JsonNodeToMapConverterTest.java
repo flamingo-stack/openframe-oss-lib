@@ -1,7 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +17,7 @@ class JsonNodeToMapConverterTest {
 
     @BeforeEach
     void setUp() {
-        objectMapper = new ObjectMapper();
+        objectMapper = new JsonMapper();
     }
 
     @Test
@@ -186,7 +187,7 @@ class JsonNodeToMapConverterTest {
      */
     private void convertJsonNodeToMap(JsonNode node, String prefix, Map<String, String> result) {
         if (node.isObject()) {
-            var fields = node.fields();
+            var fields = node.properties().iterator();
             while (fields.hasNext()) {
                 var entry = fields.next();
                 String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
@@ -200,16 +201,16 @@ class JsonNodeToMapConverterTest {
         } else {
             // Handle primitive values
             String value;
-            if (node.isTextual()) {
-                value = node.asText();
+            if (node.isString()) {
+                value = node.asString();
             } else if (node.isNumber()) {
-                value = node.asText(); // Preserve number format
+                value = node.asString(); // Preserve number format
             } else if (node.isBoolean()) {
                 value = String.valueOf(node.asBoolean());
             } else if (node.isNull()) {
                 value = null;
             } else {
-                value = node.asText();
+                value = node.asString();
             }
             
             if (value != null) {

@@ -1,12 +1,13 @@
 package com.openframe.external.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JacksonModule;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -22,7 +23,7 @@ class ExternalApiJacksonConfigTest {
 
     @BeforeEach
     void setUp() {
-        Jackson2ObjectMapperBuilder builder = Jackson2ObjectMapperBuilder.json();
+        JsonMapper.Builder builder = JsonMapper.builder();
         new ExternalApiJacksonConfig().externalApiInstantMillisCustomizer().customize(builder);
         mapper = builder.build();
     }
@@ -58,10 +59,10 @@ class ExternalApiJacksonConfigTest {
 
         JsonNode json = mapper.valueToTree(new Payload("t-1", created, null, nested));
 
-        assertEquals("t-1", json.get("id").asText());
-        assertEquals("2024-01-02T03:04:05.123Z", json.get("createdAt").asText());
+        assertEquals("t-1", json.get("id").asString());
+        assertEquals("2024-01-02T03:04:05.123Z", json.get("createdAt").asString());
         assertTrue(json.get("updatedAt").isNull());
-        assertEquals("2024-01-02T03:04:05.123Z", json.get("extra").get("history").get(0).asText());
+        assertEquals("2024-01-02T03:04:05.123Z", json.get("extra").get("history").get(0).asString());
         assertTrue(json.get("extra").get("closedAt").isNull());
     }
 
@@ -75,9 +76,11 @@ class ExternalApiJacksonConfigTest {
     }
 
     @Test
-    void customizerInstallsItsModuleAlongsideTheDefaultOnes() {
-        assertTrue(mapper.getRegisteredModuleIds().contains("external-api-instant-millis"));
-        assertTrue(mapper.getRegisteredModuleIds().size() > 1);
+    void customizerRegistersItsModule() {
+        // Jackson 3 has java.time built in, so there are no other default modules to count alongside it.
+        assertTrue(mapper.registeredModules().stream()
+                .map(JacksonModule::getModuleName)
+                .anyMatch("external-api-instant-millis"::equals));
     }
 
     record Payload(String id, Instant createdAt, Instant updatedAt, Map<String, Object> extra) {

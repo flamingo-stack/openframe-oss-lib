@@ -17,4 +17,5 @@ export const PRODUCT_SCREEN_LOADERS: Record<ProductScreenKey, ProductScreenLoade
   'tickets-board': () => import('./screens/tickets-board'),
   logs: () => import('./screens/logs'),
   knowledge: () => import('./screens/knowledge'),
+  scripts: () => import('./screens/scripts'),
 };

@@ -10,7 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+
+import static java.util.Objects.requireNonNullElse;
 import java.util.Optional;
 
 @Slf4j
@@ -45,6 +48,20 @@ public class OpenFrameClientConfigurationService {
         PublishState nextState = PublishState.published();
         config.setPublishState(nextState);
         save(config);
+    }
+
+    // true when the flags moved: the caller decides what a new set of flags sets in motion
+    @RetryOnOptimisticLockingFailure
+    public boolean updateFeatureFlags(Map<String, Boolean> newFlags) {
+        OpenFrameClientConfiguration config = get();
+        Map<String, Boolean> oldFlags = requireNonNullElse(config.getFeatureFlags(), Map.of());
+        if (oldFlags.equals(newFlags)) {
+            return false;
+        }
+        config.setFeatureFlags(newFlags);
+        save(config);
+        log.info("Updated client feature flags {} -> {}", oldFlags, newFlags);
+        return true;
     }
 
     @RetryOnOptimisticLockingFailure
