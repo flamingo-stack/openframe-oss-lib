@@ -20,6 +20,7 @@ import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.ticket.TicketService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
+import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
@@ -106,17 +107,23 @@ public class NodeDataFetcher {
             case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
                     .flatMap(service -> service.findById(rawId))
                     .orElse(null);
-            case TICKET -> Optional.ofNullable(ticketService.getIfAvailable())
-                    .flatMap(service -> service.findTicketById(rawId))
-                    .orElse(null);
+            case TICKET -> findTicket(rawId);
             default -> throw new IllegalArgumentException("Unsupported node type: " + typeName);
         };
     }
 
     private boolean isFederated(NodeType nodeType) {
-        return Optional.ofNullable(federatedNodeTypes.getIfAvailable())
+        FederatedNodeTypes federated = federatedNodeTypes.getIfAvailable();
+        return Optional.ofNullable(federated)
                 .map(FederatedNodeTypes::types)
                 .filter(types -> types.contains(nodeType))
                 .isPresent();
+    }
+
+    private Ticket findTicket(String rawId) {
+        TicketService service = ticketService.getIfAvailable();
+        return Optional.ofNullable(service)
+                .flatMap(lookup -> lookup.findTicketById(rawId))
+                .orElse(null);
     }
 }
