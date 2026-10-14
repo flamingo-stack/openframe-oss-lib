@@ -169,6 +169,132 @@ describe('embedAuthedFetch 401 self-heal (adapter.refresh)', () => {
   });
 });
 
+/**
+ * Host hooks for statuses the host handles app-wide — the case they exist for
+ * is openframe's mobile force-update: a 426 from the gateway swaps the app for
+ * an "update required" screen and must never be retried or refreshed.
+ */
+describe('embedAuthedFetch adapter.beforeRequest / adapter.onResponse', () => {
+  const originalFetch = globalThis.fetch;
+
+  class UpgradeRequired extends Error {}
+
+  const upgradeResponse = () =>
+    new Response(JSON.stringify({ code: 'CLIENT_UPGRADE_REQUIRED' }), {
+      status: 426,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    setEmbedAuthAdapter(null);
+    vi.restoreAllMocks();
+  });
+
+  it('fails the request with the error onResponse throws, with no refresh and no retry', async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(upgradeResponse()));
+    globalThis.fetch = fetchSpy;
+    const refresh = vi.fn(() => Promise.resolve(true));
+    const seen: unknown[] = [];
+    setEmbedAuthAdapter({
+      refresh,
+      onResponse: async response => {
+        if (response.status !== 426) return;
+        seen.push(await response.clone().json());
+        throw new UpgradeRequired();
+      },
+    });
+
+    await expect(embedAuthedFetch('/api/chat/x')).rejects.toBeInstanceOf(UpgradeRequired);
+    expect(seen).toEqual([{ code: 'CLIENT_UPGRADE_REQUIRED' }]);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('runs ahead of the 401 self-heal', async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(new Response('nope', { status: 401 })));
+    globalThis.fetch = fetchSpy;
+    const refresh = vi.fn(() => Promise.resolve(true));
+    setEmbedAuthAdapter({
+      refresh,
+      onResponse: () => {
+        throw new UpgradeRequired();
+      },
+    });
+
+    await expect(embedAuthedFetch('/api/chat/x')).rejects.toBeInstanceOf(UpgradeRequired);
+    expect(refresh).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands the caller the original response, body unread, when onResponse returns', async () => {
+    const original = new Response('payload', { status: 200 });
+    globalThis.fetch = vi.fn(() => Promise.resolve(original));
+    const onResponse = vi.fn(async (response: Response) => {
+      await response.clone().text();
+    });
+    setEmbedAuthAdapter({ onResponse });
+
+    const res = await embedAuthedFetch('/api/chat/x');
+    expect(res).toBe(original);
+    expect(await res.text()).toBe('payload');
+    expect(onResponse).toHaveBeenCalledWith(original);
+  });
+
+  it('sees the post-refresh retry response too', async () => {
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('nope', { status: 401 }))
+      .mockResolvedValueOnce(upgradeResponse());
+    globalThis.fetch = fetchSpy as typeof fetch;
+    const refresh = vi.fn(() => Promise.resolve(true));
+    const onResponse = vi.fn((response: Response) => {
+      if (response.status === 426) throw new UpgradeRequired();
+    });
+    setEmbedAuthAdapter({ refresh, onResponse });
+
+    await expect(embedAuthedFetch('/api/chat/x')).rejects.toBeInstanceOf(UpgradeRequired);
+    expect(onResponse).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a request beforeRequest throws for, as a rejection, before anything is sent', async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(new Response('ok')));
+    globalThis.fetch = fetchSpy;
+    setEmbedAuthAdapter({
+      beforeRequest: () => {
+        throw new UpgradeRequired();
+      },
+    });
+
+    let pending: Promise<Response> | undefined;
+    expect(() => {
+      pending = embedAuthedFetch('/api/chat/x');
+    }).not.toThrow();
+    await expect(pending).rejects.toBeInstanceOf(UpgradeRequired);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('refuses the post-refresh retry when the guard trips while the refresh is in flight', async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(new Response('nope', { status: 401 })));
+    globalThis.fetch = fetchSpy;
+    let refused = false;
+    setEmbedAuthAdapter({
+      beforeRequest: () => {
+        if (refused) throw new UpgradeRequired();
+      },
+      refresh: () => {
+        refused = true;
+        return Promise.resolve(true);
+      },
+    });
+
+    await expect(embedAuthedFetch('/api/chat/x')).rejects.toBeInstanceOf(UpgradeRequired);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('embedAuthedFetch adapter.allowedOrigins (native-shell cross-origin sanction)', () => {
   const originalFetch = globalThis.fetch;
 
