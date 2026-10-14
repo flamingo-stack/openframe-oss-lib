@@ -21,13 +21,15 @@ export * from './ai-providers';
 export * from './model-token-rates';
 export { TRIAL_TERMS, trialLabels, trialLengthLabel } from './trial';
 export {
-  VENDOR_CLASSIFICATIONS,
-  OPENFRAME_CLASSIFICATIONS,
-  isVendorClassification,
+  VENDOR_CLASSIFICATION_COPY,
+  vendorClassificationCopy,
+  vendorClassificationGroup,
+  compareVendorClassifications,
   isOpenFrameClassification,
   type VendorClassificationValue,
-  type OpenFrameClassification,
-  type OpenFrameClassificationCopy,
+  type VendorClassificationGroup,
+  type VendorClassificationCopy,
+  type VendorClassificationIconConfig,
 } from './vendor-classification';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
@@ -424,6 +426,7 @@ export * from './doc-path-utils';
 export * from './doc-tree-nav';
 export * from './tree-builder';
 export * from './markdown-heading-id';
+export * from './markdown-link';
 export * from './markdown-section-extractor';
 export * from './markdown-to-plain';
 export * from './embed-url-converters';

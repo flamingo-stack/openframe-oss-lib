@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from '../../embed-shims/next-link';
 import { formatLargeNumber } from '../../utils/format';
+import { renderedLinkRel } from '../../utils/markdown-link';
 import type { MediaItem as CarouselMediaItem } from '../../utils/media-carousel-utils-stub';
 import { socialCache } from '../../utils/social-embed-cache';
 import { MediaCarousel } from '../media-carousel';
@@ -159,10 +160,13 @@ type RedditListingResponse = Array<{ data?: { children?: Array<{ data?: RedditPo
 
 interface RedditEmbedProps {
   url: string;
+  /** The `rel` the author wrote on the post's link (`nofollow` …), kept on the card's links to the post. */
+  rel?: string;
   maxWidth?: number;
 }
 
-export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
+export function RedditEmbedClient({ url, maxWidth = 700, rel }: RedditEmbedProps) {
+  const postLinkRel = renderedLinkRel(rel, true);
   const { redditProxyUrl } = useRichMarkdownRuntime();
   const [redditData, setRedditData] = useState<RedditPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -261,7 +265,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             <Link
               href={url}
               target="_blank"
-              rel="noopener noreferrer"
+              rel={postLinkRel}
               className="inline-flex items-center space-x-2 rounded-md bg-[#FF4500] px-4 py-2 text-white transition-colors text-h6 hover:bg-[#E03D00]"
             >
               <RedditIcon />
@@ -562,7 +566,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           <Link
             href={url}
             target="_blank"
-            rel="noopener noreferrer"
+            rel={postLinkRel}
             className="inline-flex items-center space-x-2 text-ods-accent transition-colors text-h6 hover:opacity-80"
           >
             <ExternalLinkIcon />
