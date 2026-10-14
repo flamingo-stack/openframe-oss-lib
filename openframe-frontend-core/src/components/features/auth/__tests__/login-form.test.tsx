@@ -38,9 +38,9 @@ const buttonNames = () => screen.getAllByRole('button').map(button => button.tex
 const precedes = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 /**
- * Email first, methods under it: once an email resolves an organization, its own methods take the
- * place of the generic block, headed by its name, so the same-looking button never silently starts
- * signing in through a different identity provider.
+ * Email first, methods under it: once an email resolves an organization, its own methods render
+ * above the generic block under a heading that names it, so the same-looking button never silently
+ * starts signing in through a different identity provider.
  */
 describe('LoginForm sign-in methods', () => {
   it('renders the generic providers under the email field before an organization is known', () => {
@@ -57,7 +57,7 @@ describe('LoginForm sign-in methods', () => {
       <LoginForm
         {...baseProps}
         ssoProviders={[]}
-        tenantMethods={{ name: 'Acme', providers: ['microsoft', 'openframe'] }}
+        tenantMethods={{ name: 'Acme', openframe: true, providers: ['microsoft'] }}
       />,
     );
     expect(screen.getByText('Sign-in methods for Acme')).toBeTruthy();
@@ -67,7 +67,11 @@ describe('LoginForm sign-in methods', () => {
 
   it('keeps the generic providers under the organization heading when it offers them', () => {
     render(
-      <LoginForm {...baseProps} ssoProviders={GENERIC} tenantMethods={{ name: 'Acme', providers: ['openframe'] }} />,
+      <LoginForm
+        {...baseProps}
+        ssoProviders={GENERIC}
+        tenantMethods={{ name: 'Acme', openframe: true, providers: [] }}
+      />,
     );
     expect(buttonNames()).toEqual([
       'Continue with OpenFrame',
@@ -81,13 +85,19 @@ describe('LoginForm sign-in methods', () => {
   });
 
   it('drops the second divider when the organization has no buttons of its own above the generic ones', () => {
-    render(<LoginForm {...baseProps} ssoProviders={GENERIC} tenantMethods={{ name: 'Acme', providers: [] }} />);
+    render(
+      <LoginForm
+        {...baseProps}
+        ssoProviders={GENERIC}
+        tenantMethods={{ name: 'Acme', openframe: false, providers: [] }}
+      />,
+    );
     expect(screen.getByText('Sign-in methods for Acme')).toBeTruthy();
     expect(screen.queryByText('or continue with')).toBeNull();
   });
 
   it('names no organization when the name is unknown', () => {
-    render(<LoginForm {...baseProps} ssoProviders={[]} tenantMethods={{ providers: ['google'] }} />);
+    render(<LoginForm {...baseProps} ssoProviders={[]} tenantMethods={{ openframe: false, providers: ['google'] }} />);
     expect(screen.getByText('Sign-in methods for your organization')).toBeTruthy();
     expect(buttonNames()).toEqual(['Continue with Google']);
   });
@@ -98,11 +108,11 @@ describe('LoginForm sign-in methods', () => {
         {...baseProps}
         ssoDisabled
         ssoProviders={GENERIC}
-        tenantMethods={{ name: 'Acme', providers: ['openframe'] }}
+        tenantMethods={{ name: 'Acme', openframe: true, providers: [] }}
       />,
     );
     for (const button of screen.getAllByRole('button')) {
-      expect((button as HTMLButtonElement).disabled).toBe(true);
+      expect(button).toBeDisabled();
     }
   });
 });
@@ -112,6 +122,16 @@ describe('LoginForm Enter in the email field', () => {
     const onEmailEnter = vi.fn();
     render(<LoginForm {...baseProps} email="kate@acme.com" onEmailEnter={onEmailEnter} />);
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
+    expect(onEmailEnter).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a held Enter's auto-repeat", () => {
+    const onEmailEnter = vi.fn();
+    render(<LoginForm {...baseProps} email="kate@acme.com" onEmailEnter={onEmailEnter} />);
+    const field = screen.getByRole('textbox');
+    fireEvent.keyDown(field, { key: 'Enter' });
+    fireEvent.keyDown(field, { key: 'Enter', repeat: true });
+    fireEvent.keyDown(field, { key: 'Enter', repeat: true });
     expect(onEmailEnter).toHaveBeenCalledTimes(1);
   });
 

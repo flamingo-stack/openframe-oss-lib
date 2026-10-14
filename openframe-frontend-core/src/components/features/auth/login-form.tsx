@@ -16,12 +16,13 @@ import { SsoProviderButtons } from './sso-providers';
 export interface LoginFormTenantMethods {
   /** Names the block ("Sign-in methods for <name>") and tags the organization's own providers. */
   name?: string;
+  /** Its built-in OpenFrame login, offered first. */
+  openframe: boolean;
   /**
-   * What the organization offers itself. `openframe` is its built-in login and always comes first;
-   * every other entry is an identity provider it configured with its own credentials, tagged with
-   * `name` so it cannot be mistaken for the generic button of the same provider.
+   * Identity providers it configured with its own credentials, tagged with `name` so they cannot be
+   * mistaken for the generic button of the same provider.
    */
-  providers: AuthSsoProvider[];
+  providers: Exclude<AuthSsoProvider, 'openframe'>[];
 }
 
 export interface LoginFormProps {
@@ -36,9 +37,7 @@ export interface LoginFormProps {
   };
   /** Informational status under the email field (e.g. live tenant discovery). `errors.email` wins. */
   emailStatus?: { message: string; variant: 'error' | 'warning' | 'success' | 'muted' };
-  /**
-   * A message too long for the field's one-line status, shown in a notice row under the field.
-   */
+  /** A message too long for the field's one-line status, shown in a notice row under the field. */
   notice?: string;
   /**
    * The generic providers, under the email field behind `dividerLabel`. They need nothing typed: the
@@ -56,9 +55,9 @@ export interface LoginFormProps {
   /** Label on the divider above the generic providers. */
   dividerLabel?: string;
   /**
-   * The organization the typed email resolved to. Its methods take the place of the generic block
-   * under the field, headed by its name, so the switch from "any account" to "this organization's
-   * sign-in" is visible rather than a silent change of what the same buttons do.
+   * The organization the typed email resolved to. Its methods render above the generic block, under
+   * a heading that names it, so the switch from "any account" to "this organization's sign-in" is
+   * visible rather than a silent change of what the same buttons do.
    */
   tenantMethods?: LoginFormTenantMethods;
   /** Primary submit under the email field. Omit the handler to hide the button. */
@@ -118,25 +117,21 @@ export function LoginForm({
   className,
 }: LoginFormProps) {
   const fieldDisabled = disabled || loading;
-  const providersDisabled = disabled || loading || ssoDisabled;
+  const providersDisabled = fieldDisabled || ssoDisabled;
 
   // Validation messages are deferred while the user is typing (shown on blur or after a pause).
   const emailErr = useDeferredError(errors?.email, email);
 
-  // Enter drives the same action as the visible button, under the same gate.
+  // Enter drives the same action as the visible button, under the same gate. A held key's repeats
+  // are not new presses: each would re-run an action that can fail fast (a lookup while offline).
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== 'Enter' || fieldDisabled) return;
+    if (event.key !== 'Enter' || event.repeat || fieldDisabled) return;
     if (onSubmitClick) {
       if (!submitDisabled) onSubmitClick();
       return;
     }
     onEmailEnter?.();
   };
-
-  // The built-in login is not configured with anyone's credentials, so it carries no tag.
-  const tenantOpenframe = tenantMethods?.providers.filter(provider => provider === 'openframe') ?? [];
-  const tenantOwn = tenantMethods?.providers.filter(provider => provider !== 'openframe') ?? [];
-  const hasTenantButtons = tenantOpenframe.length + tenantOwn.length > 0;
 
   return (
     <div
@@ -200,17 +195,18 @@ export function LoginForm({
       {tenantMethods && (
         <>
           <LabeledDivider label={`Sign-in methods for ${tenantMethods.name || 'your organization'}`} />
-          {tenantOpenframe.length > 0 && (
+          {tenantMethods.openframe && (
+            // Not configured with anyone's credentials, so it carries no tag.
             <SsoProviderButtons
-              providers={tenantOpenframe}
+              providers={['openframe']}
               onSsoClick={onSsoClick}
               actionLabel={ssoActionLabel}
               disabled={providersDisabled}
             />
           )}
-          {tenantOwn.length > 0 && (
+          {tenantMethods.providers.length > 0 && (
             <SsoProviderButtons
-              providers={tenantOwn}
+              providers={tenantMethods.providers}
               onSsoClick={onSsoClick}
               actionLabel={ssoActionLabel}
               disabled={providersDisabled}
@@ -224,7 +220,9 @@ export function LoginForm({
         <>
           {/* Under an organization heading with nothing above it, a second divider would only
               separate the heading from its own buttons. */}
-          {(!tenantMethods || hasTenantButtons) && <LabeledDivider label={dividerLabel} />}
+          {(!tenantMethods || tenantMethods.openframe || tenantMethods.providers.length > 0) && (
+            <LabeledDivider label={dividerLabel} />
+          )}
           <SsoProviderButtons
             providers={ssoProviders}
             onSsoClick={onSsoClick}

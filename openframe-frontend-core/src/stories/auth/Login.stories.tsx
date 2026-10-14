@@ -22,7 +22,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** Full page: Sign Up / Login tabs + Login form + marketing panel. */
-function LoginPage(initial: Partial<LoginFormProps>) {
+function LoginPage({ ssoProviders = [], ...initial }: Partial<LoginFormProps>) {
   const [tab, setTab] = useState('login');
   const [email, setEmail] = useState(initial.email ?? '');
 
@@ -45,10 +45,10 @@ function LoginPage(initial: Partial<LoginFormProps>) {
       {tab === 'login' ? (
         <LoginForm
           {...initial}
+          ssoProviders={ssoProviders}
           email={email}
           onEmailChange={setEmail}
           submitDisabled={!isValid}
-          onSubmitClick={() => {}}
           termsUrl="#terms"
           privacyPolicyUrl="#privacy"
         />
@@ -63,12 +63,12 @@ function LoginPage(initial: Partial<LoginFormProps>) {
 
 /** Empty email, submit disabled. */
 export const Empty: Story = {
-  render: () => <LoginPage />,
+  render: () => <LoginPage onSubmitClick={() => {}} />,
 };
 
 /** Valid email entered, Continue enabled (accent). */
 export const Filled: Story = {
-  render: () => <LoginPage email="roman@mail.com" />,
+  render: () => <LoginPage onSubmitClick={() => {}} email="roman@mail.com" />,
 };
 
 /** The generic providers, which need nothing typed. */
@@ -85,18 +85,18 @@ export const TenantWithoutCustomSso: Story = {
     <LoginPage
       email="maya@acme.co"
       ssoProviders={SSO_PROVIDERS}
-      tenantMethods={{ name: 'Acme IT', providers: ['openframe'] }}
+      tenantMethods={{ name: 'Acme IT', openframe: true, providers: [] }}
     />
   ),
 };
 
 /** The email resolved an organization with its own SSO: only its methods, its providers tagged with its name. */
-export const TenantCustomSso: Story = {
+export const TenantWithCustomSso: Story = {
   render: () => (
     <LoginPage
       email="roman@northwind.com"
       ssoProviders={[]}
-      tenantMethods={{ name: 'Northwind', providers: ['openframe', 'google'] }}
+      tenantMethods={{ name: 'Northwind', openframe: true, providers: ['google'] }}
     />
   ),
 };
