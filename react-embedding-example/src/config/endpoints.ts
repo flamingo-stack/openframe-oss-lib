@@ -98,6 +98,8 @@ export const EP = {
   downloads: `${CONTENT_PREFIX}${DOWNLOADS_API_PATH}`,
   // misc surfaces
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
+  // The hub's list of legal documents: the legal page's switcher reads it.
+  legalDocuments: `${CONTENT}/legal`,
   contact: `${CONTENT}/contact`,
   announcements: `${CONTENT}/announcements/active`,
   // Private-storage view proxy base — ClaudeEmbed derives artifact

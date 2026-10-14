@@ -22,9 +22,10 @@ import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatLegalDate } from '../../../utils/format';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
-import { PageShell, PageLayout } from '../../ui';
+import { PageShell, PageLayout, Skeleton, TabSelector } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
+import { useLegalDocuments } from './use-legal-documents';
 
 export interface LegalDocumentMarkdownRendererProps {
   content: string;
@@ -61,6 +62,17 @@ export interface LegalDocumentPageProps {
   apiEndpoint?: string;
   /** Override the default markdown renderer. */
   MarkdownRenderer?: ComponentType<LegalDocumentMarkdownRendererProps>;
+  /**
+   * Show a switcher between every legal document the hub has published, read
+   * from its list (`useLegalDocuments`), so a host with one legal route shows
+   * them all and names none. `onSelect` is the host's navigation to another
+   * document. Absent: no switcher (a site that links each page from its footer).
+   */
+  documents?: {
+    /** The list endpoint. Default `/api/legal`. */
+    apiEndpoint?: string;
+    onSelect: (docType: string) => void;
+  };
   /** Back-button config — same pattern as `DevSectionPage`. Pass `false`
    *  to hide. Default `{ label: 'Back to home', href: '/' }`. */
   backButton?: { label?: string; href?: string } | false;
@@ -90,6 +102,35 @@ export function legalDocumentStampLabel(
   return parts.length > 0 ? parts.join(' \u00b7 ') : null;
 }
 
+/**
+ * The switcher between the hub's published legal documents. Holds its row's
+ * height while the list loads; draws nothing when the list cannot be read or
+ * holds a single document (the page still shows the one it was asked for).
+ */
+function LegalDocumentSwitcher({
+  docType,
+  apiEndpoint,
+  onSelect,
+}: {
+  docType: string;
+  apiEndpoint?: string;
+  onSelect: (docType: string) => void;
+}) {
+  const { documents, isLoading } = useLegalDocuments({ apiEndpoint });
+  if (isLoading) return <Skeleton className="h-10 w-full rounded-md" />;
+  const published = documents.filter(doc => doc.published);
+  if (published.length < 2) return null;
+  return (
+    <TabSelector
+      variant="secondary"
+      scrollable
+      value={docType}
+      onValueChange={onSelect}
+      items={published.map(doc => ({ id: doc.docType, label: doc.title }))}
+    />
+  );
+}
+
 export function LegalDocumentPage({
   docType,
   title: titleProp,
@@ -102,6 +143,7 @@ export function LegalDocumentPage({
   initialLastUpdatedLabel = null,
   apiEndpoint,
   MarkdownRenderer = RichMarkdownRenderer,
+  documents,
   backButton,
   faq,
   shell = true,
@@ -138,6 +180,7 @@ export function LegalDocumentPage({
 
   const inner = (
     <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
+      {documents && <LegalDocumentSwitcher docType={docType} {...documents} />}
       {data?.sourceFile && <p className="text-ods-text-secondary opacity-75 text-h6">Source: {data.sourceFile}</p>}
 
       <div className="flex flex-1 flex-col items-start gap-6 lg:flex-row lg:gap-10">
