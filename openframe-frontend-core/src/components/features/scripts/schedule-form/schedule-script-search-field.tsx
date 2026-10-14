@@ -67,7 +67,7 @@ export function ScheduleScriptSearchField({
 }: ScheduleScriptSearchFieldProps) {
   // Fires only when focus leaves the entire autocomplete widget (not on internal focus moves).
   const handleBlur = (e: FocusEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) onClose?.();
+    if (!e.currentTarget.contains(e.relatedTarget)) onClose?.();
   };
 
   // Every script stays offered in every card: the same script may legitimately

@@ -140,7 +140,7 @@ export function ScheduleTimingFields({
    * written. Silent until the first Save, like every other rule here.
    */
   const recheckReconnectWindow = useCallback(() => {
-    if (showErrors) triggerValidation('reconnectInterval');
+    if (showErrors) void triggerValidation('reconnectInterval');
   }, [showErrors, triggerValidation]);
   const trigger = useWatch({ control, name: 'trigger' });
   const repeatEnabled = useWatch({ control, name: 'repeatEnabled' });
