@@ -69,17 +69,35 @@ export function PageHeading({
 }
 
 /**
- * A line break inside a heading. It carries a space before the `<br>`, so the
- * heading's TEXT (what search engines, screen readers and link previews read)
- * keeps its words apart: "own. Approved", never "own.Approved". The space sits
- * at the end of a line, where it draws nothing. Use it for every break in a
- * title, in place of a bare `<br />`.
+ * THE way a heading is drawn on more than one line: each line on its own line,
+ * with a space before every break. The space is what keeps the heading's TEXT
+ * (what search engines, screen readers and link previews read) in words:
+ * "own. Approved", never "own.Approved". It sits at the end of a line, where it
+ * draws nothing. An empty line is a blank line.
+ *
+ * Every multi-line title goes through this; never write a bare `<br />` or one
+ * block `<span>` per line in a heading.
  */
-export function HeadingBreak() {
+export interface HeadingLinesProps {
+  /** The title's lines, top to bottom. */
+  lines: readonly ReactNode[];
+}
+
+export function HeadingLines({ lines }: HeadingLinesProps) {
   return (
     <>
-      {' '}
-      <br />
+      {lines.map((line, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a title's lines never reorder
+        <Fragment key={index}>
+          {index > 0 ? (
+            <>
+              {' '}
+              <br />
+            </>
+          ) : null}
+          {line}
+        </Fragment>
+      ))}
     </>
   );
 }
@@ -147,6 +165,11 @@ function accentMarks(node: ReactNode, accentClassName: string): ReactNode {
   }
   if (Array.isArray(node)) {
     return Children.map(node as ReactNode[], child => accentMarks(child, accentClassName));
+  }
+  if (isValidElement(node) && node.type === HeadingLines) {
+    // A multi-line title: mark each of its lines.
+    const element = node as ReactElement<HeadingLinesProps>;
+    return cloneElement(element, { lines: element.props.lines.map(line => accentMarks(line, accentClassName)) });
   }
   if (isValidElement(node)) {
     const element = node as ReactElement<{ children?: ReactNode }>;

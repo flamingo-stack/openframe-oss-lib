@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { accentSentenceMarks, HeadingBreak, SectionHeading } from './page-heading';
+import { accentSentenceMarks, HeadingLines, SectionHeading } from './page-heading';
 
 const html = (node: ReactNode) => renderToStaticMarkup(<>{node}</>);
 const mark = (text: string) => `<span class="text-ods-accent">${text}</span>`;
@@ -94,19 +94,16 @@ describe("a heading's text keeps its words apart", () => {
     ).toBe('AI-native IT automation Fixed on its own');
   });
 
-  it('puts a space before every line break', () => {
+  it('puts a space before every line break, and keeps an empty line as a blank line', () => {
     expect(
-      headingText(
-        <SectionHeading
-          title={
-            <>
-              Fixed on its own.
-              <HeadingBreak />
-              Approved with one tap
-            </>
-          }
-        />,
-      ),
+      headingText(<SectionHeading title={<HeadingLines lines={['Fixed on its own.', 'Approved with one tap']} />} />),
     ).toBe('Fixed on its own. Approved with one tap.');
+    expect(html(<HeadingLines lines={['A.', '', 'B.']} />)).toBe('A. <br/> <br/>B.');
+  });
+
+  it('colours the sentence marks on every line of a multi-line title', () => {
+    expect(html(<SectionHeading title={<HeadingLines lines={['Fixed on its own.', 'Approved']} />} />)).toContain(
+      `Fixed on its own${mark('.')} <br/>Approved${mark('.')}`,
+    );
   });
 });
