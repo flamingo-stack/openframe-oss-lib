@@ -25,6 +25,7 @@ import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-sectio
 import { PageShell, PageLayout } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
+import { useLegalDocuments } from './use-legal-documents';
 
 export interface LegalDocumentMarkdownRendererProps {
   content: string;
@@ -65,11 +66,19 @@ export interface LegalDocumentPageProps {
    *  to hide. Default `{ label: 'Back to home', href: '/' }`. */
   backButton?: { label?: string; href?: string } | false;
   /**
-   * The page's own FAQ block: the topic the page is about (stated by the host,
-   * never read from its address) and where the host serves the FAQs. Rendered
-   * after the page's content, inside its container. Absent: no FAQ block.
+   * The hub's list of legal documents (`GET /api/legal`). Given it, the page
+   * takes the document's title and FAQ topic from the list, so a host passes
+   * only the type and its endpoints and states nothing per document; the title
+   * then names the document even when its text fails to load.
    */
-  faq?: PageFaqSlot;
+  documentsEndpoint?: string;
+  /**
+   * The page's own FAQ block: the topic the page is about and where the host
+   * serves the FAQs. Rendered after the page's content, inside its container.
+   * Without a `topic`, the topic is the one the list (`documentsEndpoint`)
+   * gives the document. Absent, or no topic known: no FAQ block.
+   */
+  faq?: PageFaqSlot | Omit<PageFaqSlot, 'topic'>;
   /** Render the standalone `<PageShell>`. Default true. Pass false when the host
    *  layout already provides the page container — only the padding box renders,
    *  avoiding a nested `<main>`. */
@@ -102,6 +111,7 @@ export function LegalDocumentPage({
   initialLastUpdatedLabel = null,
   apiEndpoint,
   MarkdownRenderer = RichMarkdownRenderer,
+  documentsEndpoint,
   backButton,
   faq,
   shell = true,
@@ -120,7 +130,11 @@ export function LegalDocumentPage({
           onClick: () => router.push(backButton?.href ?? '/'),
         };
 
-  const title = titleProp ?? data?.title ?? 'Legal document';
+  const { documents } = useLegalDocuments({ apiEndpoint: documentsEndpoint, enabled: Boolean(documentsEndpoint) });
+  const listed = documents.find(doc => doc.docType === docType);
+  const title = titleProp ?? data?.title ?? listed?.title ?? 'Legal document';
+  const faqTopic = faq && 'topic' in faq ? faq.topic : listed?.faqTopic;
+  const faqSlot = faq && faqTopic ? { ...faq, topic: faqTopic } : null;
   const errorTitle = errorTitleProp ?? `Unable to load ${title}`;
   const emptyStateMessage = emptyStateMessageProp ?? `${title} is not available at this time.`;
 
@@ -194,7 +208,7 @@ export function LegalDocumentPage({
           </div>
         </div>
       </div>
-      {faq && <FaqSection {...pageFaqProps(faq)} />}
+      {faqSlot && <FaqSection {...pageFaqProps(faqSlot)} />}
     </PageLayout>
   );
 

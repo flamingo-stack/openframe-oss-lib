@@ -18,14 +18,12 @@ const SURFACES = [
 ]
 
 export function HomePage() {
-  // One card per legal document the hub has published (/content/api/legal): the
-  // host names none, and a document the hub adds appears here on its own.
+  // One card per legal document on the hub's list (/content/api/legal): the host
+  // names none, and a document the hub adds appears here on its own.
   const { documents } = useLegalDocuments({ apiEndpoint: EP.legalDocuments })
   const surfaces = [
     ...SURFACES,
-    ...documents
-      .filter((doc) => doc.published)
-      .map((doc) => ({ to: `/legal/${doc.docType}`, title: doc.title, desc: doc.summary })),
+    ...documents.map((doc) => ({ to: `/legal/${doc.docType}`, title: doc.title, desc: doc.summary })),
   ]
   return (
     <div className="p-6">

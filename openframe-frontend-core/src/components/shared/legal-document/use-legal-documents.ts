@@ -35,6 +35,8 @@ export interface LegalDocumentSummary {
 export interface UseLegalDocumentsOptions {
   /** Full GET endpoint URL. Default `/api/legal`. */
   apiEndpoint?: string;
+  /** False: read nothing and answer an empty list. Default true. */
+  enabled?: boolean;
 }
 
 export interface UseLegalDocumentsReturn {
@@ -79,10 +81,11 @@ export function toLegalDocumentSummaries(payload: unknown): LegalDocumentSummary
 
 export function useLegalDocuments(options: UseLegalDocumentsOptions = {}): UseLegalDocumentsReturn {
   const endpoint = options.apiEndpoint ?? '/api/legal';
-  const [state, setState] = useState<UseLegalDocumentsReturn>({ documents: [], isLoading: true, error: null });
+  const enabled = options.enabled ?? true;
+  const [state, setState] = useState<UseLegalDocumentsReturn>({ documents: [], isLoading: enabled, error: null });
 
   useEffect(() => {
-    let current = true;
+    let current = enabled;
     const load = async () => {
       try {
         const response = await contentFetch(endpoint);
@@ -100,11 +103,11 @@ export function useLegalDocuments(options: UseLegalDocumentsOptions = {}): UseLe
         }
       }
     };
-    void load();
+    if (enabled) void load();
     return () => {
       current = false;
     };
-  }, [endpoint]);
+  }, [endpoint, enabled]);
 
   return state;
 }
