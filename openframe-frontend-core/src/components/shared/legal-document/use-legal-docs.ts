@@ -189,6 +189,15 @@ export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {})
       try {
         const response = await contentFetch(effectiveEndpoint);
 
+        // 404: the hub has no published text for this document yet (a legal
+        // file is published only once it states its version and effective
+        // date). That is "not available", not a failure: no data, no error.
+        if (response.status === 404) {
+          if (!isCurrent()) return;
+          setData(null);
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`Failed to fetch ${docType} document: ${response.status} ${response.statusText}`);
         }
