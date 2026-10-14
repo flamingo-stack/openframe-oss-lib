@@ -6,7 +6,6 @@ import lombok.Data;
 
 import java.util.List;
 
-/** One page of the Fleet query list, with the page info Fleet reports beside it. */
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ScheduledQueriesResponse {

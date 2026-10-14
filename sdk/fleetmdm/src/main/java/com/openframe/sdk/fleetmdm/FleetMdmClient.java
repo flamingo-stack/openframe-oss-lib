@@ -735,12 +735,6 @@ public class FleetMdmClient {
         return listPoliciesAsync(POLICIES_URL);
     }
 
-    /**
-     * One page of policies in id order.
-     *
-     * @param afterId the id the page starts after, or null for the first page
-     * @param perPage the most policies to return
-     */
     public CompletableFuture<List<Policy>> listPoliciesAsync(Long afterId, int perPage) {
         return listPoliciesAsync(POLICIES_URL + pageAfterId(afterId, perPage));
     }
@@ -815,13 +809,7 @@ public class FleetMdmClient {
         return listScheduledQueriesAsync(QUERIES_URL);
     }
 
-    /**
-     * One page of scheduled queries in id order, by page number. Fleet's query list fails with
-     * {@code after}, so this list is not read after an id as the policy list is.
-     *
-     * @param page the zero-based page number
-     * @param perPage the most queries one page holds
-     */
+    // Paged by number: Fleet's query list fails with after, unlike the policy list.
     public CompletableFuture<ScheduledQueriesResponse> listScheduledQueriesPageAsync(int page, int perPage) {
         String path = QUERIES_URL + "?order_key=id&order_direction=asc&page=" + page + "&per_page=" + perPage;
         HttpRequest httpRequest = buildRequest(path, "GET", null);
