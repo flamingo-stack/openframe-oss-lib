@@ -14,3 +14,8 @@
 export const LEGAL_DOCUMENT_TYPES = ['privacy', 'terms', 'payment', 'license', 'security'] as const;
 
 export type LegalDocumentType = (typeof LEGAL_DOCUMENT_TYPES)[number];
+
+/** True for a type a host has a page for (one of {@link LEGAL_DOCUMENT_TYPES}). */
+export function isLegalDocumentType(value: string): value is LegalDocumentType {
+  return (LEGAL_DOCUMENT_TYPES as readonly string[]).includes(value);
+}
