@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { findIcon } from '../../components/chat/utils/icon-library';
 import { formatClassification } from '../format';
 import {
   VENDOR_CLASSIFICATION_COPY,
@@ -66,5 +67,12 @@ describe('vendor classifications', () => {
       'aaa_other',
       'zzz_other',
     ]);
+  });
+
+  it('every configured icon is a name the shared icon resolver holds', () => {
+    for (const [value, copy] of Object.entries(VENDOR_CLASSIFICATION_COPY)) {
+      expect(copy.icon, value).toBeDefined();
+      expect(findIcon(copy.icon?.name), `${value}: ${copy.icon?.name}`).not.toBeNull();
+    }
   });
 });

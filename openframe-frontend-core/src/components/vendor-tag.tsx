@@ -1,25 +1,11 @@
 'use client';
 
-import {
-  AlertTriangle,
-  Boxes,
-  Clock,
-  Code,
-  Database,
-  DollarSign,
-  FileCode,
-  Hand,
-  type LucideIcon,
-  PauseCircle,
-  Plug,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Boxes, Database, DollarSign, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { createElement, type ReactNode } from 'react';
 import { cn } from '../utils/cn';
 import { formatClassification } from '../utils/format';
-import { vendorClassificationCopy } from '../utils/vendor-classification';
-import { OpenframeLogoIcon } from './icons-v2-generated/logos/openframe-logo-icon';
+import { type VendorClassificationIconConfig, vendorClassificationCopy } from '../utils/vendor-classification';
+import { resolveIcon } from './chat/utils/icon-library';
 
 export interface VendorTagProps {
   type:
@@ -48,23 +34,58 @@ export interface VendorTagProps {
   accentColor?: string;
 }
 
-/**
- * The icon of a classification we present specially. Any other classification the server
- * sends is still a tag: its label (curated, else title case) with no icon.
- */
-const CLASSIFICATION_ICONS: Readonly<Record<string, { Icon: LucideIcon; tile: string; iconClass: string }>> = {
-  open_source: { Icon: Code, tile: 'bg-ods-accent', iconClass: 'text-ods-text-on-accent' },
-  commercial: { Icon: DollarSign, tile: 'bg-ods-border', iconClass: 'text-ods-text-secondary' },
-  source_available: { Icon: FileCode, tile: 'bg-ods-border', iconClass: 'text-ods-text-secondary' },
-  end_of_life: { Icon: AlertTriangle, tile: '', iconClass: 'text-ods-warning' },
-  end_of_support: { Icon: Clock, tile: '', iconClass: 'text-ods-warning' },
-  unmaintained: { Icon: PauseCircle, tile: '', iconClass: 'text-ods-warning' },
+const TONE_CLASS: Readonly<Record<VendorClassificationIconConfig['tone'], string>> = {
+  accent: 'text-ods-text-on-accent',
+  neutral: 'text-ods-text-secondary',
+  warning: 'text-ods-warning',
 };
 
 /**
- * A classification tag, derived from the value the server sends. An OpenFrame value is the
- * OpenFrame mark and its one word; a lifecycle value reads in the warning colour; an
- * enriched value carries its icon; any other value is its title-cased label.
+ * A classification's icon, from its config (`VENDOR_CLASSIFICATION_COPY[value].icon`): the
+ * icon is resolved by NAME through the shared resolver, never imported here. A license icon
+ * sits on a small tile (the accent tile for an `accent` tone); an OpenFrame mark and a
+ * lifecycle icon are drawn bare in their tone. A value with no icon draws nothing.
+ */
+export function VendorClassificationIcon({
+  classification,
+  accentColor,
+  className,
+}: {
+  classification: string;
+  /** The accent tile's colour, for a host that tints its hover accent (a vendor card). */
+  accentColor?: string;
+  className?: string;
+}) {
+  const copy = vendorClassificationCopy(classification);
+  if (!copy?.icon) return null;
+  // The resolver returns one component per name, loaded on demand (drawn through `createElement`, as `NamedIcon` does).
+  const icon = resolveIcon(copy.icon.name);
+  if (copy.group !== 'license') {
+    const bareClass = copy.icon.tone === 'accent' ? 'text-ods-accent' : TONE_CLASS[copy.icon.tone];
+    return createElement(icon, {
+      size: copy.group === 'openframe' ? 16 : 12,
+      className: cn('shrink-0', bareClass, className),
+    });
+  }
+  const accent = copy.icon.tone === 'accent';
+  return (
+    <div
+      className={cn(
+        'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm',
+        accent ? 'bg-ods-accent' : 'bg-ods-border',
+        className,
+      )}
+      style={accent && accentColor ? { backgroundColor: accentColor } : undefined}
+    >
+      {createElement(icon, { size: 10, className: TONE_CLASS[copy.icon.tone] })}
+    </div>
+  );
+}
+
+/**
+ * A classification tag, derived from the value the server sends and its config: the label
+ * (an OpenFrame value's one word), the configured icon, and the warning text colour for a
+ * lifecycle value. Any other value is its title-cased label with no icon.
  */
 function classificationTag(
   value: string,
@@ -72,28 +93,10 @@ function classificationTag(
   accentColor?: string,
 ): { text: string; icon: ReactNode; textColor?: string } {
   const copy = vendorClassificationCopy(value);
-  if (copy?.group === 'openframe') {
-    return {
-      text: text || copy.word || copy.label,
-      textColor: undefined,
-      icon: (
-        <OpenframeLogoIcon secondaryColor="currentColor" color="currentColor" className="h-4 w-4 text-ods-accent" />
-      ),
-    };
-  }
-  const enriched = CLASSIFICATION_ICONS[value];
-  const accentTile = value === 'open_source' && accentColor ? { backgroundColor: accentColor } : undefined;
   return {
-    text: text || copy?.label || formatClassification(value),
+    text: text || (copy?.group === 'openframe' ? copy.word : undefined) || copy?.label || formatClassification(value),
     textColor: copy?.group === 'lifecycle' ? 'text-ods-warning' : undefined,
-    icon: enriched ? (
-      <div
-        className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm', enriched.tile)}
-        style={accentTile}
-      >
-        <enriched.Icon width={10} height={10} className={enriched.iconClass} />
-      </div>
-    ) : null,
+    icon: <VendorClassificationIcon classification={value} accentColor={accentColor} />,
   };
 }
 

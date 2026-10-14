@@ -25,6 +25,18 @@ export interface VendorClassificationCopy {
   group: VendorClassificationGroup;
   /** OpenFrame group only: the one word drawn beside the OpenFrame mark. */
   word?: string;
+  /** The icon drawn beside the label, by name (resolved by the shared icon resolver), and its tone. */
+  icon?: VendorClassificationIconConfig;
+}
+
+/**
+ * A classification's icon, as data: `name` is any name the shared resolver knows (an alias such
+ * as `openframe-logo`, an icon of the design set by its kebab name, or a lucide name). `tone`:
+ * `accent` (the brand colour), `neutral` (secondary text on a tile) or `warning`.
+ */
+export interface VendorClassificationIconConfig {
+  name: string;
+  tone: 'accent' | 'neutral' | 'warning';
 }
 
 /** In display order: a filter list shows OpenFrame first, then license, then lifecycle. */
@@ -35,6 +47,7 @@ export const VENDOR_CLASSIFICATION_COPY: Readonly<Record<string, VendorClassific
     description:
       'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
     group: 'openframe',
+    icon: { name: 'openframe-logo', tone: 'accent' },
   },
   openframe_connect: {
     label: 'OpenFrame Connect',
@@ -42,43 +55,51 @@ export const VENDOR_CLASSIFICATION_COPY: Readonly<Record<string, VendorClassific
     description:
       'Services OpenFrame connects to and manages for every client, such as Microsoft 365 and Google Workspace, beside devices and tickets.',
     group: 'openframe',
+    icon: { name: 'openframe-logo', tone: 'accent' },
   },
   openframe_shipped: {
     label: 'OpenFrame Shipped',
     word: 'Shipped',
     description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
     group: 'openframe',
+    icon: { name: 'openframe-logo', tone: 'accent' },
   },
   open_source: {
     label: 'Open Source',
     description: 'Released under an OSI-approved open-source license.',
     group: 'license',
+    icon: { name: 'code', tone: 'accent' },
   },
   source_available: {
     label: 'Source-available',
     description:
       'The source code is public, but the license restricts how it may be used (for example SSPL, BSL, the Elastic License, or limits on company size or on offering it as a service).',
     group: 'license',
+    icon: { name: 'file-code', tone: 'neutral' },
   },
   commercial: {
     label: 'Commercial',
     description: 'Proprietary software sold by the vendor.',
     group: 'license',
+    icon: { name: 'dollar', tone: 'neutral' },
   },
   end_of_life: {
     label: 'End of life',
     description: 'The vendor has discontinued or retired the product. No new releases.',
     group: 'lifecycle',
+    icon: { name: 'alert-triangle', tone: 'warning' },
   },
   end_of_support: {
     label: 'End of support',
     description: 'The vendor no longer provides support or security fixes, though the product can still be obtained.',
     group: 'lifecycle',
+    icon: { name: 'clock', tone: 'warning' },
   },
   unmaintained: {
     label: 'Unmaintained',
     description: 'No release for years and no official end-of-life notice.',
     group: 'lifecycle',
+    icon: { name: 'pause-circle', tone: 'warning' },
   },
 };
 

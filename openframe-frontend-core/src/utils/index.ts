@@ -29,6 +29,7 @@ export {
   type VendorClassificationValue,
   type VendorClassificationGroup,
   type VendorClassificationCopy,
+  type VendorClassificationIconConfig,
 } from './vendor-classification';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
