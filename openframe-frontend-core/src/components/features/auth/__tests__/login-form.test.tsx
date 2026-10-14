@@ -151,3 +151,25 @@ describe('LoginForm notice', () => {
     expect(screen.getByRole('status').textContent).toContain('Ask your administrator for an invitation.');
   });
 });
+
+describe('LoginForm methods transition', () => {
+  const ACME = { name: 'Acme', openframe: true, providers: [] };
+
+  const methods = () => screen.getByRole('group', { name: 'Sign-in methods' });
+
+  it("mounts the block anew when an organization's methods take over, so all of it eases in", () => {
+    const { rerender } = render(<LoginForm {...baseProps} ssoProviders={GENERIC} />);
+    const generic = methods();
+    expect(generic).not.toHaveClass('animate-in');
+
+    rerender(<LoginForm {...baseProps} ssoProviders={GENERIC} tenantMethods={ACME} />);
+    expect(methods()).not.toBe(generic);
+    expect(methods()).toHaveClass('animate-in');
+  });
+
+  it('goes back to the generic set without easing', () => {
+    const { rerender } = render(<LoginForm {...baseProps} ssoProviders={GENERIC} tenantMethods={ACME} />);
+    rerender(<LoginForm {...baseProps} ssoProviders={GENERIC} />);
+    expect(methods()).not.toHaveClass('animate-in');
+  });
+});

@@ -12,6 +12,12 @@ import { LegalLinks } from './legal-links';
 import type { AuthSsoProvider } from './sso-providers';
 import { SsoProviderButtons } from './sso-providers';
 
+/**
+ * How a block that appears in answer to the email eases in: the prototype's fade from 4px above, short
+ * enough to read as the same card changing rather than a new one arriving.
+ */
+const ENTER_ANIMATION = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 ease-out motion-reduce:animate-none';
+
 /** The sign-in methods of the organization an email resolved to. */
 export interface LoginFormTenantMethods {
   /** Names the block ("Sign-in methods for <name>") and tags the organization's own providers. */
@@ -166,7 +172,10 @@ export function LoginForm({
         <div
           role="status"
           // A minimum, not a fixed height: the notice can run to several lines at phone width.
-          className="flex min-h-11 w-full items-center gap-[var(--spacing-system-m)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h3 md:min-h-12"
+          className={cn(
+            'flex min-h-11 w-full items-center gap-[var(--spacing-system-m)] rounded-md bg-ods-bg-surface px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h3 md:min-h-12',
+            ENTER_ANIMATION,
+          )}
         >
           <AlertTriangleIcon className="h-6 w-6 shrink-0" />
           {notice}
@@ -192,45 +201,57 @@ export function LoginForm({
         </div>
       )}
 
-      {tenantMethods && (
-        <>
-          <LabeledDivider label={`Sign-in methods for ${tenantMethods.name || 'your organization'}`} />
-          {tenantMethods.openframe && (
-            // Not configured with anyone's credentials, so it carries no tag.
-            <SsoProviderButtons
-              providers={['openframe']}
-              onSsoClick={onSsoClick}
-              actionLabel={ssoActionLabel}
-              disabled={providersDisabled}
-            />
+      {(tenantMethods || ssoProviders.length > 0) && (
+        // One block, so an organization's methods replace the generic set as a whole: the key mounts
+        // it anew when they arrive, and every row of it eases in, not only the rows that are new.
+        // Going back to the generic set swaps without a transition, as the prototype does.
+        <div
+          key={tenantMethods ? `tenant:${tenantMethods.name ?? ''}` : 'generic'}
+          role="group"
+          aria-label="Sign-in methods"
+          className={cn('flex flex-col gap-[var(--spacing-system-l)]', tenantMethods && ENTER_ANIMATION)}
+        >
+          {tenantMethods && (
+            <>
+              <LabeledDivider label={`Sign-in methods for ${tenantMethods.name || 'your organization'}`} />
+              {tenantMethods.openframe && (
+                // Not configured with anyone's credentials, so it carries no tag.
+                <SsoProviderButtons
+                  providers={['openframe']}
+                  onSsoClick={onSsoClick}
+                  actionLabel={ssoActionLabel}
+                  disabled={providersDisabled}
+                />
+              )}
+              {tenantMethods.providers.length > 0 && (
+                <SsoProviderButtons
+                  providers={tenantMethods.providers}
+                  onSsoClick={onSsoClick}
+                  actionLabel={ssoActionLabel}
+                  disabled={providersDisabled}
+                  tag={tenantMethods.name}
+                />
+              )}
+            </>
           )}
-          {tenantMethods.providers.length > 0 && (
-            <SsoProviderButtons
-              providers={tenantMethods.providers}
-              onSsoClick={onSsoClick}
-              actionLabel={ssoActionLabel}
-              disabled={providersDisabled}
-              tag={tenantMethods.name}
-            />
-          )}
-        </>
-      )}
 
-      {ssoProviders.length > 0 && (
-        <>
-          {/* Under an organization heading with nothing above it, a second divider would only
-              separate the heading from its own buttons. */}
-          {(!tenantMethods || tenantMethods.openframe || tenantMethods.providers.length > 0) && (
-            <LabeledDivider label={dividerLabel} />
+          {ssoProviders.length > 0 && (
+            <>
+              {/* Under an organization heading with nothing above it, a second divider would only
+                separate the heading from its own buttons. */}
+              {(!tenantMethods || tenantMethods.openframe || tenantMethods.providers.length > 0) && (
+                <LabeledDivider label={dividerLabel} />
+              )}
+              <SsoProviderButtons
+                providers={ssoProviders}
+                onSsoClick={onSsoClick}
+                actionLabel={ssoActionLabel}
+                disabled={providersDisabled}
+                enabledProviders={ssoEnabledProviders}
+              />
+            </>
           )}
-          <SsoProviderButtons
-            providers={ssoProviders}
-            onSsoClick={onSsoClick}
-            actionLabel={ssoActionLabel}
-            disabled={providersDisabled}
-            enabledProviders={ssoEnabledProviders}
-          />
-        </>
+        </div>
       )}
 
       {termsUrl && privacyPolicyUrl && <LegalLinks termsUrl={termsUrl} privacyPolicyUrl={privacyPolicyUrl} />}
