@@ -716,7 +716,7 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
   // An editor's Nofollow choice (the editors write it as an HTML anchor): the SEO tokens are kept,
   // any other authored token is dropped, and new-tab links still get noopener noreferrer.
   'link-authored-rel':
-    '<a href="https://example.com/sponsor" rel="nofollow">nofollow</a>, <a href="/pricing" rel="nofollow ugc">internal</a>, <a href="https://example.com/me" rel="me">me</a> and [followed](https://example.com/page).',
+    '<a href="https://example.com/sponsor" rel="nofollow">nofollow</a>, <a href="/pricing" rel="nofollow ugc">internal</a>, <a href="https://example.com/me" rel="me">me</a>, <a href="https://example.com/ad" rel="sponsored">ad</a> and [followed](https://example.com/page).',
   // A Reddit post the author marked nofollow keeps it on the card's links to the post.
   'reddit-embed-bq-nofollow':
     '<blockquote class="reddit-embed-bq"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/" rel="nofollow">view</a></blockquote>',

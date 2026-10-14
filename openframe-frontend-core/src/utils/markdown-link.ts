@@ -2,10 +2,11 @@
  * One link format for the markdown editors and one `rel` rule for the renderers.
  *
  * A FOLLOWED link is written as markdown, `[text](url)`, exactly as the editors always wrote it.
- * A NOFOLLOW link is written as an HTML anchor, `<a href="url" rel="nofollow">text</a>`: markdown
- * has no attribute syntax, and an HTML anchor is what stored content already uses for links that
- * carry attributes (the sanitizer keeps `rel` on `a`). Reading back accepts both forms, so a link
- * can be switched either way. Nothing is rewritten unless an editor changes a link.
+ * A link with an authored `rel` (nofollow, sponsored or ugc, the values Google reads) is written as
+ * an HTML anchor, `<a href="url" rel="sponsored">text</a>`: markdown has no attribute syntax, and
+ * an HTML anchor is what stored content already uses for links that carry attributes (the
+ * sanitizer keeps `rel` on `a`). Reading back accepts both forms, so a link can be switched either
+ * way. Nothing is rewritten unless an editor changes a link.
  *
  * Server-safe: no React, no DOM.
  */
@@ -13,11 +14,13 @@
 /** The `rel` tokens an author may set on a link. Search engines read these; nothing else is kept. */
 export const AUTHORED_LINK_REL_TOKENS = ['nofollow', 'ugc', 'sponsored'] as const;
 
+export type AuthoredLinkRel = (typeof AUTHORED_LINK_REL_TOKENS)[number];
+
 /** What a renderer adds to every link that opens in a new tab. */
 const NEW_TAB_REL = 'noopener noreferrer';
 
 /** The authored SEO tokens in a `rel` value, in their canonical order. */
-export function authoredRelTokens(rel: string | readonly string[] | null | undefined): string[] {
+export function authoredRelTokens(rel: string | readonly string[] | null | undefined): AuthoredLinkRel[] {
   if (!rel) return [];
   const given = new Set(
     (typeof rel === 'string' ? rel.split(/\s+/) : rel).map(token => token.trim().toLowerCase()).filter(Boolean),
@@ -38,7 +41,7 @@ export function renderedLinkRel(
   authoredRel: string | readonly string[] | null | undefined,
   opensInNewTab: boolean,
 ): string | undefined {
-  const tokens = authoredRelTokens(authoredRel);
+  const tokens: string[] = authoredRelTokens(authoredRel);
   if (opensInNewTab) tokens.push(NEW_TAB_REL);
   return tokens.length > 0 ? tokens.join(' ') : undefined;
 }
@@ -47,7 +50,8 @@ export function renderedLinkRel(
 export interface MarkdownLinkFields {
   text: string;
   url: string;
-  nofollow: boolean;
+  /** The authored `rel` values. Empty = a followed link. */
+  rel: AuthoredLinkRel[];
 }
 
 /** A link found in the editor's text, with the range it occupies. */
@@ -120,23 +124,24 @@ export function findMarkdownLinkAt(
       end,
       text: decodeHtmlEntities(match[2] ?? ''),
       url: decodeHtmlEntities(htmlAttribute(attributes, 'href') ?? ''),
-      nofollow: isNofollowRel(htmlAttribute(attributes, 'rel')),
+      rel: authoredRelTokens(htmlAttribute(attributes, 'rel')),
     };
   }
   for (const match of text.matchAll(MARKDOWN_LINK_RE)) {
     const start = match.index ?? 0;
     const end = start + match[0].length;
     if (!contains(start, end)) continue;
-    return { start, end, text: unescapeMarkdownLinkText(match[1] ?? ''), url: match[2] ?? '', nofollow: false };
+    return { start, end, text: unescapeMarkdownLinkText(match[1] ?? ''), url: match[2] ?? '', rel: [] };
   }
   return null;
 }
 
-/** The text that writes a link: markdown when followed, an HTML anchor when nofollow. */
-export function formatMarkdownLink({ text, url, nofollow }: MarkdownLinkFields): string {
+/** The text that writes a link: markdown when followed, an HTML anchor when it carries a `rel`. */
+export function formatMarkdownLink({ text, url, rel }: MarkdownLinkFields): string {
   const label = text.length > 0 ? text : url;
-  if (nofollow) {
-    return `<a href="${escapeHtmlAttribute(url)}" rel="nofollow">${escapeHtmlText(label)}</a>`;
+  const tokens = authoredRelTokens(rel);
+  if (tokens.length > 0) {
+    return `<a href="${escapeHtmlAttribute(url)}" rel="${tokens.join(' ')}">${escapeHtmlText(label)}</a>`;
   }
   return `[${escapeMarkdownLinkText(label)}](${encodeMarkdownUrl(url)})`;
 }

@@ -35,13 +35,13 @@ describe('findMarkdownLinkAt', () => {
       end: 37,
       text: 'the docs',
       url: 'https://example.com/a',
-      nofollow: false,
+      rel: [],
     });
   });
 
   it('finds an HTML anchor and reads its nofollow', () => {
     const link = findMarkdownLinkAt(text, text.indexOf('>X<') + 1);
-    expect(link).toMatchObject({ text: 'X', url: 'https://x.com/b?a=1&c=2', nofollow: true });
+    expect(link).toMatchObject({ text: 'X', url: 'https://x.com/b?a=1&c=2', rel: ['nofollow'] });
     if (!link) return;
     expect(text.slice(link.start, link.end)).toBe(
       '<a href="https://x.com/b?a=1&amp;c=2" rel="nofollow">X</a>',
@@ -60,27 +60,37 @@ describe('findMarkdownLinkAt', () => {
 
 describe('formatMarkdownLink', () => {
   it('writes a followed link as markdown', () => {
-    expect(formatMarkdownLink({ text: 'a [b]', url: 'https://e.com/x y', nofollow: false })).toBe(
+    expect(formatMarkdownLink({ text: 'a [b]', url: 'https://e.com/x y', rel: [] })).toBe(
       '[a \\[b\\]](https://e.com/x%20y)',
     );
   });
 
   it('writes a nofollow link as an HTML anchor, escaped', () => {
-    expect(formatMarkdownLink({ text: 'R&D <x>', url: 'https://e.com/?a="1"', nofollow: true })).toBe(
+    expect(formatMarkdownLink({ text: 'R&D <x>', url: 'https://e.com/?a="1"', rel: ['nofollow'] })).toBe(
       '<a href="https://e.com/?a=&quot;1&quot;" rel="nofollow">R&amp;D &lt;x&gt;</a>',
     );
   });
 
   it('uses the URL as the text when the text is empty', () => {
-    expect(formatMarkdownLink({ text: '', url: 'https://e.com', nofollow: false })).toBe('[https://e.com](https://e.com)');
+    expect(formatMarkdownLink({ text: '', url: 'https://e.com', rel: [] })).toBe('[https://e.com](https://e.com)');
   });
 
-  it('round-trips through findMarkdownLinkAt both ways', () => {
-    for (const nofollow of [true, false]) {
-      const written = formatMarkdownLink({ text: 'a [b] & c', url: 'https://e.com/p?q=1&r=2', nofollow });
+  it('writes sponsored, ugc and combined values as one rel', () => {
+    expect(formatMarkdownLink({ text: 'Ad', url: 'https://e.com', rel: ['sponsored'] })).toBe(
+      '<a href="https://e.com" rel="sponsored">Ad</a>',
+    );
+    expect(formatMarkdownLink({ text: 'c', url: 'https://e.com', rel: ['ugc', 'nofollow'] })).toBe(
+      '<a href="https://e.com" rel="nofollow ugc">c</a>',
+    );
+  });
+
+  it('round-trips through findMarkdownLinkAt for every choice', () => {
+    const choices: Parameters<typeof formatMarkdownLink>[0]['rel'][] = [[], ['nofollow'], ['sponsored'], ['ugc'], ['nofollow', 'ugc']];
+    for (const rel of choices) {
+      const written = formatMarkdownLink({ text: 'a [b] & c', url: 'https://e.com/p?q=1&r=2', rel });
       const read = findMarkdownLinkAt(written, 2);
-      expect(read).toMatchObject({ text: 'a [b] & c', url: 'https://e.com/p?q=1&r=2', nofollow });
-      expect(isNofollowRel(nofollow ? 'nofollow' : undefined)).toBe(nofollow);
+      expect(read).toMatchObject({ text: 'a [b] & c', url: 'https://e.com/p?q=1&r=2', rel });
+      expect(isNofollowRel(rel)).toBe(rel.includes('nofollow'));
     }
   });
 });

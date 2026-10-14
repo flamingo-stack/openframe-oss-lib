@@ -3,6 +3,7 @@
 import type { ICommand, TextAreaTextApi, TextRange } from '@uiw/react-md-editor';
 import { type ReactNode, useEffect, useId, useMemo, useState } from 'react';
 import {
+  type AuthoredLinkRel,
   findMarkdownLinkAt,
   formatMarkdownLink,
   type MarkdownLinkFields,
@@ -12,13 +13,33 @@ import { Input } from './input';
 import { ModalV2, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { TabSelector } from './tab-selector';
 
-const FOLLOW = 'follow';
-const NOFOLLOW = 'nofollow';
+type LinkRelChoice = 'follow' | AuthoredLinkRel;
 
-const LINK_FOLLOW_ITEMS = [
-  { id: FOLLOW, label: 'Follow' },
-  { id: NOFOLLOW, label: 'Nofollow' },
+/** What each choice tells search engines, in Google's own terms (Search Central, "Qualify your outbound links"). */
+const LINK_REL_CHOICES: { id: LinkRelChoice; label: string; hint: string }[] = [
+  { id: 'follow', label: 'Follow', hint: 'Search engines follow this link. This is the default.' },
+  {
+    id: 'nofollow',
+    label: 'Nofollow',
+    hint: 'Search engines are asked not to follow this link (rel="nofollow").',
+  },
+  {
+    id: 'sponsored',
+    label: 'Sponsored',
+    hint: 'For ads, paid placements and sponsorships (rel="sponsored").',
+  },
+  { id: 'ugc', label: 'UGC', hint: 'For links in content written by users, such as comments (rel="ugc").' },
 ];
+
+const LINK_REL_ITEMS = LINK_REL_CHOICES.map(({ id, label }) => ({ id, label }));
+
+/** The choice a link's `rel` shows: the most specific value it carries (sponsored, then ugc, then nofollow). */
+function choiceOf(rel: readonly AuthoredLinkRel[]): LinkRelChoice {
+  if (rel.includes('sponsored')) return 'sponsored';
+  if (rel.includes('ugc')) return 'ugc';
+  if (rel.includes('nofollow')) return 'nofollow';
+  return 'follow';
+}
 
 export interface MarkdownLinkDialogProps {
   isOpen: boolean;
@@ -33,14 +54,16 @@ export interface MarkdownLinkDialogProps {
 }
 
 /**
- * The link dialog of the markdown editors: the link's text, its address, and whether search engines
- * follow it. Follow is the default; Nofollow writes the link as `<a rel="nofollow">`.
+ * The link dialog of the markdown editors: the link's text, its address, and what it tells search
+ * engines: Follow (the default), Nofollow, Sponsored or UGC. Any choice but Follow writes the link
+ * as `<a rel="…">`. A link that carries several values (`rel="ugc nofollow"`) keeps them all until
+ * the choice is changed.
  */
 export function MarkdownLinkDialog({ isOpen, initial, editing, onSubmit, onRemove, onClose }: MarkdownLinkDialogProps) {
   const formId = useId();
   const [text, setText] = useState(initial.text);
   const [url, setUrl] = useState(initial.url);
-  const [nofollow, setNofollow] = useState(initial.nofollow);
+  const [rel, setRel] = useState(initial.rel);
 
   // Re-seed while rendering when the dialog opens on another link (the modal stays mounted).
   const [seededWith, setSeededWith] = useState({ isOpen, initial });
@@ -49,14 +72,15 @@ export function MarkdownLinkDialog({ isOpen, initial, editing, onSubmit, onRemov
     if (isOpen) {
       setText(initial.text);
       setUrl(initial.url);
-      setNofollow(initial.nofollow);
+      setRel(initial.rel);
     }
   }
 
+  const choice = choiceOf(rel);
   const trimmedUrl = url.trim();
   const submit = () => {
     if (!trimmedUrl) return;
-    onSubmit({ text: text.trim(), url: trimmedUrl, nofollow });
+    onSubmit({ text: text.trim(), url: trimmedUrl, rel });
   };
 
   return (
@@ -85,15 +109,16 @@ export function MarkdownLinkDialog({ isOpen, initial, editing, onSubmit, onRemov
         <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
           <TabSelector
             label="Search engines"
-            value={nofollow ? NOFOLLOW : FOLLOW}
-            onValueChange={value => setNofollow(value === NOFOLLOW)}
-            items={LINK_FOLLOW_ITEMS}
+            value={choice}
+            onValueChange={value => {
+              const next = LINK_REL_CHOICES.find(option => option.id === value)?.id ?? 'follow';
+              setRel(next === 'follow' ? [] : [next]);
+            }}
+            items={LINK_REL_ITEMS}
             variant="secondary"
           />
           <p className="text-ods-text-secondary text-h6">
-            {nofollow
-              ? 'Search engines are asked not to follow this link (rel="nofollow").'
-              : 'Search engines follow this link. This is the default.'}
+            {LINK_REL_CHOICES.find(option => option.id === choice)?.hint}
           </p>
         </div>
       </form>
@@ -124,15 +149,15 @@ interface PendingLink {
   editing: boolean;
 }
 
-const EMPTY_LINK: MarkdownLinkFields = { text: '', url: '', nofollow: false };
+const EMPTY_LINK: MarkdownLinkFields = { text: '', url: '', rel: [] };
 
 const LOOKS_LIKE_URL = /^(?:https?:\/\/|www\.|mailto:|\/|#)\S*$/i;
 
 function initialFieldsFromSelection(selectedText: string): MarkdownLinkFields {
   const selected = selectedText.trim();
   return LOOKS_LIKE_URL.test(selected)
-    ? { text: '', url: selected, nofollow: false }
-    : { text: selected, url: '', nofollow: false };
+    ? { text: '', url: selected, rel: [] }
+    : { text: selected, url: '', rel: [] };
 }
 
 export interface MarkdownLinkCommand {
@@ -187,7 +212,7 @@ export function useMarkdownLinkCommand(): MarkdownLinkCommand {
               ? {
                   api,
                   range: { start: existing.start, end: existing.end },
-                  initial: { text: existing.text, url: existing.url, nofollow: existing.nofollow },
+                  initial: { text: existing.text, url: existing.url, rel: existing.rel },
                   editing: true,
                 }
               : {
