@@ -69,6 +69,12 @@ describe('formatMarkdownLink', () => {
     );
   });
 
+  it('escapes < in a followed link so its text is never read as an HTML tag', () => {
+    const written = formatMarkdownLink({ text: 'see <notes>', url: 'https://e.com', rel: [] });
+    expect(written).toBe('[see \\<notes>](https://e.com)');
+    expect(findMarkdownLinkAt(written, 2)).toMatchObject({ text: 'see <notes>', rel: [] });
+  });
+
   it('uses the URL as the text when the text is empty', () => {
     expect(formatMarkdownLink({ text: '', url: 'https://e.com', rel: [] })).toBe('[https://e.com](https://e.com)');
   });

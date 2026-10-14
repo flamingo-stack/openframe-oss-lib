@@ -88,12 +88,13 @@ function escapeHtmlText(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+/** Brackets end the link text and `<` would open raw HTML (CommonMark), so all three are escaped. */
 function escapeMarkdownLinkText(value: string): string {
-  return value.replace(/([\\[\]])/g, '\\$1');
+  return value.replace(/([\\[\]<])/g, '\\$1');
 }
 
 function unescapeMarkdownLinkText(value: string): string {
-  return value.replace(/\\([\\[\]])/g, '$1');
+  return value.replace(/\\([\\[\]<])/g, '$1');
 }
 
 /** A URL inside `(…)` breaks on whitespace and unbalanced parentheses; percent-encode them. */

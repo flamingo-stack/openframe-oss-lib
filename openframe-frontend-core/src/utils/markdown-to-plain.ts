@@ -8,6 +8,11 @@
  * breaks; `mode: 'preview'` collapses everything to a single line. Both share
  * the same inline-marker strip (link / bold / italic / inline-code).
  *
+ * Raw HTML is Markdown too (CommonMark "Raw HTML"; the editors write a link that carries a `rel`
+ * as `<a href rel>`), so tags are removed and their text kept: `<a …>a partner</a>` → `a partner`.
+ * `<script>` / `<style>` lose their content, `<br>` becomes a line break, comments go, and the
+ * common entities are decoded. Inline code is left alone, so `` `<div>` `` stays readable.
+ *
  * All regex patterns are linear (negated character classes, non-greedy with
  * bounded targets) — no nested quantifiers, no catastrophic backtracking on
  * pathological input.
@@ -37,6 +42,41 @@ export function stripInlineMarkdown(s: string): string {
     .replace(/`([^`]+)`/g, '$1'); // `inline code` → inline code
 }
 
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
+const HTML_RAW_TEXT_RE = /<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
+const HTML_BREAK_RE = /<br\s*\/?>/gi;
+// A tag starts with `<` (or `</`) directly followed by a letter, so `a < b > c` is not one.
+const HTML_TAG_RE = /<\/?[A-Za-z][^<>]*>/g;
+const INLINE_CODE_SPLIT_RE = /(`[^`]+`)/;
+const HTML_ENTITIES: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&apos;': "'",
+  '&nbsp;': ' ',
+};
+const HTML_ENTITY_RE = /&(?:amp|lt|gt|quot|#39|apos|nbsp);/g;
+
+/** Remove raw HTML tags and keep their text, outside inline code spans. */
+function stripHtml(s: string): string {
+  return s
+    .split(INLINE_CODE_SPLIT_RE)
+    .map((part, index) =>
+      // Odd indexes are the captured inline-code spans: left as written.
+      index % 2 === 1
+        ? part
+        : part
+            .replace(HTML_COMMENT_RE, '')
+            .replace(HTML_RAW_TEXT_RE, '')
+            .replace(HTML_BREAK_RE, '\n')
+            .replace(HTML_TAG_RE, '')
+            .replace(HTML_ENTITY_RE, entity => HTML_ENTITIES[entity] ?? entity),
+    )
+    .join('');
+}
+
 export function markdownToPlainText(markdown: string, options: MarkdownToPlainOptions = {}): string {
   const { mode = 'article', maxChars } = options;
 
@@ -46,6 +86,8 @@ export function markdownToPlainText(markdown: string, options: MarkdownToPlainOp
     .replace(/```[\s\S]*?```/g, '')
     // Images — `![alt](src)` → empty (we drop them entirely in plain text).
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '');
+
+  out = stripHtml(out);
 
   out = stripInlineMarkdown(out)
     // Heading markers (any depth).
