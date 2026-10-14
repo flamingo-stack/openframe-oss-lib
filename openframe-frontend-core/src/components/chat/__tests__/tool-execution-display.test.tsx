@@ -62,6 +62,18 @@ describe('ToolExecutionDisplay', () => {
     expect(expander()).toBeTruthy();
   });
 
+  it('drops the expander once a local run ends with no arguments and no result', () => {
+    // Its "Result:" placeholder is gone with the run, so nothing is left behind the chevron.
+    render(
+      <ToolExecutionDisplay
+        message={{ ...remoteRead, integratedToolType: 'FLEET', type: 'EXECUTED_TOOL', success: true }}
+        assistantType="mingo"
+      />,
+    );
+    expect(screen.getByText('Searching OpenFrame resources')).toBeTruthy();
+    expect(expander()).toBeNull();
+  });
+
   it('keeps the old behaviour when the backend sent no title', () => {
     // Collapsing to a static row here would render a blank line.
     render(<ToolExecutionDisplay message={{ ...remoteRead, toolTitle: undefined }} assistantType="mingo" />);

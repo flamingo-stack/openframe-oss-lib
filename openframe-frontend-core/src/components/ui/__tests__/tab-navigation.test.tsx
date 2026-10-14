@@ -1,7 +1,12 @@
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { mockPush, mockReplace, setMockSearchParams } from '../../../../vitest.setup';
-import { TabNavigation, type TabItem, type TabNavigationUrlSyncOptions } from '../tab-navigation';
+import {
+  TabNavigation,
+  TabNavigationVariantProvider,
+  type TabItem,
+  type TabNavigationUrlSyncOptions,
+} from '../tab-navigation';
 
 beforeAll(() => {
   // jsdom ships no ResizeObserver; the tab strip observes itself on mount to
@@ -240,6 +245,59 @@ describe('TabNavigation with urlSync', () => {
         widthSpy.mockRestore();
         leftSpy.mockRestore();
       }
+    });
+  });
+
+  describe('the variant', () => {
+    const ICON_TABS: TabItem[] = [
+      { id: 'list', label: 'Scripts List', icon: props => <svg {...props} data-testid="icon-list" /> },
+      { id: 'schedules', label: 'Scripts Schedules', icon: props => <svg {...props} data-testid="icon-schedules" /> },
+    ];
+
+    function strip() {
+      return {
+        open: screen.getByRole('button', { name: 'Scripts List' }),
+        other: screen.getByRole('button', { name: 'Scripts Schedules' }),
+        otherIcon: screen.getByTestId('icon-schedules'),
+      };
+    }
+
+    it('draws `default` with the open tab marked by the underline alone', () => {
+      render(<TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} />);
+
+      const { open, other, otherIcon } = strip();
+      expect(open.className).not.toContain('bg-gradient-to-b');
+      expect(other.className).not.toContain('bg-gradient-to-b');
+      expect(otherIcon.getAttribute('class')).toContain('group-hover:text-ods-text-primary');
+    });
+
+    // Regression guard. The homepage demo's look once replaced the admin's on
+    // every strip: the gap and the accent fade were gone, and an inactive tab's
+    // icon lit up on hover while its label stayed grey.
+    it('draws `admin` with the accent fade, and leaves an inactive icon its colour on hover', () => {
+      render(<TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} variant="admin" />);
+
+      const { open, other, otherIcon } = strip();
+      expect(open.className).toContain('bg-gradient-to-b');
+      expect(other.className).toContain('hover:bg-gradient-to-b');
+      expect(otherIcon.getAttribute('class')).not.toContain('group-hover:');
+    });
+
+    it('takes the variant of the nearest provider, and a strip that names its own keeps it', () => {
+      render(
+        <TabNavigationVariantProvider variant="admin">
+          <TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} />
+          <TabNavigation
+            tabs={[{ id: 'own', label: 'Own Variant' }]}
+            activeTab="own"
+            onTabChange={() => {}}
+            variant="default"
+          />
+        </TabNavigationVariantProvider>,
+      );
+
+      expect(strip().open.className).toContain('bg-gradient-to-b');
+      expect(screen.getByRole('button', { name: 'Own Variant' }).className).not.toContain('bg-gradient-to-b');
     });
   });
 });
