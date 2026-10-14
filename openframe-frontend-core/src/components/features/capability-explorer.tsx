@@ -91,8 +91,6 @@ const PANEL_TOP_HEIGHT_CLASS = 'h-[256px]';
 const PANEL_SCREEN_HEIGHT_CLASS = 'h-[420px]';
 const PANEL_FOOTER_HEIGHT_CLASS = 'h-[52px]';
 const CARD_HEIGHT_CLASS = 'h-[700px]';
-/** Both, for the box shown before the layout is known (literal, so the class is generated). */
-const SKELETON_HEIGHT_CLASS = 'h-[700px] content-lg:h-[824px]';
 
 /** The element id of a job's tab (never the job's own id: that is the host's anchor). */
 export const capabilityTabId = (id: string): string => `${id}-tab`;
@@ -169,12 +167,141 @@ function Example({
   );
 }
 
-/** The box the explorer occupies while its data loads, at both layouts: the panel, or the carousel's card over its controls. */
-export function CapabilityExplorerSkeleton({ className }: { className?: string }) {
+/** A text placeholder in its line's own box (`text-h…` on the line), so a placeholder line is the loaded line's height. */
+function LineBar({ line, width }: { line: string; width: string }) {
   return (
-    <div className={className}>
-      <Skeleton className={cn(SKELETON_HEIGHT_CLASS, 'w-full')} />
-      <SnapCarouselControlsSkeleton className="content-lg:hidden" />
+    <div className={line}>
+      <span className={cn('inline-block h-[0.7em] animate-pulse rounded bg-ods-border align-middle', width)} />
+    </div>
+  );
+}
+
+/** The example's two turns, in the loaded example's own box. */
+function ExampleSkeleton({ className }: { className?: string }) {
+  const turn = (first: boolean) => (
+    <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
+      <Skeleton className="size-6 shrink-0 rounded-full" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <LineBar line="text-h6" width="w-28" />
+        <div className="min-h-[2lh] text-h4">
+          <LineBar line="text-h4" width="w-full" />
+          <LineBar line="text-h4" width="w-2/3" />
+        </div>
+      </div>
+    </div>
+  );
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col justify-center gap-3 overflow-hidden rounded-xl border border-ods-border bg-ods-bg px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]',
+        className,
+      )}
+    >
+      {turn(true)}
+      {turn(false)}
+    </div>
+  );
+}
+
+/** One job in the list or a card's head: the icon tile, the title, the caption. */
+function JobHeadSkeleton() {
+  return (
+    <>
+      <Skeleton className="size-9 shrink-0 rounded-lg" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <LineBar line="text-h4" width="w-32" />
+        <div className="mt-0.5">
+          <LineBar line="text-h6" width="w-40" />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * The explorer while its data loads, drawn as both layouts in their own boxes
+ * (the width decides which shows, by CSS, since it is not known yet): the list
+ * of jobs beside the panel with its copy, example, screen and footer, or the
+ * first card over the carousel's controls. Every box is the loaded one's, so
+ * nothing moves when the jobs arrive.
+ */
+export function CapabilityExplorerSkeleton({ className, count = 8 }: { className?: string; count?: number }) {
+  return (
+    <div className={className} aria-hidden>
+      <div className="content-lg:hidden">
+        <div className="flex gap-[var(--spacing-system-sf)] overflow-hidden">
+          <div
+            className={cn(
+              'flex min-w-0 shrink-0 basis-[86%] flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
+              CARD_HEIGHT_CLASS,
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <JobHeadSkeleton />
+            </div>
+            <div className="min-h-[3lh] text-h6">
+              <LineBar line="text-h6" width="w-full" />
+              <LineBar line="text-h6" width="w-5/6" />
+            </div>
+            <Skeleton className="h-[300px] shrink-0 rounded-lg" />
+            <ExampleSkeleton className="shrink-0" />
+          </div>
+        </div>
+        <SnapCarouselControlsSkeleton />
+      </div>
+
+      <div
+        className={cn(
+          'hidden grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-[var(--spacing-system-lf)] content-lg:grid',
+          PANEL_HEIGHT_CLASS,
+        )}
+      >
+        <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
+          {Array.from({ length: count }, (_, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex min-w-0 shrink-0 items-center gap-3.5 rounded-lg border px-3.5 py-3',
+                i === 0 ? 'border-ods-border bg-ods-card' : 'border-transparent',
+              )}
+            >
+              <JobHeadSkeleton />
+            </div>
+          ))}
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7">
+          <div className={cn('grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,380px)] gap-8', PANEL_TOP_HEIGHT_CLASS)}>
+            <div className="flex min-w-0 flex-col overflow-hidden">
+              <div className="mb-2">
+                <LineBar line="text-h2" width="w-64" />
+              </div>
+              <div className="min-h-[3lh] text-h4">
+                <LineBar line="text-h4" width="w-full" />
+                <LineBar line="text-h4" width="w-4/5" />
+              </div>
+              <div className="mt-auto grid grid-cols-1 gap-2">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="flex min-w-0 items-center gap-2.5">
+                    <Skeleton className="size-4 shrink-0 rounded-full" />
+                    <LineBar line="text-h6" width={i === 1 ? 'w-56' : 'w-48'} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <ExampleSkeleton />
+          </div>
+          <Skeleton className={cn('shrink-0 rounded-xl', PANEL_SCREEN_HEIGHT_CLASS)} />
+          <div
+            className={cn(
+              'flex min-w-0 shrink-0 items-center gap-[var(--spacing-system-sf)]',
+              PANEL_FOOTER_HEIGHT_CLASS,
+            )}
+          >
+            <LineBar line="text-h5" width="w-16" />
+            <Skeleton className="h-7 w-36 rounded-md" />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

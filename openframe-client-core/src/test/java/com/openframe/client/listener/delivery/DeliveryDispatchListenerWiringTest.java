@@ -1,10 +1,17 @@
 package com.openframe.client.listener.delivery;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.delivery.LocalDeliverySink;
+import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliverySpecRegistry;
+import com.openframe.kafka.config.KafkaJsonSerdes;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -16,7 +23,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
 
 import java.util.Collection;
 import java.util.Map;
@@ -32,6 +39,7 @@ import static org.mockito.Mockito.mock;
 class DeliveryDispatchListenerWiringTest {
 
     private static final String TRUSTED_PACKAGES = "com.openframe.delivery.dispatch";
+    private static final String TOPIC = "tenants.t1.delivery-dispatch";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withPropertyValues(
@@ -53,29 +61,43 @@ class DeliveryDispatchListenerWiringTest {
     }
 
     @Test
-    void context_sharedConsumerFactory_valuesDeserializedBehindErrorHandling() {
+    void context_sharedConsumerFactory_recordFromTheProducerReadBehindErrorHandling() {
         runner.run(context -> {
             ConcurrentKafkaListenerContainerFactory<?, ?> factory =
                     context.getBean(DeliveryDispatchListenerConfiguration.CONTAINER_FACTORY, ConcurrentKafkaListenerContainerFactory.class);
-            Map<String, Object> consumerConfig = factory.getConsumerFactory().getConfigurationProperties();
-            assertThat(consumerConfig)
-                    .containsEntry(VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class)
-                    .containsEntry(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS, JsonDeserializer.class)
-                    .containsEntry(JsonDeserializer.TRUSTED_PACKAGES, TRUSTED_PACKAGES);
+            ConsumerFactory<?, ?> consumerFactory = factory.getConsumerFactory();
+            @SuppressWarnings("unchecked")
+            Deserializer<Object> values = (Deserializer<Object>) consumerFactory.getValueDeserializer();
+            assertThat(values).isInstanceOf(ErrorHandlingDeserializer.class);
+            values.configure(consumerFactory.getConfigurationProperties(), false);
+
+            Headers headers = new RecordHeaders();
+            byte[] record = KafkaJsonSerdes.valueSerializer().serialize(TOPIC, headers, handOff());
+            Object read = values.deserialize(TOPIC, headers, record);
+
+            assertThat(read).isInstanceOf(DeliveryDispatchMessage.class);
+            DeliveryDispatchMessage message = (DeliveryDispatchMessage) read;
+            assertThat(message.getMachineId()).isEqualTo("mach-42");
+            assertThat(message.getPayload().get("delivery").get("type").asString()).isEqualTo("CLIENT_FEATURE_FLAGS");
         });
+    }
+
+    private static DeliveryDispatchMessage handOff() {
+        JsonNode payload = new JsonMapper().readTree("{\"delivery\":{\"type\":\"CLIENT_FEATURE_FLAGS\",\"targetId\":\"openframe-client\"},\"flags\":{}}");
+        return new DeliveryDispatchMessage(DeliveryAudience.MACHINE, "mach-42", payload);
     }
 
     @Configuration
     static class Dependencies {
 
-        // the factory the oss Kafka auto-configuration would provide: a plain JsonDeserializer and no broker to reach
+        // the factory the oss Kafka auto-configuration would provide: a plain JacksonJsonDeserializer and no broker to reach
         @Bean("ossTenantKafkaConsumerFactory")
         ConsumerFactory<Object, Object> ossTenantKafkaConsumerFactory() {
             return new DefaultKafkaConsumerFactory<>(Map.of(
                     BOOTSTRAP_SERVERS_CONFIG, "localhost:1",
                     KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class,
-                    VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class,
-                    JsonDeserializer.TRUSTED_PACKAGES, TRUSTED_PACKAGES));
+                    VALUE_DESERIALIZER_CLASS_CONFIG, JacksonJsonDeserializer.class,
+                    JacksonJsonDeserializer.TRUSTED_PACKAGES, TRUSTED_PACKAGES));
         }
 
         @Bean
