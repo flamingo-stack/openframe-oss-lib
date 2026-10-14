@@ -155,9 +155,7 @@ const LOOKS_LIKE_URL = /^(?:https?:\/\/|www\.|mailto:|\/|#)\S*$/i;
 
 function initialFieldsFromSelection(selectedText: string): MarkdownLinkFields {
   const selected = selectedText.trim();
-  return LOOKS_LIKE_URL.test(selected)
-    ? { text: '', url: selected, rel: [] }
-    : { text: selected, url: '', rel: [] };
+  return LOOKS_LIKE_URL.test(selected) ? { text: '', url: selected, rel: [] } : { text: selected, url: '', rel: [] };
 }
 
 export interface MarkdownLinkCommand {

@@ -8,7 +8,7 @@ import {
 } from '../markdown-link';
 
 describe('renderedLinkRel', () => {
-  it('keeps today\'s output for a link with no authored rel', () => {
+  it("keeps today's output for a link with no authored rel", () => {
     expect(renderedLinkRel(undefined, true)).toBe('noopener noreferrer');
     expect(renderedLinkRel(undefined, false)).toBeUndefined();
   });
@@ -43,9 +43,7 @@ describe('findMarkdownLinkAt', () => {
     const link = findMarkdownLinkAt(text, text.indexOf('>X<') + 1);
     expect(link).toMatchObject({ text: 'X', url: 'https://x.com/b?a=1&c=2', rel: ['nofollow'] });
     if (!link) return;
-    expect(text.slice(link.start, link.end)).toBe(
-      '<a href="https://x.com/b?a=1&amp;c=2" rel="nofollow">X</a>',
-    );
+    expect(text.slice(link.start, link.end)).toBe('<a href="https://x.com/b?a=1&amp;c=2" rel="nofollow">X</a>');
   });
 
   it('returns null outside a link, and for an image', () => {
@@ -85,7 +83,13 @@ describe('formatMarkdownLink', () => {
   });
 
   it('round-trips through findMarkdownLinkAt for every choice', () => {
-    const choices: Parameters<typeof formatMarkdownLink>[0]['rel'][] = [[], ['nofollow'], ['sponsored'], ['ugc'], ['nofollow', 'ugc']];
+    const choices: Parameters<typeof formatMarkdownLink>[0]['rel'][] = [
+      [],
+      ['nofollow'],
+      ['sponsored'],
+      ['ugc'],
+      ['nofollow', 'ugc'],
+    ];
     for (const rel of choices) {
       const written = formatMarkdownLink({ text: 'a [b] & c', url: 'https://e.com/p?q=1&r=2', rel });
       const read = findMarkdownLinkAt(written, 2);
