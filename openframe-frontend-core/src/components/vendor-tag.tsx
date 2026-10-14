@@ -224,7 +224,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           ),
         };
       case 'classification':
-        return classificationTag((text ?? '').toLowerCase());
+        return classificationTag((text ?? '').toLowerCase(), undefined, accentColor);
       case 'openframe_selected':
       case 'openframe_connect':
       case 'openframe_shipped':
