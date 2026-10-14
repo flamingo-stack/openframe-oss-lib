@@ -88,9 +88,9 @@ export interface EmbedAuthAdapter {
   refresh?: () => Promise<boolean>;
   /**
    * Optional guard, run before every request goes out — the first attempt
-   * and the retry after a `refresh`. Throw to refuse the request:
-   * `embedAuthedFetch` rejects with that error and nothing reaches the
-   * network.
+   * and the retry after a `refresh`. Throw — or reject — to refuse the
+   * request: `embedAuthedFetch` rejects with that error and nothing reaches
+   * the network.
    *
    * For a host-wide state that makes every request pointless. openframe's
    * mobile force-update is the case it exists for: once the gateway has
@@ -99,7 +99,7 @@ export interface EmbedAuthAdapter {
    * the returned promise (after the synchronous same-origin guard), so
    * callers see a rejection, never a synchronous throw.
    */
-  beforeRequest?: () => void;
+  beforeRequest?: () => void | Promise<void>;
   /**
    * Optional response hook, run on every response (the post-refresh retry's
    * too) BEFORE the 401 self-heal. Throw — or reject — to fail the request
@@ -390,7 +390,7 @@ async function fetchWithRefresh(
   const adapter = getRegisteredAuthAdapter();
   // Per attempt, so a retry after `refresh` is refused too when the host's
   // state changed while the refresh was in flight.
-  adapter?.beforeRequest?.();
+  await adapter?.beforeRequest?.();
 
   // Re-run the merge each attempt: `applyProxyAuth` reads the latest stored
   // proxy creds and `getHeaders()` reads the latest bearer, so a retry after

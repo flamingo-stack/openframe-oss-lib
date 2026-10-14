@@ -276,6 +276,17 @@ describe('embedAuthedFetch adapter.beforeRequest / adapter.onResponse', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it('refuses a request an async beforeRequest rejects for', async () => {
+    const fetchSpy = vi.fn(() => Promise.resolve(new Response('ok')));
+    globalThis.fetch = fetchSpy;
+    setEmbedAuthAdapter({
+      beforeRequest: () => Promise.reject(new UpgradeRequired()),
+    });
+
+    await expect(embedAuthedFetch('/api/chat/x')).rejects.toBeInstanceOf(UpgradeRequired);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it('refuses the post-refresh retry when the guard trips while the refresh is in flight', async () => {
     const fetchSpy = vi.fn(() => Promise.resolve(new Response('nope', { status: 401 })));
     globalThis.fetch = fetchSpy;
