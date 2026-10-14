@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { defineConfig } from 'tsup';
 
 // Config is split into two builds: client and server/universal.
@@ -24,6 +27,79 @@ import { defineConfig } from 'tsup';
 //
 // The dist/ directory is cleaned by the build script (rm -rf dist) before
 // tsup runs, so neither config needs `clean: true`.
+
+// ES-MODULE-ONLY DEPENDENCIES, BUNDLED INTO BOTH COMMONJS BUILDS.
+//
+// Both builds here are CommonJS (the `require` condition), and the hub's build scripts load them
+// through `tsx`, whose `require` cannot load an ES-module-only package: `markdownToPlainText` (utils) parses with the
+// renderer's pipeline, and the unified packages behind it ship as ES modules only, so in 0.0.745 every
+// CommonJS file holding it (`utils/index.cjs` and a shared client chunk) crashed on load
+// (`_remark.remark.call is not a function`). tsup's documented
+// answer is `noExternal`: those packages are BUNDLED into the CommonJS output (esbuild converts
+// them), and every other dependency stays external as before. The ES-module output
+// (`scripts/build-esm-modules.mjs`, the `import` condition bundlers use) keeps importing them.
+//
+// The list is DERIVED, never typed: the dependency closure of the parser packages, keeping each
+// package whose package.json is `"type": "module"` and offers no `require` condition. A parser
+// update that adds or drops a package needs no change here.
+const PARSER_ROOTS = [
+  'remark',
+  'remark-gfm',
+  'remark-breaks',
+  'remark-rehype',
+  'rehype-raw',
+  'hast-util-to-text',
+  'unist-util-visit',
+];
+
+// The config may be loaded as CommonJS, where `import.meta.url` is undefined: resolve from the package.
+const PACKAGE_MANIFEST = join(process.cwd(), 'package.json');
+
+function esmOnlyClosure(roots: string[]): string[] {
+  const esmOnly = new Set<string>();
+  const seen = new Set<string>();
+  const queue: { name: string; from: string }[] = roots.map(name => ({ name, from: PACKAGE_MANIFEST }));
+  while (queue.length > 0) {
+    const next = queue.shift();
+    if (!next || seen.has(next.name)) continue;
+    seen.add(next.name);
+    let manifestPath: string;
+    try {
+      manifestPath = createRequire(next.from).resolve(`${next.name}/package.json`);
+    } catch {
+      // A package that does not export its package.json: find it by walking up from its entry.
+      try {
+        let dir = dirname(createRequire(next.from).resolve(next.name));
+        while (!readFileSafe(join(dir, 'package.json'))) dir = dirname(dir);
+        manifestPath = join(dir, 'package.json');
+      } catch {
+        continue;
+      }
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      type?: string;
+      exports?: unknown;
+      dependencies?: Record<string, string>;
+    };
+    const offersRequire = JSON.stringify(manifest.exports ?? '').includes('"require"');
+    if (manifest.type === 'module' && !offersRequire) esmOnly.add(next.name);
+    for (const dependency of Object.keys(manifest.dependencies ?? {})) {
+      queue.push({ name: dependency, from: manifestPath });
+    }
+  }
+  return [...esmOnly].sort();
+}
+
+function readFileSafe(path: string): boolean {
+  try {
+    readFileSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const esmOnlyParserDependencies = esmOnlyClosure(PARSER_ROOTS);
 
 export default defineConfig([
   // Server/universal entries — pure types, configs, and server-safe utilities.
@@ -115,6 +191,7 @@ export default defineConfig([
     dts: false,
     splitting: false,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
+    noExternal: esmOnlyParserDependencies,
     treeshake: true,
   },
   // Client-side entries — these contain React components/hooks that require
@@ -190,6 +267,7 @@ export default defineConfig([
     dts: false,
     splitting: true,
     external: ['react', 'react-dom', 'next', '@tanstack/react-query'],
+    noExternal: esmOnlyParserDependencies,
     banner: {
       js: '"use client";',
     },
