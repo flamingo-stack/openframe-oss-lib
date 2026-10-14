@@ -1,6 +1,7 @@
 use super::*;
 use crate::models::InitialConfiguration;
 use crate::platform::directories::DirectoryManager;
+use crate::services::AgentConfigurationService;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -93,6 +94,7 @@ async fn mock_server(statuses: &[u16]) -> MockServer {
 struct Fixture {
     _dir: tempfile::TempDir,
     initial: InitialConfigurationService,
+    deactivation: Arc<DeactivationService>,
     service: Arc<RemoteAccessModeService>,
 }
 
@@ -120,17 +122,17 @@ async fn fixture(base_url: String, pending: Option<&str>) -> Fixture {
         .update_tokens("machine-token".into(), "refresh".into())
         .await
         .unwrap();
+    let deactivation = DeactivationService::new(&dm);
     let mut service = RemoteAccessModeService::new(
-        reqwest::Client::new(),
-        base_url,
+        RemoteAccessClient::new(reqwest::Client::new(), base_url, agent),
         initial.clone(),
-        agent,
-        DeactivationService::new(&dm),
+        deactivation.clone(),
     );
     service.timing = FAST;
     Fixture {
         _dir: dir,
         initial,
+        deactivation,
         service: Arc::new(service),
     }
 }
@@ -165,6 +167,16 @@ async fn no_pending_mode_makes_no_call() {
     assert!(fx.service.clone().start().is_none());
     tokio::time::sleep(Duration::from_millis(50)).await;
     assert!(server.requests().is_empty());
+}
+
+#[tokio::test]
+async fn unknown_pending_mode_is_dropped_without_a_call() {
+    let server = mock_server(&[200]).await;
+    let fx = fixture(server.url.clone(), Some("ALLOW")).await;
+
+    assert!(fx.service.clone().start().is_none());
+    assert!(server.requests().is_empty());
+    assert_eq!(fx.initial.get_remote_access_mode().unwrap(), None);
 }
 
 #[tokio::test]
@@ -258,4 +270,32 @@ async fn dropped_connections_keep_the_mode_pending() {
         fx.initial.get_remote_access_mode().unwrap().as_deref(),
         Some("SILENT_ACCESS")
     );
+}
+
+// Suspension only exists where self-uninstall is supported.
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[tokio::test]
+async fn nothing_is_sent_while_the_tenant_is_suspended() {
+    let server = mock_server(&[200]).await;
+    let fx = fixture(server.url.clone(), Some("SILENT_ACCESS")).await;
+    for _ in 0..10 {
+        fx.deactivation
+            .on_gateway_status(reqwest::StatusCode::GONE)
+            .await;
+    }
+    assert!(fx.deactivation.is_suspended());
+
+    let handle = fx.service.clone().start().unwrap();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(server.requests().is_empty());
+
+    fx.deactivation
+        .on_gateway_status(reqwest::StatusCode::OK)
+        .await;
+    tokio::time::timeout(Duration::from_secs(5), handle)
+        .await
+        .expect("the mode is sent once the tenant is back")
+        .unwrap();
+    assert_eq!(server.requests().len(), 1);
+    assert_eq!(fx.initial.get_remote_access_mode().unwrap(), None);
 }

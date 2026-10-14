@@ -72,7 +72,7 @@ impl InstallationInitialConfigService {
             user_id: params.user_id.clone().unwrap_or_default(),
             local_mode: params.local_mode,
             tags: DeviceTag::parse_from_cli(params.tags.clone()),
-            remote_access_mode: params.remote_access_mode.map(|m| m.as_wire().to_string()),
+            remote_access_mode: params.remote_access_mode.map(RemoteAccessMode::wire_name),
             ..Default::default()
         };
 

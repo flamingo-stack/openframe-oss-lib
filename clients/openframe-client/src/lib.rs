@@ -37,7 +37,7 @@ pub mod executor;
 
 use crate::clients::build_agent_http_client;
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
-use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
+use crate::clients::{AuthClient, RegistrationClient, RemoteAccessClient, ToolApiClient};
 use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::execution_listener::ExecutionListener;
@@ -338,10 +338,12 @@ impl Client {
         ));
 
         let remote_access_mode_service = Arc::new(RemoteAccessModeService::new(
-            http_client.clone(),
-            http_url.clone(),
+            RemoteAccessClient::new(
+                http_client.clone(),
+                http_url.clone(),
+                config_service.clone(),
+            ),
             initial_configuration_service.clone(),
-            config_service.clone(),
             deactivation_service.clone(),
         ));
 
