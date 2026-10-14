@@ -3,7 +3,7 @@ package com.openframe.api.exception;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.netflix.graphql.dgs.autoconfig.DgsAutoConfiguration;
+import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
 import org.junit.jupiter.api.AfterEach;
@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -87,7 +88,7 @@ class GraphQLExceptionHandlerDgsTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration(DgsAutoConfiguration.class)
+    @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class})
     @EnableMethodSecurity
     @Import({GraphQLExceptionHandler.class, AdminOnlyDataFetcher.class})
     static class RoleCheckedGraphQlApp {

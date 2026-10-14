@@ -1,6 +1,7 @@
 package com.openframe.client.listener.rmm;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.client.service.rmm.MachinePackageManagersService;
 import com.openframe.data.document.packagesearch.PackageManagerState;
@@ -45,7 +46,7 @@ class MachinePackageManagersListenerTest {
     @BeforeEach
     void setUp() {
         listener = new MachinePackageManagersListener(
-                natsConnection, new ObjectMapper(), packageManagersService, new NatsTopicMachineIdExtractor());
+                natsConnection, new JsonMapper(), packageManagersService, new NatsTopicMachineIdExtractor());
     }
 
     @Test

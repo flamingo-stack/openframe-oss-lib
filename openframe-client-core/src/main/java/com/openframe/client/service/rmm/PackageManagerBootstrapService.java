@@ -46,7 +46,7 @@ public class PackageManagerBootstrapService {
         }
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(status)) {
+        if (!DeviceStatus.CONNECTED.contains(status)) {
             log.debug("Ignoring package-manager report for machineId={} in status {}", machineId, status);
             return;
         }

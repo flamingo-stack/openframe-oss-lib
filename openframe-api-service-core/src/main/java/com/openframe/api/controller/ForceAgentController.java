@@ -1,9 +1,11 @@
 package com.openframe.api.controller;
 
+import com.openframe.api.dto.force.request.ForceClientFeatureFlagsRequest;
 import com.openframe.api.dto.force.request.ForceClientUninstallRequest;
 import com.openframe.api.dto.force.request.ForceToolInstallationAllRequest;
 import com.openframe.api.dto.force.request.ForceToolInstallationRequest;
 import com.openframe.api.dto.force.request.ForceToolReinstallationRequest;
+import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponse;
 import com.openframe.api.dto.force.response.ForceClientUninstallResponse;
 import com.openframe.api.dto.force.response.ForceClientUpdateResponse;
 import com.openframe.api.dto.force.response.ForceToolAgentInstallationResponse;
@@ -11,6 +13,7 @@ import com.openframe.api.dto.update.ForceClientUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateAllRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateRequest;
 import com.openframe.api.dto.update.ForceToolAgentUpdateResponse;
+import com.openframe.api.service.ForceClientFeatureFlagsService;
 import com.openframe.api.service.ForceClientUninstallService;
 import com.openframe.api.service.ForceClientUpdateService;
 import com.openframe.api.service.ForceToolAgentUpdateService;
@@ -27,6 +30,7 @@ public class ForceAgentController {
     private final ForceClientUpdateService clientUpdateService;
     private final ForceToolAgentUpdateService toolAgentUpdateService;
     private final ForceClientUninstallService clientUninstallService;
+    private final ForceClientFeatureFlagsService clientFeatureFlagsService;
 
     @PostMapping("tool-agent/install")
     public ForceToolAgentInstallationResponse forceToolInstallation(@RequestBody ForceToolInstallationRequest request) {
@@ -46,6 +50,11 @@ public class ForceAgentController {
     @PostMapping("client/uninstall")
     public ForceClientUninstallResponse forceClientUninstall(@RequestBody ForceClientUninstallRequest request) {
         return clientUninstallService.process(request);
+    }
+
+    @PostMapping("client/feature-flags")
+    public ForceClientFeatureFlagsResponse forceClientFeatureFlags(@RequestBody ForceClientFeatureFlagsRequest request) {
+        return clientFeatureFlagsService.process(request);
     }
 
     @PostMapping("client/update/all")

@@ -2,6 +2,7 @@ package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.dto.device.DeviceFilterFacet;
 import com.openframe.api.dto.device.DeviceFilters;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
@@ -24,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.support.GenericApplicationContext;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -83,12 +85,12 @@ class DeviceFiltersSelectionSetTest {
     @BeforeEach
     void setUp() {
         DeviceDataFetcher dataFetcher = new DeviceDataFetcher(deviceService, deviceFilterService, tagService,
-                fleetVulnerabilityStatusService, mapper, packageManagerAvailability);
+                fleetVulnerabilityStatusService, mapper, packageManagerAvailability, new RelayIdCodec());
 
         TypeDefinitionRegistry registry = new SchemaParser().parse(SDL);
         RuntimeWiring wiring = RuntimeWiring.newRuntimeWiring()
                 .type("Query", builder -> builder.dataFetcher("deviceFilters",
-                        env -> dataFetcher.deviceFilters(null, new DgsDataFetchingEnvironment(env))))
+                        env -> dataFetcher.deviceFilters(null, new DgsDataFetchingEnvironment(env, new GenericApplicationContext()))))
                 .build();
         GraphQLSchema schema = new SchemaGenerator().makeExecutableSchema(registry, wiring);
         graphQL = GraphQL.newGraphQL(schema).build();

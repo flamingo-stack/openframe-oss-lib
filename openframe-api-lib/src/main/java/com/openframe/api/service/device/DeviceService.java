@@ -41,7 +41,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -92,7 +91,7 @@ public class DeviceService {
     public void verifyDispatchable(String machineId) {
         Machine machine = findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
+        if (!DeviceStatus.CONNECTED.contains(machine.getStatus())) {
             throw new BadRequestException(
                     "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
         }
@@ -235,10 +234,9 @@ public class DeviceService {
                 .build();
     }
 
-    private static final Set<DeviceStatus> SCHEDULE_ALLOWED_STATUSES = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
 
     private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
-            .filter(status -> !SCHEDULE_ALLOWED_STATUSES.contains(status))
+            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
             .map(Enum::name)
             .toList();
 

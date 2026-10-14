@@ -346,7 +346,7 @@ public class ScheduleScriptDeviceService {
         }
 
         List<String> nonDispatchable = machines.stream()
-                .filter(m -> !DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
+                .filter(m -> !DeviceStatus.CONNECTED.contains(m.getStatus()))
                 .map(m -> m.getHostname() != null ? m.getHostname() : m.getMachineId())
                 .toList();
         if (!nonDispatchable.isEmpty()) {
@@ -388,7 +388,7 @@ public class ScheduleScriptDeviceService {
             return Set.of();
         }
         return machineRepository.findByTenantIdAndMachineIdIn(tenantId, ids).stream()
-                .filter(m -> DeviceStatus.DISPATCH_ELIGIBLE.contains(m.getStatus()))
+                .filter(m -> DeviceStatus.CONNECTED.contains(m.getStatus()))
                 .map(Machine::getMachineId)
                 .collect(java.util.stream.Collectors.toSet());
     }

@@ -32,9 +32,9 @@ export const EP = {
   // The active agents' public identities (name, icon, audience): where the assistant's
   // identity comes from on a platform that configured none of its own.
   aiAgents: `${CONTENT}/ai-agents`,
-  // The questions an "ask" surface offers (the FAQ's card): `?count&section&exclude`.
-  // `section` is the surface's topic, any string the hub's chat config knows.
-  askPrompts: `${CONTENT}/quick-actions/questions`,
+  // The questions an "ask" surface offers (the FAQ's card): `?count&topic&exclude`.
+  // `topic` is the surface's topic, any FAQ topic the hub knows.
+  askPrompts: `${CONTENT}/faqs/questions`,
   docsSearch: `${CONTENT}/docs/search`,
   // doc sources (knowledge-base mounts <DocsHubPage> against these)
   docsStructure: (sourceId: string) => `${CONTENT}/docs/sources/${sourceId}/structure`,
@@ -98,6 +98,8 @@ export const EP = {
   downloads: `${CONTENT_PREFIX}${DOWNLOADS_API_PATH}`,
   // misc surfaces
   legal: (docType: string) => `${CONTENT}/legal/${docType}`,
+  // The hub's list of legal documents: the home page shows one card per published document.
+  legalDocuments: `${CONTENT}/legal`,
   contact: `${CONTENT}/contact`,
   announcements: `${CONTENT}/announcements/active`,
   // Private-storage view proxy base — ClaudeEmbed derives artifact

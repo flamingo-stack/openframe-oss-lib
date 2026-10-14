@@ -26,7 +26,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Hard cap on how long an external install/uninstall command may run before we abort
 /// it. Prevents a hung installer from pinning the tool-op marker (and therefore the
@@ -693,7 +693,6 @@ impl ToolInstallationService {
                 .command_params_resolver
                 .process(tool_agent_id, command_args)
                 .context("Failed to process installation command params")?;
-            debug!("Processed args: {:?}", installation_command_args);
 
             info!(
                 "Stopping any existing processes for {} before installation",

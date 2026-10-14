@@ -20,7 +20,9 @@ import java.time.Instant;
 @RequiredArgsConstructor
 public class DeliveryRolloutRecorder {
 
-    static final String BEFORE_FIRST_MACHINE = "";
+    // the smallest ObjectId: machine ids are ObjectIds in Mongo and a string cursor never matches one ($gt only compares
+    // values of the same type), the walk would find nothing; Spring Data turns this hex into an ObjectId in the query
+    static final String BEFORE_FIRST_MACHINE = "000000000000000000000000";
 
     private final MachineDeliveryRolloutRepository repository;
     private final MachineDeliverySequenceRepository sequences;

@@ -11,5 +11,6 @@ public enum NotificationCategory {
     TICKETS,
     INSIGHTS,
     MINGO,
+    INTEGRATIONS,
     GENERIC
 }

@@ -467,10 +467,7 @@ impl ToolRunManager {
                         }
                     };
 
-                debug!(
-                    "Running tool {} with args: {:?}",
-                    tool.tool_agent_id, processed_args
-                );
+                debug!("Running tool {}", tool.tool_agent_id);
 
                 let command_path = params_processor
                     .directory_manager

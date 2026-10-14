@@ -56,11 +56,11 @@ export interface AssistantRuntime {
   source?: string;
   /**
    * GET endpoint the questions are read from:
-   *   `<url>?count=<n>&section=<topic>&exclude=<id,id>` → `{ prompts: AskPrompt[] }`
-   * `section` is ANY string: the host decides what topics exist (the hub: the
-   * `section` attribute of a quick action, set in chat config), so a new topic
-   * needs no change here. Hub: '/api/quick-actions/questions'. Absent: an "ask"
-   * surface shows its launcher with no questions.
+   *   `<url>?count=<n>&topic=<topic>&exclude=<id,id>` → `{ prompts: AskPrompt[] }`
+   * `topic` is ANY string: the host decides what topics exist (the hub: the
+   * topics of its FAQs, set in the FAQ admin), so a new topic needs no change
+   * here. Hub: '/api/faqs/questions'. Absent: an "ask" surface shows its
+   * launcher with no questions.
    */
   askPromptsUrl?: string;
   /**

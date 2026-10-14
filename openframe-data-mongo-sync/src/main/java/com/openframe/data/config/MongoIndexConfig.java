@@ -2,9 +2,9 @@ package com.openframe.data.config;
 
 import com.openframe.data.document.rmm.script.ScriptStatus;
 import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -14,7 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 
 @Slf4j
 @Configuration
-public class MongoIndexConfig {
+public class MongoIndexConfig implements SmartLifecycle {
 
     /**
      * Partial-unique name index on {@code scripts}. Explicitly named so it
@@ -31,7 +31,33 @@ public class MongoIndexConfig {
     @Autowired
     private MongoTemplate mongoTemplate;
 
-    @PostConstruct
+    private volatile boolean running;
+
+    /**
+     * Phase 0: before the web server (phase {@code Integer.MAX_VALUE - 1}) takes traffic, but after the
+     * context refresh, so a refresh alone needs no Mongo (the JVM AOT cache training run exits there).
+     */
+    @Override
+    public int getPhase() {
+        return 0;
+    }
+
+    @Override
+    public void start() {
+        initIndexes();
+        running = true;
+    }
+
+    @Override
+    public void stop() {
+        running = false;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
     public void initIndexes() {
         // Load-bearing: the (provider, subject) unique index IS the enforcement of the
         // one-SSO-account-one-user invariant (registration guards rely on it, and

@@ -83,8 +83,8 @@ const EDITORIAL_META_ROW =
 const EDITORIAL_PERSON_ROW = 'flex h-8 min-w-0 items-center gap-[var(--spacing-system-s)]';
 
 // The default card's boxes, shared by the card and its skeleton: a large SQUARE cover
-// (the picture fills it), a display title, the date and meta row (stacked on a phone,
-// one line from md), a three-line description, a tag row, the gallery and the action,
+// (the picture fills it), a two-line display title, the date and meta row (stacked up to
+// lg, where the text column is wide enough for one line), a three-line description, a tag row, the gallery and the action,
 // so a card is one height whatever its copy and cover.
 const DEFAULT_BODY =
   'flex flex-col gap-[var(--spacing-system-lf)] p-[var(--spacing-system-lf)] md:p-[var(--spacing-system-xlf)]';
@@ -92,9 +92,9 @@ const DEFAULT_HEADER = 'flex flex-col gap-[var(--spacing-system-lf)] md:flex-row
 const DEFAULT_COVER_FRAME =
   'relative aspect-square w-full flex-shrink-0 overflow-hidden rounded-lg md:w-[240px] lg:w-[320px] xl:w-[400px]';
 const DEFAULT_TEXT = 'flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-mf)]';
-const DEFAULT_TITLE = 'line-clamp-2 text-ods-text-primary text-h1';
+const DEFAULT_TITLE = 'line-clamp-2 min-h-[2lh] text-ods-text-primary text-h1';
 const DEFAULT_META_ROW =
-  'flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h4 md:min-h-[1lh] md:flex-row md:items-center md:gap-4';
+  'flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h4 lg:min-h-[1lh] lg:flex-row lg:items-center lg:gap-4';
 const DEFAULT_DESCRIPTION = 'line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4';
 const DEFAULT_TAG_ROW = 'flex flex-wrap gap-[var(--spacing-system-xsf)]';
 const DEFAULT_GALLERY_ROW = 'flex gap-[var(--spacing-system-mf)]';
@@ -177,7 +177,7 @@ export function ProgramCardSkeleton({
         <div className={`${DEFAULT_COVER_FRAME} bg-ods-border`} />
         <div className={DEFAULT_TEXT}>
           <div className={DEFAULT_TITLE}>
-            <span className="block h-[1lh] w-3/4 rounded bg-ods-border" />
+            <span className="block h-[2lh] w-3/4 rounded bg-ods-border" />
           </div>
           <div className={DEFAULT_META_ROW}>
             <span className="block h-[1lh] w-32 rounded bg-ods-border" />
@@ -202,7 +202,8 @@ export function ProgramCardSkeleton({
         </div>
       )}
       <div className={DEFAULT_FOOTER}>
-        <div className="h-10 w-40 rounded bg-ods-border" />
+        {/* The action button's own height (44px, 48px from md). */}
+        <div className="h-11 w-40 rounded bg-ods-border md:h-12" />
       </div>
     </div>
   );
@@ -632,13 +633,13 @@ export function ProgramCard<T extends BaseProgramItem>({
           <span style={{ color: accentColor }}>{dateLabel}</span>
           {renderMeta ? (
             <>
-              <span className="hidden text-ods-text-secondary md:inline">•</span>
+              <span className="hidden text-ods-text-secondary lg:inline">•</span>
               {renderMeta(item)}
             </>
           ) : (
             defaultRenderMeta() && (
               <>
-                <span className="hidden text-ods-text-secondary md:inline">•</span>
+                <span className="hidden text-ods-text-secondary lg:inline">•</span>
                 <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
               </>
             )

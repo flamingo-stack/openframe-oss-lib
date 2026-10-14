@@ -140,6 +140,30 @@ describe('SnapCarousel', () => {
     expect(scrolledTo.length).toBe(2);
   });
 
+  it('resumes a slide where it left off when it comes back on screen, never from the start', () => {
+    renderCarousel();
+    setInView(true);
+    // 3 of the 5 seconds run, then it leaves the screen for a long time.
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    setInView(false);
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(scrolledTo).toEqual([]);
+    // Back: only the 2 seconds that were left, not a whole interval.
+    setInView(true);
+    act(() => {
+      vi.advanceTimersByTime(1_900);
+    });
+    expect(scrolledTo).toEqual([]);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(scrolledTo).toEqual([STEP]);
+  });
+
   it('has no pause button: it waits while keyboard focus is inside it, and carries on after', () => {
     renderCarousel();
     setInView(true);
