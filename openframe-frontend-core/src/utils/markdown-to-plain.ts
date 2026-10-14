@@ -3,23 +3,32 @@
  * (article-body echo in JSON-LD) and chat entity-card preview (clamped previews
  * inside chat cards).
  *
- * The text is what a reader of the rendered page reads: the markdown is parsed with the SAME
- * pipeline the renderer uses (remark with GFM and line breaks, then rehype with raw HTML, as in
- * `components/ui/markdown/engine.tsx`), and the result is the `innerText` of that HTML
+ * The text is what a reader of the rendered page reads: the markdown goes through the SAME steps
+ * the renderer's pipeline runs (`components/ui/markdown/engine.tsx`: remark with GFM and line
+ * breaks, then rehype with raw HTML), and the result is the `innerText` of that HTML
  * (`hast-util-to-text`). So link, emphasis and heading syntax, raw HTML tags (`<a rel>`, `<div>`),
  * escapes (`\<`) and entities (`&amp;`) all come out as their text; script and style content and
  * comments do not. Code blocks and images are left out: their content is not prose.
+ *
+ * The steps are unified's UTILITY functions, the ones those plugins wrap (`mdast-util-from-markdown`
+ * with the GFM extensions, `mdast-util-newline-to-break`, `mdast-util-to-hast`, `hast-util-raw`),
+ * not a `remark()` processor. This module is in the CommonJS builds, and a unified processor is a
+ * callable object without `Function.prototype`: the bundler compiles a call to an imported
+ * function as `.call(void 0)`, which a processor does not have (0.0.745 crashed on load:
+ * `_remark.remark.call is not a function`). Plain functions have no such limit, and one
+ * synchronous conversion needs no plugin system.
  *
  * The two consumers differ only in whitespace — `mode: 'article'` keeps paragraph breaks;
  * `mode: 'preview'` collapses everything to a single line.
  */
 import type { Element, Root } from 'hast';
+import { raw } from 'hast-util-raw';
 import { toText } from 'hast-util-to-text';
-import rehypeRaw from 'rehype-raw';
-import { remark } from 'remark';
-import remarkBreaks from 'remark-breaks';
-import remarkGfm from 'remark-gfm';
-import remarkRehype from 'remark-rehype';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { gfmFromMarkdown } from 'mdast-util-gfm';
+import { newlineToBreak } from 'mdast-util-newline-to-break';
+import { toHast } from 'mdast-util-to-hast';
+import { gfm } from 'micromark-extension-gfm';
 import { SKIP, visit } from 'unist-util-visit';
 
 export interface MarkdownToPlainOptions {
@@ -47,20 +56,20 @@ export function stripInlineMarkdown(s: string): string {
     .replace(/`([^`]+)`/g, '$1'); // `inline code` → inline code
 }
 
-// The renderer's own pipeline, up to the HTML tree. Built once; `runSync` has no async plugins.
-const toHtmlTree = remark()
-  .use(remarkGfm)
-  .use(remarkBreaks)
-  .use(remarkRehype, { allowDangerousHtml: true })
-  .use(rehypeRaw);
-
 /** Elements whose content is not prose: code blocks and images. */
 const NOT_PROSE = new Set(['pre', 'img']);
 
 const TABLE_SECTIONS = new Set(['thead', 'tbody', 'tfoot']);
 
+/** The renderer's steps, as functions: markdown (GFM) → line breaks → HTML tree with raw HTML parsed. */
+function htmlTree(markdown: string): Root {
+  const mdast = fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
+  newlineToBreak(mdast);
+  return raw(toHast(mdast, { allowDangerousHtml: true })) as Root;
+}
+
 function proseTree(markdown: string): Root {
-  const tree: Root = toHtmlTree.runSync(toHtmlTree.parse(markdown));
+  const tree = htmlTree(markdown);
   visit(tree, 'element', (node: Element, index, parent) => {
     if (NOT_PROSE.has(node.tagName) && parent && index !== undefined) {
       parent.children.splice(index, 1);
