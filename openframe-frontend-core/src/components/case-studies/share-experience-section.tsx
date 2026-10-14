@@ -7,7 +7,7 @@ import { CapterraIcon } from '../icons-v2-generated/brand-logos/capterra-icon';
 import { G2Icon } from '../icons-v2-generated/brand-logos/g2-icon';
 import { GetappIcon } from '../icons-v2-generated/brand-logos/getapp-icon';
 import { TrustpilotIcon } from '../icons-v2-generated/brand-logos/trustpilot-icon';
-import { accentSentenceMarks } from '../layout/page-heading';
+import { accentSentenceMarks, HeadingBreak } from '../layout/page-heading';
 import { BenefitCard, BenefitCardGrid } from '../ui';
 
 /**
@@ -58,7 +58,7 @@ export interface ShareExperienceSectionProps {
 const DEFAULT_TITLE: React.ReactNode = (
   <>
     Share Your Experience
-    <br />
+    <HeadingBreak />
     with Fellow MSPs<span className="text-ods-accent">:</span>
   </>
 );

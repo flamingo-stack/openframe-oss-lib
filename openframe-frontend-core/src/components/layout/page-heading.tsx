@@ -68,6 +68,22 @@ export function PageHeading({
   );
 }
 
+/**
+ * A line break inside a heading. It carries a space before the `<br>`, so the
+ * heading's TEXT (what search engines, screen readers and link previews read)
+ * keeps its words apart: "own. Approved", never "own.Approved". The space sits
+ * at the end of a line, where it draws nothing. Use it for every break in a
+ * title, in place of a bare `<br />`.
+ */
+export function HeadingBreak() {
+  return (
+    <>
+      {' '}
+      <br />
+    </>
+  );
+}
+
 /** A sentence mark inside a title: `.`, `:`, `?` or `!` that ends a sentence (followed by a space or the end). */
 const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
 const ONLY_MARKS = /^\s*[.:?!]+\s*$/;
@@ -225,6 +241,7 @@ export function SectionHeading({
         // `contents`: the element names the heading and draws no box, so the stack lays its two children out as before.
         <Tag className="contents">
           {eyebrowNode}
+          {/* A space between the eyebrow and the title, so the heading's text reads "Eyebrow Title", not "EyebrowTitle". */}{' '}
           <span className={`block ${layout.heading}`} data-section-heading>
             {headingText}
           </span>
