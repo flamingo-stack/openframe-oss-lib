@@ -6,8 +6,12 @@ import { useProductDemoCast } from '../cast';
 import { buildScriptsFixture } from '../fixtures/scripts';
 import type { ProductScreenViewProps } from '../types';
 
-/** The picture has no row menu and nowhere to open a row. */
-const LIBRARY_COLUMNS_HIDDEN = ['open'];
+/**
+ * The picture has no row menu and nowhere to open a row. Each table gets half
+ * the frame, so the library leaves out who added a script and keeps the room
+ * for its name and what it does.
+ */
+const LIBRARY_COLUMNS_HIDDEN = ['authorId', 'open'];
 const SCHEDULE_COLUMNS_HIDDEN = ['supportedPlatforms', 'open'];
 const COMPACT_SCHEDULE_COLUMNS_HIDDEN = ['supportedPlatforms', 'deviceCount', 'open'];
 
