@@ -21,6 +21,9 @@ public class NodeTypeResolver {
 
     @DgsTypeResolver(name = "Node")
     public String resolveNode(Object node) {
+        if (node instanceof FederatedNodeReference reference) {
+            return reference.getTypeName();
+        }
         if (node instanceof Machine) {
             return "Machine";
         }

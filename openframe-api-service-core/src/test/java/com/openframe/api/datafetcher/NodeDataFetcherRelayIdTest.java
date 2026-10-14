@@ -1,5 +1,6 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.api.relay.FederatedNodeTypes;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -13,6 +14,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +31,7 @@ class NodeDataFetcherRelayIdTest {
     private static final String RAW_OBJECT_ID = "507f1f77bcf86cd799439011";
 
     @Mock private DeviceService deviceService;
+    @Mock private ObjectProvider<FederatedNodeTypes> federatedNodeTypes;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private NodeDataFetcher dataFetcher;
