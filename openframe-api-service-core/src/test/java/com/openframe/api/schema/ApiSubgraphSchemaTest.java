@@ -1,11 +1,15 @@
 package com.openframe.api.schema;
 
 import com.apollographql.federation.graphqljava.Federation;
+import com.openframe.data.document.ticket.TicketCreationSource;
+import com.openframe.data.document.ticket.TicketStatus;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
 import graphql.schema.GraphQLAppliedDirective;
 import graphql.schema.GraphQLAppliedDirectiveArgument;
 import graphql.schema.GraphQLDirectiveContainer;
+import graphql.schema.GraphQLEnumType;
+import graphql.schema.GraphQLEnumValueDefinition;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
@@ -26,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -137,6 +142,19 @@ class ApiSubgraphSchemaTest {
         assertThat(printed).isEqualTo(type);
     }
 
+    @ParameterizedTest
+    @MethodSource("ticketEnums")
+    void ticketEnum_valuesEqualJavaEnum(String type, Class<? extends Enum<?>> javaEnum) {
+        // setup
+        List<String> javaNames = javaEnumNames(javaEnum);
+
+        // execution
+        List<String> sdlNames = sdlEnumNames(type);
+
+        // verifications
+        assertThat(sdlNames).containsExactlyInAnyOrderElementsOf(javaNames);
+    }
+
     @Test
     void entities_rootFieldAdded() {
         // execution
@@ -158,6 +176,26 @@ class ApiSubgraphSchemaTest {
         return Stream.of(
                 Arguments.of("status", "TicketStatus"),
                 Arguments.of("creationSource", "TicketCreationSource"));
+    }
+
+    private static Stream<Arguments> ticketEnums() {
+        return Stream.of(
+                Arguments.of("TicketStatus", TicketStatus.class),
+                Arguments.of("TicketCreationSource", TicketCreationSource.class));
+    }
+
+    private static List<String> sdlEnumNames(String type) {
+        GraphQLEnumType definition = schema.getTypeAs(type);
+        return definition.getValues().stream()
+                .map(GraphQLEnumValueDefinition::getName)
+                .toList();
+    }
+
+    private static List<String> javaEnumNames(Class<? extends Enum<?>> javaEnum) {
+        Enum<?>[] constants = javaEnum.getEnumConstants();
+        return Arrays.stream(constants)
+                .map(Enum::name)
+                .toList();
     }
 
     private static TypeDefinitionRegistry loadSchemaFiles() throws IOException {

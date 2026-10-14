@@ -9,14 +9,19 @@ import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -123,5 +128,24 @@ class ApiEntityFetchersTest {
 
         // verifications
         assertThat(entity).isNull();
+    }
+
+    @ParameterizedTest
+    @MethodSource("keysWithoutMachineId")
+    void machine_keyWithoutMachineId_nullWithoutLookup(Map<String, Object> key) {
+        // execution
+        Machine entity = fetchers.machine(key);
+
+        // verifications
+        assertThat(entity).isNull();
+        verifyNoInteractions(deviceService);
+    }
+
+    private static Stream<Arguments> keysWithoutMachineId() {
+        return Stream.of(
+                Arguments.of(Map.of()),
+                Arguments.of(Collections.singletonMap("machineId", null)),
+                Arguments.of(Map.of("machineId", "")),
+                Arguments.of(Map.of("machineId", " ")));
     }
 }

@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
@@ -39,6 +41,9 @@ public class ApiEntityFetchers {
     @DgsEntityFetcher(name = "Machine")
     public Machine machine(Map<String, Object> values) {
         String machineId = (String) values.get(MACHINE_ID);
+        if (!hasText(machineId)) {
+            return null;
+        }
         return deviceService.findByMachineId(machineId).orElse(null);
     }
 

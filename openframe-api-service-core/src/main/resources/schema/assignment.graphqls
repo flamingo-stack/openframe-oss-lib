@@ -74,7 +74,7 @@ type Ticket implements AssignableTarget & Node @key(fields: "id", resolvable: fa
     description: String
     status: TicketStatus
     # The lifecycle status: the kind drives the canonical chip styling, the definition carries the
-    # name and colour a custom column is drawn from. `status` above is the legacy string and reports
+    # name and colour a custom column is drawn from. `status` above is the legacy status and reports
     # every custom column as TECH_REQUIRED — it stays only for clients that have not migrated.
     statusKind: TicketStatusKind
     statusDefinition: TicketStatusDefinition
