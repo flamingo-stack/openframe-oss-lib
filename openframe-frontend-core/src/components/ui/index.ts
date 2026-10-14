@@ -78,7 +78,6 @@ export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
 export * from './skeleton';
-export * from './skeleton-class';
 export * from './hover-dropdown';
 // Chat components
 export * from '../chat';

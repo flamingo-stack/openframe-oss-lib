@@ -2,14 +2,13 @@
 
 import { type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
-import { SKELETON_CLASS } from './skeleton-class';
 
 interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {
   className?: string;
 }
 
 const Skeleton = forwardRef<HTMLDivElement, SkeletonProps>(({ className, ...props }, ref) => {
-  return <div ref={ref} className={cn(SKELETON_CLASS, className)} {...props} />;
+  return <div ref={ref} className={cn('animate-pulse rounded-md bg-ods-border', className)} {...props} />;
 });
 Skeleton.displayName = 'Skeleton';
 
