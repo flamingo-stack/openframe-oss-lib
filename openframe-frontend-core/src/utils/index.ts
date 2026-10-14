@@ -425,6 +425,7 @@ export * from './doc-path-utils';
 export * from './doc-tree-nav';
 export * from './tree-builder';
 export * from './markdown-heading-id';
+export * from './markdown-link';
 export * from './markdown-section-extractor';
 export * from './markdown-to-plain';
 export * from './embed-url-converters';
