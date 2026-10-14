@@ -2,7 +2,7 @@ import type { DeviceRow } from '../../features/devices';
 import type { SelectedPackage, SoftwareActionFormProps, SoftwareScheduleTiming } from '../../features/software';
 import type { DemoCast } from '../cast';
 import { buildDevicesFixture } from './devices';
-import { DEMO_DEVICES, DEMO_NOW } from './shared';
+import { DEMO_DEVICES, demoDay } from './shared';
 
 /** The catalog entry the row holds: WinGet's Google Chrome. */
 const chrome: SelectedPackage = {
@@ -12,12 +12,6 @@ const chrome: SelectedPackage = {
   version: '141.0.7390.66',
   packageType: null,
 };
-
-/** The demo day as a local calendar day, so the date field reads the same in every timezone. */
-function demoDay(): Date {
-  const [year, month, day] = DEMO_NOW.slice(0, 10).split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
 
 const TONIGHT_11_PM = { value: '23:00', label: '11:00 PM' };
 

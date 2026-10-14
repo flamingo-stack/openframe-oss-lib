@@ -82,6 +82,7 @@ public class SecurityConfig {
                                 "/login",
                                 "/favicon.ico",
                                 "/tenant/**",
+                                "/mobile/version-policy",
                                 "/management/**",
                                 "/.well-known/**",
                                 "/error",
