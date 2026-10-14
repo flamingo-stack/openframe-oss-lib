@@ -2,41 +2,10 @@ import { useParams } from 'react-router-dom'
 import { LegalDocumentPage } from '@flamingo-stack/openframe-frontend-core/components'
 import { EP } from '../config/endpoints'
 
-// LegalDocumentPage is one parameterized surface (it replaced the hub's separate
-// Privacy/Terms pages), so the host supplies the per-doc copy strings.
-const COPY: Record<
-  string,
-  {
-    title: string
-    fallbackDescription: string
-    contactEmail: string
-    errorContactPrompt: string
-    errorTitle: string
-    emptyStateMessage: string
-  }
-> = {
-  privacy: {
-    title: 'Privacy Policy',
-    fallbackDescription: 'Our privacy policy and data protection practices.',
-    contactEmail: 'privacy@openframe.io',
-    errorContactPrompt: 'For privacy-related questions, please contact:',
-    errorTitle: 'Unable to load privacy policy',
-    emptyStateMessage: 'Privacy policy content is not available at this time.',
-  },
-  terms: {
-    title: 'Terms of Service',
-    fallbackDescription: 'The terms governing your use of OpenFrame.',
-    contactEmail: 'legal@openframe.io',
-    errorContactPrompt: 'For terms-related questions, please contact:',
-    errorTitle: 'Unable to load terms of service',
-    emptyStateMessage: 'Terms of service content is not available at this time.',
-  },
-}
-
+// The hub serves each legal document with its own title, version and effective
+// date (and lists them all at `/api/legal`), so the host states no per-document
+// copy: a document the hub adds needs no change here.
 export function LegalPage() {
   const { docType = 'privacy' } = useParams()
-  const copy = COPY[docType] ?? COPY.privacy
-  return (
-    <LegalDocumentPage docType={docType} apiEndpoint={EP.legal(docType)} backButton={false} {...copy} />
-  )
+  return <LegalDocumentPage docType={docType} apiEndpoint={EP.legal(docType)} backButton={false} />
 }

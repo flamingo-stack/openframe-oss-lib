@@ -34,25 +34,24 @@ export interface LegalDocumentMarkdownRendererProps {
 
 export interface LegalDocumentPageProps {
   /** Document type identifier — drives the default API endpoint
-   *  `/api/legal/<docType>` AND the error-log prefix. Common values:
-   *  `'privacy'`, `'terms'`. Embedders may use any string. */
+   *  `/api/legal/<docType>` AND the error-log prefix. One of the types the
+   *  host's list answers (`useLegalDocuments`). */
   docType: string;
-  /** Heading text (e.g. "Privacy Policy", "Terms of Service"). */
-  title: string;
-  /** Fallback subtitle shown when no `lastUpdated` date is available
-   *  (e.g. "Our privacy policy and data protection practices"). */
-  fallbackDescription: string;
-  /** Email shown in the error + empty-state copy
-   *  (e.g. `'privacy@openframe.io'`, `'legal@openframe.io'`). */
-  contactEmail: string;
-  /** Prompt shown above the contact link in the error state
-   *  (e.g. "For privacy-related questions, please contact:"). */
-  errorContactPrompt: string;
-  /** Title for the error block (e.g. "Unable to load privacy policy"). */
-  errorTitle: string;
-  /** Sentence shown when the API returns no document
-   *  (e.g. "Privacy policy content is not available at this time."). */
-  emptyStateMessage: string;
+  /** Heading text. Default: the title the served document carries, so a host
+   *  that shows whatever the list holds states no per-document copy. */
+  title?: string;
+  /** Subtitle shown when the document states neither a version nor a date. */
+  fallbackDescription?: string;
+  /** Email shown in the error + empty-state copy. Absent: no contact line. */
+  contactEmail?: string;
+  /** Prompt shown above the contact link in the error state.
+   *  Default "For questions about this document, please contact:". */
+  errorContactPrompt?: string;
+  /** Title for the error block. Default "Unable to load <title>". */
+  errorTitle?: string;
+  /** Sentence shown when the API returns no document.
+   *  Default "<title> is not available at this time.". */
+  emptyStateMessage?: string;
   /** SSR-prepared document, if available. */
   initialData?: LegalDocument | null;
   /** SSR-prepared formatted "Last Updated" label. Stable across hydration. */
@@ -77,14 +76,28 @@ export interface LegalDocumentPageProps {
   shell?: boolean;
 }
 
+/**
+ * "Version 1.0 · Effective October 14, 2026" for a document that states them;
+ * null for one that states neither. One wording for every legal surface.
+ */
+export function legalDocumentStampLabel(
+  doc: Pick<LegalDocument, 'version' | 'effectiveDate'> | null | undefined,
+): string | null {
+  const parts = [
+    doc?.version ? `Version ${doc.version}` : null,
+    doc?.effectiveDate ? `Effective ${doc.effectiveDate}` : null,
+  ].filter((part): part is string => part !== null);
+  return parts.length > 0 ? parts.join(' \u00b7 ') : null;
+}
+
 export function LegalDocumentPage({
   docType,
-  title,
-  fallbackDescription,
+  title: titleProp,
+  fallbackDescription = '',
   contactEmail,
-  errorContactPrompt,
-  errorTitle,
-  emptyStateMessage,
+  errorContactPrompt = 'For questions about this document, please contact:',
+  errorTitle: errorTitleProp,
+  emptyStateMessage: emptyStateMessageProp,
   initialData = null,
   initialLastUpdatedLabel = null,
   apiEndpoint,
@@ -107,13 +120,21 @@ export function LegalDocumentPage({
           onClick: () => router.push(backButton?.href ?? '/'),
         };
 
+  const title = titleProp ?? data?.title ?? 'Legal document';
+  const errorTitle = errorTitleProp ?? `Unable to load ${title}`;
+  const emptyStateMessage = emptyStateMessageProp ?? `${title} is not available at this time.`;
+
   const fallbackLastUpdatedLabel = data?.lastSynced != null ? formatLegalDate(data.lastSynced) : null;
   const effectiveLastUpdatedLabel = initialLastUpdatedLabel ?? fallbackLastUpdatedLabel;
 
   // Subtitle routes through the frozen `PageLayout` `TitleBlock` (text-h2 title
-  // + subtitle) — unified header across all help-center pages. Shows the
-  // last-updated date when known, else the fallback description.
-  const subtitle = effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription;
+  // + subtitle) — unified header across all help-center pages. A document that
+  // states its own version and effective date shows those (they are what a
+  // reader agreed to); one that states neither shows when it was last read
+  // from its source, else the fallback description.
+  const subtitle =
+    legalDocumentStampLabel(data) ??
+    (effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription);
 
   const inner = (
     <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
@@ -144,25 +165,29 @@ export function LegalDocumentPage({
                     <p className="mb-2 text-ods-error">{errorTitle}</p>
                     <p className="text-ods-error text-h6">{error}</p>
                   </div>
-                  <div className="text-ods-text-secondary">
-                    <p>{errorContactPrompt}</p>
-                    <Link href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
-                      {contactEmail}
-                    </Link>
-                  </div>
+                  {contactEmail && (
+                    <div className="text-ods-text-secondary">
+                      <p>{errorContactPrompt}</p>
+                      <Link href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
+                        {contactEmail}
+                      </Link>
+                    </div>
+                  )}
                 </div>
               ) : data ? (
                 <MarkdownRenderer content={data.content} sectionIds={data.sections || []} demoteMarkdownH1ToH2 />
               ) : (
                 <div className="py-16 text-center text-ods-text-secondary">
                   <p className="text-h4">{emptyStateMessage}</p>
-                  <p className="mt-2">
-                    Please contact{' '}
-                    <Link href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
-                      {contactEmail}
-                    </Link>{' '}
-                    for more information.
-                  </p>
+                  {contactEmail && (
+                    <p className="mt-2">
+                      Please contact{' '}
+                      <Link href={`mailto:${contactEmail}`} className="text-ods-accent hover:underline">
+                        {contactEmail}
+                      </Link>{' '}
+                      for more information.
+                    </p>
+                  )}
                 </div>
               )}
             </article>

@@ -24,6 +24,10 @@ export interface LegalDocument {
   githubSha: string | null;
   sections: Array<{ id: string; title: string; level: number }>;
   docType: string;
+  /** The version the document states for itself ("1.0"); null when it states none. */
+  version: string | null;
+  /** The day that version takes effect, as the document words it; null when it states none. */
+  effectiveDate: string | null;
   meta: {
     sectionsCount: number;
     contentLength: number;
@@ -111,6 +115,8 @@ function toLegalDocument(payload: unknown, docType: string): LegalDocument | nul
     githubSha: typeof githubSha === 'string' ? githubSha : null,
     sections,
     docType: readString(payload, 'docType') ?? docType,
+    version: readString(payload, 'version') ?? null,
+    effectiveDate: readString(payload, 'effectiveDate') ?? null,
     meta: {
       sectionsCount: typeof sectionsCount === 'number' ? sectionsCount : sections.length,
       contentLength: typeof contentLength === 'number' ? contentLength : content.length,
@@ -122,9 +128,9 @@ function toLegalDocument(payload: unknown, docType: string): LegalDocument | nul
 /**
  * Hook to fetch a legal document.
  * @param docType — short identifier for the document (drives the
- *   default endpoint path AND the error-log prefix). Common values:
- *   `'privacy'` (SECURITY.md), `'terms'` (LICENSE). Embedders may use
- *   any string — the hook treats it as opaque.
+ *   default endpoint path AND the error-log prefix). The valid values are
+ *   the ones the host's list endpoint answers (`useLegalDocuments`); the
+ *   hook treats it as opaque.
  */
 export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {}): UseLegalDocsReturn {
   const { initialData = null, apiEndpoint } = options;
