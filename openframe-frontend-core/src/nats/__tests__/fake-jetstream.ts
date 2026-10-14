@@ -112,6 +112,12 @@ export class FakeJetStream {
   createdConsumers: ServerConsumerConfig[] = [];
   /** Latency between CONSUMER.CREATE and the first delivered message. */
   consumeDelayMs = 0;
+  /** CONSUMER lookups fail (e.g. STREAM.INFO while JetStream recovers after a restart). */
+  failConsumerLookup = false;
+  /** Every `consumers.get`, failed ones included. */
+  consumerLookups = 0;
+  /** `consume()` fails (nats.ws gave up creating the consumer). */
+  failConsume = false;
   private live = new Set<LiveConsumer>();
   private conns = new Set<{ drop: () => void }>();
   private consumerSerial = 0;
@@ -155,7 +161,7 @@ export class FakeJetStream {
   }
 
   /** The `nats.ws` `connect()` replacement. */
-  connect = async () => {
+  connect = () => {
     let closed = false;
     const status = new Queue<StatusEvent>();
     const token = {};
@@ -168,21 +174,25 @@ export class FakeJetStream {
       },
     };
     this.conns.add(connEntry);
-    return {
+    return Promise.resolve({
       isClosed: () => closed,
       closed: () => new Promise(() => {}),
-      drain: async () => {
+      drain: () => {
         closed = true;
+        return Promise.resolve();
       },
-      close: async () => {
+      close: () => {
         closed = true;
+        return Promise.resolve();
       },
       status: () => status,
       publish: () => {},
       subscribe: () => ({ unsubscribe() {}, [Symbol.asyncIterator]: async function* () {} }),
       jetstream: () => ({
         consumers: {
-          get: async (stream: string, opts: Record<string, unknown>) => {
+          get: (stream: string, opts: Record<string, unknown>) => {
+            this.consumerLookups += 1;
+            if (this.failConsumerLookup) return Promise.reject(new Error('JetStream not available'));
             const config = orderedConsumerServerConfig(stream, opts);
             this.createdConsumers.push(config);
             const filter = String(opts.filterSubjects);
@@ -236,9 +246,10 @@ export class FakeJetStream {
               },
             };
 
-            return {
-              info: async () => info,
-              consume: async () => {
+            return Promise.resolve({
+              info: () => Promise.resolve(info),
+              consume: () => {
+                if (this.failConsume) return Promise.reject(new Error('consumer could not be created'));
                 const backlog =
                   config.deliver_policy === 'by_start_sequence'
                     ? this.retainedAfter(filter, config.opt_start_seq ?? 1)
@@ -252,16 +263,19 @@ export class FakeJetStream {
                   if (this.consumeDelayMs > 0) setTimeout(() => deliverBacklog(backlog), this.consumeDelayMs);
                   else deliverBacklog(backlog);
                 }
-                return {
-                  status: async () => consumerStatus,
-                  close: async () => entry.end(),
+                return Promise.resolve({
+                  status: () => Promise.resolve(consumerStatus),
+                  close: () => {
+                    entry.end();
+                    return Promise.resolve();
+                  },
                   [Symbol.asyncIterator]: () => messages[Symbol.asyncIterator](),
-                };
+                });
               },
-            };
+            });
           },
         },
       }),
-    };
+    });
   };
 }

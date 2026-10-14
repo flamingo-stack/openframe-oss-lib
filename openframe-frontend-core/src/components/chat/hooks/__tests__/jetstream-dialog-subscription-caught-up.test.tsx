@@ -8,7 +8,7 @@
  * them a second time (the Mingo "burst of old messages" report). The counter
  * may only move once the replay is in.
  */
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FakeJetStream } from '../../../../nats/__tests__/fake-jetstream';
@@ -58,8 +58,7 @@ async function wait(ms: number) {
 }
 
 async function until(check: () => boolean) {
-  for (let i = 0; i < 100 && !check(); i++) await wait(10);
-  expect(check()).toBe(true);
+  await waitFor(() => expect(check()).toBe(true));
 }
 
 function publish(text: string) {
@@ -88,10 +87,10 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
     render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seen - 1} />);
     await until(() => latest.isSubscribed && log.length === 1);
 
+    server.current.consumeDelayMs = 50;
     server.current.disconnectAll();
     await wait(5);
     const missed = [publish('missed-1'), publish('missed-2')];
-    server.current.consumeDelayMs = 50;
 
     await until(() => latest.caughtUpCount === 1);
     expect(latest.reconnectionCount).toBe(1);
@@ -122,6 +121,38 @@ describe('useJetStreamDialogSubscription caughtUpCount', () => {
     await until(() => latest.caughtUpCount === 1);
     expect(latest.reconnectionCount).toBe(1);
     expect(log).toEqual([`msg:${seen}`, ...missed.map(s => `msg:${s}`), 'caught-up:1']);
+  });
+
+  it('moves when the resumed tail cannot subscribe at all, so history is not left at its pre-gap snapshot', async () => {
+    const seen = publish('seen');
+    render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seen - 1} />);
+    await until(() => latest.isSubscribed && log.length === 1);
+
+    server.current.failConsumerLookup = true;
+    server.current.disconnectAll();
+
+    await until(() => latest.caughtUpCount === 1);
+    await wait(50);
+    expect(latest.caughtUpCount).toBe(1);
+    // The first consumer and one failed resume; nothing retried it.
+    expect(server.current.consumerLookups).toBe(2);
+  });
+
+  it('moves when the resumed consumer cannot consume: nothing more will arrive from it', async () => {
+    const seen = publish('seen');
+    render(<Probe url={`ws://caught-up-${testIndex}`} optStartSeq={seen - 1} />);
+    await until(() => latest.isSubscribed && log.length === 1);
+
+    server.current.failConsume = true;
+    server.current.disconnectAll();
+    await wait(5);
+    publish('missed');
+
+    await until(() => latest.caughtUpCount === 1);
+    await wait(50);
+    expect(latest.caughtUpCount).toBe(1);
+    expect(server.current.createdConsumers).toHaveLength(2);
+    expect(log).toEqual([`msg:${seen}`, 'caught-up:1']);
   });
 
   it('live-tails a null start sequence instead of replaying what the stream retains', async () => {

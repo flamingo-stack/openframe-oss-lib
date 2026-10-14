@@ -34,9 +34,10 @@ export interface JetStreamOrderedSubscribeOptions {
   optStartSeq?: number;
   /**
    * Auto-cleanup the ephemeral consumer after this idle time. Defaults to
-   * nats.ws's own. Applies to the consumer created first: nats.ws only reads it
-   * when the start sequence is the one it was built with, so every consumer it
-   * recreates afterwards reverts to the library default.
+   * nats.ws's own. nats.ws reads it only while it builds the consumer at the
+   * start it was asked for — `'new'`, or `optStartSeq` 0/unset — and has
+   * delivered nothing yet. A consumer created from `optStartSeq` ≥ 1, and any
+   * recreation after a delivery, gets the library default.
    */
   inactiveThresholdMs?: number;
   /** AbortSignal to tear down the consumer. */
@@ -58,7 +59,10 @@ export interface JetStreamOrderedSubscribeOptions {
    * The consumer has delivered everything the stream held for the subject when
    * it was created. Fires once for the first consumer and once more for each
    * one nats.ws recreates (`onRecovered`): after `onMessage` has handled the
-   * last message of that backlog, or straight away when it was empty.
+   * last message of that backlog, straight away when it was empty, or when
+   * consuming failed and nothing more will arrive. In that last case a later
+   * consumer replays the gap over a refetch made in the meantime, and the
+   * refetch on ITS `onCaughtUp` clears the copies.
    *
    * This is the moment to refetch persisted history after a gap. A refetch
    * that lands while the backlog is still arriving merges without the turns it
@@ -711,9 +715,13 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     // An empty backlog has no message to say so: it shows only in the answer to
     // CONSUMER.CREATE, which `info(true)` returns without asking the server again.
     const reportIfNothingPending = async (consumerName?: string) => {
-      const info = await consumer.info(true);
-      if (consumerName !== undefined && info.name !== consumerName) return;
-      if (info.num_pending === 0) reportCaughtUp();
+      try {
+        const info = await consumer.info(true);
+        if (consumerName !== undefined && info.name !== consumerName) return;
+        if (info.num_pending === 0) reportCaughtUp();
+      } catch {
+        // A failed lookup reports nothing: the next message with `pending === 0` does instead.
+      }
     };
 
     (async () => {
@@ -736,9 +744,7 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
             // the current one (a promise continuation does that), so its answer
             // is read once those have run — and only if it is the one announced.
             setTimeout(() => {
-              reportIfNothingPending(consumerName).catch(() => {
-                // Its first message reports instead.
-              });
+              void reportIfNothingPending(consumerName);
             }, 0);
           });
         }
@@ -755,7 +761,12 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           if (msg.info.pending === 0) reportCaughtUp();
         }
       } catch (e) {
-        if (!closed) emitStatus({ status: 'error', data: e });
+        if (!closed) {
+          emitStatus({ status: 'error', data: e });
+          // This consumer delivers nothing more: settle what it owed rather than
+          // leave the caller's history at its pre-gap snapshot (see `onCaughtUp`).
+          reportCaughtUp();
+        }
       }
     })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
 

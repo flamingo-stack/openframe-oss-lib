@@ -128,8 +128,10 @@ export interface UseJetStreamDialogSubscriptionOptions {
     maxDelayMs?: number;
     multiplier?: number;
   };
-  /** Consumer inactivity threshold in ms before NATS auto-cleans it. Defaults to the
-   *  client's, and applies only to the first consumer — recreations use nats.ws's. */
+  /** Consumer inactivity threshold in ms before NATS auto-cleans it, passed to the client
+   *  (see `JetStreamOrderedSubscribeOptions.inactiveThresholdMs`). It takes effect only
+   *  while the hook live-tails (`optStartSeq` null, nothing seen yet): every other consumer
+   *  it opens starts from a sequence ≥ 1, which nats.ws gives its own default. */
   inactiveThresholdMs?: number;
   /**
    * A counter the host bumps when it knows, from outside the page, that the tail
@@ -172,8 +174,10 @@ export interface UseJetStreamDialogSubscriptionReturn {
    * persisted history on this: the gap may predate what the stream retains,
    * and only a refetch that lands after the replay merges against the turns it
    * re-delivered. One that lands first merges without them, and they then
-   * render a second time. Never moves for the first consumer of a dialog.
-   * Starts at 0.
+   * render a second time. Also moves when such a tail could not be resumed at
+   * all, so history is not left at its pre-gap snapshot: the next resume then
+   * replays the gap over that refetch, and its own increment's refetch clears
+   * the copies. Never moves for the first consumer of a dialog. Starts at 0.
    */
   caughtUpCount: number;
   /** Highest JetStream stream sequence observed so far (null before first delivery). */

@@ -52,13 +52,13 @@ const RECOVERY_REPORT_FLOOR_MS = 5_000;
  *   (`DeliverPolicy.New`) from whenever the server creates the consumer.
  * - On reconnect, the consumer is recreated starting from the highest stream
  *   sequence we've already observed + 1, so no chunk is replayed or skipped.
- * - Consumer is ephemeral with `AckPolicy.None` and the client's default
- *   inactivity threshold (overridable via `inactiveThresholdMs`).
+ * - Consumer is ephemeral with `AckPolicy.None` and nats.ws's default
+ *   inactivity threshold (`inactiveThresholdMs` only reaches a live-tail
+ *   consumer — see the option).
  * - `reconnectionCount` also counts consumer recreations and post-absence
  *   resyncs, not just NATS reconnects — see the counter's docs.
- * - `caughtUpCount` moves once a tail that came back has replayed everything
- *   the stream still held. Callers refetch persisted history on it, not on
- *   `reconnectionCount`.
+ * - `caughtUpCount` is when callers refetch persisted history after a gap —
+ *   not `reconnectionCount` (see its docs).
  */
 export function useJetStreamDialogSubscription({
   enabled,
@@ -396,10 +396,20 @@ export function useJetStreamDialogSubscription({
     if (!owesCatchUp) tailOpenedAtRef.current = { dialogId, count: reconnectionCount };
 
     let cancelled = false;
+    // Settles an owed catch-up once the replay is in, or once there can be none
+    // (a failed resume, below) — never as the tail comes back: a refetch that
+    // lands first merges without the turns the replay is still delivering, and
+    // they then render twice.
+    const settleCatchUp = () => {
+      if (cancelled || !owesCatchUp) return;
+      owesCatchUp = false;
+      setCaughtUpCount(c => c + 1);
+    };
 
     void (async () => {
+      let handle: JetStreamSubscriptionHandle;
       try {
-        const handle = await client.subscribeJetStreamOrdered(
+        handle = await client.subscribeJetStreamOrdered(
           msg => {
             if (cancelled) return;
             const streamSeq = msg.info.streamSequence;
@@ -441,33 +451,36 @@ export function useJetStreamDialogSubscription({
               owesCatchUp = true;
               setRecoveryCount(c => c + 1);
             },
-            // Reported once the replay is in, never as the tail comes back: a
-            // refetch that lands first merges without the turns the replay is
-            // still delivering, and they then render twice.
-            onCaughtUp: () => {
-              if (cancelled || !owesCatchUp) return;
-              owesCatchUp = false;
-              setCaughtUpCount(c => c + 1);
-            },
+            onCaughtUp: settleCatchUp,
           },
         );
-
-        if (cancelled) {
-          try {
-            handle.unsubscribe();
-          } catch {
-            // ignore
-          }
-          return;
-        }
-
-        subscriptionRef.current = handle;
-        setIsSubscribed(true);
-        onSubscribedRef.current?.();
       } catch {
-        if (!cancelled) {
-          setIsSubscribed(false);
+        if (cancelled) return;
+        setIsSubscribed(false);
+        // With no consumer the refetch cannot wait for a replay. The next resume
+        // still owes one (`tailOpenedAtRef` did not move), and its own catch-up
+        // refetch clears what its replay re-renders meanwhile.
+        settleCatchUp();
+        return;
+      }
+
+      if (cancelled) {
+        try {
+          handle.unsubscribe();
+        } catch {
+          // ignore
         }
+        return;
+      }
+
+      subscriptionRef.current = handle;
+      setIsSubscribed(true);
+      // A host callback, outside the subscribe's catch: a throw there must not
+      // read as a failed subscribe and settle the catch-up before the replay.
+      try {
+        onSubscribedRef.current?.();
+      } catch (e) {
+        console.warn('[JetStream] onSubscribed threw:', e);
       }
     })();
 
@@ -488,8 +501,8 @@ export function useJetStreamDialogSubscription({
 
   // One counter for every way the tail comes back — reconnect, consumer
   // recreation, post-absence resync. The last two are the quiet ones; no
-  // connection event fires for either. `caughtUpCount` is the same events, each
-  // counted once its replay is in.
+  // connection event fires for either. `caughtUpCount` counts the same events,
+  // each once its replay is in or once it could not be resumed (see its docs).
   return {
     isConnected,
     isSubscribed,
