@@ -1,6 +1,6 @@
 package com.openframe.gateway.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.core.clientversion.BundleVersions;
 import com.openframe.core.clientversion.ClientIdentity;
 import com.openframe.core.clientversion.ClientIdentityParser;

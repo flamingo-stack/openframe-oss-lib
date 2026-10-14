@@ -1,6 +1,6 @@
 package com.openframe.gateway.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.core.clientversion.MobileVersionPolicyProperties;
 import com.openframe.gateway.metrics.GatewayTrafficMetrics;
 import io.micrometer.core.instrument.Counter;

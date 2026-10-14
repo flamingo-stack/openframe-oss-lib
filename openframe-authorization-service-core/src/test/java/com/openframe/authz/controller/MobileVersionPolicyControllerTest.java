@@ -1,6 +1,6 @@
 package com.openframe.authz.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.authz.dto.MobileVersionPolicyResponse;
 import com.openframe.core.clientversion.MobileVersionPolicyProperties;
 import org.junit.jupiter.api.BeforeEach;
