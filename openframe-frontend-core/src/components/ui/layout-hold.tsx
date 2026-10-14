@@ -2,7 +2,7 @@
 
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
-import { Skeleton } from './skeleton';
+import { SkeletonText } from './skeleton';
 
 /**
  * Holding a layout while its content is read, the two ways that are right at
@@ -13,8 +13,8 @@ import { Skeleton } from './skeleton';
  *
  * - `TextHold`: an inline stand-in exactly as wide as the words it is given
  *   (same font, same letter spacing, because it IS those words, not shown).
- *   `bar` draws a `Skeleton` over each line the words take; `blank` only keeps
- *   their space.
+ *   `bar` draws a `SkeletonText` of as many lines as the words take; `blank`
+ *   only keeps their space.
  * - `LayoutHold`: a block as tall as the real layout rendered inside it, kept
  *   invisible and inert: the layout's own height, at any width.
  *
@@ -23,95 +23,49 @@ import { Skeleton } from './skeleton';
 export interface TextHoldProps {
   /** The words whose width is held (the content's own, or a stand-in of its length). */
   children: ReactNode;
-  /** `bar`: a `Skeleton` over each line the words take. `blank`: the space only. */
+  /** `bar`: a `SkeletonText` of as many lines as the words take. `blank`: the space only. */
   variant?: 'bar' | 'blank';
   className?: string;
 }
 
 export function TextHold({ children, variant = 'bar', className }: TextHoldProps) {
+  const hold = useRef<HTMLSpanElement>(null);
   const words = useRef<HTMLSpanElement>(null);
-  const bars = useLineBars(words, variant === 'bar');
+  const lines = useLineCount(hold, words, variant === 'bar');
   return (
     <span
+      ref={hold}
       aria-hidden
-      className={cn(
-        // The words keep their space and their line breaks, unseen; `bar` draws a `Skeleton` over each line they take.
-        'pointer-events-none invisible select-none',
-        variant === 'bar' && 'relative',
-        className,
-      )}
+      className={cn('pointer-events-none select-none', variant === 'bar' && 'relative inline-block', className)}
     >
-      <span ref={words}>{children}</span>
-      {bars.map(bar => (
-        <Skeleton
-          key={`${bar.top}:${bar.left}`}
-          className="visible absolute h-4"
-          style={{ top: bar.top, left: bar.left, width: bar.width }}
-        />
-      ))}
+      <span ref={words} className="invisible">
+        {children}
+      </span>
+      {lines > 0 ? (
+        // `justify-around`: each `Skeleton` sits in the middle of the line it stands for.
+        <SkeletonText lines={lines} className="absolute inset-0 flex flex-col justify-around space-y-0" />
+      ) : null}
     </span>
   );
 }
 
-interface LineBar {
-  top: number;
-  left: number;
-  width: number;
-}
-
-/** The `Skeleton` bar's height (`h-4`), centred on each line. */
-const BAR_HEIGHT_PX = 16;
-
-/**
- * One bar per line the words take, measured from their own line boxes and kept
- * current as the width changes: each bar spans its line's words and sits in the
- * middle of the line. Positions are relative to the hold's first line, which is
- * where an inline box's absolutely positioned children are placed.
- */
-function useLineBars(words: RefObject<HTMLSpanElement | null>, enabled: boolean): LineBar[] {
-  const [bars, setBars] = useState<LineBar[]>([]);
+/** How many lines the words take (one box per line), kept current as the width changes. */
+function useLineCount(
+  hold: RefObject<HTMLSpanElement | null>,
+  words: RefObject<HTMLSpanElement | null>,
+  enabled: boolean,
+): number {
+  const [lines, setLines] = useState(0);
   useLayoutEffect(() => {
-    const element = words.current;
-    if (!enabled || !element) return undefined;
-    const measure = () => {
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      const lines = new Map<number, DOMRect>();
-      for (const rect of Array.from(range.getClientRects())) {
-        if (rect.width === 0) continue;
-        const key = Math.round(rect.top);
-        const line = lines.get(key);
-        lines.set(
-          key,
-          line
-            ? new DOMRect(
-                Math.min(line.left, rect.left),
-                line.top,
-                Math.max(line.right, rect.right) - Math.min(line.left, rect.left),
-                line.height,
-              )
-            : rect,
-        );
-      }
-      const all = [...lines.values()].sort((a, b) => a.top - b.top || a.left - b.left);
-      const first = element.getClientRects()[0];
-      setBars(
-        !first
-          ? []
-          : all.map(line => ({
-              top: Math.round(line.top - first.top + (line.height - BAR_HEIGHT_PX) / 2),
-              left: Math.round(line.left - first.left),
-              width: Math.round(line.width),
-            })),
-      );
-    };
+    const box = hold.current;
+    if (!enabled || !box) return undefined;
+    const measure = () => setLines(words.current?.getClientRects().length ?? 0);
     measure();
     const observer = new ResizeObserver(measure);
-    const block = element.closest('p, div, li, dd, dt, section') ?? element.parentElement;
-    if (block) observer.observe(block);
+    observer.observe(box);
     return () => observer.disconnect();
-  }, [words, enabled]);
-  return bars;
+  }, [hold, words, enabled]);
+  return lines;
 }
 
 export interface LayoutHoldProps {

@@ -56,14 +56,14 @@ export interface ShareExperienceSectionProps {
 }
 
 const DEFAULT_TITLE: React.ReactNode = (
-  <HeadingLines
-    lines={[
+  <HeadingLines>
+    {[
       'Share Your Experience',
       <>
         with Fellow MSPs<span className="text-ods-accent">:</span>
       </>,
     ]}
-  />
+  </HeadingLines>
 );
 
 const DEFAULT_SUBTITLE: React.ReactNode = (

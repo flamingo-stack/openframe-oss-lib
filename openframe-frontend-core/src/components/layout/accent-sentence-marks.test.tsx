@@ -96,13 +96,15 @@ describe("a heading's text keeps its words apart", () => {
 
   it('puts a space before every line break, and keeps an empty line as a blank line', () => {
     expect(
-      headingText(<SectionHeading title={<HeadingLines lines={['Fixed on its own.', 'Approved with one tap']} />} />),
+      headingText(
+        <SectionHeading title={<HeadingLines>{['Fixed on its own.', 'Approved with one tap']}</HeadingLines>} />,
+      ),
     ).toBe('Fixed on its own. Approved with one tap.');
-    expect(html(<HeadingLines lines={['A.', '', 'B.']} />)).toBe('A. <br/> <br/>B.');
+    expect(html(<HeadingLines>{['A.', '', 'B.']}</HeadingLines>)).toBe('A. <br/> <br/>B.');
   });
 
   it('colours the sentence marks on every line of a multi-line title', () => {
-    expect(html(<SectionHeading title={<HeadingLines lines={['Fixed on its own.', 'Approved']} />} />)).toContain(
+    expect(html(<SectionHeading title={<HeadingLines>{['Fixed on its own.', 'Approved']}</HeadingLines>} />)).toContain(
       `Fixed on its own${mark('.')} <br/>Approved${mark('.')}`,
     );
   });

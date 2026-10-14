@@ -76,17 +76,18 @@ export function PageHeading({
  * draws nothing. An empty line is a blank line.
  *
  * Every multi-line title goes through this; never write a bare `<br />` or one
- * block `<span>` per line in a heading.
+ * block `<span>` per line in a heading. The lines are its children, so anything
+ * that walks a title's children (the accent marks) reaches every line.
  */
 export interface HeadingLinesProps {
-  /** The title's lines, top to bottom. */
-  lines: readonly ReactNode[];
+  /** The title's lines, top to bottom: one child per line. */
+  children: ReactNode;
 }
 
-export function HeadingLines({ lines }: HeadingLinesProps) {
+export function HeadingLines({ children }: HeadingLinesProps) {
   return (
     <>
-      {lines.map((line, index) => (
+      {Children.toArray(children).map((line, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: a title's lines never reorder
         <Fragment key={index}>
           {index > 0 ? (
@@ -150,26 +151,26 @@ function accentMarks(node: ReactNode, accentClassName: string): ReactNode {
     if (ONLY_MARKS.test(node)) return node;
     const parts = node.split(SENTENCE_MARK);
     if (parts.length === 1) return node;
-    return parts.map((part, index) =>
-      // `split` with one capture group alternates text, mark, text, mark...
-      index % 2 === 1 ? (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
-        <span key={index} className={accentClassName}>
-          {part}
-        </span>
-      ) : (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
-        <Fragment key={index}>{part}</Fragment>
-      ),
+    // One node for one string, so a list of children keeps its length (each of `HeadingLines`' lines stays one line).
+    return (
+      <>
+        {parts.map((part, index) =>
+          // `split` with one capture group alternates text, mark, text, mark...
+          index % 2 === 1 ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+            <span key={index} className={accentClassName}>
+              {part}
+            </span>
+          ) : (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+            <Fragment key={index}>{part}</Fragment>
+          ),
+        )}
+      </>
     );
   }
   if (Array.isArray(node)) {
     return Children.map(node as ReactNode[], child => accentMarks(child, accentClassName));
-  }
-  if (isValidElement(node) && node.type === HeadingLines) {
-    // A multi-line title: mark each of its lines.
-    const element = node as ReactElement<HeadingLinesProps>;
-    return cloneElement(element, { lines: element.props.lines.map(line => accentMarks(line, accentClassName)) });
   }
   if (isValidElement(node)) {
     const element = node as ReactElement<{ children?: ReactNode }>;
