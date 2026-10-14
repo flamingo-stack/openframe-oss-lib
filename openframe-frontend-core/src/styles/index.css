@@ -4,6 +4,7 @@
 @import './ods-design-tokens.css';
 @import './ods-interaction-states.css';
 @import './ods-effects.css';
+@import './ods-skeleton.css';
 @import './ods-responsive-tokens.css';
 @import './ods-content-area.css';
 @import './ods-content-area-tokens.css';

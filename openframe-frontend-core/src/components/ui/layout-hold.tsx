@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { SKELETON_TEXT_CLASS } from './skeleton-class';
 
 /**
  * Holding a layout while its content is read, the two ways that are right at
@@ -10,7 +11,8 @@ import { cn } from '../../utils/cn';
  *
  * - `TextHold`: an inline stand-in exactly as wide as the words it is given
  *   (same font, same letter spacing, because it IS those words, not shown).
- *   `bar` draws it as a pulsing grey bar; `blank` only keeps its space.
+ *   `bar` draws it in the skeleton look (`SKELETON_TEXT_CLASS`), one rounded bar per
+ *   line it wraps to; `blank` only keeps its space.
  * - `LayoutHold`: a block as tall as the real layout rendered inside it, kept
  *   invisible and inert: the layout's own height, at any width.
  *
@@ -19,7 +21,7 @@ import { cn } from '../../utils/cn';
 export interface TextHoldProps {
   /** The words whose width is held (the content's own, or a stand-in of its length). */
   children: ReactNode;
-  /** `bar`: a pulsing grey bar of that width. `blank`: the width only. */
+  /** `bar`: the skeleton look, one bar per line, of the words' width. `blank`: the width only. */
   variant?: 'bar' | 'blank';
   className?: string;
 }
@@ -29,7 +31,8 @@ export function TextHold({ children, variant = 'bar', className }: TextHoldProps
     <span
       aria-hidden
       className={cn(
-        variant === 'bar' ? 'animate-pulse rounded bg-ods-border text-transparent' : 'invisible',
+        // One rounded bar per line the words wrap to, like a stack of `Skeleton`s.
+        variant === 'bar' ? SKELETON_TEXT_CLASS : 'invisible',
         // A hold is never selectable or clickable, whatever it wraps.
         'pointer-events-none select-none',
         className,
