@@ -6,6 +6,8 @@ import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.security.authentication.ActorType;
+import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -38,13 +40,14 @@ class NodeDataFetcherRelayIdTest {
 
     private final RelayIdCodec codec = new RelayIdCodec();
     private final Machine machine = new Machine();
+    private final AuthPrincipal principal = AuthPrincipal.builder().id("admin-1").actorType(ActorType.ADMIN).build();
 
     @ParameterizedTest
     @ValueSource(strings = {RAW_OBJECT_ID, MACHINE_ID})
     void node_rawId_throwsInvalidRelayId(String rawId) {
         // execution
         InvalidRelayIdException exception = assertThrows(InvalidRelayIdException.class,
-                () -> dataFetcher.node(rawId));
+                () -> dataFetcher.node(rawId, principal));
 
         // verifications
         assertThat(exception.getMessage()).isEqualTo("Invalid node id");
@@ -58,7 +61,7 @@ class NodeDataFetcherRelayIdTest {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
 
         // execution
-        Object node = dataFetcher.node(machineGlobalId);
+        Object node = dataFetcher.node(machineGlobalId, principal);
 
         // verifications
         assertThat(node).isSameAs(machine);
@@ -72,7 +75,7 @@ class NodeDataFetcherRelayIdTest {
         when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machine));
 
         // execution
-        List<Object> nodes = dataFetcher.nodes(ids);
+        List<Object> nodes = dataFetcher.nodes(ids, principal);
 
         // verifications
         assertThat(nodes).containsExactly(null, machine);

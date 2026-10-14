@@ -15,6 +15,8 @@ import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
+import com.openframe.security.authentication.ActorType;
+import com.openframe.security.authentication.AuthPrincipal;
 import graphql.relay.Relay;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,13 +55,15 @@ class NodeDataFetcherOptionalNodeTest {
     @Mock private TenantRepository tenantRepository;
     @Mock private SoftwareBundleService softwareBundleService;
 
+    private final AuthPrincipal principal = AuthPrincipal.builder().id("admin-1").actorType(ActorType.ADMIN).build();
+
     @Test
     @DisplayName("node(Tenant): returns the tenant from the repository when the repository bean exists")
     void tenant_repositoryPresent_returnsTenant() {
         Tenant tenant = Tenant.builder().id("t-1").build();
         when(tenantRepository.findById("t-1")).thenReturn(Optional.of(tenant));
 
-        Object node = fetcher(tenantRepository, null).node(RELAY.toGlobalId("Tenant", "t-1"));
+        Object node = fetcher(tenantRepository, null).node(RELAY.toGlobalId("Tenant", "t-1"), principal);
 
         assertThat(node).isSameAs(tenant);
     }
@@ -69,13 +73,13 @@ class NodeDataFetcherOptionalNodeTest {
     void tenant_repositoryPresent_unknownId_returnsNull() {
         when(tenantRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThat(fetcher(tenantRepository, null).node(RELAY.toGlobalId("Tenant", "missing"))).isNull();
+        assertThat(fetcher(tenantRepository, null).node(RELAY.toGlobalId("Tenant", "missing"), principal)).isNull();
     }
 
     @Test
     @DisplayName("node(Tenant): returns null when no TenantRepository bean is deployed")
     void tenant_repositoryAbsent_returnsNull() {
-        assertThat(fetcher(null, null).node(RELAY.toGlobalId("Tenant", "t-1"))).isNull();
+        assertThat(fetcher(null, null).node(RELAY.toGlobalId("Tenant", "t-1"), principal)).isNull();
     }
 
     @Test
@@ -84,7 +88,7 @@ class NodeDataFetcherOptionalNodeTest {
         SoftwareBundleResponse bundle = SoftwareBundleResponse.builder().build();
         when(softwareBundleService.findById("b-1")).thenReturn(Optional.of(bundle));
 
-        Object node = fetcher(null, softwareBundleService).node(RELAY.toGlobalId("SoftwareBundle", "b-1"));
+        Object node = fetcher(null, softwareBundleService).node(RELAY.toGlobalId("SoftwareBundle", "b-1"), principal);
 
         assertThat(node).isSameAs(bundle);
     }
@@ -92,7 +96,7 @@ class NodeDataFetcherOptionalNodeTest {
     @Test
     @DisplayName("node(SoftwareBundle): returns null when no SoftwareBundleService bean is deployed")
     void softwareBundle_serviceAbsent_returnsNull() {
-        assertThat(fetcher(null, null).node(RELAY.toGlobalId("SoftwareBundle", "b-1"))).isNull();
+        assertThat(fetcher(null, null).node(RELAY.toGlobalId("SoftwareBundle", "b-1"), principal)).isNull();
     }
 
     @Test
@@ -103,7 +107,7 @@ class NodeDataFetcherOptionalNodeTest {
 
         List<Object> nodes = fetcher(tenantRepository, null).nodes(List.of(
                 RELAY.toGlobalId("Tenant", "t-1"),
-                RELAY.toGlobalId("SoftwareBundle", "b-1")));
+                RELAY.toGlobalId("SoftwareBundle", "b-1")), principal);
 
         assertThat(nodes).containsExactly(tenant, null);
     }

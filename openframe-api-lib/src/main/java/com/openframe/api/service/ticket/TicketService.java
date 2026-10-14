@@ -124,10 +124,6 @@ public class TicketService {
         return ticketRepository.findById(ticketId);
     }
 
-    public Optional<Ticket> findTicketById(@NotBlank String ticketId) {
-        return ticketRepository.findById(ticketId);
-    }
-
     public Optional<Ticket> getTicketByNumber(AuthPrincipal principal, Integer ticketNumber) {
         log.debug("Getting ticket #{} for {}", ticketNumber, principal.getActorType());
 

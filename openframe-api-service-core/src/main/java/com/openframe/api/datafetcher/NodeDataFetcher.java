@@ -23,9 +23,11 @@ import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
+import com.openframe.security.authentication.AuthPrincipal;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.List;
 import java.util.Optional;
@@ -54,24 +56,24 @@ public class NodeDataFetcher {
     private final ObjectProvider<FederatedNodeTypes> federatedNodeTypes;
 
     @DgsQuery
-    public Object node(@InputArgument String id) {
+    public Object node(@InputArgument String id, @AuthenticationPrincipal AuthPrincipal principal) {
         log.debug("Resolving node with global ID: {}", id);
         ParsedRelayId globalId = parseNodeId(id);
-        return resolveNode(globalId);
+        return resolveNode(globalId, principal);
     }
 
     @DgsQuery
-    public List<Object> nodes(@InputArgument List<String> ids) {
+    public List<Object> nodes(@InputArgument List<String> ids, @AuthenticationPrincipal AuthPrincipal principal) {
         log.debug("Resolving {} nodes", ids.size());
         return ids.stream()
-                .map(this::resolveNodeOrNull)
+                .map(id -> resolveNodeOrNull(id, principal))
                 .toList();
     }
 
-    private Object resolveNodeOrNull(String id) {
+    private Object resolveNodeOrNull(String id, AuthPrincipal principal) {
         try {
             ParsedRelayId globalId = parseNodeId(id);
-            return resolveNode(globalId);
+            return resolveNode(globalId, principal);
         } catch (RuntimeException e) {
             log.warn("Failed to resolve node: {}", id, e);
             return null;
@@ -83,7 +85,7 @@ public class NodeDataFetcher {
                 .orElseThrow(() -> new InvalidRelayIdException(INVALID_NODE_ID));
     }
 
-    private Object resolveNode(ParsedRelayId globalId) {
+    private Object resolveNode(ParsedRelayId globalId, AuthPrincipal principal) {
         String typeName = globalId.getTypeName();
         String rawId = globalId.getRawId();
         NodeType nodeType = NodeType.fromTypeName(typeName);
@@ -107,7 +109,7 @@ public class NodeDataFetcher {
             case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
                     .flatMap(service -> service.findById(rawId))
                     .orElse(null);
-            case TICKET -> findTicket(rawId);
+            case TICKET -> findTicket(principal, rawId);
             default -> throw new IllegalArgumentException("Unsupported node type: " + typeName);
         };
     }
@@ -120,10 +122,10 @@ public class NodeDataFetcher {
                 .isPresent();
     }
 
-    private Ticket findTicket(String rawId) {
+    private Ticket findTicket(AuthPrincipal principal, String rawId) {
         TicketService service = ticketService.getIfAvailable();
         return Optional.ofNullable(service)
-                .flatMap(lookup -> lookup.findTicketById(rawId))
+                .flatMap(lookup -> lookup.getTicket(principal, rawId))
                 .orElse(null);
     }
 }

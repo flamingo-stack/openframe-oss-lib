@@ -16,6 +16,8 @@ import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.service.OrganizationService;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.security.authentication.ActorType;
+import com.openframe.security.authentication.AuthPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +41,7 @@ class NodeDataFetcherFederatedNodeTest {
 
     private static final String DIALOG_ID = "665f1c2ab3e4d5f6a7b8c9e1";
     private static final String TICKET_ID = "665f1c2ab3e4d5f6a7b8c9d0";
+    private static final String MACHINE_ID = "machine-1";
 
     @Mock private DeviceService deviceService;
     @Mock private OrganizationService organizationService;
@@ -54,10 +58,12 @@ class NodeDataFetcherFederatedNodeTest {
 
     private final RelayIdCodec codec = new RelayIdCodec();
     private Ticket ticket;
+    private AuthPrincipal principal;
 
     @BeforeEach
     void setUp() {
         ticket = Ticket.builder().id(TICKET_ID).build();
+        principal = AuthPrincipal.builder().id("agent-1").machineId(MACHINE_ID).actorType(ActorType.AGENT).build();
     }
 
     @Test
@@ -68,7 +74,7 @@ class NodeDataFetcherFederatedNodeTest {
         NodeDataFetcher fetcher = fetcher(ticketService, federatedNodeTypes);
 
         // execution
-        Object node = fetcher.node(dialogGlobalId);
+        Object node = fetcher.node(dialogGlobalId, principal);
 
         // verifications
         assertThat(node)
@@ -85,7 +91,7 @@ class NodeDataFetcherFederatedNodeTest {
 
         // execution
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> fetcher.node(dialogGlobalId));
+                () -> fetcher.node(dialogGlobalId, principal));
 
         // verifications
         assertThat(exception.getMessage()).isEqualTo("Unsupported node type: Dialog");
@@ -95,15 +101,44 @@ class NodeDataFetcherFederatedNodeTest {
     void node_ticketGlobalId_loadedThroughTicketService() {
         // setup
         when(federatedNodeTypes.types()).thenReturn(EnumSet.of(NodeType.DIALOG));
-        when(ticketService.findTicketById(TICKET_ID)).thenReturn(Optional.of(ticket));
+        when(ticketService.getTicket(principal, TICKET_ID)).thenReturn(Optional.of(ticket));
         String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
         NodeDataFetcher fetcher = fetcher(ticketService, federatedNodeTypes);
 
         // execution
-        Object node = fetcher.node(ticketGlobalId);
+        Object node = fetcher.node(ticketGlobalId, principal);
 
         // verifications
         assertThat(node).isSameAs(ticket);
+    }
+
+    @Test
+    void node_ticketGlobalId_callerPrincipalPassedToTicketService() {
+        // setup
+        when(ticketService.getTicket(principal, TICKET_ID)).thenReturn(Optional.of(ticket));
+        String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
+        NodeDataFetcher fetcher = fetcher(ticketService, null);
+
+        // execution
+        fetcher.node(ticketGlobalId, principal);
+
+        // verifications
+        verify(ticketService).getTicket(principal, TICKET_ID);
+    }
+
+    @Test
+    void nodes_ticketGlobalId_callerPrincipalPassedToTicketService() {
+        // setup
+        when(ticketService.getTicket(principal, TICKET_ID)).thenReturn(Optional.of(ticket));
+        String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
+        NodeDataFetcher fetcher = fetcher(ticketService, null);
+
+        // execution
+        List<Object> nodes = fetcher.nodes(List.of(ticketGlobalId), principal);
+
+        // verifications
+        verify(ticketService).getTicket(principal, TICKET_ID);
+        assertThat(nodes).containsExactly(ticket);
     }
 
     @Test
@@ -113,7 +148,7 @@ class NodeDataFetcherFederatedNodeTest {
         NodeDataFetcher fetcher = fetcher(null, null);
 
         // execution
-        Object node = fetcher.node(ticketGlobalId);
+        Object node = fetcher.node(ticketGlobalId, principal);
 
         // verifications
         assertThat(node).isNull();
@@ -123,13 +158,13 @@ class NodeDataFetcherFederatedNodeTest {
     void nodes_federatedAndMissingTicket_referenceAndNull() {
         // setup
         when(federatedNodeTypes.types()).thenReturn(EnumSet.of(NodeType.DIALOG));
-        when(ticketService.findTicketById(TICKET_ID)).thenReturn(Optional.empty());
+        when(ticketService.getTicket(principal, TICKET_ID)).thenReturn(Optional.empty());
         String dialogGlobalId = codec.encode(NodeType.DIALOG, DIALOG_ID);
         String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
         NodeDataFetcher fetcher = fetcher(ticketService, federatedNodeTypes);
 
         // execution
-        List<Object> nodes = fetcher.nodes(List.of(dialogGlobalId, ticketGlobalId));
+        List<Object> nodes = fetcher.nodes(List.of(dialogGlobalId, ticketGlobalId), principal);
 
         // verifications
         assertThat(nodes).satisfiesExactly(
