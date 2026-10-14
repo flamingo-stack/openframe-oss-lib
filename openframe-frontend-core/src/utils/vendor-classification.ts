@@ -10,7 +10,7 @@
  *
  * Groups:
  *   - `license`: how the software is licensed.
- *   - `lifecycle`: where the product is in its life; a card shows it before the license.
+ *   - `lifecycle`: where the product is in its life (a tag and a filter; a card's one tag stays the license).
  *   - `openframe`: drawn with the OpenFrame mark and ONE word (`word`).
  */
 export type VendorClassificationValue = string;
