@@ -78,12 +78,16 @@ public class TenantDiscoveryService {
     }
 
     private TenantDiscoveryResponse tenantFound(String email, Tenant tenant) {
+        boolean openframeLoginEnabled = ssoConfigService.isOpenframeLoginEnabled(tenant.getId());
         return TenantDiscoveryResponse.builder()
                 .email(email)
                 .hasExistingAccounts(true)
                 .tenantId(tenant.getId())
+                .tenantName(tenant.getName())
                 .domain(tenant.getDomain())
-                .authProviders(availableAuthProviders(tenant))
+                .authProviders(availableAuthProviders(tenant, openframeLoginEnabled))
+                .openframeLoginEnabled(openframeLoginEnabled)
+                .customProviders(ssoConfigService.getCustomProvidersForTenant(tenant.getId()))
                 .build();
     }
 
@@ -94,9 +98,9 @@ public class TenantDiscoveryService {
                 .build();
     }
 
-    private List<String> availableAuthProviders(Tenant tenant) {
+    private List<String> availableAuthProviders(Tenant tenant, boolean openframeLoginEnabled) {
         List<String> providers = new ArrayList<>(ssoConfigService.getEffectiveProvidersForTenant(tenant.getId()));
-        if (ssoConfigService.isOpenframeLoginEnabled(tenant.getId())) {
+        if (openframeLoginEnabled) {
             providers.add(OPENFRAME_PROVIDER);
         }
         return providers.stream()
