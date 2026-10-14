@@ -9,12 +9,15 @@ import graphql.schema.GraphQLDirectiveContainer;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
+import graphql.schema.GraphQLTypeUtil;
 import graphql.schema.idl.RuntimeWiring;
 import graphql.schema.idl.SchemaParser;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -25,6 +28,7 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +83,81 @@ class ApiSubgraphSchemaTest {
 
         // verifications
         assertThat(shareable).isTrue();
+    }
+
+    @ParameterizedTest
+    @MethodSource("entityKeys")
+    void entity_keyFields(String type, String keyFields) {
+        // setup
+        GraphQLObjectType definition = schema.getObjectType(type);
+
+        // execution
+        Object fields = appliedArgument(definition, "key", "fields");
+
+        // verifications
+        assertThat(fields).isEqualTo(keyFields);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"Ticket", "TicketStatusDefinition"})
+    void aiAgentOwnedCopy_keyNotResolvable(String type) {
+        // setup
+        GraphQLObjectType definition = schema.getObjectType(type);
+
+        // execution
+        Object resolvable = appliedArgument(definition, "key", "resolvable");
+
+        // verifications
+        assertThat(resolvable).isEqualTo(false);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"User", "Machine", "Ticket", "TicketStatusDefinition"})
+    void sharedEntity_shareable(String type) {
+        // setup
+        GraphQLObjectType definition = schema.getObjectType(type);
+
+        // execution
+        boolean shareable = definition.hasAppliedDirective("shareable");
+
+        // verifications
+        assertThat(shareable).isTrue();
+    }
+
+    @ParameterizedTest
+    @MethodSource("ticketEnumFields")
+    void ticketCopy_enumTypedLikeAiAgent(String field, String type) {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("Ticket").getFieldDefinition(field);
+
+        // execution
+        String printed = GraphQLTypeUtil.simplePrint(definition.getType());
+
+        // verifications
+        assertThat(printed).isEqualTo(type);
+    }
+
+    @Test
+    void entities_rootFieldAdded() {
+        // execution
+        GraphQLFieldDefinition entities = schema.getQueryType().getFieldDefinition("_entities");
+
+        // verifications
+        assertThat(entities).isNotNull();
+    }
+
+    private static Stream<Arguments> entityKeys() {
+        return Stream.of(
+                Arguments.of("User", "id"),
+                Arguments.of("Machine", "machineId"),
+                Arguments.of("Ticket", "id"),
+                Arguments.of("TicketStatusDefinition", "id"));
+    }
+
+    private static Stream<Arguments> ticketEnumFields() {
+        return Stream.of(
+                Arguments.of("status", "TicketStatus"),
+                Arguments.of("creationSource", "TicketCreationSource"));
     }
 
     private static TypeDefinitionRegistry loadSchemaFiles() throws IOException {

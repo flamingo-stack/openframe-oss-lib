@@ -213,7 +213,7 @@ input DeleteFolderInput {
 
 # Minimal User type for KB author resolution.
 # TODO: Extract to shared schema or replace after user management module.
-type User implements Node {
+type User implements Node @key(fields: "id") @shareable {
     id: ID!
     firstName: String
     lastName: String
