@@ -35,7 +35,7 @@ export const Schedules: Story = {
   render: () => <ScriptSchedulesTable rows={FIXTURE.schedules} rightSlot={<DataTable.RowCount />} />,
 };
 
-/** The product screen: the library and the schedules side by side, in the frame's size. */
+/** The product screen: the schedule form over the library, in the frame's size. */
 export const Screen: Story = {
   render: () => (
     <div className="ods-content-area h-[440px] w-[1400px]">

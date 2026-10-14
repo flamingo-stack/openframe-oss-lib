@@ -47,6 +47,12 @@ export const DEMO_DEVICES = {
  */
 export const DEMO_NOW = '2026-10-06T14:05:00.000Z';
 
+/** The demo day as a local calendar day, so a date field reads the same in every timezone. */
+export function demoDay(): Date {
+  const [year, month, day] = DEMO_NOW.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
 /** An instant `minutes` before {@link DEMO_NOW}. */
 export function demoMinutesAgo(minutes: number): string {
   return new Date(Date.parse(DEMO_NOW) - minutes * 60_000).toISOString();

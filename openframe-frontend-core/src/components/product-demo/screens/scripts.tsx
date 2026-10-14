@@ -1,60 +1,88 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
-import { SCRIPTS_TABS, ScriptSchedulesTable, type ScriptsTabId, ScriptsTable } from '../../features/scripts';
+import { useMemo } from 'react';
+import { FormProvider, useForm } from 'react-hook-form';
+import {
+  type RenderScheduleScriptSearch,
+  type ScheduleFormData,
+  ScheduleFormFields,
+  ScheduleScriptSearchField,
+  ScriptSchedulesTable,
+  ScriptsTable,
+} from '../../features/scripts';
 import { useProductDemoCast } from '../cast';
-import { buildScriptsFixture } from '../fixtures/scripts';
+import { buildScriptsFixture, type ScheduleFormFixture } from '../fixtures/scripts';
 import type { ProductScreenViewProps } from '../types';
 
+const noop = () => {};
+
 /**
- * The picture has no row menu and nowhere to open a row. Each table gets half
- * the frame, so the library leaves out who added a script and keeps the room
- * for its name and what it does.
+ * The picture has no row menu and nowhere to open a row. The library leaves out
+ * who added a script: the picture is about what a script is and what runs it.
  */
 const LIBRARY_COLUMNS_HIDDEN = ['authorId', 'open'];
-const SCHEDULE_COLUMNS_HIDDEN = ['supportedPlatforms', 'open'];
 const COMPACT_SCHEDULE_COLUMNS_HIDDEN = ['supportedPlatforms', 'deviceCount', 'open'];
 
-/** One of the two Scripts pages, under the name and icon its tab carries in the product. */
-function ScriptsPanel({ tab, children }: { tab: ScriptsTabId; children: ReactNode }) {
-  const item = SCRIPTS_TABS.find(candidate => candidate.id === tab);
-  const Icon = item?.icon;
+/**
+ * The product's "New Script Schedule" form with the fixture's schedule filled
+ * in. It is the product's own fields in their densest arrangement: the name
+ * beside the date, time and repeat, then the one script as one row. The note,
+ * the trigger, the platforms and the offline rule are left out of the picture.
+ * Nothing is saved and nothing is searched: "Select Script" offers the library
+ * the table under it lists.
+ */
+function ScheduleFormPicture({ fixture }: { fixture: ScheduleFormFixture }) {
+  const form = useForm<ScheduleFormData>({ defaultValues: fixture.values });
+  const renderScriptSearch: RenderScheduleScriptSearch = field => (
+    <ScheduleScriptSearchField
+      scriptId={field.scriptId}
+      name={field.name}
+      scripts={fixture.scripts}
+      onChange={noop}
+      disabled={field.disabled}
+    />
+  );
   return (
-    <section className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-s)]">
-      <h3 className="flex items-center gap-[var(--spacing-system-xs)] text-ods-text-secondary text-h5">
-        {Icon && <Icon className="h-5 w-5" />}
-        {item?.label}
-      </h3>
-      {children}
-    </section>
+    <FormProvider {...form}>
+      <ScheduleFormFields
+        showErrors={false}
+        renderScriptSearch={renderScriptSearch}
+        getTimeSlots={() => fixture.timeSlots}
+        nameLayout="inline"
+        showNote={false}
+        showTrigger={false}
+        showPlatforms={false}
+        showOfflineBehavior={false}
+        showScriptsHeading={false}
+        showScriptParams={false}
+        addScripts={false}
+      />
+    </FormProvider>
   );
 }
 
 /**
- * The product's two Scripts pages side by side, without their title rows and
- * search fields (the job is named above the picture): the library a team
- * keeps, and the schedules that run it across the fleet. The narrow rendering
- * is the schedules alone: what runs, when and how often.
+ * The product's Scripts pages, without their title rows and search fields (the
+ * job is named above the picture): a schedule being set up, over the library
+ * its script comes from (the frame cuts the library off after a few rows). The
+ * narrow rendering is the schedules that result: what runs, when and how often.
  */
 export default function ScriptsScreen({ compact = false }: ProductScreenViewProps) {
   const cast = useProductDemoCast();
   const fixture = useMemo(() => buildScriptsFixture(cast), [cast]);
 
-  const schedules = (
-    <ScriptSchedulesTable
-      rows={fixture.schedules}
-      hideColumns={compact ? COMPACT_SCHEDULE_COLUMNS_HIDDEN : SCHEDULE_COLUMNS_HIDDEN}
-    />
-  );
-
-  if (compact) return <div className="h-full bg-ods-bg p-[var(--spacing-system-l)]">{schedules}</div>;
+  if (compact) {
+    return (
+      <div className="h-full bg-ods-bg p-[var(--spacing-system-l)]">
+        <ScriptSchedulesTable rows={fixture.schedules} hideColumns={COMPACT_SCHEDULE_COLUMNS_HIDDEN} />
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full gap-[var(--spacing-system-l)] bg-ods-bg p-[var(--spacing-system-l)]">
-      <ScriptsPanel tab="list">
-        <ScriptsTable rows={fixture.scripts} hideColumns={LIBRARY_COLUMNS_HIDDEN} />
-      </ScriptsPanel>
-      <ScriptsPanel tab="schedules">{schedules}</ScriptsPanel>
+    <div className="flex h-full flex-col gap-[var(--spacing-system-l)] bg-ods-bg p-[var(--spacing-system-l)]">
+      <ScheduleFormPicture fixture={fixture.scheduleForm} />
+      <ScriptsTable rows={fixture.scripts} hideColumns={LIBRARY_COLUMNS_HIDDEN} />
     </div>
   );
 }

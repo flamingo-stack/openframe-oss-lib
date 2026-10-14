@@ -22,7 +22,7 @@ export const PRODUCT_SCREEN_COMPACT_HEIGHT = 300;
  * mid-word below it, and the logs table beside its open drawer has no room
  * for the message; the software form is laid out wide so the package, the
  * schedule and the picked devices all fit the frame's height; the scripts
- * screen holds two tables side by side. A frame never
+ * screen puts a schedule's name, its timing and its repeat on one row. A frame never
  * lays such a screen out narrower.
  */
 const MIN_LAYOUT_WIDTH: Partial<Record<ProductScreenKey, number>> = {

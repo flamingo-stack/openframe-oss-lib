@@ -1,12 +1,33 @@
-import type { ScriptScheduleTableRow, ScriptTableRow } from '../../features/scripts';
+import {
+  applyTimeSlot,
+  DEFAULT_SCHEDULE_FORM_VALUES,
+  EMPTY_SCHEDULE_SCRIPT_ROW,
+  type ScheduleFormData,
+  type ScheduleScriptSearchResult,
+  type ScheduleTimeSlot,
+  type ScriptScheduleTableRow,
+  type ScriptTableRow,
+} from '../../features/scripts';
 import type { DemoCast } from '../cast';
-import type { DemoPersonKey } from './shared';
+import { type DemoPersonKey, demoDay } from './shared';
+
+/** The "New Script Schedule" form, filled in. */
+export interface ScheduleFormFixture {
+  /** What the form opens with. */
+  values: ScheduleFormData;
+  /** A fixed reading of the Time dropdown: the evening's late slots. */
+  timeSlots: ScheduleTimeSlot[];
+  /** What "Select Script" offers: the library. */
+  scripts: ScheduleScriptSearchResult[];
+}
 
 export interface ScriptsFixture {
   /** The script library, newest first. */
   scripts: ScriptTableRow[];
   /** The schedules that run scripts from it. */
   schedules: ScriptScheduleTableRow[];
+  /** One of those schedules as the form that makes it. */
+  scheduleForm: ScheduleFormFixture;
 }
 
 const WINDOWS = ['windows'];
@@ -85,6 +106,49 @@ function schedule(
   };
 }
 
+const TONIGHT_11_PM: ScheduleTimeSlot = { value: '23:00', label: '11:00 PM' };
+
+const TIME_SLOTS: ScheduleTimeSlot[] = [
+  { value: '22:00', label: '10:00 PM' },
+  { value: '22:30', label: '10:30 PM' },
+  TONIGHT_11_PM,
+  { value: '23:30', label: '11:30 PM' },
+];
+
+/**
+ * "Nightly temp cleanup": the library's "Clear temp files" on Windows, every
+ * day at 11 PM from the demo day on.
+ */
+function buildScheduleForm(): ScheduleFormFixture {
+  const script = SCRIPTS[0];
+  const day = demoDay();
+  return {
+    values: {
+      ...DEFAULT_SCHEDULE_FORM_VALUES,
+      name: 'Nightly temp cleanup',
+      scheduledDate: day,
+      scheduledTime: TONIGHT_11_PM.value,
+      // The start the form holds is the one it was opened with, so it stays legal whatever today is.
+      startAtStored: applyTimeSlot(day, TONIGHT_11_PM.value).toISOString(),
+      repeatEnabled: true,
+      repeatInterval: 1,
+      repeatUnit: 'day',
+      supportedPlatforms: script.supportedPlatforms,
+      scripts: [
+        {
+          ...EMPTY_SCHEDULE_SCRIPT_ROW,
+          scriptId: script.id,
+          name: script.name,
+          supportedPlatforms: script.supportedPlatforms,
+          timeoutSeconds: 90,
+        },
+      ],
+    },
+    timeSlots: TIME_SLOTS,
+    scripts: SCRIPTS.map(item => ({ id: item.id, name: item.name, supportedPlatforms: item.supportedPlatforms })),
+  };
+}
+
 /**
  * The product's Scripts pages: the library a team keeps, and the schedules
  * that run it across a fleet (every night, every week, or the moment a device
@@ -131,5 +195,6 @@ export function buildScriptsFixture(cast: DemoCast): ScriptsFixture {
         12,
       ),
     ],
+    scheduleForm: buildScheduleForm(),
   };
 }
