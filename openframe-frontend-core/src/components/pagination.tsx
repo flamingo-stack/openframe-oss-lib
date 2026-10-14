@@ -1,8 +1,10 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
-import { type ButtonHTMLAttributes, type HTMLAttributes, forwardRef } from 'react';
+import { type ButtonHTMLAttributes, type HTMLAttributes, type MouseEvent, type ReactNode, forwardRef } from 'react';
+import Link from '../embed-shims/next-link';
 import { cn } from '../utils/cn';
+import { isModifierClick } from './chat/utils/chat-nav-resolution';
 import { Button } from './ui/button';
 
 interface PaginationProps {
@@ -10,9 +12,98 @@ interface PaginationProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   className?: string;
+  /**
+   * The address of a page of this list. With it every enabled control is a real
+   * link (`<a href>`), so a crawler that runs no script can reach every page of
+   * the list, and a person can open a page in a new tab. A plain click still
+   * changes the page in place through `onPageChange`. Without it the controls
+   * are buttons.
+   */
+  getPageHref?: (page: number) => string;
 }
 
-const Pagination = ({ currentPage, totalPages, onPageChange, className }: PaginationProps) => {
+interface PaginationControlProps {
+  /** The page this control goes to. */
+  page: number;
+  /** The control's accessible name ("Page 3", "Go to next page"). */
+  label: string;
+  variant: 'accent' | 'outline';
+  className: string;
+  /** The control marks the page being shown. */
+  current?: boolean;
+  /** There is no such page (previous on the first page, next on the last). */
+  disabled?: boolean;
+  /** Which neighbour the control leads to, stated to crawlers and assistive technology as `rel`. */
+  rel?: 'prev' | 'next';
+  onPageChange: (page: number) => void;
+  getPageHref?: (page: number) => string;
+  children: ReactNode;
+}
+
+/**
+ * One control of the pager. With a page address it is a link: the href is the
+ * page's real URL, so it works with no script, in a new tab and for a crawler,
+ * and a plain click is taken over to change the page in place (the progressive
+ * enhancement every in-page link in this library uses). With no address, or
+ * when there is no such page, it is a button: a link must always lead somewhere.
+ */
+function PaginationControl({
+  page,
+  label,
+  variant,
+  className,
+  current,
+  disabled,
+  rel,
+  onPageChange,
+  getPageHref,
+  children,
+}: PaginationControlProps) {
+  const ariaCurrent = current ? ('page' as const) : undefined;
+
+  if (!getPageHref || disabled) {
+    return (
+      <Button
+        variant={variant}
+        size="icon"
+        className={className}
+        disabled={disabled}
+        aria-label={label}
+        aria-current={ariaCurrent}
+        onClick={() => onPageChange(page)}
+      >
+        {children}
+      </Button>
+    );
+  }
+
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    // A new tab or window is the browser's to open, at the link's own address.
+    if (isModifierClick(event)) return;
+    event.preventDefault();
+    onPageChange(page);
+  };
+
+  return (
+    <Button variant={variant} size="icon" className={className} asChild>
+      <Link
+        href={getPageHref(page)}
+        prefetch={false}
+        rel={rel}
+        aria-label={label}
+        aria-current={ariaCurrent}
+        onClick={handleClick}
+      >
+        {children}
+      </Link>
+    </Button>
+  );
+}
+
+const NEIGHBOUR_CLASS = '!h-10 !w-10 content-md:!h-10 content-md:!w-10';
+const PAGE_CLASS = '!h-9 !w-9 content-md:!h-9 content-md:!w-9';
+
+const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageHref }: PaginationProps) => {
   // Generate page numbers to display
   const getPageNumbers = () => {
     const pages = [];
@@ -68,16 +159,18 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
     <nav role="navigation" aria-label="pagination" className={cn('mx-auto flex w-full justify-center', className)}>
       <ul className="flex flex-row items-center gap-1">
         <li>
-          <Button
+          <PaginationControl
+            page={currentPage - 1}
+            label="Go to previous page"
             variant="outline"
-            size="icon"
-            onClick={() => onPageChange(currentPage - 1)}
+            className={NEIGHBOUR_CLASS}
             disabled={currentPage === 1}
-            aria-label="Go to previous page"
-            className="!h-10 !w-10 content-md:!h-10 content-md:!w-10"
+            rel="prev"
+            onPageChange={onPageChange}
+            getPageHref={getPageHref}
           >
             <ChevronLeft className="h-4 w-4" />
-          </Button>
+          </PaginationControl>
         </li>
 
         {pageNumbers.map((page, index) => {
@@ -95,32 +188,35 @@ const Pagination = ({ currentPage, totalPages, onPageChange, className }: Pagina
 
           return (
             <li key={page}>
-              <Button
+              <PaginationControl
+                page={page}
+                label={`Page ${page}`}
                 variant={currentPage === page ? 'accent' : 'outline'}
-                size="icon"
-                onClick={() => onPageChange(page)}
-                className="!h-9 !w-9 content-md:!h-9 content-md:!w-9"
-                aria-label={`Page ${page}`}
-                aria-current={currentPage === page ? 'page' : undefined}
+                className={PAGE_CLASS}
+                current={currentPage === page}
+                onPageChange={onPageChange}
+                getPageHref={getPageHref}
               >
                 {page}
-              </Button>
+              </PaginationControl>
             </li>
           );
         })}
 
         <li>
-          <Button
+          <PaginationControl
+            page={currentPage + 1}
+            label="Go to next page"
             variant="outline"
-            size="icon"
-            onClick={() => onPageChange(currentPage + 1)}
+            className={NEIGHBOUR_CLASS}
             disabled={currentPage === totalPages}
-            aria-label="Go to next page"
-            className="!h-10 !w-10 content-md:!h-10 content-md:!w-10"
+            rel="next"
+            onPageChange={onPageChange}
+            getPageHref={getPageHref}
           >
             <ChevronRight className="h-4 w-4" />
             <span className="sr-only">Next page</span>
-          </Button>
+          </PaginationControl>
         </li>
       </ul>
     </nav>

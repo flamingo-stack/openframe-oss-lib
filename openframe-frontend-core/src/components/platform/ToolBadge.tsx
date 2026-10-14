@@ -85,13 +85,14 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
     return linked(
       <span
         className={cn(
-          'inline-flex h-7 items-center gap-1.5 rounded-md border border-ods-border px-2 text-ods-text-secondary text-h6',
-          href && 'transition-colors hover:border-ods-border-hover hover:text-ods-text-primary',
+          // The house tag (Figma `tag`): 32px, on the card surface, the caption face.
+          'inline-flex h-8 items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5',
+          href && 'transition-colors hover:border-ods-border-hover',
           className,
         )}
       >
         {mark && (
-          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center [&_img]:h-full [&_img]:w-full [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center [&_img]:h-full [&_img]:w-full [&_img]:rounded-sm [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full">
             {mark}
           </span>
         )}

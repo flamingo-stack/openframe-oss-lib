@@ -3,7 +3,7 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.netflix.graphql.dgs.autoconfig.DgsAutoConfiguration;
+import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
@@ -47,7 +48,7 @@ class UserNodeIdDgsTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({DgsAutoConfiguration.class, RelayAutoConfiguration.class})
+    @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class, RelayAutoConfiguration.class})
     @Import(RelayUserNodeQueries.class)
     static class RelayUserNodeGraphQlApp {
     }

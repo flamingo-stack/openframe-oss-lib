@@ -29,10 +29,15 @@
             <version>${netflix.dgs.version}</version>
             <optional>true</optional>
         </dependency>
+        <!-- graphql-dgs 12 no longer brings it -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.netflix.graphql.dgs</groupId>
-            <artifactId>graphql-dgs-spring-boot-starter</artifactId>
+            <artifactId>dgs-starter</artifactId>
             <version>${netflix.dgs.version}</version>
             <scope>test</scope>
         </dependency>

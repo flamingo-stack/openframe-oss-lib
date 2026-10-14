@@ -7,7 +7,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
+import tools.jackson.databind.json.JsonMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -25,10 +25,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Configuration
@@ -60,7 +59,7 @@ public class PinotConfigInitializer {
         this.resourceLoader = resourceLoader;
         this.environment = environment;
         this.restTemplate = new RestTemplate();
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = new JsonMapper();
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -256,13 +255,13 @@ public class PinotConfigInitializer {
     private String resolveTableNameWithType(String tableConfig) {
         try {
             JsonNode tableConfigJson = objectMapper.readTree(tableConfig);
-            String baseTableName = tableConfigJson.get("tableName").asText();
-            String tableType = tableConfigJson.get("tableType").asText();
+            String baseTableName = tableConfigJson.get("tableName").asString();
+            String tableType = tableConfigJson.get("tableType").asString();
             if ("REALTIME".equalsIgnoreCase(tableType)) {
                 return baseTableName + "_REALTIME";
             }
             return baseTableName + "_OFFLINE";
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to read Pinot table configuration", e);
         }
     }

@@ -5,7 +5,8 @@ import com.netflix.graphql.dgs.DgsData;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.netflix.graphql.dgs.autoconfig.DgsAutoConfiguration;
+import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.junit.jupiter.api.Test;
@@ -87,7 +88,7 @@ class RelayNodeIdWiringDgsTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({DgsAutoConfiguration.class, RelayAutoConfiguration.class})
+    @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class, RelayAutoConfiguration.class})
     @Import(RelayNodesDataFetcher.class)
     static class RelayNodesGraphQlApp {
     }

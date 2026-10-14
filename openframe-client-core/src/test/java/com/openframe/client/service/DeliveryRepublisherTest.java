@@ -1,6 +1,7 @@
 package com.openframe.client.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.rmm.watchdog.DeliveryRepublisher;
 import com.openframe.client.service.rmm.watchdog.DeliveryRepublisherRegistry;
 import com.openframe.client.service.rmm.watchdog.ScheduleDeliveryRepublisher;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.verify;
 
 class DeliveryRepublisherTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new JsonMapper();
     private final ScriptScheduleNatsPublisher scheduleNats = mock(ScriptScheduleNatsPublisher.class);
     private final SoftwareNatsPublisher softwareNats = mock(SoftwareNatsPublisher.class);
 

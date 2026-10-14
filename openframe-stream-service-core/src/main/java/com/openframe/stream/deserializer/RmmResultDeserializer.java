@@ -1,9 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -167,7 +166,7 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
         }
     }
 
-    protected ObjectNode toObjectNode(String json) throws JsonProcessingException {
+    protected ObjectNode toObjectNode(String json) {
         if (json == null) {
             return mapper.createObjectNode();
         }

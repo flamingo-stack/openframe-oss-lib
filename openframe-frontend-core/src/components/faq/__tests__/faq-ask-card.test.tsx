@@ -64,7 +64,7 @@ const RUNTIME: AssistantRuntime = {
   available: true,
   name: 'Mingo',
   source: 'flamingo',
-  askPromptsUrl: '/api/quick-actions/questions',
+  askPromptsUrl: '/api/faqs/questions',
 };
 
 const requestedUrl = () => String(fetchMock.mock.calls[0]?.[0]);
@@ -100,15 +100,15 @@ describe('FaqSection ask card', () => {
     expect(screen.queryByText('Still deciding?')).not.toBeInTheDocument();
   });
 
-  it('sends any topic string as the section, with the count and the exclusions', async () => {
+  it('sends any topic string as the topic, with the count and the exclusions', async () => {
     renderFaq(
       RUNTIME,
       <FaqSection initialFaqs={FAQS} ask={{ topic: 'a topic nobody listed', exclude: ['a', 'b'], count: 2 }} />,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const url = new URL(requestedUrl(), 'https://host.test');
-    expect(url.pathname).toBe('/api/quick-actions/questions');
-    expect(url.searchParams.get('section')).toBe('a topic nobody listed');
+    expect(url.pathname).toBe('/api/faqs/questions');
+    expect(url.searchParams.get('topic')).toBe('a topic nobody listed');
     expect(url.searchParams.get('count')).toBe('2');
     expect(url.searchParams.get('exclude')).toBe('a,b');
   });
@@ -116,7 +116,7 @@ describe('FaqSection ask card', () => {
   it('asks for the questions of the entity it is attached to when the host states no topic', async () => {
     renderFaq(RUNTIME, <FaqSection initialFaqs={FAQS} entityType="case_study" entityId={7} />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('case_study');
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('topic')).toBe('case_study');
   });
 
   it('shows no card with no topic and no entity: the lib names no topic of its own', () => {
@@ -184,6 +184,69 @@ describe('FaqSection ask card', () => {
   });
 });
 
+describe('FaqSection topic', () => {
+  /** Answers the FAQ endpoint and the questions endpoint each with its own shape. */
+  const answerByUrl = () =>
+    fetchMock.mockImplementation((input: unknown) =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(String(input).includes('/questions') ? { prompts: PROMPTS } : { faqs: FAQS }),
+      }),
+    );
+  const requested = (path: string) =>
+    fetchMock.mock.calls.map(call => new URL(String(call[0]), 'https://host.test')).filter(u => u.pathname === path);
+
+  it('fetches the FAQs written for its topic and offers the questions of the same topic', async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="pricing" apiBaseUrl="/content" />);
+
+    expect(await screen.findByText('What is OpenFrame?')).toBeInTheDocument();
+    expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
+    const [faqs] = requested('/content/api/faqs');
+    expect(faqs.searchParams.get('topic')).toBe('pricing');
+    const [questions] = requested('/api/faqs/questions');
+    expect(questions.searchParams.get('topic')).toBe('pricing');
+  });
+
+  it("does not re-fetch the host's own read of the topic", async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="pricing" initialFaqs={FAQS} />);
+    expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
+    expect(requested('/api/faqs')).toHaveLength(0);
+  });
+
+  it('lets the card state another topic than the block', async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="pricing" initialFaqs={FAQS} ask={{ topic: 'ai-tokens' }} />);
+    await waitFor(() => expect(requested('/api/faqs/questions')).toHaveLength(1));
+    expect(requested('/api/faqs/questions')[0].searchParams.get('topic')).toBe('ai-tokens');
+  });
+
+  it("keeps an entity's FAQs the entity's: the topic is not sent with an entity scope", async () => {
+    answerByUrl();
+    renderFaq(RUNTIME, <FaqSection topic="blog" entityType="blog_post" entityId={3} />);
+    await waitFor(() => expect(requested('/api/faqs')).toHaveLength(1));
+    const [faqs] = requested('/api/faqs');
+    expect(faqs.searchParams.get('entityType')).toBe('blog_post');
+    expect(faqs.searchParams.has('topic')).toBe(false);
+  });
+
+  it("shows the new topic's questions, never the previous topic's, when the topic changes", async () => {
+    fetchMock.mockImplementation((input: unknown) => {
+      const url = new URL(String(input), 'https://host.test');
+      const faqs =
+        url.searchParams.get('topic') === 'careers' ? [{ ...FAQS[0], id: 2, question: 'Do you hire remotely?' }] : FAQS;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ faqs }) });
+    });
+    const { rerender } = render(<FaqSection topic="pricing" ask={false} />);
+    expect(await screen.findByText('What is OpenFrame?')).toBeInTheDocument();
+
+    rerender(<FaqSection topic="careers" ask={false} />);
+    expect(screen.queryByText('What is OpenFrame?')).not.toBeInTheDocument();
+    expect(await screen.findByText('Do you hire remotely?')).toBeInTheDocument();
+  });
+});
+
 describe('MingoAiButton', () => {
   it('takes its name and its opener from the assistant runtime, with no prop', () => {
     const open = vi.fn();
@@ -219,7 +282,7 @@ describe('AssistantAskPrompts', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     const url = new URL(requestedUrl(), 'https://host.test');
-    expect(url.searchParams.get('section')).toBe('pricing');
+    expect(url.searchParams.get('topic')).toBe('pricing');
     expect(url.searchParams.get('count')).toBe('2');
 
     fireEvent.click(await screen.findByText('Is it open source?'));
@@ -240,9 +303,7 @@ describe('AssistantAskPrompts', () => {
       </>,
     );
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    const card = fetchMock.mock.calls
-      .map(call => String(call[0]))
-      .find(url => url.startsWith('/api/quick-actions/questions'));
+    const card = fetchMock.mock.calls.map(call => String(call[0])).find(url => url.startsWith('/api/faqs/questions'));
     expect(new URL(card ?? '', 'https://host.test').searchParams.get('exclude')).toBeNull();
   });
 
@@ -255,7 +316,7 @@ describe('AssistantAskPrompts', () => {
   it("keeps its questions out of the FAQ's card, which waits for the row's pick", async () => {
     fetchMock.mockImplementation((input: unknown) => {
       const url = new URL(String(input), 'https://host.test');
-      const row = url.searchParams.get('section') === 'pricing';
+      const row = url.searchParams.get('topic') === 'pricing';
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ prompts: row ? [PROMPTS[0]] : [PROMPTS[1]] }) });
     });
     renderFaq(
@@ -269,7 +330,7 @@ describe('AssistantAskPrompts', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const card = fetchMock.mock.calls
       .map(call => new URL(String(call[0]), 'https://host.test'))
-      .find(url => url.searchParams.get('section') === 'faq');
+      .find(url => url.searchParams.get('topic') === 'faq');
     // One request for the card, made after the row's pick: it names the row's question.
     expect(card?.searchParams.get('exclude')).toBe('q1');
   });
@@ -320,7 +381,7 @@ describe('ask surfaces of one page', () => {
     );
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
-    expect(requests().map(url => [url.searchParams.get('section'), url.searchParams.get('exclude')])).toEqual([
+    expect(requests().map(url => [url.searchParams.get('topic'), url.searchParams.get('exclude')])).toEqual([
       ['agents', null],
       ['pricing', 'q1'],
       ['faq', 'q1,q2'],
@@ -343,7 +404,7 @@ describe('ask surfaces of one page', () => {
 
   it('a failed pick does not hold the surfaces after it', async () => {
     fetchMock.mockImplementation((input: unknown) => {
-      const first = new URL(String(input), 'https://host.test').searchParams.get('section') === 'agents';
+      const first = new URL(String(input), 'https://host.test').searchParams.get('topic') === 'agents';
       return Promise.resolve(
         first ? { ok: false, status: 500 } : { ok: true, json: () => Promise.resolve({ prompts: [PROMPTS[1]] }) },
       );
@@ -361,7 +422,7 @@ describe('ask surfaces of one page', () => {
   it('a surface told what to leave out picks at once, without waiting for the one ahead of it', async () => {
     // The row's request never answers: a surface that waited for its turn would never pick.
     fetchMock.mockImplementation((input: unknown) => {
-      const row = new URL(String(input), 'https://host.test').searchParams.get('section') === 'pricing';
+      const row = new URL(String(input), 'https://host.test').searchParams.get('topic') === 'pricing';
       return row
         ? new Promise(() => undefined)
         : Promise.resolve({ ok: true, json: () => Promise.resolve({ prompts: [PROMPTS[1]] }) });
@@ -375,7 +436,7 @@ describe('ask surfaces of one page', () => {
     );
 
     expect(await screen.findByText('Is it open source?')).toBeInTheDocument();
-    const card = requests().find(url => url.searchParams.get('section') === 'faq');
+    const card = requests().find(url => url.searchParams.get('topic') === 'faq');
     expect(card?.searchParams.get('exclude')).toBe('q5');
   });
 
@@ -383,7 +444,7 @@ describe('ask surfaces of one page', () => {
     renderFaq(RUNTIME, <AssistantAskPrompts variant="card" topic="docs" count={2} />);
     expect(screen.getByText('Still deciding?')).toBeInTheDocument();
     expect(await screen.findByText('How does pricing work?')).toBeInTheDocument();
-    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('section')).toBe('docs');
+    expect(new URL(requestedUrl(), 'https://host.test').searchParams.get('topic')).toBe('docs');
   });
 });
 
@@ -391,7 +452,7 @@ describe('buildAskPromptsUrl', () => {
   it('leaves out an empty topic and an empty exclusion list, and keeps a base query', () => {
     expect(buildAskPromptsUrl('/q', { count: 3, exclude: [] })).toBe('/q?count=3');
     expect(buildAskPromptsUrl('/q?agent=mingo', { count: 1, topic: 'faq', exclude: ['x'] })).toBe(
-      '/q?agent=mingo&count=1&section=faq&exclude=x',
+      '/q?agent=mingo&count=1&topic=faq&exclude=x',
     );
   });
 });

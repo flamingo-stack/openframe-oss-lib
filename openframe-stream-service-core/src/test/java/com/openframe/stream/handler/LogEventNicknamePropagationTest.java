@@ -1,6 +1,7 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
@@ -32,7 +33,7 @@ class LogEventNicknamePropagationTest {
     private static final String NICKNAME = "Reception iMac";
 
     private static DeserializedDebeziumMessage message() {
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation("c");
         return DeserializedDebeziumMessage.builder()
                 .payload(payload)
@@ -60,7 +61,7 @@ class LogEventNicknamePropagationTest {
     void cassandraHandlerWritesBothNameFields() {
         UnifiedLogEventRepository repository = mock(UnifiedLogEventRepository.class);
         DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         handler.handle(message(), enriched(NICKNAME));
 
@@ -76,7 +77,7 @@ class LogEventNicknamePropagationTest {
     void cassandraHandlerWritesNullNicknameWhenAbsent() {
         UnifiedLogEventRepository repository = mock(UnifiedLogEventRepository.class);
         DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         handler.handle(message(), enriched(null));
 
@@ -92,7 +93,7 @@ class LogEventNicknamePropagationTest {
     void kafkaHandlerPublishesBothNameFields() {
         OssTenantRetryingKafkaProducer producer = mock(OssTenantRetryingKafkaProducer.class);
         TenantDebeziumKafkaMessageHandler handler = new TenantDebeziumKafkaMessageHandler(
-                producer, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                producer, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
 
         handler.handle(message(), enriched(NICKNAME));
 

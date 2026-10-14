@@ -13,7 +13,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.openframe.test.config.UserConfig.getUser;
@@ -21,7 +20,7 @@ import static com.openframe.test.config.UserConfig.getUser;
 @Slf4j
 abstract class BaseUITest {
 
-    private static final Path FAILURE_DIR = Paths.get("/tmp/playwright-failures");
+    private static final Path FAILURE_DIR = Path.of("/tmp/playwright-failures");
 
     protected static Playwright playwright;
     protected static Browser browser;

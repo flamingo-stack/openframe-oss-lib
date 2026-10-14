@@ -1,7 +1,7 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.netflix.graphql.dgs.autoconfig.DgsAutoConfiguration;
+import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
 import com.openframe.api.config.DateScalarConfig;
 import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.JsonScalarConfig;
@@ -22,9 +22,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Instant;
 import java.util.List;
@@ -50,10 +51,10 @@ class UserMutationsDgsTest {
     @Autowired
     private DgsQueryExecutor queryExecutor;
 
-    @MockBean
+    @MockitoBean
     private UserService userService;
 
-    @MockBean
+    @MockitoBean
     private InvitationService invitationService;
 
     @Test
@@ -107,7 +108,7 @@ class UserMutationsDgsTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({DgsAutoConfiguration.class, RelayAutoConfiguration.class})
+    @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class, RelayAutoConfiguration.class})
     @Import({UserDataFetcher.class, InvitationDataFetcher.class, GraphQLUserMapper.class, InstantScalarConfig.class,
             DateScalarConfig.class, LongScalarConfig.class, JsonScalarConfig.class})
     static class UserMutationsGraphQlApp {

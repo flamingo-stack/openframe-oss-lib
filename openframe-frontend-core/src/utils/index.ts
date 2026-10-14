@@ -415,6 +415,7 @@ export * from './humanity-signals';
 // so the host's draft endpoint re-applies the same filter the browser hook runs.
 // Also exported via the granular subpath `./utils/form-rescue`.
 export * from './form-rescue';
+export * from './legal-documents';
 
 // Doc-source viewer utilities (path parsing, tree building, section extraction,
 // embed-URL conversion) — single home for all doc-viewer pure helpers across
@@ -473,3 +474,5 @@ export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './
 export { copyrightLine } from './copyright-line';
 export * from './path-pattern';
 export * from './random-id';
+export * from './demo-clock';
+export * from './identity-tint';

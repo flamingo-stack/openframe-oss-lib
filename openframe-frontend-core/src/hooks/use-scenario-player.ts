@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { type AutoplayHoldProps, useAutoplay } from './ui/use-autoplay';
+import { useResumableTimeout } from './ui/use-resumable-timeout';
 
 /**
  * How soon the first step follows the moment the demo becomes playable (it
@@ -78,9 +79,10 @@ export interface UseScenarioPlayerResult {
  * not held by the visitor, motion allowed. Under reduced motion it parks on the last step
  * of the current scenario, and every scenario can still be read by choosing it.
  *
- * The moment it becomes playable, and at the top of every scenario (the
- * rotation moved on, or a tab was chosen), its first step follows within
- * `START_MS`, not a whole step later; from there every step takes `stepMs`.
+ * A step is `stepMs` of time spent playing: an interruption pauses it and it
+ * resumes with what was left (`useResumableTimeout`, the one clock every timed
+ * thing here runs on). At the top of a scenario whose first step is the empty
+ * stage, that step is left within `START_MS`.
  *
  * A visitor's own choice (`go`, `setStep`) moves the clock there and lets go of
  * any hold; the rotation carries on from that point.
@@ -110,34 +112,28 @@ export function useScenarioPlayer({
   const [started, setStarted] = useState(false);
   if (playing && !started) setStarted(true);
 
-  // True from the moment it becomes playable until its first tick has been scheduled.
-  const starting = useRef(false);
-  const wasPlaying = useRef(false);
-  useEffect(() => {
-    if (playing && !wasPlaying.current) starting.current = true;
-    wasPlaying.current = playing;
-    if (!playing) return undefined;
-    const atEnd = rawStep >= lastStep;
-    // The first step comes quickly, both after it becomes playable and at the
-    // top of every scenario whose step 0 is the empty stage (the rotation
-    // moved on, or the visitor chose a tab): a stage that sits empty for a
-    // whole step after a tap reads as not responding. A finished scenario still
-    // holds its full time: it is there to be read.
-    const quickStart = emptyFirstStep && (starting.current || rawStep === 0) && !atEnd;
-    starting.current = false;
-    const timer = setTimeout(
-      () => {
-        if (atEnd) {
-          setScenario(current => (current + 1) % scenarioCount);
-          setRawStep(0);
-        } else {
-          setRawStep(current => Math.min(current, lastStep) + 1);
-        }
-      },
-      atEnd ? holdMs : quickStart ? Math.min(START_MS, stepMs) : stepMs,
-    );
-    return () => clearTimeout(timer);
-  }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount, emptyFirstStep]);
+  // ONE clock for everything that waits and moves on (`useResumableTimeout`,
+  // the carousel's too): a step is `stepMs` of time spent PLAYING. Interrupted
+  // (off screen, held, another tab), it comes back with what was left of the
+  // step, never a whole new one and never a skipped one.
+  const atEnd = rawStep >= lastStep;
+  // Step 0 of a scenario whose first step is the empty stage is left at once:
+  // a stage that sits empty for a whole step after a tap reads as not
+  // responding. A finished scenario holds its full time: it is there to be read.
+  const leavesAtOnce = emptyFirstStep && rawStep === 0 && !atEnd;
+  useResumableTimeout({
+    running: playing,
+    durationMs: atEnd ? holdMs : leavesAtOnce ? Math.min(START_MS, stepMs) : stepMs,
+    resetKey: `${scenario}:${Math.min(rawStep, lastStep)}`,
+    onElapsed: () => {
+      if (atEnd) {
+        setScenario(current => (current + 1) % scenarioCount);
+        setRawStep(0);
+      } else {
+        setRawStep(current => Math.min(current, lastStep) + 1);
+      }
+    },
+  });
 
   // A visitor's choice is an instruction to play from there: it lets go of any hold.
   const setStep = useCallback(
