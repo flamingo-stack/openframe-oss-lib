@@ -59,7 +59,7 @@ import {
 } from '../icons-v2-generated';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ActionsMenuDropdown } from '../ui/actions-menu';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
@@ -91,6 +91,7 @@ import { useEmptyStateConfig } from './hooks/use-empty-state-config';
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
 import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
+import { useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader } from './mingo-chat-header';
 import { ChatDialogModals } from './mingo-chat-modals';
@@ -102,7 +103,7 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
-import { CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
+import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
@@ -497,6 +498,19 @@ export interface EmbeddableChatProps {
    * guided tour in a conversation of its own) points it there instead.
    */
   onWhatToAsk?: () => void;
+  /**
+   * v2: the "What to ask?" exchange the list's entry shows (when no
+   * `onWhatToAsk` takes it over): added at the end of the open conversation,
+   * or a new chat opens with it. Local - never sent, never stored. Picking a
+   * chip puts its prompt into the composer.
+   */
+  whatToAsk?: WhatToAskContent;
+  /**
+   * v2: items in the chat's ⋯ menu after its own, past a separator - actions
+   * that are not about the chat (e.g. the host's onboarding reset). Shown in
+   * every chat that is not archived, a new one included.
+   */
+  chatMenuExtraItems?: ActionsMenuItem[];
 }
 
 // =============================================================================
@@ -1063,6 +1077,8 @@ function EmbeddableChatInner({
   contextMemory,
   aboveComposer,
   onWhatToAsk,
+  whatToAsk: whatToAskContent,
+  chatMenuExtraItems,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
   // `shell` 'none' / 'inline' means the consumer hosts us inside their own panel
@@ -1626,7 +1642,10 @@ function EmbeddableChatInner({
   // Source chips already route through `handleNavigationClose`; inline
   // cards now match. New-tab clicks never invoke `closeChat`.
   const chatPanelHandle = useMemo<ChatPanelHandle>(
-    () => ({ closeChat: handleNavigationClose }),
+    () => ({
+      closeChat: handleNavigationClose,
+      fillComposer: (text: string) => chatInputRef.current?.setValue(text),
+    }),
     [handleNavigationClose],
   );
 
@@ -1711,18 +1730,35 @@ function EmbeddableChatInner({
 
   // Map the host's rows → the lib's Message type. The mapping itself lives in
   // `mapHostMessage`, which is where its pass-through list is pinned by tests.
-  const messages: Message[] = useMemo(() => {
+  const hostMessages: Message[] = useMemo(() => {
     const options = { userName: guideUserName, userAvatar: guideUserAvatar, timestampCache };
     const mapped = rawMessages.map(m => mapHostMessage(m, options));
     pruneTimestampCache(timestampCache, new Set(rawMessages.map(m => m.id)));
     return mapped;
   }, [rawMessages, guideUserName, guideUserAvatar, timestampCache]);
 
+  // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
+  // thread beside the host's messages; a new chat holding one reads as a
+  // conversation until it is sent or left.
+  const whatToAsk = useWhatToAsk({
+    dialogId: activeDialogId,
+    content: whatToAskContent,
+    user: {
+      name: headerUserName ?? 'You',
+      avatar: identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || null,
+      authorType: AUTHOR_TYPE.ADMIN,
+    },
+    assistant: { name: 'Mingo', assistantType: 'mingo' },
+  });
+  const noteWhatToAskSend = whatToAsk.noteSend;
+  const messages = whatToAsk.withExchanges(hostMessages);
+
   const handleSend = useCallback(
     (text: string) => {
       // Locked: the disabled editor cannot submit, but a queued Enter or a
       // stale ref call still lands here — refused at the seam, not by luck.
       if (composerLock) return;
+      noteWhatToAskSend();
       // Append chat-attachment markdown lines to the user's bubble.
       let augmentedText = text;
       if (readyAttachments.length > 0) {
@@ -1750,7 +1786,7 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [composerLock, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
   );
 
   /**
@@ -2213,7 +2249,14 @@ function EmbeddableChatInner({
       ? freshConversationTitle
       : 'Current Chats';
   const headerBackAriaLabel = hasConversation ? (isViewingArchived ? 'Back to archive' : 'Back') : 'Back to Mingo';
-  const headerOnBack = hasConversation ? handleBack : () => handleActiveModeChange('mingo');
+  const clearWhatToAskDraft = whatToAsk.clearDraft;
+  const headerOnBack = hasConversation
+    ? () => {
+        // Leaving a new chat that only holds "What to ask?" exchanges drops them.
+        if (activeDialogId == null) clearWhatToAskDraft();
+        handleBack();
+      }
+    : () => handleActiveModeChange('mingo');
   const headerOnRestore =
     isViewingArchived && unarchiveDialog && activeDialog ? () => setRestoreTarget(activeDialog) : undefined;
   const headerOnRename =
@@ -2247,8 +2290,22 @@ function EmbeddableChatInner({
   // dedicated reset (not `handleBack`, which would reopen the archive when the
   // open conversation is archived) so it always lands on a fresh chat.
   const handleNewChat = useCallback(() => {
+    clearWhatToAskDraft();
     resetToNewChat();
-  }, [resetToNewChat]);
+  }, [clearWhatToAskDraft, resetToNewChat]);
+
+  // "What to ask Mingo?" with `whatToAsk`: the exchange goes at the end of the
+  // open conversation; with none (or an archived one, which is read-only) a
+  // new chat opens with it. A new chat already holding one gets another.
+  const showWhatToAsk = () => {
+    if (activeDialogId && hasConversation && !isViewingArchived) {
+      whatToAsk.ask('current');
+      return;
+    }
+    if (activeDialogId != null || isViewingArchived) resetToNewChat();
+    setComposeOpen(true);
+    whatToAsk.ask('draft');
+  };
 
   // "Ask Mingo" from an archived chat: the conversation is read-only (the
   // backend refuses writes), so the question starts a new chat instead. It is
@@ -2416,7 +2473,7 @@ function EmbeddableChatInner({
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     // The suggestions a new chat opens on, unless the host has a surface of its own.
-    onWhatToAsk: leaveArchiveThen(onWhatToAsk ?? handleNewChat),
+    onWhatToAsk: leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? showWhatToAsk : handleNewChat)),
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
@@ -2449,6 +2506,7 @@ function EmbeddableChatInner({
           onToggleList={wideMingo ? toggleRailCollapsed : headerShowBack ? headerOnBack : () => setComposeOpen(false)}
           listOpen={splitActive}
           menuItems={headerShowBack && !isViewingArchived ? splitHeaderMenuItems : []}
+          extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
           onRestore={isViewingArchived ? headerOnRestore : undefined}
           // Only while the list and the chat both fit: narrow, the toggle is
           // already the way back to the list.
