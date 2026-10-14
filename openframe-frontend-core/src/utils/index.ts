@@ -24,6 +24,7 @@ export {
   VENDOR_CLASSIFICATION_COPY,
   vendorClassificationCopy,
   vendorClassificationGroup,
+  compareVendorClassifications,
   isOpenFrameClassification,
   type VendorClassificationValue,
   type VendorClassificationGroup,

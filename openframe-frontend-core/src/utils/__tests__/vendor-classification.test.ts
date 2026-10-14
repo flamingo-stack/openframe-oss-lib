@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatClassification } from '../format';
 import {
   VENDOR_CLASSIFICATION_COPY,
+  compareVendorClassifications,
   isOpenFrameClassification,
   vendorClassificationCopy,
   vendorClassificationGroup,
@@ -38,5 +39,32 @@ describe('vendor classifications', () => {
   it('does not treat inherited object keys as enriched values', () => {
     expect(vendorClassificationCopy('toString')).toBeUndefined();
     expect(vendorClassificationCopy('__proto__')).toBeUndefined();
+  });
+
+  it('orders a filter list: OpenFrame Selected, Connect, Shipped, then license, lifecycle, then the rest', () => {
+    const fromServer = [
+      'unmaintained',
+      'zzz_other',
+      'commercial',
+      'openframe_shipped',
+      'aaa_other',
+      'open_source',
+      'openframe_connect',
+      'end_of_life',
+      'openframe_selected',
+      'source_available',
+    ];
+    expect([...fromServer].sort(compareVendorClassifications)).toEqual([
+      'openframe_selected',
+      'openframe_connect',
+      'openframe_shipped',
+      'open_source',
+      'source_available',
+      'commercial',
+      'end_of_life',
+      'unmaintained',
+      'aaa_other',
+      'zzz_other',
+    ]);
   });
 });

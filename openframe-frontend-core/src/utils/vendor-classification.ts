@@ -27,7 +27,28 @@ export interface VendorClassificationCopy {
   word?: string;
 }
 
+/** In display order: a filter list shows OpenFrame first, then license, then lifecycle. */
 export const VENDOR_CLASSIFICATION_COPY: Readonly<Record<string, VendorClassificationCopy>> = {
+  openframe_selected: {
+    label: 'OpenFrame Selected',
+    word: 'Selected',
+    description:
+      'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
+    group: 'openframe',
+  },
+  openframe_connect: {
+    label: 'OpenFrame Connect',
+    word: 'Connect',
+    description:
+      'Services OpenFrame connects to and manages for every client, such as Microsoft 365 and Google Workspace, beside devices and tickets.',
+    group: 'openframe',
+  },
+  openframe_shipped: {
+    label: 'OpenFrame Shipped',
+    word: 'Shipped',
+    description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
+    group: 'openframe',
+  },
   open_source: {
     label: 'Open Source',
     description: 'Released under an OSI-approved open-source license.',
@@ -59,26 +80,6 @@ export const VENDOR_CLASSIFICATION_COPY: Readonly<Record<string, VendorClassific
     description: 'No release for years and no official end-of-life notice.',
     group: 'lifecycle',
   },
-  openframe_selected: {
-    label: 'OpenFrame Selected',
-    word: 'Selected',
-    description:
-      'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
-    group: 'openframe',
-  },
-  openframe_shipped: {
-    label: 'OpenFrame Shipped',
-    word: 'Shipped',
-    description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
-    group: 'openframe',
-  },
-  openframe_connect: {
-    label: 'OpenFrame Connect',
-    word: 'Connect',
-    description:
-      'Services OpenFrame connects to and manages for every client, such as Microsoft 365 and Google Workspace, beside devices and tickets.',
-    group: 'openframe',
-  },
 };
 
 /** The enrichment of a classification, or undefined for a value we do not present specially. */
@@ -95,4 +96,22 @@ export function vendorClassificationGroup(value: string | null | undefined): Ven
 /** A classification drawn with the OpenFrame mark (it has a `word`). */
 export function isOpenFrameClassification(value: string | null | undefined): boolean {
   return vendorClassificationGroup(value) === 'openframe';
+}
+
+const DISPLAY_ORDER = Object.keys(VENDOR_CLASSIFICATION_COPY);
+
+/**
+ * Sort order for a list of classifications (a filter list): the enriched values in their
+ * display order (OpenFrame Selected, Connect, Shipped, then license, then lifecycle), then
+ * every other value the server holds, alphabetically.
+ */
+export function compareVendorClassifications(a: string, b: string): number {
+  const ia = DISPLAY_ORDER.indexOf(a);
+  const ib = DISPLAY_ORDER.indexOf(b);
+  if (ia !== -1 || ib !== -1) {
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  }
+  return a.localeCompare(b);
 }
