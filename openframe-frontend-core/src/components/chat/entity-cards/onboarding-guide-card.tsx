@@ -296,7 +296,14 @@ export function OnboardingGuideCard({
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
     return (
-      <Link href={href} target={target} rel={rel} prefetch={false} className={cn(COMPACT_CARD_OUTER, className)}>
+      <Link
+        href={href}
+        target={target}
+        rel={rel}
+        prefetch={false}
+        // `group`: the play mark on a video cover shows on the card's hover.
+        className={cn(COMPACT_CARD_OUTER, 'group', className)}
+      >
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image src={compactCover} alt={guide.title} fill sizes="56px" className="object-contain" unoptimized />

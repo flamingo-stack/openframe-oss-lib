@@ -55,18 +55,25 @@ interface ScheduleIntervalInputProps {
  * held until the first Save (`showErrors`) and re-checked on blur
  * (`reValidateMode`), so nothing here is judged mid-word.
  */
-export function ScheduleIntervalInput({
-  value,
-  onChange,
-  onBlur,
-  disabled,
-  invalid,
-  error,
-  min,
-  className,
-  'aria-label': ariaLabel,
-  'data-invalid-focus': invalidFocus,
-}: ScheduleIntervalInputProps) {
+export function ScheduleIntervalInput(props: ScheduleIntervalInputProps) {
+  const {
+    value,
+    onChange,
+    onBlur,
+    disabled,
+    invalid,
+    error,
+    min,
+    className,
+    'aria-label': ariaLabel,
+    'data-invalid-focus': invalidFocus,
+  } = props;
+  // Only a box that shows its own error wires `Input`'s error slot (Repeat in).
+  // A wired slot wraps the box in a full-width column that reserves room for the
+  // message, and in a row that column takes the width of the control beside it:
+  // Stop Retry after, whose error the section carries, would squeeze its unit
+  // select to nothing.
+  const errorSlot = 'error' in props;
   const [text, setText] = useState(() => (value === null ? '' : String(value)));
   const focused = useRef(false);
 
@@ -115,7 +122,7 @@ export function ScheduleIntervalInput({
       }}
       disabled={disabled}
       invalid={invalid}
-      error={error}
+      {...(errorSlot ? { error } : {})}
     />
   );
 }
