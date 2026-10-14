@@ -1,6 +1,7 @@
 package com.openframe.data.service;
 
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
@@ -50,18 +51,23 @@ public class OpenFrameClientConfigurationService {
         save(config);
     }
 
-    // true when the flags moved: the caller decides what a new set of flags sets in motion
+    public boolean haveFeatureFlagsMoved(Map<String, ClientFeatureFlag> newFlags) {
+        Map<String, ClientFeatureFlag> oldFlags = currentFeatureFlags();
+        return !oldFlags.equals(newFlags);
+    }
+
     @RetryOnOptimisticLockingFailure
-    public boolean updateFeatureFlags(Map<String, Boolean> newFlags) {
+    public void updateFeatureFlags(Map<String, ClientFeatureFlag> newFlags) {
         OpenFrameClientConfiguration config = get();
-        Map<String, Boolean> oldFlags = requireNonNullElse(config.getFeatureFlags(), Map.of());
-        if (oldFlags.equals(newFlags)) {
-            return false;
-        }
+        Map<String, ClientFeatureFlag> oldFlags = requireNonNullElse(config.getFeatureFlags(), Map.of());
         config.setFeatureFlags(newFlags);
         save(config);
         log.info("Updated client feature flags {} -> {}", oldFlags, newFlags);
-        return true;
+    }
+
+    private Map<String, ClientFeatureFlag> currentFeatureFlags() {
+        OpenFrameClientConfiguration config = get();
+        return requireNonNullElse(config.getFeatureFlags(), Map.of());
     }
 
     @RetryOnOptimisticLockingFailure

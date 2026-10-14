@@ -4,6 +4,7 @@ import com.openframe.api.dto.force.request.ForceClientFeatureFlagsRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponse;
 import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponseItem;
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
@@ -37,7 +38,7 @@ class ForceClientFeatureFlagsServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
     private static final String OTHER_MACHINE_ID = "mach-43";
-    private static final Map<String, Boolean> FLAGS = Map.of("delivery-tool-installation", true);
+    private static final Map<String, ClientFeatureFlag> FLAGS = Map.of("delivery-tool-installation", new ClientFeatureFlag(true, "1.6.0"));
 
     @Mock private OpenFrameClientConfigurationService clientConfigurationService;
     @Mock private DeliveryProperties deliveryProperties;
