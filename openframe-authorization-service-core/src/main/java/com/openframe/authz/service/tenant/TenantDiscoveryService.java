@@ -83,6 +83,7 @@ public class TenantDiscoveryService {
                 .email(email)
                 .hasExistingAccounts(true)
                 .tenantId(tenant.getId())
+                .tenantName(tenant.getName())
                 .domain(tenant.getDomain())
                 .authProviders(availableAuthProviders(tenant, openframeLoginEnabled))
                 .openframeLoginEnabled(openframeLoginEnabled)

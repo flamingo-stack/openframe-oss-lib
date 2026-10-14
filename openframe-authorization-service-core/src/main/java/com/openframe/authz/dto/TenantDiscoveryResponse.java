@@ -26,6 +26,9 @@ public class TenantDiscoveryResponse {
     @JsonProperty("tenant_id")
     private String tenantId;
 
+    @JsonProperty("tenant_name")
+    private String tenantName;
+
     private String domain;
 
     /**
