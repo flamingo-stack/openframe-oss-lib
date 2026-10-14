@@ -1,50 +1,42 @@
 import { describe, expect, it } from 'vitest';
 import { formatClassification } from '../format';
 import {
-  GENERAL_CLASSIFICATIONS,
-  OPENFRAME_CLASSIFICATIONS,
-  VENDOR_CLASSIFICATIONS,
-  isVendorClassification,
+  VENDOR_CLASSIFICATION_COPY,
+  isOpenFrameClassification,
+  vendorClassificationCopy,
   vendorClassificationGroup,
-  vendorClassificationLabel,
 } from '../vendor-classification';
 
 describe('vendor classifications', () => {
-  it('every value has copy, in exactly one table', () => {
-    for (const value of VENDOR_CLASSIFICATIONS) {
-      const inGeneral = Object.prototype.hasOwnProperty.call(GENERAL_CLASSIFICATIONS, value);
-      const inOpenFrame = Object.prototype.hasOwnProperty.call(OPENFRAME_CLASSIFICATIONS, value);
-      expect(inGeneral !== inOpenFrame).toBe(true);
-    }
-    expect(Object.keys(GENERAL_CLASSIFICATIONS).length + Object.keys(OPENFRAME_CLASSIFICATIONS).length).toBe(
-      VENDOR_CLASSIFICATIONS.length,
-    );
+  it('a value the server sends with no enrichment still has a label', () => {
+    expect(vendorClassificationCopy('some_new_value')).toBeUndefined();
+    expect(vendorClassificationGroup('some_new_value')).toBeUndefined();
+    expect(formatClassification('some_new_value')).toBe('Some New Value');
   });
 
-  it('groups license, lifecycle and OpenFrame values', () => {
-    expect(vendorClassificationGroup('open_source')).toBe('license');
-    expect(vendorClassificationGroup('source_available')).toBe('license');
-    expect(vendorClassificationGroup('commercial')).toBe('license');
-    expect(vendorClassificationGroup('end_of_life')).toBe('lifecycle');
-    expect(vendorClassificationGroup('end_of_support')).toBe('lifecycle');
-    expect(vendorClassificationGroup('unmaintained')).toBe('lifecycle');
-    expect(vendorClassificationGroup('openframe_selected')).toBe('openframe');
-  });
-
-  it('the lifecycle and source-available values are filterable classifications', () => {
-    for (const value of ['source_available', 'end_of_life', 'end_of_support', 'unmaintained']) {
-      expect(isVendorClassification(value)).toBe(true);
-    }
-    expect(isVendorClassification('favorites')).toBe(false);
-  });
-
-  it('labels a filter from the one vocabulary, and title-cases an unknown value', () => {
+  it('enriched values carry a curated label and group', () => {
     expect(formatClassification('source_available')).toBe('Source-available');
     expect(formatClassification('end_of_life')).toBe('End of life');
     expect(formatClassification('end_of_support')).toBe('End of support');
     expect(formatClassification('unmaintained')).toBe('Unmaintained');
     expect(formatClassification('openframe_selected')).toBe('OpenFrame Selected');
-    expect(vendorClassificationLabel('not_a_value')).toBeNull();
-    expect(formatClassification('not_a_value')).toBe('Not A Value');
+    expect(vendorClassificationGroup('source_available')).toBe('license');
+    expect(vendorClassificationGroup('end_of_life')).toBe('lifecycle');
+    expect(vendorClassificationGroup('openframe_shipped')).toBe('openframe');
+  });
+
+  it('only OpenFrame values are drawn with the OpenFrame mark, and each has its word', () => {
+    expect(isOpenFrameClassification('openframe_connect')).toBe(true);
+    expect(isOpenFrameClassification('open_source')).toBe(false);
+    expect(isOpenFrameClassification(undefined)).toBe(false);
+    for (const [value, copy] of Object.entries(VENDOR_CLASSIFICATION_COPY)) {
+      expect(Boolean(copy.word)).toBe(copy.group === 'openframe');
+      expect(isOpenFrameClassification(value)).toBe(copy.group === 'openframe');
+    }
+  });
+
+  it('does not treat inherited object keys as enriched values', () => {
+    expect(vendorClassificationCopy('toString')).toBeUndefined();
+    expect(vendorClassificationCopy('__proto__')).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@
  */
 
 import type { ProgramInstant } from './program-instant';
-import { vendorClassificationLabel } from './vendor-classification';
+import { vendorClassificationCopy } from './vendor-classification';
 
 /**
  * Format a date to a human-readable string
@@ -941,7 +941,7 @@ export function stripHtml(html: string): string {
  * curated mapping.
  */
 export function formatClassification(classification: string): string {
-  return vendorClassificationLabel(classification) ?? formatUnderscoreText(classification);
+  return vendorClassificationCopy(classification)?.label ?? formatUnderscoreText(classification);
 }
 
 /**

@@ -1,13 +1,10 @@
 'use client';
 
-import { AlertTriangle, Boxes, Clock, Code, Database, DollarSign, FileCode, Hand, PauseCircle, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, Boxes, Clock, Code, Database, DollarSign, FileCode, Hand, type LucideIcon, PauseCircle, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { cn } from '../utils/cn';
-import {
-  GENERAL_CLASSIFICATIONS,
-  OPENFRAME_CLASSIFICATIONS,
-  isOpenFrameClassification,
-  type OpenFrameClassification,
-} from '../utils/vendor-classification';
+import { formatClassification } from '../utils/format';
+import { vendorClassificationCopy } from '../utils/vendor-classification';
 import { OpenframeLogoIcon } from './icons-v2-generated/logos/openframe-logo-icon';
 
 export interface VendorTagProps {
@@ -37,12 +34,46 @@ export interface VendorTagProps {
   accentColor?: string;
 }
 
-/** An OpenFrame classification: the OpenFrame mark and its one word ("Selected", "Connect"). */
-function openFrameTag(classification: OpenFrameClassification, text?: string) {
+/**
+ * The icon of a classification we present specially. Any other classification the server
+ * sends is still a tag: its label (curated, else title case) with no icon.
+ */
+const CLASSIFICATION_ICONS: Readonly<Record<string, { Icon: LucideIcon; tile: string; iconClass: string }>> = {
+  open_source: { Icon: Code, tile: 'bg-ods-accent', iconClass: 'text-ods-text-on-accent' },
+  commercial: { Icon: DollarSign, tile: 'bg-ods-border', iconClass: 'text-ods-text-secondary' },
+  source_available: { Icon: FileCode, tile: 'bg-ods-border', iconClass: 'text-ods-text-secondary' },
+  end_of_life: { Icon: AlertTriangle, tile: '', iconClass: 'text-ods-warning' },
+  end_of_support: { Icon: Clock, tile: '', iconClass: 'text-ods-warning' },
+  unmaintained: { Icon: PauseCircle, tile: '', iconClass: 'text-ods-warning' },
+};
+
+/**
+ * A classification tag, derived from the value the server sends. An OpenFrame value is the
+ * OpenFrame mark and its one word; a lifecycle value reads in the warning colour; an
+ * enriched value carries its icon; any other value is its title-cased label.
+ */
+function classificationTag(value: string, text?: string, accentColor?: string): { text: string; icon: ReactNode; textColor?: string } {
+  const copy = vendorClassificationCopy(value);
+  if (copy?.group === 'openframe') {
+    return {
+      text: text || copy.word || copy.label,
+      textColor: undefined,
+      icon: <OpenframeLogoIcon secondaryColor="currentColor" color="currentColor" className="h-4 w-4 text-ods-accent" />,
+    };
+  }
+  const enriched = CLASSIFICATION_ICONS[value];
+  const accentTile = value === 'open_source' && accentColor ? { backgroundColor: accentColor } : undefined;
   return {
-    text: text || OPENFRAME_CLASSIFICATIONS[classification].word,
-    textColor: undefined,
-    icon: <OpenframeLogoIcon secondaryColor="currentColor" color="currentColor" className="h-4 w-4 text-ods-accent" />,
+    text: text || copy?.label || formatClassification(value),
+    textColor: copy?.group === 'lifecycle' ? 'text-ods-warning' : undefined,
+    icon: enriched ? (
+      <div
+        className={cn('flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm', enriched.tile)}
+        style={accentTile}
+      >
+        <enriched.Icon width={10} height={10} className={enriched.iconClass} />
+      </div>
+    ) : null,
   };
 }
 
@@ -54,7 +85,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
   );
 
   // Get display text and styling based on type
-  const getTagContent = () => {
+  const getTagContent = (): { text: string; icon: ReactNode; textColor?: string } => {
     switch (type) {
       case 'placeholder':
         return {
@@ -87,26 +118,9 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           ),
         };
       case 'open-source':
-        return {
-          text: text || 'Open Source',
-          icon: (
-            <div
-              className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent"
-              style={accentColor ? { backgroundColor: accentColor } : undefined}
-            >
-              <Code width={10} height={10} className="text-ods-text-on-accent" />
-            </div>
-          ),
-        };
+        return classificationTag('open_source', text, accentColor);
       case 'commercial':
-        return {
-          text: text || 'Commercial Vendor',
-          icon: (
-            <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <DollarSign width={10} height={10} className="text-ods-text-secondary" />
-            </div>
-          ),
-        };
+        return classificationTag('commercial', text);
       // platform-capability tags — same neutral icon-box chrome as 'commercial'
       case 'api':
         return {
@@ -189,75 +203,12 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             </div>
           ),
         };
-      case 'classification': {
-        // Handle specific classification types based on the text value
-        const classificationType = text?.toLowerCase();
-
-        if (classificationType === 'open_source') {
-          return {
-            text: 'Open Source',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent">
-                <Code width={10} height={10} className="text-ods-text-on-accent" />
-              </div>
-            ),
-          };
-        } else if (classificationType === 'commercial') {
-          return {
-            text: 'Commercial Vendor',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-                <DollarSign width={10} height={10} className="text-ods-text-secondary" />
-              </div>
-            ),
-          };
-        } else if (classificationType === 'source_available') {
-          return {
-            text: GENERAL_CLASSIFICATIONS.source_available.label,
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-                <FileCode width={10} height={10} className="text-ods-text-secondary" />
-              </div>
-            ),
-          };
-        } else if (
-          classificationType === 'end_of_life' ||
-          classificationType === 'end_of_support' ||
-          classificationType === 'unmaintained'
-        ) {
-          const LifecycleIcon =
-            classificationType === 'end_of_life'
-              ? AlertTriangle
-              : classificationType === 'end_of_support'
-                ? Clock
-                : PauseCircle;
-          return {
-            text: GENERAL_CLASSIFICATIONS[classificationType].label,
-            textColor: 'text-ods-warning',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm">
-                <LifecycleIcon width={12} height={12} className="text-ods-warning" />
-              </div>
-            ),
-          };
-        } else if (isOpenFrameClassification(classificationType)) {
-          return openFrameTag(classificationType);
-        } else {
-          // Fallback for unknown classification types
-          return {
-            text: text || 'Classification',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent">
-                <span className="text-[8px] font-bold text-ods-text-on-accent">C</span>
-              </div>
-            ),
-          };
-        }
-      }
+      case 'classification':
+        return classificationTag((text ?? '').toLowerCase());
       case 'openframe_selected':
       case 'openframe_connect':
       case 'openframe_shipped':
-        return openFrameTag(type, text);
+        return classificationTag(type, text);
       default:
         return {
           text: text || type,

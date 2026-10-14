@@ -1,81 +1,33 @@
 /**
- * Vendor classifications: the ONE vocabulary of `vendor_classification.classification`.
+ * Vendor classifications: whatever `vendor_classification.classification` holds on the
+ * server. The database owns the vocabulary (its CHECK constraint is the list), the catalog
+ * builds its filters from the rows that exist, and nothing here limits which values are valid.
  *
- * A vendor may carry several (an OpenFrame product is `open_source` and
- * `openframe_selected`; a retired tool is `open_source` and `end_of_life`).
- * Every value is a filter in the catalog and a tag on a card, so a new value is
- * added HERE (with its copy below) and in the database's CHECK constraint, nowhere else.
+ * This module only ENRICHES the values we want to present specially: a curated label, a
+ * tooltip description and a group. A value with no entry still works everywhere, labelled
+ * by title case. To present a new value better, add an entry here; to make it exist, add it
+ * to the database.
  *
- * Three groups:
- *   - license: `open_source` (an OSI license), `source_available` (the source is
- *     public but the license restricts use, e.g. SSPL, BSL, Elastic License, size or
- *     service limits), `commercial`.
- *   - lifecycle: `end_of_life` (the vendor discontinued or retired the product),
- *     `end_of_support` (no more vendor support or security fixes, still obtainable),
- *     `unmaintained` (no release for years and no end-of-life notice).
- *   - OpenFrame: `openframe_selected` (a tool OpenFrame is built on, picked by the
- *     team), `openframe_shipped` (in the released product today), `openframe_connect`
- *     (a service OpenFrame connects to and manages). Drawn with the OpenFrame mark
- *     and ONE word.
+ * Groups:
+ *   - `license`: how the software is licensed.
+ *   - `lifecycle`: where the product is in its life; a card shows it before the license.
+ *   - `openframe`: drawn with the OpenFrame mark and ONE word (`word`).
  */
-export const VENDOR_CLASSIFICATIONS = [
-  'open_source',
-  'source_available',
-  'commercial',
-  'end_of_life',
-  'end_of_support',
-  'unmaintained',
-  'openframe_selected',
-  'openframe_shipped',
-  'openframe_connect',
-] as const;
-
-export type VendorClassificationValue = (typeof VENDOR_CLASSIFICATIONS)[number];
-
-export type OpenFrameClassification = Extract<VendorClassificationValue, `openframe_${string}`>;
-
-export interface OpenFrameClassificationCopy {
-  /** The word drawn beside the OpenFrame mark. */
-  word: string;
-  /** The full name, for plain-text surfaces (a select option, an aria label). */
-  label: string;
-  /** What the classification means, for a tooltip. */
-  description: string;
-}
-
-export const OPENFRAME_CLASSIFICATIONS: Record<OpenFrameClassification, OpenFrameClassificationCopy> = {
-  openframe_selected: {
-    word: 'Selected',
-    label: 'OpenFrame Selected',
-    description:
-      'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
-  },
-  openframe_shipped: {
-    word: 'Shipped',
-    label: 'OpenFrame Shipped',
-    description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
-  },
-  openframe_connect: {
-    word: 'Connect',
-    label: 'OpenFrame Connect',
-    description:
-      'Services OpenFrame connects to and manages for every client, such as Microsoft 365 and Google Workspace, beside devices and tickets.',
-  },
-};
+export type VendorClassificationValue = string;
 
 export type VendorClassificationGroup = 'license' | 'lifecycle' | 'openframe';
 
-export type GeneralClassification = Exclude<VendorClassificationValue, OpenFrameClassification>;
-
-export interface GeneralClassificationCopy {
-  /** The label on a tag and a filter. */
+export interface VendorClassificationCopy {
+  /** The label on a tag, a filter and a plain-text surface. */
   label: string;
   /** What the classification means, for a tooltip. */
   description: string;
-  group: Exclude<VendorClassificationGroup, 'openframe'>;
+  group: VendorClassificationGroup;
+  /** OpenFrame group only: the one word drawn beside the OpenFrame mark. */
+  word?: string;
 }
 
-export const GENERAL_CLASSIFICATIONS: Record<GeneralClassification, GeneralClassificationCopy> = {
+export const VENDOR_CLASSIFICATION_COPY: Readonly<Record<string, VendorClassificationCopy>> = {
   open_source: {
     label: 'Open Source',
     description: 'Released under an OSI-approved open-source license.',
@@ -107,24 +59,40 @@ export const GENERAL_CLASSIFICATIONS: Record<GeneralClassification, GeneralClass
     description: 'No release for years and no official end-of-life notice.',
     group: 'lifecycle',
   },
+  openframe_selected: {
+    label: 'OpenFrame Selected',
+    word: 'Selected',
+    description:
+      'OpenFrame is a unified platform that integrates multiple open-source IT and security tools into a single dashboard for MSPs. This filter shows vendors selected by our team for their excellence, community support, and MSP-specific value.',
+    group: 'openframe',
+  },
+  openframe_shipped: {
+    label: 'OpenFrame Shipped',
+    word: 'Shipped',
+    description: 'Tools and OpenFrame products that are in the released OpenFrame product today, not on the roadmap.',
+    group: 'openframe',
+  },
+  openframe_connect: {
+    label: 'OpenFrame Connect',
+    word: 'Connect',
+    description:
+      'Services OpenFrame connects to and manages for every client, such as Microsoft 365 and Google Workspace, beside devices and tickets.',
+    group: 'openframe',
+  },
 };
 
-/** The group a classification belongs to (license, lifecycle or OpenFrame). */
-export function vendorClassificationGroup(value: VendorClassificationValue): VendorClassificationGroup {
-  return isOpenFrameClassification(value) ? 'openframe' : GENERAL_CLASSIFICATIONS[value].group;
+/** The enrichment of a classification, or undefined for a value we do not present specially. */
+export function vendorClassificationCopy(value: string | null | undefined): VendorClassificationCopy | undefined {
+  if (!value || !Object.prototype.hasOwnProperty.call(VENDOR_CLASSIFICATION_COPY, value)) return undefined;
+  return VENDOR_CLASSIFICATION_COPY[value];
 }
 
-/** The display label of a classification; an unknown value is title-cased by the caller's fallback. */
-export function vendorClassificationLabel(value: string): string | null {
-  if (isOpenFrameClassification(value)) return OPENFRAME_CLASSIFICATIONS[value].label;
-  if (isVendorClassification(value)) return GENERAL_CLASSIFICATIONS[value as GeneralClassification].label;
-  return null;
+/** The group of a classification, or undefined for a value with no enrichment. */
+export function vendorClassificationGroup(value: string | null | undefined): VendorClassificationGroup | undefined {
+  return vendorClassificationCopy(value)?.group;
 }
 
-export function isVendorClassification(value: string): value is VendorClassificationValue {
-  return (VENDOR_CLASSIFICATIONS as readonly string[]).includes(value);
-}
-
-export function isOpenFrameClassification(value: string | null | undefined): value is OpenFrameClassification {
-  return !!value && Object.prototype.hasOwnProperty.call(OPENFRAME_CLASSIFICATIONS, value);
+/** A classification drawn with the OpenFrame mark (it has a `word`). */
+export function isOpenFrameClassification(value: string | null | undefined): boolean {
+  return vendorClassificationGroup(value) === 'openframe';
 }
