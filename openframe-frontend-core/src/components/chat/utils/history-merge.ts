@@ -160,6 +160,45 @@ function sharesRequestKey(keys: ReadonlySet<string>, others: ReadonlySet<string>
   return false;
 }
 
+/** Stream seqs of the ticket lifecycle receipts a set of rows renders. A
+ *  `TICKET_EVENT` is persisted as its own row, so history stamps the row's seq
+ *  onto the segment and it is the receipt's exact identity. */
+function ticketEventSeqs(messages: readonly MergeableChatMessage[]): Set<number> {
+  const seqs = new Set<number>();
+  for (const m of messages) {
+    if (!Array.isArray(m.content)) continue;
+    for (const seg of m.content) {
+      if (seg.type === 'ticket_event' && typeof seg.streamSeq === 'number') seqs.add(seg.streamSeq);
+    }
+  }
+  return seqs;
+}
+
+/**
+ * A kept realtime row without the ticket receipts the window already renders.
+ *
+ * Receipts arrive standalone, so a live bubble made of them grows with every
+ * status change while its `streamSeq` follows the newest one - and coverage
+ * keeps or drops a row WHOLE. Once history persisted the older receipts but
+ * not the newest, the bubble was kept and its older cards rendered a second
+ * time beside their persisted twins (resolve → reopen in a dialog Fae never
+ * answered this session). Returns `null` for a row left with nothing to show;
+ * the streaming row is never removed, it is the bubble chunks are landing in.
+ */
+function withoutPersistedTicketEvents<M extends MergeableChatMessage>(
+  m: M,
+  persistedSeqs: ReadonlySet<number>,
+  streamingMessageId: string | null,
+): M | null {
+  if (persistedSeqs.size === 0 || !Array.isArray(m.content)) return m;
+  const content = m.content.filter(
+    seg => !(seg.type === 'ticket_event' && typeof seg.streamSeq === 'number' && persistedSeqs.has(seg.streamSeq)),
+  );
+  if (content.length === m.content.length) return m;
+  if (content.length === 0 && m.id !== streamingMessageId) return null;
+  return { ...m, content };
+}
+
 /** A user row's identity is its text under its author kind; empty text is no
  *  identity (system rows persist with `content: ''`). `''` for any other row.
  *  The kind is part of the key because technician (`authorType: 'admin'`) and
@@ -665,7 +704,13 @@ export function mergeHistoryWithRealtime<M extends MergeableChatMessage>(input: 
     if (keepRealtime(m)) realtimeMessages.push(m);
   }
 
-  return [...olderThanWindowMessages, ...processedToUse, ...realtimeMessages];
+  const persistedTicketEventSeqs = ticketEventSeqs(processedToUse);
+  const dedupedRealtimeMessages = realtimeMessages.flatMap(m => {
+    const kept = withoutPersistedTicketEvents(m, persistedTicketEventSeqs, streamingMessageId);
+    return kept ? [kept] : [];
+  });
+
+  return [...olderThanWindowMessages, ...processedToUse, ...dedupedRealtimeMessages];
 }
 
 export interface HistoryPrependResult<M extends MergeableChatMessage> {

@@ -204,6 +204,7 @@ export * from './tag-key-value-filter';
 
 // Markdown Editor (MDEditor-based)
 export * from './markdown-editor';
+export * from './markdown-link-command';
 
 // File Upload
 export * from './file-upload';

@@ -22,15 +22,18 @@ import { Video } from '../../../features/video';
 import { buildStandardLeafRenderers, hasRenderableSrc, type MdRenderProps } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
-/** Depth-first search of a hast node for the first `<a href>` matching `hostRe`. */
-function findFirstHref(node: ElementContent | undefined, hostRe: RegExp): string | null {
+/** Depth-first search of a hast node for the first `<a href>` matching `hostRe`, with the `rel` written on it. */
+function findFirstLink(node: ElementContent | undefined, hostRe: RegExp): { href: string; rel?: string } | null {
   if (!node || node.type !== 'element') return null;
   if (node.tagName === 'a') {
-    const href = node.properties.href;
-    if (typeof href === 'string' && hostRe.test(href)) return href;
+    const { href, rel } = node.properties;
+    if (typeof href === 'string' && hostRe.test(href)) {
+      const relText = Array.isArray(rel) ? rel.join(' ') : typeof rel === 'string' ? rel : undefined;
+      return { href, rel: relText };
+    }
   }
   for (const child of node.children) {
-    const found = findFirstHref(child, hostRe);
+    const found = findFirstLink(child, hostRe);
     if (found) return found;
   }
   return null;
@@ -202,12 +205,12 @@ export function buildRichEmbedOverrides({
       const { node, className } = bqProps;
       const classNames: string = Array.isArray(className) ? className.join(' ') : (className ?? '');
       if (classNames.includes('reddit-embed-bq')) {
-        const postUrl = findFirstHref(node, /reddit\.com/);
-        if (postUrl) return <RedditEmbedClient url={postUrl} />;
+        const post = findFirstLink(node, /reddit\.com/);
+        if (post) return <RedditEmbedClient url={post.href} rel={post.rel} />;
       }
       if (classNames.includes('twitter-tweet')) {
-        const tweetUrl = findFirstHref(node, /(?:twitter\.com|x\.com)\/[^/]+\/status\//);
-        if (tweetUrl) return <TwitterEmbedClient url={tweetUrl} />;
+        const tweet = findFirstLink(node, /(?:twitter\.com|x\.com)\/[^/]+\/status\//);
+        if (tweet) return <TwitterEmbedClient url={tweet.href} rel={tweet.rel} />;
       }
       return standard.blockquote(bqProps);
     },
