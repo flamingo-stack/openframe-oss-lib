@@ -36,7 +36,8 @@ export interface ChunkData {
   sequenceId?: number;
   /** JetStream stream sequence, populated from JsMsg.info.streamSequence when delivered via JetStream. */
   streamSeq?: number;
-  /** Authoritative dialog streaming state at the time this chunk was emitted; consumers should mirror it into their dialog cache. */
+  /** Not set by the ai-agent: its chunks carry no stream state, which exists only as the
+   *  GraphQL `Dialog.streamState` field (resolved from the dialog lock). Read that instead. */
   streamState?: 'IDLE' | 'STREAMING';
   type: string;
   text?: string;

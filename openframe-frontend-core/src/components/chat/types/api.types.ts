@@ -103,8 +103,9 @@ export interface UseJetStreamDialogSubscriptionOptions {
   /** Single topic to subscribe to. */
   topic: NatsMessageType;
   /**
-   * Resume from this JetStream sequence + 1. When null/undefined, the consumer starts with
-   * DeliverPolicy.New (live tail only).
+   * Resume from this JetStream sequence + 1 (0 replays everything the stream retains for the
+   * dialog). When null/undefined, the consumer starts with DeliverPolicy.New: live tail only,
+   * from whenever the server creates the consumer — after `onSubscribed` has fired.
    */
   optStartSeq?: number | null;
   onEvent?: (payload: unknown, messageType: NatsMessageType) => void;
@@ -140,7 +141,8 @@ export interface UseJetStreamDialogSubscriptionOptions {
    * either kind of knowledge bumps this instead of hoping the page noticed.
    *
    * Treated exactly like a reconnect: the consumer is rebuilt from the highest
-   * sequence already seen, and `reconnectionCount` moves so callers refetch
+   * sequence already seen, `reconnectionCount` moves, and `caughtUpCount` moves
+   * once the rebuilt consumer has replayed what it missed, so callers refetch
    * persisted history. Any increase counts; the value itself means nothing, and
    * an increase arriving alongside a `visibilitychange` costs one rebuild, not
    * two.
@@ -156,11 +158,24 @@ export interface UseJetStreamDialogSubscriptionReturn {
    * JetStream ordered-consumer recreation, the page returning to view after
    * being hidden long enough to have missed something, or a host reporting the
    * same via `resyncSignal`. All of them mean the same thing to the caller —
-   * the tail may have skipped messages, so persisted history has to be
-   * refetched. One absence counts once even when two sources report it.
-   * Starts at 0.
+   * the tail may have skipped messages. One absence counts once even when two
+   * sources report it. Starts at 0.
+   *
+   * Not the moment to refetch persisted history: the replay is still arriving
+   * when this moves. See `caughtUpCount`.
    */
   reconnectionCount: number;
+  /**
+   * Incremented once a tail that came back — any of the events
+   * `reconnectionCount` counts, recoveries past its report floor — has
+   * delivered everything the stream still held for the dialog. Refetch
+   * persisted history on this: the gap may predate what the stream retains,
+   * and only a refetch that lands after the replay merges against the turns it
+   * re-delivered. One that lands first merges without them, and they then
+   * render a second time. Never moves for the first consumer of a dialog.
+   * Starts at 0.
+   */
+  caughtUpCount: number;
   /** Highest JetStream stream sequence observed so far (null before first delivery). */
   currentStreamSeq: number | null;
 }
