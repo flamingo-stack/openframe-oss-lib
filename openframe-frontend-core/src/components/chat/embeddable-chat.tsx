@@ -1757,6 +1757,8 @@ function EmbeddableChatInner({
   });
   const noteWhatToAskSend = whatToAsk.noteSend;
   const messages = whatToAsk.withExchanges(hostMessages);
+  // A new chat whose only messages are those exchanges: no dialog yet.
+  const isWhatToAskDraft = activeDialogId == null && hostMessages.length === 0 && messages.length > 0;
 
   const handleSend = useCallback(
     (text: string) => {
@@ -2494,7 +2496,9 @@ function EmbeddableChatInner({
     dialogs,
     activeDialogId: activeDialogId ?? undefined,
     // Beside a new chat (wide only: narrow, the list is its own screen).
-    draftTitle: wideMingo && !hasConversation && !archiveOpen ? freshConversationTitle : undefined,
+    // A new chat holding only "What to ask?" exchanges is still that new chat.
+    draftTitle:
+      wideMingo && (!hasConversation || isWhatToAskDraft) && !archiveOpen ? freshConversationTitle : undefined,
     onSelectDialog: (id: string) => leaveArchiveThen(() => handleSelectDialog(id))(),
     onNewChat: leaveArchiveThen(handleNewChat),
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),

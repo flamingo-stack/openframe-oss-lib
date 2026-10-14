@@ -154,6 +154,9 @@ describe('EmbeddableChat - whatToAsk', () => {
 
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
     expect(screen.queryByText('hello')).not.toBeInTheDocument();
+    // The list keeps the new chat as the active row.
+    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
+    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
   it('puts a picked prompt into the composer without sending it', () => {
