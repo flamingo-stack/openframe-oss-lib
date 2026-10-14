@@ -5,7 +5,8 @@
  * policy, terms of service, payment terms, license, security policy, and
  * whatever it adds later), each with its page and the version it states.
  *
- * A host that links or lists legal pages reads this list and names no document
+ * A host that lists legal pages reads this list, shows one entry per published
+ * document, each leading to that document's own page, and names no document
  * itself: a document the hub adds appears with no change here.
  *
  * Endpoint: default `/api/legal`; an embedder passes its proxied path.
@@ -18,6 +19,8 @@ export interface LegalDocumentSummary {
   /** The identifier `useLegalDocs` and `<LegalDocumentPage>` take. */
   docType: string;
   title: string;
+  /** One line saying what the document is, for a card that lists it. */
+  summary: string;
   /** The document's page on the hub's own site (a path). */
   route: string;
   sourceFile: string;
@@ -62,6 +65,7 @@ export function toLegalDocumentSummaries(payload: unknown): LegalDocumentSummary
     documents.push({
       docType,
       title,
+      summary: text(row, 'summary') ?? '',
       route: text(row, 'route') ?? '',
       sourceFile: text(row, 'sourceFile') ?? '',
       faqTopic: text(row, 'faqTopic'),

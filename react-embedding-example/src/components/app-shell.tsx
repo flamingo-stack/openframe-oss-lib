@@ -22,7 +22,7 @@ const NAV = [
   { to: '/faqs', label: 'FAQ' },
   { to: '/trust-center', label: 'Trust' },
   { to: '/download', label: 'Download' },
-  { to: '/legal/privacy', label: 'Legal' },
+  { to: '/legal/privacy', label: 'Privacy' },
   { to: '/contact', label: 'Contact' },
   { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },

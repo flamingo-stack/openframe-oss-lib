@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom'
+import { useLegalDocuments } from '@flamingo-stack/openframe-frontend-core/components'
+import { EP } from '../config/endpoints'
 
 const SURFACES = [
   { to: '/knowledge-base', title: 'Knowledge Hub', desc: 'DocsHubPage (sidebar tree + content + scroll-spy + in-source RAG search) over /content/api/docs/*.' },
@@ -8,7 +10,6 @@ const SURFACES = [
   { to: '/releases', title: 'Product releases', desc: 'List via the shared ProductReleasesView; detail injects a roadmap section.' },
   { to: '/authors', title: 'Authors', desc: 'Author byline (description card) + author-scoped related-content rail via /content/api/related-content?authorId=…' },
   { to: '/faqs', title: 'FAQ', desc: 'FaqDocumentPage — grouped accordion + category jump-nav + FAQPage JSON-LD; self-fetches /content/api/faqs.' },
-  { to: '/legal/privacy', title: 'Legal', desc: 'Every legal document the hub publishes, via /content/api/legal and /content/api/legal/*.' },
   { to: '/contact', title: 'Contact', desc: 'ContactForm → /content/api/contact (EndpointsRuntime).' },
   { to: '/case-studies', title: 'Case studies — Share Your Experience', desc: 'Lib ShareExperienceSection (G2/Capterra/TrustPilot/GetApp benefit grid + proxied ContactForm).' },
   { to: '/tickets', title: 'Help center / tickets', desc: 'HelpCenterList (tickets hooks).' },
@@ -17,6 +18,15 @@ const SURFACES = [
 ]
 
 export function HomePage() {
+  // One card per legal document the hub has published (/content/api/legal): the
+  // host names none, and a document the hub adds appears here on its own.
+  const { documents } = useLegalDocuments({ apiEndpoint: EP.legalDocuments })
+  const surfaces = [
+    ...SURFACES,
+    ...documents
+      .filter((doc) => doc.published)
+      .map((doc) => ({ to: `/legal/${doc.docType}`, title: doc.title, desc: doc.summary })),
+  ]
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold text-ods-text-primary">OpenFrame embedding example</h1>
@@ -27,7 +37,7 @@ export function HomePage() {
         chat — it greets Michael, resolved entirely server-side.
       </p>
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {SURFACES.map((s) => (
+        {surfaces.map((s) => (
           <Link
             key={s.to}
             to={s.to}

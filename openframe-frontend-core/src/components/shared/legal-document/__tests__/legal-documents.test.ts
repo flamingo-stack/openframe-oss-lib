@@ -24,6 +24,7 @@ describe('toLegalDocumentSummaries', () => {
           {
             docType: 'terms',
             title: 'Terms of Service',
+            summary: 'The agreement for using OpenFrame and our websites.',
             route: '/terms-of-service',
             sourceFile: 'TERMS.md',
             faqTopic: 'terms-of-service',
@@ -38,6 +39,7 @@ describe('toLegalDocumentSummaries', () => {
       {
         docType: 'terms',
         title: 'Terms of Service',
+        summary: 'The agreement for using OpenFrame and our websites.',
         route: '/terms-of-service',
         sourceFile: 'TERMS.md',
         faqTopic: 'terms-of-service',
@@ -48,6 +50,7 @@ describe('toLegalDocumentSummaries', () => {
       {
         docType: 'payment',
         title: 'Payment Terms',
+        summary: '',
         route: '',
         sourceFile: '',
         faqTopic: null,
