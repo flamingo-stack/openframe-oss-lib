@@ -7,6 +7,7 @@ import { useRef, useCallback, useState, useEffect } from 'react';
 import dynamic from '../../embed-shims/next-dynamic';
 import { cn } from '../../utils/cn';
 import { IMAGE_FILE_ACCEPT, fileMediaType } from '../../utils/media-type';
+import { useMarkdownLinkCommand } from './markdown-link-command';
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
 
@@ -135,6 +136,8 @@ export function MarkdownEditor({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [defaultExtraCommands, setDefaultExtraCommands] = useState<ICommand[]>([]);
+  // The toolbar's link button opens the shared link dialog (text, URL, Follow / Nofollow).
+  const { commands: toolbarCommands, linkDialog } = useMarkdownLinkCommand();
 
   useEffect(() => {
     let cancelled = false;
@@ -352,6 +355,7 @@ export function MarkdownEditor({
           visibleDragbar={true}
           height={height}
           minHeight={minHeight}
+          commands={toolbarCommands}
           extraCommands={extraCommands}
           style={
             {
@@ -386,6 +390,8 @@ export function MarkdownEditor({
       )}
 
       {uploadProgress && <p className="mt-1 text-ods-text-secondary text-h6">{uploadProgress}</p>}
+
+      {linkDialog}
 
       <MarkdownEditorStyles />
     </div>
