@@ -111,7 +111,7 @@ class NodeDataFetcherOptionalNodeTest {
     private NodeDataFetcher fetcher(TenantRepository tenants, SoftwareBundleService bundles) {
         return new NodeDataFetcher(deviceService, organizationService, toolService, tagService,
                 toolConnectionService, installedAgentService, scriptService, scriptExecutionService,
-                scheduleScriptService, scheduleRunService, providerOf(tenants), providerOf(bundles), new RelayIdCodec());
+                scheduleScriptService, scheduleRunService, providerOf(tenants), providerOf(bundles), new RelayIdCodec(), providerOf(null), providerOf(null));
     }
 
     @SuppressWarnings("unchecked")

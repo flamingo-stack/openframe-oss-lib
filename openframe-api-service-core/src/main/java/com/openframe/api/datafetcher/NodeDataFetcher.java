@@ -3,6 +3,8 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
+import com.openframe.api.relay.FederatedNodeReference;
+import com.openframe.api.relay.FederatedNodeTypes;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.ParsedRelayId;
@@ -16,6 +18,7 @@ import com.openframe.api.service.rmm.schedule.ScheduleRunService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.api.service.ticket.TicketService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
@@ -46,6 +49,8 @@ public class NodeDataFetcher {
     private final ObjectProvider<TenantRepository> tenantRepository;
     private final ObjectProvider<SoftwareBundleService> softwareBundleService;
     private final RelayIdCodec relayIdCodec;
+    private final ObjectProvider<TicketService> ticketService;
+    private final ObjectProvider<FederatedNodeTypes> federatedNodeTypes;
 
     @DgsQuery
     public Object node(@InputArgument String id) {
@@ -81,6 +86,9 @@ public class NodeDataFetcher {
         String typeName = globalId.getTypeName();
         String rawId = globalId.getRawId();
         NodeType nodeType = NodeType.fromTypeName(typeName);
+        if (isFederated(nodeType)) {
+            return new FederatedNodeReference(typeName, rawId);
+        }
         return switch (nodeType) {
             case MACHINE -> deviceService.findByMachineId(rawId).orElse(null);
             case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(rawId).orElse(null);
@@ -98,7 +106,17 @@ public class NodeDataFetcher {
             case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
                     .flatMap(service -> service.findById(rawId))
                     .orElse(null);
+            case TICKET -> Optional.ofNullable(ticketService.getIfAvailable())
+                    .flatMap(service -> service.findTicketById(rawId))
+                    .orElse(null);
             default -> throw new IllegalArgumentException("Unsupported node type: " + typeName);
         };
+    }
+
+    private boolean isFederated(NodeType nodeType) {
+        return Optional.ofNullable(federatedNodeTypes.getIfAvailable())
+                .map(FederatedNodeTypes::types)
+                .filter(types -> types.contains(nodeType))
+                .isPresent();
     }
 }
