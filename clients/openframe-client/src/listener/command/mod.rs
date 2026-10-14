@@ -17,14 +17,12 @@ use crate::models::DeliveryRef;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::result_store::ResultStore;
-use crate::services::tool_ops::ToolOps;
-use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::AgentConfigurationService;
 
 use delivery::Delivery;
-use restart::RestartGate;
 
 pub use handlers::FeatureFlagsHandler;
+pub use restart::RestartGate;
 
 pub trait CommandHandler: Clone + Send + Sync + 'static {
     type Command: DeserializeOwned + Send + 'static;
@@ -68,8 +66,7 @@ impl CommandContext {
     pub fn new(
         nats_connection_manager: NatsConnectionManager,
         config_service: AgentConfigurationService,
-        tool_ops: ToolOps,
-        tool_run_manager: ToolRunManager,
+        restart: RestartGate,
         publisher: NatsMessagePublisher,
         result_store: Arc<ResultStore>,
         flush_notify: Arc<Notify>,
@@ -77,15 +74,9 @@ impl CommandContext {
         Self {
             nats_connection_manager,
             config_service,
-            restart: RestartGate::new(tool_ops, tool_run_manager),
+            restart,
             delivery: Delivery::new(publisher, result_store, flush_notify),
         }
-    }
-}
-
-impl CommandContext {
-    pub async fn restart_requested(&self) {
-        self.restart.requested().await;
     }
 }
 

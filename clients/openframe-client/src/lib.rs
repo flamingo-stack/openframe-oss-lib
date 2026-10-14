@@ -46,7 +46,7 @@ use crate::config::update_config::{
     SELF_RESTART_HANDOFF_SECS,
 };
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
-use crate::listener::command::{CommandContext, CommandListener, FeatureFlagsHandler};
+use crate::listener::command::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -181,7 +181,7 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
-    command_context: CommandContext,
+    restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
@@ -568,18 +568,22 @@ impl Client {
         );
         let result_store_for_recovery = result_store.clone();
 
+        let restart_gate = RestartGate::new(
+            tool_ops.busy_tools(),
+            execution_service.running_scripts(),
+            tool_run_manager.client_update_pending(),
+        );
         let command_context = CommandContext::new(
             nats_connection_manager.clone(),
             config_service.clone(),
-            tool_ops.clone(),
-            tool_run_manager.clone(),
+            restart_gate.clone(),
             nats_message_publisher.clone(),
             result_store.clone(),
             flush_notify.clone(),
         );
         let feature_flags_listener = CommandListener::new(
             FeatureFlagsHandler::new(feature_flags_service),
-            command_context.clone(),
+            command_context,
         );
 
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
@@ -665,7 +669,7 @@ impl Client {
             client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
-            command_context,
+            restart_gate,
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
@@ -751,9 +755,9 @@ impl Client {
         }
 
         self.feature_flags_listener.start().await?;
-        let command_context = self.command_context.clone();
+        let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
-            command_context.restart_requested().await;
+            restart_gate.requested().await;
             match crate::platform::detached_process::spawn_detached(
                 &crate::service::Service::get_install_location(),
                 cli::RESTART_SERVICE_SUBCOMMAND,

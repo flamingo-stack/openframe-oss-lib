@@ -7,12 +7,13 @@ use tempfile::TempDir;
 use tokio::sync::Notify;
 use tokio::time::{timeout, Duration};
 
-use super::{CommandContext, CommandListener, FeatureFlagsHandler};
+use super::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
 use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState};
 use crate::platform::DirectoryManager;
 use crate::services::encryption_service::EncryptionService;
+use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
@@ -50,11 +51,11 @@ struct Agent {
 }
 
 impl Agent {
-    async fn start() -> Option<(Self, CommandContext)> {
+    async fn start() -> Option<(Self, RestartGate)> {
         Self::start_as(VERSION).await
     }
 
-    async fn start_as(version: &str) -> Option<(Self, CommandContext)> {
+    async fn start_as(version: &str) -> Option<(Self, RestartGate)> {
         let server = NatsServer::start()?;
         let dir = tempfile::tempdir().unwrap();
         let directories = DirectoryManager::with_custom_dirs(
@@ -133,16 +134,20 @@ impl Agent {
             store,
             flush,
         };
-        let (context, _service) = agent.launch().await;
-        Some((agent, context))
+        let (gate, _service) = agent.launch().await;
+        Some((agent, gate))
     }
 
-    async fn launch(&mut self) -> (CommandContext, Arc<FeatureFlagsService>) {
+    async fn launch(&mut self) -> (RestartGate, Arc<FeatureFlagsService>) {
+        let gate = RestartGate::new(
+            ToolOps::default().busy_tools(),
+            ExecutionService::new().running_scripts(),
+            self.tool_run_manager.client_update_pending(),
+        );
         let context = CommandContext::new(
             self.manager.clone(),
             self.config.clone(),
-            ToolOps::default(),
-            self.tool_run_manager.clone(),
+            gate.clone(),
             self.publisher.clone(),
             self.store.clone(),
             self.flush.clone(),
@@ -151,15 +156,15 @@ impl Agent {
             self.flags_path.clone(),
             self.version.clone(),
         ));
-        CommandListener::new(FeatureFlagsHandler::new(service.clone()), context.clone())
+        CommandListener::new(FeatureFlagsHandler::new(service.clone()), context)
             .start()
             .await
             .unwrap();
         self.until_listening().await;
-        (context, service)
+        (gate, service)
     }
 
-    async fn launch_as(&mut self, version: &str) -> (CommandContext, Arc<FeatureFlagsService>) {
+    async fn launch_as(&mut self, version: &str) -> (RestartGate, Arc<FeatureFlagsService>) {
         self.version = version.to_string();
         self.launch().await
     }
@@ -242,8 +247,8 @@ fn entry(value: bool, min_version: &str) -> serde_json::Value {
     json!({ "enabled": value, "minVersion": min_version })
 }
 
-async fn expect_no_restart(context: &CommandContext) {
-    let requested = timeout(QUIET, context.restart_requested()).await;
+async fn expect_no_restart(gate: &RestartGate) {
+    let requested = timeout(QUIET, gate.requested()).await;
     assert!(requested.is_err(), "a restart was requested");
 }
 
@@ -265,7 +270,7 @@ fn command(
 
 #[tokio::test]
 async fn unchanged_flags_are_acked_done_and_persisted() {
-    let Some((mut agent, _context)) = Agent::start().await else {
+    let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
 
@@ -286,7 +291,7 @@ async fn unchanged_flags_are_acked_done_and_persisted() {
 
 #[tokio::test]
 async fn changed_flags_restart_and_the_next_process_reports_done() {
-    let Some((mut agent, context)) = Agent::start().await else {
+    let Some((mut agent, gate)) = Agent::start().await else {
         return;
     };
 
@@ -299,7 +304,7 @@ async fn changed_flags_restart_and_the_next_process_reports_done() {
         .await;
 
     agent.expect("d2", DeliveryResult::Acked).await;
-    timeout(BOUND, context.restart_requested())
+    timeout(BOUND, gate.requested())
         .await
         .expect("restart was never requested");
     agent.expect_silence("d2").await;
@@ -325,7 +330,7 @@ async fn changed_flags_restart_and_the_next_process_reports_done() {
 
 #[tokio::test]
 async fn commands_after_a_requested_restart_are_left_to_the_backend_retry() {
-    let Some((mut agent, context)) = Agent::start().await else {
+    let Some((mut agent, gate)) = Agent::start().await else {
         return;
     };
     agent
@@ -335,7 +340,7 @@ async fn commands_after_a_requested_restart_are_left_to_the_backend_retry() {
             json!({ "delivery-tool-installation": entry(true, "1.0.0") }),
         ))
         .await;
-    timeout(BOUND, context.restart_requested())
+    timeout(BOUND, gate.requested())
         .await
         .expect("restart was never requested");
 
@@ -353,7 +358,7 @@ async fn commands_after_a_requested_restart_are_left_to_the_backend_retry() {
 
 #[tokio::test]
 async fn stale_sequence_is_done_without_applying() {
-    let Some((mut agent, _context)) = Agent::start().await else {
+    let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
     agent.send(command("d5", Some(5), json!({}))).await;
@@ -375,7 +380,7 @@ async fn stale_sequence_is_done_without_applying() {
 
 #[tokio::test]
 async fn malformed_flags_fail_with_a_reason() {
-    let Some((mut agent, _context)) = Agent::start().await else {
+    let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
 
@@ -400,7 +405,7 @@ async fn malformed_flags_fail_with_a_reason() {
 
 #[tokio::test]
 async fn a_message_without_delivery_gets_no_answer() {
-    let Some((mut agent, _context)) = Agent::start().await else {
+    let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
 
@@ -432,7 +437,7 @@ async fn a_message_without_delivery_gets_no_answer() {
 
 #[tokio::test]
 async fn flags_without_a_sequence_fail() {
-    let Some((mut agent, _context)) = Agent::start().await else {
+    let Some((mut agent, _gate)) = Agent::start().await else {
         return;
     };
 
@@ -451,7 +456,7 @@ async fn flags_without_a_sequence_fail() {
 
 #[tokio::test]
 async fn a_flag_for_a_newer_client_is_stored_without_a_restart_and_turns_on_after_the_update() {
-    let Some((mut agent, context)) = Agent::start_as("1.5.9").await else {
+    let Some((mut agent, gate)) = Agent::start_as("1.5.9").await else {
         return;
     };
 
@@ -465,7 +470,7 @@ async fn a_flag_for_a_newer_client_is_stored_without_a_restart_and_turns_on_afte
 
     agent.expect("d20", DeliveryResult::Acked).await;
     agent.expect("d20", DeliveryResult::Done).await;
-    expect_no_restart(&context).await;
+    expect_no_restart(&gate).await;
     assert!(agent
         .persisted()
         .flags
@@ -481,7 +486,7 @@ async fn a_flag_for_a_newer_client_is_stored_without_a_restart_and_turns_on_afte
 
 #[tokio::test]
 async fn a_rollback_below_the_min_version_runs_with_the_flag_off() {
-    let Some((mut agent, context)) = Agent::start().await else {
+    let Some((mut agent, gate)) = Agent::start().await else {
         return;
     };
     agent
@@ -491,7 +496,7 @@ async fn a_rollback_below_the_min_version_runs_with_the_flag_off() {
             json!({ "delivery-tool-installation": entry(true, "1.5.0") }),
         ))
         .await;
-    timeout(BOUND, context.restart_requested())
+    timeout(BOUND, gate.requested())
         .await
         .expect("restart was never requested");
 
@@ -504,7 +509,7 @@ async fn a_rollback_below_the_min_version_runs_with_the_flag_off() {
 
 #[tokio::test]
 async fn a_dev_build_applies_a_true_flag_whatever_its_min_version() {
-    let Some((mut agent, context)) = Agent::start_as(DEV_CLIENT_VERSION).await else {
+    let Some((mut agent, gate)) = Agent::start_as(DEV_CLIENT_VERSION).await else {
         return;
     };
 
@@ -517,14 +522,14 @@ async fn a_dev_build_applies_a_true_flag_whatever_its_min_version() {
         .await;
 
     agent.expect("d22", DeliveryResult::Acked).await;
-    timeout(BOUND, context.restart_requested())
+    timeout(BOUND, gate.requested())
         .await
         .expect("restart was never requested");
 }
 
 #[tokio::test]
 async fn invalid_flag_entries_are_done_without_a_restart() {
-    let Some((mut agent, context)) = Agent::start().await else {
+    let Some((mut agent, gate)) = Agent::start().await else {
         return;
     };
 
@@ -542,6 +547,6 @@ async fn invalid_flag_entries_are_done_without_a_restart() {
 
     agent.expect("d23", DeliveryResult::Acked).await;
     agent.expect("d23", DeliveryResult::Done).await;
-    expect_no_restart(&context).await;
+    expect_no_restart(&gate).await;
     assert!(agent.persisted().flags.is_empty());
 }

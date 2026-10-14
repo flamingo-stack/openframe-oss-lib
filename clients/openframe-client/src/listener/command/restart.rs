@@ -6,26 +6,33 @@ use tokio::time::{sleep, timeout_at, Duration, Instant};
 use tracing::{info, warn};
 
 use crate::config::update_config::{SELF_RESTART_IDLE_POLL_SECS, SELF_RESTART_IDLE_WAIT_SECS};
-use crate::services::tool_ops::ToolOps;
-use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::execution_service::RunningScripts;
+use crate::services::tool_ops::BusyTools;
+use crate::services::tool_run_manager::ClientUpdatePending;
 
 #[derive(Clone)]
-pub(super) struct RestartGate {
+pub struct RestartGate {
     closing: Arc<AtomicBool>,
     work: Arc<RwLock<()>>,
     requested: Arc<Notify>,
-    tool_ops: ToolOps,
-    tool_run_manager: ToolRunManager,
+    busy_tools: BusyTools,
+    running_scripts: RunningScripts,
+    client_update: ClientUpdatePending,
 }
 
 impl RestartGate {
-    pub(super) fn new(tool_ops: ToolOps, tool_run_manager: ToolRunManager) -> Self {
+    pub fn new(
+        busy_tools: BusyTools,
+        running_scripts: RunningScripts,
+        client_update: ClientUpdatePending,
+    ) -> Self {
         Self {
             closing: Arc::new(AtomicBool::new(false)),
             work: Arc::new(RwLock::new(())),
             requested: Arc::new(Notify::new()),
-            tool_ops,
-            tool_run_manager,
+            busy_tools,
+            running_scripts,
+            client_update,
         }
     }
 
@@ -48,23 +55,29 @@ impl RestartGate {
                 SELF_RESTART_IDLE_WAIT_SECS
             );
         }
-        while self.busy().await && Instant::now() < deadline {
+        while self.busy() && Instant::now() < deadline {
             sleep(Duration::from_secs(SELF_RESTART_IDLE_POLL_SECS)).await;
         }
-        if self.busy().await {
+        if self.busy() {
             warn!(
-                "Tool operation or client update still running after {}s, restarting anyway",
+                "Tool operation, script or client update still running after {}s, restarting anyway",
                 SELF_RESTART_IDLE_WAIT_SECS
             );
+        }
+        // A running client update restarts the client itself; stopping the service under it could
+        // interrupt the binary swap. With a tool still busy the update is only deferred and keeps
+        // re-marking the flag on redelivery, so it is not worth waiting for.
+        while self.client_update.is_pending() && !self.busy_tools.any() {
+            sleep(Duration::from_secs(SELF_RESTART_IDLE_POLL_SECS)).await;
         }
         self.requested.notify_one();
     }
 
-    async fn busy(&self) -> bool {
-        self.tool_ops.any_busy() || self.tool_run_manager.is_client_update_pending().await
+    fn busy(&self) -> bool {
+        self.busy_tools.any() || self.running_scripts.any() || self.client_update.is_pending()
     }
 
-    pub(super) async fn requested(&self) {
+    pub async fn requested(&self) {
         self.requested.notified().await;
     }
 }
