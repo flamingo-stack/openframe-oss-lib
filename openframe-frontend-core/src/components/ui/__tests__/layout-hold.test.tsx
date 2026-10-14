@@ -17,12 +17,15 @@ describe('TextHold', () => {
     expect(html).toContain('animate-pulse rounded-md bg-ods-border');
     expect(html).toContain('box-decoration-clone');
     expect(html).not.toContain('inline-block');
+    // Each line's bar is a band inside its line, so the lines of a wrapped paragraph never merge into one block.
+    expect(html).toContain('1lh - 6px');
   });
 
   it('draws nothing in the blank variant', () => {
     const html = renderToString(<TextHold variant="blank">All 00 stories</TextHold>);
     expect(html).toContain('invisible');
     expect(html).not.toContain('animate-pulse');
+    expect(html).not.toContain('mask');
   });
 });
 

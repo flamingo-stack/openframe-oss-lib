@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { SKELETON_SURFACE_CLASS } from './skeleton-surface';
 
@@ -27,20 +27,33 @@ export interface TextHoldProps {
   className?: string;
 }
 
+/** A rounded rectangle filling whatever box it is drawn in: the shape of each line's bar. */
+const ROUNDED_BAR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' rx='6'/%3E%3C/svg%3E")`;
+/**
+ * Each line's bar: a text-high band in the middle of the line, so wrapped lines are separate bars with
+ * a gap between them. A line box's background is as tall as the font's whole ascent and descent, which in
+ * DM Sans fills the line, so unmasked the lines of a paragraph touch and read as one block.
+ */
+const BAR_MASK = `${ROUNDED_BAR} center / 100% min(1em, calc(1lh - 6px)) no-repeat`;
+const BAR_STYLE: CSSProperties = { mask: BAR_MASK, WebkitMask: BAR_MASK };
+
 export function TextHold({ children, variant = 'bar', className }: TextHoldProps) {
+  const bar = variant === 'bar';
   return (
     <span
       aria-hidden
       className={cn(
         // `bar`: the words themselves, unseen, on the skeleton's surface. The span stays INLINE, so the
         // browser paints one bar per line the words take, each exactly as wide as that line, and
-        // `box-decoration-clone` rounds every one. Pure CSS: it is drawn in the server's HTML, before any
-        // script runs (a loading state streamed by the server is often replaced before it hydrates).
-        variant === 'bar' ? cn(SKELETON_SURFACE_CLASS, 'box-decoration-clone text-transparent') : 'invisible',
+        // `box-decoration-clone` gives every line its own bar (and its own mask, `BAR_STYLE`). Pure CSS: it
+        // is drawn in the server's HTML, before any script runs (a loading state streamed by the server
+        // is often replaced before it hydrates).
+        bar ? cn(SKELETON_SURFACE_CLASS, 'box-decoration-clone text-transparent') : 'invisible',
         // A hold is never selectable or clickable, whatever it wraps.
         'pointer-events-none select-none',
         className,
       )}
+      style={bar ? BAR_STYLE : undefined}
     >
       {children}
     </span>
