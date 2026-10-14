@@ -1,6 +1,6 @@
 'use client';
 
-import { Skeleton } from '../skeleton';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 interface FileManagerSkeletonProps {
   rows?: number;
@@ -18,26 +18,26 @@ export function FileManagerSkeleton({ rows = 8, showSearch = true, showActions =
         <div className="flex flex-wrap items-start justify-between gap-4">
           {/* Breadcrumb skeleton */}
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <Skeleton className="h-5 w-12" />
-            <Skeleton className="h-4 w-4 rounded-full" />
-            <Skeleton className="h-5 w-20" />
-            <Skeleton className="h-4 w-4 rounded-full" />
-            <Skeleton className="h-5 w-24" />
+            <UnifiedSkeleton className="h-5 w-12" />
+            <UnifiedSkeleton className="h-4 w-4 rounded-full" />
+            <UnifiedSkeleton className="h-5 w-20" />
+            <UnifiedSkeleton className="h-4 w-4 rounded-full" />
+            <UnifiedSkeleton className="h-5 w-24" />
           </div>
 
           {/* Action buttons skeleton */}
           {showActions && (
             <div className="flex flex-shrink-0 items-center gap-2">
-              <Skeleton className="h-9 w-24" />
-              <Skeleton className="h-9 w-20" />
-              <Skeleton className="h-9 w-20" />
-              <Skeleton className="h-9 w-28" />
+              <UnifiedSkeleton className="h-9 w-24" />
+              <UnifiedSkeleton className="h-9 w-20" />
+              <UnifiedSkeleton className="h-9 w-20" />
+              <UnifiedSkeleton className="h-9 w-28" />
             </div>
           )}
         </div>
 
         {/* Search bar skeleton */}
-        {showSearch && <Skeleton className="h-10 w-full rounded-lg" />}
+        {showSearch && <UnifiedSkeleton className="h-10 w-full rounded-lg" />}
 
         {/* Table skeleton */}
         <div className="min-h-0 flex-1">
@@ -46,7 +46,7 @@ export function FileManagerSkeleton({ rows = 8, showSearch = true, showActions =
             <div className="flex h-12 items-center rounded-t-lg border-b border-ods-border bg-ods-bg-surface px-4">
               {/* Checkbox */}
               <div className="mr-4">
-                <Skeleton className="h-5 w-5 rounded" />
+                <UnifiedSkeleton className="h-5 w-5 rounded" />
               </div>
 
               {/* Column headers */}
@@ -65,31 +65,31 @@ export function FileManagerSkeleton({ rows = 8, showSearch = true, showActions =
                 <div key={idx} className="flex h-16 items-center border-ods-border bg-ods-card px-4">
                   {/* Checkbox */}
                   <div className="mr-4">
-                    <Skeleton className="h-5 w-5 rounded" />
+                    <UnifiedSkeleton className="h-5 w-5 rounded" />
                   </div>
 
                   {/* File icon and name */}
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <Skeleton className="h-6 w-6 rounded" />
+                    <UnifiedSkeleton className="h-6 w-6 rounded" />
                     <div className="flex min-w-0 flex-col">
-                      <Skeleton className="h-4 w-32" />
+                      <UnifiedSkeleton className="h-4 w-32" />
                     </div>
                   </div>
 
                   {/* Size */}
                   <div className="w-24 shrink-0 pr-4">
-                    <Skeleton className="h-4 w-16" />
+                    <UnifiedSkeleton className="h-4 w-16" />
                   </div>
 
                   {/* Modified date */}
                   <div className="w-36 shrink-0 pl-4">
-                    <Skeleton className="h-4 w-24" />
+                    <UnifiedSkeleton className="h-4 w-24" />
                   </div>
 
                   {/* Action buttons */}
                   <div className="flex w-48 shrink-0 items-center justify-end gap-1 pl-4">
-                    <Skeleton className="h-8 w-8 rounded" />
-                    <Skeleton className="h-8 w-8 rounded" />
+                    <UnifiedSkeleton className="h-8 w-8 rounded" />
+                    <UnifiedSkeleton className="h-8 w-8 rounded" />
                   </div>
                 </div>
               ))}

@@ -27,6 +27,7 @@
 
 import { useState, type ChangeEvent } from 'react';
 import { ContactForm } from '../contact';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Input, Label } from '../ui';
 import { RequiredMark } from '../ui/required-mark';
 import type { UseTicketActionsReturn } from './hooks/use-ticket-actions';
@@ -98,7 +99,7 @@ export function HelpCenterCreateFormSkeleton() {
           `mb-3 content-md:mb-4` and `text-h2` height (32px font, line-height
           ~1.25 → 40px). h-10 bar matches the rendered h2 height. */}
       <div className="mb-6 content-md:mb-8">
-        <div className="mb-3 h-10 w-72 animate-pulse rounded bg-ods-border content-md:mb-4" />
+        <UnifiedSkeleton className="mb-3 h-10 w-72 rounded content-md:mb-4" />
       </div>
 
       {/* Form body — same `space-y-4 content-md:space-y-6` gap stack.
@@ -124,8 +125,8 @@ export function HelpCenterCreateFormSkeleton() {
             height: 27 + 4 + 48 (h-12 input) = 79px, identical to
             real form. */}
         <div className="flex flex-col">
-          <div className="mb-1 h-[27px] w-20 animate-pulse rounded bg-ods-border" />
-          <div className="h-12 w-full animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="mb-1 h-[27px] w-20 rounded" />
+          <UnifiedSkeleton className="h-12 w-full rounded" />
         </div>
 
         {/* Message section — `flex flex-col flex-grow` matches real
@@ -135,8 +136,8 @@ export function HelpCenterCreateFormSkeleton() {
             below it. Same `h-[27px]` + `mb-1` Label pattern as Subject:
             27 + 4 + 96 = 127px, identical to real form. */}
         <div className="flex flex-grow flex-col">
-          <div className="mb-1 h-[27px] w-32 animate-pulse rounded bg-ods-border" />
-          <div className="h-24 w-full flex-grow animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="mb-1 h-[27px] w-32 rounded" />
+          <UnifiedSkeleton className="h-24 w-full flex-grow rounded" />
         </div>
 
         {/* Attachments row — mirrors the real `flex flex-col gap-2`
@@ -144,8 +145,8 @@ export function HelpCenterCreateFormSkeleton() {
             the h-7 add button + helper text. */}
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 shrink-0 animate-pulse rounded bg-ods-border" />
-            <div className="h-4 w-40 animate-pulse rounded bg-ods-border" />
+            <UnifiedSkeleton className="h-7 w-7 shrink-0 rounded" />
+            <UnifiedSkeleton className="h-4 w-40 rounded" />
           </div>
         </div>
 
@@ -153,8 +154,8 @@ export function HelpCenterCreateFormSkeleton() {
             Button bar is h-12 to match the real `<Button>` height
             (48px). */}
         <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 content-md:flex-row content-md:gap-6">
-          <div className="h-4 w-72 animate-pulse rounded bg-ods-border" />
-          <div className="h-12 w-32 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-4 w-72 rounded" />
+          <UnifiedSkeleton className="h-12 w-32 rounded" />
         </div>
       </div>
     </div>

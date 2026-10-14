@@ -2,12 +2,11 @@
 
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
-/** Loading skeleton for iframe embeds — clean iframe-sized rectangle.
- *  Uses `bg-ods-card` (visible token) rather than `bg-ods-skeleton`
- *  which resolves to transparent in this build (the same gotcha
- *  documented in `chat-message-row.tsx`'s skeleton). No fake inner
- *  placeholder cruft — a real loading iframe shows a blank rectangle.
+/** Loading skeleton for iframe embeds: a clean iframe-sized `UnifiedSkeleton`
+ *  rectangle. No fake inner placeholder cruft: a real loading iframe shows a
+ *  blank rectangle.
  *
  *  Exported so a viewer that is still RESOLVING where its frame points
  *  (ClaudeEmbed probing for a self-hosted mirror, before it has a `src`)
@@ -15,9 +14,9 @@ import { useState, useCallback, useRef, useEffect } from 'react';
  *  every embed's loading state 1:1 with the Figma/Sheets/PDF viewers. */
 export function EmbedLoadingSkeleton({ height }: { height?: string }) {
   return (
-    <div
-      className="w-full animate-pulse overflow-hidden rounded-lg border border-ods-border bg-ods-card"
-      style={{ height: height || 'calc(100vh - 250px)' }}
+    <UnifiedSkeleton
+      className="w-full overflow-hidden rounded-lg border border-ods-border"
+      height={height || 'calc(100vh - 250px)'}
     />
   );
 }

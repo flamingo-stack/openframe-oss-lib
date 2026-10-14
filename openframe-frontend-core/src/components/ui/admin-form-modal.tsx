@@ -2,6 +2,7 @@
 
 import { useId, type ReactNode } from 'react';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { UnsavedChangesChip, useGuardedClose } from './modal-guarded-close';
 import {
@@ -13,7 +14,6 @@ import {
   ModalV2TwoColumn,
   type ModalV2Size,
 } from './modal-v2';
-import { Skeleton } from './skeleton';
 
 /**
  * Label widths for the loading placeholder. Uneven on purpose — a column of
@@ -194,8 +194,8 @@ export function AdminFormModal({
                   <div key={col} className="space-y-[var(--spacing-system-lf)]" aria-hidden="true">
                     {SKELETON_FIELD_WIDTHS.map((labelWidth, i) => (
                       <div key={i} className="space-y-[var(--spacing-system-xsf)]">
-                        <Skeleton className={`h-4 ${labelWidth}`} />
-                        <Skeleton className="h-10 w-full" />
+                        <UnifiedSkeleton className={`h-4 ${labelWidth}`} />
+                        <UnifiedSkeleton className="h-10 w-full" />
                       </div>
                     ))}
                   </div>

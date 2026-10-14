@@ -12,20 +12,20 @@ interface PageLayoutSkeletonProps {
  */
 export function AnnouncementBarSkeleton() {
   return (
-    <div className="relative w-full animate-pulse bg-ods-skeleton">
+    <div className="relative w-full bg-ods-card">
       <div className="relative flex w-full flex-row items-center">
         <div className="relative box-border flex w-full flex-row items-center justify-start gap-4 py-3 pl-4 pr-12 content-md:gap-6 content-md:py-4 content-md:pl-6 content-md:pr-16">
           {/* Logo skeleton */}
-          <div className="relative h-6 w-6 shrink-0 rounded bg-ods-border content-md:h-8 content-md:w-8"></div>
+          <UnifiedSkeleton className="relative h-6 w-6 shrink-0 rounded content-md:h-8 content-md:w-8" />
 
           {/* Text content skeleton */}
           <div className="min-w-0 flex-1 space-y-1 content-md:space-y-2">
-            <div className="h-[14px] w-3/4 max-w-md rounded bg-ods-border content-md:h-[18px]"></div>
-            <div className="hidden h-[12px] w-full max-w-lg rounded bg-ods-border content-md:block content-md:h-[18px]"></div>
+            <UnifiedSkeleton className="h-[14px] w-3/4 max-w-md rounded content-md:h-[18px]" />
+            <UnifiedSkeleton className="hidden h-[12px] w-full max-w-lg rounded content-md:block content-md:h-[18px]" />
           </div>
 
           {/* Close button skeleton */}
-          <div className="absolute right-2 top-2 h-6 w-6 rounded bg-ods-border"></div>
+          <UnifiedSkeleton className="absolute right-2 top-2 h-6 w-6 rounded" />
         </div>
       </div>
     </div>
@@ -37,10 +37,10 @@ export function AnnouncementBarSkeleton() {
  */
 export function HeaderSkeleton() {
   return (
-    <header className="sticky top-0 z-40 flex w-full animate-pulse items-center justify-between border-b border-ods-border bg-ods-card bg-ods-card/95 px-4 py-3 backdrop-blur-sm content-md:px-[80px] content-md:py-[12px]">
+    <header className="sticky top-0 z-40 flex w-full items-center justify-between border-b border-ods-border bg-ods-card bg-ods-card/95 px-4 py-3 backdrop-blur-sm content-md:px-[80px] content-md:py-[12px]">
       {/* Left: Logo skeleton */}
       <div className="flex min-w-0 flex-1 items-center justify-start">
-        <div className="h-[26px] w-[110px] rounded bg-ods-skeleton content-md:h-8 content-md:w-[137px]"></div>
+        <UnifiedSkeleton className="h-[26px] w-[110px] rounded content-md:h-8 content-md:w-[137px]" />
       </div>
 
       {/* Center: Navigation skeleton - hidden on mobile, visible on desktop */}
@@ -76,7 +76,7 @@ export function HeaderSkeleton() {
 export function HeroSkeleton() {
   return (
     <section
-      className="flex w-full animate-pulse flex-col items-center justify-center px-4 py-12 text-center content-md:px-8 content-md:py-20"
+      className="flex w-full flex-col items-center justify-center px-4 py-12 text-center content-md:px-8 content-md:py-20"
       style={{
         background: 'radial-gradient(circle at 50% 0%, #242323 0%, #1A1A1A 100%)',
       }}
@@ -328,28 +328,28 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
             <div className="mb-10">
               {/* Header - Logo and Title Side by Side */}
               <div className="mb-6 flex gap-6">
-                <div className="h-20 w-20 flex-shrink-0 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                <UnifiedSkeleton className="h-20 w-20 flex-shrink-0 rounded-lg border border-ods-border" />
 
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-2">
                     {/* Large title skeleton */}
-                    <div className="h-12 w-80 max-w-full animate-pulse rounded bg-ods-skeleton content-md:h-16 content-lg:h-20"></div>
+                    <UnifiedSkeleton className="h-12 w-80 max-w-full rounded content-md:h-16 content-lg:h-20" />
                     {/* Category text */}
-                    <div className="h-5 w-32 animate-pulse rounded bg-ods-skeleton content-md:h-6"></div>
+                    <UnifiedSkeleton className="h-5 w-32 rounded content-md:h-6" />
                   </div>
 
                   {/* Pricing tags */}
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-20 animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-8 w-16 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-8 w-20 rounded" />
+                    <UnifiedSkeleton className="h-8 w-16 rounded" />
                   </div>
                 </div>
               </div>
 
               {/* Vendor Image Display Skeleton */}
-              <div className="mb-2 h-[300px] w-full animate-pulse rounded-lg border border-ods-border bg-ods-card content-md:h-[400px] content-lg:h-[500px]"></div>
+              <UnifiedSkeleton className="mb-2 h-[300px] w-full rounded-lg border border-ods-border content-md:h-[400px] content-lg:h-[500px]" />
               <div className="text-center">
-                <div className="mx-auto h-4 w-24 animate-pulse rounded bg-ods-skeleton"></div>
+                <UnifiedSkeleton className="mx-auto h-4 w-24 rounded" />
               </div>
             </div>
 
@@ -357,22 +357,22 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
             <div className="mb-10 content-lg:hidden">
               <div className="space-y-4">
                 {/* Deploy Button */}
-                <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
 
                 {/* Voting Buttons */}
                 <div className="space-y-2">
-                  <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
-                  <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                  <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
+                  <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
                 </div>
 
                 {/* GitHub Score Section */}
                 <div className="overflow-hidden rounded-lg border border-ods-border">
                   {/* Header */}
                   <div className="flex items-center gap-3 bg-ods-card p-4">
-                    <div className="h-8 w-8 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-8 w-8 rounded" />
                     <div className="flex flex-col gap-1">
-                      <div className="h-4 w-20 animate-pulse rounded bg-ods-skeleton"></div>
-                      <div className="h-6 w-12 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-4 w-20 rounded" />
+                      <UnifiedSkeleton className="h-6 w-12 rounded" />
                     </div>
                   </div>
 
@@ -380,10 +380,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                   <div className="space-y-3 p-4">
                     {Array.from({ length: 4 }).map((_, i) => (
                       <div key={i} className="flex items-center gap-3">
-                        <div className="h-6 w-6 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-6 w-6 rounded" />
                         <div className="flex items-end gap-1">
-                          <div className="h-4 w-12 animate-pulse rounded bg-ods-skeleton"></div>
-                          <div className="h-3 w-8 animate-pulse rounded bg-ods-skeleton"></div>
+                          <UnifiedSkeleton className="h-4 w-12 rounded" />
+                          <UnifiedSkeleton className="h-3 w-8 rounded" />
                         </div>
                       </div>
                     ))}
@@ -392,39 +392,33 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
-                  <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
-                  <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                  <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
+                  <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
+                  <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
                 </div>
               </div>
             </div>
 
             {/* Alternatives Container */}
             <div className="mb-20 flex flex-col gap-6">
-              <div className="h-8 w-48 animate-pulse rounded bg-ods-skeleton content-md:h-10"></div>
+              <UnifiedSkeleton className="h-8 w-48 rounded content-md:h-10" />
 
               {/* Open Source Alternatives */}
               <div className="flex flex-col gap-4">
-                <div className="h-5 w-48 animate-pulse rounded bg-ods-skeleton"></div>
+                <UnifiedSkeleton className="h-5 w-48 rounded" />
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 6 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-10 w-24 animate-pulse rounded-lg border border-ods-border bg-ods-card"
-                    ></div>
+                    <UnifiedSkeleton key={i} className="h-10 w-24 rounded-lg border border-ods-border" />
                   ))}
                 </div>
               </div>
 
               {/* Commercial Alternatives */}
               <div className="flex flex-col gap-4">
-                <div className="h-5 w-52 animate-pulse rounded bg-ods-skeleton"></div>
+                <UnifiedSkeleton className="h-5 w-52 rounded" />
                 <div className="flex flex-wrap gap-2">
                   {Array.from({ length: 4 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-10 w-28 animate-pulse rounded-lg border border-ods-border bg-ods-card"
-                    ></div>
+                    <UnifiedSkeleton key={i} className="h-10 w-28 rounded-lg border border-ods-border" />
                   ))}
                 </div>
               </div>
@@ -432,28 +426,28 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* About Section */}
             <div className="mb-20 flex flex-col gap-6">
-              <div className="h-8 w-64 animate-pulse rounded bg-ods-skeleton content-md:h-10"></div>
+              <UnifiedSkeleton className="h-8 w-64 rounded content-md:h-10" />
 
               <div className="rounded-lg border border-ods-border bg-ods-card p-6 content-md:p-8">
                 <div className="space-y-4">
-                  <div className="h-6 animate-pulse rounded bg-ods-skeleton"></div>
-                  <div className="h-6 animate-pulse rounded bg-ods-skeleton"></div>
-                  <div className="h-6 w-5/6 animate-pulse rounded bg-ods-skeleton"></div>
-                  <div className="h-6 w-4/5 animate-pulse rounded bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-6 rounded" />
+                  <UnifiedSkeleton className="h-6 rounded" />
+                  <UnifiedSkeleton className="h-6 w-5/6 rounded" />
+                  <UnifiedSkeleton className="h-6 w-4/5 rounded" />
                 </div>
               </div>
             </div>
 
             {/* Key Features Section */}
             <div className="mb-20 flex flex-col gap-6">
-              <div className="h-8 w-72 animate-pulse rounded bg-ods-skeleton content-md:h-10"></div>
+              <UnifiedSkeleton className="h-8 w-72 rounded content-md:h-10" />
               <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="flex gap-4 rounded-lg border border-ods-border bg-ods-card p-4">
-                    <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-12 w-12 flex-shrink-0 rounded" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-5 w-3/4 animate-pulse rounded bg-ods-skeleton"></div>
-                      <div className="h-4 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-5 w-3/4 rounded" />
+                      <UnifiedSkeleton className="h-4 rounded" />
                     </div>
                   </div>
                 ))}
@@ -462,30 +456,30 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* Pros and Cons Section */}
             <div className="mb-20 flex flex-col gap-6">
-              <div className="h-8 w-80 animate-pulse rounded bg-ods-skeleton content-md:h-10"></div>
+              <UnifiedSkeleton className="h-8 w-80 rounded content-md:h-10" />
               <div className="grid grid-cols-1 gap-6 content-lg:grid-cols-2">
                 {/* Pros Column */}
                 <div className="flex flex-col gap-6">
-                  <div className="h-5 w-16 animate-pulse rounded bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-5 w-16 rounded" />
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="flex gap-3 rounded-lg border border-ods-border bg-ods-card p-4">
-                      <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded border border-ods-border bg-ods-bg"></div>
+                      <UnifiedSkeleton className="h-12 w-12 flex-shrink-0 rounded border border-ods-border" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-5 w-2/3 animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-5 w-2/3 rounded" />
+                        <UnifiedSkeleton className="h-4 rounded" />
                       </div>
                     </div>
                   ))}
                 </div>
                 {/* Cons Column */}
                 <div className="flex flex-col gap-6">
-                  <div className="h-5 w-16 animate-pulse rounded bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-5 w-16 rounded" />
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="flex gap-3 rounded-lg border border-ods-border bg-ods-card p-4">
-                      <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded border border-ods-border bg-ods-bg"></div>
+                      <UnifiedSkeleton className="h-12 w-12 flex-shrink-0 rounded border border-ods-border" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-5 w-2/3 animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-5 w-2/3 rounded" />
+                        <UnifiedSkeleton className="h-4 rounded" />
                       </div>
                     </div>
                   ))}
@@ -495,42 +489,42 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
             {/* Alternatives Section */}
             <div className="mb-20 flex flex-col gap-6">
-              <div className="h-8 w-72 animate-pulse rounded bg-ods-skeleton content-md:h-10"></div>
+              <UnifiedSkeleton className="h-8 w-72 rounded content-md:h-10" />
               <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="space-y-4 rounded-lg border border-ods-border bg-ods-card p-6">
                     {/* Header */}
                     <div className="flex items-start gap-4">
-                      <div className="h-16 w-16 flex-shrink-0 animate-pulse rounded-lg border border-ods-border bg-ods-bg"></div>
+                      <UnifiedSkeleton className="h-16 w-16 flex-shrink-0 rounded-lg border border-ods-border" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-6 w-3/4 animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 w-1/2 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-6 w-3/4 rounded" />
+                        <UnifiedSkeleton className="h-4 w-1/2 rounded" />
                       </div>
-                      <div className="h-6 w-20 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-6 w-20 rounded" />
                     </div>
 
                     {/* Description */}
                     <div className="space-y-2">
-                      <div className="h-4 animate-pulse rounded bg-ods-skeleton"></div>
-                      <div className="h-4 w-5/6 animate-pulse rounded bg-ods-skeleton"></div>
-                      <div className="h-4 w-4/5 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-4 rounded" />
+                      <UnifiedSkeleton className="h-4 w-5/6 rounded" />
+                      <UnifiedSkeleton className="h-4 w-4/5 rounded" />
                     </div>
 
                     {/* Footer */}
                     <div className="flex items-center justify-between border-t border-ods-border pt-2">
-                      <div className="h-4 w-16 animate-pulse rounded bg-ods-skeleton"></div>
-                      <div className="h-4 w-20 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-4 w-16 rounded" />
+                      <UnifiedSkeleton className="h-4 w-20 rounded" />
                     </div>
                   </div>
                 ))}
               </div>
               {/* Show All Button */}
-              <div className="h-12 animate-pulse rounded-md bg-ods-skeleton"></div>
+              <UnifiedSkeleton className="h-12 rounded-md" />
             </div>
 
             {/* Comments Section */}
             <div className="mb-20 flex flex-col gap-6">
-              <div className="h-8 w-64 animate-pulse rounded bg-ods-skeleton content-md:h-10"></div>
+              <UnifiedSkeleton className="h-8 w-64 rounded content-md:h-10" />
 
               {/* Comment Form Skeleton */}
               <div className="space-y-3">
@@ -538,24 +532,24 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                   <div className="flex-1 overflow-hidden rounded-lg border border-ods-border bg-ods-bg">
                     {/* Title Section */}
                     <div className="border-b border-ods-border p-3">
-                      <div className="mb-2 h-3 w-8 animate-pulse rounded bg-ods-skeleton"></div>
-                      <div className="h-6 w-full animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="mb-2 h-3 w-8 rounded" />
+                      <UnifiedSkeleton className="h-6 w-full rounded" />
                     </div>
 
                     {/* Description Section */}
                     <div className="p-3">
-                      <div className="mb-2 h-3 w-16 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="mb-2 h-3 w-16 rounded" />
                       <div className="space-y-2">
-                        <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 w-3/4 animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 w-1/2 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-4 w-full rounded" />
+                        <UnifiedSkeleton className="h-4 w-3/4 rounded" />
+                        <UnifiedSkeleton className="h-4 w-1/2 rounded" />
                       </div>
                     </div>
                   </div>
 
                   {/* Send Button */}
                   <div className="flex items-stretch">
-                    <div className="h-[120px] w-20 animate-pulse rounded-lg bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-[120px] w-20 rounded-lg" />
                   </div>
                 </div>
               </div>
@@ -569,22 +563,22 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                       <div className="flex items-center gap-2">
                         {/* User Info */}
                         <div className="flex items-center gap-2 rounded-lg border border-ods-border bg-ods-card px-3 py-2">
-                          <div className="h-8 w-8 animate-pulse rounded-lg bg-ods-skeleton"></div>
-                          <div className="h-4 w-20 animate-pulse rounded bg-ods-skeleton"></div>
+                          <UnifiedSkeleton className="h-8 w-8 rounded-lg" />
+                          <UnifiedSkeleton className="h-4 w-20 rounded" />
                         </div>
 
                         {/* Timestamp */}
-                        <div className="h-4 w-12 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-4 w-12 rounded" />
                       </div>
                     </div>
 
                     {/* Comment Content */}
                     <div className="space-y-2">
-                      <div className="h-6 w-2/3 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-6 w-2/3 rounded" />
                       <div className="space-y-1">
-                        <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 w-4/5 animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-4 w-3/5 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-4 w-full rounded" />
+                        <UnifiedSkeleton className="h-4 w-4/5 rounded" />
+                        <UnifiedSkeleton className="h-4 w-3/5 rounded" />
                       </div>
                     </div>
                   </div>
@@ -597,22 +591,22 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
           <div className="hidden w-[290px] flex-shrink-0 content-lg:block">
             <div className="space-y-4">
               {/* Deploy Button */}
-              <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+              <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
 
               {/* Voting Buttons */}
               <div className="space-y-2">
-                <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
-                <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
+                <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
               </div>
 
               {/* GitHub Score Section */}
               <div className="overflow-hidden rounded-lg border border-ods-border">
                 {/* Header */}
                 <div className="flex items-center gap-3 bg-ods-card p-4">
-                  <div className="h-8 w-8 animate-pulse rounded bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-8 w-8 rounded" />
                   <div className="flex flex-col gap-1">
-                    <div className="h-4 w-20 animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-6 w-12 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-4 w-20 rounded" />
+                    <UnifiedSkeleton className="h-6 w-12 rounded" />
                   </div>
                 </div>
 
@@ -620,10 +614,10 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
                 <div className="space-y-3 p-4">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="h-6 w-6 animate-pulse rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="h-6 w-6 rounded" />
                       <div className="flex items-end gap-1">
-                        <div className="h-4 w-12 animate-pulse rounded bg-ods-skeleton"></div>
-                        <div className="h-3 w-8 animate-pulse rounded bg-ods-skeleton"></div>
+                        <UnifiedSkeleton className="h-4 w-12 rounded" />
+                        <UnifiedSkeleton className="h-3 w-8 rounded" />
                       </div>
                     </div>
                   ))}
@@ -632,9 +626,9 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
-                <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
-                <div className="h-12 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
+                <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
+                <UnifiedSkeleton className="h-12 rounded-lg border border-ods-border" />
               </div>
             </div>
           </div>
@@ -715,32 +709,32 @@ export function SlackCommunitySkeleton() {
       <div className="flex w-full flex-col gap-4 content-md:gap-6">
         {/* Title Skeleton */}
         <div className="w-full">
-          <div className="h-8 max-w-md animate-pulse rounded-lg bg-ods-skeleton content-md:h-12 content-lg:h-14"></div>
+          <UnifiedSkeleton className="h-8 max-w-md rounded-lg content-md:h-12 content-lg:h-14" />
         </div>
 
         {/* Content Area - Channel List + Chat Interface */}
         <div className="flex w-full min-w-0 flex-col gap-4 content-md:gap-6 content-lg:flex-row content-lg:items-start content-lg:justify-end">
           {/* Channel List Skeleton */}
-          <div className="flex w-full flex-shrink-0 animate-pulse flex-col overflow-hidden rounded border border-ods-border bg-ods-bg content-lg:w-[290px] content-lg:max-w-[290px]">
+          <div className="flex w-full flex-shrink-0 flex-col overflow-hidden rounded border border-ods-border bg-ods-bg content-lg:w-[290px] content-lg:max-w-[290px]">
             <div className="space-y-4 p-4">
               {/* Header */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <div className="h-4 w-24 rounded bg-ods-skeleton"></div>
-                  <div className="h-3 w-16 rounded bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-4 w-24 rounded" />
+                  <UnifiedSkeleton className="h-3 w-16 rounded" />
                 </div>
-                <div className="h-3 w-32 rounded bg-ods-skeleton"></div>
+                <UnifiedSkeleton className="h-3 w-32 rounded" />
               </div>
 
               {/* Channels */}
               <div className="flex flex-col gap-1">
-                <div className="mb-2 h-3 w-16 rounded bg-ods-skeleton"></div>
+                <UnifiedSkeleton className="mb-2 h-3 w-16 rounded" />
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div key={i} className="flex min-h-[48px] items-center gap-2 px-2 py-3">
-                    <div className="h-4 w-4 rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-4 w-4 rounded" />
                     <div className="flex-1">
-                      <div className="mb-1 h-3 w-24 rounded bg-ods-skeleton"></div>
-                      <div className="h-2 w-16 rounded bg-ods-skeleton"></div>
+                      <UnifiedSkeleton className="mb-1 h-3 w-24 rounded" />
+                      <UnifiedSkeleton className="h-2 w-16 rounded" />
                     </div>
                   </div>
                 ))}
@@ -750,12 +744,12 @@ export function SlackCommunitySkeleton() {
               <div className="mt-2 border-t border-ods-border pt-3">
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <div className="h-3 w-16 rounded bg-ods-skeleton"></div>
-                    <div className="h-3 w-8 rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-3 w-16 rounded" />
+                    <UnifiedSkeleton className="h-3 w-8 rounded" />
                   </div>
                   <div className="flex justify-between">
-                    <div className="h-3 w-20 rounded bg-ods-skeleton"></div>
-                    <div className="h-3 w-8 rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-3 w-20 rounded" />
+                    <UnifiedSkeleton className="h-3 w-8 rounded" />
                   </div>
                 </div>
               </div>
@@ -763,27 +757,27 @@ export function SlackCommunitySkeleton() {
           </div>
 
           {/* Chat Interface Skeleton */}
-          <div className="flex h-[450px] min-h-[450px] min-w-0 flex-1 animate-pulse flex-col rounded-lg border border-ods-border bg-ods-card content-md:h-[500px] content-md:min-h-[500px] content-lg:h-[600px] content-lg:min-h-[600px]">
+          <div className="flex h-[450px] min-h-[450px] min-w-0 flex-1 flex-col rounded-lg border border-ods-border bg-ods-card content-md:h-[500px] content-md:min-h-[500px] content-lg:h-[600px] content-lg:min-h-[600px]">
             {/* Header */}
             <div className="flex h-[56px] flex-shrink-0 items-center justify-between border-b border-ods-border bg-ods-bg p-4 content-md:h-[60px] content-md:p-6">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-ods-skeleton content-md:h-4 content-md:w-4"></div>
-                <div className="h-3 w-24 rounded bg-ods-skeleton content-md:h-4 content-md:w-32"></div>
+                <UnifiedSkeleton className="h-3 w-3 rounded content-md:h-4 content-md:w-4" />
+                <UnifiedSkeleton className="h-3 w-24 rounded content-md:h-4 content-md:w-32" />
               </div>
-              <div className="h-3 w-12 rounded bg-ods-skeleton content-md:w-16"></div>
+              <UnifiedSkeleton className="h-3 w-12 rounded content-md:w-16" />
             </div>
 
             {/* Messages */}
             <div className="min-h-[280px] flex-1 space-y-3 overflow-hidden bg-ods-bg p-4 content-md:min-h-[320px] content-md:space-y-4 content-md:p-6 content-lg:min-h-[420px]">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex gap-2 content-md:gap-3">
-                  <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-ods-skeleton content-md:h-12 content-md:w-12"></div>
+                  <UnifiedSkeleton className="h-10 w-10 flex-shrink-0 rounded-lg content-md:h-12 content-md:w-12" />
                   <div className="flex-1">
                     <div className="mb-1 flex items-center gap-2">
-                      <div className="h-3 w-16 rounded bg-ods-skeleton content-md:w-20"></div>
-                      <div className="h-3 w-12 rounded bg-ods-skeleton content-md:w-16"></div>
+                      <UnifiedSkeleton className="h-3 w-16 rounded content-md:w-20" />
+                      <UnifiedSkeleton className="h-3 w-12 rounded content-md:w-16" />
                     </div>
-                    <div className="h-3 w-full rounded bg-ods-skeleton content-md:h-4"></div>
+                    <UnifiedSkeleton className="h-3 w-full rounded content-md:h-4" />
                   </div>
                 </div>
               ))}
@@ -792,7 +786,7 @@ export function SlackCommunitySkeleton() {
             {/* Input Area */}
             <div className="h-[72px] flex-shrink-0 border-t border-ods-border bg-ods-card p-4 content-md:h-[80px] content-md:p-6">
               <div className="flex items-end justify-center gap-3 content-md:justify-end">
-                <div className="h-10 w-28 rounded-lg bg-ods-skeleton content-md:h-12 content-md:w-32"></div>
+                <UnifiedSkeleton className="h-10 w-28 rounded-lg content-md:h-12 content-md:w-32" />
               </div>
             </div>
           </div>

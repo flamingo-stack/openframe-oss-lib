@@ -23,6 +23,7 @@ import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { formatDurationMMSS } from '../../../utils/format';
 import { CardHoverPlay } from '../../features/video-center-badge';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import type { OnboardingGuide } from '../types/entities/onboarding-guide';
 import {
   COMPACT_CARD_OUTER,
@@ -94,17 +95,17 @@ const HORIZONTAL_SIZE_TOKENS = {
 export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'catalog' | 'default' | 'sm' }) {
   if (size === 'catalog') {
     return (
-      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col gap-4 p-6')}>
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-4 p-6')}>
         <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border md:w-[256px]" />
+          <UnifiedSkeleton className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg md:w-[256px]" />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="mb-3 flex min-h-[60px] flex-col justify-start gap-1.5 md:min-h-[72px]">
-              <div className="h-[25px] w-3/4 rounded bg-ods-border md:h-[30px]" />
-              <div className="h-[25px] w-1/2 rounded bg-ods-border md:h-[30px]" />
+              <UnifiedSkeleton className="h-[25px] w-3/4 rounded md:h-[30px]" />
+              <UnifiedSkeleton className="h-[25px] w-1/2 rounded md:h-[30px]" />
             </div>
             <div className="flex min-h-[46px] flex-col justify-start gap-2 md:min-h-[52px]">
-              <div className="h-3 w-full rounded bg-ods-border/70" />
-              <div className="h-3 w-5/6 rounded bg-ods-border/70" />
+              <UnifiedSkeleton className="h-3 w-full rounded" />
+              <UnifiedSkeleton className="h-3 w-5/6 rounded" />
             </div>
           </div>
         </div>
@@ -115,16 +116,16 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
               className="flex flex-col gap-3 border-b border-ods-border p-4 md:border-b-0 md:border-r"
             >
               <div className="flex flex-col gap-2">
-                <div className="h-6 w-32 rounded bg-ods-border" />
-                <div className="h-3 w-20 rounded bg-ods-border" />
+                <UnifiedSkeleton className="h-6 w-32 rounded" />
+                <UnifiedSkeleton className="h-3 w-20 rounded" />
               </div>
             </div>
           ))}
           <div className="flex items-center gap-3 p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-border" />
+            <UnifiedSkeleton className="h-10 w-10 shrink-0 rounded-full" />
             <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-4 w-3/4 rounded bg-ods-border" />
-              <div className="h-3 w-1/2 rounded bg-ods-border" />
+              <UnifiedSkeleton className="h-4 w-3/4 rounded" />
+              <UnifiedSkeleton className="h-3 w-1/2 rounded" />
             </div>
           </div>
         </div>
@@ -134,34 +135,32 @@ export function OnboardingGuideCardSkeleton({ size = 'default' }: { size?: 'cata
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-2/5 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
         <span className="flex h-5 shrink-0 items-center self-start">
-          <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
+          <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
         </span>
       </span>
     );
   }
   const t = HORIZONTAL_SIZE_TOKENS.default;
   return (
-    <span
-      className={`flex items-start gap-3 rounded-md border border-ods-border bg-ods-card ${t.padding} animate-pulse`}
-    >
+    <span className={`flex items-start gap-3 rounded-md border border-ods-border bg-ods-card ${t.padding}`}>
       <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ods-bg ${t.step}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
-        <span className="block h-4 w-2/3 rounded bg-ods-bg" />
-        <span className="block h-3 w-1/3 rounded bg-ods-bg/70" />
-        <span className="block h-3 w-full rounded bg-ods-bg/40" />
+        <UnifiedSkeleton as="span" className="block h-4 w-2/3 rounded" />
+        <UnifiedSkeleton as="span" className="block h-3 w-1/3 rounded" />
+        <UnifiedSkeleton as="span" className="block h-3 w-full rounded" />
       </span>
     </span>
   );

@@ -5,7 +5,8 @@ import { useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
-import { Button, DatePickerCalendar, Skeleton } from '../ui';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button, DatePickerCalendar } from '../ui';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -363,7 +364,7 @@ export function TimeChipsSkeleton() {
       {/* The day label is data — but it is held inside the REAL heading line
           box, so the skeleton's first row sits exactly where the label lands. */}
       <div className={COLUMN_HEADING_CLASS}>
-        <Skeleton className="inline-block h-4 w-40 align-middle" />
+        <UnifiedSkeleton className="inline-block h-4 w-40 align-middle" />
       </div>
       <div className={CHIP_GRID_CLASS}>
         {/* Enough to fill the visible scroll box at any column count — the
@@ -371,7 +372,7 @@ export function TimeChipsSkeleton() {
             lands flush and a partial last row is the honest shape anyway. */}
         {Array.from({ length: 16 }, (_, i) => (
           // h-11 content-md:h-12 — the loaded chip's own default-size height.
-          <Skeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
+          <UnifiedSkeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
         ))}
       </div>
     </>

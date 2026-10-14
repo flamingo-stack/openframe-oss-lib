@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { ChatPlusIcon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 
 interface DialogListItemSkeletonProps {
@@ -25,14 +26,14 @@ const DialogListItemSkeleton = forwardRef<HTMLDivElement, DialogListItemSkeleton
         <div className="flex flex-1 flex-col items-start justify-center gap-1">
           <div className="flex w-full items-center">
             {/* Title skeleton */}
-            <div className="h-6 w-full max-w-[200px] animate-pulse rounded bg-ods-border" />
+            <UnifiedSkeleton className="h-6 w-full max-w-[200px] rounded" />
           </div>
           {/* Timestamp skeleton */}
-          <div className="h-4 w-32 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-4 w-32 rounded" />
         </div>
 
         {/* Right side chevron skeleton */}
-        <div className="size-6 shrink-0 animate-pulse rounded bg-ods-border" />
+        <UnifiedSkeleton className="size-6 shrink-0 rounded" />
       </div>
     );
   },

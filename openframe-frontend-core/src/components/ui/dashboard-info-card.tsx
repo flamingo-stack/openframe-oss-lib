@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress';
 import { FloatingTooltip } from './floating-tooltip';
 import { Tag } from './tag';
@@ -205,7 +206,7 @@ export function DashboardInfoCard({
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
           {loading ? (
             <p className="text-h5">
-              <span className="block h-[1lh] w-20 animate-pulse rounded bg-ods-border" />
+              <UnifiedSkeleton as="span" className="block h-[1lh] w-20 rounded" />
             </p>
           ) : (
             (titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>))
@@ -216,7 +217,7 @@ export function DashboardInfoCard({
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
           <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
-            {loading ? <span className="block h-[1lh] w-24 animate-pulse rounded bg-ods-border" /> : formattedValue}
+            {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-24 rounded" /> : formattedValue}
           </p>
           {subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
           {renderPercentage()}
@@ -232,7 +233,7 @@ export function DashboardInfoCard({
         {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
         {caption && (
           <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
-            {loading ? <span className="block h-[1lh] w-32 animate-pulse rounded bg-ods-border" /> : caption}
+            {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-32 rounded" /> : caption}
           </p>
         )}
       </div>

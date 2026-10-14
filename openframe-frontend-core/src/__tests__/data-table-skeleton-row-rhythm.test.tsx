@@ -1,5 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
-import { render } from '@testing-library/react';
+import { render, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DataTable } from '../components/ui/data-table';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
@@ -76,13 +76,16 @@ type SlotKind = 'row' | 'skeleton' | 'pad';
  * slot is exactly what ships in its class attribute.
  */
 function slots(container: HTMLElement): { kind: SlotKind; classes: string[] }[] {
-  return [...container.innerHTML.matchAll(/class="([^"]*\brounded-md\b[^"]*)"/g)].map(match => {
-    const classes = (match[1] ?? '').split(/\s+/);
-    const kind: SlotKind = classes.includes('animate-pulse')
-      ? 'skeleton'
-      : classes.includes('border-transparent')
-        ? 'pad'
-        : 'row';
+  // A placeholder bar is a `UnifiedSkeleton` (`role="status"`), never a slot itself; a skeleton slot
+  // is the row card that holds them.
+  return [...container.querySelectorAll<HTMLElement>('.rounded-md:not([role="status"])')].map(element => {
+    const classes = element.className.split(/\s+/);
+    const kind: SlotKind =
+      within(element).queryAllByRole('status', { hidden: true }).length > 0
+        ? 'skeleton'
+        : classes.includes('border-transparent')
+          ? 'pad'
+          : 'row';
     return { kind, classes };
   });
 }

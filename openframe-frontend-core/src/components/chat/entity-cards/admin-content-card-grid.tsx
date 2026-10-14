@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 /** THE admin card grid: columns and gap shared by the live grid and its skeleton. */
 export const ADMIN_CONTENT_CARD_GRID_CLASS =
@@ -29,26 +30,26 @@ export function AdminContentCardSkeleton({
   return (
     <div
       className={cn(
-        'flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-transparent',
+        'flex h-full flex-col overflow-hidden rounded-2xl border border-ods-border bg-transparent',
         className,
       )}
     >
-      <div className="aspect-[3/2] w-full shrink-0 bg-ods-border/20" />
+      <UnifiedSkeleton className="aspect-[3/2] w-full shrink-0" />
       <div className="flex flex-1 flex-col gap-[var(--spacing-system-sf)] p-5">
-        <div className="h-[2lh] w-full rounded bg-ods-border text-h3" />
-        {subtitleRow && <div className="h-[1lh] w-1/2 rounded bg-ods-border text-h6" />}
-        <div className="h-[2lh] w-full rounded bg-ods-border text-h6" />
+        <UnifiedSkeleton className="h-[2lh] w-full rounded text-h3" />
+        {subtitleRow && <UnifiedSkeleton className="h-[1lh] w-1/2 rounded text-h6" />}
+        <UnifiedSkeleton className="h-[2lh] w-full rounded text-h6" />
         <div className="flex h-7 items-center gap-[var(--spacing-system-xsf)]">
-          <div className="h-5 w-20 rounded-full bg-ods-border" />
-          <div className="h-5 w-24 rounded-full bg-ods-border" />
+          <UnifiedSkeleton className="h-5 w-20 rounded-full" />
+          <UnifiedSkeleton className="h-5 w-24 rounded-full" />
         </div>
-        <div className="h-[1lh] w-32 rounded bg-ods-border text-h6" />
+        <UnifiedSkeleton className="h-[1lh] w-32 rounded text-h6" />
         {actions && (
           <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-[var(--spacing-system-sf)]">
-            <div className="h-10 w-24 rounded bg-ods-border" />
+            <UnifiedSkeleton className="h-10 w-24 rounded" />
             <div className="flex gap-[var(--spacing-system-xsf)]">
-              <div className="h-10 w-20 rounded bg-ods-border" />
-              <div className="h-10 w-20 rounded bg-ods-border" />
+              <UnifiedSkeleton className="h-10 w-20 rounded" />
+              <UnifiedSkeleton className="h-10 w-20 rounded" />
             </div>
           </div>
         )}

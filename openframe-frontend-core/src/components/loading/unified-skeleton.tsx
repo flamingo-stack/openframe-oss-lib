@@ -1,5 +1,6 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 
 interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string;
@@ -14,6 +15,11 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
    * Accessibility label for screen readers
    */
   'aria-label'?: string;
+  /**
+   * The element drawn. `span` keeps the placeholder valid phrasing content where
+   * a `div` may not stand (inside a `p`, a heading, a label or an inline card).
+   */
+  as?: 'div' | 'span';
 }
 
 /**
@@ -32,6 +38,7 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
  * @param height - Custom height (defaults to auto based on variant)
  * @param animate - Enable/disable animation (respects prefers-reduced-motion)
  * @param aria-label - Accessibility label for screen readers
+ * @param as - The element drawn: `div` (default) or `span` for phrasing content
  */
 export function UnifiedSkeleton({
   className,
@@ -40,10 +47,9 @@ export function UnifiedSkeleton({
   height,
   animate = true,
   'aria-label': ariaLabel,
+  as: Tag = 'div',
   ...props
 }: UnifiedSkeletonProps) {
-  const baseClasses = 'bg-ods-skeleton';
-
   const variantClasses = {
     default: 'rounded-md',
     text: 'rounded-sm',
@@ -58,8 +64,6 @@ export function UnifiedSkeleton({
     rectangular: 'h-4',
   };
 
-  const animationClasses = animate ? 'animate-pulse motion-reduce:animate-none' : '';
-
   // An `aspect-*` utility sizes the box itself; a default height would win
   // over it (explicit height beats aspect-ratio) and collapse the box to 16px.
   const sizedByAspect = /(?:^|\s)aspect-/.test(className ?? '');
@@ -70,13 +74,12 @@ export function UnifiedSkeleton({
   };
 
   return (
-    <div
+    <Tag
       className={cn(
-        baseClasses,
+        animate ? SKELETON_SURFACE_CLASS : 'bg-ods-skeleton',
         variantClasses[variant],
         !height && !style.height && !sizedByAspect && defaultHeights[variant],
         !width && !style.width && variant !== 'circular' && 'w-full',
-        animationClasses,
         className,
       )}
       style={style}

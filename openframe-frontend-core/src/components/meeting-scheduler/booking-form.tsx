@@ -29,6 +29,7 @@ import {
 import { cn } from '../../utils/cn';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import {
   Button,
   FieldWrapper,
@@ -44,7 +45,6 @@ import {
   CheckboxBlock,
   RadioGroup,
   RadioGroupItem,
-  Skeleton,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
 
@@ -874,21 +874,24 @@ export function BookingFormSkeleton({
       {skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS).map(row => (
         <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
           {row.map((slot, slotIndex) => (
-            <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
+            <UnifiedSkeleton
+              key={slot.name}
+              className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))}
+            />
           ))}
         </div>
       ))}
       {/* Without rows there is no telling how many questions the link declares: one long answer stands for them. */}
-      {!fieldRows && <Skeleton className="h-[7.75rem] w-full" />}
-      {consent && <Skeleton className="h-[4.25rem] w-full" />}
+      {!fieldRows && <UnifiedSkeleton className="h-[7.75rem] w-full" />}
+      {consent && <UnifiedSkeleton className="h-[4.25rem] w-full" />}
       {footerNote ? (
         <div className={FOOTER_ROW_CLASS}>
-          <Skeleton className="h-5 min-w-40 flex-1" />
-          <Skeleton className={cn('h-12 w-full', SUBMIT_WIDE_CLASS)} />
+          <UnifiedSkeleton className="h-5 min-w-40 flex-1" />
+          <UnifiedSkeleton className={cn('h-12 w-full', SUBMIT_WIDE_CLASS)} />
         </div>
       ) : (
         <div className={FOOTER_BARE_CLASS}>
-          <Skeleton className="h-12 w-40" />
+          <UnifiedSkeleton className="h-12 w-40" />
         </div>
       )}
     </div>

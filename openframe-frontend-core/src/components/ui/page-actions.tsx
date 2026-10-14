@@ -3,10 +3,10 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
-import { Skeleton } from './skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
@@ -274,7 +274,7 @@ function ActionSkeletons({
         // icon action keeps its square box there too.
         const isIconOnly = action ? !action.label || !!action.iconOnlyOnDesktop : emptyFallback === 'icon';
         return (
-          <Skeleton
+          <UnifiedSkeleton
             // Static placeholder list — index IS the identity here.
             key={`action-skeleton-${idx}`}
             className={cn(
@@ -291,7 +291,7 @@ function ActionSkeletons({
 
 /** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
 function MobileTriggerSkeleton() {
-  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />;
+  return <UnifiedSkeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />;
 }
 
 export function PageActions({

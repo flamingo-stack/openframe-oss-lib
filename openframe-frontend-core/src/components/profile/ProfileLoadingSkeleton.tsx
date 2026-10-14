@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 interface ProfileLoadingSkeletonProps {
   className?: string;
@@ -9,18 +10,18 @@ export function ProfileLoadingSkeleton({ className }: ProfileLoadingSkeletonProp
     <div className={cn('space-y-6', className)}>
       {/* Header skeleton */}
       <div className="flex items-center space-x-4">
-        <div className="h-16 w-16 animate-pulse rounded-full bg-ods-skeleton" />
+        <UnifiedSkeleton className="h-16 w-16 rounded-full" />
         <div className="space-y-2">
-          <div className="h-4 w-32 animate-pulse rounded bg-ods-skeleton" />
-          <div className="h-3 w-24 animate-pulse rounded bg-ods-skeleton" />
+          <UnifiedSkeleton className="h-4 w-32 rounded" />
+          <UnifiedSkeleton className="h-3 w-24 rounded" />
         </div>
       </div>
 
       {/* Content skeleton */}
       <div className="space-y-4">
-        <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton" />
-        <div className="h-4 w-3/4 animate-pulse rounded bg-ods-skeleton" />
-        <div className="h-4 w-1/2 animate-pulse rounded bg-ods-skeleton" />
+        <UnifiedSkeleton className="h-4 w-full rounded" />
+        <UnifiedSkeleton className="h-4 w-3/4 rounded" />
+        <UnifiedSkeleton className="h-4 w-1/2 rounded" />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from './unified-skeleton';
 
 interface Props {
   rows?: number;
@@ -8,7 +9,7 @@ interface Props {
 export function UsersGridSkeleton({ rows = 10, className }: Props) {
   const skeletonRows = Array.from({ length: rows });
   return (
-    <div className={cn('animate-pulse overflow-x-auto rounded-lg border border-ods-border bg-ods-card', className)}>
+    <div className={cn('overflow-x-auto rounded-lg border border-ods-border bg-ods-card', className)}>
       <table className="min-w-full divide-y divide-ods-border">
         <thead className="bg-ods-skeleton">
           <tr>
@@ -24,7 +25,7 @@ export function UsersGridSkeleton({ rows = 10, className }: Props) {
             <tr key={idx}>
               {Array.from({ length: 5 }).map((__, cell) => (
                 <td key={cell} className="whitespace-nowrap px-4 py-3">
-                  <div className="h-4 w-full rounded bg-ods-border"></div>
+                  <UnifiedSkeleton className="h-4 w-full rounded" />
                 </td>
               ))}
             </tr>

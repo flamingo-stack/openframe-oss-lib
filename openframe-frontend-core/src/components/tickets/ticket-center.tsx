@@ -23,9 +23,9 @@ import { formatRelativeTime } from '../../utils/date-utils';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
-import { Skeleton } from '../ui/skeleton';
 import { useTicketActions } from './hooks/use-ticket-actions';
 import { useTicketsList } from './hooks/use-tickets-list';
 import { TicketOpenForm } from './ticket-open-form';
@@ -182,9 +182,9 @@ function TicketCenterSkeleton() {
   return (
     <div className="flex flex-col gap-6">
       <Card className="p-6">
-        <Skeleton className="mb-4 h-7 w-48" />
-        <Skeleton className="mb-3 h-10 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <UnifiedSkeleton className="mb-4 h-7 w-48" />
+        <UnifiedSkeleton className="mb-3 h-10 w-full" />
+        <UnifiedSkeleton className="h-24 w-full" />
       </Card>
       <TicketListSkeleton />
     </div>
@@ -197,11 +197,11 @@ function TicketListSkeleton() {
       {[0, 1, 2].map(i => (
         <div key={i} className="flex h-20 items-center gap-4 border-b border-ods-border px-4 last:border-b-0">
           <div className="flex flex-1 flex-col gap-2">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-3 w-full" />
+            <UnifiedSkeleton className="h-4 w-2/3" />
+            <UnifiedSkeleton className="h-3 w-full" />
           </div>
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-16" />
+          <UnifiedSkeleton className="h-8 w-20" />
+          <UnifiedSkeleton className="h-8 w-16" />
         </div>
       ))}
     </Card>

@@ -5,6 +5,7 @@ import { useState, useEffect, Component, type ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../hooks';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 /**
  * Open-Graph metadata returned by the consumer's scrape endpoint.
@@ -346,40 +347,34 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     isCompact ? (
       <div className="my-4">
         <div className="flex h-[120px] flex-row overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-          <div className="h-full w-[200px] flex-shrink-0 animate-pulse bg-ods-border" />
+          <UnifiedSkeleton className="h-full w-[200px] flex-shrink-0" />
           <div className="flex flex-1 flex-col justify-center p-3">
-            <div className="mb-2 h-4 w-3/4 animate-pulse rounded bg-ods-border" />
-            <div className="mb-1 h-3 w-full animate-pulse rounded bg-ods-border" />
-            <div className="mb-2 h-3 w-2/3 animate-pulse rounded bg-ods-border" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-ods-border" />
+            <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
+            <UnifiedSkeleton className="mb-1 h-3 w-full rounded" />
+            <UnifiedSkeleton className="mb-2 h-3 w-2/3 rounded" />
+            <UnifiedSkeleton className="h-3 w-1/3 rounded" />
           </div>
         </div>
       </div>
     ) : (
       <div className="my-6">
         <div className="block overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-          <div className="relative aspect-video w-full animate-pulse overflow-hidden bg-ods-border" />
+          <UnifiedSkeleton className="relative aspect-video w-full overflow-hidden" />
           <div className="p-4">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 h-6 w-6 flex-shrink-0 animate-pulse rounded bg-ods-border" />
+              <UnifiedSkeleton className="mt-0.5 h-6 w-6 flex-shrink-0 rounded" />
               <div className="min-w-0 flex-1">
                 <div className="mb-2 h-[2.5rem] overflow-hidden leading-[1.25rem]">
-                  <div
-                    className="animate-pulse rounded bg-ods-border"
-                    style={{ height: '1.25rem', marginBottom: '0.25rem' }}
-                  />
-                  <div className="w-3/4 animate-pulse rounded bg-ods-border" style={{ height: '1.25rem' }} />
+                  <UnifiedSkeleton className="mb-1 h-5 rounded" />
+                  <UnifiedSkeleton className="h-5 w-3/4 rounded" />
                 </div>
                 <div className="mb-2 h-[2.5rem] overflow-hidden leading-[1.25rem]">
-                  <div
-                    className="animate-pulse rounded bg-ods-border"
-                    style={{ height: '1.25rem', marginBottom: '0.25rem' }}
-                  />
-                  <div className="w-5/6 animate-pulse rounded bg-ods-border" style={{ height: '1.25rem' }} />
+                  <UnifiedSkeleton className="mb-1 h-5 rounded" />
+                  <UnifiedSkeleton className="h-5 w-5/6 rounded" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="animate-pulse rounded bg-ods-border" style={{ height: '0.75rem', width: '6rem' }} />
-                  <div className="animate-pulse rounded bg-ods-border" style={{ height: '0.75rem', width: '5rem' }} />
+                  <UnifiedSkeleton className="h-3 w-24 rounded" />
+                  <UnifiedSkeleton className="h-3 w-20 rounded" />
                 </div>
               </div>
             </div>

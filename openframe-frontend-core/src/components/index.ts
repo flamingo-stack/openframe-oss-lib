@@ -18,7 +18,6 @@ export * from './comment-card';
 export * from './comment-composer';
 export * from './comment-thread';
 export * from './content-loading-container';
-export * from './dynamic-skeleton';
 export * from './empty-state';
 export * from './list-empty-state';
 export * from './faq-accordion';

@@ -6,6 +6,7 @@ import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/format-date';
 import { Copy02Icon, SearchIcon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { DataTable } from './data-table';
 import { useDataTable } from './data-table/use-data-table';
 import { NoData } from './no-data';
@@ -34,9 +35,8 @@ const RESULT_COLUMN_MIN_WIDTH = 176;
 const SKELETON_COLUMNS = 6;
 
 /** Column-bar skeleton (header cells + one card row): fixed 160px columns on
-    every breakpoint, scrolling horizontally when they do not fit. Bars use
-    bg-ods-bg-surface like the table skeletons — the bg-ods-skeleton token is
-    the same color as the card background and would be invisible on the row. */
+    every breakpoint, scrolling horizontally when they do not fit. Bars are
+    `UnifiedSkeleton`s, like the table skeletons. */
 export function TestResultsSkeleton() {
   return (
     <ScrollShadow axis="horizontal">
@@ -46,17 +46,17 @@ export function TestResultsSkeleton() {
         <div className="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
           {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
             <div key={`skeleton-header-${i}`} className="flex h-12 w-[160px] shrink-0 items-center">
-              <div className="h-4 w-3/4 animate-pulse rounded-sm bg-ods-bg-surface" />
+              <UnifiedSkeleton className="h-4 w-3/4 rounded-sm" />
             </div>
           ))}
         </div>
-        <div className="animate-pulse overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+        <div className="overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
           {/* Same INNER row heights as the DataTable (66/78px + the 1px card
               border on each side = 68/80px total, per design). */}
           <div className="flex h-[66px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] content-md:h-[78px]">
             {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
               <div key={`skeleton-cell-${i}`} className="w-[160px] shrink-0">
-                <div className="h-5 w-3/4 rounded-sm bg-ods-bg-surface" />
+                <UnifiedSkeleton className="h-5 w-3/4 rounded-sm" />
               </div>
             ))}
           </div>

@@ -3,7 +3,8 @@
 import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
-import { SquareAvatar, AvatarStack, Button, Skeleton } from '../ui';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { SquareAvatar, AvatarStack, Button } from '../ui';
 import { TimezoneSelect } from '../ui/timezone-select';
 
 /**
@@ -114,7 +115,7 @@ export function SchedulerModalHeader({
               }}
             />
           ) : (
-            <Skeleton className="h-12 w-full" />
+            <UnifiedSkeleton className="h-12 w-full" />
           )}
         </div>
       )}
@@ -128,17 +129,17 @@ export function SchedulerModalHeaderSkeleton() {
     <>
       <div className={STRIP_CLASS}>
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
+          <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded-full" />
           <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <Skeleton className="h-5 w-32" />
-            <Skeleton className="h-4 w-24" />
+            <UnifiedSkeleton className="h-5 w-32" />
+            <UnifiedSkeleton className="h-4 w-24" />
           </div>
         </div>
-        <Skeleton className="h-4 w-20 shrink-0" />
+        <UnifiedSkeleton className="h-4 w-20 shrink-0" />
       </div>
       <div className={cn(ROW_CLASS, 'flex flex-col gap-[var(--spacing-system-xxs)]')}>
         <p className={FIELD_LABEL_CLASS}>Timezone</p>
-        <Skeleton className="h-12 w-full" />
+        <UnifiedSkeleton className="h-12 w-full" />
       </div>
     </>
   );

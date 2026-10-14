@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
@@ -250,14 +251,13 @@ function MingoChatHistoryRow({
  * above. Shown while the FIRST page of dialogs is in flight so the Mingo empty
  * state doesn't flash the new-user greeting+grid before the list arrives (the
  * two layouts are mutually exclusive — swapping between them mid-load reads as
- * a flicker). Pure ODS tokens, `animate-pulse`.
+ * a flicker). Built from `UnifiedSkeleton`.
  */
 export function MingoChatHistorySkeleton({ className }: { className?: string }) {
   // Mirror the real grouped list exactly: a small group label, then a bordered
   // rounded container of `h-12` rows, each with a single title bar of varying
   // width (no unread-badge squares — the real rows currently never show one, so
-  // a badge placeholder would mis-promise the layout). `bg-ods-border` matches
-  // the kit's canonical `Skeleton` placeholder colour; `bg-ods-bg` rows read a
+  // a badge placeholder would mis-promise the layout). `bg-ods-bg` rows read a
   // touch darker than the `bg-ods-card` panel so the bars stay legible.
   const groups: ReadonlyArray<ReadonlyArray<string>> = [
     ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4'],
@@ -273,14 +273,14 @@ export function MingoChatHistorySkeleton({ className }: { className?: string }) 
       {groups.map((widths, g) => (
         <div key={g} className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]">
           {/* Group label (Today / Older). */}
-          <div className="h-3 w-16 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-3 w-16 rounded" />
           <div className="overflow-hidden rounded-md border border-ods-border">
             {widths.map((w, i) => (
               <div
                 key={i}
                 className="flex h-12 items-center border-b border-ods-border bg-ods-bg px-[var(--spacing-system-s)] last:border-b-0"
               >
-                <div className={cn('h-4 animate-pulse rounded bg-ods-border', w)} />
+                <UnifiedSkeleton className={cn('h-4 rounded', w)} />
               </div>
             ))}
           </div>

@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
 import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
-import { Skeleton } from '../ui/skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
 import { TruncateText } from '../ui/truncate-text';
 
@@ -167,25 +167,28 @@ function Example({
   );
 }
 
-/** A text placeholder in its line's own box (`text-h…` on the line), so a placeholder line is the loaded line's height. */
-function LineBar({ line, width }: { line: string; width: string }) {
-  return (
-    <div className={line}>
-      <span className={cn('inline-block h-[0.7em] animate-pulse rounded bg-ods-border align-middle', width)} />
-    </div>
-  );
-}
+/**
+ * A text placeholder in its line's own box (`text-h…` on the line, the bar inline in it), so a
+ * placeholder line is the loaded line's height.
+ */
+const LINE_SKELETON_CLASS = 'inline-block h-[0.7em] rounded align-middle';
 
 /** The example's two turns, in the loaded example's own box. */
 function ExampleSkeleton({ className }: { className?: string }) {
   const turn = (first: boolean) => (
     <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
-      <Skeleton className="size-6 shrink-0 rounded-full" />
+      <UnifiedSkeleton className="size-6 shrink-0 rounded-full" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <LineBar line="text-h6" width="w-28" />
+        <div className="text-h6">
+          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-28')} />
+        </div>
         <div className="min-h-[2lh] text-h4">
-          <LineBar line="text-h4" width="w-full" />
-          <LineBar line="text-h4" width="w-2/3" />
+          <div className="text-h4">
+            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
+          </div>
+          <div className="text-h4">
+            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-2/3')} />
+          </div>
         </div>
       </div>
     </div>
@@ -207,11 +210,15 @@ function ExampleSkeleton({ className }: { className?: string }) {
 function JobHeadSkeleton() {
   return (
     <>
-      <Skeleton className="size-9 shrink-0 rounded-lg" />
+      <UnifiedSkeleton className="size-9 shrink-0 rounded-lg" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <LineBar line="text-h4" width="w-32" />
+        <div className="text-h4">
+          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-32')} />
+        </div>
         <div className="mt-0.5">
-          <LineBar line="text-h6" width="w-40" />
+          <div className="text-h6">
+            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-40')} />
+          </div>
         </div>
       </div>
     </>
@@ -240,10 +247,14 @@ export function CapabilityExplorerSkeleton({ className, count = 8 }: { className
               <JobHeadSkeleton />
             </div>
             <div className="min-h-[3lh] text-h6">
-              <LineBar line="text-h6" width="w-full" />
-              <LineBar line="text-h6" width="w-5/6" />
+              <div className="text-h6">
+                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
+              </div>
+              <div className="text-h6">
+                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-5/6')} />
+              </div>
             </div>
-            <Skeleton className="h-[300px] shrink-0 rounded-lg" />
+            <UnifiedSkeleton className="h-[300px] shrink-0 rounded-lg" />
             <ExampleSkeleton className="shrink-0" />
           </div>
         </div>
@@ -273,32 +284,42 @@ export function CapabilityExplorerSkeleton({ className, count = 8 }: { className
           <div className={cn('grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,380px)] gap-8', PANEL_TOP_HEIGHT_CLASS)}>
             <div className="flex min-w-0 flex-col overflow-hidden">
               <div className="mb-2">
-                <LineBar line="text-h2" width="w-64" />
+                <div className="text-h2">
+                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-64')} />
+                </div>
               </div>
               <div className="min-h-[3lh] text-h4">
-                <LineBar line="text-h4" width="w-full" />
-                <LineBar line="text-h4" width="w-4/5" />
+                <div className="text-h4">
+                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
+                </div>
+                <div className="text-h4">
+                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-4/5')} />
+                </div>
               </div>
               <div className="mt-auto grid grid-cols-1 gap-2">
                 {[0, 1, 2].map(i => (
                   <div key={i} className="flex min-w-0 items-center gap-2.5">
-                    <Skeleton className="size-4 shrink-0 rounded-full" />
-                    <LineBar line="text-h6" width={i === 1 ? 'w-56' : 'w-48'} />
+                    <UnifiedSkeleton className="size-4 shrink-0 rounded-full" />
+                    <div className="text-h6">
+                      <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, i === 1 ? 'w-56' : 'w-48')} />
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
             <ExampleSkeleton />
           </div>
-          <Skeleton className={cn('shrink-0 rounded-xl', PANEL_SCREEN_HEIGHT_CLASS)} />
+          <UnifiedSkeleton className={cn('shrink-0 rounded-xl', PANEL_SCREEN_HEIGHT_CLASS)} />
           <div
             className={cn(
               'flex min-w-0 shrink-0 items-center gap-[var(--spacing-system-sf)]',
               PANEL_FOOTER_HEIGHT_CLASS,
             )}
           >
-            <LineBar line="text-h5" width="w-16" />
-            <Skeleton className="h-7 w-36 rounded-md" />
+            <div className="text-h5">
+              <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-16')} />
+            </div>
+            <UnifiedSkeleton className="h-7 w-36 rounded-md" />
           </div>
         </div>
       </div>

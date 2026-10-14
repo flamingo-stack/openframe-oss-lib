@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 interface ChatMessageSkeletonProps {
   className?: string;
@@ -40,15 +41,15 @@ export function ChatMessageSkeleton({
             `bg-ods-border` so the placeholders are actually visible (a tinted
             low-alpha fill reads as blank on the dark surface). */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          {showAvatar && !isUser && <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-full bg-ods-border" />}
-          <div className="h-5 w-32 animate-pulse rounded bg-ods-border" />
-          <div className="ml-auto h-4 w-14 animate-pulse rounded bg-ods-border" />
+          {showAvatar && !isUser && <UnifiedSkeleton className="h-8 w-8 flex-shrink-0 rounded-full" />}
+          <UnifiedSkeleton className="h-5 w-32 rounded" />
+          <UnifiedSkeleton className="ml-auto h-4 w-14 rounded" />
         </div>
 
         {/* Body lines — percentage widths so they reflow on panel resize. */}
         <div className="flex flex-col gap-2 pt-[var(--spacing-system-xxs)]">
           {Array.from({ length: lines }, (_, i) => (
-            <div key={i} className={cn('h-4 animate-pulse rounded bg-ods-border', bodyLineWidth(i, lines))} />
+            <UnifiedSkeleton key={i} className={cn('h-4 rounded', bodyLineWidth(i, lines))} />
           ))}
         </div>
       </div>

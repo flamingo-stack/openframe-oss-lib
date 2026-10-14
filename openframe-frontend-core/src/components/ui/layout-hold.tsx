@@ -48,7 +48,7 @@ export function TextHold({ children, variant = 'bar', className }: TextHoldProps
         // `box-decoration-clone` gives every line its own bar (and its own mask, `BAR_STYLE`). Pure CSS: it
         // is drawn in the server's HTML, before any script runs (a loading state streamed by the server
         // is often replaced before it hydrates).
-        bar ? cn(SKELETON_SURFACE_CLASS, 'box-decoration-clone text-transparent') : 'invisible',
+        bar ? cn(SKELETON_SURFACE_CLASS, 'rounded-md box-decoration-clone text-transparent') : 'invisible',
         // A hold is never selectable or clickable, whatever it wraps.
         'pointer-events-none select-none',
         className,

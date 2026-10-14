@@ -1,3 +1,4 @@
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 /**
  * RoadmapGridSkeleton — loading state for the `/roadmap` grid view.
  *
@@ -18,18 +19,18 @@ function RoadmapCardSkeleton() {
     <div className="relative flex min-h-[340px] flex-col gap-[16px] rounded-[6px] border border-ods-border bg-ods-card p-[24px]">
       {/* Status Badge Skeleton - Top Right */}
       <div className="absolute right-[24px] top-[24px]">
-        <div className="h-[20px] w-[80px] animate-pulse rounded bg-ods-border"></div>
+        <UnifiedSkeleton className="h-[20px] w-[80px] rounded" />
       </div>
 
       {/* Icon and title skeleton */}
       <div className="flex items-center gap-[16px] pr-[120px]">
-        <div className="h-[80px] w-[80px] flex-shrink-0 animate-pulse rounded-lg bg-ods-border"></div>
+        <UnifiedSkeleton className="h-[80px] w-[80px] flex-shrink-0 rounded-lg" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-h-[48px] items-center">
-            <div className="h-[24px] w-full animate-pulse rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-[24px] w-full rounded" />
           </div>
           <div className="flex min-h-[20px] items-center">
-            <div className="h-[14px] w-1/2 animate-pulse rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-[14px] w-1/2 rounded" />
           </div>
         </div>
       </div>
@@ -37,9 +38,9 @@ function RoadmapCardSkeleton() {
       {/* Description skeleton - exactly 3 lines */}
       <div className="flex min-h-[72px] items-center">
         <div className="w-full space-y-2">
-          <div className="h-[24px] animate-pulse rounded bg-ods-border"></div>
-          <div className="h-[24px] animate-pulse rounded bg-ods-border"></div>
-          <div className="h-[24px] w-4/5 animate-pulse rounded bg-ods-border"></div>
+          <UnifiedSkeleton className="h-[24px] rounded" />
+          <UnifiedSkeleton className="h-[24px] rounded" />
+          <UnifiedSkeleton className="h-[24px] w-4/5 rounded" />
         </div>
       </div>
 
@@ -47,8 +48,8 @@ function RoadmapCardSkeleton() {
 
       {/* Bottom skeleton */}
       <div className="flex items-center justify-between">
-        <div className="h-[48px] w-[120px] animate-pulse rounded bg-ods-border"></div>
-        <div className="h-[32px] w-[100px] animate-pulse rounded bg-ods-border"></div>
+        <UnifiedSkeleton className="h-[48px] w-[120px] rounded" />
+        <UnifiedSkeleton className="h-[32px] w-[100px] rounded" />
       </div>
     </div>
   );

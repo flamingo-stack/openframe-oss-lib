@@ -5,6 +5,7 @@ import { useNotificationPermission } from '../../../hooks/ui';
 import { cn } from '../../../utils/cn';
 import { ClockHistoryIcon, ArrowRightUpIcon } from '../../icons-v2-generated';
 import { BellOffIcon } from '../../icons-v2-generated/interface/bell-off-icon';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { useAppLayoutDrawerContainer } from '../../navigation/app-layout-context';
 import { AppLayoutDrawer, AppLayoutDrawerContent } from '../../navigation/app-layout-drawer';
 import { SplitButton } from '../../ui/button';
@@ -232,14 +233,8 @@ function DrawerScrollList({
 function DrawerLoadingTiles() {
   return (
     <>
-      <div
-        aria-hidden="true"
-        className="h-16 w-full shrink-0 animate-pulse rounded-md border border-ods-border bg-ods-card"
-      />
-      <div
-        aria-hidden="true"
-        className="h-16 w-full shrink-0 animate-pulse rounded-md border border-ods-border bg-ods-card"
-      />
+      <UnifiedSkeleton aria-hidden="true" className="h-16 w-full shrink-0 rounded-md border border-ods-border" />
+      <UnifiedSkeleton aria-hidden="true" className="h-16 w-full shrink-0 rounded-md border border-ods-border" />
     </>
   );
 }

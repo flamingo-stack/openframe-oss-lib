@@ -14,7 +14,7 @@
 import { Component, type ReactNode, type UIEvent, useCallback } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
-import { Skeleton } from '../ui/skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import type { ChatContextItem } from './types/context-item.types';
 
 const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
@@ -86,7 +86,7 @@ export function ContextItemsSkeleton({ count }: { count: number }) {
           key={`ctx-skeleton-${i}`}
           className="flex items-center border-b border-ods-border bg-ods-bg py-3 pl-4 pr-2 last:border-b-0"
         >
-          <Skeleton className="h-5 w-1/2" />
+          <UnifiedSkeleton className="h-5 w-1/2" />
         </div>
       ))}
     </>
