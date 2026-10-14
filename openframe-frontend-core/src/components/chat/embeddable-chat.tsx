@@ -503,8 +503,13 @@ export interface EmbeddableChatProps {
    * `onWhatToAsk` takes it over): added at the end of the open conversation,
    * or a new chat opens with it. Local - never sent, never stored. Picking a
    * chip puts its prompt into the composer.
+   *
+   * A function is called on each click and the exchange appears, whole, once
+   * its promise settles (prompts built from live data, e.g. the workspace's
+   * devices); clicks while one is pending are ignored. It should not reject:
+   * a rejection is logged and shows nothing.
    */
-  whatToAsk?: WhatToAskContent;
+  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
   /**
    * v2: items in the chat's ⋯ menu after its own, past a separator - actions
    * that are not about the chat (e.g. the host's onboarding reset). Shown in
@@ -1742,7 +1747,7 @@ function EmbeddableChatInner({
   // conversation until it is sent or left.
   const whatToAsk = useWhatToAsk({
     dialogId: activeDialogId,
-    content: whatToAskContent,
+    content: typeof whatToAskContent === 'function' ? undefined : whatToAskContent,
     user: {
       name: headerUserName ?? 'You',
       avatar: identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || null,
@@ -2297,14 +2302,36 @@ function EmbeddableChatInner({
   // "What to ask Mingo?" with `whatToAsk`: the exchange goes at the end of the
   // open conversation; with none (or an archived one, which is read-only) a
   // new chat opens with it. A new chat already holding one gets another.
-  const showWhatToAsk = () => {
+  const showWhatToAsk = (content: WhatToAskContent) => {
     if (activeDialogId && hasConversation && !isViewingArchived) {
-      whatToAsk.ask('current');
+      whatToAsk.ask('current', content);
       return;
     }
     if (activeDialogId != null || isViewingArchived) resetToNewChat();
     setComposeOpen(true);
-    whatToAsk.ask('draft');
+    whatToAsk.ask('draft', content);
+  };
+  // An async `whatToAsk` settles renders later: by then the panel may be in
+  // another state, so it is shown through the latest `showWhatToAsk`.
+  const showWhatToAskRef = useRef(showWhatToAsk);
+  useEffect(() => {
+    showWhatToAskRef.current = showWhatToAsk;
+  });
+  const whatToAskPendingRef = useRef(false);
+  const requestWhatToAsk = () => {
+    if (!whatToAskContent) return;
+    if (typeof whatToAskContent !== 'function') {
+      showWhatToAsk(whatToAskContent);
+      return;
+    }
+    if (whatToAskPendingRef.current) return;
+    whatToAskPendingRef.current = true;
+    whatToAskContent()
+      .then(content => showWhatToAskRef.current(content))
+      .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
+      .finally(() => {
+        whatToAskPendingRef.current = false;
+      });
   };
 
   // "Ask Mingo" from an archived chat: the conversation is read-only (the
@@ -2473,7 +2500,7 @@ function EmbeddableChatInner({
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     // The suggestions a new chat opens on, unless the host has a surface of its own.
-    onWhatToAsk: leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? showWhatToAsk : handleNewChat)),
+    onWhatToAsk: () => leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? requestWhatToAsk : handleNewChat))(),
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,

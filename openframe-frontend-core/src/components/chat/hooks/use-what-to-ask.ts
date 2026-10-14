@@ -29,7 +29,8 @@ export interface WhatToAskAuthor {
 export interface UseWhatToAskOptions {
   /** The open conversation; `null` for a new chat that has no dialog yet. */
   dialogId: string | null | undefined;
-  content: WhatToAskContent | undefined;
+  /** What an exchange shows unless `ask` is handed its own. */
+  content?: WhatToAskContent;
   user?: WhatToAskAuthor;
   assistant?: WhatToAskAuthor;
   /** Where a picked prompt goes. Absent: the composer of the surrounding chat panel. */
@@ -40,9 +41,11 @@ export interface WhatToAsk {
   /**
    * Show the exchange: at the end of the open conversation (`'current'`), or
    * in the new chat (`'draft'`), which then reads as a conversation until it
-   * is sent or left. No-op without `content`.
+   * is sent or left. `content` overrides the hook's for this exchange (e.g.
+   * prompts built from live data); each exchange keeps what it was shown
+   * with. No-op without either.
    */
-  ask: (target: 'current' | 'draft') => void;
+  ask: (target: 'current' | 'draft', content?: WhatToAskContent) => void;
   /** The thread with the exchanges of the open conversation (or the new chat) merged in by time. */
   withExchanges: (messages: Message[]) => Message[];
   /** Call before sending: a new chat's exchanges then move into the dialog the send creates. */
@@ -57,12 +60,13 @@ const DRAFT_KEY = '';
 interface Exchange {
   id: string;
   at: number;
+  content: WhatToAskContent;
 }
 
 /**
  * Local "What to ask?" exchanges, per conversation: never sent, never stored,
  * gone on reload. Each is a user message and an assistant message carrying a
- * `suggestions` segment, built at render from `content`. A new chat holds its
+ * `suggestions` segment, built at render from the exchange's content. A new chat holds its
  * own until a send gives it a dialog (they move there) or the user opens
  * another conversation (they are dropped).
  */
@@ -88,12 +92,14 @@ export function useWhatToAsk({ dialogId, content, user, assistant, onPick }: Use
   }
 
   const ask = useCallback(
-    (target: 'current' | 'draft') => {
-      if (!content) return;
+    (target: 'current' | 'draft', override?: WhatToAskContent) => {
+      const shown = override ?? content;
+      if (!shown) return;
       const into = target === 'current' && dialogId ? dialogId : DRAFT_KEY;
       const exchange = {
         id: `what-to-ask-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
         at: Date.now(),
+        content: shown,
       };
       setByDialog(prev => ({ ...prev, [into]: [...(prev[into] ?? []), exchange] }));
     },
@@ -114,10 +120,10 @@ export function useWhatToAsk({ dialogId, content, user, assistant, onPick }: Use
     });
   }, []);
 
-  const exchanges = content ? (byDialog[key] ?? []) : [];
+  const exchanges = byDialog[key] ?? [];
   const withExchanges = (messages: Message[]): Message[] => {
-    if (!content || exchanges.length === 0) return messages;
-    const local = exchanges.flatMap(exchange => exchangeMessages(exchange, content, user, assistant, onPick));
+    if (exchanges.length === 0) return messages;
+    const local = exchanges.flatMap(exchange => exchangeMessages(exchange, user, assistant, onPick));
     return mergeByTime(messages, local);
   };
 
@@ -125,31 +131,30 @@ export function useWhatToAsk({ dialogId, content, user, assistant, onPick }: Use
 }
 
 function exchangeMessages(
-  exchange: Exchange,
-  content: WhatToAskContent,
+  { id, at, content }: Exchange,
   user: WhatToAskAuthor | undefined,
   assistant: WhatToAskAuthor | undefined,
   onPick: ((prompt: string) => void) | undefined,
 ): Message[] {
   return [
     {
-      id: `${exchange.id}-question`,
+      id: `${id}-question`,
       role: 'user',
       content: content.question,
-      timestamp: new Date(exchange.at),
+      timestamp: new Date(at),
       name: user?.name,
       avatar: user?.avatar,
       authorType: user?.authorType,
     },
     {
-      id: `${exchange.id}-answer`,
+      id: `${id}-answer`,
       role: 'assistant',
       content: [
         { type: 'text', text: content.reply },
         { type: 'suggestions', groups: content.groups, note: content.note, onPick },
       ],
       // A millisecond after the question, so the pair keeps its order.
-      timestamp: new Date(exchange.at + 1),
+      timestamp: new Date(at + 1),
       name: assistant?.name,
       avatar: assistant?.avatar,
       authorType: assistant?.authorType,

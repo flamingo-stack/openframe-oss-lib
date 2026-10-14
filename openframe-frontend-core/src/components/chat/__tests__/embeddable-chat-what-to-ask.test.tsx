@@ -44,7 +44,15 @@ const WHAT_TO_ASK: WhatToAskContent = {
 const HELLO: UnifiedChatMessage = { id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) };
 
 /** A host that owns the dialogs; a send from a new chat creates `d-new`. */
-function Host({ initialDialogId = null, onReset }: { initialDialogId?: string | null; onReset?: () => void }) {
+function Host({
+  initialDialogId = null,
+  onReset,
+  whatToAsk = WHAT_TO_ASK,
+}: {
+  initialDialogId?: string | null;
+  onReset?: () => void;
+  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
+}) {
   const [activeDialogId, setActiveDialogId] = useState<string | null>(initialDialogId);
   const [sent, setSent] = useState<UnifiedChatMessage[]>([]);
   const noop = () => {};
@@ -98,13 +106,13 @@ function Host({ initialDialogId = null, onReset }: { initialDialogId?: string | 
       showInternalTrigger={false}
       mingoState={state}
       mingoDialogCapabilities={{ canRename: true }}
-      whatToAsk={WHAT_TO_ASK}
+      whatToAsk={whatToAsk}
       chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
     />
   );
 }
 
-function renderHost(props: { initialDialogId?: string | null; onReset?: () => void } = {}) {
+function renderHost(props: Parameters<typeof Host>[0] = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
@@ -168,6 +176,27 @@ describe('EmbeddableChat - whatToAsk', () => {
     // The send went out and made its dialog (it is in the list now).
     expect((await screen.findAllByText('Sent')).length).toBeGreaterThan(0);
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+  });
+
+  it('waits for an async whatToAsk and shows the exchange whole, once per pending click', async () => {
+    let settle: (content: WhatToAskContent) => void = () => {};
+    const load = vi.fn(
+      () =>
+        new Promise<WhatToAskContent>(resolve => {
+          settle = resolve;
+        }),
+    );
+    renderHost({ initialDialogId: 'd-1', whatToAsk: load });
+
+    fireEvent.click(whatToAsk());
+    fireEvent.click(whatToAsk());
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
+
+    settle({ ...WHAT_TO_ASK, reply: 'Live devices:' });
+
+    expect(await screen.findByText('Live devices:')).toBeInTheDocument();
+    expect(screen.getAllByText('What can I ask you?')).toHaveLength(1);
   });
 
   it("lists the host's extra items after the chat's own in the ⋯ menu", () => {

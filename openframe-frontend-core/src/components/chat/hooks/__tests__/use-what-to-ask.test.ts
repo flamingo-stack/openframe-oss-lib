@@ -106,6 +106,19 @@ describe('useWhatToAsk', () => {
     expect(result.current.withExchanges([])).toHaveLength(0);
   });
 
+  it("keeps each exchange's own content, over the hook's", () => {
+    const { result } = setup('d-1');
+    const live: WhatToAskContent = { ...content, reply: 'Built from live data:' };
+
+    act(() => result.current.ask('current', live));
+    act(() => result.current.ask('current'));
+    const answers = result.current.withExchanges([]).filter(m => m.role === 'assistant');
+
+    expect(
+      answers.map(m => (Array.isArray(m.content) && m.content[0].type === 'text' ? m.content[0].text : '')),
+    ).toEqual(['Built from live data:', 'Try one:']);
+  });
+
   it('shows nothing without content', () => {
     const { result } = renderHook(() => useWhatToAsk({ dialogId: 'd-1', content: undefined }));
     act(() => result.current.ask('current'));
