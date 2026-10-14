@@ -27,7 +27,7 @@ fn delivery(sequence: i64) -> DeliveryRef {
 }
 
 fn entry(value: bool, min_version: &str) -> Value {
-    json!({ "value": value, "minVersion": min_version })
+    json!({ "enabled": value, "minVersion": min_version })
 }
 
 fn apply(service: &FeatureFlagsService, sequence: i64, flags: Value) -> FlagsApplied {
@@ -184,7 +184,7 @@ fn a_flag_for_a_newer_client_is_stored_without_a_restart() {
     assert_eq!(
         persisted(&path).flags.get(TOOL_INSTALLATION),
         Some(&FeatureFlag {
-            value: true,
+            enabled: true,
             min_version: "1.6.0".to_string()
         })
     );
@@ -236,19 +236,19 @@ fn the_dev_build_turns_on_a_flag_whatever_its_min_version() {
 fn invalid_entries_are_dropped_and_resolve_to_the_default() {
     let cases = [
         ("a plain boolean", json!(true)),
-        ("no minVersion", json!({ "value": true })),
+        ("no minVersion", json!({ "enabled": true })),
         ("no value", json!({ "minVersion": "1.0.0" })),
         (
             "a string value",
-            json!({ "value": "true", "minVersion": "1.0.0" }),
+            json!({ "enabled": "true", "minVersion": "1.0.0" }),
         ),
         (
             "a numeric minVersion",
-            json!({ "value": true, "minVersion": 1 }),
+            json!({ "enabled": true, "minVersion": 1 }),
         ),
         (
             "a non-semver minVersion",
-            json!({ "value": true, "minVersion": "latest" }),
+            json!({ "enabled": true, "minVersion": "latest" }),
         ),
         ("null", json!(null)),
         ("a string", json!("on")),
@@ -349,7 +349,7 @@ fn a_file_without_machine_id_accepts_the_first_set() {
     let (path, _dir) = flags_path();
     std::fs::write(
         &path,
-        br#"{ "sequence": 9, "flags": { "delivery-tool-installation": { "value": true, "minVersion": "1.0.0" } } }"#,
+        br#"{ "sequence": 9, "flags": { "delivery-tool-installation": { "enabled": true, "minVersion": "1.0.0" } } }"#,
     )
     .unwrap();
 
@@ -376,7 +376,7 @@ fn the_persisted_state_matches_the_documented_shape() {
         json!({
             "machine_id": MACHINE,
             "sequence": 42,
-            "flags": { TOOL_INSTALLATION: { "value": true, "minVersion": "1.5.1" } },
+            "flags": { TOOL_INSTALLATION: { "enabled": true, "minVersion": "1.5.1" } },
             "awaiting_restart": {
                 "type": "CLIENT_FEATURE_FLAGS",
                 "targetId": "tenant",

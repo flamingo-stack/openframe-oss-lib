@@ -30,10 +30,11 @@ impl RestartGate {
     }
 
     pub(super) fn admit(&self) -> Option<OwnedRwLockReadGuard<()>> {
+        let admitted = self.work.clone().try_read_owned().ok()?;
         if self.closing.load(Ordering::Acquire) {
             return None;
         }
-        self.work.clone().try_read_owned().ok()
+        Some(admitted)
     }
 
     pub(super) async fn drain_and_request(&self) {

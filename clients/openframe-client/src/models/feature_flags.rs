@@ -57,21 +57,21 @@ pub struct FeatureFlagsState {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeatureFlag {
-    pub value: bool,
+    pub enabled: bool,
     pub min_version: String,
 }
 
 impl FeatureFlag {
     fn effective(&self, running_version: &str, default: bool) -> bool {
         if running_version == DEV_CLIENT_VERSION {
-            return self.value;
+            return self.enabled;
         }
         match (
             parse_version(running_version),
             parse_version(&self.min_version),
         ) {
             (Some(running), Some(min)) if precedence(&running, &min) != Ordering::Less => {
-                self.value
+                self.enabled
             }
             _ => default,
         }

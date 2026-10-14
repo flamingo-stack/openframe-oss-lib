@@ -87,7 +87,7 @@ impl FeatureFlagsService {
                     flags.insert(name, flag);
                 }
                 _ => {
-                    warn!(flag = %name, %value, "Ignoring feature flag without a boolean value and a semver minVersion")
+                    warn!(flag = %name, %value, "Ignoring feature flag without a boolean enabled and a semver minVersion")
                 }
             }
         }

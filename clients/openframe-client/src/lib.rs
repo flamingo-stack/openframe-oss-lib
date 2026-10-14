@@ -744,6 +744,12 @@ impl Client {
 
         self.nats_connection_manager.start_connection_watchdog();
 
+        // Handle any pending update from previous run (after NATS is connected)
+        if let Err(e) = self.update_handler_service.handle_pending_update().await {
+            error!("Failed to handle pending update: {:#}", e);
+            // Continue startup even if update handling fails - don't block the client
+        }
+
         self.feature_flags_listener.start().await?;
         let command_context = self.command_context.clone();
         tokio::spawn(async move {
@@ -796,12 +802,6 @@ impl Client {
             );
             std::process::exit(SELF_RESTART_EXIT_CODE);
         });
-
-        // Handle any pending update from previous run (after NATS is connected)
-        if let Err(e) = self.update_handler_service.handle_pending_update().await {
-            error!("Failed to handle pending update: {:#}", e);
-            // Continue startup even if update handling fails - don't block the client
-        }
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();

@@ -22,7 +22,9 @@ fn delivery(sequence: Option<i64>) -> DeliveryRef {
 }
 
 fn tool_installation(value: bool, min_version: &str) -> FeatureFlagsMessage {
-    message(json!({ "delivery-tool-installation": { "value": value, "minVersion": min_version } }))
+    message(
+        json!({ "delivery-tool-installation": { "enabled": value, "minVersion": min_version } }),
+    )
 }
 
 fn message(flags: Value) -> FeatureFlagsMessage {

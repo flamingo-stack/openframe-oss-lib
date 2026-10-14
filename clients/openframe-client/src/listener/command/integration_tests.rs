@@ -239,7 +239,7 @@ impl Agent {
 }
 
 fn entry(value: bool, min_version: &str) -> serde_json::Value {
-    json!({ "value": value, "minVersion": min_version })
+    json!({ "enabled": value, "minVersion": min_version })
 }
 
 async fn expect_no_restart(context: &CommandContext) {
@@ -534,8 +534,8 @@ async fn invalid_flag_entries_are_done_without_a_restart() {
             Some(23),
             json!({
                 "delivery-tool-installation": true,
-                "delivery-client-uninstall": { "value": true },
-                "delivery-client-update": { "value": true, "minVersion": "latest" }
+                "delivery-client-uninstall": { "enabled": true },
+                "delivery-client-update": { "enabled": true, "minVersion": "latest" }
             }),
         ))
         .await;

@@ -4,7 +4,7 @@ const TOOL_INSTALLATION: &str = "delivery-tool-installation";
 
 fn flag(value: bool, min_version: &str) -> FeatureFlag {
     FeatureFlag {
-        value,
+        enabled: value,
         min_version: min_version.to_string(),
     }
 }
@@ -198,12 +198,12 @@ fn unknown_flags_do_not_touch_known_features() {
 #[test]
 fn flag_entries_use_the_backend_field_names() {
     let parsed: FeatureFlag =
-        serde_json::from_value(serde_json::json!({ "value": true, "minVersion": "1.5.1" }))
+        serde_json::from_value(serde_json::json!({ "enabled": true, "minVersion": "1.5.1" }))
             .unwrap();
 
     assert_eq!(parsed, flag(true, "1.5.1"));
     assert_eq!(
         serde_json::to_value(&parsed).unwrap(),
-        serde_json::json!({ "value": true, "minVersion": "1.5.1" })
+        serde_json::json!({ "enabled": true, "minVersion": "1.5.1" })
     );
 }
