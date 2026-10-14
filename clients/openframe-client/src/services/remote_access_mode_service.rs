@@ -10,6 +10,8 @@ use crate::services::deactivation_service::DeactivationService;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 
 const DEVICE_MODE_PATH: &str = "/clients/api/v1/remote-access/device-mode";
+const RETRY_INITIAL: Duration = Duration::from_secs(30);
+const RETRY_MAX: Duration = Duration::from_secs(30 * 60);
 
 /// Retry delays; production values by default, shrunk in tests.
 #[derive(Debug, Clone, Copy)]
@@ -21,8 +23,8 @@ struct RetryTiming {
 impl Default for RetryTiming {
     fn default() -> Self {
         Self {
-            initial: Duration::from_secs(30),
-            max: Duration::from_secs(30 * 60),
+            initial: RETRY_INITIAL,
+            max: RETRY_MAX,
         }
     }
 }
@@ -101,7 +103,7 @@ impl RemoteAccessModeService {
                             mode
                         ),
                     }
-                    if let Err(e) = self.initial_config_service.clear_remote_access_mode(mode) {
+                    if let Err(e) = self.initial_config_service.clear_remote_access_mode() {
                         error!("Failed to clear the pending remote access mode: {:#}", e);
                     }
                     return;

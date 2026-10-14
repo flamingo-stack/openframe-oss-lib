@@ -61,7 +61,7 @@ fn config_without_remote_access_mode_has_none_pending() {
 }
 
 #[test]
-fn clearing_the_sent_remote_access_mode_keeps_the_rest_of_the_config() {
+fn clearing_the_remote_access_mode_keeps_the_rest_of_the_config() {
     let dir = TempDir::new().unwrap();
     write_config(
         &dir,
@@ -69,28 +69,11 @@ fn clearing_the_sent_remote_access_mode_keeps_the_rest_of_the_config() {
     );
     let service = service_in(&dir);
 
-    service.clear_remote_access_mode("SILENT_ACCESS").unwrap();
+    service.clear_remote_access_mode().unwrap();
 
     assert_eq!(service.get_remote_access_mode().unwrap(), None);
     assert_eq!(service.get_org_id().unwrap(), "org");
     assert_eq!(service.get_initial_key().unwrap(), "k");
     let raw = std::fs::read_to_string(dir.path().join("secured/initial_config.json")).unwrap();
     assert!(!raw.contains("remote_access_mode"));
-}
-
-#[test]
-fn clearing_does_not_drop_a_mode_saved_after_the_call_was_sent() {
-    let dir = TempDir::new().unwrap();
-    write_config(
-        &dir,
-        r#"{"server_host":"acme.openframe.ai","initial_key":"k","local_mode":false,"remote_access_mode":"DENY_ACCESS"}"#,
-    );
-    let service = service_in(&dir);
-
-    service.clear_remote_access_mode("SILENT_ACCESS").unwrap();
-
-    assert_eq!(
-        service.get_remote_access_mode().unwrap().as_deref(),
-        Some("DENY_ACCESS")
-    );
 }

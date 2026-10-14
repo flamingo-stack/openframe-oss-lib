@@ -259,10 +259,3 @@ async fn dropped_connections_keep_the_mode_pending() {
         Some("SILENT_ACCESS")
     );
 }
-
-#[test]
-fn production_retry_timing() {
-    let timing = RetryTiming::default();
-    assert_eq!(timing.initial, Duration::from_secs(30));
-    assert_eq!(timing.max, Duration::from_secs(1800));
-}

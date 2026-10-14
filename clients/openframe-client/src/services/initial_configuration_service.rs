@@ -61,12 +61,8 @@ impl InitialConfigurationService {
         Ok(config.remote_access_mode)
     }
 
-    /// Clears the pending mode only if it is still `sent`, so a newer `auth` value is not lost.
-    pub fn clear_remote_access_mode(&self, sent: &str) -> Result<()> {
+    pub fn clear_remote_access_mode(&self) -> Result<()> {
         let mut config = self.get()?;
-        if config.remote_access_mode.as_deref() != Some(sent) {
-            return Ok(());
-        }
         config.remote_access_mode = None;
         self.save(&config)
             .context("Failed to save initial configuration without the remote access mode")
