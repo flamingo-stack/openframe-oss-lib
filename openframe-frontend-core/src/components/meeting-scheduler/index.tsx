@@ -902,7 +902,9 @@ export function HubSpotMeetingScheduler({
             timezone={timezone}
             onTimezoneChange={setTimezone}
             locked={step !== 'slot'}
-            showTimezone={step !== 'confirmed'}
+            // The zone is chosen with the time; the form restates it in its
+            // summary line, so the picker is the calendar's only.
+            showTimezone={step === 'slot'}
           />
           {step === 'confirmed' && confirmation && timezone ? (
             <div className={MODAL_STEP_CLASS}>

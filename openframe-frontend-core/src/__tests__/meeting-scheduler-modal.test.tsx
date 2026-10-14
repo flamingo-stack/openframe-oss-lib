@@ -71,9 +71,11 @@ describe('HubSpotMeetingScheduler — modal layout', () => {
     fireEvent.click(await timeChip());
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     await screen.findByLabelText(/^Email/);
-    // Chosen: the chips give way to the length alone.
+    // Chosen: the chips give way to the length alone, and the timezone picker
+    // stays with the calendar.
     expect(screen.queryByRole('button', { name: '45 min' })).not.toBeInTheDocument();
     expect(screen.getByText('30 min call')).toBeInTheDocument();
+    expect(screen.queryByText('Timezone')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expect(screen.queryByLabelText(/^Email/)).not.toBeInTheDocument();
     expect(await timeChip()).toBeInTheDocument();

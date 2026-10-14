@@ -205,7 +205,7 @@ asks for `layout="modal"`:
 
 - The host strip runs across the top with the length on its right: chips when the link
   offers several lengths, the length alone otherwise. The timezone row sits under it at
-  every width.
+  every width on the calendar step only; the form restates the zone in its summary line.
 - The calendar keeps its width; the times run down one column beside it and scroll inside
   the calendar's height. On a phone the two stack and the times are four across.
 - A time is chosen, not submitted. Continue, in a footer under the card, opens the details
