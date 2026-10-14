@@ -23,11 +23,17 @@ export { TRIAL_TERMS, trialLabels, trialLengthLabel } from './trial';
 export {
   VENDOR_CLASSIFICATIONS,
   OPENFRAME_CLASSIFICATIONS,
+  GENERAL_CLASSIFICATIONS,
   isVendorClassification,
   isOpenFrameClassification,
+  vendorClassificationGroup,
+  vendorClassificationLabel,
   type VendorClassificationValue,
+  type VendorClassificationGroup,
   type OpenFrameClassification,
   type OpenFrameClassificationCopy,
+  type GeneralClassification,
+  type GeneralClassificationCopy,
 } from './vendor-classification';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';

@@ -1,8 +1,9 @@
 'use client';
 
-import { Boxes, Code, Database, DollarSign, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, Boxes, Clock, Code, Database, DollarSign, FileCode, Hand, PauseCircle, Plug, ShieldCheck, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
 import {
+  GENERAL_CLASSIFICATIONS,
   OPENFRAME_CLASSIFICATIONS,
   isOpenFrameClassification,
   type OpenFrameClassification,
@@ -207,6 +208,35 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             icon: (
               <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
                 <DollarSign width={10} height={10} className="text-ods-text-secondary" />
+              </div>
+            ),
+          };
+        } else if (classificationType === 'source_available') {
+          return {
+            text: GENERAL_CLASSIFICATIONS.source_available.label,
+            icon: (
+              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
+                <FileCode width={10} height={10} className="text-ods-text-secondary" />
+              </div>
+            ),
+          };
+        } else if (
+          classificationType === 'end_of_life' ||
+          classificationType === 'end_of_support' ||
+          classificationType === 'unmaintained'
+        ) {
+          const LifecycleIcon =
+            classificationType === 'end_of_life'
+              ? AlertTriangle
+              : classificationType === 'end_of_support'
+                ? Clock
+                : PauseCircle;
+          return {
+            text: GENERAL_CLASSIFICATIONS[classificationType].label,
+            textColor: 'text-ods-warning',
+            icon: (
+              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm">
+                <LifecycleIcon width={12} height={12} className="text-ods-warning" />
               </div>
             ),
           };
