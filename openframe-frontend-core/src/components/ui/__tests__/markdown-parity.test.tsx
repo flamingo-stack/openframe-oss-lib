@@ -45,11 +45,15 @@ vi.mock('@/components/features/video', () => ({
 }));
 
 vi.mock('@/components/embeds/reddit-embed-client', () => ({
-  RedditEmbedClient: ({ url }: MockUrlProps) => <div data-mock="reddit" data-url={url} />,
+  RedditEmbedClient: ({ url, rel }: MockUrlProps & { rel?: string }) => (
+    <div data-mock="reddit" data-url={url} data-rel={rel} />
+  ),
 }));
 
 vi.mock('@/components/embeds/twitter-embed-client', () => ({
-  TwitterEmbedClient: ({ url }: MockUrlProps) => <div data-mock="twitter" data-url={url} />,
+  TwitterEmbedClient: ({ url, rel }: MockUrlProps & { rel?: string }) => (
+    <div data-mock="twitter" data-url={url} data-rel={rel} />
+  ),
 }));
 
 vi.mock('@/components/embeds/linkedin-embed-client', () => ({
@@ -709,6 +713,13 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
   // (script stripped by sanitize; blockquote rehydrated to RedditEmbedClient).
   'audit-reddit-embed-bq':
     '<blockquote class="reddit-embed-bq" data-embed-height="500"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/">view</a></blockquote>\n<script async src="https://embed.reddit.com/widgets.js" charset="UTF-8"></script>',
+  // An editor's Nofollow choice (the editors write it as an HTML anchor): the SEO tokens are kept,
+  // any other authored token is dropped, and new-tab links still get noopener noreferrer.
+  'link-authored-rel':
+    '<a href="https://example.com/sponsor" rel="nofollow">nofollow</a>, <a href="/pricing" rel="nofollow ugc">internal</a>, <a href="https://example.com/me" rel="me">me</a> and [followed](https://example.com/page).',
+  // A Reddit post the author marked nofollow keeps it on the card's links to the post.
+  'reddit-embed-bq-nofollow':
+    '<blockquote class="reddit-embed-bq"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/" rel="nofollow">view</a></blockquote>',
 };
 
 const CHAT_FIXTURES: Record<string, string> = {

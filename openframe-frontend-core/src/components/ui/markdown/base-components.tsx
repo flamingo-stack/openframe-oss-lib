@@ -14,6 +14,7 @@ import { useAuthedImageSrc } from '../../../hooks/use-authed-image-src';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
 import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
+import { renderedLinkRel } from '../../../utils/markdown-link';
 import { getHashTargetElement, navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import { extractText, resolveFallbackHeadingId, useAssignedHeadingIds, useHeadingId } from './heading-ids';
 import { MermaidDiagram } from './mermaid-diagram';
@@ -250,7 +251,7 @@ export function buildBaseComponents({
     ),
 
     // --- links ---
-    a: ({ href, children, className: linkClassName }: MdRenderProps<'a'>) => {
+    a: ({ href, children, className: linkClassName, rel: authoredRel }: MdRenderProps<'a'>) => {
       const isBroken = href !== undefined && brokenLinks.includes(href);
       const isInternalDocLink =
         propCurrentPath !== undefined &&
@@ -339,7 +340,9 @@ export function buildBaseComponents({
           href={href}
           className={`relative text-ods-accent no-underline transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-0 after:bg-ods-accent after:transition-all after:duration-300 after:content-[''] hover:after:w-full ${linkClassName || ''}`}
           target={href?.startsWith('http') ? '_blank' : undefined}
-          rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+          // The author's SEO tokens (`<a rel="nofollow">`, the editor's Nofollow choice) are kept;
+          // every other authored token is dropped, and a new-tab link always gets noopener noreferrer.
+          rel={renderedLinkRel(authoredRel, href?.startsWith('http') ?? false)}
           onClick={inPageAnchorId !== null ? handleAnchorClick : undefined}
         >
           {children}
