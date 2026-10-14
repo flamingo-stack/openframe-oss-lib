@@ -1,6 +1,6 @@
 package com.openframe.client.listener.rmm;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.rmm.ScriptExecutionAcknowledgeService;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.data.nats.rmm.model.ScriptExecutionAcknowledgeMessage;

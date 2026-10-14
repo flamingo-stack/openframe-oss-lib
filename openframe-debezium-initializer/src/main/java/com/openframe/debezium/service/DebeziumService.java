@@ -10,7 +10,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -44,7 +44,6 @@ public class DebeziumService {
     private final RecreationTracker recreationTracker;
     private RestTemplate restTemplate;
 
-    @Autowired
     public DebeziumService(ConnectorNameStrategy nameStrategy,
                            @Autowired(required = false) RecreationTracker recreationTracker) {
         this.nameStrategy = nameStrategy;
@@ -63,8 +62,8 @@ public class DebeziumService {
     public void init() {
         this.connectorsBaseUrl = debeziumUrl + PATH_CONNECTORS;
         this.restTemplate = new RestTemplateBuilder()
-                .setConnectTimeout(connectTimeout)
-                .setReadTimeout(readTimeout)
+                .connectTimeout(connectTimeout)
+                .readTimeout(readTimeout)
                 .build();
     }
 
@@ -285,7 +284,7 @@ public class DebeziumService {
      * Restart connector and all failed tasks in a single call (KIP-745).
      */
     public void restartConnectorWithFailedTasks(String connectorName) {
-        String url = UriComponentsBuilder.fromHttpUrl(connectorUrl(connectorName) + PATH_RESTART)
+        String url = UriComponentsBuilder.fromUriString(connectorUrl(connectorName) + PATH_RESTART)
                 .queryParam("includeTasks", "true")
                 .queryParam("onlyFailed", "true")
                 .build()
@@ -367,7 +366,7 @@ public class DebeziumService {
     }
 
     private String connectorUrl(String name) {
-        return UriComponentsBuilder.fromHttpUrl(connectorsBaseUrl)
+        return UriComponentsBuilder.fromUriString(connectorsBaseUrl)
                 .pathSegment(name)
                 .build()
                 .toUriString();

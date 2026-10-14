@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.data.model.enums.MessageType;
@@ -170,7 +170,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         if (teamId == null || teamId.isNull()) {
             return Optional.empty();
         }
-        return Optional.of(teamId.asText());
+        return Optional.of(teamId.asString());
     }
 
     /**
@@ -278,7 +278,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
         return Optional.ofNullable(node)
                 .map(n -> n.get(fieldName))
                 .filter(field -> !field.isNull() && !field.isMissingNode())
-                .map(JsonNode::asText)
+                .map(JsonNode::asString)
                 .filter(StringUtils::isNotBlank);
     }
 

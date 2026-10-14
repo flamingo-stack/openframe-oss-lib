@@ -9,7 +9,7 @@ import com.datastax.oss.driver.api.core.metadata.schema.KeyspaceMetadata;
 import com.datastax.oss.driver.api.core.metadata.schema.TableMetadata;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.SmartInitializingSingleton;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.data.cassandra.core.convert.SchemaFactory;
 import org.springframework.data.cassandra.core.cql.keyspace.ColumnSpecification;
 import org.springframework.data.cassandra.core.cql.keyspace.CreateTableSpecification;
@@ -22,10 +22,10 @@ import java.util.Map;
 import java.util.Optional;
 
 // Spring Data's CREATE_IF_NOT_EXISTS never alters a table that already exists, so a column added to an
-// entity later has to be added here; it runs after the schema action, once every singleton is up.
+// entity later has to be added here; it runs at start, in the phase right after the schema action.
 @Slf4j
 @RequiredArgsConstructor
-public class CassandraTableColumnSync implements SmartInitializingSingleton {
+public class CassandraTableColumnSync implements SmartLifecycle {
 
     // A schema change waits for cluster-wide agreement, which takes longer than the default request timeout.
     private static final Duration SCHEMA_CHANGE_TIMEOUT = Duration.ofSeconds(30);
@@ -34,15 +34,32 @@ public class CassandraTableColumnSync implements SmartInitializingSingleton {
     private final CassandraMappingContext mappingContext;
     private final SchemaFactory schemaFactory;
     private final String keyspaceName;
+    private volatile boolean running;
 
     @Override
-    public void afterSingletonsInstantiated() {
+    public void start() {
         try {
             syncKeyspace();
         } catch (RuntimeException e) {
             // A missing column fails only the writes that use it; failing startup would take the whole service down.
             log.error("Cassandra column sync failed for keyspace {}", keyspaceName, e);
         }
+        running = true;
+    }
+
+    @Override
+    public void stop() {
+        running = false;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
+    @Override
+    public int getPhase() {
+        return CassandraSchemaInitializer.PHASE + 1;
     }
 
     private void syncKeyspace() {

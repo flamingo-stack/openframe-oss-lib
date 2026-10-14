@@ -22,6 +22,8 @@
 'use client';
 import { forwardRef, type ComponentType, type ImgHTMLAttributes, type Ref } from 'react';
 
+import { fetchPriorityProp } from '../utils/fetch-priority';
+
 type ImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder'> & {
   src?: string | { src: string };
   alt?: string;
@@ -91,12 +93,18 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ 
     optimizedWidth && resizer && typeof given.src === 'string'
       ? { ...given, src: resizer(given.src, optimizedWidth), unoptimized: true }
       : given;
-  // Real impl path — registered by the host. Hand off untouched so
-  // every Next-specific prop (priority, placeholder, sizes, loader…)
-  // reaches the real component intact.
+  // `priority` means "this is the picture the page is waiting for", so its
+  // request is ranked high on EVERY host. Stated here, once: since Next 16
+  // `priority` only preloads and no longer ranks the request, and the plain
+  // <img> below dropped the prop altogether, so an embedder's hero went out at
+  // the default priority. A caller that names its own `fetchPriority` keeps it.
+  const fetchPriority = props.fetchPriority ?? (props.priority ? 'high' : undefined);
+
+  // Real impl path — registered by the host. Every Next-specific prop
+  // (priority, placeholder, sizes, loader…) reaches the real component intact.
   if (impl) {
     const Real = impl;
-    return <Real ref={ref} {...props} />;
+    return <Real ref={ref} {...props} fetchPriority={fetchPriority} />;
   }
 
   // Fallback path — plain <img>. Drops Next-only props and reduces
@@ -115,6 +123,7 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ 
     unoptimized: _unoptimized,
     onLoadingComplete,
     loader: _loader,
+    fetchPriority: _fetchPriority,
     style,
     ...rest
   } = props;
@@ -147,6 +156,8 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ 
       style={finalStyle}
       onLoad={onLoadingComplete ? e => onLoadingComplete(e.currentTarget) : undefined}
       {...rest}
+      // The attribute's spelling depends on the host's React major (`fetchPriorityProp`).
+      {...(fetchPriority ? fetchPriorityProp(fetchPriority) : {})}
     />
   );
 });
