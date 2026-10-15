@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MessageTypeTest {
@@ -29,6 +31,20 @@ class MessageTypeTest {
         assertThat(type.getDataEnrichmentServiceType()).isEqualTo(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
         assertThat(type.getDestinationList())
                 .containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+        assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
+    }
+
+    @Test
+    void meshCentralEvent_routesToTheEventLogsPinotAndTheTenantRemoteSessionEvent() {
+        // setup
+        MessageType type = MessageType.MESHCENTRAL_EVENT;
+
+        // execution
+        List<Destination> destinations = type.getDestinationList();
+
+        // verifications
+        assertThat(destinations).containsExactly(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG,
+                Destination.KAFKA_PINOT, Destination.TENANT_REMOTE_SESSION_EVENT);
         assertThat(type.getEventHandlerType()).isEqualTo(EventHandlerType.COMMON_TYPE);
     }
 }

@@ -53,6 +53,8 @@ public interface SourceEventTypes {
         String NODE_AGENT_LOG = "node.agentlog";
         String NODE_BATCH_UPLOAD = "node.batchupload";
         String NODE_SESSION_COMPRESSION = "node.sessioncompression";
+        int AGENT_LOG_CLIPBOARD_GET = 21;
+        int AGENT_LOG_CLIPBOARD_SET = 22;
         
         // Relay events
         String RELAY_LOG = "relay.relaylog";

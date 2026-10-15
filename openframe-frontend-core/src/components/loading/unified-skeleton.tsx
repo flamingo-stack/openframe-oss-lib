@@ -19,6 +19,8 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * The element drawn. `span` keeps the placeholder valid phrasing content where
    * a `div` may not stand (inside a `p`, a heading, a label or an inline card).
+   * A span bar whose classes set no base display gets one of its own, capped to
+   * its line and centred on it; a caller that sets one gets none of the three.
    */
   as?: 'div' | 'span';
 }
@@ -68,6 +70,15 @@ export function UnifiedSkeleton({
   // An `aspect-*` utility sizes the box itself; a default height would win
   // over it (explicit height beats aspect-ratio) and collapse the box to 16px.
   const sizedByAspect = /(?:^|\s)aspect-/.test(className ?? '');
+  // A span that already names its base display keeps it, with its own cap and alignment: the frozen
+  // TitleBlock's bars and the chip and breadcrumb skeletons are `inline-block` on the baseline, tuned to
+  // their text. Only an unprefixed display counts: `md:hidden` leaves the base span inline, and a bar
+  // without the default would draw at 0×0 below that breakpoint. The list is the displays bars use;
+  // any other falls back to the default, and twMerge still lets the caller's display win.
+  const setsDisplay =
+    /(?:^|\s)(?:inline-block|inline-flex|inline-grid|inline|block|flex|grid|contents|hidden)(?=\s|$)/.test(
+      className ?? '',
+    );
 
   const style: React.CSSProperties = {
     width: width,
@@ -77,6 +88,8 @@ export function UnifiedSkeleton({
   return (
     <Tag
       className={cn(
+        // An inline span ignores width and height: without a display of its own the bar draws at 0×0.
+        Tag === 'span' && !setsDisplay && 'inline-block max-w-full align-middle',
         animate ? SKELETON_SURFACE_CLASS : 'bg-ods-skeleton',
         variantClasses[variant],
         !height && !style.height && !sizedByAspect && defaultHeights[variant],

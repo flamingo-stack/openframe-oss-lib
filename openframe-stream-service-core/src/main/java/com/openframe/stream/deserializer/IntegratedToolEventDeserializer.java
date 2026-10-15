@@ -47,27 +47,29 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
             if (after == null || after.isNull()) {
                 return null;
             }
-            long eventTimestamp = getEffectiveTimestamp(debeziumMessage, after);
-            String sourceEventType = getSourceEventType(after).orElse(UNKNOWN);
+            JsonNode event = toEventNode(after);
+            long eventTimestamp = getEffectiveTimestamp(debeziumMessage, event);
+            String sourceEventType = getSourceEventType(event).orElse(UNKNOWN);
+            Integer sourceMessageId = getSourceMessageId(event).orElse(null);
 
             // Build complete details JSON with error, result, and dynamic fields
-            String detailsJson = buildDetailsJson(after);
+            String detailsJson = buildDetailsJson(event);
 
             return DeserializedDebeziumMessage.builder()
                     .payload(debeziumMessage.getPayload())
-                    .agentId(getAgentId(after).orElse(null))
+                    .agentId(getAgentId(event).orElse(null))
                     .ingestDay(formatter.format(Instant.ofEpochMilli(eventTimestamp)))
                     .sourceEventType(sourceEventType)
-                    .toolEventId(generateCompositeId(debeziumMessage, messageType, after))
-                    .unifiedEventType(getEventType(sourceEventType, messageType.getIntegratedToolType()))
-                    .message(getMessage(after).orElse(null))
+                    .toolEventId(generateCompositeId(debeziumMessage, messageType, event))
+                    .unifiedEventType(getEventType(sourceEventType, sourceMessageId, messageType.getIntegratedToolType()))
+                    .message(getMessage(event).orElse(null))
                     .integratedToolType(messageType.getIntegratedToolType())
                     .debeziumMessage(getDebeziumMessage(after))
                     .details(detailsJson)
                     .eventTimestamp(eventTimestamp)
                     .skipProcessing(getSkipProcessing(sourceEventType))
                     .isVisible(isVisible(sourceEventType))
-                    .tenantId(getTenantId(after).orElse(null))
+                    .tenantId(getTenantId(event).orElse(null))
                     .build();
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Error converting Map to DebeziumMessage", e);
@@ -153,6 +155,14 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
 
     protected Optional<String> getTenantId(JsonNode afterField) {
         return Optional.empty();
+    }
+
+    protected Optional<Integer> getSourceMessageId(JsonNode afterField) {
+        return Optional.empty();
+    }
+
+    protected JsonNode toEventNode(JsonNode afterField) {
+        return afterField;
     }
 
     /**
@@ -266,8 +276,8 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
      */
     abstract protected String getDetails(JsonNode after);
 
-    private UnifiedEventType getEventType(String sourceEventType, IntegratedToolType toolType) {
-        return EventTypeMapper.mapToUnifiedType(toolType, sourceEventType);
+    private UnifiedEventType getEventType(String sourceEventType, Integer messageId, IntegratedToolType toolType) {
+        return EventTypeMapper.mapToUnifiedType(toolType, sourceEventType, messageId);
     }
 
     /**
