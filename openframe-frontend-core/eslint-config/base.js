@@ -8,12 +8,18 @@ import tseslint from 'typescript-eslint';
 import { boxedPrimitivesPlugin } from './boxed-primitives.js';
 import { ignores } from './ignores.js';
 import { layoutVariantsPlugin } from './layout-variants.js';
+import { popupPortalPlugin } from './popup-portal.js';
 import { webviewPerformancePlugin } from './webview-performance.js';
 
 /** The rules this config ships itself, under one `flamingo/` namespace. */
 export const flamingoPlugin = {
   meta: { name: 'flamingo' },
-  rules: { ...webviewPerformancePlugin.rules, ...layoutVariantsPlugin.rules, ...boxedPrimitivesPlugin.rules },
+  rules: {
+    ...webviewPerformancePlugin.rules,
+    ...layoutVariantsPlugin.rules,
+    ...boxedPrimitivesPlugin.rules,
+    ...popupPortalPlugin.rules,
+  },
 };
 
 /**

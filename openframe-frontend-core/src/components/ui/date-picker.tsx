@@ -9,6 +9,7 @@ import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
+import { usePortalContainer } from './portal-container';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 import type { SortDirection } from './sort-column-item';
 
@@ -677,6 +678,7 @@ export function DatePicker(props: DatePickerProps) {
   } = props;
 
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
 
   const displayValue = useMemo(() => {
@@ -730,7 +732,7 @@ export function DatePicker(props: DatePickerProps) {
         </button>
       </Popover.Trigger>
 
-      <Popover.Portal>
+      <Popover.Portal container={portalContainer ?? undefined}>
         <Popover.Content
           className={cn(
             'z-[9999]',
@@ -809,6 +811,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
     invalid = false,
   } = props;
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
 
   const displayValue = value ? formatDate(value) : '';
@@ -913,7 +916,7 @@ export function DatePickerInput(props: DatePickerInputProps) {
           </button>
         </Popover.Trigger>
 
-        <Popover.Portal>
+        <Popover.Portal container={portalContainer ?? undefined}>
           <Popover.Content
             className={cn(
               'z-[9999]',
@@ -1057,6 +1060,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
     invalid = false,
   } = props;
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
   const isInvalid = invalid || !!error;
 
   const displayValue = value ? formatDate(value) : '';
@@ -1139,7 +1143,7 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
           </button>
         </Popover.Trigger>
 
-        <Popover.Portal>
+        <Popover.Portal container={portalContainer ?? undefined}>
           <Popover.Content
             className={cn(
               'z-[9999]',
@@ -1350,6 +1354,7 @@ export function DateFilterMenu({
   'aria-label': ariaLabel = 'Open date filter',
 }: DateFilterMenuProps) {
   const [open, setOpen] = useState(false);
+  const portalContainer = usePortalContainer();
 
   // Drafted selection — initialized from props each time the menu opens.
   const [draftSort, setDraftSort] = useState<SortDirection>(sort);
@@ -1412,7 +1417,7 @@ export function DateFilterMenu({
         )}
       </Popover.Trigger>
 
-      <Popover.Portal>
+      <Popover.Portal container={portalContainer ?? undefined}>
         <Popover.Content
           className={cn(
             'z-[9999] w-80 max-w-[calc(100vw-2rem)]',

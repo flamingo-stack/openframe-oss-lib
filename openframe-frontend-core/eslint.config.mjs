@@ -400,5 +400,15 @@ export default defineConfig([
     rules: { 'flamingo/no-raw-anchor': 'off' },
   },
 
+  {
+    // Popups portal into the active portal container, so a modal or panel that
+    // owns its overlays keeps them above itself: ./eslint-config/popup-portal.js.
+    name: 'openframe-frontend-core/popup-portal-container',
+    files: ['src/**/*.{jsx,tsx}'],
+    ignores: ['**/*.{test,spec}.{jsx,tsx}', '**/__tests__/**', '**/*.stories.{jsx,tsx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/popup-portal-container': 'error' },
+  },
+
   ...prettierCompat,
 ]);

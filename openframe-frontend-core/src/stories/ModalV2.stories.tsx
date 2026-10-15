@@ -17,6 +17,7 @@ import {
   ModalV2Title,
   ModalV2TwoColumn,
 } from '../components/ui/modal-v2';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 
 type ModalV2StoryMeta = Meta<typeof ModalV2>;
@@ -427,10 +428,10 @@ export const PinnedHeaderAndFooter: Story = {
 };
 
 /**
- * A dropdown opened inside the modal portals into the modal's own layer, so it
- * stacks over the panel rather than under the `z-[1300]` overlay.
+ * Popups opened inside the modal portal into the modal's own layer, so they
+ * stack over the panel rather than under the `z-[1300]` overlay.
  */
-export const WithMenu: Story = {
+export const WithPopups: Story = {
   args: {
     isOpen: true,
     onClose: fn(),
@@ -443,13 +444,13 @@ export const WithMenu: Story = {
     return (
       <>
         <Button onClick={() => setIsOpen(true)} variant="outline">
-          Open modal with a menu
+          Open modal with popups
         </Button>
         <ModalV2 isOpen={isOpen} onClose={() => setIsOpen(false)} size={args.size}>
           <ModalV2Header>
             <ModalV2Title>Move vendor</ModalV2Title>
           </ModalV2Header>
-          <ModalV2Content>
+          <ModalV2Content className="flex gap-[var(--spacing-system-mf)]">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">Pick a folder</Button>
@@ -460,6 +461,16 @@ export const WithMenu: Story = {
                 <DropdownMenuItem>Identity</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Select>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Pick an owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ann">Ann</SelectItem>
+                <SelectItem value="bo">Bo</SelectItem>
+                <SelectItem value="cy">Cy</SelectItem>
+              </SelectContent>
+            </Select>
           </ModalV2Content>
         </ModalV2>
       </>
