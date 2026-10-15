@@ -8,7 +8,9 @@ import java.util.List;
 public enum MessageType {
 
     MESHCENTRAL_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT,
+                    Destination.TENANT_REMOTE_SESSION_EVENT),
+            EventHandlerType.COMMON_TYPE),
     COMMAND_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
             List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT, Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY), EventHandlerType.COMMON_TYPE),
     SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
