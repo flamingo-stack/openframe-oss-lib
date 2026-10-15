@@ -1,5 +1,6 @@
 package com.openframe.api.dto.knowledgebase;
 
+import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import lombok.AllArgsConstructor;
@@ -20,4 +21,5 @@ public class KnowledgeBaseFilterCriteria {
     private List<KnowledgeBaseArticleStatus> statuses;
     /** Null lets the listing choose: one level, or the subtree under a search or a tag filter. */
     private KnowledgeBaseScope scope;
+    private AssignmentTarget assignedTo;
 }

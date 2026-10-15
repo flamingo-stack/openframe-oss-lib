@@ -376,10 +376,14 @@ export function TrustCenterPageSkeleton({
   backButton = false,
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
-}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'>) {
+  region = true,
+}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'> & {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}) {
   return (
     <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton}>
-      <TrustCenterSkeleton />
+      <TrustCenterSkeleton region={region} />
     </TrustCenterChrome>
   );
 }

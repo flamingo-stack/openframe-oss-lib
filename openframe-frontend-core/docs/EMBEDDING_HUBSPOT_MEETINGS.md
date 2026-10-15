@@ -192,3 +192,26 @@ host's own fallback in the same box and the same type:
   `BookingConfirmation`, `MeetingBookingErrorCode`, `SUPPORTED_FORM_FIELD_TYPES`,
   `MAX_MONTH_OFFSET`.
 - `utils/hubspot-meetings-convention` — the slug parser + label helpers.
+
+## The modal layout (`layout="modal"`)
+
+The card above is a page embed: a context panel beside (or over) the calendar. A 600px
+window has no room for a side column, so the onboarding "Book an Onboarding Call" modal
+asks for `layout="modal"`:
+
+```tsx
+<HubSpotMeetingScheduler meetingId={link.id} layout="modal" onBack={onClose} onBooked={...} />
+```
+
+- The host strip runs across the top with the length on its right: chips when the link
+  offers several lengths, the length alone otherwise. The timezone row sits under it at
+  every width on the calendar step only; the form restates the zone in its summary line.
+- The calendar keeps its width; the times run down one column beside it and scroll inside
+  the calendar's height. On a phone the two stack and the times are four across.
+- A time is chosen, not submitted. Continue, in a footer under the card, opens the details
+  form; Back on the form returns to the calendar. On a phone Cancel sits beside Continue and
+  calls `onBack` (the window has no X there); from the tablet step up the window's own X is
+  the exit and Cancel is not drawn.
+- Opt-in: the default `layout="card"` is byte for byte what every existing embed renders.
+  `flow="details-first"` has no modal arrangement and keeps the card.
+

@@ -4,7 +4,7 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
-import { Skeleton } from '../ui/skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -185,11 +185,11 @@ const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkelet
   ({ className, showTokens = false, ...props }, ref) => (
     <div ref={ref} aria-hidden className={cn('flex items-center gap-1 text-h6', className)} {...props}>
       {/* provider icon */}
-      <Skeleton className="h-5 w-4 shrink-0 rounded-sm" />
+      <UnifiedSkeleton className="h-5 w-4 shrink-0 rounded-sm" />
       {/* model name */}
-      <Skeleton className="h-5 w-24" />
+      <UnifiedSkeleton className="h-5 w-24" />
       {/* "X / Y tokens used" tail — only when tokens are expected */}
-      {showTokens && <Skeleton className="ml-auto h-3 w-32" />}
+      {showTokens && <UnifiedSkeleton className="ml-auto h-3 w-32" />}
     </div>
   ),
 );

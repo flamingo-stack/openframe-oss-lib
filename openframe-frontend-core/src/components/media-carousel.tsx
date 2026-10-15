@@ -6,6 +6,7 @@ import { cn } from '../utils/cn';
 import type { MediaItem } from '../utils/media-carousel-utils-stub';
 import { Video } from './features/video';
 import { ImageOffIcon } from './icons-v2-generated/audio-and-visual/image-off-icon';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
 
 // Navigation icons
@@ -214,7 +215,7 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
     const imageLoaded = loadedImageSrc === rawSrc;
     return (
       <div className="absolute inset-0 bg-ods-bg">
-        {!imageLoaded && <div className="absolute inset-0 z-[1] animate-pulse bg-ods-card/90" aria-hidden />}
+        {!imageLoaded && <UnifiedSkeleton className="absolute inset-0 z-[1] h-full rounded-none" aria-hidden />}
         <Image
           src={displayImageSrc(rawSrc)}
           alt={item.alt || `Media ${index + 1}`}

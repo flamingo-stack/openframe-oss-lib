@@ -4,6 +4,7 @@ import com.openframe.api.dto.force.request.ForceClientFeatureFlagsRequest;
 import com.openframe.api.dto.force.response.ForceAgentStatus;
 import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponse;
 import com.openframe.api.dto.force.response.ForceClientFeatureFlagsResponseItem;
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
@@ -37,7 +38,7 @@ public class ForceClientFeatureFlagsService {
         if (!isClientFeatureFlagsDeliveryEnabled()) {
             throw new IllegalStateException("Client feature flags are not delivered by the engine on this environment");
         }
-        Map<String, Boolean> flags = currentFlags();
+        Map<String, ClientFeatureFlag> flags = currentFlags();
         List<ForceClientFeatureFlagsResponseItem> responseItems = machineIds.stream()
                 .map(machineId -> processMachine(machineId, flags))
                 .toList();
@@ -46,7 +47,7 @@ public class ForceClientFeatureFlagsService {
         return response;
     }
 
-    private ForceClientFeatureFlagsResponseItem processMachine(String machineId, Map<String, Boolean> flags) {
+    private ForceClientFeatureFlagsResponseItem processMachine(String machineId, Map<String, ClientFeatureFlag> flags) {
         try {
             deliveryDispatcher.dispatch(ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags));
             return buildResponseItem(machineId, ForceAgentStatus.PROCESSED);
@@ -56,7 +57,7 @@ public class ForceClientFeatureFlagsService {
         }
     }
 
-    private Map<String, Boolean> currentFlags() {
+    private Map<String, ClientFeatureFlag> currentFlags() {
         OpenFrameClientConfiguration configuration = clientConfigurationService.get();
         return requireNonNullElse(configuration.getFeatureFlags(), Map.of());
     }

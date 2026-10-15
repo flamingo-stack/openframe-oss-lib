@@ -3,7 +3,7 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Settings01Icon, SidebarIcon } from '../icons-v2-generated';
-import { Skeleton } from '../ui/skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar } from '../ui/square-avatar';
 
 export interface ChatTopNavigationProps extends HTMLAttributes<HTMLElement> {
@@ -72,10 +72,10 @@ const ChatTopNavigation = forwardRef<HTMLElement, ChatTopNavigationProps>(
         <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)]">
           {isLoading ? (
             <>
-              <Skeleton className="size-10 shrink-0 rounded-full" />
+              <UnifiedSkeleton className="size-10 shrink-0 rounded-full" />
               <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-                <Skeleton className="h-5 w-24" />
-                <Skeleton className="h-4 w-32" />
+                <UnifiedSkeleton className="h-5 w-24" />
+                <UnifiedSkeleton className="h-4 w-32" />
               </div>
             </>
           ) : (

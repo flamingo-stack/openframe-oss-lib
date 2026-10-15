@@ -1,68 +1,66 @@
 import { cn } from '../../utils/cn';
-import { OrganizationIconSkeleton } from './organization-icon-skeleton';
+import { LoadingRegion } from './loading-region';
+import { UnifiedSkeleton } from './unified-skeleton';
 
 export interface DeviceCardSkeletonProps {
   /**
    * Additional CSS classes
    */
   className?: string;
+  /** Hold `DeviceCard`'s "more" button (its `actions.moreButton`). Default `true`. */
+  moreButton?: boolean;
+  /**
+   * Hold the box of `DeviceCard`'s `actions.detailsButton.component` with these size classes
+   * (e.g. `'h-12 w-[88px]'`). Omit when the card has no details button.
+   */
+  detailsButtonClassName?: string;
 }
 
 /**
- * DeviceCardSkeleton - Loading skeleton matching DeviceCard exact layout
+ * DeviceCardSkeleton: the loading box of `DeviceCard` (`ui/device-card.tsx`), box for box:
+ * the same container classes, then
+ * - Row 1: the bordered device-icon box, the OS icon and name line (`text-h4`) over the
+ *   organization line (`text-h6`), the bordered "more" button (`moreButton`) and/or the details
+ *   button's box (`detailsButtonClassName`);
+ * - Row 2: the status tag (`Tag`'s `h-8`) and the "Last seen" line (`text-h6`).
  *
- * Matches the structure of DeviceCard:
- * - Row 1: Device icon + Device name + More button
- * - Row 2: OS badge + Organization icon + Organization name
- * - Row 3: Status badge + Last seen
- *
- * Prevents layout jumps by matching exact dimensions.
+ * The loaded card replaces it with no movement.
  */
-export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
+export function DeviceCardSkeleton({ className, moreButton = true, detailsButtonClassName }: DeviceCardSkeletonProps) {
   return (
     <div
-      className={cn('h-full rounded-[6px] border border-ods-border bg-ods-card', className)}
-      role="status"
-      aria-label="Loading device card"
+      className={cn(
+        'overflow-clip rounded-[6px] border border-ods-border bg-ods-card',
+        'flex flex-col gap-4 p-4',
+        className,
+      )}
     >
-      {/* Row 1: Device icon + Device name + More button */}
-      <div className="flex items-center gap-4 px-4 py-3">
-        {/* Device type icon (8x8 container) */}
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-bg">
-          <div className="h-4 w-4 animate-pulse rounded bg-ods-border" />
+      {/* Row 1: device icon | name over organization | more button */}
+      <div className="flex w-full items-center gap-4">
+        <div className="flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-2">
+          <UnifiedSkeleton className="size-4 rounded" />
         </div>
-
-        {/* Device name */}
-        <div className="min-w-0 flex-1">
-          <div className="h-6 w-3/4 animate-pulse rounded bg-ods-border" />
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          {/* OS icon (16px) + name, one `text-h4` line */}
+          <div className="flex items-center gap-1 text-h4">
+            <UnifiedSkeleton className="size-4 shrink-0 rounded" />
+            <UnifiedSkeleton className="h-[1lh] w-3/4 rounded" />
+          </div>
+          <UnifiedSkeleton className="h-[1lh] w-1/2 rounded text-h6" />
         </div>
-
-        {/* More button */}
-        <div className="h-12 w-12 flex-shrink-0 animate-pulse rounded-[6px] bg-ods-border" />
+        {moreButton && (
+          <div className="flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-3">
+            <UnifiedSkeleton className="size-6 rounded" />
+          </div>
+        )}
+        {detailsButtonClassName && <UnifiedSkeleton className={cn('shrink-0 rounded-[6px]', detailsButtonClassName)} />}
       </div>
 
-      {/* Row 2: OS badge + Organization */}
-      <div className="flex items-center gap-4 px-4 py-2">
-        {/* OS badge */}
-        <div className="h-6 w-24 flex-shrink-0 animate-pulse rounded bg-ods-border" />
-
-        {/* Organization icon */}
-        <OrganizationIconSkeleton size="sm" />
-
-        {/* Organization name */}
-        <div className="min-w-0 flex-1">
-          <div className="h-5 w-1/2 animate-pulse rounded bg-ods-border" />
-        </div>
-      </div>
-
-      {/* Row 3: Status badge + Last seen */}
-      <div className="flex items-center gap-4 px-4 py-2">
-        {/* Status badge */}
-        <div className="h-6 w-20 flex-shrink-0 animate-pulse rounded-full bg-ods-border" />
-
-        {/* Last seen */}
-        <div className="flex-1">
-          <div className="h-5 w-40 animate-pulse rounded bg-ods-border" />
+      {/* Row 2: status tag | last seen */}
+      <div className="flex w-full items-center gap-2">
+        <UnifiedSkeleton className="h-8 w-20 shrink-0 rounded-md" />
+        <div className="min-w-0 flex-1 text-h6">
+          <UnifiedSkeleton className="h-[1lh] w-40 max-w-full rounded" />
         </div>
       </div>
     </div>
@@ -78,16 +76,25 @@ export function DeviceCardSkeleton({ className }: DeviceCardSkeletonProps) {
  * - Desktop (lg): 3 columns
  * - Large (xl): 4 columns
  */
-export function DeviceCardSkeletonGrid({ count = 12, className }: { count?: number; className?: string }) {
+export function DeviceCardSkeletonGrid({
+  region = true,
+  count = 12,
+  className,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  count?: number;
+  className?: string;
+}) {
   return (
-    <div
+    <LoadingRegion
+      label="Loading devices"
+      announce={region}
       className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2 content-lg:grid-cols-4', className)}
-      role="status"
-      aria-label={`Loading ${count} device cards`}
     >
       {Array.from({ length: count }, (_, index) => (
         <DeviceCardSkeleton key={index} />
       ))}
-    </div>
+    </LoadingRegion>
   );
 }

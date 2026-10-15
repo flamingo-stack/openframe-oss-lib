@@ -2,7 +2,7 @@
 
 import { type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../../utils/cn';
-import { Skeleton } from '../../ui/skeleton';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 export interface TicketCardSkeletonProps extends HTMLAttributes<HTMLDivElement> {}
 
@@ -19,21 +19,21 @@ export const TicketCardSkeleton = forwardRef<HTMLDivElement, TicketCardSkeletonP
       <div className="flex items-start gap-[var(--spacing-system-sf)]">
         <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
           <div className="flex items-center text-h3">
-            <Skeleton className="h-4 w-3/4" />
+            <UnifiedSkeleton className="h-4 w-3/4" />
           </div>
           <div className="flex items-center gap-[var(--spacing-system-xxs)] text-h6">
-            <Skeleton className="size-4 shrink-0 rounded-sm" />
-            <Skeleton className="h-3 w-1/2" />
+            <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />
+            <UnifiedSkeleton className="h-3 w-1/2" />
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
-          <Skeleton className="size-4 rounded-sm" />
-          <Skeleton className="size-8 rounded-full" />
+          <UnifiedSkeleton className="size-4 rounded-sm" />
+          <UnifiedSkeleton className="size-8 rounded-full" />
         </div>
       </div>
       <div className="flex h-8 items-center gap-[var(--spacing-system-xxs)]">
-        <Skeleton className="h-8 w-16 rounded-md" />
-        <Skeleton className="h-8 w-12 rounded-md" />
+        <UnifiedSkeleton className="h-8 w-16 rounded-md" />
+        <UnifiedSkeleton className="h-8 w-12 rounded-md" />
       </div>
     </div>
   ),

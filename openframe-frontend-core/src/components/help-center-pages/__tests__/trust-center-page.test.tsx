@@ -123,7 +123,9 @@ describe('TrustCenterPage', () => {
     let answer: (response: Response) => void = () => {};
     fetchMock.mockReturnValueOnce(new Promise<Response>(resolve => (answer = resolve)));
     render(<TrustCenterPage endpoint="/content/api/trust-center" />);
-    const loading = await screen.findByLabelText('Loading the trust center');
+    // The loading region's one status names what loads; the skeleton under it carries the real headings.
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading the trust center');
+    const loading = document.body;
     for (const [label, lead] of [
       ['Compliance', TRUST_SECTION_LEADS.compliance],
       ['Controls', TRUST_SECTION_LEADS.controls],
@@ -134,13 +136,13 @@ describe('TrustCenterPage', () => {
     }
     act(() => answer(jsonResponse(makeData())));
     expect(await screen.findByText('SOC 2 Type II')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Loading the trust center')).toBeNull();
+    expect(screen.queryByText('Loading the trust center')).toBeNull();
   });
 
   it('TrustCenterPageSkeleton wears the page chrome it is given: no title and subtitle means no header at all', () => {
     const { rerender } = render(<TrustCenterPageSkeleton shell={false} title="" subtitle="" />);
     expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
-    expect(screen.getByLabelText('Loading the trust center')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading the trust center');
     rerender(<TrustCenterPageSkeleton shell={false} />);
     expect(screen.getByRole('heading', { level: 1, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
   });

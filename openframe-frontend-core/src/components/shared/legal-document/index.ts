@@ -8,7 +8,15 @@
 
 export {
   LegalDocumentPage,
+  legalDocumentStampLabel,
   type LegalDocumentPageProps,
   type LegalDocumentMarkdownRendererProps,
 } from './legal-document-page';
 export { useLegalDocs, type LegalDocument, type UseLegalDocsOptions, type UseLegalDocsReturn } from './use-legal-docs';
+export {
+  useLegalDocuments,
+  toLegalDocumentSummaries,
+  type LegalDocumentSummary,
+  type UseLegalDocumentsOptions,
+  type UseLegalDocumentsReturn,
+} from './use-legal-documents';

@@ -1,5 +1,6 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
@@ -30,7 +31,7 @@ import static org.mockito.Mockito.when;
 class AgentRegistrationClientFeatureFlagsServiceTest {
 
     private static final String MACHINE_ID = "mach-42";
-    private static final Map<String, Boolean> FLAGS = Map.of("delivery-tool-installation", true);
+    private static final Map<String, ClientFeatureFlag> FLAGS = Map.of("delivery-tool-installation", new ClientFeatureFlag(true, "1.6.0"));
 
     @Mock private OpenFrameClientConfigurationService clientConfigurationService;
     @Mock private DeliveryDispatcher deliveryDispatcher;

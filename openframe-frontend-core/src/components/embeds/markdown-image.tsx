@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
 
 /**
@@ -63,9 +64,10 @@ export function MarkdownImage({ src, alt }: { src: string; alt?: string }) {
   // Reserve a neutral box while probing so the layout doesn't jump when the image appears.
   if (!ratio) {
     return (
-      <span
-        className="mx-auto my-2 block w-full max-w-full animate-pulse rounded-lg bg-ods-card"
-        style={{ aspectRatio: '3 / 2', maxHeight: `${MAX_H_REM}rem` }}
+      <UnifiedSkeleton
+        as="span"
+        className="mx-auto my-2 block aspect-[3/2] w-full max-w-full rounded-lg"
+        style={{ maxHeight: `${MAX_H_REM}rem` }}
         aria-hidden
       />
     );

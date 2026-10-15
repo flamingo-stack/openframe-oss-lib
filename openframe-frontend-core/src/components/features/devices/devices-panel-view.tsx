@@ -70,6 +70,11 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
    * are the real ones, locked, and only the rows are skeletons.
    */
   loading?: boolean;
+  /**
+   * The loading state announces itself, once ("Loading devices…"; the table or grid inside it stays quiet).
+   * `false` inside another loading region. Default `true`.
+   */
+  loadingRegion?: boolean;
   /** The rows on screen answer the previous narrowing while the next loads: dimmed, not replaced. */
   isNarrowing?: boolean;
   /** Server-side total for the current narrowing. */
@@ -127,6 +132,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   actions,
   devices,
   loading = false,
+  loadingRegion = true,
   isNarrowing = false,
   totalCount,
   deviceFilters = null,
@@ -157,6 +163,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
         <DevicesTableBody
           devices={devices}
           isLoading={loading}
+          loadingRegion={false}
           emptyMessage={loading ? '' : emptyMessage}
           skeletonRows={10}
           stickyHeaderOffset="top-[96px]"
@@ -198,6 +205,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           <DevicesGrid
             devices={devices}
             isLoading={loading}
+            loadingRegion={false}
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             sentinelRef={gridSentinelRef}
@@ -227,7 +235,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
       contentClassName="flex flex-col"
     >
       {headerSlot}
-      {loading && (
+      {loading && loadingRegion && (
         <span role="status" className="sr-only">
           Loading devices…
         </span>

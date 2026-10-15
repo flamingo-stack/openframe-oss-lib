@@ -16,6 +16,7 @@ export function QueryReportTable({
   title,
   data,
   loading = false,
+  loadingRegion = true,
   skeletonRows = 8,
   skeletonColumns = 6,
   emptyMessage,
@@ -84,6 +85,7 @@ export function QueryReportTable({
           columns={skeletonColumns}
           columnWidth={columnWidth}
           variant={variant}
+          region={loadingRegion}
         />
       )}
 

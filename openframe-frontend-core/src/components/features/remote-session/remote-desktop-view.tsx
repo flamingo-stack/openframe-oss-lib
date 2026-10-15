@@ -11,9 +11,10 @@ import {
   Settings01Icon,
 } from '../../icons-v2-generated';
 import { PageLayout } from '../../layout/page-layout';
+import { LoadingRegion } from '../../loading/loading-region';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-menu';
 import { Button } from '../../ui/button/button';
-import { Skeleton } from '../../ui/skeleton';
 import { TruncateText } from '../../ui/truncate-text';
 import { RemoteDesktopFullscreenToolbar } from './remote-desktop-fullscreen-toolbar';
 
@@ -206,27 +207,36 @@ export function RemoteDesktopView({
 }
 
 /** The page while the device is still loading: the header bar as placeholders over an empty screen. */
-export function RemoteDesktopViewSkeleton({ onBack }: Pick<RemoteDesktopViewProps, 'onBack'>) {
+export function RemoteDesktopViewSkeleton({
+  onBack,
+  region = true,
+}: Pick<RemoteDesktopViewProps, 'onBack'> & {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}) {
   return (
     <PageLayout className={PAGE_CLASS} backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}>
-      <div className={CONTROLS_BAR_CLASS}>
-        <div className={CONTROLS_ROW_CLASS}>
-          <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
-            <Skeleton className="h-9 w-9 flex-shrink-0 rounded-md" />
-            <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-              <Skeleton className="h-5 w-48" />
-              <Skeleton className="h-4 w-36" />
+      {/* `contents`: the page's own children stay its layout items; the region adds the one announcement. */}
+      <LoadingRegion label="Loading the remote session" announce={region} className="contents">
+        <div className={CONTROLS_BAR_CLASS}>
+          <div className={CONTROLS_ROW_CLASS}>
+            <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
+              <UnifiedSkeleton className="h-9 w-9 flex-shrink-0 rounded-md" />
+              <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+                <UnifiedSkeleton className="h-5 w-48" />
+                <UnifiedSkeleton className="h-4 w-36" />
+              </div>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
+              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
+              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
+              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
             </div>
           </div>
-          <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
-            <Skeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-            <Skeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-            <Skeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-          </div>
         </div>
-      </div>
 
-      <div className="min-h-0 min-w-0 flex-1 rounded-lg bg-black" />
+        <div className="min-h-0 min-w-0 flex-1 rounded-lg bg-black" />
+      </LoadingRegion>
     </PageLayout>
   );
 }

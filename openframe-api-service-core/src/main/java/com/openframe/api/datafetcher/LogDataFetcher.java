@@ -8,6 +8,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLLogMapper;
+import com.openframe.api.service.LogDetailsService;
 import com.openframe.api.service.LogService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -23,10 +24,11 @@ import java.util.Optional;
 @Slf4j
 @Validated
 @AllArgsConstructor
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.tool-events.store")
 public class LogDataFetcher {
 
     private final LogService logService;
+    private final LogDetailsService logDetailsService;
     private final GraphQLLogMapper logMapper;
 
     @DgsQuery
@@ -74,7 +76,7 @@ public class LogDataFetcher {
         log.debug("Fetching audit details for ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {}",
                 ingestDay, toolType, eventType, timestamp, toolEventId);
 
-        Optional<LogDetails> details = logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId);
+        Optional<LogDetails> details = logDetailsService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId);
         if (details.isPresent()) {
             log.debug("Successfully fetched audit details for toolEventId: {}", toolEventId);
             return details.get();

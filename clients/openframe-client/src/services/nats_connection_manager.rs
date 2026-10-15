@@ -330,6 +330,11 @@ impl NatsConnectionManager {
         Ok(format!("{}/ws/nats?authorization={}", host, token))
     }
 
+    #[cfg(test)]
+    pub(crate) fn use_client_for_tests(&self, client: Client) {
+        self.client.send_replace(Some(Arc::new(client)));
+    }
+
     pub async fn get_client(&self) -> Result<Arc<Client>> {
         self.client
             .borrow()
