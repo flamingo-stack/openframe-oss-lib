@@ -227,7 +227,7 @@ export function AppLayout({
                 onToggleMobileMenu={handleToggleMobileMenu}
                 disabled={disabled}
               />
-              <NotificationDrawer />
+              <NotificationDrawer showClose={!desktopHeader} />
 
               {/* Main + AppLayoutDrawer portal target. `relative` so the drawer
               can absolutely position within just this area (not over
