@@ -188,6 +188,9 @@ export default defineConfig([
       // is under test is its display mode — `contents` versus a positioned box —
       // which no `screen` query can reach, so the test walks up from the control.
       'src/components/ui/__tests__/field-wrapper-error-slot.test.tsx',
+      // Where a menu opened inside ModalV2 hangs: in the role-less `z-[1300]` layer,
+      // not under <body>. The test walks up from the dialog to reach that layer.
+      'src/components/ui/__tests__/modal-portal-host.test.tsx',
       // The store badges paint through <linearGradient>/<clipPath> elements addressed
       // by id, and the contract is that those ids are unique PER INSTANCE — two badge
       // rows on one page must not resolve each other's <defs>. A <defs> child has no

@@ -2,6 +2,12 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { Button } from '../components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { Input } from '../components/ui/input';
 import {
   ModalV2,
@@ -414,6 +420,47 @@ export const PinnedHeaderAndFooter: Story = {
               <Button onClick={() => setIsOpen(false)}>Save</Button>
             </div>
           </ModalV2Footer>
+        </ModalV2>
+      </>
+    );
+  },
+};
+
+/**
+ * A dropdown opened inside the modal portals into the modal's own layer, so it
+ * stacks over the panel rather than under the `z-[1300]` overlay.
+ */
+export const WithMenu: Story = {
+  args: {
+    isOpen: true,
+    onClose: fn(),
+    size: 'default',
+    children: null,
+  },
+  render: function Render(args) {
+    const [isOpen, setIsOpen] = useState(args.isOpen);
+
+    return (
+      <>
+        <Button onClick={() => setIsOpen(true)} variant="outline">
+          Open modal with a menu
+        </Button>
+        <ModalV2 isOpen={isOpen} onClose={() => setIsOpen(false)} size={args.size}>
+          <ModalV2Header>
+            <ModalV2Title>Move vendor</ModalV2Title>
+          </ModalV2Header>
+          <ModalV2Content>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">Pick a folder</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem>Endpoint security</DropdownMenuItem>
+                <DropdownMenuItem>Backup</DropdownMenuItem>
+                <DropdownMenuItem>Identity</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </ModalV2Content>
         </ModalV2>
       </>
     );
