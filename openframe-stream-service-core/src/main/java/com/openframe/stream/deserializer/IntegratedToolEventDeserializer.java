@@ -49,6 +49,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
             }
             long eventTimestamp = getEffectiveTimestamp(debeziumMessage, after);
             String sourceEventType = getSourceEventType(after).orElse(UNKNOWN);
+            Integer sourceMessageId = getSourceMessageId(after).orElse(null);
 
             // Build complete details JSON with error, result, and dynamic fields
             String detailsJson = buildDetailsJson(after);
@@ -59,7 +60,7 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
                     .ingestDay(formatter.format(Instant.ofEpochMilli(eventTimestamp)))
                     .sourceEventType(sourceEventType)
                     .toolEventId(generateCompositeId(debeziumMessage, messageType, after))
-                    .unifiedEventType(getEventType(sourceEventType, messageType.getIntegratedToolType()))
+                    .unifiedEventType(getEventType(sourceEventType, sourceMessageId, messageType.getIntegratedToolType()))
                     .message(getMessage(after).orElse(null))
                     .integratedToolType(messageType.getIntegratedToolType())
                     .debeziumMessage(getDebeziumMessage(after))
@@ -152,6 +153,10 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
     }
 
     protected Optional<String> getTenantId(JsonNode afterField) {
+        return Optional.empty();
+    }
+
+    protected Optional<Integer> getSourceMessageId(JsonNode afterField) {
         return Optional.empty();
     }
 
@@ -266,8 +271,8 @@ public abstract class IntegratedToolEventDeserializer implements KafkaMessageDes
      */
     abstract protected String getDetails(JsonNode after);
 
-    private UnifiedEventType getEventType(String sourceEventType, IntegratedToolType toolType) {
-        return EventTypeMapper.mapToUnifiedType(toolType, sourceEventType);
+    private UnifiedEventType getEventType(String sourceEventType, Integer messageId, IntegratedToolType toolType) {
+        return EventTypeMapper.mapToUnifiedType(toolType, sourceEventType, messageId);
     }
 
     /**
