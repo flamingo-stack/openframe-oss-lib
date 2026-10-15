@@ -19,6 +19,7 @@ import { AlertTriangleIcon } from '../icons-v2-generated/interface/alert-triangl
 import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { Button } from '../ui/button';
@@ -347,7 +348,12 @@ export function ModelTokenRatesUnavailable({ className }: { className?: string }
 }
 
 /** The table's loading footprint: the provider tabs, the header and rows of the boxes the loaded rows use. */
-export function ModelTokenRatesSkeleton() {
+export function ModelTokenRatesSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   const cells = (
     <>
       <div className="flex-1" />
@@ -356,7 +362,7 @@ export function ModelTokenRatesSkeleton() {
     </>
   );
   return (
-    <div aria-busy="true" className="min-h-0 flex-1 overflow-hidden">
+    <LoadingRegion label="Loading the model token rates" announce={region} className="min-h-0 flex-1 overflow-hidden">
       <div className={cn('border-b border-ods-border py-[var(--spacing-system-xs)]', PAD_X)}>
         <UnifiedSkeleton className={TABS_SKELETON_CLASS} />
       </div>
@@ -371,7 +377,7 @@ export function ModelTokenRatesSkeleton() {
           {cells}
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
 }
 

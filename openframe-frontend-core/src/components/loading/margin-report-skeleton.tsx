@@ -1,7 +1,10 @@
 import type React from 'react';
+import { LoadingRegion } from './loading-region';
 import { UnifiedSkeleton } from './unified-skeleton';
 
 interface MarginReportSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   /** Enable pulse animation (default: true) */
   animate?: boolean;
   /** Optional explanation text shown above overlay content */
@@ -10,9 +13,19 @@ interface MarginReportSkeletonProps {
   overlayContent?: React.ReactNode;
 }
 
-export function MarginReportSkeleton({ animate = true, description, overlayContent }: MarginReportSkeletonProps) {
+export function MarginReportSkeleton({
+  region = true,
+  animate = true,
+  description,
+  overlayContent,
+}: MarginReportSkeletonProps) {
   return (
-    <main className="relative min-h-screen bg-ods-bg">
+    <LoadingRegion
+      label="Loading the report"
+      as="main"
+      announce={region && !overlayContent}
+      className="relative min-h-screen bg-ods-bg"
+    >
       <div className="mx-auto max-w-[1920px] space-y-10 px-6 py-6 content-md:px-20 content-md:py-10">
         {/* Header */}
         <div className="space-y-3">
@@ -135,6 +148,6 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
           </div>
         </div>
       )}
-    </main>
+    </LoadingRegion>
   );
 }

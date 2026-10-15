@@ -1,6 +1,7 @@
 'use client';
 
 import { PageLayout } from '../layout/page-layout';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface DetailPageSkeletonProps {
@@ -11,15 +12,21 @@ export interface DetailPageSkeletonProps {
    *  matches the loaded page's width, padding, and min-height. Default false
    *  (self-contained `<PageLayout>` at the hub article width). */
   bare?: boolean;
+  /** What is loading, read once by a screen reader. Default "Loading". */
+  label?: string;
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
 }
 
 export function DetailPageSkeleton({
   metadataColumns = 4,
   showImageGallery = true,
   bare = false,
+  label = 'Loading',
+  region = true,
 }: DetailPageSkeletonProps = {}) {
   const content = (
-    <div className="space-y-6 content-md:space-y-10">
+    <LoadingRegion label={label} announce={region} className="space-y-6 content-md:space-y-10">
       {/* Title Block */}
       <div className="flex w-full flex-col gap-6">
         <UnifiedSkeleton className="h-16 w-full max-w-3xl rounded content-md:h-20" />
@@ -70,7 +77,7 @@ export function DetailPageSkeleton({
           </div>
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
   if (bare) return content;
   return (

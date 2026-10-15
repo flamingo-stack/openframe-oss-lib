@@ -105,8 +105,6 @@ export function ChatMessageRow({ displayName, avatarUrl, timeLabel, body, footer
  * name/time/body line-heights so the loading→loaded swap does not reflow.
  */
 export function ChatMessageRowSkeleton() {
-  // Bars use `bg-ods-border` (NOT `bg-ods-skeleton` — that token resolves to
-  // transparent in this build, leaving the box visually empty).
   return (
     <div className="flex w-full min-w-0 gap-2 md:gap-3">
       <UnifiedSkeleton className="h-8 w-8 flex-shrink-0 rounded-lg md:h-10 md:w-10" />

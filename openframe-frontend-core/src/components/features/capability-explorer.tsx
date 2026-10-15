@@ -6,6 +6,7 @@ import { cn } from '../../utils/cn';
 import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
 import { TruncateText } from '../ui/truncate-text';
@@ -232,9 +233,18 @@ function JobHeadSkeleton() {
  * first card over the carousel's controls. Every box is the loaded one's, so
  * nothing moves when the jobs arrive.
  */
-export function CapabilityExplorerSkeleton({ className, count = 8 }: { className?: string; count?: number }) {
+export function CapabilityExplorerSkeleton({
+  region = true,
+  className,
+  count = 8,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  className?: string;
+  count?: number;
+}) {
   return (
-    <div className={className} aria-hidden>
+    <LoadingRegion label="Loading capabilities" announce={region} className={className}>
       <div className="content-lg:hidden">
         <div className="flex gap-[var(--spacing-system-sf)] overflow-hidden">
           <div
@@ -323,7 +333,7 @@ export function CapabilityExplorerSkeleton({ className, count = 8 }: { className
           </div>
         </div>
       </div>
-    </div>
+    </LoadingRegion>
   );
 }
 

@@ -56,7 +56,6 @@ export * from './social-icon-row';
 export * from './user-display';
 export * from './vendor-display-button';
 export * from './vendor-icon';
-export * from './vendor-page-skeleton';
 export * from './vendor-tag';
 export * from './why-it-matters';
 export * from './yes-no-display';

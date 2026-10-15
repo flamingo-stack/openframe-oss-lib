@@ -12,11 +12,19 @@ import { UnifiedSkeleton } from '../loading/unified-skeleton';
  *  (ClaudeEmbed probing for a self-hosted mirror, before it has a `src`)
  *  can render the IDENTICAL skeleton through `EmbedViewerFrame`, keeping
  *  every embed's loading state 1:1 with the Figma/Sheets/PDF viewers. */
-export function EmbedLoadingSkeleton({ height }: { height?: string }) {
+export function EmbedLoadingSkeleton({
+  height,
+  region = true,
+}: {
+  height?: string;
+  /** The box announces itself (one named status). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}) {
   return (
     <UnifiedSkeleton
       className="w-full overflow-hidden rounded-lg border border-ods-border"
       height={height || 'calc(100vh - 250px)'}
+      aria-label={region ? 'Loading the embed' : undefined}
     />
   );
 }

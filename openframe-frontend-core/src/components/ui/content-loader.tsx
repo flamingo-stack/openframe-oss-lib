@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface ContentLoaderProps {
@@ -24,6 +25,10 @@ export interface ContentLoaderProps {
    * Container CSS classes
    */
   containerClassName?: string;
+  /** What is loading, read once by a screen reader. Default "Loading". */
+  label?: string;
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
 }
 
 /**
@@ -36,6 +41,8 @@ export function ContentLoader({
   showTitle = true,
   className,
   containerClassName,
+  label = 'Loading',
+  region = true,
 }: ContentLoaderProps) {
   const renderCardSkeleton = () => (
     <div>
@@ -131,9 +138,9 @@ export function ContentLoader({
   };
 
   return (
-    <div className={cn('p-6', containerClassName)}>
+    <LoadingRegion label={label} announce={region} className={cn('p-6', containerClassName)}>
       <div className={cn(className)}>{renderSkeleton()}</div>
-    </div>
+    </LoadingRegion>
   );
 }
 

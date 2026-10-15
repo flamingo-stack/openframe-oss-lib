@@ -26,6 +26,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { LoadingRegion } from '../../loading/loading-region';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 export interface DevCardRowContentProps {
@@ -106,12 +107,23 @@ export function DevCardRowSkeleton() {
  * used by every list shell. Both delivery (`delivery-table.tsx`) and
  * tickets (`tickets-list.tsx`) mount this directly.
  */
-export function DevCardRowSkeletonList({ rows = 5 }: { rows?: number }) {
+export function DevCardRowSkeletonList({
+  region = true,
+  rows = 5,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  rows?: number;
+}) {
   return (
-    <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+    <LoadingRegion
+      label="Loading"
+      announce={region}
+      className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card"
+    >
       {Array.from({ length: rows }, (_, i) => (
         <DevCardRowSkeleton key={i} />
       ))}
-    </div>
+    </LoadingRegion>
   );
 }

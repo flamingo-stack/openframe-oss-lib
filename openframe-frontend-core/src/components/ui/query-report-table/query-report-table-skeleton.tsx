@@ -1,10 +1,12 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { LoadingRegion } from '../../loading/loading-region';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import type { QueryReportTableSkeletonProps } from './types';
 
 export function QueryReportTableSkeleton({
+  region = true,
   rows,
   columns,
   columnWidth,
@@ -14,7 +16,11 @@ export function QueryReportTableSkeleton({
   const isCompact = variant === 'compact';
 
   return (
-    <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]', className)}>
+    <LoadingRegion
+      label="Loading results"
+      announce={region}
+      className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]', className)}
+    >
       {/* Skeleton header */}
       <div className={cn('flex items-center gap-4 px-4', isCompact ? 'border-b border-ods-border py-2' : '')}>
         {Array.from({ length: columns }).map((_, i) => (
@@ -46,6 +52,6 @@ export function QueryReportTableSkeleton({
           </div>
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
 }

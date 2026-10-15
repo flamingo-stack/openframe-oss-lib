@@ -1,18 +1,26 @@
 'use client';
 
+import { LoadingRegion } from '../../loading/loading-region';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 interface FileManagerSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   rows?: number;
   showSearch?: boolean;
   showActions?: boolean;
 }
 
-export function FileManagerSkeleton({ rows = 8, showSearch = true, showActions = true }: FileManagerSkeletonProps) {
+export function FileManagerSkeleton({
+  region = true,
+  rows = 8,
+  showSearch = true,
+  showActions = true,
+}: FileManagerSkeletonProps) {
   const rowPlaceholders = Array.from({ length: rows });
 
   return (
-    <div className="flex h-full flex-col bg-ods-bg">
+    <LoadingRegion label="Loading files" announce={region} className="flex h-full flex-col bg-ods-bg">
       <div className="flex min-h-0 flex-1 flex-col space-y-6 py-6">
         {/* Breadcrumb and Action Bar */}
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -97,6 +105,6 @@ export function FileManagerSkeleton({ rows = 8, showSearch = true, showActions =
           </div>
         </div>
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

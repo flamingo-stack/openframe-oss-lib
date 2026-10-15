@@ -1,5 +1,5 @@
 import { createColumnHelper } from '@tanstack/react-table';
-import { render, within } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { DataTable } from '../components/ui/data-table';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
@@ -76,16 +76,15 @@ type SlotKind = 'row' | 'skeleton' | 'pad';
  * slot is exactly what ships in its class attribute.
  */
 function slots(container: HTMLElement): { kind: SlotKind; classes: string[] }[] {
-  // A placeholder bar is a `UnifiedSkeleton` (`role="status"`), never a slot itself; a skeleton slot
-  // is the row card that holds them.
-  return [...container.querySelectorAll<HTMLElement>('.rounded-md:not([role="status"])')].map(element => {
+  // A placeholder bar (`UnifiedSkeleton`, the pulsing surface) is never a slot itself. A skeleton slot is the
+  // row card hidden from assistive technology (its region announces the loading); a pad row is transparent.
+  return [...container.querySelectorAll<HTMLElement>('.rounded-md:not(.animate-pulse)')].map(element => {
     const classes = element.className.split(/\s+/);
-    const kind: SlotKind =
-      within(element).queryAllByRole('status', { hidden: true }).length > 0
+    const kind: SlotKind = classes.includes('border-transparent')
+      ? 'pad'
+      : element.getAttribute('aria-hidden') === 'true'
         ? 'skeleton'
-        : classes.includes('border-transparent')
-          ? 'pad'
-          : 'row';
+        : 'row';
     return { kind, classes };
   });
 }

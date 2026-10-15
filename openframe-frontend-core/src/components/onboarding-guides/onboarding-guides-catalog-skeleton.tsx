@@ -1,6 +1,7 @@
 'use client';
 
 import { OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 /**
@@ -18,9 +19,14 @@ import { UnifiedSkeleton } from '../loading/unified-skeleton';
  * Wrapper mirrors the loaded view's `w-full flex flex-col gap-10`; per-card
  * height matches the loaded catalog card so resolve shifts are zero.
  */
-export function OnboardingGuidesCatalogSkeleton() {
+export function OnboardingGuidesCatalogSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
-    <div className="flex w-full flex-col gap-10">
+    <LoadingRegion label="Loading onboarding guides" announce={region} className="flex w-full flex-col gap-10">
       {/* Search input placeholder — matches `<SearchInput>` h-12 — plus the
           section pill row (~74 px incl. padding), same as the loaded
           preControls block. */}
@@ -50,6 +56,6 @@ export function OnboardingGuidesCatalogSkeleton() {
           </section>
         ))}
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

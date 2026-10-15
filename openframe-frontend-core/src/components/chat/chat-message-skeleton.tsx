@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 interface ChatMessageSkeletonProps {
@@ -58,6 +59,8 @@ export function ChatMessageSkeleton({
 }
 
 interface ChatMessageListSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   className?: string;
   messageCount?: number;
   showAvatars?: boolean;
@@ -86,6 +89,7 @@ interface ChatMessageListSkeletonProps {
 }
 
 export function ChatMessageListSkeleton({
+  region = true,
   className,
   messageCount = 6,
   showAvatars = true,
@@ -100,7 +104,7 @@ export function ChatMessageListSkeleton({
   }));
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <LoadingRegion label="Loading messages" announce={region} className="relative flex min-h-0 flex-1 flex-col">
       <div
         className={cn(
           'flex h-full w-full flex-1 flex-col',
@@ -132,6 +136,6 @@ export function ChatMessageListSkeleton({
           ))}
         </div>
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

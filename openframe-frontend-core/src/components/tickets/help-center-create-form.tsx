@@ -27,6 +27,7 @@
 
 import { useState, type ChangeEvent } from 'react';
 import { ContactForm } from '../contact';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Input, Label } from '../ui';
 import { RequiredMark } from '../ui/required-mark';
@@ -92,9 +93,18 @@ export interface HelpCenterCreateFormProps {
  * the spacing rule fires identically — without them the whole stack
  * shifts up 24px on every page load.
  */
-export function HelpCenterCreateFormSkeleton() {
+export function HelpCenterCreateFormSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-ods-border p-6 content-md:rounded-3xl content-md:p-8 content-lg:p-10">
+    <LoadingRegion
+      label="Loading the form"
+      announce={region}
+      className="flex h-full flex-col rounded-2xl border border-ods-border p-6 content-md:rounded-3xl content-md:p-8 content-lg:p-10"
+    >
       {/* Heading container — mirrors `mb-6 content-md:mb-8` + h2 with its own
           `mb-3 content-md:mb-4` and `text-h2` height (32px font, line-height
           ~1.25 → 40px). h-10 bar matches the rendered h2 height. */}
@@ -158,7 +168,7 @@ export function HelpCenterCreateFormSkeleton() {
           <UnifiedSkeleton className="h-12 w-32 rounded" />
         </div>
       </div>
-    </div>
+    </LoadingRegion>
   );
 }
 

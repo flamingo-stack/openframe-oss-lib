@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface MingoOnboardingCardSkeletonProps {
@@ -80,6 +81,8 @@ export function MingoOnboardingCardSkeleton({
 }
 
 export interface MingoOnboardingListSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   /** Row count. Defaults to 6 — fills the typical empty-state
    *  viewport so the loader doesn't pop in shorter than the resolved
    *  list. */
@@ -120,12 +123,11 @@ const ROW_VARIANTS: ReadonlyArray<{
   { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
 ];
 
-export function MingoOnboardingListSkeleton({ rows = 6, className }: MingoOnboardingListSkeletonProps) {
+export function MingoOnboardingListSkeleton({ region = true, rows = 6, className }: MingoOnboardingListSkeletonProps) {
   return (
-    <div
-      role="status"
-      aria-label="Loading slash commands"
-      aria-busy="true"
+    <LoadingRegion
+      label="Loading slash commands"
+      announce={region}
       className={cn('overflow-hidden rounded-md border border-ods-border bg-ods-card', className)}
     >
       {Array.from({ length: rows }).map((_, i) => {
@@ -139,6 +141,6 @@ export function MingoOnboardingListSkeleton({ rows = 6, className }: MingoOnboar
           />
         );
       })}
-    </div>
+    </LoadingRegion>
   );
 }

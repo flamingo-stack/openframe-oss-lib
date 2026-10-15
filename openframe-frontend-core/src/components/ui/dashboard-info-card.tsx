@@ -85,10 +85,24 @@ export interface DashboardInfoCardProps {
    */
   caption?: ReactNode;
   /**
-   * The figure is still being fetched: the SAME card, its title, value and caption
-   * drawn as bars of their own line heights, so the loaded card replaces it in place.
+   * The figure is still being fetched: the SAME card, so the loaded card replaces it in
+   * place. `title` / `titleSlot` / `titleTag` / `icon` are drawn as they are (they are known
+   * before the data; with neither title a bar holds the title line), the value and caption are
+   * bars of their own line heights, the progress ring is held when `showProgress` is set, and
+   * the percentage when `loadingShowsPercentage` is set, the sub-value when `loadingShowsSubValue` is set.
    */
   loading?: boolean;
+  /**
+   * While `loading`: hold the percentage's box (plain "(NN%)" text, or a `Tag` when
+   * `percentageDisplay` / `progressVariant` would draw one), because the loaded card will show
+   * a percentage. Default `false`.
+   */
+  loadingShowsPercentage?: boolean;
+  /**
+   * While `loading`: hold the `subValue`'s box (one `text-h6` line beside the value) for a card
+   * whose loaded state will carry one. Default `false`.
+   */
+  loadingShowsSubValue?: boolean;
 }
 
 export function DashboardInfoCard({
@@ -110,17 +124,30 @@ export function DashboardInfoCard({
   subValue,
   caption,
   loading = false,
+  loadingShowsPercentage = false,
+  loadingShowsSubValue = false,
 }: DashboardInfoCardProps) {
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
+  const percentageAsTag =
+    percentageDisplay === 'tag' ||
+    (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
+
   const renderPercentage = () => {
+    if (loading) {
+      if (!loadingShowsPercentage) return null;
+      // The box the loaded percentage takes: a `Tag` (h-8) or one `text-h4` line.
+      return percentageAsTag ? (
+        <UnifiedSkeleton className="h-8 w-12 shrink-0 rounded-md" />
+      ) : (
+        <p className="text-h4">
+          <UnifiedSkeleton as="span" className="block h-[1lh] w-12 rounded" />
+        </p>
+      );
+    }
     if (percentage === undefined) return null;
 
-    const asTag =
-      percentageDisplay === 'tag' ||
-      (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
-
-    if (asTag) {
+    if (percentageAsTag) {
       const tagVariant =
         progressVariant === 'warning' || progressVariant === 'error'
           ? progressVariant
@@ -134,13 +161,13 @@ export function DashboardInfoCard({
   };
 
   const renderProgress = () => {
-    if (!showProgress || percentage === undefined) return null;
+    if (!showProgress || (percentage === undefined && !loading)) return null;
 
     // Keep the ring proportionally weighted (10px stroke at the 56px default).
     const strokeFor = (size: number) => Math.max(2, Math.round((size * 10) / 56));
 
     const common = {
-      percentage,
+      percentage: percentage ?? 0,
       variant: progressVariant,
       overflow: progressOverflow,
       showLabel: false,
@@ -175,6 +202,23 @@ export function DashboardInfoCard({
       rings.push({ key: 'lg', size: lg, className: 'hidden content-lg:block' });
     }
 
+    if (loading) {
+      // The ring's own box at each breakpoint, as a circle.
+      return (
+        <>
+          {rings.map(ring => (
+            <UnifiedSkeleton
+              key={ring.key}
+              variant="circular"
+              width={ring.size}
+              height={ring.size}
+              className={cn('shrink-0', ring.className)}
+            />
+          ))}
+        </>
+      );
+    }
+
     return (
       <>
         {rings.map(ring => (
@@ -204,13 +248,16 @@ export function DashboardInfoCard({
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
-          {loading ? (
-            <p className="text-h5">
-              <UnifiedSkeleton as="span" className="block h-[1lh] w-20 rounded" />
-            </p>
-          ) : (
-            (titleSlot ?? (title !== undefined && <p className="truncate text-ods-text-secondary text-h5">{title}</p>))
-          )}
+          {titleSlot ??
+            (title !== undefined ? (
+              <p className="truncate text-ods-text-secondary text-h5">{title}</p>
+            ) : (
+              loading && (
+                <p className="text-h5">
+                  <UnifiedSkeleton as="span" className="block h-[1lh] w-20 rounded" />
+                </p>
+              )
+            ))}
           {titleTag}
         </div>
 
@@ -219,7 +266,13 @@ export function DashboardInfoCard({
           <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
             {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-24 rounded" /> : formattedValue}
           </p>
-          {subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
+          {loading
+            ? loadingShowsSubValue && (
+                <p className="text-h6">
+                  <UnifiedSkeleton as="span" className="block h-[1lh] w-16 rounded" />
+                </p>
+              )
+            : subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
           {renderPercentage()}
           {tooltip && (
             <FloatingTooltip content={tooltip} side="top">
@@ -257,6 +310,7 @@ export function DashboardInfoCard({
     return (
       <Link
         href={href}
+        aria-busy={loading || undefined}
         className={cn(
           baseClassName,
           captionClassName,
@@ -270,5 +324,11 @@ export function DashboardInfoCard({
     );
   }
 
-  return <div className={cn(baseClassName, captionClassName, className)}>{cardContent}</div>;
+  // Loading, the card is busy: one card announces nothing of its own (a grid of them would say it once per
+  // card); the region it sits in does.
+  return (
+    <div aria-busy={loading || undefined} className={cn(baseClassName, captionClassName, className)}>
+      {cardContent}
+    </div>
+  );
 }

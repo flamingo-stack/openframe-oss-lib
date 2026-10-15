@@ -7,6 +7,7 @@ export {
   SearchContainerSkeleton,
   CategorySidebarSkeleton,
   BreadcrumbSkeleton,
+  BreadcrumbLinkSkeleton,
   ResultsHeaderSkeleton,
   TwoColumnLayoutSkeleton,
   ArticleLayoutSkeleton,
@@ -26,24 +27,12 @@ export { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } fro
 // New unified loading components
 export { ContentLoadingContainer, useContentLoading } from '../content-loading-container';
 
-// Content skeleton components
-export {
-  ParagraphSkeleton,
-  ListSkeleton,
-  TableSkeleton,
-  FormSkeleton,
-  NavigationSkeleton,
-  ProfileSkeleton,
-  CommentSkeleton,
-  FeatureListSkeleton,
-  TimelineSkeleton,
-  PricingSkeleton,
-} from './content-skeleton';
-
 // Profile system loading skeleton
 export { ProfileLoadingSkeleton } from '../profile/ProfileLoadingSkeleton';
 
 export { MspProfileFormSkeleton } from './msp-profile-form-skeleton';
+
+export { SettingsFormSkeleton, type SettingsFormSkeletonProps } from './settings-form-skeleton';
 
 export { CategoryCardSkeleton } from './category-card-skeleton';
 
@@ -56,9 +45,9 @@ export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 // export it here, otherwise server components that import this index will
 // break due to client-only code.
 
-export { MarginReportSkeleton } from './margin-report-skeleton';
+export { LoadingRegion, type LoadingRegionProps } from './loading-region';
 
-export { UsersGridSkeleton } from './users-grid-skeleton';
+export { MarginReportSkeleton } from './margin-report-skeleton';
 
 // Organization & Device skeleton components
 export { OrganizationIconSkeleton } from './organization-icon-skeleton';

@@ -1,13 +1,16 @@
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 interface ProfileLoadingSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   className?: string;
 }
 
-export function ProfileLoadingSkeleton({ className }: ProfileLoadingSkeletonProps) {
+export function ProfileLoadingSkeleton({ region = true, className }: ProfileLoadingSkeletonProps) {
   return (
-    <div className={cn('space-y-6', className)}>
+    <LoadingRegion label="Loading the profile" announce={region} className={cn('space-y-6', className)}>
       {/* Header skeleton */}
       <div className="flex items-center space-x-4">
         <UnifiedSkeleton className="h-16 w-16 rounded-full" />
@@ -23,6 +26,6 @@ export function ProfileLoadingSkeleton({ className }: ProfileLoadingSkeletonProp
         <UnifiedSkeleton className="h-4 w-3/4 rounded" />
         <UnifiedSkeleton className="h-4 w-1/2 rounded" />
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

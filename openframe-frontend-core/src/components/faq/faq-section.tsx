@@ -14,6 +14,7 @@ import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import { FaqAccordion, type FaqItem } from '../faq-accordion';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
@@ -413,9 +414,14 @@ function GroupedFaqList({
   );
 }
 
-function FaqSkeleton() {
+function FaqSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
-    <div className="space-y-8">
+    <LoadingRegion label="Loading questions" announce={region} className="space-y-8">
       <UnifiedSkeleton className="h-12 w-2/3 rounded content-md:h-14" />
       <div className="w-full divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
         {Array.from({ length: 8 }).map((_, idx) => (
@@ -425,7 +431,7 @@ function FaqSkeleton() {
           </div>
         ))}
       </div>
-    </div>
+    </LoadingRegion>
   );
 }
 

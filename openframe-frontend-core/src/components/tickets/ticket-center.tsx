@@ -23,6 +23,7 @@ import { formatRelativeTime } from '../../utils/date-utils';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
@@ -178,16 +179,21 @@ function TicketCenterAuthed({
   );
 }
 
-function TicketCenterSkeleton() {
+function TicketCenterSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
-    <div className="flex flex-col gap-6">
+    <LoadingRegion label="Loading tickets" announce={region} className="flex flex-col gap-6">
       <Card className="p-6">
         <UnifiedSkeleton className="mb-4 h-7 w-48" />
         <UnifiedSkeleton className="mb-3 h-10 w-full" />
         <UnifiedSkeleton className="h-24 w-full" />
       </Card>
       <TicketListSkeleton />
-    </div>
+    </LoadingRegion>
   );
 }
 

@@ -12,7 +12,8 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
    */
   animate?: boolean;
   /**
-   * Accessibility label for screen readers
+   * Names what is loading for screen readers. Only a bar that stands alone sets it: it then becomes a
+   * `role="status"`. Without it the bar is `aria-hidden`, and its `LoadingRegion` announces the loading once.
    */
   'aria-label'?: string;
   /**
@@ -31,13 +32,13 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
  * - Color: #2A2A2A base with #3A3A3A pulse highlight
  * - Animation: 1.5s pulse duration, ease-in-out timing
  * - Responsive: Mobile-first approach with proper scaling
- * - Accessibility: ARIA labels and reduced motion support
+ * - Accessibility: hidden from assistive technology (the `LoadingRegion` around it announces), reduced motion support
  *
  * @param variant - Shape variant: default (rounded), text (rounded-sm), circular, rectangular
  * @param width - Custom width (defaults to full width)
  * @param height - Custom height (defaults to auto based on variant)
  * @param animate - Enable/disable animation (respects prefers-reduced-motion)
- * @param aria-label - Accessibility label for screen readers
+ * @param aria-label - Makes this one bar a `role="status"` with that name; otherwise it is `aria-hidden`
  * @param as - The element drawn: `div` (default) or `span` for phrasing content
  */
 export function UnifiedSkeleton({
@@ -83,8 +84,9 @@ export function UnifiedSkeleton({
         className,
       )}
       style={style}
-      role="status"
-      aria-label={ariaLabel || 'Loading content'}
+      // A bar is decoration: hidden from assistive technology unless the caller names what is loading.
+      // The loading CONTAINER says it once (`LoadingRegion`: aria-busy plus one polite status).
+      {...(ariaLabel ? { role: 'status', 'aria-label': ariaLabel } : { 'aria-hidden': true })}
       {...props}
     />
   );
@@ -98,48 +100,28 @@ export const TextSkeleton = {
    * Large heading skeleton (h1, h2)
    */
   Heading: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="text"
-      className={cn('h-8 content-md:h-10 content-lg:h-12', className)}
-      aria-label="Loading heading"
-      {...props}
-    />
+    <UnifiedSkeleton variant="text" className={cn('h-8 content-md:h-10 content-lg:h-12', className)} {...props} />
   ),
 
   /**
    * Medium heading skeleton (h3, h4)
    */
   Subheading: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="text"
-      className={cn('h-6 content-md:h-7 content-lg:h-8', className)}
-      aria-label="Loading subheading"
-      {...props}
-    />
+    <UnifiedSkeleton variant="text" className={cn('h-6 content-md:h-7 content-lg:h-8', className)} {...props} />
   ),
 
   /**
    * Body text skeleton
    */
   Body: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="text"
-      className={cn('h-4 content-md:h-5', className)}
-      aria-label="Loading text"
-      {...props}
-    />
+    <UnifiedSkeleton variant="text" className={cn('h-4 content-md:h-5', className)} {...props} />
   ),
 
   /**
    * Small text skeleton (captions, metadata)
    */
   Caption: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="text"
-      className={cn('h-3 content-md:h-4', className)}
-      aria-label="Loading caption"
-      {...props}
-    />
+    <UnifiedSkeleton variant="text" className={cn('h-3 content-md:h-4', className)} {...props} />
   ),
 };
 
@@ -154,7 +136,6 @@ export const InteractiveSkeleton = {
     <UnifiedSkeleton
       variant="default"
       className={cn('h-10 w-32 content-md:h-12 content-md:w-40', className)}
-      aria-label="Loading button"
       {...props}
     />
   ),
@@ -163,24 +144,14 @@ export const InteractiveSkeleton = {
    * Input field skeleton
    */
   Input: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="default"
-      className={cn('h-10 w-full content-md:h-12', className)}
-      aria-label="Loading input field"
-      {...props}
-    />
+    <UnifiedSkeleton variant="default" className={cn('h-10 w-full content-md:h-12', className)} {...props} />
   ),
 
   /**
    * Filter chip skeleton
    */
   Chip: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="default"
-      className={cn('h-8 w-20 rounded-full', className)}
-      aria-label="Loading filter"
-      {...props}
-    />
+    <UnifiedSkeleton variant="default" className={cn('h-8 w-20 rounded-full', className)} {...props} />
   ),
 };
 
@@ -202,14 +173,7 @@ export const MediaSkeleton = {
       lg: 'h-16 w-16',
     };
 
-    return (
-      <UnifiedSkeleton
-        variant="circular"
-        className={cn(sizeClasses[size], className)}
-        aria-label="Loading profile image"
-        {...props}
-      />
-    );
+    return <UnifiedSkeleton variant="circular" className={cn(sizeClasses[size], className)} {...props} />;
   },
 
   /**
@@ -217,12 +181,7 @@ export const MediaSkeleton = {
    * so loading state never causes a height shift when card data arrives)
    */
   CardImage: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton
-      variant="default"
-      className={cn('aspect-[1200/630] w-full', className)}
-      aria-label="Loading image"
-      {...props}
-    />
+    <UnifiedSkeleton variant="default" className={cn('aspect-[1200/630] w-full', className)} {...props} />
   ),
 
   /**
@@ -239,13 +198,6 @@ export const MediaSkeleton = {
       lg: 'h-8 w-8',
     };
 
-    return (
-      <UnifiedSkeleton
-        variant="default"
-        className={cn(sizeClasses[size], className)}
-        aria-label="Loading icon"
-        {...props}
-      />
-    );
+    return <UnifiedSkeleton variant="default" className={cn(sizeClasses[size], className)} {...props} />;
   },
 };

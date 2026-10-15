@@ -14,6 +14,7 @@
 import { Component, type ReactNode, type UIEvent, useCallback } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import type { ChatContextItem } from './types/context-item.types';
 
@@ -164,7 +165,12 @@ export function ContextItemsList({
           />
         );
       })}
-      {loadingMore && <ContextItemsSkeleton count={3} />}
+      {loadingMore && (
+        // `contents`: the rows stay the list's own rows; the region only adds the one announcement.
+        <LoadingRegion label="Loading more items" className="contents">
+          <ContextItemsSkeleton count={3} />
+        </LoadingRegion>
+      )}
     </div>
   );
 }

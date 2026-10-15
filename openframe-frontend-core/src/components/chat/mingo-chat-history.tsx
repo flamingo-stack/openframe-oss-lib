@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
@@ -253,7 +254,14 @@ function MingoChatHistoryRow({
  * two layouts are mutually exclusive — swapping between them mid-load reads as
  * a flicker). Built from `UnifiedSkeleton`.
  */
-export function MingoChatHistorySkeleton({ className }: { className?: string }) {
+export function MingoChatHistorySkeleton({
+  region = true,
+  className,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  className?: string;
+}) {
   // Mirror the real grouped list exactly: a small group label, then a bordered
   // rounded container of `h-12` rows, each with a single title bar of varying
   // width (no unread-badge squares — the real rows currently never show one, so
@@ -264,8 +272,9 @@ export function MingoChatHistorySkeleton({ className }: { className?: string }) 
     ['w-1/2', 'w-2/3'],
   ];
   return (
-    <div
-      aria-hidden
+    <LoadingRegion
+      label="Loading conversations"
+      announce={region}
       // `overflow-hidden` clips the placeholder rows to the flex-1 box (the real
       // list scrolls; the skeleton just needs to stay within bounds).
       className={cn('flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-hidden', className)}
@@ -286,7 +295,7 @@ export function MingoChatHistorySkeleton({ className }: { className?: string }) 
           </div>
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
 }
 

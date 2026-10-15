@@ -290,9 +290,7 @@ function ActionSkeletons({
 }
 
 /** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
-function MobileTriggerSkeleton() {
-  return <UnifiedSkeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />;
-}
+const MOBILE_TRIGGER_SKELETON_CLASS = cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS);
 
 export function PageActions({
   variant = 'icon-buttons',
@@ -372,7 +370,7 @@ function IconButtonsVariant({
       {/* Mobile: single icon button OR all actions merged into one "..." menu */}
       <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
-          <MobileTriggerSkeleton />
+          <UnifiedSkeleton className={MOBILE_TRIGGER_SKELETON_CLASS} />
         ) : useSingleActionMobile && singleAction ? (
           renderActionButton(singleAction, { iconOnly: true })
         ) : hasMobileMenuItems ? (
@@ -426,7 +424,11 @@ function PrimaryButtonsVariant({
       </div>
 
       <div className={cn('hidden items-center md:content-max-md:flex', ACTIONS_GAP, className)}>
-        {loading ? <MobileTriggerSkeleton /> : <CompactPrimaryActions actions={desktopActions} />}
+        {loading ? (
+          <UnifiedSkeleton className={MOBILE_TRIGGER_SKELETON_CLASS} />
+        ) : (
+          <CompactPrimaryActions actions={desktopActions} />
+        )}
       </div>
 
       <MobileBottomActions actions={sortedActions} loading={loading} />
@@ -477,7 +479,7 @@ function MenuPrimaryVariant({
 
       <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
-          <MobileTriggerSkeleton />
+          <UnifiedSkeleton className={MOBILE_TRIGGER_SKELETON_CLASS} />
         ) : hasMobileMenuItems || selector ? (
           // The selector rides into the menu as its header row: on mobile the
           // title row has no room for it, and hiding it entirely (what

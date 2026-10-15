@@ -387,7 +387,7 @@ export function buildBaseComponents({
 
     // --- tables ---
     // The frame and the scroll container are ONE element, matching the sibling
-    // block embed (`mermaid-diagram.tsx`) and `users-grid-skeleton`. It used to
+    // block embed (`mermaid-diagram.tsx`). It used to
     // be two — `overflow-x-auto` outside, `rounded-lg border` on an inner
     // `min-w-full` div — so nothing clipped: the cells' own `border-r`/`border-b`
     // ran straight through the rounded corners and out past the frame's edge.

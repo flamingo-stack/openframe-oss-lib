@@ -1,10 +1,20 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { CardSkeletonGrid } from './card-skeleton';
+import { LoadingRegion } from './loading-region';
 import { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
 
 interface PageLayoutSkeletonProps {
   className?: string;
+}
+
+/**
+ * A whole loading state (a layout or a grid, not a piece of chrome): it announces itself once
+ * (`LoadingRegion`). `region={false}` inside another loading region.
+ */
+interface LoadingLayoutProps extends PageLayoutSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
 }
 
 /**
@@ -191,6 +201,14 @@ export function BreadcrumbSkeleton({ className }: PageLayoutSkeletonProps) {
 }
 
 /**
+ * ONE breadcrumb link while it loads: a bar the height of the link's line
+ * (`text-h6`), for a trail whose links stream in one by one.
+ */
+export function BreadcrumbLinkSkeleton({ className }: PageLayoutSkeletonProps) {
+  return <UnifiedSkeleton as="span" className={cn('inline-block h-5 w-16', className)} />;
+}
+
+/**
  * Results header skeleton with count and sorting
  */
 export function ResultsHeaderSkeleton({ className }: PageLayoutSkeletonProps) {
@@ -217,16 +235,20 @@ export function TwoColumnLayoutSkeleton({
   sidebarContent,
   mainContent,
   sidebarPosition = 'left',
-}: PageLayoutSkeletonProps & {
+  region = true,
+}: LoadingLayoutProps & {
   sidebarContent?: React.ReactNode;
   mainContent?: React.ReactNode;
   sidebarPosition?: 'left' | 'right';
 }) {
   const sidebar = sidebarContent || <CategorySidebarSkeleton />;
-  const main = mainContent || <CardSkeletonGrid count={6} />;
+  // The layout announces for its parts: content passed in should not announce again (`region={false}`).
+  const main = mainContent || <CardSkeletonGrid count={6} region={false} />;
 
   return (
-    <div
+    <LoadingRegion
+      label="Loading"
+      announce={region}
       className={cn(
         'grid grid-cols-1 gap-6 content-lg:grid-cols-[320px_1fr] content-lg:gap-8',
         sidebarPosition === 'right' && 'content-lg:grid-cols-[1fr_320px]',
@@ -244,16 +266,21 @@ export function TwoColumnLayoutSkeleton({
           <aside className="order-2">{sidebar}</aside>
         </>
       )}
-    </div>
+    </LoadingRegion>
   );
 }
 
 /**
  * Article/blog post layout skeleton
  */
-export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
+export function ArticleLayoutSkeleton({ className, region = true }: LoadingLayoutProps) {
   return (
-    <article className={cn('mx-auto max-w-4xl', className)}>
+    <LoadingRegion
+      label="Loading the article"
+      as="article"
+      announce={region}
+      className={cn('mx-auto max-w-4xl', className)}
+    >
       {/* Article header */}
       <header className="mb-8 space-y-4 content-md:mb-12 content-md:space-y-6">
         {/* Category/tags */}
@@ -305,7 +332,7 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
           </div>
         </div>
       </div>
-    </article>
+    </LoadingRegion>
   );
 }
 
@@ -313,9 +340,14 @@ export function ArticleLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
  * Vendor Detail Layout Skeleton - Complete vendor detail page structure
  * Matches the refactored vendor detail page with proper platform colors and responsive layout
  */
-export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProps) {
+export function VendorDetailLayoutSkeleton({ className, region = true }: LoadingLayoutProps) {
   return (
-    <main className={cn('min-h-screen bg-ods-bg', className)}>
+    <LoadingRegion
+      label="Loading the vendor"
+      as="main"
+      announce={region}
+      className={cn('min-h-screen bg-ods-bg', className)}
+    >
       <div className="mx-auto max-w-[1920px] px-6 py-6 content-md:px-20 content-md:py-10">
         {/* Breadcrumb */}
         <BreadcrumbSkeleton className="mb-6" />
@@ -634,7 +666,7 @@ export function VendorDetailLayoutSkeleton({ className }: PageLayoutSkeletonProp
           </div>
         </div>
       </div>
-    </main>
+    </LoadingRegion>
   );
 }
 
@@ -671,10 +703,10 @@ export function StatsSectionSkeleton({ className, columns = 3 }: PageLayoutSkele
  * Blog Card Grid Skeleton - Always displays exactly 4 blog card skeletons
  * Used for consistent blog page layout with predictable height
  */
-export function BlogCardGridSkeleton({ className }: PageLayoutSkeletonProps) {
+export function BlogCardGridSkeleton({ className, region = true }: LoadingLayoutProps) {
   return (
     <div className={cn('space-y-6', className)}>
-      <CardSkeletonGrid count={4} variant="blog" className="grid-cols-1 content-md:grid-cols-2" />
+      <CardSkeletonGrid count={4} variant="blog" region={region} className="grid-cols-1 content-md:grid-cols-2" />
     </div>
   );
 }
@@ -683,12 +715,13 @@ export function BlogCardGridSkeleton({ className }: PageLayoutSkeletonProps) {
  * Vendor Grid Skeleton - Always displays exactly 12 vendor card skeletons
  * Used for consistent vendor page layout with predictable height
  */
-export function VendorGridSkeleton({ className }: PageLayoutSkeletonProps) {
+export function VendorGridSkeleton({ className, region = true }: LoadingLayoutProps) {
   return (
     <div className={cn('space-y-6', className)}>
       <CardSkeletonGrid
         count={12}
         variant="vendor"
+        region={region}
         className="grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-3"
       />
     </div>
@@ -699,11 +732,13 @@ export function VendorGridSkeleton({ className }: PageLayoutSkeletonProps) {
  * Slack Community Section Skeleton
  * Matches SlackCommunity component structure with title, channel list, and chat interface
  */
-export function SlackCommunitySkeleton() {
+export function SlackCommunitySkeleton({ region = true }: { region?: boolean } = {}) {
   return (
-    <section
+    <LoadingRegion
+      label="Loading the Slack community"
+      as="section"
+      announce={region}
       className="w-full bg-ods-bg px-4 py-12 content-md:px-20 content-md:py-20 content-lg:px-20"
-      aria-label="Slack Community Loading"
     >
       {/* Frame 651 Container */}
       <div className="flex w-full flex-col gap-4 content-md:gap-6">
@@ -792,6 +827,6 @@ export function SlackCommunitySkeleton() {
           </div>
         </div>
       </div>
-    </section>
+    </LoadingRegion>
   );
 }

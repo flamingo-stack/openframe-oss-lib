@@ -2,6 +2,7 @@
 
 import { useId, type ReactNode } from 'react';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { UnsavedChangesChip, useGuardedClose } from './modal-guarded-close';
@@ -174,10 +175,11 @@ export function AdminFormModal({
           // the modal doesn't visibly re-flow when the entity lands.
           <ModalV2Content>
             {loadingContent ? (
-              <div aria-busy="true">{loadingContent}</div>
+              // The one announcement: a `loadingContent` with a region of its own takes `region={false}`.
+              <LoadingRegion label="Loading">{loadingContent}</LoadingRegion>
             ) : (
-              <div
-                aria-busy="true"
+              <LoadingRegion
+                label="Loading"
                 className={
                   // Mirrors the PANEL WIDTH, not the slot API. `wide` covers the
                   // master-detail modals too (seo-redirect, managed-repo,
@@ -189,7 +191,6 @@ export function AdminFormModal({
                     : 'grid grid-cols-1 gap-[var(--spacing-system-xl)]'
                 }
               >
-                <span className="sr-only">Loading…</span>
                 {Array.from({ length: skeletonColumns }, (_, col) => (
                   <div key={col} className="space-y-[var(--spacing-system-lf)]" aria-hidden="true">
                     {SKELETON_FIELD_WIDTHS.map((labelWidth, i) => (
@@ -200,7 +201,7 @@ export function AdminFormModal({
                     ))}
                   </div>
                 ))}
-              </div>
+              </LoadingRegion>
             )}
           </ModalV2Content>
         ) : twoColumn ? (

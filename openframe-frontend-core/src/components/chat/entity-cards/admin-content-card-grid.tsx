@@ -2,6 +2,7 @@
 
 import type { ComponentType, ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { LoadingRegion } from '../../loading/loading-region';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 /** THE admin card grid: columns and gap shared by the live grid and its skeleton. */
@@ -58,6 +59,44 @@ export function AdminContentCardSkeleton({
   );
 }
 
+export interface AdminContentCardGridSkeletonProps {
+  /** How many placeholder cards: one page. */
+  count?: number;
+  /** The placeholder card. Default `AdminContentCardSkeleton`. */
+  Skeleton?: ComponentType<{ className?: string }>;
+  className?: string;
+  /** What is loading, read once by a screen reader. Default "Loading". */
+  label?: string;
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}
+
+/**
+ * The grid's loading state on its own: one page of placeholder cards in the
+ * grid's columns. `AdminContentCardGrid` draws exactly this while it loads; a
+ * page that has no grid yet (a Suspense fallback) draws it directly.
+ */
+export function AdminContentCardGridSkeleton({
+  count = 12,
+  Skeleton = AdminContentCardSkeleton,
+  className,
+  label = 'Loading',
+  region = true,
+}: AdminContentCardGridSkeletonProps) {
+  return (
+    <LoadingRegion
+      label={label}
+      announce={region}
+      className={cn(ADMIN_CONTENT_CARD_GRID_CLASS, className)}
+      data-state="loading"
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <Skeleton key={i} />
+      ))}
+    </LoadingRegion>
+  );
+}
+
 export interface AdminContentCardGridProps<T> {
   items: readonly T[];
   /** One page of cards: the loading skeleton count and the reserved slot count. */
@@ -74,6 +113,10 @@ export interface AdminContentCardGridProps<T> {
    */
   Skeleton?: ComponentType<{ className?: string }>;
   className?: string;
+  /** What is loading, read once by a screen reader while `loading`. Default "Loading". */
+  loadingLabel?: string;
+  /** The loading state announces itself. `false` inside another loading region. Default `true`. */
+  loadingRegion?: boolean;
 }
 
 /**
@@ -98,18 +141,21 @@ export function AdminContentCardGrid<T>({
   empty,
   Skeleton = AdminContentCardSkeleton,
   className,
+  loadingLabel,
+  loadingRegion,
 }: AdminContentCardGridProps<T>) {
   const gridClass = cn(ADMIN_CONTENT_CARD_GRID_CLASS, className);
 
-  if (loading) {
+  if (loading)
     return (
-      <div className={gridClass} data-state="loading">
-        {Array.from({ length: pageSize }, (_, i) => (
-          <Skeleton key={i} />
-        ))}
-      </div>
+      <AdminContentCardGridSkeleton
+        count={pageSize}
+        Skeleton={Skeleton}
+        className={className}
+        label={loadingLabel}
+        region={loadingRegion}
+      />
     );
-  }
 
   const slots = Array.from({ length: Math.max(0, pageSize - items.length) }, (_, i) => (
     <Skeleton key={`slot-${i}`} className="invisible" />
