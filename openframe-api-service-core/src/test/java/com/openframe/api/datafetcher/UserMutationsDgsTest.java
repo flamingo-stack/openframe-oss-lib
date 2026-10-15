@@ -6,19 +6,27 @@ import com.openframe.api.config.DateScalarConfig;
 import com.openframe.api.config.InstantScalarConfig;
 import com.openframe.api.config.JsonScalarConfig;
 import com.openframe.api.config.LongScalarConfig;
+import com.openframe.api.dto.invitation.InvitationFilterInput;
+import com.openframe.api.dto.invitation.InvitationFilters;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.invitation.InvitationStatus;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.MutationError;
+import com.openframe.api.dto.user.FilterOption;
+import com.openframe.api.dto.user.UserFilterInput;
+import com.openframe.api.dto.user.UserFilters;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLUserMapper;
 import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.InvitationService.InviteUsersResult;
 import com.openframe.api.service.user.UserService;
+import com.openframe.data.document.user.UserRole;
+import com.openframe.data.document.user.UserStatus;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
 import com.openframe.graphql.relay.RelayIdCodec;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
@@ -36,6 +44,7 @@ import static com.openframe.graphql.relay.NodeType.USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -105,6 +114,44 @@ class UserMutationsDgsTest {
 
         assertThat(user).isEqualTo(Map.of(
                 "id", CODEC.encode(USER, "u-1"), "firstName", "Jane", "status", "ACTIVE", "emailVerified", true));
+    }
+
+    @Test
+    @DisplayName("userFilters: excluded ids are decoded, options serialize as enum values with counts")
+    void userFilters() {
+        when(userService.userFilters(any(), eq("smith"))).thenReturn(new UserFilters(
+                List.of(new FilterOption<>(UserStatus.ACTIVE, 5), new FilterOption<>(UserStatus.DELETED, 0)),
+                List.of(new FilterOption<>(UserRole.OWNER, 1))));
+
+        Map<String, Object> filters = queryExecutor.executeAndExtractJsonPath(
+                "query($id: ID!) { userFilters(filter: { excludeIds: [$id] }, search: \"smith\") { statuses { value count } roles { value count } } }",
+                "data.userFilters", Map.of("id", CODEC.encode(USER, "u-1")));
+
+        ArgumentCaptor<UserFilterInput> filter = ArgumentCaptor.forClass(UserFilterInput.class);
+        verify(userService).userFilters(filter.capture(), eq("smith"));
+        assertThat(filter.getValue().getExcludeIds()).containsExactly("u-1");
+        assertThat(filters).isEqualTo(Map.of(
+                "statuses", List.of(Map.of("value", "ACTIVE", "count", 5), Map.of("value", "DELETED", "count", 0)),
+                "roles", List.of(Map.of("value", "OWNER", "count", 1))));
+    }
+
+    @Test
+    @DisplayName("invitationFilters: the statuses bind and the options serialize as enum values with counts")
+    void invitationFilters() {
+        when(invitationService.invitationFilters(any(), isNull())).thenReturn(new InvitationFilters(
+                List.of(new FilterOption<>(InvitationStatus.PENDING, 3), new FilterOption<>(InvitationStatus.EXPIRED, 4)),
+                List.of(new FilterOption<>(UserRole.ADMIN, 7))));
+
+        Map<String, Object> filters = queryExecutor.executeAndExtractJsonPath(
+                "{ invitationFilters(filter: { statuses: [EXPIRED] }) { statuses { value count } roles { value count } } }",
+                "data.invitationFilters");
+
+        ArgumentCaptor<InvitationFilterInput> filter = ArgumentCaptor.forClass(InvitationFilterInput.class);
+        verify(invitationService).invitationFilters(filter.capture(), isNull());
+        assertThat(filter.getValue().getStatuses()).containsExactly(InvitationStatus.EXPIRED);
+        assertThat(filters).isEqualTo(Map.of(
+                "statuses", List.of(Map.of("value", "PENDING", "count", 3), Map.of("value", "EXPIRED", "count", 4)),
+                "roles", List.of(Map.of("value", "ADMIN", "count", 7))));
     }
 
     @SpringBootConfiguration

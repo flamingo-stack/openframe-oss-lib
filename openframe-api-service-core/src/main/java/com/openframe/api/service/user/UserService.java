@@ -4,8 +4,10 @@ import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.CursorCodec;
+import com.openframe.api.dto.user.FilterOption;
 import com.openframe.api.dto.user.UpdateUserRequest;
 import com.openframe.api.dto.user.UserFilterInput;
+import com.openframe.api.dto.user.UserFilters;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.exception.OperationNotAllowedException;
@@ -15,6 +17,7 @@ import com.openframe.api.mapper.UserMapper;
 import com.openframe.api.service.processor.UserProcessor;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
 import com.openframe.data.repository.user.UserListFilter;
@@ -30,6 +33,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -84,10 +88,7 @@ public class UserService {
     public CountedGenericQueryResult<UserResponse> queryUsers(UserFilterInput filter, String search,
                                                              CursorPaginationCriteria pagination) {
         CursorPaginationCriteria page = pagination.normalize();
-        UserListFilter listFilter = filter == null
-                ? new UserListFilter(null, null, null, search)
-                : new UserListFilter(filter.getStatuses(), grantedFor(filter.getRoles()), filter.getExcludeIds(),
-                        search);
+        UserListFilter listFilter = toListFilter(filter, search);
         long filteredCount = userRepository.countUsers(listFilter);
         List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), page.getLimit() + 1);
         boolean hasNextPage = raw.size() > page.getLimit();
@@ -102,6 +103,30 @@ public class UserService {
                         .build())
                 .filteredCount((int) filteredCount)
                 .build();
+    }
+
+    /**
+     * Counts each status and role under the search, the exclusions and the other funnel's ticks, but not its own
+     * funnel's, so ticking within a funnel keeps all of it on offer. Zero counts included.
+     */
+    public UserFilters userFilters(UserFilterInput filter, String search) {
+        UserListFilter listFilter = toListFilter(filter, search);
+        return new UserFilters(
+                Arrays.stream(UserStatus.values())
+                        .map(status -> new FilterOption<>(status,
+                                (int) userRepository.countUsers(listFilter.withStatuses(List.of(status)))))
+                        .toList(),
+                Arrays.stream(UserRole.values())
+                        .map(role -> new FilterOption<>(role,
+                                (int) userRepository.countUsers(listFilter.withRoles(grantedFor(List.of(role))))))
+                        .toList());
+    }
+
+    private static UserListFilter toListFilter(UserFilterInput filter, String search) {
+        return filter == null
+                ? new UserListFilter(null, null, null, search)
+                : new UserListFilter(filter.getStatuses(), grantedFor(filter.getRoles()), filter.getExcludeIds(),
+                        search);
     }
 
     public Optional<UserResponse> findUserById(String id) {

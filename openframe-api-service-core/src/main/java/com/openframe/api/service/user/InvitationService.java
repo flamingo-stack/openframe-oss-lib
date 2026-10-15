@@ -3,6 +3,7 @@ package com.openframe.api.service.user;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.invitation.CreateInvitationRequest;
 import com.openframe.api.dto.invitation.InvitationFilterInput;
+import com.openframe.api.dto.invitation.InvitationFilters;
 import com.openframe.api.dto.invitation.InvitationPageResponse;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.Role;
@@ -10,6 +11,7 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.MutationError;
 import com.openframe.api.dto.shared.PageInfo;
+import com.openframe.api.dto.user.FilterOption;
 import com.openframe.api.mapper.InvitationMapper;
 import com.openframe.api.service.processor.InvitationProcessor;
 import com.openframe.core.email.EmailDomainPolicy;
@@ -17,6 +19,7 @@ import com.openframe.core.exception.BaseException;
 import com.openframe.core.validation.ValidEmail;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
+import com.openframe.data.document.user.UserRole;
 import com.openframe.data.repository.user.InvitationListFilter;
 import com.openframe.data.repository.user.InvitationPageCursor;
 import com.openframe.data.repository.user.InvitationRepository;
@@ -31,6 +34,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -159,9 +163,7 @@ public class InvitationService {
     public CountedGenericQueryResult<InvitationResponse> queryInvitations(InvitationFilterInput filter, String search,
                                                                          CursorPaginationCriteria pagination) {
         CursorPaginationCriteria page = pagination.normalize();
-        InvitationListFilter listFilter = filter == null
-                ? new InvitationListFilter(null, null, search)
-                : new InvitationListFilter(filter.expiredOnly(), grantedFor(filter.getRoles()), search);
+        InvitationListFilter listFilter = toListFilter(filter, search);
         Instant now = Instant.now();
         long filteredCount = invitationRepository.countOpenInvitations(listFilter, now);
         List<Invitation> raw = invitationRepository.findOpenInvitationsPage(
@@ -180,6 +182,30 @@ public class InvitationService {
                         .build())
                 .filteredCount((int) filteredCount)
                 .build();
+    }
+
+    /**
+     * Counts each status and role under the search and the other funnel's ticks, but not its own funnel's, so
+     * ticking within a funnel keeps all of it on offer. Zero counts included.
+     */
+    public InvitationFilters invitationFilters(InvitationFilterInput filter, String search) {
+        InvitationListFilter listFilter = toListFilter(filter, search);
+        Instant now = Instant.now();
+        return new InvitationFilters(
+                List.of(new FilterOption<>(com.openframe.api.dto.invitation.InvitationStatus.PENDING,
+                                (int) invitationRepository.countOpenInvitations(listFilter.withExpired(false), now)),
+                        new FilterOption<>(com.openframe.api.dto.invitation.InvitationStatus.EXPIRED,
+                                (int) invitationRepository.countOpenInvitations(listFilter.withExpired(true), now))),
+                Arrays.stream(UserRole.values())
+                        .map(role -> new FilterOption<>(role, (int) invitationRepository.countOpenInvitations(
+                                listFilter.withRoles(grantedFor(List.of(role))), now)))
+                        .toList());
+    }
+
+    private static InvitationListFilter toListFilter(InvitationFilterInput filter, String search) {
+        return filter == null
+                ? new InvitationListFilter(null, null, search)
+                : new InvitationListFilter(filter.expiredOnly(), grantedFor(filter.getRoles()), search);
     }
 
     /** An open invitation by id; accepted and revoked ones are not exposed. */

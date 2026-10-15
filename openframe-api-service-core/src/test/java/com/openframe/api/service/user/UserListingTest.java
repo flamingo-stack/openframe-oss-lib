@@ -2,11 +2,14 @@ package com.openframe.api.service.user;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.invitation.InvitationFilterInput;
+import com.openframe.api.dto.invitation.InvitationFilters;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.dto.user.FilterOption;
 import com.openframe.api.dto.user.UpdateUserRequest;
 import com.openframe.api.dto.user.UserFilterInput;
+import com.openframe.api.dto.user.UserFilters;
 import com.openframe.api.dto.user.UserPageResponse;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.exception.OperationNotAllowedException;
@@ -133,6 +136,36 @@ class UserListingTest {
     }
 
     @Test
+    @DisplayName("userFilters: a funnel is counted without its own ticks but with the other's; ADMIN counts the owners")
+    void userFiltersCountEachFunnelWithoutItsOwnTicks() {
+        Set<UserRole> admins = Set.of(UserRole.ADMIN, UserRole.OWNER);
+        List<String> excluded = List.of("u-1");
+        when(userRepository.countUsers(new UserListFilter(List.of(UserStatus.ACTIVE), admins, excluded, "smith")))
+                .thenReturn(5L);
+        when(userRepository.countUsers(new UserListFilter(List.of(UserStatus.DELETED), admins, excluded, "smith")))
+                .thenReturn(2L);
+        when(userRepository.countUsers(
+                new UserListFilter(List.of(UserStatus.SELF_DELETED), admins, excluded, "smith"))).thenReturn(0L);
+        when(userRepository.countUsers(
+                new UserListFilter(List.of(UserStatus.DELETED), Set.of(UserRole.OWNER), excluded, "smith")))
+                .thenReturn(1L);
+
+        UserFilters filters = userService().userFilters(UserFilterInput.builder()
+                .statuses(List.of(UserStatus.DELETED))
+                .roles(List.of(UserRole.ADMIN))
+                .excludeIds(excluded)
+                .build(), "smith");
+
+        assertThat(filters.statuses()).containsExactly(
+                new FilterOption<>(UserStatus.ACTIVE, 5),
+                new FilterOption<>(UserStatus.DELETED, 2),
+                new FilterOption<>(UserStatus.SELF_DELETED, 0));
+        assertThat(filters.roles()).containsExactly(
+                new FilterOption<>(UserRole.ADMIN, 2),
+                new FilterOption<>(UserRole.OWNER, 1));
+    }
+
+    @Test
     @DisplayName("REST users page: size is clamped to 1..1000, page to >= 0, and the order is stable")
     void restUsersPageIsClampedAndOrdered() {
         when(userRepository.findAll(any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
@@ -174,6 +207,28 @@ class UserListingTest {
         ArgumentCaptor<InvitationListFilter> filter = ArgumentCaptor.forClass(InvitationListFilter.class);
         verify(invitationRepository).findOpenInvitationsPage(filter.capture(), any(), any(), anyInt());
         assertThat(filter.getValue().roles()).isEqualTo(Set.of(UserRole.ADMIN, UserRole.OWNER));
+    }
+
+    @Test
+    @DisplayName("invitationFilters: a funnel is counted without its own ticks but with the other's")
+    void invitationFiltersCountEachFunnelWithoutItsOwnTicks() {
+        Set<UserRole> admins = Set.of(UserRole.ADMIN, UserRole.OWNER);
+        when(invitationRepository.countOpenInvitations(eq(new InvitationListFilter(false, admins, "acme")), any()))
+                .thenReturn(3L);
+        when(invitationRepository.countOpenInvitations(eq(new InvitationListFilter(true, admins, "acme")), any()))
+                .thenReturn(4L);
+        when(invitationRepository.countOpenInvitations(
+                eq(new InvitationListFilter(true, Set.of(UserRole.OWNER), "acme")), any())).thenReturn(0L);
+
+        InvitationFilters filters = invitationService().invitationFilters(InvitationFilterInput.builder()
+                .statuses(List.of(EXPIRED))
+                .roles(List.of(UserRole.ADMIN))
+                .build(), "acme");
+
+        assertThat(filters.statuses()).containsExactly(new FilterOption<>(PENDING, 3), new FilterOption<>(EXPIRED, 4));
+        assertThat(filters.roles()).containsExactly(
+                new FilterOption<>(UserRole.ADMIN, 4),
+                new FilterOption<>(UserRole.OWNER, 0));
     }
 
     @Test

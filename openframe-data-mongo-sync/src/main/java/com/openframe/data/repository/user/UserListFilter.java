@@ -15,4 +15,12 @@ import java.util.Collection;
  */
 public record UserListFilter(Collection<UserStatus> statuses, Collection<UserRole> roles,
                              Collection<String> excludeIds, String search) {
+
+    public UserListFilter withStatuses(Collection<UserStatus> statuses) {
+        return new UserListFilter(statuses, roles, excludeIds, search);
+    }
+
+    public UserListFilter withRoles(Collection<UserRole> roles) {
+        return new UserListFilter(statuses, roles, excludeIds, search);
+    }
 }

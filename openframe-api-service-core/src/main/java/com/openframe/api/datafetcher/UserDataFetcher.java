@@ -14,6 +14,7 @@ import com.openframe.api.dto.user.TransferOwnershipPayload;
 import com.openframe.api.dto.user.UpdateUserInput;
 import com.openframe.api.dto.user.UpdateUserRequest;
 import com.openframe.api.dto.user.UserFilterInput;
+import com.openframe.api.dto.user.UserFilters;
 import com.openframe.api.dto.user.UserPayload;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLUserMapper;
@@ -53,6 +54,12 @@ public class UserDataFetcher {
         CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
                 ConnectionArgs.builder().first(first).after(after).build());
         return mapper.toUserConnection(userService.queryUsers(withRawIds(filter), search, pagination));
+    }
+
+    @DgsQuery
+    public UserFilters userFilters(@InputArgument UserFilterInput filter,
+                                   @InputArgument @Size(max = MAX_SEARCH_LENGTH) String search) {
+        return userService.userFilters(withRawIds(filter), search);
     }
 
     private UserFilterInput withRawIds(UserFilterInput filter) {

@@ -20,6 +20,16 @@ extend type Query {
         first: Int
         after: String
     ): InvitationConnection!
+
+    """
+    The users list's funnels: every status and role, each with how many users the list would show with it ticked
+    alone in its funnel. Counted under the search, the exclusions and the other funnel's ticks, but not its own
+    funnel's, so ticking within a funnel keeps all of it on offer.
+    """
+    userFilters(filter: UserFilterInput, search: String): UserFilters!
+
+    "The open invitations list's funnels, counted the way userFilters counts."
+    invitationFilters(filter: InvitationFilterInput, search: String): InvitationFilters!
 }
 
 extend type Mutation {
@@ -93,6 +103,22 @@ input UserFilterInput {
     excludeIds: [ID!]
 }
 
+type UserFilters {
+    statuses: [UserStatusFilterOption!]!
+    "Effective roles, as the filter matches them: ADMIN counts the owners too."
+    roles: [UserRoleFilterOption!]!
+}
+
+type UserStatusFilterOption {
+    value: UserStatus!
+    count: Int!
+}
+
+type UserRoleFilterOption {
+    value: UserRole!
+    count: Int!
+}
+
 type UserConnection {
     edges: [UserEdge!]!
     pageInfo: PageInfo!
@@ -128,6 +154,16 @@ input InvitationFilterInput {
     statuses: [InvitationStatus!]
     "The roles the invitee gets. Omit or leave empty for every role."
     roles: [UserRole!]
+}
+
+type InvitationFilters {
+    statuses: [InvitationStatusFilterOption!]!
+    roles: [UserRoleFilterOption!]!
+}
+
+type InvitationStatusFilterOption {
+    value: InvitationStatus!
+    count: Int!
 }
 
 type InvitationConnection {

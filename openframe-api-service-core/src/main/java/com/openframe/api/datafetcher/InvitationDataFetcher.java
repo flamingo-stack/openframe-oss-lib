@@ -7,6 +7,7 @@ import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.invitation.InvitationFilterInput;
+import com.openframe.api.dto.invitation.InvitationFilters;
 import com.openframe.api.dto.invitation.InvitationIdInput;
 import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.invitation.InviteUsersInput;
@@ -50,6 +51,12 @@ public class InvitationDataFetcher {
         CursorPaginationCriteria pagination = CursorPaginationCriteria.fromConnectionArgs(
                 ConnectionArgs.builder().first(first).after(after).build());
         return mapper.toInvitationConnection(invitationService.queryInvitations(filter, search, pagination));
+    }
+
+    @DgsQuery
+    public InvitationFilters invitationFilters(@InputArgument InvitationFilterInput filter,
+                                               @InputArgument @Size(max = MAX_SEARCH_LENGTH) String search) {
+        return invitationService.invitationFilters(filter, search);
     }
 
     @DgsMutation

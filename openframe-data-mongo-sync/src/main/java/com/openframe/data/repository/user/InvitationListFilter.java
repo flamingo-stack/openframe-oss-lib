@@ -14,4 +14,12 @@ import java.util.Collection;
  * @param search  matches the email
  */
 public record InvitationListFilter(Boolean expired, Collection<UserRole> roles, String search) {
+
+    public InvitationListFilter withExpired(Boolean expired) {
+        return new InvitationListFilter(expired, roles, search);
+    }
+
+    public InvitationListFilter withRoles(Collection<UserRole> roles) {
+        return new InvitationListFilter(expired, roles, search);
+    }
 }
