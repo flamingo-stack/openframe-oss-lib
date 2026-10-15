@@ -33,20 +33,20 @@ class UserListQueryTest {
     private final CustomInvitationRepositoryImpl invitations = new CustomInvitationRepositoryImpl(template);
 
     @Test
-    @DisplayName("users: sorted by email asc / _id asc, limited, continued after the (email, id) cursor")
+    @DisplayName("users: sorted by email asc / id asc, limited, continued after the (email, id) cursor")
     void usersArePagedByEmailThenId() {
         users.findUsersPage(new UserListFilter(null, null, null, null), UserPageCursor.of("jane_doe@acme.io", USER_ID), 21);
 
         Query query = captured(User.class);
         assertThat(query.getLimit()).isEqualTo(21);
-        assertThat(query.getSortObject()).isEqualTo(new Document("email", 1).append("_id", 1));
+        assertThat(query.getSortObject()).isEqualTo(new Document("email", 1).append("id", 1));
 
-        // email > E, or email = E and _id > id
+        // email > E, or email = E and id > cursor id (Spring maps the id property to _id)
         List<?> position = (List<?>) and(query).getFirst().get("$or");
         assertThat(((Document) position.get(0)).get("email")).isEqualTo(new Document("$gt", "jane_doe@acme.io"));
         List<?> tie = (List<?>) ((Document) position.get(1)).get("$and");
         assertThat(((Document) tie.get(0)).get("email")).isEqualTo("jane_doe@acme.io");
-        assertThat(((Document) tie.get(1)).get("_id")).isEqualTo(new Document("$gt", USER_ID));
+        assertThat(((Document) tie.get(1)).get("id")).isEqualTo(new Document("$gt", USER_ID));
     }
 
     @Test
@@ -76,13 +76,13 @@ class UserListQueryTest {
     }
 
     @Test
-    @DisplayName("users: excluded ids become a $nin on _id")
+    @DisplayName("users: excluded ids become a $nin on the id")
     void usersLeaveOutExcludedIds() {
         users.findUsersPage(new UserListFilter(List.of(UserStatus.ACTIVE), null, List.of(USER_ID), null), null, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(2);
-        assertThat(and.get(1).get("_id")).isEqualTo(new Document("$nin", List.of(USER_ID)));
+        assertThat(and.get(1).get("id")).isEqualTo(new Document("$nin", List.of(USER_ID)));
     }
 
     @Test

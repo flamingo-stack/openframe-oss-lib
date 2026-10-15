@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import type { TableCardSkeletonProps } from './types';
 
 // INNER row heights: the bordered row card adds 1px top + bottom, so the
@@ -36,10 +37,7 @@ export function TableCardSkeleton({
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
-          className={cn(
-            'relative animate-pulse overflow-hidden rounded-[6px] border border-ods-border bg-ods-card',
-            className,
-          )}
+          className={cn('relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card', className)}
         >
           {/* Desktop Skeleton */}
           {/* Matches the ROW it stands in for: a compact row is content-sized
@@ -54,10 +52,10 @@ export function TableCardSkeleton({
           >
             {columns.map(column => (
               <div key={column.key} className={cn('flex shrink-0 flex-col justify-center', column.width || 'flex-1')}>
-                <div className="mb-1 h-5 w-3/4 rounded bg-ods-bg-surface" />
+                <UnifiedSkeleton className="mb-1 h-5 w-3/4 rounded" />
                 {/* second line simulates multi-line content on the primary column */}
                 {index % 2 === 0 && column.key === primaryKey && (
-                  <div className="h-4 w-1/2 rounded bg-ods-bg-surface opacity-60" />
+                  <UnifiedSkeleton className="h-4 w-1/2 rounded opacity-60" />
                 )}
               </div>
             ))}
@@ -65,15 +63,15 @@ export function TableCardSkeleton({
             {/* Actions skeleton */}
             {hasActions && (
               <div className={cn('flex shrink-0 items-center gap-2', !hasChevron && 'ml-auto')}>
-                <div className="h-12 w-12 rounded bg-ods-bg-surface" />
-                <div className="h-12 w-24 rounded bg-ods-bg-surface" />
+                <UnifiedSkeleton className="h-12 w-12 rounded" />
+                <UnifiedSkeleton className="h-12 w-24 rounded" />
               </div>
             )}
 
             {/* Chevron skeleton */}
             {hasChevron && (
               <div className={cn('flex w-12 shrink-0 items-center justify-end', !hasActions && 'ml-auto')}>
-                <div className="h-8 w-8 rounded bg-ods-bg-surface" />
+                <UnifiedSkeleton className="h-8 w-8 rounded" />
               </div>
             )}
           </div>
@@ -94,11 +92,11 @@ export function TableCardSkeleton({
                 sized by its own `py-2` + floor, so adding `py-3` here made the
                 compact mobile skeleton 78px against a real row's 58. */}
             <div className={cn('flex min-w-0 flex-1 flex-col justify-center', compact ? 'py-0' : 'py-3')}>
-              <div className="mb-2 h-4 w-3/4 rounded bg-ods-bg-surface" />
-              <div className="h-3 w-1/2 rounded bg-ods-bg-surface opacity-60" />
+              <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
+              <UnifiedSkeleton className="h-3 w-1/2 rounded opacity-60" />
             </div>
-            {hasActions && <div className="h-12 w-12 shrink-0 rounded bg-ods-bg-surface" />}
-            {hasChevron && <div className="h-8 w-8 shrink-0 rounded bg-ods-bg-surface" />}
+            {hasActions && <UnifiedSkeleton className="h-12 w-12 shrink-0 rounded" />}
+            {hasChevron && <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded" />}
           </div>
         </div>
       ))}

@@ -16,4 +16,6 @@ public interface CustomUserRepository {
     List<User> findUsersPage(UserListFilter filter, String cursor, int limit);
 
     long countUsers(UserListFilter filter);
+
+    List<User> findUserPageAfter(UserQueryFilter filter, UserSortKey after, int limit);
 }

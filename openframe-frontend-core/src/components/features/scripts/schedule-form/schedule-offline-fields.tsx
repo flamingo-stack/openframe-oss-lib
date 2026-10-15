@@ -160,10 +160,15 @@ export function ScheduleOfflineFields({ showErrors, disabled = false }: { showEr
 
   const options = SCHEDULE_OFFLINE_BEHAVIOR_OPTIONS.map(option =>
     isRetryOnReconnect(option.value)
-      ? // Desktop only. Below `md` the caption plus two controls cannot share a
-        // row with the option's own label without squeezing it to nothing, so
-        // the same fields render full-width under the group instead.
-        { ...option, trailing: <div className="hidden content-md:flex">{windowFieldsFor(false)}</div> }
+      ? {
+          ...option,
+          // Desktop: the fields end the option's row.
+          trailing: <div className="hidden content-md:flex">{windowFieldsFor(false)}</div>,
+          // Below `md` the caption plus two controls cannot share a row with the
+          // option's own label without squeezing it to nothing, so the same
+          // fields take their own full-width row under it, inside the option.
+          footer: <div className="content-md:hidden">{windowFieldsFor(true)}</div>,
+        }
       : option,
   );
 
@@ -202,7 +207,6 @@ export function ScheduleOfflineFields({ showErrors, disabled = false }: { showEr
               disabled={disabled}
               options={options}
             />
-            <div className="pt-[var(--spacing-system-xs)] content-md:hidden">{windowFieldsFor(true)}</div>
             {intervalError && (
               <div className="absolute bottom-0 left-0 right-0 translate-y-full">
                 <TruncateText variant="h6" className="text-ods-error">

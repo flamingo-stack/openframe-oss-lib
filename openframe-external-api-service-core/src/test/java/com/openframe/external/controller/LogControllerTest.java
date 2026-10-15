@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.service.LogDetailsService;
 import com.openframe.api.service.LogService;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import com.openframe.external.mapper.LogMapper;
@@ -53,6 +54,8 @@ class LogControllerTest {
 
     @Mock
     private LogService logService;
+    @Mock
+    private LogDetailsService logDetailsService;
 
     @Captor
     private ArgumentCaptor<LogFilterCriteria> filterCaptor;
@@ -65,7 +68,7 @@ class LogControllerTest {
 
     @BeforeEach
     void setUp() {
-        mockMvc = ExternalApiMockMvc.standalone(new LogController(logService, new LogMapper()));
+        mockMvc = ExternalApiMockMvc.standalone(new LogController(logService, logDetailsService, new LogMapper()));
     }
 
     @Test
@@ -350,8 +353,8 @@ class LogControllerTest {
     }
 
     @Test
-    void logDetailsAreReturnedForTheRequestedKey() throws Exception {
-        when(logService.findLogDetails("2024-01-15", "MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
+    void getLogDetails_eventFound_returnsTheStoredDetails() throws Exception {
+        when(logDetailsService.findLogDetails("2024-01-15", "MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
                 .thenReturn(Optional.of(LogDetails.builder()
                         .toolEventId("evt-1")
                         .eventType("LOGIN")
@@ -391,8 +394,8 @@ class LogControllerTest {
     }
 
     @Test
-    void unknownLogIs404WithLogNotFoundCode() throws Exception {
-        when(logService.findLogDetails("2024-01-15", "MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
+    void getLogDetails_nothingFound_answers404LogNotFound() throws Exception {
+        when(logDetailsService.findLogDetails("2024-01-15", "MESHCENTRAL", "LOGIN", TIMESTAMP, "evt-1"))
                 .thenReturn(Optional.empty());
 
         mockMvc.perform(detailsRequest())
@@ -400,6 +403,17 @@ class LogControllerTest {
                 .andExpect(jsonPath("$.code").value("LOG_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Log not found for toolEventId: evt-1, ingestDay: 2024-01-15, "
                         + "toolType: MESHCENTRAL, eventType: LOGIN, timestamp: 2024-01-15T10:00:00.123Z"));
+    }
+
+    @Test
+    void databaseFailureOnDetailsIs503() throws Exception {
+        when(logDetailsService.findLogDetails(any(), any(), any(), any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("cassandra down"));
+
+        mockMvc.perform(detailsRequest())
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("DATABASE_ERROR"))
+                .andExpect(jsonPath("$.message").value("Database operation failed. Please try again later."));
     }
 
     @ParameterizedTest
@@ -417,7 +431,7 @@ class LogControllerTest {
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").value("Required parameter '" + missing + "' is missing"));
 
-        verifyNoInteractions(logService);
+        verifyNoInteractions(logDetailsService);
     }
 
     @Test
@@ -432,18 +446,7 @@ class LogControllerTest {
                 .andExpect(jsonPath("$.code").value("TYPE_MISMATCH"))
                 .andExpect(jsonPath("$.message").value("Invalid value 'yesterday' for parameter 'timestamp'"));
 
-        verifyNoInteractions(logService);
-    }
-
-    @Test
-    void databaseFailureOnDetailsIs503() throws Exception {
-        when(logService.findLogDetails(any(), any(), any(), any(), any()))
-                .thenThrow(new DataAccessResourceFailureException("cassandra down"));
-
-        mockMvc.perform(detailsRequest())
-                .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.code").value("DATABASE_ERROR"))
-                .andExpect(jsonPath("$.message").value("Database operation failed. Please try again later."));
+        verifyNoInteractions(logDetailsService);
     }
 
     private static MockHttpServletRequestBuilder detailsRequest() {

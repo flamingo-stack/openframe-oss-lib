@@ -8,6 +8,7 @@ import { findDocNodeByPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { CategorySidebarSkeleton } from '../loading/page-layout-skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { PersistentSidebar, PersistentMobileDropdown } from '../persistent-filter-controls';
@@ -368,7 +369,7 @@ function DocViewerContent({
                   {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
                     <div className="hidden content-lg:block">
                       <div className="sticky top-24">
-                        <div className="mb-5 h-[14px] w-28 animate-pulse rounded bg-ods-border" />
+                        <UnifiedSkeleton className="mb-5 h-[14px] w-28 rounded" />
                         <div className="space-y-0">
                           {[130, 170, 190, 220, 110, 200, 80, 100, 120, 140, 90].map((w, i) => (
                             <div
@@ -377,7 +378,7 @@ function DocViewerContent({
                                 i === 0 ? 'border-ods-accent' : 'border-transparent'
                               }`}
                             >
-                              <div className="h-[13px] animate-pulse rounded bg-ods-border" style={{ width: w }} />
+                              <UnifiedSkeleton className="h-[13px] rounded" width={w} />
                             </div>
                           ))}
                         </div>

@@ -22,6 +22,7 @@
 import { useState, type ReactNode } from 'react';
 import Image from '../../embed-shims/next-image';
 import { personInitials } from '../../utils/format';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useProxiedImageUrl } from './hooks/use-proxied-image-url';
 
 export interface ChatMessageRowProps {
@@ -104,20 +105,18 @@ export function ChatMessageRow({ displayName, avatarUrl, timeLabel, body, footer
  * name/time/body line-heights so the loading→loaded swap does not reflow.
  */
 export function ChatMessageRowSkeleton() {
-  // Bars use `bg-ods-border` (NOT `bg-ods-skeleton` — that token resolves to
-  // transparent in this build, leaving the box visually empty).
   return (
     <div className="flex w-full min-w-0 gap-2 md:gap-3">
-      <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-lg bg-ods-border md:h-10 md:w-10" />
+      <UnifiedSkeleton className="h-8 w-8 flex-shrink-0 rounded-lg md:h-10 md:w-10" />
       <div className="min-w-0 flex-1">
         {/* Header row — name + time bars, same mb-1 + gap-2 as the real header. */}
         <div className="mb-1 flex items-center gap-2">
-          <div className="h-[15px] w-24 animate-pulse rounded bg-ods-border md:h-[20px] md:w-32" />
-          <div className="h-[12px] w-12 animate-pulse rounded bg-ods-border md:h-[16px] md:w-16" />
+          <UnifiedSkeleton className="h-[15px] w-24 rounded md:h-[20px] md:w-32" />
+          <UnifiedSkeleton className="h-[12px] w-12 rounded md:h-[16px] md:w-16" />
         </div>
         {/* Two body lines — match the 12/14px body line-height. */}
-        <div className="h-[14px] w-full animate-pulse rounded bg-ods-border md:h-[18px]" />
-        <div className="mt-1 h-[14px] w-3/4 animate-pulse rounded bg-ods-border md:h-[18px]" />
+        <UnifiedSkeleton className="h-[14px] w-full rounded md:h-[18px]" />
+        <UnifiedSkeleton className="mt-1 h-[14px] w-3/4 rounded md:h-[18px]" />
       </div>
     </div>
   );

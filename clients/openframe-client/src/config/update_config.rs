@@ -17,6 +17,12 @@ pub const CONSUMER_CYCLE_PAUSE_MS: u64 = 30000; // 30 seconds pause between retr
 // Reconnection
 pub const RECONNECTION_DELAY_MS: u64 = 5000; // 5 seconds
 
+pub const SELF_RESTART_EXIT_CODE: i32 = 75;
+pub const SELF_RESTART_IDLE_WAIT_SECS: u64 = 600;
+pub const SELF_RESTART_IDLE_POLL_SECS: u64 = 5;
+pub const SELF_RESTART_HANDOFF_SECS: u64 = 900;
+pub const DEV_CLIENT_VERSION: &str = "0.0.0-dev";
+
 // Durable result outbox
 pub const OUTBOX_MAX_ENTRIES: usize = 500;
 pub const OUTBOX_FLUSH_INTERVAL_SECS: u64 = 30;
