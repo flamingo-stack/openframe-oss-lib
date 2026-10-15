@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { formatRelativeTime } from '../../utils/date-utils';
 import { BoxArchiveIcon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatListItem } from './chat-nav-sidebar';
@@ -93,7 +94,7 @@ export function MingoArchiveList({
           </>
         ) : isLoading ? (
           Array.from({ length: 6 }, (_, i) => (
-            <div key={i} className="h-10 shrink-0 animate-pulse rounded-md bg-ods-skeleton" aria-hidden />
+            <UnifiedSkeleton key={i} aria-hidden className="h-10 shrink-0 rounded-md" />
           ))
         ) : (
           <ChatListEmptyState

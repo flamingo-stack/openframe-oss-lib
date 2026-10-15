@@ -4,8 +4,8 @@ import { type ReactNode, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
-import { Skeleton } from '../ui/skeleton';
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip';
 import { QuickActionWall } from './quick-action-wall';
 
@@ -175,7 +175,7 @@ export function GuideWelcome({
                 <p className="text-ods-text-secondary text-h4">{subtitle}</p>
               ) : subtitleLoading ? (
                 <div className="flex w-full justify-center">
-                  <Skeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
+                  <UnifiedSkeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
                 </div>
               ) : null}
             </div>

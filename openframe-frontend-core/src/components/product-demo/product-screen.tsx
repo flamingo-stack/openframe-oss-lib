@@ -1,8 +1,8 @@
 'use client';
 
 import { lazy, type LazyExoticComponent, Suspense } from 'react';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ProductScreenFrame, type ProductScreenFrameProps } from '../ui/product-screen-frame';
-import { Skeleton } from '../ui/skeleton';
 import { PRODUCT_SCREEN_LOADERS } from './registry';
 import { PRODUCT_SCREEN_KEYS, PRODUCT_SCREEN_LABELS, type ProductScreenKey } from './screen-keys';
 import type { ProductScreenComponent } from './types';
@@ -59,9 +59,9 @@ export function ProductScreenSkeleton({
   className,
 }: Pick<ProductScreenProps, 'compact' | 'height' | 'className'>) {
   return (
-    <Skeleton
+    <UnifiedSkeleton
       className={className}
-      style={{ height: height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT) }}
+      height={height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT)}
     />
   );
 }
@@ -88,7 +88,7 @@ export function ProductScreen({ screen, compact = false, label, height, designWi
       label={label ?? PRODUCT_SCREEN_LABELS[screen]}
       height={frameHeight}
     >
-      <Suspense fallback={<Skeleton className="h-full w-full" />}>
+      <Suspense fallback={<UnifiedSkeleton className="h-full w-full" />}>
         <Screen compact={compact} />
       </Suspense>
     </ProductScreenFrame>

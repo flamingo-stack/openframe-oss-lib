@@ -77,7 +77,6 @@ export * from './mobile-app-qr';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
-export * from './skeleton';
 export * from './hover-dropdown';
 // Chat components
 export * from '../chat';
