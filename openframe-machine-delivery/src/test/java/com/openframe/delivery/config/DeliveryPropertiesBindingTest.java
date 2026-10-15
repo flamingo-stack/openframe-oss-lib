@@ -65,8 +65,9 @@ class DeliveryPropertiesBindingTest {
         config.put(PREFIX + ".sweep.batch-size", "500");
         config.put(PREFIX + ".defaults.ack-threshold-seconds", "30");
         config.put(PREFIX + ".defaults.max-attempts", "3");
-        config.put(PREFIX + ".defaults.backoff-multiplier", "2");
-        config.put(PREFIX + ".defaults.max-retry-interval-seconds", "300");
+        config.put(PREFIX + ".defaults.backoff.multiplier", "2");
+        config.put(PREFIX + ".defaults.backoff.max-interval-seconds", "300");
+        config.put(PREFIX + ".defaults.backoff.jitter", "0.2");
         config.put(PREFIX + ".defaults.offline-behavior", "RETRY_ON_RECONNECT");
         config.put(PREFIX + ".defaults.reconnect-window-seconds", "86400");
         config.put(PREFIX + ".defaults.result-timeout-seconds", "600");
