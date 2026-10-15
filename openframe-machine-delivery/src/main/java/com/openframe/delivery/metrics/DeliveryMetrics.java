@@ -22,6 +22,7 @@ public class DeliveryMetrics {
     private static final String DISPATCH_FAILED_COUNTER = "openframe.delivery.dispatch.failed";
     private static final String DISPATCH_DUPLICATE_COUNTER = "openframe.delivery.dispatch.duplicate";
     private static final String DISPATCH_REJECTED_COUNTER = "openframe.delivery.dispatch.rejected";
+    private static final String DISPATCH_RECEIVED_COUNTER = "openframe.delivery.dispatch.received";
     private static final String SWEEP_TIMER = "openframe.delivery.sweep.duration";
     private static final String ROLLOUT_BATCH_FAILED_COUNTER = "openframe.delivery.rollout.batch_failed";
     private static final String ROLLOUT_MACHINE_SKIPPED_COUNTER = "openframe.delivery.rollout.machine_skipped";
@@ -59,6 +60,11 @@ public class DeliveryMetrics {
     public void recordDispatchDuplicate(DeliveryType type) {
         String typeTag = tagValue(type.name());
         meterRegistry.counter(DISPATCH_DUPLICATE_COUNTER, TAG_TYPE, typeTag).increment();
+    }
+
+    // every record the hand-off consumer took off the topic, before it is read: the one sign the consumer is alive
+    public void recordDispatchReceived() {
+        meterRegistry.counter(DISPATCH_RECEIVED_COUNTER).increment();
     }
 
     public void recordDispatchRejected(String reason) {

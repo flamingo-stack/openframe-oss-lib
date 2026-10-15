@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryDispatchListenerTest {
@@ -71,7 +72,8 @@ class DeliveryDispatchListenerTest {
         DeliveryRequest<DeliveryPayload> request = requestCaptor.getValue();
         assertThat(request.isForEveryMachine()).isTrue();
         assertThat(request.getTargetId()).isEqualTo(TARGET_ID);
-        verifyNoInteractions(metrics);
+        verify(metrics).recordDispatchReceived();
+        verifyNoMoreInteractions(metrics);
     }
 
     @Test
