@@ -12,6 +12,7 @@ import {
   dismissAnnouncement,
   isAnnouncementDismissed,
 } from '../utils/announcement-storage';
+import { isAnnouncementOnSurface } from '../utils/announcement-surface';
 import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
 import { pathMatchesAny } from '../utils/path-pattern';
@@ -71,6 +72,7 @@ export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
   dismissible = true,
+  surface = 'web',
   className,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
@@ -148,7 +150,11 @@ export function AnnouncementBar({
   // Preview always mirrors the draft directly (storage is not consulted there).
   // A page that shows the news itself (a hero's news pill) is listed in the
   // announcement's `excluded_paths` (path patterns); the bar stays collapsed there.
-  const excludedHere = pathMatchesAny(pathname, announcement?.excluded_paths);
+  // So does an announcement for other surfaces (the phone app, when the host
+  // is a browser): the host passes `surface`, the one thing only it knows.
+  const excludedHere =
+    pathMatchesAny(pathname, announcement?.excluded_paths) ||
+    (announcement != null && !isAnnouncementOnSurface(announcement, surface));
   const expanded = previewMode
     ? announcement != null
     : announcement != null && expandedState && !dismissed && !excludedHere;
