@@ -50,9 +50,6 @@ pub mod update_cleanup_service;
 pub mod update_handler_service;
 pub mod update_state_service;
 
-#[cfg(test)]
-pub(crate) mod test_support;
-
 pub use agent_auth_service::AgentAuthService;
 pub use agent_configuration_service::AgentConfigurationService;
 pub use agent_registration_service::AgentRegistrationService;

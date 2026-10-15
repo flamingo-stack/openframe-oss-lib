@@ -1,6 +1,6 @@
 use super::*;
 use crate::models::InitialConfiguration;
-use crate::services::test_support::{directories, mock_server_with_body, registered_agent, FAST};
+use crate::test_support::{directories, mock_server_with_body, registered_agent, FAST};
 
 struct Fixture {
     _dir: tempfile::TempDir,

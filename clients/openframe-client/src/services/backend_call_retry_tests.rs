@@ -1,5 +1,5 @@
 use super::*;
-use crate::services::test_support::{directories, FAST};
+use crate::test_support::{directories, FAST};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn healthy_deactivation(dir: &tempfile::TempDir) -> std::sync::Arc<DeactivationService> {
