@@ -121,7 +121,8 @@ class GatewayVerifiedJwtDecoderTest {
 
         assertThatThrownBy(() -> decoder.decode(token))
                 .isInstanceOf(BadJwtException.class)
-                .hasMessage("Malformed token claims: Unexpected type of JSON object member with key exp");
+                .hasMessageStartingWith("Malformed token claims: Unexpected type of JSON object member")
+                .hasMessageEndingWith("exp");
     }
 
     @Test

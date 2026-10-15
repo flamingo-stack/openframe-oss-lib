@@ -1,6 +1,8 @@
 package com.openframe.authz.support;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
@@ -8,7 +10,6 @@ import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
 import jakarta.servlet.http.Cookie;
-import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
@@ -33,7 +34,9 @@ public final class SsoTestFixtures {
 
     /** The mapper Spring Boot builds: unknown properties are ignored, as in the running app. */
     public static ObjectMapper objectMapper() {
-        return Jackson2ObjectMapperBuilder.json().build();
+        return JsonMapper.builder()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 
     public static SsoCookieCodec cookieCodec() {

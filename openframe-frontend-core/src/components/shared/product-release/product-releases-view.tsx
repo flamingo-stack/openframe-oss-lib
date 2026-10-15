@@ -33,6 +33,7 @@ import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link'
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution';
 import { executeNavigationImperative } from '../../chat/utils/execute-navigation';
 import { ListEmptyState } from '../../list-empty-state';
+import { LoadingRegion } from '../../loading/loading-region';
 import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
@@ -209,7 +210,7 @@ export function ProductReleasesView({
           <>
             {/* ALWAYS render `itemsPerPage` slots — visibility toggles so the
                 list height is stable across loading ↔ loaded. */}
-            <div className="flex flex-col gap-6">
+            <LoadingRegion label="Loading releases" announce={isLoading} className="flex flex-col gap-6">
               {Array.from({ length: itemsPerPage }).map((_, i) => {
                 const release = releases[i];
                 const hasData = !!release;
@@ -228,7 +229,7 @@ export function ProductReleasesView({
                   </div>
                 );
               })}
-            </div>
+            </LoadingRegion>
 
             {/* Pagination — always present at the bottom for consistent spacing. */}
             <div className="mt-6 flex justify-center content-md:mt-8">

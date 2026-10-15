@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
+import { LoadingRegion } from '../../loading/loading-region';
 import { Button } from '../button';
 import { useOptionalDataTableContext } from './data-table';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
@@ -163,9 +164,10 @@ export function DataTableInfiniteFooter({
   return (
     <>
       {isFetchingNextPage && !bodyDrawsRows && (
-        <div className={ROW_STACK_CLASSES}>
+        // Busy, without a second status: the footer's own one below says "Loading more results".
+        <LoadingRegion status={false} className={ROW_STACK_CLASSES}>
           <DataTableSkeleton rows={skeletonRows} />
-        </div>
+        </LoadingRegion>
       )}
       {isStalled && (
         <div className="flex justify-center pt-[var(--spacing-system-mf)]">

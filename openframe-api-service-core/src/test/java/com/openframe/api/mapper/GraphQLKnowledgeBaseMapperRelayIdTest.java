@@ -1,11 +1,14 @@
 package com.openframe.api.mapper;
 
+import com.openframe.api.dto.assignment.AssignmentTarget;
+import com.openframe.api.dto.assignment.AssignmentTargetInput;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.CreateArticleInput;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterCriteria;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseFilterInput;
 import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
+import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -117,5 +120,92 @@ class GraphQLKnowledgeBaseMapperRelayIdTest {
         assertThat(criteria)
                 .returns(RAW_PARENT_ID, KnowledgeBaseFilterCriteria::getParentId)
                 .returns(List.of(RAW_TAG_ID), KnowledgeBaseFilterCriteria::getTagIds);
+    }
+
+    @Test
+    void toFilterCriteria_assignedTo_decodedWithTheTargetType() {
+        // setup
+        KnowledgeBaseFilterInput input = KnowledgeBaseFilterInput.builder()
+                .assignedTo(AssignmentTargetInput.builder()
+                        .targetType(AssignmentTargetType.DEVICE)
+                        .targetId(codec.encode(NodeType.MACHINE, RAW_MACHINE_ID))
+                        .build())
+                .build();
+
+        // execution
+        KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getAssignedTo())
+                .isEqualTo(new AssignmentTarget(AssignmentTargetType.DEVICE, RAW_MACHINE_ID));
+        assertThat(criteria.getAssignedTo().resolvable()).isTrue();
+    }
+
+    @Test
+    void toFilterCriteria_assignedToIdOfAnotherType_matchesNothingInsteadOfThrowing() {
+        // setup
+        KnowledgeBaseFilterInput input = KnowledgeBaseFilterInput.builder()
+                .assignedTo(AssignmentTargetInput.builder()
+                        .targetType(AssignmentTargetType.ORGANIZATION)
+                        .targetId(codec.encode(NodeType.MACHINE, RAW_MACHINE_ID))
+                        .build())
+                .build();
+
+        // execution
+        KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getAssignedTo())
+                .isEqualTo(AssignmentTarget.unresolvable(AssignmentTargetType.ORGANIZATION));
+        assertThat(criteria.getAssignedTo().resolvable()).isFalse();
+    }
+
+    @Test
+    void toFilterCriteria_assignedToPlainId_passesThroughAsRawIdLikeEveryOtherId() {
+        // setup
+        KnowledgeBaseFilterInput input = KnowledgeBaseFilterInput.builder()
+                .assignedTo(AssignmentTargetInput.builder()
+                        .targetType(AssignmentTargetType.ORGANIZATION)
+                        .targetId("not-a-relay-id")
+                        .build())
+                .build();
+
+        // execution
+        KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(input);
+
+        // verifications: the codec lets a raw id through; the lookup then finds nothing for it
+        assertThat(criteria.getAssignedTo())
+                .isEqualTo(new AssignmentTarget(AssignmentTargetType.ORGANIZATION, "not-a-relay-id"));
+    }
+
+    @Test
+    void toFilterCriteria_assignedToBlankId_matchesNothing() {
+        // setup
+        KnowledgeBaseFilterInput input = KnowledgeBaseFilterInput.builder()
+                .assignedTo(AssignmentTargetInput.builder()
+                        .targetType(AssignmentTargetType.ORGANIZATION)
+                        .targetId(" ")
+                        .build())
+                .build();
+
+        // execution
+        KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getAssignedTo())
+                .isEqualTo(AssignmentTarget.unresolvable(AssignmentTargetType.ORGANIZATION));
+    }
+
+    @Test
+    void toFilterCriteria_noAssignedTo_staysNull() {
+        // setup
+        KnowledgeBaseFilterInput input = KnowledgeBaseFilterInput.builder().build();
+
+        // execution
+        KnowledgeBaseFilterCriteria criteria = mapper.toFilterCriteria(input);
+
+        // verifications
+        assertThat(criteria.getAssignedTo()).isNull();
+        assertThat(mapper.toAssignmentTarget(null)).isNull();
     }
 }

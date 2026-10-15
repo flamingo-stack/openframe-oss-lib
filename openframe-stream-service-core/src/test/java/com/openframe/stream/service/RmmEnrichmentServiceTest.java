@@ -1,8 +1,9 @@
 package com.openframe.stream.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
@@ -43,7 +44,7 @@ class RmmEnrichmentServiceTest {
     private static final String EXECUTION_ID = "exec-1";
     private static final String SCRIPT_ID = "script-1";
     private static final String ADMIN_ID = "admin-7";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new JsonMapper();
 
     @Mock
     private MachineIdCacheService machineIdCacheService;

@@ -1,6 +1,10 @@
 import type React from 'react';
+import { LoadingRegion } from './loading-region';
+import { UnifiedSkeleton } from './unified-skeleton';
 
 interface MarginReportSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   /** Enable pulse animation (default: true) */
   animate?: boolean;
   /** Optional explanation text shown above overlay content */
@@ -9,63 +13,70 @@ interface MarginReportSkeletonProps {
   overlayContent?: React.ReactNode;
 }
 
-export function MarginReportSkeleton({ animate = true, description, overlayContent }: MarginReportSkeletonProps) {
+export function MarginReportSkeleton({
+  region = true,
+  animate = true,
+  description,
+  overlayContent,
+}: MarginReportSkeletonProps) {
   return (
-    <main className={`bg-ods-bg ${animate ? 'animate-pulse' : ''} relative min-h-screen`}>
+    <LoadingRegion
+      label="Loading the report"
+      as="main"
+      announce={region && !overlayContent}
+      className="relative min-h-screen bg-ods-bg"
+    >
       <div className="mx-auto max-w-[1920px] space-y-10 px-6 py-6 content-md:px-20 content-md:py-10">
         {/* Header */}
         <div className="space-y-3">
-          <div className="h-10 w-72 rounded bg-ods-skeleton" />
-          <div className="h-4 w-80 rounded bg-ods-skeleton" />
+          <UnifiedSkeleton className="h-10 w-72 rounded" animate={animate} />
+          <UnifiedSkeleton className="h-4 w-80 rounded" animate={animate} />
         </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-1 gap-6 content-md:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-32 rounded border border-ods-border bg-ods-card" />
+            <UnifiedSkeleton key={i} className="h-32 rounded border border-ods-border" animate={animate} />
           ))}
         </div>
 
         {/* MSP Profile & Report Info cards */}
         <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2">
           {/* MSP profile skeleton */}
-          <div className="flex animate-pulse items-center gap-4 rounded-lg border border-ods-border bg-ods-card p-6">
-            <div className="h-14 w-14 rounded-lg bg-ods-skeleton" />
+          <div className="flex items-center gap-4 rounded-lg border border-ods-border bg-ods-card p-6">
+            <UnifiedSkeleton className="h-14 w-14 rounded-lg" animate={animate} />
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-3/4 rounded bg-ods-skeleton" />
-              <div className="h-3 w-1/2 rounded bg-ods-skeleton" />
+              <UnifiedSkeleton className="h-4 w-3/4 rounded" animate={animate} />
+              <UnifiedSkeleton className="h-3 w-1/2 rounded" animate={animate} />
             </div>
           </div>
 
           {/* Report info skeleton */}
-          <div className="flex animate-pulse flex-col gap-4 rounded-lg border border-ods-border bg-ods-card p-6">
+          <div className="flex flex-col gap-4 rounded-lg border border-ods-border bg-ods-card p-6">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <div className="h-10 w-10 rounded-lg bg-ods-skeleton" />
+                <UnifiedSkeleton className="h-10 w-10 rounded-lg" animate={animate} />
                 <div className="space-y-1">
-                  <div className="h-4 w-32 rounded bg-ods-skeleton" />
-                  <div className="h-3 w-20 rounded bg-ods-skeleton" />
+                  <UnifiedSkeleton className="h-4 w-32 rounded" animate={animate} />
+                  <UnifiedSkeleton className="h-3 w-20 rounded" animate={animate} />
                 </div>
               </div>
-              <div className="h-6 w-36 rounded bg-ods-skeleton" />
+              <UnifiedSkeleton className="h-6 w-36 rounded" animate={animate} />
             </div>
-            <div className="mt-4 h-4 w-40 rounded bg-ods-skeleton" />
+            <UnifiedSkeleton className="mt-4 h-4 w-40 rounded" animate={animate} />
           </div>
         </div>
 
         {/* Vendor solution lists (Commercial & Open-Source) */}
         <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2">
           {['Commercial Stack', 'Open-Source Stack'].map((label, idx) => (
-            <div
-              key={idx}
-              className="flex animate-pulse flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card"
-            >
+            <div key={idx} className="flex flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card">
               {/* list header */}
               <div className="flex items-center justify-between px-6 py-4">
-                <div className="h-6 w-40 rounded bg-ods-skeleton" />
+                <UnifiedSkeleton className="h-6 w-40 rounded" animate={animate} />
                 <div className="flex items-center gap-2">
-                  <div className="h-5 w-20 rounded bg-ods-skeleton" />
-                  <div className="h-4 w-10 rounded bg-ods-skeleton" />
+                  <UnifiedSkeleton className="h-5 w-20 rounded" animate={animate} />
+                  <UnifiedSkeleton className="h-4 w-10 rounded" animate={animate} />
                 </div>
               </div>
 
@@ -78,16 +89,16 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
                   >
                     {/* left section: icon + text */}
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="h-12 w-12 flex-shrink-0 rounded-lg bg-ods-skeleton" />
+                      <UnifiedSkeleton className="h-12 w-12 flex-shrink-0 rounded-lg" animate={animate} />
                       <div className="flex min-w-0 flex-col">
-                        <div className="h-4 w-32 rounded bg-ods-skeleton" />
-                        <div className="mt-1 hidden h-3 w-24 rounded bg-ods-skeleton content-md:block" />
+                        <UnifiedSkeleton className="h-4 w-32 rounded" animate={animate} />
+                        <UnifiedSkeleton className="mt-1 hidden h-3 w-24 rounded content-md:block" animate={animate} />
                       </div>
                     </div>
                     {/* right addon: cost text */}
                     <div className="flex flex-shrink-0 items-center gap-1">
-                      <div className="h-4 w-16 rounded bg-ods-skeleton" />
-                      <div className="h-3 w-8 rounded bg-ods-skeleton" />
+                      <UnifiedSkeleton className="h-4 w-16 rounded" animate={animate} />
+                      <UnifiedSkeleton className="h-3 w-8 rounded" animate={animate} />
                     </div>
                   </div>
                 ))}
@@ -97,12 +108,12 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
         </div>
 
         {/* Strategic Recommendations header placeholder */}
-        <div className="h-6 w-60 rounded bg-ods-skeleton" />
+        <UnifiedSkeleton className="h-6 w-60 rounded" animate={animate} />
 
         {/* Recommendations grid */}
         <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-48 rounded border border-ods-border bg-ods-card" />
+            <UnifiedSkeleton key={i} className="h-48 rounded border border-ods-border" animate={animate} />
           ))}
         </div>
 
@@ -111,17 +122,17 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
           {/* Section header */}
           <div className="flex items-start gap-6">
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-8 w-72 rounded bg-ods-skeleton" />
-              <div className="h-4 w-3/4 rounded bg-ods-skeleton" />
+              <UnifiedSkeleton className="h-8 w-72 rounded" animate={animate} />
+              <UnifiedSkeleton className="h-4 w-3/4 rounded" animate={animate} />
             </div>
             {/* Logo placeholder */}
-            <div className="h-12 w-12 shrink-0 rounded-md bg-ods-skeleton" />
+            <UnifiedSkeleton className="h-12 w-12 shrink-0 rounded-md" animate={animate} />
           </div>
 
           {/* Value cards grid */}
           <div className="grid grid-cols-1 gap-6 content-md:grid-cols-2 content-lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-32 rounded border border-ods-border bg-ods-card" />
+              <UnifiedSkeleton key={i} className="h-32 rounded border border-ods-border" animate={animate} />
             ))}
           </div>
         </div>
@@ -137,6 +148,6 @@ export function MarginReportSkeleton({ animate = true, description, overlayConte
           </div>
         </div>
       )}
-    </main>
+    </LoadingRegion>
   );
 }

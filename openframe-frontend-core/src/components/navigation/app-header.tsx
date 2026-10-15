@@ -11,6 +11,7 @@ import { LogOutIcon } from '../icons-v2-generated/interface/log-out-icon';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-icon';
 import { UserClassicIcon } from '../icons-v2-generated/users/user-classic-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
@@ -387,7 +388,7 @@ const CELL_VISIBILITY: Record<Exclude<HeaderLoadingCell, 'wide'>, string | undef
 function HeaderCellSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn('flex h-full w-14 shrink-0 items-center justify-center border-l border-ods-border', className)}>
-      <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+      <UnifiedSkeleton className="h-6 w-6 rounded" />
     </div>
   );
 }
@@ -403,8 +404,8 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
 function HeaderWideCellSkeleton() {
   return (
     <div className="flex h-full w-14 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
-      <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
-      <div className="hidden h-5 animate-pulse rounded bg-ods-border md:block md:w-[72px]" />
+      <UnifiedSkeleton className="h-6 w-6 shrink-0 rounded" />
+      <UnifiedSkeleton className="hidden h-5 rounded md:block md:w-[72px]" />
     </div>
   );
 }
@@ -438,13 +439,13 @@ function AppHeaderSkeleton({
       leading={
         // Burger cell: mobile only, in CSS.
         <div className="flex h-full w-14 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
-          <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-6 w-6 rounded" />
         </div>
       }
       logo={
         <>
-          <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
-          <div className="h-4 w-24 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-6 w-6 shrink-0 rounded" />
+          <UnifiedSkeleton className="h-4 w-24 rounded" />
         </>
       }
       // `md:hidden` belongs on the WRAPPER, not the placeholder inside it:
@@ -455,7 +456,7 @@ function AppHeaderSkeleton({
       // it back on handoff, which is the exact jump this branch removes.
       logoClassName="gap-2 md:hidden"
       // `TopNavigation` already hides the center zone below `centerBreakpoint`.
-      center={showSearch ? <div className="h-10 w-full animate-pulse rounded-md bg-ods-border" /> : undefined}
+      center={showSearch ? <UnifiedSkeleton className="h-10 w-full rounded-md" /> : undefined}
       sideActions={
         <>
           {/* Mobile-only search trigger; from md the search lives in the center zone. */}

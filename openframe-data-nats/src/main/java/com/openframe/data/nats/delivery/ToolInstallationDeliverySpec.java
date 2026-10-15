@@ -24,7 +24,9 @@ import static java.util.Objects.requireNonNullElse;
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallationDeliverySeed, ToolInstallationMessage> {
 
-    private static final String SUBJECT_TEMPLATE = "machine.%s.tool-installation";
+    // .v2 keeps the engine out of the TOOL_INSTALLATION stream, which captures machine.*.tool-installation for the
+    // agent's durable: an agent that listens to both gets a command once, from whichever path the server uses
+    private static final String SUBJECT_TEMPLATE = "machine.%s.tool-installation.v2";
 
     private final DownloadConfigurationMapper downloadConfigurationMapper;
     private final LocalFilenameConfigurationMapper localFilenameConfigurationMapper;

@@ -1,12 +1,13 @@
 import { cn } from '../../utils/cn';
-import { TextSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
+import { LoadingRegion } from './loading-region';
+import { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
 
 interface CardSkeletonProps {
   className?: string;
   /**
    * Card layout variant
    */
-  variant?: 'vendor' | 'blog' | 'category' | 'alternative';
+  variant?: 'vendor' | 'blog' | 'alternative';
   /**
    * Show action buttons area
    */
@@ -24,9 +25,10 @@ interface CardSkeletonProps {
  *
  * Supports different card types used across the application:
  * - vendor: Vendor cards with logo, title, description, and actions
- * - blog: Blog post cards with image, title, summary, and metadata  
- * - category: Category cards with icon, title, and description
+ * - blog: Blog post cards with image, title, summary, and metadata
  * - alternative: Alternative vendor cards in comparison lists
+ *
+ * A category card's loading box is `CategoryCardSkeleton`.
  */
 export function CardSkeleton({
   className,
@@ -39,7 +41,6 @@ export function CardSkeleton({
   const cardContent = {
     vendor: <VendorCardContent showMetadata={showMetadata} />,
     blog: <BlogCardContent showActions={showActions} showMetadata={showMetadata} />,
-    category: <CategoryCardContent />,
     alternative: <AlternativeCardContent showActions={showActions} />,
   };
 
@@ -53,8 +54,6 @@ export function CardSkeleton({
         variant === 'vendor' && 'flex h-full flex-col',
         className,
       )}
-      role="status"
-      aria-label={`Loading ${variant} card`}
       {...props}
     >
       {cardContent[variant]}
@@ -181,7 +180,7 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
               <div className="flex shrink-0 items-center gap-3 text-ods-text-muted">
                 <TextSkeleton.Caption className="w-12" />
                 {/* Separator dot */}
-                <div className="h-1 w-1 rounded-full bg-ods-skeleton"></div>
+                <UnifiedSkeleton variant="circular" className="h-1 w-1" />
                 <TextSkeleton.Caption className="w-16" />
               </div>
             </div>
@@ -189,39 +188,6 @@ function BlogCardContent({ showActions, showMetadata }: { showActions: boolean; 
         )}
       </div>
     </>
-  );
-}
-
-/**
- * Category card skeleton content
- */
-function CategoryCardContent() {
-  return (
-    <div className="space-y-4 p-4 content-md:p-6">
-      {/* Icon grid */}
-      <div className="flex gap-2 content-md:gap-3">
-        {Array.from({ length: 6 }).map((_, index) => (
-          <MediaSkeleton.Icon key={index} size="lg" className="flex-shrink-0" />
-        ))}
-      </div>
-
-      {/* Content */}
-      <div className="space-y-2">
-        <div className="space-y-1">
-          <TextSkeleton.Subheading className="w-3/4" />
-          <TextSkeleton.Caption className="w-1/2" />
-        </div>
-
-        <div className="flex items-start justify-between gap-4 content-md:items-end content-md:gap-6">
-          <div className="flex-1 space-y-2">
-            <TextSkeleton.Body className="w-full" />
-            <TextSkeleton.Body className="w-2/3" />
-          </div>
-
-          <InteractiveSkeleton.Button className="h-10 w-10 flex-shrink-0 content-md:h-12 content-md:w-12" />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -258,34 +224,36 @@ function AlternativeCardContent({ showActions }: { showActions: boolean }) {
  * Grid of card skeletons for loading lists
  */
 export function CardSkeletonGrid({
+  region = true,
   count = 6,
   variant = 'vendor',
   className,
   containerClassName,
   ...props
 }: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   count?: number;
   variant?: CardSkeletonProps['variant'];
   className?: string;
   containerClassName?: string;
 } & Omit<CardSkeletonProps, 'variant'>) {
   return (
-    <div
+    <LoadingRegion
+      label={`Loading ${variant} cards`}
+      announce={region}
       className={cn(
         'grid gap-4 content-md:gap-6',
         // Responsive grid based on card type
         variant === 'vendor' && 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-3',
         variant === 'blog' && 'grid-cols-1 content-md:grid-cols-2',
-        variant === 'category' && 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-4',
         variant === 'alternative' && 'grid-cols-1',
         className,
       )}
-      role="status"
-      aria-label={`Loading ${count} ${variant} cards`}
     >
       {Array.from({ length: count }, (_, index) => (
         <CardSkeleton key={index} variant={variant} containerClassName={containerClassName} {...props} />
       ))}
-    </div>
+    </LoadingRegion>
   );
 }

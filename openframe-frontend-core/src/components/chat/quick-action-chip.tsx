@@ -1,8 +1,9 @@
 'use client';
 
-import { type CSSProperties, type ReactNode, isValidElement } from 'react';
+import { type ReactNode, isValidElement } from 'react';
 import { cn } from '../../utils/cn';
 import { EntityIcon, type EntityIconValue } from '../icon-display';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Tag } from '../ui/tag';
 
 // =============================================================================
@@ -201,18 +202,11 @@ export interface QuickActionChipSkeletonProps {
   className?: string;
 }
 
-/** Pulse bar inside the chip skeleton — the standard `ui/skeleton` treatment
- *  (`animate-pulse bg-ods-border`), as a SPAN so it stays valid phrasing
- *  content inside the Tag's label span. */
-function ChipSkelBar({ className, style }: { className?: string; style?: CSSProperties }) {
-  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />;
-}
-
 /**
  * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
- * `Tag` (same height, padding, border, radius, icon box) with standard
- * skeleton pulse bars (identical animation + token as `ui/skeleton`) in the
- * icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
+ * `Tag` (same height, padding, border, radius, icon box) with `UnifiedSkeleton`
+ * bars (as spans, so they stay valid phrasing content inside the Tag's label
+ * span) in the icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
  * construction. Use anywhere quick actions stream in (chat empty states,
  * marketing walls, deck panels).
  */
@@ -231,12 +225,21 @@ export function QuickActionChipSkeleton({
       size={question ? 'sentence' : size}
       className={cn(question && 'max-w-full', className)}
       icon={
-        icon && !question ? <ChipSkelBar className={size === 'large' ? 'block size-5' : 'block size-4'} /> : undefined
+        icon && !question ? (
+          <UnifiedSkeleton as="span" aria-hidden className={size === 'large' ? 'block size-5' : 'block size-4'} />
+        ) : undefined
       }
       label={
         <>
-          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />}
-          <ChipSkelBar className="inline-block h-[0.9em] translate-y-[0.08em]" style={{ width: `${labelCh}ch` }} />
+          {lozenge && (
+            <UnifiedSkeleton as="span" aria-hidden className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />
+          )}
+          <UnifiedSkeleton
+            as="span"
+            aria-hidden
+            className="inline-block h-[0.9em] translate-y-[0.08em]"
+            width={`${labelCh}ch`}
+          />
         </>
       }
     />

@@ -1,8 +1,9 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
@@ -39,7 +40,7 @@ class CommandResultDeserializerTest {
     @Mock
     private CommandExecutionRepository commandExecutionRepository;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
 
     private CommandResultDeserializer deserializer;
 
@@ -118,7 +119,7 @@ class CommandResultDeserializerTest {
     void result() throws Exception {
         ObjectNode after = after().put("stdout", "hey\n").put("exitCode", 0).put("executionTimeMs", 12L);
         JsonNode result = parse(deserializer.getResult(after));
-        assertThat(result.get("output").asText()).isEqualTo("hey\n");
+        assertThat(result.get("output").asString()).isEqualTo("hey\n");
         assertThat(result.get("exit_code").isInt()).isTrue();
         assertThat(result.get("exit_code").asInt()).isZero();
         assertThat(result.get("execution_time_ms").isNumber()).isTrue();
@@ -146,11 +147,11 @@ class CommandResultDeserializerTest {
         JsonNode result = parse(deserializer.getResult(after));
 
         // verifications
-        assertThat(result.get("output").asText()).isEqualTo("hey\n");
+        assertThat(result.get("output").asString()).isEqualTo("hey\n");
         JsonNode input = result.get("input");
-        assertThat(input.get("command").asText()).isEqualTo("osascript -e 'display dialog \"hi\"'");
-        assertThat(input.get("shell").asText()).isEqualTo("BASH");
-        assertThat(input.get("privilegeLevel").asText()).isEqualTo("USER");
+        assertThat(input.get("command").asString()).isEqualTo("osascript -e 'display dialog \"hi\"'");
+        assertThat(input.get("shell").asString()).isEqualTo("BASH");
+        assertThat(input.get("privilegeLevel").asString()).isEqualTo("USER");
         assertThat(input.get("timeoutSeconds").asInt()).isEqualTo(60);
     }
 
@@ -216,11 +217,11 @@ class CommandResultDeserializerTest {
 
         // stderr present even with exit 0 → reported as output
         JsonNode stderr = parse(deserializer.getError(after().put("exitCode", 0).put("stderr", "boom")));
-        assertThat(stderr.get("output").asText()).isEqualTo("boom");
+        assertThat(stderr.get("output").asString()).isEqualTo("boom");
 
         // explicit error string
         JsonNode err = parse(deserializer.getError(after().put("error", "connection refused")));
-        assertThat(err.get("error").asText()).isEqualTo("connection refused");
+        assertThat(err.get("error").asString()).isEqualTo("connection refused");
 
         // timed out → timed_out flag
         JsonNode timed = parse(deserializer.getError(after().put("timedOut", true)));
@@ -243,8 +244,8 @@ class CommandResultDeserializerTest {
     @DisplayName("non-numeric exit_code falls back to a string value (putIntOrString)")
     void nonNumericExitCodeFallsBackToString() throws Exception {
         JsonNode result = parse(deserializer.getResult(after().put("exitCode", "n/a")));
-        assertThat(result.get("exit_code").isTextual()).isTrue();
-        assertThat(result.get("exit_code").asText()).isEqualTo("n/a");
+        assertThat(result.get("exit_code").isString()).isTrue();
+        assertThat(result.get("exit_code").asString()).isEqualTo("n/a");
     }
 
 }

@@ -1,6 +1,7 @@
 package com.openframe.delivery.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.delivery.dispatch.DeliverySink;
 import com.openframe.delivery.dispatch.KafkaDeliverySink;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -48,7 +49,7 @@ class DeliveryAutoConfigurationTest {
 
         @Bean
         ObjectMapper objectMapper() {
-            return new ObjectMapper();
+            return new JsonMapper();
         }
 
         @Bean

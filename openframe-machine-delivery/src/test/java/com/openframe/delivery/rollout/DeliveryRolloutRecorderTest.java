@@ -1,6 +1,7 @@
 package com.openframe.delivery.rollout;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryRolloutStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDeliveryRollout;
@@ -39,7 +40,7 @@ class DeliveryRolloutRecorderTest {
 
     @BeforeEach
     void setUp() {
-        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new ObjectMapper()));
+        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new JsonMapper()));
         TestPayload payload = new TestPayload();
         payload.setValue("1.5.11");
         payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));

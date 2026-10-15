@@ -11,6 +11,7 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLAssignmentMapper;
 import com.openframe.api.dataloader.TicketStatusDefinitionDataLoader;
+import com.openframe.api.relay.AssignmentNodeTypes;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.AssignmentService;
@@ -29,8 +30,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.Collections;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -47,8 +46,6 @@ public class AssignmentDataFetcher {
 
     private static final Set<NodeType> ASSIGNABLE_ITEM_TYPES =
             EnumSet.of(NodeType.TICKET, NodeType.KNOWLEDGE_BASE_ITEM, NodeType.INSIGHT);
-    private static final Map<AssignmentItemType, NodeType> ITEM_NODE_TYPES = itemNodeTypes();
-    private static final Map<AssignmentTargetType, NodeType> TARGET_NODE_TYPES = targetNodeTypes();
 
     private final AssignmentService assignmentService;
     private final GraphQLAssignmentMapper mapper;
@@ -168,29 +165,10 @@ public class AssignmentDataFetcher {
     }
 
     private String decodeItemId(String itemId, AssignmentItemType itemType) {
-        NodeType expected = ITEM_NODE_TYPES.get(itemType);
-        return relayIdCodec.decode(itemId, expected);
+        return relayIdCodec.decode(itemId, AssignmentNodeTypes.forItem(itemType));
     }
 
     private String decodeTargetId(String targetId, AssignmentTargetType targetType) {
-        NodeType expected = TARGET_NODE_TYPES.get(targetType);
-        return relayIdCodec.decode(targetId, expected);
-    }
-
-    private static Map<AssignmentItemType, NodeType> itemNodeTypes() {
-        Map<AssignmentItemType, NodeType> types = new EnumMap<>(AssignmentItemType.class);
-        types.put(AssignmentItemType.TICKET, NodeType.TICKET);
-        types.put(AssignmentItemType.KNOWLEDGE_ARTICLE, NodeType.KNOWLEDGE_BASE_ITEM);
-        types.put(AssignmentItemType.INSIGHT, NodeType.INSIGHT);
-        return Collections.unmodifiableMap(types);
-    }
-
-    private static Map<AssignmentTargetType, NodeType> targetNodeTypes() {
-        Map<AssignmentTargetType, NodeType> types = new EnumMap<>(AssignmentTargetType.class);
-        types.put(AssignmentTargetType.ORGANIZATION, NodeType.ORGANIZATION);
-        types.put(AssignmentTargetType.DEVICE, NodeType.MACHINE);
-        types.put(AssignmentTargetType.TICKET, NodeType.TICKET);
-        types.put(AssignmentTargetType.KNOWLEDGE_ARTICLE, NodeType.KNOWLEDGE_BASE_ITEM);
-        return Collections.unmodifiableMap(types);
+        return relayIdCodec.decode(targetId, AssignmentNodeTypes.forTarget(targetType));
     }
 }

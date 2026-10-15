@@ -6,6 +6,7 @@ import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { tagVariants, type TagProps } from '../ui/tag';
 
@@ -158,16 +159,16 @@ export function MingoInfoCardSkeleton({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'flex w-full animate-pulse items-center gap-[var(--spacing-system-s)] overflow-hidden rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
+        'flex w-full items-center gap-[var(--spacing-system-s)] overflow-hidden rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
         className,
       )}
     >
-      <span className="block size-10 shrink-0 rounded-md border border-ods-border bg-ods-bg" />
+      <UnifiedSkeleton as="span" className="block size-10 shrink-0 rounded-md border border-ods-border" />
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
-        <span className="block h-4 w-1/2 rounded bg-ods-bg" />
-        <span className="block h-3 w-3/4 rounded bg-ods-bg/60" />
+        <UnifiedSkeleton as="span" className="block h-4 w-1/2 rounded" />
+        <UnifiedSkeleton as="span" className="block h-3 w-3/4 rounded" />
       </span>
-      <span className="block h-5 w-16 shrink-0 rounded bg-ods-bg/60" />
+      <UnifiedSkeleton as="span" className="block h-5 w-16 shrink-0 rounded" />
     </span>
   );
 }
