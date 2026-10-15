@@ -22,17 +22,17 @@ export function chatDialogMenuItems({
   onArchive,
 }: ChatDialogMenuActions): ActionsMenuItem[] {
   const items: (ActionsMenuItem | undefined)[] = [
-    onCopyLink && {
-      id: 'copy-link',
-      label: 'Copy Chat Link',
-      icon: <Link01HorizontalIcon className={chatMenuIconClassName} />,
-      onClick: onCopyLink,
-    },
     onRename && {
       id: 'rename',
       label: 'Rename Chat',
       icon: <PenEditIcon className={chatMenuIconClassName} />,
       onClick: onRename,
+    },
+    onCopyLink && {
+      id: 'copy-link',
+      label: 'Copy Chat Link',
+      icon: <Link01HorizontalIcon className={chatMenuIconClassName} />,
+      onClick: onCopyLink,
     },
     onCompact && {
       id: 'compact',
