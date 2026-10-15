@@ -118,4 +118,5 @@ export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatPro
 EmbeddableChat.displayName = 'EmbeddableChat';
 export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './chat-dimensions';
 export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_EVENTS, ASK_AI_OPEN_WITH_REF_EVENT } from './utils/ask-ai-events';
+export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';
