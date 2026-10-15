@@ -74,7 +74,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: blockquote-with-b
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: closed-iframe-still-renders 1`] = `
 "<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">Hello</p>
-<iframe src="https://example.com/frame" width="300"></iframe>
+<iframe width="300" src="https://example.com/frame" loading="lazy"></iframe>
 <h2 id="after-heading" class="mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary text-[28px] md:text-[32px]">After heading</h2>
 <p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4">more</p></article></div></div>"
 `;
@@ -149,7 +149,7 @@ exports[`RichMarkdownRenderer golden parity > renders fixture: headings-with-emo
 <h6 id="h6-level" class="mb-1 mt-3 font-sans font-semibold text-ods-text-primary text-[16px] md:text-[18px]">H6 level</h6></article></div></div>"
 `;
 
-exports[`RichMarkdownRenderer golden parity > renders fixture: hostile-iframe-srcdoc 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><iframe src="https://example.com/frame"></iframe></article></div></div>"`;
+exports[`RichMarkdownRenderer golden parity > renders fixture: hostile-iframe-srcdoc 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><iframe src="https://example.com/frame" loading="lazy"></iframe></article></div></div>"`;
 
 exports[`RichMarkdownRenderer golden parity > renders fixture: hostile-js-href 1`] = `"<div class="simple-markdown-renderer "><div class="content-wrapper max-w-none"><article class="prose prose-lg max-w-none"><p class="text-ods-text-primary first:mt-0 last:mb-0 font-sans text-[16px] md:text-[18px] lg:text-[20px] leading-[1.6] my-4"><a class="relative text-ods-accent no-underline transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-0 after:bg-ods-accent after:transition-all after:duration-300 after:content-[''] hover:after:w-full ">click</a></p></article></div></div>"`;
 

@@ -1,5 +1,18 @@
 'use client';
 
+import type React from 'react';
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+} from 'react';
+import { useNearViewport } from '../../hooks/use-near-viewport';
+import { fetchPriorityProp } from '../../utils/fetch-priority';
 /**
  * <Video> — single source of truth for every public video surface
  * across every Flamingo platform consumer of this lib.
@@ -29,19 +42,7 @@
  *   layout="fill"     → absolute inset-0 w-full h-full. Carousel slides.
  *   layout="native"   → intrinsic aspect ratio. Bites grid, blog cards.
  */
-import type React from 'react';
-import {
-  createElement,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ComponentType,
-} from 'react';
-import { useNearViewport } from '../../hooks/use-near-viewport';
-import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { isYouTubeUrl, YT_HOSTS } from '../../utils/youtube-url';
 import { VideoPlayBadge } from './video-center-badge';
 import type { FilePlayerProps } from './video-file-player';
 import {
@@ -128,26 +129,8 @@ function FilePlayer(props: FilePlayerProps): React.ReactElement {
 }
 
 // =============================================================================
-// URL classifiers (private — `<Video>` is the only consumer)
+// URL classifiers (`isYouTubeUrl` lives in utils/youtube-url.ts, shared with the markdown iframe override)
 // =============================================================================
-
-const YT_HOSTS = new Set([
-  'youtube.com',
-  'www.youtube.com',
-  'm.youtube.com',
-  'youtu.be',
-  'youtube-nocookie.com',
-  'www.youtube-nocookie.com',
-]);
-
-/** Strict YouTube URL detection — parses the URL and checks the hostname. */
-export function isYouTubeUrl(url: string): boolean {
-  try {
-    return YT_HOSTS.has(new URL(url, 'http://placeholder.local').hostname.toLowerCase());
-  } catch {
-    return false;
-  }
-}
 
 // `youtube.com/(embed|v|shorts)/<id>` — anchored, no `.*`, ReDoS-safe.
 const YT_PATH_RE = /^\/(?:embed|v|shorts)\/([^/]+)\/?$/;
