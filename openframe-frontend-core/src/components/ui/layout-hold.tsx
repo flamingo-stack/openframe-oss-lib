@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { SKELETON_SURFACE_CLASS } from './skeleton-surface';
 
 /**
  * Holding a layout while its content is read, the two ways that are right at
@@ -10,7 +11,9 @@ import { cn } from '../../utils/cn';
  *
  * - `TextHold`: an inline stand-in exactly as wide as the words it is given
  *   (same font, same letter spacing, because it IS those words, not shown).
- *   `bar` draws it as a pulsing grey bar; `blank` only keeps its space.
+ *   `bar` draws one skeleton bar per line the words take, each as wide as
+ *   its line, in plain CSS (no measuring, so it is in the server's HTML);
+ *   `blank` only keeps their space.
  * - `LayoutHold`: a block as tall as the real layout rendered inside it, kept
  *   invisible and inert: the layout's own height, at any width.
  *
@@ -19,21 +22,38 @@ import { cn } from '../../utils/cn';
 export interface TextHoldProps {
   /** The words whose width is held (the content's own, or a stand-in of its length). */
   children: ReactNode;
-  /** `bar`: a pulsing grey bar of that width. `blank`: the width only. */
+  /** `bar`: one skeleton bar per line the words take. `blank`: the space only. */
   variant?: 'bar' | 'blank';
   className?: string;
 }
 
+/** A rounded rectangle filling whatever box it is drawn in: the shape of each line's bar. */
+const ROUNDED_BAR = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' rx='6'/%3E%3C/svg%3E")`;
+/**
+ * Each line's bar: a text-high band in the middle of the line, so wrapped lines are separate bars with
+ * a gap between them. A line box's background is as tall as the font's whole ascent and descent, which in
+ * DM Sans fills the line, so unmasked the lines of a paragraph touch and read as one block.
+ */
+const BAR_MASK = `${ROUNDED_BAR} center / 100% min(1em, calc(1lh - 6px)) no-repeat`;
+const BAR_STYLE: CSSProperties = { mask: BAR_MASK, WebkitMask: BAR_MASK };
+
 export function TextHold({ children, variant = 'bar', className }: TextHoldProps) {
+  const bar = variant === 'bar';
   return (
     <span
       aria-hidden
       className={cn(
-        variant === 'bar' ? 'animate-pulse rounded bg-ods-border text-transparent' : 'invisible',
+        // `bar`: the words themselves, unseen, on the skeleton's surface. The span stays INLINE, so the
+        // browser paints one bar per line the words take, each exactly as wide as that line, and
+        // `box-decoration-clone` gives every line its own bar (and its own mask, `BAR_STYLE`). Pure CSS: it
+        // is drawn in the server's HTML, before any script runs (a loading state streamed by the server
+        // is often replaced before it hydrates).
+        bar ? cn(SKELETON_SURFACE_CLASS, 'rounded-md box-decoration-clone text-transparent') : 'invisible',
         // A hold is never selectable or clickable, whatever it wraps.
         'pointer-events-none select-none',
         className,
       )}
+      style={bar ? BAR_STYLE : undefined}
     >
       {children}
     </span>

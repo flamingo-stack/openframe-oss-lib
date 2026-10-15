@@ -13,6 +13,7 @@ import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import type { CustomerInterview } from '../../../types/customer-interview';
 import { cn } from '../../../utils/cn';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Card } from '../../ui/card';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -54,39 +55,39 @@ export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'de
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-2/5 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
       </span>
     );
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col gap-6 p-6')}>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
       {/* Aspect matches the loaded image slot (OG 1200×630) */}
-      <div className="aspect-[1200/630] w-full rounded-sm bg-ods-border" />
+      <UnifiedSkeleton className="aspect-[1200/630] w-full rounded-sm" />
       <div className="space-y-2">
-        <div className="h-5 w-3/4 rounded bg-ods-border" />
-        <div className="h-5 w-1/2 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
+        <UnifiedSkeleton className="h-5 w-1/2 rounded" />
       </div>
       <div className="space-y-2">
-        <div className="h-3 w-full rounded bg-ods-border" />
-        <div className="h-3 w-5/6 rounded bg-ods-border" />
-        <div className="h-3 w-4/5 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-3 w-full rounded" />
+        <UnifiedSkeleton className="h-3 w-5/6 rounded" />
+        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
       </div>
       <div className="mt-auto flex h-[60px] items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-ods-border" />
+        <UnifiedSkeleton className="h-12 w-12 rounded-full" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-2/3 rounded bg-ods-border" />
-          <div className="h-3 w-1/2 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-4 w-2/3 rounded" />
+          <UnifiedSkeleton className="h-3 w-1/2 rounded" />
         </div>
       </div>
     </div>

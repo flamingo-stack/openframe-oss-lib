@@ -1,6 +1,6 @@
 import { cn } from '../../utils/cn';
 import { ChatTypingIndicator } from '../chat/chat-typing-indicator';
-import { Skeleton } from './skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface AnalyzingStateProps {
   /** What is being worked on, as a sentence with no closing mark ("Mingo is analyzing your logs"). */
@@ -19,7 +19,7 @@ const ROW_STAGGER_MS = 200;
  * and the chat's own typing dots. It says an agent is at work, where a bare
  * sentence in an empty box reads as idle.
  *
- * Built from the shared pieces only: `Skeleton` for the rows and
+ * Built from the shared pieces only: `UnifiedSkeleton` for the rows and
  * `ChatTypingIndicator` for the dots. Still under reduced motion. It is
  * announced as a status; the rows and dots are decoration.
  */
@@ -37,12 +37,9 @@ export function AnalyzingState({ label, className }: AnalyzingStateProps) {
                 opacity,
               )}
             >
-              <Skeleton
-                className="h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan motion-reduce:animate-none"
-                style={delay}
-              />
-              <Skeleton className="h-2.5 min-w-0 flex-1 motion-reduce:animate-none" style={delay} />
-              <Skeleton className="h-2.5 w-12 shrink-0 motion-reduce:animate-none" style={delay} />
+              <UnifiedSkeleton className="h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan" style={delay} />
+              <UnifiedSkeleton className="h-2.5 min-w-0 flex-1" style={delay} />
+              <UnifiedSkeleton className="h-2.5 w-12 shrink-0" style={delay} />
             </div>
           );
         })}

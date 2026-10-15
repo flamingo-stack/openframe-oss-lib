@@ -1,6 +1,8 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface ContentLoaderProps {
   /**
@@ -23,6 +25,10 @@ export interface ContentLoaderProps {
    * Container CSS classes
    */
   containerClassName?: string;
+  /** What is loading, read once by a screen reader. Default "Loading". */
+  label?: string;
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
 }
 
 /**
@@ -35,35 +41,37 @@ export function ContentLoader({
   showTitle = true,
   className,
   containerClassName,
+  label = 'Loading',
+  region = true,
 }: ContentLoaderProps) {
   const renderCardSkeleton = () => (
-    <div className="animate-pulse">
-      {showTitle && <div className="mb-6 h-8 w-64 rounded bg-ods-skeleton" />}
+    <div>
+      {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
       <div className="rounded-lg border border-ods-border bg-ods-card p-6">
         <div className="mb-6 grid grid-cols-1 gap-6 content-md:grid-cols-4">
           {Array.from({ length: items }).map((_, i) => (
             <div key={i}>
-              <div className="mb-2 h-4 w-20 rounded bg-ods-skeleton" />
-              <div className="h-6 w-32 rounded bg-ods-skeleton" />
+              <UnifiedSkeleton className="mb-2 h-4 w-20 rounded" />
+              <UnifiedSkeleton className="h-6 w-32 rounded" />
             </div>
           ))}
         </div>
         <div className="border-t border-ods-border pt-4">
-          <div className="h-4 w-64 rounded bg-ods-skeleton" />
+          <UnifiedSkeleton className="h-4 w-64 rounded" />
         </div>
       </div>
     </div>
   );
 
   const renderFormSkeleton = () => (
-    <div className="animate-pulse">
-      {showTitle && <div className="mb-6 h-8 w-64 rounded bg-ods-card" />}
+    <div>
+      {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
       <div className="rounded-lg bg-ods-card p-6">
         <div className="space-y-4">
           {Array.from({ length: items }).map((_, i) => (
             <div key={i}>
-              <div className="mb-2 h-4 w-32 rounded bg-ods-skeleton" />
-              <div className="h-10 rounded bg-ods-skeleton" />
+              <UnifiedSkeleton className="mb-2 h-4 w-32 rounded" />
+              <UnifiedSkeleton className="h-10 rounded" />
             </div>
           ))}
         </div>
@@ -72,23 +80,23 @@ export function ContentLoader({
   );
 
   const renderDetailSkeleton = () => (
-    <div className="animate-pulse">
-      {showTitle && <div className="mb-6 h-8 w-64 rounded bg-ods-skeleton" />}
+    <div>
+      {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
       <div className="rounded-lg border border-ods-border bg-ods-card p-6">
         <div className="grid grid-cols-1 gap-6 content-lg:grid-cols-3">
           <div className="content-lg:col-span-2">
-            <div className="mb-4 h-64 rounded bg-ods-skeleton" />
+            <UnifiedSkeleton className="mb-4 h-64 rounded" />
             <div className="space-y-2">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-4 rounded bg-ods-skeleton" />
+                <UnifiedSkeleton key={i} className="h-4 rounded" />
               ))}
             </div>
           </div>
           <div>
-            <div className="mb-4 h-32 rounded bg-ods-skeleton" />
+            <UnifiedSkeleton className="mb-4 h-32 rounded" />
             <div className="space-y-2">
               {Array.from({ length: items }).map((_, i) => (
-                <div key={i} className="h-3 rounded bg-ods-skeleton" />
+                <UnifiedSkeleton key={i} className="h-3 rounded" />
               ))}
             </div>
           </div>
@@ -98,17 +106,17 @@ export function ContentLoader({
   );
 
   const renderListSkeleton = () => (
-    <div className="animate-pulse space-y-3">
-      {showTitle && <div className="mb-6 h-8 w-64 rounded bg-ods-skeleton" />}
+    <div className="space-y-3">
+      {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
       {Array.from({ length: items }).map((_, i) => (
         <div key={i} className="rounded-lg border border-ods-border bg-ods-card p-4">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded bg-ods-skeleton" />
+            <UnifiedSkeleton className="h-12 w-12 rounded" />
             <div className="flex-1">
-              <div className="mb-2 h-4 w-3/4 rounded bg-ods-skeleton" />
-              <div className="h-3 w-1/2 rounded bg-ods-skeleton" />
+              <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
+              <UnifiedSkeleton className="h-3 w-1/2 rounded" />
             </div>
-            <div className="h-8 w-20 rounded bg-ods-skeleton" />
+            <UnifiedSkeleton className="h-8 w-20 rounded" />
           </div>
         </div>
       ))}
@@ -130,9 +138,9 @@ export function ContentLoader({
   };
 
   return (
-    <div className={cn('p-6', containerClassName)}>
+    <LoadingRegion label={label} announce={region} className={cn('p-6', containerClassName)}>
       <div className={cn(className)}>{renderSkeleton()}</div>
-    </div>
+    </LoadingRegion>
   );
 }
 

@@ -23,6 +23,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
+import { LoadingRegion } from '../loading/loading-region';
 import { formatRelativeTime } from './../../utils/date-utils';
 import { ChatMessageRow, ChatMessageRowSkeleton } from './../chat/chat-message-row';
 import { useChatIdentity } from './../chat/hooks/use-chat-identity';
@@ -297,11 +298,11 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     // the skeleton would snap-to-bottom on skeleton height, then again on content).
     return (
       <div className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
-        <div className={TICKET_FEED_INNER}>
+        <LoadingRegion label="Loading messages" className={TICKET_FEED_INNER}>
           {Array.from({ length: TICKET_FEED_SKELETON_ROWS }, (_, i) => (
             <ChatMessageRowSkeleton key={i} />
           ))}
-        </div>
+        </LoadingRegion>
       </div>
     );
   }

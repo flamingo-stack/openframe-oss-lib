@@ -22,6 +22,7 @@ import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { formatLegalDate } from '../../../utils/format';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { PageShell, PageLayout } from '../../ui';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
@@ -161,16 +162,16 @@ export function LegalDocumentPage({
               {isLoading ? (
                 // Loading skeleton matching Knowledge Hub pattern
                 <div className="space-y-6">
-                  <div className="h-10 w-3/4 animate-pulse rounded-lg bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-10 w-3/4 rounded-lg" />
                   <div className="space-y-4">
-                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-4 w-5/6 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-4 w-full rounded" />
+                    <UnifiedSkeleton className="h-4 w-full rounded" />
+                    <UnifiedSkeleton className="h-4 w-5/6 rounded" />
                   </div>
-                  <div className="h-32 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                  <UnifiedSkeleton className="h-32 rounded-lg border border-ods-border" />
                   <div className="space-y-4">
-                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-4 w-4/5 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-4 w-full rounded" />
+                    <UnifiedSkeleton className="h-4 w-4/5 rounded" />
                   </div>
                 </div>
               ) : error ? (

@@ -29,6 +29,7 @@ import { SearchIcon } from '../icons-v2-generated/interface/search-icon';
 import { Upload02Icon } from '../icons-v2-generated/interface/upload-02-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LoadingRegion } from '../loading/loading-region';
 import {
   CONTEXT_BACK_CLASS,
   CONTEXT_STATE_CLASS,
@@ -384,9 +385,9 @@ export function ChatContextPicker({
               >
                 <Suspense
                   fallback={
-                    <div className="max-h-[340px] overflow-hidden">
+                    <LoadingRegion label="Loading items" className="max-h-[340px] overflow-hidden">
                       <ContextItemsSkeleton count={ITEMS_SKELETON_ROWS} />
-                    </div>
+                    </LoadingRegion>
                   }
                 >
                   {config.renderItems({

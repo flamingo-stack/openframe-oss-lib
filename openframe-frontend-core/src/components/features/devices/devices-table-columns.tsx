@@ -100,6 +100,8 @@ export function getDeviceOpenColumn<T extends DeviceRow = DeviceRow>(): ColumnDe
 export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   devices: T[];
   isLoading?: boolean;
+  /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
+  loadingRegion?: boolean;
   /**
    * The empty state, as the design's `data-placeholder`: icon over a title over
    * a description. Wins over `emptyMessage` when both are given.
@@ -139,6 +141,7 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
 export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   devices,
   isLoading,
+  loadingRegion,
   emptyState,
   emptyMessage = 'No devices found.',
   skeletonRows = 10,
@@ -186,6 +189,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
       )}
       <DataTable.Body
         loading={isLoading}
+        loadingRegion={loadingRegion}
         skeletonRows={skeletonRows}
         emptyState={emptyState}
         emptyMessage={emptyState ? undefined : emptyMessage}
