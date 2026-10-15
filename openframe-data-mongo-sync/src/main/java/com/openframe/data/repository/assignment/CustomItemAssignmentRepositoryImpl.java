@@ -1,5 +1,6 @@
 package com.openframe.data.repository.assignment;
 
+import com.openframe.data.document.assignment.AssignmentItemType;
 import com.openframe.data.document.assignment.AssignmentTargetType;
 import com.openframe.data.document.assignment.ItemAssignment;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
@@ -25,7 +26,9 @@ import java.util.regex.Pattern;
 public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySupport implements CustomItemAssignmentRepository {
 
     private static final String FIELD_ITEM_ID = "itemId";
+    private static final String FIELD_ITEM_TYPE = "itemType";
     private static final String FIELD_TARGET_TYPE = "targetType";
+    private static final String FIELD_TARGET_ID = "targetId";
     private static final String FIELD_DISPLAY_NAME = "displayName";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String ID_FIELD = "_id";
@@ -163,6 +166,20 @@ public class CustomItemAssignmentRepositoryImpl extends TenantAwareRepositorySup
         }
 
         return counts;
+    }
+
+    @Override
+    public List<String> findItemIdsByTarget(AssignmentItemType itemType, AssignmentTargetType targetType,
+                                            String targetId) {
+        Query query = new Query();
+        query.addCriteria(Criteria.where(FIELD_TARGET_TYPE).is(targetType));
+        query.addCriteria(Criteria.where(FIELD_TARGET_ID).is(targetId));
+        query.addCriteria(Criteria.where(FIELD_ITEM_TYPE).is(itemType));
+        query.fields().include(FIELD_ITEM_ID);
+
+        return mongoTemplate.find(query, ItemAssignment.class).stream()
+                .map(ItemAssignment::getItemId)
+                .toList();
     }
 
     @Override

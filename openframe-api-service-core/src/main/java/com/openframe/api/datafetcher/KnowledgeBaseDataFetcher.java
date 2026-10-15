@@ -4,6 +4,7 @@ import com.netflix.graphql.dgs.*;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.assignment.AssignmentTargetInput;
 import com.openframe.api.dto.knowledgebase.CreateArticleInput;
 import com.openframe.api.dto.knowledgebase.CreateKnowledgeBaseAttachmentInput;
 import com.openframe.api.dto.knowledgebase.CreateKnowledgeBaseTempAttachmentInput;
@@ -88,7 +89,12 @@ public class KnowledgeBaseDataFetcher {
 
     @DgsQuery
     public List<Tag> knowledgeBaseTags(@InputArgument String folderId,
-                                       @InputArgument Boolean archived) {
+                                       @InputArgument Boolean archived,
+                                       @InputArgument AssignmentTargetInput assignedTo) {
+        if (assignedTo != null) {
+            log.debug("Fetching KB tags of articles assigned to {}", assignedTo);
+            return knowledgeBaseService.getTagsOfAssignedArticles(mapper.toAssignmentTarget(assignedTo));
+        }
         if (folderId != null) {
             String rawFolderId = relayIdCodec.decode(folderId, KNOWLEDGE_BASE_ITEM);
             return knowledgeBaseService.getTagsInSubtree(rawFolderId);

@@ -1,6 +1,7 @@
 package com.openframe.api.service.knowledgebase;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.FolderChildrenAction;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseCursors;
@@ -68,13 +69,15 @@ public class KnowledgeBaseService {
         CursorPaginationCriteria normalized = paginationCriteria.normalize();
         int limit = normalized.getLimit();
 
-        List<String> restrictToItemIds = resolveTagFilter(filter.getTagIds());
-        boolean wantsFolders = filter.getType() != KnowledgeBaseItemType.ARTICLE;
+        List<String> restrictToItemIds = resolveItemIdRestriction(filter);
+        boolean assigned = filter.getAssignedTo() != null;
+        boolean wantsFolders = !assigned && filter.getType() != KnowledgeBaseItemType.ARTICLE;
         boolean wantsArticles = filter.getType() != KnowledgeBaseItemType.FOLDER;
         // Folders and articles always read from the same parents: a search that reaches three
         // levels down for articles reaches three levels down for folders too.
-        KnowledgeBaseParentFilter parent = parentFilter(
-                filter.getParentId(), effectiveScope(filter, search, restrictToItemIds != null));
+        KnowledgeBaseParentFilter parent = assigned
+                ? KnowledgeBaseParentFilter.any()
+                : parentFilter(filter.getParentId(), effectiveScope(filter, search, restrictToItemIds != null));
 
         // A folder cursor continues the folder stream; an article cursor means the folders have
         // already been served.
@@ -134,7 +137,22 @@ public class KnowledgeBaseService {
     }
 
     public List<Tag> getTagsInSubtree(String folderId) {
-        List<String> articleIds = collectArticleIdsInSubtree(folderId);
+        return tagsOf(collectArticleIdsInSubtree(folderId));
+    }
+
+    public List<Tag> getTagsOfAssignedArticles(AssignmentTarget target) {
+        List<String> assignedIds = assignmentService.findAssignedItemIds(AssignmentItemType.KNOWLEDGE_ARTICLE, target);
+        if (assignedIds.isEmpty()) {
+            return List.of();
+        }
+        List<String> articleIds = repository.findAllById(assignedIds).stream()
+                .filter(article -> article.getStatus() != KnowledgeBaseArticleStatus.ARCHIVED)
+                .map(KnowledgeBaseItem::getId)
+                .toList();
+        return tagsOf(articleIds);
+    }
+
+    private List<Tag> tagsOf(List<String> articleIds) {
         return articleIds.isEmpty()
                 ? List.of()
                 : knowledgeBaseTagService.getTagsForItemIds(articleIds);
@@ -598,6 +616,20 @@ public class KnowledgeBaseService {
 
     private List<String> resolveTagFilter(List<String> tagIds) {
         return knowledgeBaseTagService.findItemIdsByTags(tagIds);
+    }
+
+    private List<String> resolveItemIdRestriction(KnowledgeBaseFilterCriteria filter) {
+        List<String> taggedIds = resolveTagFilter(filter.getTagIds());
+        if (filter.getAssignedTo() == null) {
+            return taggedIds;
+        }
+        List<String> assignedIds = assignmentService.findAssignedItemIds(
+                AssignmentItemType.KNOWLEDGE_ARTICLE, filter.getAssignedTo());
+        if (taggedIds == null) {
+            return assignedIds;
+        }
+        Set<String> tagged = new HashSet<>(taggedIds);
+        return assignedIds.stream().filter(tagged::contains).toList();
     }
 
     private KnowledgeBaseItem getById(String id) {

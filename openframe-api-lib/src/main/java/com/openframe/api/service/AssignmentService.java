@@ -1,6 +1,7 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.assignment.AssignmentTarget;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -98,6 +99,13 @@ public class AssignmentService {
         return trimmedField;
     }
 
+    public List<String> findAssignedItemIds(AssignmentItemType itemType, AssignmentTarget target) {
+        if (!target.resolvable()) {
+            return List.of();
+        }
+        return repository.findItemIdsByTarget(itemType, target.targetType(), target.targetId());
+    }
+
     @Transactional
     public ItemAssignment assignItem(String itemId, AssignmentItemType itemType,
                                       AssignmentTargetType targetType, String targetId) {
@@ -110,7 +118,13 @@ public class AssignmentService {
                 .targetId(targetId)
                 .displayName(displayName)
                 .build();
-        return repository.save(assignment);
+        try {
+            return repository.save(assignment);
+        } catch (DuplicateKeyException alreadyAssigned) {
+            log.debug("{}:{} is already assigned to item {}", targetType, targetId, itemId);
+            return repository.findByItemIdAndTargetTypeAndTargetId(itemId, targetType, targetId)
+                    .orElseThrow(() -> alreadyAssigned);
+        }
     }
 
     @Transactional
@@ -121,8 +135,7 @@ public class AssignmentService {
 
     /**
      * Makes the item's assignments of one target type exactly {@code targetIds}: assigns the missing
-     * ones, unassigns the rest and leaves the ones already there alone — (item, type, target) is
-     * unique, so assigning one twice would be refused.
+     * ones, unassigns the rest and leaves the ones already there alone.
      */
     @Transactional
     public void replaceAssignments(String itemId, AssignmentItemType itemType,
@@ -140,13 +153,17 @@ public class AssignmentService {
                 .forEach(targetId -> assignIfAbsent(itemId, itemType, targetType, targetId));
     }
 
-    /** A save racing this one may have assigned the target in between; that is the wanted state, not a failure. */
+    /**
+     * assignItem answers the existing row when the target was assigned in between; it only
+     * throws when that row is gone again by the time it is read, which here means an unassign
+     * raced too. The wanted state is "assigned", and the next save will see it; not a failure.
+     */
     private void assignIfAbsent(String itemId, AssignmentItemType itemType,
                                 AssignmentTargetType targetType, String targetId) {
         try {
             assignItem(itemId, itemType, targetType, targetId);
-        } catch (DuplicateKeyException alreadyAssigned) {
-            log.debug("{}:{} is already assigned to item {}", targetType, targetId, itemId);
+        } catch (DuplicateKeyException assignedAndUnassignedMeanwhile) {
+            log.debug("{}:{} was assigned to item {} and unassigned again meanwhile", targetType, targetId, itemId);
         }
     }
 
