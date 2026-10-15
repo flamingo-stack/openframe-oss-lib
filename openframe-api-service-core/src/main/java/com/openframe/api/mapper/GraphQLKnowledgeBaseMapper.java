@@ -3,6 +3,8 @@ package com.openframe.api.mapper;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.assignment.AssignmentTarget;
+import com.openframe.api.dto.assignment.AssignmentTargetInput;
 import com.openframe.api.dto.knowledgebase.CreateArticleCommand;
 import com.openframe.api.dto.knowledgebase.CreateArticleInput;
 import com.openframe.api.dto.knowledgebase.KnowledgeBaseCursors;
@@ -12,11 +14,15 @@ import com.openframe.api.dto.knowledgebase.UpdateArticleCommand;
 import com.openframe.api.dto.knowledgebase.UpdateArticleInput;
 import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
+import com.openframe.api.relay.AssignmentNodeTypes;
+import com.openframe.data.document.assignment.AssignmentTargetType;
+import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,7 +52,25 @@ public class GraphQLKnowledgeBaseMapper {
                 .type(input.getType())
                 .tagIds(tagIds)
                 .scope(input.getScope())
+                .assignedTo(toAssignmentTarget(input.getAssignedTo()))
                 .build();
+    }
+
+    public AssignmentTarget toAssignmentTarget(AssignmentTargetInput input) {
+        if (input == null) {
+            return null;
+        }
+        AssignmentTargetType targetType = input.getTargetType();
+        String targetGlobalId = input.getTargetId();
+        if (!StringUtils.hasText(targetGlobalId)) {
+            return AssignmentTarget.unresolvable(targetType);
+        }
+        try {
+            String targetId = relayIdCodec.decode(targetGlobalId, AssignmentNodeTypes.forTarget(targetType));
+            return new AssignmentTarget(targetType, targetId);
+        } catch (InvalidRelayIdException idOfAnotherType) {
+            return AssignmentTarget.unresolvable(targetType);
+        }
     }
 
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {
