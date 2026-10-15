@@ -1,6 +1,7 @@
 package com.openframe.data.loki.config;
 
 import com.openframe.data.loki.client.LokiClient;
+import com.openframe.data.loki.toolevent.ToolEventLogRepository;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -10,6 +11,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.Assert;
 import org.springframework.web.client.RestClient;
+
+import java.time.Duration;
 
 @Configuration
 @ConditionalOnProperty(name = "openframe.loki.enabled", havingValue = "true")
@@ -22,10 +25,21 @@ public class LokiConfig {
      */
     @Bean
     public LokiClient lokiClient(ObjectProvider<RestClient.Builder> restClientBuilder, LokiProperties properties) {
+        return lokiClient(restClientBuilder, properties, properties.getReadTimeout());
+    }
+
+    @Bean
+    public ToolEventLogRepository toolEventLogRepository(ObjectProvider<RestClient.Builder> restClientBuilder,
+                                                         LokiProperties properties) {
+        return new ToolEventLogRepository(lokiClient(restClientBuilder, properties, properties.getToolEventReadTimeout()));
+    }
+
+    private static LokiClient lokiClient(ObjectProvider<RestClient.Builder> restClientBuilder, LokiProperties properties,
+                                         Duration readTimeout) {
         Assert.hasText(properties.getUrl(), "openframe.loki.url must be set when openframe.loki.enabled=true");
 
         HttpClientSettings settings = HttpClientSettings.defaults()
-                .withTimeouts(properties.getConnectTimeout(), properties.getReadTimeout());
+                .withTimeouts(properties.getConnectTimeout(), readTimeout);
 
         RestClient restClient = restClientBuilder.getIfAvailable(RestClient::builder)
                 .baseUrl(properties.getUrl())
