@@ -19,6 +19,8 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * The element drawn. `span` keeps the placeholder valid phrasing content where
    * a `div` may not stand (inside a `p`, a heading, a label or an inline card).
+   * A span bar is `inline-block max-w-full align-middle` unless the caller's
+   * classes say otherwise.
    */
   as?: 'div' | 'span';
 }
@@ -39,7 +41,7 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
  * @param height - Custom height (defaults to auto based on variant)
  * @param animate - Enable/disable animation (respects prefers-reduced-motion)
  * @param aria-label - Makes this one bar a `role="status"` with that name; otherwise it is `aria-hidden`
- * @param as - The element drawn: `div` (default) or `span` for phrasing content
+ * @param as - The element drawn: `div` (default) or `span` for phrasing content (drawn `inline-block`)
  */
 export function UnifiedSkeleton({
   className,
@@ -77,6 +79,8 @@ export function UnifiedSkeleton({
   return (
     <Tag
       className={cn(
+        // An inline span ignores width and height: without a display of its own the bar draws at 0×0.
+        Tag === 'span' && 'inline-block max-w-full align-middle',
         animate ? SKELETON_SURFACE_CLASS : 'bg-ods-skeleton',
         variantClasses[variant],
         !height && !style.height && !sizedByAspect && defaultHeights[variant],

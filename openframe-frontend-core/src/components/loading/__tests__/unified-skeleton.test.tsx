@@ -14,3 +14,28 @@ describe('UnifiedSkeleton sizing', () => {
     expect(container.firstElementChild?.className).toMatch(/aspect-video/);
   });
 });
+
+describe('UnifiedSkeleton as a span', () => {
+  it('draws an inline bar that has a size of its own', () => {
+    const { container } = render(<UnifiedSkeleton as="span" className="h-4 w-16" />);
+    expect(container.firstElementChild?.tagName).toBe('SPAN');
+    const className = container.firstElementChild?.className ?? '';
+    expect(className).toMatch(/\binline-block\b/);
+    expect(className).toMatch(/\bmax-w-full\b/);
+    expect(className).toMatch(/\balign-middle\b/);
+  });
+
+  it('leaves a div bar without them', () => {
+    const { container } = render(<UnifiedSkeleton className="h-4 w-16" />);
+    expect(container.firstElementChild?.className).not.toMatch(/\b(inline-block|max-w-full|align-middle)\b/);
+  });
+
+  it("lets the caller's display, width cap and alignment replace them", () => {
+    const { container } = render(<UnifiedSkeleton as="span" className="block h-4 max-w-xs align-top" />);
+    const className = container.firstElementChild?.className ?? '';
+    expect(className).toMatch(/\bblock\b/);
+    expect(className).toMatch(/\bmax-w-xs\b/);
+    expect(className).toMatch(/\balign-top\b/);
+    expect(className).not.toMatch(/\b(inline-block|max-w-full|align-middle)\b/);
+  });
+});
