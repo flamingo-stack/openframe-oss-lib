@@ -12,51 +12,91 @@ import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import com.openframe.stream.service.DataEnrichmentService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class GenericJsonMessageProcessorTest {
 
+    private final CommonDebeziumMessage incoming = new CommonDebeziumMessage();
+    private final DeserializedDebeziumMessage event =
+            DeserializedDebeziumMessage.builder().tenantId("tenant-a").toolEventId("evt-1").build();
+    private final IntegratedToolEnrichedData enriched =
+            IntegratedToolEnrichedData.builder().tenantId("tenant-a").machineId("device-7").build();
+
     @Mock
     private MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> eventLogHandler;
 
     @Mock
-    private MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> pinotHandler;
-
-    @Mock
-    private DataEnrichmentService<DeserializedDebeziumMessage> enrichment;
+    private MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> listHandler;
 
     @Mock
     private KafkaMessageDeserializer deserializer;
 
+    @Mock
+    private DataEnrichmentService<DeserializedDebeziumMessage> enrichmentService;
+
     @Test
-    void process_noHandlerForTheTenantDestination_eventLogAndPinotStillRun() {
-        // setup
-        CommonDebeziumMessage message = new CommonDebeziumMessage();
-        DeserializedDebeziumMessage deserialized = DeserializedDebeziumMessage.builder().build();
-        IntegratedToolEnrichedData enriched = new IntegratedToolEnrichedData();
+    void process_everyDestinationHandled_savesTheDetailsBeforePublishingToTheList() {
+        GenericJsonMessageProcessor processor = processor();
+
+        processor.process(incoming, MessageType.FLEET_MDM_EVENT);
+
+        InOrder calls = inOrder(eventLogHandler, listHandler);
+        calls.verify(eventLogHandler).handle(event, enriched);
+        calls.verify(listHandler).handle(event, enriched);
+    }
+
+    @Test
+    void process_savingTheDetailsFails_letsTheFailureThroughWithoutPublishingToTheList() {
+        GenericJsonMessageProcessor processor = processor();
+        IllegalStateException failure = new IllegalStateException("log store down");
+        doThrow(failure).when(eventLogHandler).handle(event, enriched);
+
+        assertThatThrownBy(() -> processor.process(incoming, MessageType.FLEET_MDM_EVENT)).isSameAs(failure);
+
+        verify(listHandler, never()).handle(event, enriched);
+    }
+
+    @Test
+    void process_noHandlerForTheTenantRemoteSessionDestination_theRegisteredHandlersStillRun() {
         when(eventLogHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
-        when(eventLogHandler.getDestination()).thenReturn(Destination.CASSANDRA_EVENT_LOG);
-        when(pinotHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
-        when(pinotHandler.getDestination()).thenReturn(Destination.KAFKA_PINOT);
-        when(enrichment.getType()).thenReturn(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
-        when(enrichment.getExtraParams(deserialized)).thenReturn(enriched);
+        when(eventLogHandler.getDestination()).thenReturn(Destination.LOKI_EVENT_LOG);
+        when(listHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
+        when(listHandler.getDestination()).thenReturn(Destination.KAFKA_PINOT);
         when(deserializer.getType()).thenReturn(MessageType.MESHCENTRAL_EVENT);
-        when(deserializer.deserialize(message, MessageType.MESHCENTRAL_EVENT)).thenReturn(deserialized);
-        GenericJsonMessageProcessor processor = new GenericJsonMessageProcessor(
-                List.of(eventLogHandler, pinotHandler), List.of(enrichment), List.of(deserializer));
+        when(deserializer.deserialize(incoming, MessageType.MESHCENTRAL_EVENT)).thenReturn(event);
+        when(enrichmentService.getType()).thenReturn(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
+        when(enrichmentService.getExtraParams(event)).thenReturn(enriched);
+        GenericJsonMessageProcessor processor = new GenericJsonMessageProcessor(List.of(listHandler, eventLogHandler),
+                List.of(enrichmentService), List.of(deserializer));
 
-        // execution
-        processor.process(message, MessageType.MESHCENTRAL_EVENT);
+        processor.process(incoming, MessageType.MESHCENTRAL_EVENT);
 
-        // verifications
-        verify(eventLogHandler).handle(deserialized, enriched);
-        verify(pinotHandler).handle(deserialized, enriched);
+        verify(eventLogHandler).handle(event, enriched);
+        verify(listHandler).handle(event, enriched);
+    }
+
+    private GenericJsonMessageProcessor processor() {
+        when(eventLogHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
+        when(eventLogHandler.getDestination()).thenReturn(Destination.LOKI_EVENT_LOG);
+        when(listHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
+        when(listHandler.getDestination()).thenReturn(Destination.KAFKA_PINOT);
+        when(deserializer.getType()).thenReturn(MessageType.FLEET_MDM_EVENT);
+        when(deserializer.deserialize(incoming, MessageType.FLEET_MDM_EVENT)).thenReturn(event);
+        when(enrichmentService.getType()).thenReturn(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
+        when(enrichmentService.getExtraParams(event)).thenReturn(enriched);
+        return new GenericJsonMessageProcessor(List.of(listHandler, eventLogHandler), List.of(enrichmentService),
+                List.of(deserializer));
     }
 }

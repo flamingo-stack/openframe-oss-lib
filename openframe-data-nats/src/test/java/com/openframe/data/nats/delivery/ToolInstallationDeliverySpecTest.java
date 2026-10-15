@@ -92,6 +92,6 @@ class ToolInstallationDeliverySpecTest {
         String subject = spec.subject(MACHINE_ID);
 
         // verifications
-        assertThat(subject).isEqualTo("machine.mach-42.tool-installation");
+        assertThat(subject).isEqualTo("machine.mach-42.tool-installation.v2");
     }
 }
