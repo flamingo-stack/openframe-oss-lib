@@ -68,6 +68,25 @@ class GenericJsonMessageProcessorTest {
         verify(listHandler, never()).handle(event, enriched);
     }
 
+    @Test
+    void process_noHandlerForTheTenantRemoteSessionDestination_theRegisteredHandlersStillRun() {
+        when(eventLogHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
+        when(eventLogHandler.getDestination()).thenReturn(Destination.LOKI_EVENT_LOG);
+        when(listHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
+        when(listHandler.getDestination()).thenReturn(Destination.KAFKA_PINOT);
+        when(deserializer.getType()).thenReturn(MessageType.MESHCENTRAL_EVENT);
+        when(deserializer.deserialize(incoming, MessageType.MESHCENTRAL_EVENT)).thenReturn(event);
+        when(enrichmentService.getType()).thenReturn(DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS);
+        when(enrichmentService.getExtraParams(event)).thenReturn(enriched);
+        GenericJsonMessageProcessor processor = new GenericJsonMessageProcessor(List.of(listHandler, eventLogHandler),
+                List.of(enrichmentService), List.of(deserializer));
+
+        processor.process(incoming, MessageType.MESHCENTRAL_EVENT);
+
+        verify(eventLogHandler).handle(event, enriched);
+        verify(listHandler).handle(event, enriched);
+    }
+
     private GenericJsonMessageProcessor processor() {
         when(eventLogHandler.getType()).thenReturn(EventHandlerType.COMMON_TYPE);
         when(eventLogHandler.getDestination()).thenReturn(Destination.LOKI_EVENT_LOG);
