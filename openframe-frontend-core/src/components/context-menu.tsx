@@ -5,6 +5,7 @@ import { Check, ChevronRight, Circle } from 'lucide-react';
 import { type ComponentPropsWithoutRef, type ElementRef, type HTMLAttributes, forwardRef } from 'react';
 
 import { cn } from '../utils/cn';
+import { usePortalContainer } from './ui/portal-container';
 
 const ContextMenu = ContextMenuPrimitive.Root;
 
@@ -12,7 +13,10 @@ const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
 
 const ContextMenuGroup = ContextMenuPrimitive.Group;
 
-const ContextMenuPortal = ContextMenuPrimitive.Portal;
+function ContextMenuPortal({ container, ...props }: ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Portal>) {
+  const active = usePortalContainer();
+  return <ContextMenuPrimitive.Portal container={container ?? active ?? undefined} {...props} />;
+}
 
 const ContextMenuSub = ContextMenuPrimitive.Sub;
 
@@ -57,18 +61,21 @@ ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
 const ContextMenuContent = forwardRef<
   ElementRef<typeof ContextMenuPrimitive.Content>,
   ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <ContextMenuPrimitive.Portal>
-    <ContextMenuPrimitive.Content
-      ref={ref}
-      className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
-        className,
-      )}
-      {...props}
-    />
-  </ContextMenuPrimitive.Portal>
-));
+>(({ className, ...props }, ref) => {
+  const container = usePortalContainer();
+  return (
+    <ContextMenuPrimitive.Portal container={container ?? undefined}>
+      <ContextMenuPrimitive.Content
+        ref={ref}
+        className={cn(
+          'z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          className,
+        )}
+        {...props}
+      />
+    </ContextMenuPrimitive.Portal>
+  );
+});
 ContextMenuContent.displayName = ContextMenuPrimitive.Content.displayName;
 
 const ContextMenuItem = forwardRef<
