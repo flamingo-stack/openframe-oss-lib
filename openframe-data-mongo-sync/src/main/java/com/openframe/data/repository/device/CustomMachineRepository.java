@@ -14,6 +14,10 @@ public interface CustomMachineRepository {
 
     List<Machine> findMachines(String tenantId, MachineQueryFilter filter);
 
+    List<Machine> findMachinesAfter(String tenantId, MachineQueryFilter filter, String afterMachineId, int limit);
+
+    MachineNameMatches findMatchingNames(String tenantId, MachineQueryFilter filter);
+
     long countMachines(String tenantId, MachineQueryFilter filter, String search);
 
     Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search, DeviceFacetDimension dimension);
