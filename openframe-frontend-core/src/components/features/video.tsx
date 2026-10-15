@@ -141,7 +141,7 @@ const YT_HOSTS = new Set([
 ]);
 
 /** Strict YouTube URL detection — parses the URL and checks the hostname. */
-function isYouTubeUrl(url: string): boolean {
+export function isYouTubeUrl(url: string): boolean {
   try {
     return YT_HOSTS.has(new URL(url, 'http://placeholder.local').hostname.toLowerCase());
   } catch {

@@ -18,7 +18,7 @@ import { MarkdownImage } from '../../../embeds/markdown-image';
 import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { RedditEmbedClient } from '../../../embeds/reddit-embed-client';
 import { TwitterEmbedClient } from '../../../embeds/twitter-embed-client';
-import { Video } from '../../../features/video';
+import { isYouTubeUrl, Video } from '../../../features/video';
 import { buildStandardLeafRenderers, hasRenderableSrc, type MdRenderProps } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
@@ -222,6 +222,16 @@ export function buildRichEmbedOverrides({
       // Empty-`![]()` guard shared with the base `img` renderer.
       if (!hasRenderableSrc(src)) return null;
       return <MarkdownImage src={src.trim()} alt={alt} />;
+    },
+
+    // Raw <iframe> tags in stored content (a pasted YouTube embed). A YouTube one becomes the same click-to-play
+    // facade as the `youtube-embed` fence: the raw iframe loaded YouTube's whole player (about 470 KB of script) with
+    // the page, on every post that carried one (CU-17tkuw5xp4q). Any other iframe loads when it nears the screen.
+    iframe: ({ node: _node, src, ...rest }: MdRenderProps<'iframe'>) => {
+      if (!hasRenderableSrc(src)) return null;
+      const url = src.trim();
+      if (isYouTubeUrl(url)) return <Video kind="youtube" url={url} />;
+      return <iframe {...rest} src={url} loading="lazy" />;
     },
 
     // Raw <video> tags in stored content (blog publisher injection) route
