@@ -14,6 +14,7 @@ export * from './use-chat-attachment-image-gallery';
 export * from './use-chat-identity';
 export * from './use-chat-card-item';
 export * from './use-close-on-navigation';
+export * from './use-what-to-ask';
 
 // useChat + useSSE — ported from hub `hooks/useChat.ts` + `hooks/useSSE.ts`
 // minus the MockChatService + useChatConfig dependencies (which stay in

@@ -432,13 +432,15 @@ const PENDING_FILTER = { options: [] as never[], pending: true };
 export interface LogsTableSkeletonProps {
   /** The Log ID header in its inert form, so the icon does not arrive with the data. */
   logIdHeader?: ReactNode;
+  /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
+  region?: boolean;
 }
 
 /**
  * Loading fallback of the logs table: an empty `DataTable` with the table's own
  * columns, so the header row and the column widths match the loaded table.
  */
-export function LogsTableSkeleton({ logIdHeader }: LogsTableSkeletonProps) {
+export function LogsTableSkeleton({ logIdHeader, region = true }: LogsTableSkeletonProps) {
   const columns = useMemo<ColumnDef<unknown>[]>(() => {
     const multiSelect = multiSelectFor<unknown>();
     return [
@@ -503,7 +505,7 @@ export function LogsTableSkeleton({ logIdHeader }: LogsTableSkeletonProps) {
   return (
     <DataTable table={table}>
       <DataTable.Header stickyHeader stickyHeaderOffset="top-[96px]" />
-      <DataTable.Body loading={true} skeletonRows={10} emptyMessage="" rowClassName="mb-1" />
+      <DataTable.Body loading={true} loadingRegion={region} skeletonRows={10} emptyMessage="" rowClassName="mb-1" />
     </DataTable>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '../../utils/cn';
-import { Skeleton } from '../ui/skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface MspOrganizationCardSkeletonProps {
   /** Appended to the root element. */
@@ -22,12 +22,12 @@ export function MspOrganizationCardSkeleton({ className }: MspOrganizationCardSk
         className,
       )}
     >
-      <Skeleton className="size-12 shrink-0 rounded-md" />
+      <UnifiedSkeleton className="size-12 shrink-0 rounded-md" />
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-2 self-stretch">
-        <Skeleton className="h-5 w-3/5 rounded-md" />
-        <Skeleton className="h-4 w-2/5 rounded-md" />
+        <UnifiedSkeleton className="h-5 w-3/5 rounded-md" />
+        <UnifiedSkeleton className="h-4 w-2/5 rounded-md" />
       </div>
-      <Skeleton className="size-12 shrink-0 rounded-md" />
+      <UnifiedSkeleton className="size-12 shrink-0 rounded-md" />
     </div>
   );
 }

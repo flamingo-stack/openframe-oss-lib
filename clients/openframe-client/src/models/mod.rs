@@ -2,9 +2,11 @@ pub mod agent_configuration;
 pub mod agent_registration_request;
 pub mod agent_registration_response;
 pub mod agent_token_response;
+pub mod delivery;
 pub mod device_tag;
 pub mod download_configuration;
 pub mod execution;
+pub mod feature_flags;
 pub mod hostname_report_message;
 pub mod initial_configuration;
 pub mod installed_agent_message;
@@ -24,7 +26,7 @@ pub mod tool_version_overrides;
 pub mod update_state;
 
 pub use execution::{
-    is_ack_subject, BootstrapRoute, BootstrapScriptMessage, CommandMessage, ExecutionAck,
+    requires_stream_ack, BootstrapRoute, BootstrapScriptMessage, CommandMessage, ExecutionAck,
     ExecutionMessage, ExecutionRequest, PrivilegeLevel, PrivilegePolicy, RmmResult,
     RoutedScriptMessage, ScriptEnvVar, ScriptMessage, ScriptRoute, ScriptScheduleExecutionItem,
     ScriptScheduleExecutionMessage, ScriptShell, ScriptSpec, SoftwareRoute, SoftwareScriptMessage,
@@ -35,8 +37,15 @@ pub use agent_configuration::AgentConfiguration;
 pub use agent_registration_request::AgentRegistrationRequest;
 pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
+pub use delivery::{
+    delivery_result_subject, DeliveryRef, DeliveryResult, DeliveryResultMessage,
+    DELIVERY_RESULT_KIND,
+};
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
+pub use feature_flags::{
+    Feature, FeatureFlag, FeatureFlags, FeatureFlagsMessage, FeatureFlagsState,
+};
 pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;

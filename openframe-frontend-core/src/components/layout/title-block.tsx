@@ -84,6 +84,7 @@
 import type React from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { EntityImage } from '../ui/entity-image';
 import { FloatingTooltip } from '../ui/floating-tooltip';
@@ -159,21 +160,14 @@ export interface TitleBlockProps {
 }
 
 /**
- * Inline text skeleton — used only in `loading` mode, placed directly inside the real
- * `h1`/`p`. It is a single `inline-block` bar whose height is intentionally SHORTER than the
- * typography line-height, and it uses the default baseline alignment. That way the element's
+ * The inline text skeleton, used only in `loading` mode, placed directly inside the real
+ * `h1`/`p`: a single `inline-block` `UnifiedSkeleton` span whose height is intentionally SHORTER
+ * than the typography line-height, on the default baseline alignment. That way the element's
  * own line-box STRUT (text-h2 → 40px, text-h6 → 20px) sets the height exactly as it would for
- * real text — the bar fits within the ascent and never inflates the line. So a loading header
+ * real text: the bar fits within the ascent and never inflates the line. So a loading header
  * is pixel-identical in height to the loaded one. Phrasing-valid (`span` only).
  */
-function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; heightClass: string }) {
-  return (
-    <span
-      aria-hidden
-      className={cn('inline-block max-w-full animate-pulse rounded-md bg-ods-border', widthClass, heightClass)}
-    />
-  );
-}
+const TITLE_TEXT_SKELETON_CLASS = 'inline-block max-w-full rounded-md';
 
 /**
  * Bar geometry per title size, following the ODS type scale across breakpoints
@@ -184,7 +178,7 @@ function TitleTextSkeleton({ widthClass, heightClass }: { widthClass: string; he
  * 32/40 from tablet up. `text-h1` scales at both breakpoints (40 → 48 → 56), so
  * its bar does too — reusing the h2 bar there would leave a stamp-sized smudge
  * inside a 64px line. Heights stay well under the line box's ascent on purpose;
- * see `TitleTextSkeleton` for why that is what keeps the header height honest.
+ * see `TITLE_TEXT_SKELETON_CLASS` for why that is what keeps the header height honest.
  */
 const TITLE_SKELETON_SIZE = {
   h1: { width: 'w-56 content-md:w-80 content-lg:w-96', height: 'h-7 content-md:h-8 content-lg:h-9' },
@@ -226,7 +220,11 @@ export function TitleBlock({
     loading ? null : subtitle,
   );
   const titleNode = loading ? (
-    <TitleTextSkeleton widthClass={skeletonSize.width} heightClass={skeletonSize.height} />
+    <UnifiedSkeleton
+      as="span"
+      aria-hidden
+      className={cn(TITLE_TEXT_SKELETON_CLASS, skeletonSize.width, skeletonSize.height)}
+    />
   ) : (
     title
   );
@@ -307,7 +305,11 @@ export function TitleBlock({
                     aria-hidden={!loading && !subtitle ? true : undefined}
                   >
                     {loading ? (
-                      <TitleTextSkeleton widthClass="w-28 content-md:w-36" heightClass="h-2.5 content-md:h-3" />
+                      <UnifiedSkeleton
+                        as="span"
+                        aria-hidden
+                        className={cn(TITLE_TEXT_SKELETON_CLASS, 'h-2.5 w-28 content-md:h-3 content-md:w-36')}
+                      />
                     ) : (
                       subtitle || '\u00A0'
                     )}

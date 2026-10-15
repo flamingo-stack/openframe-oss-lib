@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { useDataTableContext } from './data-table';
 import { getHideClasses } from './utils';
 
@@ -60,8 +61,10 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
+          // Decoration: the table's own status line says it is loading.
+          aria-hidden="true"
           className={cn(
-            'relative animate-pulse overflow-hidden rounded-md border border-ods-border bg-ods-card',
+            'relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
             // The slot height sits on the card, matching a real row.
             rowHeightClassName,
             className,
@@ -91,9 +94,9 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
                     getHideClasses(meta?.hideAt),
                   )}
                 >
-                  <div className="mb-[var(--spacing-system-xxs)] h-5 w-3/4 rounded-sm bg-ods-bg-surface" />
+                  <UnifiedSkeleton className="mb-[var(--spacing-system-xxs)] h-5 w-3/4 rounded-sm" />
                   {index % 2 === 0 && column.id === firstColumnId && (
-                    <div className="h-4 w-1/2 rounded-sm bg-ods-bg-surface opacity-60" />
+                    <UnifiedSkeleton className="h-4 w-1/2 rounded-sm opacity-60" />
                   )}
                 </div>
               );
@@ -108,8 +111,8 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
             )}
           >
             <div className="flex min-w-0 flex-1 flex-col justify-center py-[var(--spacing-system-sf)]">
-              <div className="mb-[var(--spacing-system-xsf)] h-4 w-3/4 rounded-sm bg-ods-bg-surface" />
-              <div className="h-3 w-1/2 rounded-sm bg-ods-bg-surface opacity-60" />
+              <UnifiedSkeleton className="mb-[var(--spacing-system-xsf)] h-4 w-3/4 rounded-sm" />
+              <UnifiedSkeleton className="h-3 w-1/2 rounded-sm opacity-60" />
             </div>
           </div>
         </div>

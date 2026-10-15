@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { ScheduleIntervalInput } from '../../features/scripts/schedule-form/schedule-interval-input';
 import { FieldWrapper } from '../field-wrapper';
 import { Input } from '../input';
 import { Select, SelectTrigger, SelectValue } from '../select';
@@ -78,5 +79,26 @@ describe('the controls reserve the slot when an error attribute is written', () 
   it('Textarea with error={undefined} is a box before any message', () => {
     render(<Textarea aria-label="Notes" error={undefined} />);
     expect(wrapperOf(screen.getByLabelText('Notes'))).toHaveClass(BOX);
+  });
+});
+
+/**
+ * A wrapper that forwards `error={error}` unconditionally writes the attribute
+ * for every caller, so the slot appears even where the caller never wired one.
+ * In a flex row that full-width box takes the width of the control beside it:
+ * the schedule form's "Stop Retry after" pair squeezed its unit select to
+ * nothing and halved the box's height.
+ */
+describe('ScheduleIntervalInput forwards the slot only when its caller wires one', () => {
+  const noop = () => {};
+
+  it('stays transparent without an error attribute (Stop Retry after)', () => {
+    render(<ScheduleIntervalInput aria-label="Name" value={30} onChange={noop} />);
+    expect(inputWrapper()).toHaveClass(TRANSPARENT);
+  });
+
+  it('is a box with error={undefined} (Repeat in)', () => {
+    render(<ScheduleIntervalInput aria-label="Name" value={30} onChange={noop} error={undefined} />);
+    expect(inputWrapper()).toHaveClass(BOX);
   });
 });

@@ -27,6 +27,7 @@ import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
 import { CardHoverPlay } from '../../features/video-center-badge';
 import { VideoHoverPreviewSurface } from '../../features/video-hover-preview';
 import { EntityIcon } from '../../icon-display';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Card } from '../../ui/card';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -138,20 +139,20 @@ function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
 export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' | 'result' }) {
   if (size === 'result') {
     return (
-      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_RESULT_STACK, 'animate-pulse')}>
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_RESULT_STACK)}>
         <div className="flex h-[60px] shrink-0 items-center gap-3">
-          <div className="h-12 w-12 rounded-full bg-ods-border" />
+          <UnifiedSkeleton className="h-12 w-12 rounded-full" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-2/3 rounded bg-ods-border" />
-            <div className="h-3 w-1/2 rounded bg-ods-border" />
+            <UnifiedSkeleton className="h-4 w-2/3 rounded" />
+            <UnifiedSkeleton className="h-3 w-1/2 rounded" />
           </div>
         </div>
         <div className={CASE_STUDY_RESULT_METRIC_BOX} data-testid="case-study-result-skeleton-metric">
-          <div className="h-10 w-1/3 rounded bg-ods-border" />
-          <div className="h-4 w-3/4 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-10 w-1/3 rounded" />
+          <UnifiedSkeleton className="h-4 w-3/4 rounded" />
         </div>
         <div className={CASE_STUDY_RESULT_FOOTER_BOX}>
-          <div className="h-4 w-2/3 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-4 w-2/3 rounded" />
         </div>
       </div>
     );
@@ -159,34 +160,34 @@ export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' |
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-1/2 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-1/2 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
       </span>
     );
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex animate-pulse flex-col gap-6 p-6')}>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
       {/* Skeleton aspect matches the real card's image slot (OG 1200×630) */}
-      <div className="aspect-[1200/630] w-full rounded-sm bg-ods-border" />
+      <UnifiedSkeleton className="aspect-[1200/630] w-full rounded-sm" />
       <div className="flex h-[72px] flex-col gap-2">
-        <div className="h-5 w-3/4 rounded bg-ods-border" />
-        <div className="h-5 w-1/2 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
+        <UnifiedSkeleton className="h-5 w-1/2 rounded" />
       </div>
       <div className="flex h-[60px] items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-ods-border" />
+        <UnifiedSkeleton className="h-12 w-12 rounded-full" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 w-2/3 rounded bg-ods-border" />
-          <div className="h-3 w-1/2 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-4 w-2/3 rounded" />
+          <UnifiedSkeleton className="h-3 w-1/2 rounded" />
         </div>
       </div>
     </div>

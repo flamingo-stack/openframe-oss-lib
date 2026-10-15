@@ -39,7 +39,7 @@
  * `SCHEDULER_FLOW_PRESETS` and the `detailsFirst` branches below.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { completeFormRescue } from '../../hooks/use-form-rescue';
@@ -56,10 +56,19 @@ import {
 import { cn } from '../../utils/cn';
 import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../utils/form-rescue';
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
+import { BackButton } from '../layout/back-button';
+import { LoadingRegion } from '../loading/loading-region';
 import { Alert, AlertDescription, Button } from '../ui';
-import { BookingForm, BookingFormSkeleton, DEFAULT_SUBMIT_LABEL, type BookingFormProps } from './booking-form';
+import {
+  BookingForm,
+  BookingFormSkeleton,
+  DEFAULT_SUBMIT_LABEL,
+  type BookingFieldRow,
+  type BookingFormProps,
+} from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
+import { SchedulerModalHeader, SchedulerModalHeaderSkeleton } from './modal-header';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
 
 /**
@@ -156,7 +165,23 @@ export interface HubSpotMeetingSchedulerProps {
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
   rescue?: FormRescueDefinition | null;
+  /**
+   * How the card is drawn.
+   *
+   * `'card'` (default, unchanged): the scheduler card - context panel beside
+   * (or over) the calendar, as every page embed has it.
+   * `'modal'`: the onboarding "Book an Onboarding Call" window: the host strip
+   * with the length on its right, the timezone row, then the calendar beside
+   * a single column of times, and Continue in a footer under the card (with
+   * Cancel beside it on a phone, where the window has no X). A time is
+   * CHOSEN, not submitted: Continue moves to the details form. Opt-in, so
+   * every existing embed keeps the card byte for byte; `details-first` has
+   * no modal arrangement and ignores it.
+   */
+  layout?: SchedulerLayout;
 }
+
+export type SchedulerLayout = 'card' | 'modal';
 
 type Step = 'slot' | 'details' | 'confirmed';
 /** `onStageChange`'s value: a step, or the degraded box that replaces the flow. */
@@ -393,6 +418,41 @@ function isNativelyBookable(availability: MeetingAvailability): boolean {
   return true;
 }
 
+/**
+ * The modal layout's frame: the content card and, under it, the footer row.
+ * No stated height - the window is as tall as the step (the calendar states
+ * its own, see the slot picker), and the modal around it scrolls if the form
+ * ever outgrows the screen.
+ */
+const MODAL_STACK_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
+const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
+const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
+const NOOP = () => undefined;
+
+/** The modal's form draws the name pair first and the email under it, as its design does. */
+const MODAL_FIELD_ROWS: BookingFieldRow[] = [[{ name: 'firstName' }, { name: 'lastName' }], [{ name: 'email' }]];
+
+const MODAL_PRIMARY_CLASS = 'flex-1 content-md:min-w-[15.5rem] content-md:flex-none';
+
+/**
+ * The action row under the card: the step's primary on the right and, on a
+ * phone, Cancel beside it (the window has no X there). On the calendar the
+ * primary is Continue; on the form it is the form's own submit, drawn here and
+ * wired to the form by id so the actions sit under the card, not inside it.
+ */
+function ModalFooter({ onCancel, primary }: { onCancel?: () => void; primary: ReactNode }) {
+  return (
+    <div className="flex gap-[var(--spacing-system-l)] content-md:justify-end">
+      {onCancel && (
+        <Button variant="outline" onClick={onCancel} className="flex-1 content-md:hidden">
+          Cancel
+        </Button>
+      )}
+      {primary}
+    </div>
+  );
+}
+
 export function HubSpotMeetingScheduler({
   meetingId,
   apiBaseUrl = '',
@@ -410,6 +470,7 @@ export function HubSpotMeetingScheduler({
   detailsForm: DetailsForm = BookingForm,
   detailsFormProps,
   rescue = null,
+  layout = 'card',
 }: HubSpotMeetingSchedulerProps) {
   const {
     availability,
@@ -424,6 +485,11 @@ export function HubSpotMeetingScheduler({
   } = useMeetingBooking({ meetingId, apiBaseUrl, initialAvailability });
 
   const detailsFirst = flow === 'details-first';
+  // The modal arrangement is slot-first's only: details-first keeps the card.
+  const modal = layout === 'modal' && !detailsFirst;
+  const modalFormId = useId();
+  // The modal's submit sits outside the form and follows what the form reports.
+  const [modalFormValid, setModalFormValid] = useState(false);
 
   // Zone resolution happens POST-mount (Intl) unless the embedder pins one —
   // the initial (server) render stays deterministic; time labels appear once
@@ -740,6 +806,25 @@ export function HubSpotMeetingScheduler({
   );
   const degradedCard = degraded("We couldn't load available call times. Please try again shortly.");
 
+  if (modal && isLoadingAvailability && !availability) {
+    return (
+      <div className={cn(MODAL_STACK_CLASS, className)}>
+        <LoadingRegion label="Loading available times" className={MODAL_CARD_CLASS}>
+          <SchedulerModalHeaderSkeleton />
+          <SlotPickerSkeleton monthOffset={monthOffset} layout="modal" />
+        </LoadingRegion>
+        <ModalFooter
+          onCancel={onBack}
+          primary={
+            <Button disabled onClick={NOOP} className={MODAL_PRIMARY_CLASS}>
+              Continue
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (isLoadingAvailability && !availability) {
     // COLD start only — a month already in the query cache renders straight
     // into the loaded card. Composed inside the SAME wrappers as that card
@@ -747,7 +832,7 @@ export function HubSpotMeetingScheduler({
     // shifts when it swaps.
     return (
       <div className={cardClass}>
-        <div className={innerClass}>
+        <LoadingRegion label="Loading available times" className={innerClass}>
           {!formOnly && <ContextPanelSkeleton onBack={backEdge} className={CONTEXT_PANEL_CLASS} />}
           <div className={actionPanelClass}>
             {/* Both terms matter. Without `flow` this stays a calendar where
@@ -768,7 +853,7 @@ export function HubSpotMeetingScheduler({
               <SlotPickerSkeleton monthOffset={monthOffset} />
             )}
           </div>
-        </div>
+        </LoadingRegion>
       </div>
     );
   }
@@ -782,6 +867,142 @@ export function HubSpotMeetingScheduler({
   }
 
   // ---- the card ------------------------------------------------------------
+
+  if (modal) {
+    // slot-first only, so the form's Back is the calendar and the calendar's is the host's exit.
+    const modalBack = step === 'details' ? backToSlot : onBack;
+    const onSelectDuration = (ms: number) => {
+      setDurationMs(ms);
+      setSelectedDay(null);
+      setSelectedSlot(null);
+    };
+    const summary =
+      selectedSlot != null && durationMs != null && timezone != null
+        ? `${formatDateWithTimezone(selectedSlot, timezone, 'weekdayDateTimeZoned', { viewerLocale: true })} · ${formatDurationCompact(durationMs / 1000)}`
+        : null;
+    return (
+      <div className={cn(MODAL_STACK_CLASS, className)}>
+        <div className={MODAL_CARD_CLASS}>
+          {/* The window's one back edge: on the form it returns to the
+              calendar at every width; on the calendar it is the host's exit,
+              drawn on a phone only - the window has an X everywhere else. */}
+          {modalBack && (
+            <BackButton
+              onClick={modalBack}
+              className={cn(
+                'px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]',
+                step === 'slot' && 'content-md:hidden',
+              )}
+            />
+          )}
+          <SchedulerModalHeader
+            hosts={shownHosts}
+            durationsMs={durations}
+            selectedDurationMs={durationMs}
+            onSelectDuration={onSelectDuration}
+            timezone={timezone}
+            onTimezoneChange={setTimezone}
+            locked={step !== 'slot'}
+            // The zone is chosen with the time; the form restates it in its
+            // summary line, so the picker is the calendar's only.
+            showTimezone={step === 'slot'}
+          />
+          {step === 'confirmed' && confirmation && timezone ? (
+            <div className={MODAL_STEP_CLASS}>
+              <Confirmation confirmation={confirmation} timezone={timezone} />
+            </div>
+          ) : step === 'details' && durationMs != null && selectedSlot != null && timezone ? (
+            <div className={cn(MODAL_STEP_CLASS, 'gap-[var(--spacing-system-m)]')}>
+              {summary && <p className="text-ods-text-primary text-h4">{summary}</p>}
+              <DetailsForm
+                fieldRows={MODAL_FIELD_ROWS}
+                {...detailsFormProps}
+                availability={availability}
+                meetingId={meetingId}
+                startTimeMs={selectedSlot}
+                durationMs={durationMs}
+                timezone={timezone}
+                formId={modalFormId}
+                hideSubmit
+                onValidityChange={setModalFormValid}
+                isSubmitting={isSubmitting}
+                onSubmit={handleSubmit}
+                honeypotInputProps={honeypotInputProps}
+                getSignals={getSignals}
+                rescue={rescue}
+              />
+            </div>
+          ) : (
+            <>
+              {bookingError === 'SLOT_TAKEN' && (
+                <Alert variant="warning" className="mx-[var(--spacing-system-m)] mt-[var(--spacing-system-m)] w-auto">
+                  <AlertDescription>
+                    That time was just taken — pick another slot below. (If you already submitted, check your email for
+                    a confirmation before rebooking.)
+                  </AlertDescription>
+                </Alert>
+              )}
+              {timezone && durationMs != null ? (
+                <SlotPicker
+                  layout="modal"
+                  slots={slots}
+                  timezone={timezone}
+                  monthOffset={monthOffset}
+                  onMonthOffsetChange={o => {
+                    setSelectedDay(null);
+                    setSelectedSlot(null);
+                    setMonthOffset(o);
+                  }}
+                  selectedSlot={selectedSlot}
+                  onSelectSlot={setSelectedSlot}
+                  selectedDay={selectedDay}
+                  onSelectDay={setSelectedDay}
+                  isLoading={isLoadingAvailability}
+                />
+              ) : durations.length === 0 && !isFetchingAvailability ? (
+                <div className={cn(MODAL_STEP_CLASS, 'items-start gap-[var(--spacing-system-m)]')}>
+                  <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
+                  {escapeHatch}
+                </div>
+              ) : (
+                <SlotPickerSkeleton monthOffset={monthOffset} layout="modal" />
+              )}
+            </>
+          )}
+        </div>
+        {step === 'slot' && (
+          <ModalFooter
+            onCancel={onBack}
+            primary={
+              <Button
+                disabled={selectedSlot == null || durationMs == null}
+                onClick={() => setStep('details')}
+                className={MODAL_PRIMARY_CLASS}
+              >
+                Continue
+              </Button>
+            }
+          />
+        )}
+        {step === 'details' && (
+          <ModalFooter
+            onCancel={onBack}
+            primary={
+              <Button
+                type="submit"
+                form={modalFormId}
+                loading={isSubmitting}
+                disabled={isSubmitting || !modalFormValid}
+                className={MODAL_PRIMARY_CLASS}
+              >
+                {preset.submitLabel}
+              </Button>
+            }
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cardClass}>
@@ -912,7 +1133,8 @@ export function HubSpotMeetingScheduler({
                   onSelectSlot={ms => {
                     if (!detailsFirst) {
                       setSelectedSlot(ms);
-                      setStep('details');
+                      // The modal's Continue is what moves on; the card moves at the click.
+                      if (!modal) setStep('details');
                       return;
                     }
                     // details-first: the slot IS the submit. The step stays

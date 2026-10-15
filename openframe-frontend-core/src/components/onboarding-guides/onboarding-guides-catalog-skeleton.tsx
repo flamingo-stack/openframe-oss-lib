@@ -1,6 +1,8 @@
 'use client';
 
 import { OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 /**
  * Loading skeleton for `/onboarding-guides` — CHROME-LESS, exactly like the
@@ -17,28 +19,33 @@ import { OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-gui
  * Wrapper mirrors the loaded view's `w-full flex flex-col gap-10`; per-card
  * height matches the loaded catalog card so resolve shifts are zero.
  */
-export function OnboardingGuidesCatalogSkeleton() {
+export function OnboardingGuidesCatalogSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
-    <div className="flex w-full animate-pulse flex-col gap-10">
+    <LoadingRegion label="Loading onboarding guides" announce={region} className="flex w-full flex-col gap-10">
       {/* Search input placeholder — matches `<SearchInput>` h-12 — plus the
           section pill row (~74 px incl. padding), same as the loaded
           preControls block. */}
       <div className="space-y-4">
-        <div className="h-12 w-full rounded-md border border-ods-border bg-ods-card" />
+        <UnifiedSkeleton className="h-12 w-full rounded-md" />
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4">
-          <div className="h-4 w-14 rounded bg-ods-border/60" />
+          <UnifiedSkeleton className="h-4 w-14 rounded" />
           {[0, 1, 2, 3].map(i => (
-            <div key={i} className="h-10 w-24 rounded-md border border-ods-border bg-ods-card" />
+            <UnifiedSkeleton key={i} className="h-10 w-24 rounded-md" />
           ))}
         </div>
       </div>
       <div className="space-y-10">
         {[4, 3, 3].map((cardCount, sectionIdx) => (
           <section key={sectionIdx} className="space-y-4">
-            <h2 className="flex items-center gap-2 tracking-[-0.36px] text-ods-text-primary text-h3">
-              <span className="h-6 w-40 rounded bg-ods-border/70" />
-              <span className="h-5 w-8 rounded-full bg-ods-text-secondary/20" />
-            </h2>
+            <div className="flex items-center gap-2 tracking-[-0.36px] text-ods-text-primary text-h3">
+              <UnifiedSkeleton className="h-6 w-40 rounded" />
+              <UnifiedSkeleton className="h-5 w-8 rounded-full" />
+            </div>
             <ul className="flex flex-col gap-4">
               {Array.from({ length: cardCount }).map((_, cardIdx) => (
                 <li key={cardIdx}>
@@ -49,6 +56,6 @@ export function OnboardingGuidesCatalogSkeleton() {
           </section>
         ))}
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

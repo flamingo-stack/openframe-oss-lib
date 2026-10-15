@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
 import type { Notification, NotificationSeverity, NotificationVariant } from './types';
 
@@ -265,6 +266,62 @@ export function NotificationTile({
       </div>
 
       {children}
+    </output>
+  );
+}
+
+export interface NotificationTileSkeletonProps {
+  /** `approval`: the approval tile, which adds a row of small buttons under the body. */
+  variant?: 'default' | 'approval';
+  className?: string;
+}
+
+/** One row of the tile: the LINE BOX of the text it stands in for, with its bar centred inside. */
+function TileLine({ box, bar, width }: { box: string; bar: string; width: string }) {
+  return (
+    <span className={cn('flex items-center', box)}>
+      <UnifiedSkeleton as="span" width={width} className={bar} />
+    </span>
+  );
+}
+
+/**
+ * A tile while its notification is read, box for box: the tile's frame and pad,
+ * the header (icon, type, time, trailing control), a one-line title over a
+ * TWO-line description (a host that rotates tiles in one cell is as tall as its
+ * tallest tile), and for `approval` the button row. Each row is its text's line
+ * box (h5/h6 20px, the h4 title 24px), so a host panel sizes itself against the
+ * height it will have when loaded.
+ */
+export function NotificationTileSkeleton({ variant = 'default', className }: NotificationTileSkeletonProps) {
+  return (
+    <output
+      aria-hidden
+      className={cn(
+        'relative block w-full shrink-0 overflow-hidden rounded-md border border-ods-border bg-ods-card',
+        className,
+      )}
+    >
+      <span className="relative flex flex-col gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]">
+        <span className="flex items-center gap-[var(--spacing-system-xs)]">
+          <TileLine box="size-4" width="1rem" bar="h-4 rounded-[2px]" />
+          <TileLine box="h-5" width="7rem" bar="h-3 rounded" />
+          <span className="min-w-0 flex-1" />
+          <TileLine box="h-5" width="3.5rem" bar="h-3 rounded" />
+          <TileLine box="size-4" width="1rem" bar="h-4 rounded-full" />
+        </span>
+        <span className="grid min-w-0 grid-cols-1">
+          <TileLine box="h-6" width="60%" bar="h-4 rounded" />
+          <TileLine box="h-5" width="88%" bar="h-3 rounded" />
+          <TileLine box="h-5" width="52%" bar="h-3 rounded" />
+        </span>
+        {variant === 'approval' && (
+          <span className="flex w-full items-center gap-[var(--spacing-system-xs)]">
+            <TileLine box="h-6 md:h-8" width="5.5rem" bar="h-6 rounded md:h-8" />
+            <TileLine box="h-6 md:h-8" width="4.5rem" bar="h-6 rounded md:h-8" />
+          </span>
+        )}
+      </span>
     </output>
   );
 }

@@ -1,14 +1,17 @@
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from './loading-region';
 import { UnifiedSkeleton, TextSkeleton } from './unified-skeleton';
 
 interface WizardLayoutSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   steps?: number;
   className?: string;
 }
 
-export function WizardLayoutSkeleton({ steps = 6, className }: WizardLayoutSkeletonProps) {
+export function WizardLayoutSkeleton({ region = true, steps = 6, className }: WizardLayoutSkeletonProps) {
   return (
-    <div className={cn('space-y-6', className)} role="status" aria-label="Loading wizard layout">
+    <LoadingRegion label="Loading the wizard" announce={region} className={cn('space-y-6', className)}>
       {/* Progress bar */}
       <div className="flex flex-wrap items-center gap-2">
         {Array.from({ length: steps }).map((_, i) => (
@@ -27,6 +30,6 @@ export function WizardLayoutSkeleton({ steps = 6, className }: WizardLayoutSkele
         <UnifiedSkeleton className="h-10 w-24 rounded" />
         <UnifiedSkeleton className="h-10 w-32 rounded" />
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

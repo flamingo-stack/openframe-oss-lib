@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from './unified-skeleton';
 
 export interface OrganizationIconSkeletonProps {
   /**
@@ -87,8 +88,8 @@ export function OrganizationIconSkeleton({
   );
 
   return (
-    <div className={containerClasses} role="status" aria-label="Loading organization icon">
-      <div className="h-1/2 w-1/2 animate-pulse rounded-sm bg-ods-border" />
+    <div className={containerClasses}>
+      <UnifiedSkeleton className="h-1/2 w-1/2 rounded-sm" />
     </div>
   );
 }

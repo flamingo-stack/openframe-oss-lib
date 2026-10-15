@@ -100,6 +100,7 @@ export * from './board';
 export * from './devices';
 export * from './software';
 export * from './logs';
+export * from './scripts';
 export * from './knowledge-base';
 export * from './sortable-list';
 export * from './ticket-status-config-list';

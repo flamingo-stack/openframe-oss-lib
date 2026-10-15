@@ -2,6 +2,8 @@
 
 import type React from 'react';
 import {
+  createContext,
+  useContext,
   useState,
   useEffect,
   useLayoutEffect,
@@ -71,6 +73,31 @@ export interface TabItem {
   accent?: string;
 }
 
+/**
+ * How a strip marks its tabs.
+ *
+ * - `default`: the tabs touch, and the open tab is marked by the underline alone.
+ * - `admin`: the product admin's tab bar. A gap between tabs, and the open and the
+ *   hovered tab carry an accent fade above the underline.
+ */
+export type TabNavigationVariant = 'default' | 'admin';
+
+const TabNavigationVariantContext = createContext<TabNavigationVariant>('default');
+
+/**
+ * Sets the variant of every `TabNavigation` below it that does not pass its own
+ * `variant`. An app whose tab bars all share one look mounts it once in its layout.
+ */
+export function TabNavigationVariantProvider({
+  variant,
+  children,
+}: {
+  variant: TabNavigationVariant;
+  children: React.ReactNode;
+}) {
+  return <TabNavigationVariantContext.Provider value={variant}>{children}</TabNavigationVariantContext.Provider>;
+}
+
 export interface TabNavigationUrlSyncOptions {
   paramName?: string; // Default: 'tab'
   replaceState?: boolean; // Default: true (use replace instead of push)
@@ -99,6 +126,8 @@ interface TabNavigationProps {
   tabAlign?: 'center' | 'start';
   /** How long the underline takes to reach a new `TabItem.progress` value. Default 200. */
   progressTransitionMs?: number;
+  /** How the strip marks its tabs. Omitted: the nearest `TabNavigationVariantProvider`'s, else `default`. */
+  variant?: TabNavigationVariant;
 
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions;
@@ -145,6 +174,7 @@ interface TabBarProps {
   stretchTabs: boolean;
   tabAlign: 'center' | 'start';
   progressTransitionMs: number;
+  variant: TabNavigationVariant;
 }
 
 /**
@@ -170,7 +200,9 @@ const TabBar = memo(function TabBarImpl({
   stretchTabs,
   tabAlign,
   progressTransitionMs,
+  variant,
 }: TabBarProps) {
+  const isAdmin = variant === 'admin';
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const isFirstActiveScrollRef = useRef(true);
@@ -396,7 +428,10 @@ const TabBar = memo(function TabBarImpl({
           `relative` makes this the offsetParent the underline is measured against. */}
       <div
         ref={scrollRef}
-        className="scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden"
+        className={cn(
+          'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden',
+          isAdmin && 'gap-[var(--spacing-system-xxs)]',
+        )}
       >
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -417,11 +452,19 @@ const TabBar = memo(function TabBarImpl({
                 // `outline-none` above drops the browser's own focus ring, so
                 // put one back or the strip is un-navigable by keyboard — you
                 // can tab through it with nothing to show where you are. Inset,
-                // so it stays within the button: the tabs touch.
+                // so it stays within the button and never overlaps a neighbour.
                 'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
                 stretchTabs && 'flex-1',
                 tab.avatar && 'gap-[var(--spacing-system-xsf)]',
-                // The open tab is marked by the underline alone: no surface of its own.
+                // `default`: the open tab is marked by the underline alone, no surface
+                // of its own. `admin`: the open and the hovered tab carry an accent
+                // fade. ODS colour vars hold hex values, so Tailwind alpha modifiers
+                // (to-ods-accent/10) silently produce no CSS; color-mix() accepts
+                // hex, so the 10%-alpha stop is derived from the token.
+                isAdmin &&
+                  (isActive
+                    ? 'bg-gradient-to-b from-transparent to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
+                    : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'),
               )}
             >
               {tab.avatar ? (
@@ -436,7 +479,7 @@ const TabBar = memo(function TabBarImpl({
                       'h-4 w-4 transition-colors content-md:h-6 content-md:w-6',
                       isActive
                         ? !tab.accent && 'text-ods-accent'
-                        : 'text-ods-text-secondary group-hover:text-ods-text-primary',
+                        : cn('text-ods-text-secondary', !isAdmin && 'group-hover:text-ods-text-primary'),
                     )}
                     style={isActive && tab.accent ? { color: tab.accent } : undefined}
                   />
@@ -453,7 +496,9 @@ const TabBar = memo(function TabBarImpl({
                   <span
                     className={cn(
                       'whitespace-nowrap transition-colors text-h4',
-                      isActive ? 'text-ods-text-primary' : 'text-ods-text-secondary group-hover:text-ods-text-primary',
+                      isActive
+                        ? 'text-ods-text-primary'
+                        : cn('text-ods-text-secondary', !isAdmin && 'group-hover:text-ods-text-primary'),
                     )}
                   >
                     {tab.label}
@@ -542,10 +587,13 @@ export function TabNavigation({
   stretchTabs = false,
   tabAlign = 'center',
   progressTransitionMs = 200,
+  variant: variantProp,
   urlSync = false,
   defaultTab,
   children,
 }: TabNavigationProps) {
+  const providedVariant = useContext(TabNavigationVariantContext);
+  const variant = variantProp ?? providedVariant;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -717,6 +765,7 @@ export function TabNavigation({
         stretchTabs={stretchTabs}
         tabAlign={tabAlign}
         progressTransitionMs={progressTransitionMs}
+        variant={variant}
       />
 
       {/* Render children with active tab if provided */}

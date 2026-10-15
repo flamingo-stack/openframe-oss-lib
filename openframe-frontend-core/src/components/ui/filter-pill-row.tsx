@@ -14,6 +14,7 @@
 
 import { Filter } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 
 export interface FilterPillRowOption {
@@ -65,5 +66,23 @@ export function FilterPillRow({
         ))}
       {countLabel && <div className="ml-auto shrink-0 text-ods-text-secondary text-h6">{countLabel}</div>}
     </div>
+  );
+}
+
+const noop = () => {};
+
+/**
+ * The loading state of a SERVED pill row (facets that arrive with the data):
+ * the same row shell with placeholder pills, so the filters never pop in under
+ * the content. The row renders its children INSTEAD of options, which is
+ * exactly what a skeleton wants.
+ */
+export function FilterPillRowSkeleton({ label, pills = 5 }: { label: string; pills?: number }) {
+  return (
+    <FilterPillRow label={label} selectedValue="" onValueChange={noop} options={[]}>
+      {Array.from({ length: pills }, (_, i) => (
+        <UnifiedSkeleton key={i} className="h-8 w-24 rounded" />
+      ))}
+    </FilterPillRow>
   );
 }

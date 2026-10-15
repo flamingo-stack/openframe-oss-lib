@@ -1,5 +1,6 @@
 package com.openframe.management.initializer;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.management.config.ClientFeatureFlagsProperties;
 import com.openframe.management.service.ClientFeatureFlagsService;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ public class OpenFrameClientFeatureFlagsInitializer implements ApplicationRunner
 
     @Override
     public void run(ApplicationArguments args) {
-        Map<String, Boolean> flags = clientFeatureFlagsProperties.getFeatureFlags();
+        Map<String, ClientFeatureFlag> flags = clientFeatureFlagsProperties.getFeatureFlags();
         clientFeatureFlagsService.process(flags);
         log.info("Client feature flags initialized from configuration: {}", flags);
     }

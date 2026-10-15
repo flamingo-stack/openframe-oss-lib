@@ -62,8 +62,6 @@ export function DesignDocCardSkeleton() {
         CONTENT_CARD_SKELETON_FRAME_CLASS,
         'flex h-full flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]',
       )}
-      role="status"
-      aria-label="Loading design doc"
     >
       <div className="flex w-full items-center gap-[16px]">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
