@@ -18,7 +18,8 @@ import static java.lang.String.format;
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 public class ClientUninstallDeliverySpec implements DeliverySpec<ClientUninstallDeliverySeed, ClientUninstallMessage> {
 
-    private static final String SUBJECT_TEMPLATE = "machine.%s.client-uninstall";
+    // .v2 keeps the engine out of the CLIENT_UNINSTALL stream (see ToolInstallationDeliverySpec)
+    private static final String SUBJECT_TEMPLATE = "machine.%s.client-uninstall.v2";
 
     @Override
     public DeliveryType getType() {

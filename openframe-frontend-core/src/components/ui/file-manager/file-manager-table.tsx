@@ -2,8 +2,8 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '../../../utils/cn';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Checkbox } from '../checkbox';
-import { Skeleton } from '../skeleton';
 import { FileManagerEmpty } from './file-manager-empty';
 import { FileManagerTableRow } from './file-manager-table-row';
 import type { FileManagerTableProps } from './types';
@@ -81,7 +81,7 @@ export function FileManagerTable({
         <div className="flex h-12 items-center rounded-t-lg border-b border-ods-border bg-ods-bg-surface px-4">
           {showCheckboxes && (
             <div className="mr-4">
-              <Skeleton className="h-5 w-5 rounded" />
+              <UnifiedSkeleton className="h-5 w-5 rounded" />
             </div>
           )}
 
@@ -100,33 +100,33 @@ export function FileManagerTable({
             <div key={idx} className="group flex h-16 items-center border-ods-border bg-ods-card px-4">
               {showCheckboxes && (
                 <div className="mr-4">
-                  <Skeleton className="h-5 w-5 rounded" />
+                  <UnifiedSkeleton className="h-5 w-5 rounded" />
                 </div>
               )}
 
               {/* File icon and name column */}
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <Skeleton className="h-6 w-6 rounded" />
+                <UnifiedSkeleton className="h-6 w-6 rounded" />
                 <div className="flex min-w-0 flex-col">
-                  <Skeleton className="h-4 w-32" />
-                  {isSearchResult && <Skeleton className="mt-1 h-3 w-48" />}
+                  <UnifiedSkeleton className="h-4 w-32" />
+                  {isSearchResult && <UnifiedSkeleton className="mt-1 h-3 w-48" />}
                 </div>
               </div>
 
               {/* Size column */}
               <div className="w-24 shrink-0 pr-4">
-                <Skeleton className="h-4 w-16" />
+                <UnifiedSkeleton className="h-4 w-16" />
               </div>
 
               {/* Modified date column */}
               <div className="w-36 shrink-0 pl-4">
-                <Skeleton className="h-4 w-24" />
+                <UnifiedSkeleton className="h-4 w-24" />
               </div>
 
               {/* Action buttons column */}
               <div className="flex w-48 shrink-0 items-center justify-end gap-1 pl-4">
-                <Skeleton className="h-8 w-8 rounded" />
-                <Skeleton className="h-8 w-8 rounded" />
+                <UnifiedSkeleton className="h-8 w-8 rounded" />
+                <UnifiedSkeleton className="h-8 w-8 rounded" />
               </div>
             </div>
           ))}

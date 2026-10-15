@@ -48,4 +48,18 @@ class GatewayTrafficMetricsTest {
                 .counter().count();
         assertThat(count).isEqualTo(2.0);
     }
+
+    @Test
+    void recordClientUpgradeRequiredIncrementsCounterByKind() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+
+        metrics.recordClientUpgradeRequired("android");
+        metrics.recordClientUpgradeRequired("android");
+
+        double count = registry.get("openframe.tenant.gateway.client.upgrade.required")
+                .tag("kind", "android")
+                .counter().count();
+        assertThat(count).isEqualTo(2.0);
+    }
 }

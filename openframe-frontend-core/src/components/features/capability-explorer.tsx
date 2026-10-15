@@ -6,7 +6,8 @@ import { cn } from '../../utils/cn';
 import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
-import { Skeleton } from '../ui/skeleton';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
 import { TruncateText } from '../ui/truncate-text';
 
@@ -91,8 +92,6 @@ const PANEL_TOP_HEIGHT_CLASS = 'h-[256px]';
 const PANEL_SCREEN_HEIGHT_CLASS = 'h-[420px]';
 const PANEL_FOOTER_HEIGHT_CLASS = 'h-[52px]';
 const CARD_HEIGHT_CLASS = 'h-[700px]';
-/** Both, for the box shown before the layout is known (literal, so the class is generated). */
-const SKELETON_HEIGHT_CLASS = 'h-[700px] content-lg:h-[824px]';
 
 /** The element id of a job's tab (never the job's own id: that is the host's anchor). */
 export const capabilityTabId = (id: string): string => `${id}-tab`;
@@ -169,13 +168,172 @@ function Example({
   );
 }
 
-/** The box the explorer occupies while its data loads, at both layouts: the panel, or the carousel's card over its controls. */
-export function CapabilityExplorerSkeleton({ className }: { className?: string }) {
-  return (
-    <div className={className}>
-      <Skeleton className={cn(SKELETON_HEIGHT_CLASS, 'w-full')} />
-      <SnapCarouselControlsSkeleton className="content-lg:hidden" />
+/**
+ * A text placeholder in its line's own box (`text-h…` on the line, the bar inline in it), so a
+ * placeholder line is the loaded line's height.
+ */
+const LINE_SKELETON_CLASS = 'inline-block h-[0.7em] rounded align-middle';
+
+/** The example's two turns, in the loaded example's own box. */
+function ExampleSkeleton({ className }: { className?: string }) {
+  const turn = (first: boolean) => (
+    <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
+      <UnifiedSkeleton className="size-6 shrink-0 rounded-full" />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="text-h6">
+          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-28')} />
+        </div>
+        <div className="min-h-[2lh] text-h4">
+          <div className="text-h4">
+            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
+          </div>
+          <div className="text-h4">
+            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-2/3')} />
+          </div>
+        </div>
+      </div>
     </div>
+  );
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-col justify-center gap-3 overflow-hidden rounded-xl border border-ods-border bg-ods-bg px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]',
+        className,
+      )}
+    >
+      {turn(true)}
+      {turn(false)}
+    </div>
+  );
+}
+
+/** One job in the list or a card's head: the icon tile, the title, the caption. */
+function JobHeadSkeleton() {
+  return (
+    <>
+      <UnifiedSkeleton className="size-9 shrink-0 rounded-lg" />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="text-h4">
+          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-32')} />
+        </div>
+        <div className="mt-0.5">
+          <div className="text-h6">
+            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-40')} />
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * The explorer while its data loads, drawn as both layouts in their own boxes
+ * (the width decides which shows, by CSS, since it is not known yet): the list
+ * of jobs beside the panel with its copy, example, screen and footer, or the
+ * first card over the carousel's controls. Every box is the loaded one's, so
+ * nothing moves when the jobs arrive.
+ */
+export function CapabilityExplorerSkeleton({
+  region = true,
+  className,
+  count = 8,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  className?: string;
+  count?: number;
+}) {
+  return (
+    <LoadingRegion label="Loading capabilities" announce={region} className={className}>
+      <div className="content-lg:hidden">
+        <div className="flex gap-[var(--spacing-system-sf)] overflow-hidden">
+          <div
+            className={cn(
+              'flex min-w-0 shrink-0 basis-[86%] flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
+              CARD_HEIGHT_CLASS,
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <JobHeadSkeleton />
+            </div>
+            <div className="min-h-[3lh] text-h6">
+              <div className="text-h6">
+                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
+              </div>
+              <div className="text-h6">
+                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-5/6')} />
+              </div>
+            </div>
+            <UnifiedSkeleton className="h-[300px] shrink-0 rounded-lg" />
+            <ExampleSkeleton className="shrink-0" />
+          </div>
+        </div>
+        <SnapCarouselControlsSkeleton />
+      </div>
+
+      <div
+        className={cn(
+          'hidden grid-cols-[minmax(0,360px)_minmax(0,1fr)] gap-[var(--spacing-system-lf)] content-lg:grid',
+          PANEL_HEIGHT_CLASS,
+        )}
+      >
+        <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
+          {Array.from({ length: count }, (_, i) => (
+            <div
+              key={i}
+              className={cn(
+                'flex min-w-0 shrink-0 items-center gap-3.5 rounded-lg border px-3.5 py-3',
+                i === 0 ? 'border-ods-border bg-ods-card' : 'border-transparent',
+              )}
+            >
+              <JobHeadSkeleton />
+            </div>
+          ))}
+        </div>
+        <div className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7">
+          <div className={cn('grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,380px)] gap-8', PANEL_TOP_HEIGHT_CLASS)}>
+            <div className="flex min-w-0 flex-col overflow-hidden">
+              <div className="mb-2">
+                <div className="text-h2">
+                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-64')} />
+                </div>
+              </div>
+              <div className="min-h-[3lh] text-h4">
+                <div className="text-h4">
+                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
+                </div>
+                <div className="text-h4">
+                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-4/5')} />
+                </div>
+              </div>
+              <div className="mt-auto grid grid-cols-1 gap-2">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="flex min-w-0 items-center gap-2.5">
+                    <UnifiedSkeleton className="size-4 shrink-0 rounded-full" />
+                    <div className="text-h6">
+                      <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, i === 1 ? 'w-56' : 'w-48')} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <ExampleSkeleton />
+          </div>
+          <UnifiedSkeleton className={cn('shrink-0 rounded-xl', PANEL_SCREEN_HEIGHT_CLASS)} />
+          <div
+            className={cn(
+              'flex min-w-0 shrink-0 items-center gap-[var(--spacing-system-sf)]',
+              PANEL_FOOTER_HEIGHT_CLASS,
+            )}
+          >
+            <div className="text-h5">
+              <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-16')} />
+            </div>
+            <UnifiedSkeleton className="h-7 w-36 rounded-md" />
+          </div>
+        </div>
+      </div>
+    </LoadingRegion>
   );
 }
 

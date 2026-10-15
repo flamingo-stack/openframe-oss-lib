@@ -28,7 +28,7 @@ public class OpenFrameClientConfiguration implements TenantScoped {
     private String version;
     private List<DownloadConfiguration> downloadConfiguration;
     // the switches every client of the tenant runs with; absent on documents written before the flags existed
-    private Map<String, Boolean> featureFlags;
+    private Map<String, ClientFeatureFlag> featureFlags;
     @CreatedDate
     private LocalDateTime createdAt;
     @LastModifiedDate

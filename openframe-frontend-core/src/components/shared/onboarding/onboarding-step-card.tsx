@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { InteractiveCard } from '../../ui/interactive-card';
 import { StatusBadge } from '../../ui/status-badge';
@@ -81,8 +82,8 @@ export function OnboardingStepCard({
       >
         {isCheckingCompletion ? (
           <>
-            <div className="h-[32px] w-[100px] animate-pulse rounded-[6px] bg-ods-border" />
-            <div className="h-[32px] w-[120px] animate-pulse rounded-[6px] bg-ods-border" />
+            <UnifiedSkeleton className="h-[32px] w-[100px] rounded-[6px]" />
+            <UnifiedSkeleton className="h-[32px] w-[120px] rounded-[6px]" />
           </>
         ) : isCompleted ? (
           <>

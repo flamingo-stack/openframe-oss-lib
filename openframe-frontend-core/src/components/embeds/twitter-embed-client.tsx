@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
+import { renderedLinkRel } from '../../utils/markdown-link';
 import { socialCache } from '../../utils/social-embed-cache';
 import { XLogoIcon } from '../icons-v2-generated/brand-logos/x-logo-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { TwitterContainer } from './embed-container';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
 
@@ -71,11 +73,14 @@ interface TwitterOEmbedResponse {
 
 interface TwitterEmbedProps {
   url: string;
+  /** The `rel` the author wrote on the post's link (`nofollow` …), kept on the card's links to the post. */
+  rel?: string;
   tweetId?: string;
   maxWidth?: number;
 }
 
-export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbedProps) {
+export function TwitterEmbedClient({ url, tweetId, maxWidth = 700, rel }: TwitterEmbedProps) {
+  const postLinkRel = renderedLinkRel(rel, true);
   const { twitterProxyUrl } = useRichMarkdownRuntime();
   const [tweetData, setTweetData] = useState<TwitterOEmbedResponse | null>(null);
   const [fetchLoading, setLoading] = useState(true);
@@ -141,22 +146,22 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
   if (loading) {
     return (
       <TwitterContainer>
-        <div className="animate-pulse rounded-lg border border-ods-border bg-ods-card p-6">
+        <div className="rounded-lg border border-ods-border bg-ods-card p-6">
           <div className="mb-4 flex items-center space-x-3">
-            <div className="h-12 w-12 rounded-full bg-ods-border"></div>
+            <UnifiedSkeleton className="h-12 w-12 rounded-full" />
             <div>
-              <div className="mb-2 h-4 w-32 rounded bg-ods-border"></div>
-              <div className="h-3 w-24 rounded bg-ods-border"></div>
+              <UnifiedSkeleton className="mb-2 h-4 w-32 rounded" />
+              <UnifiedSkeleton className="h-3 w-24 rounded" />
             </div>
           </div>
           <div className="mb-4 space-y-2">
-            <div className="h-4 w-full rounded bg-ods-border"></div>
-            <div className="h-4 w-3/4 rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-4 w-full rounded" />
+            <UnifiedSkeleton className="h-4 w-3/4 rounded" />
           </div>
           <div className="flex items-center space-x-4">
-            <div className="h-4 w-16 rounded bg-ods-border"></div>
-            <div className="h-4 w-16 rounded bg-ods-border"></div>
-            <div className="h-4 w-16 rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-4 w-16 rounded" />
+            <UnifiedSkeleton className="h-4 w-16 rounded" />
+            <UnifiedSkeleton className="h-4 w-16 rounded" />
           </div>
         </div>
       </TwitterContainer>
@@ -179,7 +184,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
             <Link
               href={url}
               target="_blank"
-              rel="noopener noreferrer"
+              rel={postLinkRel}
               className="inline-flex items-center space-x-2 rounded-md bg-ods-bg-surface px-4 py-2 text-ods-text-primary transition-colors text-h6 hover:bg-ods-bg-active"
             >
               <XIcon />
@@ -318,7 +323,7 @@ export function TwitterEmbedClient({ url, tweetId, maxWidth = 700 }: TwitterEmbe
           <Link
             href={url}
             target="_blank"
-            rel="noopener noreferrer"
+            rel={postLinkRel}
             className="inline-flex items-center space-x-2 text-ods-accent transition-colors text-h6 hover:opacity-80"
           >
             <ExternalLinkIcon />

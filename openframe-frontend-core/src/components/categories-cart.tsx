@@ -3,6 +3,7 @@
 import { ChevronRight } from 'lucide-react';
 import Link from '../embed-shims/next-link';
 import type { RealCategoryCardProps } from '../types/category';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
 import { VendorIcon } from './vendor-icon';
 
 // Component that receives vendor and subcategory data as props
@@ -26,10 +27,7 @@ export function CategoriesCart({
             {isLoading
               ? // Skeleton loading for vendor icons
                 Array.from({ length: 20 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="h-8 w-8 flex-shrink-0 animate-pulse rounded bg-ods-border md:h-10 md:w-10"
-                  />
+                  <UnifiedSkeleton key={index} className="h-8 w-8 flex-shrink-0 rounded md:h-10 md:w-10" />
                 ))
               : vendors && vendors.length > 0
                 ? vendors.map(vendor => (
