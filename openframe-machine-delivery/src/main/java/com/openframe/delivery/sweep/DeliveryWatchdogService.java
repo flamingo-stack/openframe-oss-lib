@@ -49,7 +49,7 @@ public class DeliveryWatchdogService {
         try {
             DeliveryType type = delivery.getType();
             Policy policy = properties.resolve(type);
-            long delaySeconds = policy.getMaxRetryIntervalSeconds();
+            long delaySeconds = policy.getBackoff().getMaxIntervalSeconds();
             Instant dueAt = now.plusSeconds(delaySeconds);
             String id = delivery.getId();
             Instant dispatchedAt = delivery.getDispatchedAt();
