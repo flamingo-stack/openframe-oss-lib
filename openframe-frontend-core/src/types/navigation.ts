@@ -168,7 +168,106 @@ export interface NavigationSidebarConfig {
   onNavigate?: (path: string) => void;
   onToggleMinimized?: () => void;
   className?: string;
+  /**
+   * How the entries are drawn. `'flat'` (the default) is the original sidebar:
+   * every entry a 56px row, `children` ignored. `'grouped'` draws entries that
+   * carry `children` as groups — the parent row, and while the group is open a
+   * bordered card holding the parent and its children (one level only) — with
+   * 44px rows and a label-only active pill. Only one group is open at a time:
+   * the one holding the active entry. The mobile burger menu follows the same
+   * switch.
+   */
+  variant?: 'flat' | 'grouped';
+  /**
+   * The current location, pathname plus query string (`/monitoring?tab=policies`).
+   * Lets the sidebar resolve the active entry itself — through `match`, or an
+   * entry's own `path` — for entries that do not set `isActive`. Without it only
+   * `isActive` marks an entry, as before.
+   */
+  currentPath?: string;
+  /**
+   * What a click on a CLOSED group parent does (grouped variant). `'first-child'`
+   * (default): open the group and navigate to its first child — through
+   * `onNavigate`, so without one it only opens. `'expand'`: only open it. A click
+   * on an OPEN parent always folds it; a closed parent whose group holds the
+   * current page only re-opens. The mobile burger menu always expands: there a
+   * navigation closes the menu over the children the user asked to see.
+   */
+  groupParentClick?: 'first-child' | 'expand';
+  /**
+   * Host content below the navigation tree that takes the remaining height and
+   * scrolls on its own (the chat history), so the tree above it stays in view.
+   * A node is hidden in the collapsed rail (it stays mounted); a function is
+   * called with the sidebar's own `minimized` state and decides for itself.
+   * Rendered in the mobile burger menu too, with `minimized: false`.
+   */
+  sectionSlot?: NavigationSidebarSlot;
+  /**
+   * Host content pinned above the "Hide Menu" toggle (the account row). A node
+   * renders as-is in both widths; a function receives `minimized` and adapts
+   * (e.g. `AccountPopover`'s `collapsed`). Rendered at the bottom of the mobile
+   * burger menu too, with `minimized: false`.
+   */
+  footerSlot?: NavigationSidebarSlot;
+  /**
+   * Controlled desktop collapse. When set, it replaces the persisted preference
+   * (`localStorage`): the host owns the value and seeds
+   * `NAVIGATION_SIDEBAR_WIDTH_VAR` to match it before first paint. The tablet
+   * overlay stays the sidebar's own transient state, but a CHANGE of this value
+   * opens (`false`) or closes (`true`) it too, so a host can reveal the sidebar
+   * from anywhere (⌘K) on every width. Omitted: uncontrolled, as before.
+   */
+  collapsed?: boolean;
+  /**
+   * Called with the next desktop collapse state when the user toggles it on
+   * desktop (not for the tablet overlay). Pair with `collapsed`.
+   */
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
+
+/**
+ * A sidebar slot: a node, or a render function of the sidebar's own state (the
+ * host cannot derive `minimized` — it comes from a persisted preference, the
+ * tablet breakpoint and any open overlay).
+ */
+export type NavigationSidebarSlot = React.ReactNode | ((state: { minimized: boolean }) => React.ReactNode);
+
+/** The location a `NavigationSidebarItem.match` function is asked about. */
+export interface NavigationSidebarLocation {
+  /** Without its trailing slash (`/` stays `/`). */
+  pathname: string;
+  searchParams: URLSearchParams;
+}
+
+/**
+ * One declarative match rule. `path` is a segment-aware prefix: `/scripts`
+ * matches `/scripts` and `/scripts/details`, never `/scriptsx`.
+ */
+export interface NavigationSidebarMatchRule {
+  path: string;
+  /** Only the pathname itself, not the pages below it. */
+  exact?: boolean;
+  /**
+   * Required query values: a string must be equal, `null` must be absent, an
+   * array accepts any of its values (`{ tab: ['queries', null] }` = the queries
+   * tab, or no tab at all).
+   */
+  query?: Record<string, string | null | ReadonlyArray<string | null>>;
+}
+
+/**
+ * When an entry is the current page. A string is a rule written as a URL —
+ * `'/monitoring?tab=policies'` = the `/monitoring` prefix with `tab=policies`.
+ * Several rules match if any does. When several entries match, the most
+ * specific rule wins (more path segments, then more query constraints), so
+ * `/scripts` and `/scripts/schedules` need no `exclude`. A function is the host
+ * deciding outright and outranks every rule.
+ */
+export type NavigationSidebarMatch =
+  | string
+  | NavigationSidebarMatchRule
+  | ReadonlyArray<string | NavigationSidebarMatchRule>
+  | ((location: NavigationSidebarLocation) => boolean);
 
 /**
  * Navigation sidebar item interface
@@ -187,8 +286,24 @@ export interface NavigationSidebarItem {
    * themselves, and the accessible name becomes "Devices (Beta)".
    */
   badge?: string;
+  /**
+   * The host's own answer to "is this the current page". When set (`true` or
+   * `false`) it wins over `match`; leave it out to let `match` / `path` decide
+   * against `NavigationSidebarConfig.currentPath`.
+   */
   isActive?: boolean;
+  /**
+   * When this entry is the current page, checked against
+   * `NavigationSidebarConfig.currentPath` for entries without `isActive`.
+   * Omitted: the entry's own `path` (its query included) is the rule.
+   */
+  match?: NavigationSidebarMatch;
   onClick?: () => void;
+  /**
+   * The group's entries (grouped variant only; one level). The flat variant
+   * ignores them. A parent's click opens the group (see
+   * `NavigationSidebarConfig.groupParentClick`), so a parent needs no `path`.
+   */
   children?: NavigationSidebarItem[];
   section?: 'primary' | 'secondary'; // To separate top and bottom sections
 }
