@@ -105,6 +105,15 @@ class GraphQLExceptionHandlerTest {
     }
 
     @Test
+    void handleException_lokiFailureWithACause_logsItAsAnErrorWithTheCause(CapturedOutput output) {
+        handle(new LokiQueryException("line not readable", new IllegalStateException("unexpected end of input")));
+
+        assertThat(output.getOut())
+                .containsPattern("ERROR .*GraphQL error occurred")
+                .contains("line not readable", "unexpected end of input");
+    }
+
+    @Test
     void handleException_invalidRelayId_logsTheReasonAsAWarningOnly(CapturedOutput output) {
         // setup
         InvalidRelayIdException exception = new InvalidRelayIdException(WRONG_TYPE_ID);
@@ -196,7 +205,7 @@ class GraphQLExceptionHandlerTest {
                         "This log search covers too much data. Narrow the time range, or filter by device or level.",
                         "LOKI_QUERY_REJECTED", 400),
                 arguments(new LokiQueryException("loki down"),
-                        "Device logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
+                        "Logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
                 arguments(new DataAccessResourceFailureException("mongo down"),
                         "Database operation failed. Please try again later.", "DATABASE_ERROR", 503),
                 arguments(new RuntimeException("boom"), UNEXPECTED, "INTERNAL_ERROR", 500),
