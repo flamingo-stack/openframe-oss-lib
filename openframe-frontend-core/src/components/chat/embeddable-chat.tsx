@@ -2320,8 +2320,10 @@ function EmbeddableChatInner({
   // archived one, one still loading or blocked as above) a new chat opens with
   // it: adding prompts under a pending approval or a running turn would mix
   // two conversations. A new chat with nothing sent yet gets another exchange.
-  const showWhatToAsk = (content: WhatToAskContent) => {
-    if (activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
+  // `newChat`: asked from a screen with no chat open (the archive list), where
+  // the conversation open before it is not the one the user is looking at.
+  const showWhatToAsk = (content: WhatToAskContent, newChat = false) => {
+    if (!newChat && activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
       whatToAsk.ask('current', content);
       return;
     }
@@ -2354,16 +2356,16 @@ function EmbeddableChatInner({
     showWhatToAskRef.current = showWhatToAsk;
   });
   const whatToAskPendingRef = useRef(false);
-  const requestWhatToAsk = () => {
+  const requestWhatToAsk = (newChat: boolean) => {
     if (!whatToAskContent) return;
     if (typeof whatToAskContent !== 'function') {
-      showWhatToAsk(whatToAskContent);
+      showWhatToAsk(whatToAskContent, newChat);
       return;
     }
     if (whatToAskPendingRef.current) return;
     whatToAskPendingRef.current = true;
     whatToAskContent()
-      .then(content => showWhatToAskRef.current(content))
+      .then(content => showWhatToAskRef.current(content, newChat))
       .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
       .finally(() => {
         whatToAskPendingRef.current = false;
@@ -2540,7 +2542,12 @@ function EmbeddableChatInner({
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     // The suggestions a new chat opens on, unless the host has a surface of its own.
-    onWhatToAsk: () => leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? requestWhatToAsk : handleNewChat))(),
+    // From the archive list no chat is on screen, even though the one open
+    // before it is still the active dialog: that click opens a new chat.
+    onWhatToAsk: () => {
+      const fromArchive = archiveOpen;
+      leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? () => requestWhatToAsk(fromArchive) : handleNewChat))();
+    },
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
