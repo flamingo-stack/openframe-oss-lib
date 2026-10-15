@@ -24,6 +24,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import static com.openframe.data.document.rmm.script.OsType.WINDOWS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
@@ -184,7 +185,7 @@ class CustomMachineRepositoryPagingTest {
     void findMatchingNames_filteredNames_appliesTenantStatusOsOrganizationAndTags() {
         // setup
         MachineQueryFilter filter = MachineQueryFilter.builder().hostnames(List.of("host-1"))
-                .statuses(List.of("ONLINE")).osTypes(List.of(com.openframe.data.document.rmm.script.OsType.WINDOWS))
+                .statuses(List.of("ONLINE")).osTypes(List.of(WINDOWS))
                 .organizationIds(List.of("organization-1")).tagValues(List.of("production")).build();
         TagAssignment assignment = TagAssignment.builder().entityId("machine-1").build();
         when(mongoTemplate.find(any(Query.class), eq(TagAssignment.class))).thenReturn(List.of(assignment));
