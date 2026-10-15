@@ -1,5 +1,6 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.ClientFeatureFlagsDeliverySeed;
@@ -31,7 +32,7 @@ public class AgentRegistrationClientFeatureFlagsService {
         }
         try {
             OpenFrameClientConfiguration configuration = clientConfigurationService.get();
-            Map<String, Boolean> flags = requireNonNullElse(configuration.getFeatureFlags(), Map.of());
+            Map<String, ClientFeatureFlag> flags = requireNonNullElse(configuration.getFeatureFlags(), Map.of());
             deliveryDispatcher.dispatch(ClientFeatureFlagsDeliverySeed.forMachine(machineId, flags));
         } catch (RuntimeException e) {
             // the registration itself must not fail on this: the next release reaches the machine anyway

@@ -66,6 +66,7 @@ import { buildSuggestionUrl } from '../../utils/suggestion-url';
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
 import { accentSentenceMarks } from '../layout/page-heading';
+import { LoadingRegion } from '../loading/loading-region';
 import { Pagination } from '../pagination';
 // The per-type card dispatch — one registry entry per content type, each
 // carrying its OWN row type — plus the DEEP card imports that keep this
@@ -361,7 +362,7 @@ function ContentGroup({
       <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
     ));
     return (
-      <div className="space-y-4">
+      <LoadingRegion label="Loading related content" className="space-y-4">
         {heading}
         {isListLayout ? (
           <div className="space-y-4">{skeletons}</div>
@@ -369,7 +370,7 @@ function ContentGroup({
           <div className={gridClassFor(columns)}>{skeletons}</div>
         )}
         {groupPagination}
-      </div>
+      </LoadingRegion>
     );
   }
 
@@ -652,14 +653,14 @@ export function RelatedContentSection({
     if (isLoading) {
       const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
       return (
-        <div className="space-y-8">
+        <LoadingRegion label="Loading related content" className="space-y-8">
           <h2 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h2>
           <div className={gridClassFor(columns)}>
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
             ))}
           </div>
-        </div>
+        </LoadingRegion>
       );
     }
     return (

@@ -1,13 +1,17 @@
 package com.openframe.data.loki.client;
 
+import com.openframe.data.loki.model.LokiPushRequest;
 import com.openframe.data.loki.model.LokiQueryResponse;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.HttpExchange;
+import org.springframework.web.service.annotation.PostExchange;
 
 /**
- * Declarative binding of the Loki HTTP query API, limited to what OpenFrame reads.
+ * Declarative binding of the Loki HTTP API, limited to what OpenFrame uses.
  * Request parameters are sent as encoded URI variables, so LogQL braces, pipes and {@code +} survive intact.
  */
 @HttpExchange("/loki/api/v1")
@@ -35,4 +39,7 @@ public interface LokiHttpApi {
                                  @RequestParam("direction") String direction,
                                  @RequestHeader(name = ACTOR_HEADER, required = false) String actor,
                                  @RequestHeader(name = QUERY_LIMITS_HEADER, required = false) String queryLimits);
+
+    @PostExchange(value = "/push", contentType = MediaType.APPLICATION_JSON_VALUE)
+    void push(@RequestBody LokiPushRequest request);
 }

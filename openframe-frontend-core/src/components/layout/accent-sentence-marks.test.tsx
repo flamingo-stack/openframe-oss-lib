@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { accentSentenceMarks, SectionHeading } from './page-heading';
+import { accentSentenceMarks, HeadingLines, SectionHeading } from './page-heading';
 
 const html = (node: ReactNode) => renderToStaticMarkup(<>{node}</>);
 const mark = (text: string) => `<span class="text-ods-accent">${text}</span>`;
@@ -74,7 +74,38 @@ describe('accentSentenceMarks', () => {
       <SectionHeading level="page" eyebrow="Endpoint management software" title="Run by AI" punctuation={null} />,
     );
     expect(out).toContain(
-      '<h1 class="contents"><span class="text-h5 text-ods-accent">Endpoint management software</span><span class="block text-h1 text-ods-text-primary" data-section-heading="true">Run by AI</span></h1>',
+      '<h1 class="contents"><span class="text-h5 text-ods-accent">Endpoint management software</span> <span class="block text-h1 text-ods-text-primary" data-section-heading="true">Run by AI</span></h1>',
+    );
+  });
+});
+
+/** A heading's text as search engines and screen readers read it: the markup's text, tags removed, nothing added. */
+const headingText = (node: ReactNode) =>
+  html(node)
+    .match(/<h[1-6][^>]*>([\s\S]*)<\/h[1-6]>/)?.[1]
+    .replace(/<[^>]+>/g, '');
+
+describe("a heading's text keeps its words apart", () => {
+  it('reads a page heading with an eyebrow as two phrases, not one word', () => {
+    expect(
+      headingText(
+        <SectionHeading level="page" eyebrow="AI-native IT automation" title="Fixed on its own" punctuation={null} />,
+      ),
+    ).toBe('AI-native IT automation Fixed on its own');
+  });
+
+  it('puts a space before every line break, and keeps an empty line as a blank line', () => {
+    expect(
+      headingText(
+        <SectionHeading title={<HeadingLines>{['Fixed on its own.', 'Approved with one tap']}</HeadingLines>} />,
+      ),
+    ).toBe('Fixed on its own. Approved with one tap.');
+    expect(html(<HeadingLines>{['A.', '', 'B.']}</HeadingLines>)).toBe('A. <br/> <br/>B.');
+  });
+
+  it('colours the sentence marks on every line of a multi-line title', () => {
+    expect(html(<SectionHeading title={<HeadingLines>{['Fixed on its own.', 'Approved']}</HeadingLines>} />)).toContain(
+      `Fixed on its own${mark('.')} <br/>Approved${mark('.')}`,
     );
   });
 });
