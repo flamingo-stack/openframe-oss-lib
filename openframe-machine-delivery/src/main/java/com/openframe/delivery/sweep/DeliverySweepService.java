@@ -44,6 +44,7 @@ public class DeliverySweepService {
     private final DeliveryMetrics metrics;
     private final DeliveryPublisher publisher;
     private final DeliveryPayloadJson payloadJson;
+    private final RetryBackoff retryBackoff;
 
     public void retryPending() {
         Instant now = Instant.now();
@@ -123,7 +124,7 @@ public class DeliverySweepService {
         }
         int attempts = delivery.getAttempts();
         int attempt = attempts + 1;
-        long delaySeconds = retryDelaySeconds(attempt, policy);
+        long delaySeconds = retryBackoff.delaySeconds(attempt, policy);
         Instant dueAt = now.plusSeconds(delaySeconds);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
@@ -180,18 +181,10 @@ public class DeliverySweepService {
     private Instant recheckAt(MachineDelivery delivery, Instant now) {
         DeliveryType type = delivery.getType();
         Policy policy = properties.resolve(type);
-        long delaySeconds = policy.getMaxRetryIntervalSeconds();
+        long delaySeconds = policy.getBackoff().getMaxIntervalSeconds();
         return now.plusSeconds(delaySeconds);
     }
 
-    private static long retryDelaySeconds(int attempt, Policy policy) {
-        int multiplier = policy.getBackoffMultiplier();
-        long firstDelay = policy.getAckThresholdSeconds();
-        double growth = Math.pow(multiplier, attempt);
-        long delay = (long) (firstDelay * growth);
-        long cap = policy.getMaxRetryIntervalSeconds();
-        return Math.min(delay, cap);
-    }
 
     private static Instant earliest(Instant first, Instant second) {
         return first.isBefore(second) ? first : second;
