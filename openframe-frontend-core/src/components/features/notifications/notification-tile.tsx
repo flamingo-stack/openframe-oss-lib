@@ -310,7 +310,7 @@ export function NotificationTileSkeleton({ variant = 'default', className }: Not
           <TileLine box="h-5" width="3.5rem" bar="h-3 rounded" />
           <TileLine box="size-4" width="1rem" bar="h-4 rounded-full" />
         </span>
-        <span className="flex min-w-0 flex-col">
+        <span className="grid min-w-0 grid-cols-1">
           <TileLine box="h-6" width="60%" bar="h-4 rounded" />
           <TileLine box="h-5" width="88%" bar="h-3 rounded" />
           <TileLine box="h-5" width="52%" bar="h-3 rounded" />
