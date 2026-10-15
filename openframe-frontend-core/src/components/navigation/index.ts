@@ -34,6 +34,9 @@ export type { NavigationSidebarProps } from './navigation-sidebar';
 
 export { AppHeader } from './app-header';
 export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
+export type { AppHeaderCell } from './app-header';
+export { NotificationsBellButton } from './notifications-bell-button';
+export type { NotificationsBellButtonProps } from './notifications-bell-button';
 
 export { AppLayout, useAppLayoutDrawerContainer } from './app-layout';
 export type { AppLayoutProps } from './app-layout';
