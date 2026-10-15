@@ -30,6 +30,7 @@ public class TenantSoftwareHandler implements MessageHandler<DeserializedDebeziu
 
     private final TenantSoftwareRepository tenantSoftwareRepository;
     private final FleetSoftwareTitleRepository softwareTitleRepository;
+    private final TenantSoftwareCveAggregator tenantSoftwareCveAggregator;
 
     @Override
     public EventHandlerType getType() {
@@ -79,6 +80,7 @@ public class TenantSoftwareHandler implements MessageHandler<DeserializedDebeziu
         applyTitle(tenantSoftware, softwareTitleId);
         tenantSoftware.setUpdatedAt(Instant.now());
         tenantSoftwareRepository.save(tenantSoftware);
+        tenantSoftwareCveAggregator.recompute(tenantId, softwareTitleId);
         log.debug("[software-cdc] tenant_software upserted: tenant={} title={} devices={}",
                 tenantId, softwareTitleId, tenantSoftware.getDevicesCount());
     }

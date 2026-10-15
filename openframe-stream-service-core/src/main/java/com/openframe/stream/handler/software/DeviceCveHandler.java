@@ -27,7 +27,9 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
@@ -51,6 +53,7 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
     private final FleetOperatingSystemRepository fleetOperatingSystemRepository;
     private final DeviceOperatingSystemRepository deviceOperatingSystemRepository;
     private final DeviceCveRepository deviceCveRepository;
+    private final TenantSoftwareCveAggregator tenantSoftwareCveAggregator;
 
     @Override
     public EventHandlerType getType() {
@@ -96,8 +99,11 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
             log.debug("[software-cdc] device_cve: unresolved Fleet host {} — skipping (software {})", hostId, softwareId);
             return;
         }
+        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
+        Long titleId = software == null ? null : software.getSoftwareTitleId();
         if (delete) {
             deviceCveRepository.deleteByTenantIdAndMachineIdAndSoftwareId(host.tenantId(), host.machineId(), softwareId);
+            tenantSoftwareCveAggregator.recompute(host.tenantId(), titleId);
             return;
         }
         List<FleetSoftwareCve> cves = fleetSoftwareCveRepository.findBySoftwareId(softwareId);
@@ -105,13 +111,12 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
             // No CVE known for this software yet; a later software_cve event fans it in.
             return;
         }
-        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
-        Long titleId = software == null ? null : software.getSoftwareTitleId();
         String version = software == null ? null : software.getVersion();
         for (FleetSoftwareCve sc : cves) {
             upsert(host.tenantId(), host.machineId(), hostId, sc.getCve(), softwareId, titleId, version,
                     sc.getResolvedInVersion());
         }
+        tenantSoftwareCveAggregator.recompute(host.tenantId(), titleId);
     }
 
     private void handleSoftwareCve(DebeziumMessage.Payload<JsonNode> payload) {
@@ -126,26 +131,32 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
             return;
         }
 
+        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
+        Long softwareTitleId = software == null ? null : software.getSoftwareTitleId();
+        String version = software == null ? null : software.getVersion();
+        String resolvedInVersion = str(row, "resolved_in_version");
+
         if (delete) {
             fleetSoftwareCveRepository.deleteBySoftwareIdAndCve(softwareId, cve);
-            for (DeviceSoftware ds : deviceSoftwareRepository.findBySoftwareId(softwareId)) {
-                deviceCveRepository.deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId(
-                        ds.getTenantId(), ds.getMachineId(), cve, softwareId);
-            }
-            return;
+        } else {
+            upsertCatalog(softwareId, cve, resolvedInVersion);
         }
 
-        String resolvedInVersion = str(row, "resolved_in_version");
-        upsertCatalog(softwareId, cve, resolvedInVersion);
-
-        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
-        Long titleId = software == null ? null : software.getSoftwareTitleId();
-        String version = software == null ? null : software.getVersion();
+        Set<String> affectedTenants = new HashSet<>();
         for (DeviceSoftware ds : deviceSoftwareRepository.findBySoftwareId(softwareId)) {
-            upsert(ds.getTenantId(), ds.getMachineId(), ds.getHostId(), cve, softwareId,
-                    titleId != null ? titleId : ds.getSoftwareTitleId(),
-                    version != null ? version : ds.getVersion(),
-                    resolvedInVersion);
+            if (delete) {
+                deviceCveRepository.deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId(
+                        ds.getTenantId(), ds.getMachineId(), cve, softwareId);
+            } else {
+                upsert(ds.getTenantId(), ds.getMachineId(), ds.getHostId(), cve, softwareId,
+                        softwareTitleId != null ? softwareTitleId : ds.getSoftwareTitleId(),
+                        version != null ? version : ds.getVersion(),
+                        resolvedInVersion);
+            }
+            affectedTenants.add(ds.getTenantId());
+        }
+        for (String tenant : affectedTenants) {
+            tenantSoftwareCveAggregator.recompute(tenant, softwareTitleId);
         }
     }
 

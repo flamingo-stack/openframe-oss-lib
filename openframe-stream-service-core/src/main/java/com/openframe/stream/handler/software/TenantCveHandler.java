@@ -84,6 +84,7 @@ public class TenantCveHandler implements MessageHandler<DeserializedDebeziumMess
     private void applyMetadata(TenantCve tenantCve, String cveId) {
         CveMetadata meta = cveMetadataRepository.findByCveId(cveId).orElse(null);
         if (meta == null) {
+            ensurePlaceholder(cveId);
             return;
         }
         tenantCve.setSeverity(meta.getSeverity());
@@ -91,5 +92,14 @@ public class TenantCveHandler implements MessageHandler<DeserializedDebeziumMess
         tenantCve.setEpssProbability(meta.getEpssProbability());
         tenantCve.setCisaKnownExploit(meta.getCisaKnownExploit());
         tenantCve.setPublishedAt(meta.getPublishedAt());
+    }
+
+    private void ensurePlaceholder(String cveId) {
+        try {
+            cveMetadataRepository.save(CveMetadata.builder().cveId(cveId).build());
+        } catch (RuntimeException e) {
+            // Concurrent event already created it (unique cveId) — nothing to do.
+            log.debug("[software-cdc] cve_metadata placeholder already present: {}", cveId);
+        }
     }
 }

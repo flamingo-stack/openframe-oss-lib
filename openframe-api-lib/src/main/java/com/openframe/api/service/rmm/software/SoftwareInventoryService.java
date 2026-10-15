@@ -91,6 +91,7 @@ public class SoftwareInventoryService {
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
     private final DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    private final TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -137,6 +138,9 @@ public class SoftwareInventoryService {
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
         if (field != null && !SORTABLE.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
+        }
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.listSoftware(tenantIdProvider.getTenantId(), search, page, perPage, sort, vulnerable);
         }
         if (fleetPaging) {
             return softwarePageFromFleet(search, page, perPage, sort, vulnerable);

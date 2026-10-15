@@ -21,6 +21,7 @@ import java.time.Instant;
         def = "{'tenantId': 1, 'machineId': 1, 'cveId': 1, 'softwareId': 1}",
         unique = true)
 @CompoundIndex(name = "tenant_cve", def = "{'tenantId': 1, 'cveId': 1}")
+@CompoundIndex(name = "tenant_title", def = "{'tenantId': 1, 'softwareTitleId': 1}")
 @CompoundIndex(name = "tenant_machine_discovered", def = "{'tenantId': 1, 'machineId': 1, 'discoveredAt': -1}")
 public class DeviceCve implements TenantScoped {
 

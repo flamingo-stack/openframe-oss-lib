@@ -1,6 +1,8 @@
 package com.openframe.data.repository.rmm.software;
 
 import com.openframe.data.document.rmm.software.TenantSoftware;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,4 +20,15 @@ public interface TenantSoftwareRepository extends MongoRepository<TenantSoftware
     List<TenantSoftware> findBySoftwareTitleId(Long softwareTitleId);
 
     long deleteByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
+
+    Page<TenantSoftware> findByTenantIdAndDevicesCountGreaterThan(String tenantId, int minDevices, Pageable pageable);
+
+    Page<TenantSoftware> findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(
+            String tenantId, String nameLower, int minDevices, Pageable pageable);
+
+    Page<TenantSoftware> findByTenantIdAndCveCountGreaterThanAndDevicesCountGreaterThan(
+            String tenantId, int minCve, int minDevices, Pageable pageable);
+
+    Page<TenantSoftware> findByTenantIdAndNameLowerContainingAndCveCountGreaterThanAndDevicesCountGreaterThan(
+            String tenantId, String nameLower, int minCve, int minDevices, Pageable pageable);
 }
