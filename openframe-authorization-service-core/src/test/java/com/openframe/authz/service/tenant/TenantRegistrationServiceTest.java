@@ -8,6 +8,7 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import com.openframe.data.document.tenant.TenantStatus;
 import com.openframe.data.document.user.UserRole;
+import com.openframe.data.service.OrganizationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,6 +40,8 @@ class TenantRegistrationServiceTest {
     private RegistrationProcessor registrationProcessor;
     @Mock
     private EmailDomainPolicy emailDomainPolicy;
+    @Mock
+    private OrganizationService organizationService;
     @InjectMocks
     private TenantRegistrationService service;
 
@@ -63,6 +66,7 @@ class TenantRegistrationServiceTest {
         Tenant saved = service.registerTenant(request(false));
 
         assertThat(saved.getOwnerId()).isEqualTo("owner-1");
+        verify(organizationService).createDefaultOrganization("reserved-id");
         verify(registrationProcessor).preProcessTenantRegistration(any());
         verify(registrationProcessor).postProcessTenantRegistration(created, owner, request(false));
         verify(userService, never()).registerVerifiedUser(any(), any(), any(), any(), any(), any());
@@ -88,6 +92,7 @@ class TenantRegistrationServiceTest {
 
         assertThatThrownBy(() -> service.registerTenant(request(false))).hasMessageContaining("domain is already in use");
         verify(tenantService, never()).createTenant(any(), any(), any());
+        verify(organizationService, never()).createDefaultOrganization(any());
     }
 
     @Test

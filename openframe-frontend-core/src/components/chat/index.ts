@@ -16,6 +16,7 @@ export * from './context-compaction-display';
 export * from './expand-chevron';
 export * from './thinking-display';
 export * from './ask-display';
+export * from './suggestions-display';
 export * from './error-message-display';
 export * from './chat-container';
 export * from './chat-input';
@@ -23,6 +24,7 @@ export * from './slash-command-suggestions';
 export * from './chat-message-enhanced';
 export * from './chat-message-list';
 export * from './chat-message-row';
+export * from './chat-turn';
 export * from './chat-message-skeleton';
 
 export * from './quick-action-chip';

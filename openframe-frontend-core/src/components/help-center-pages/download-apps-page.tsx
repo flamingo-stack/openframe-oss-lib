@@ -52,12 +52,14 @@ import {
 import { cn } from '../../utils/cn';
 import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
+import { FaqSection, pageFaqProps, type PageFaqSlot } from '../faq/faq-section';
 import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { LoadError } from '../ui/error-state';
@@ -86,6 +88,12 @@ export interface DownloadAppsPageProps {
   onDownloadAction?: (event: DownloadActionEvent) => void;
   /** The closing card, under the mobile app: using OpenFrame without installing anything. Default: none. */
   web?: DownloadAppsWebOption;
+  /**
+   * The page's own FAQ block: the topic the page is about (stated by the host,
+   * never read from its address) and where the host serves the FAQs. Rendered
+   * after the page's content, inside its container. Absent: no FAQ block.
+   */
+  faq?: PageFaqSlot;
 }
 
 /** The "no install" card: the host's words and its own button (the page holds no signup link). */
@@ -241,7 +249,7 @@ function WebCard({ web }: { web: DownloadAppsWebOption }) {
 /** A section's cards while the server's answer loads: the same grid and card frame, a button's box in each. */
 function CardsSkeleton({ label }: { label: string }) {
   return (
-    <div className={CARDS_GRID_CLASS} aria-busy="true" aria-label={label}>
+    <LoadingRegion label={label} className={CARDS_GRID_CLASS}>
       {[0, 1].map(card => (
         <div key={card} className={CARD_CLASS}>
           <UnifiedSkeleton className="h-6 w-32 rounded" />
@@ -249,7 +257,7 @@ function CardsSkeleton({ label }: { label: string }) {
           <UnifiedSkeleton className="h-14 w-full rounded-md" />
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
 }
 
@@ -281,6 +289,7 @@ export function DownloadAppsPage({
   openStoresInNewTab = true,
   onDownloadAction,
   web,
+  faq,
 }: DownloadAppsPageProps) {
   const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData });
   // The page adapts to the server's answer: a section exists only for what it names.
@@ -362,6 +371,7 @@ export function DownloadAppsPage({
         {body}
         {web && <WebCard web={web} />}
       </div>
+      {faq && <FaqSection {...pageFaqProps(faq)} />}
     </DownloadAppsChrome>
   );
 }

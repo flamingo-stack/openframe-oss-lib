@@ -20,6 +20,7 @@
 import type { DeliveryItem } from '../../../types/delivery';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { DeliveryRow } from './delivery-row';
 
 interface DeliveryTableProps {
@@ -38,26 +39,26 @@ function SkeletonRow() {
         <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
           {/* Title skeleton - responsive */}
           <div className="flex min-h-[24px] items-center">
-            <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-[20px] w-full rounded" />
           </div>
           {/* Subtitle skeleton - 1 line */}
           <div className="flex min-h-[20px] items-center">
-            <div className="h-[20px] w-1/2 animate-pulse rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-[20px] w-1/2 rounded" />
           </div>
           {/* Description skeleton - 3 lines */}
           <div className="flex min-h-[72px] items-center">
             <div className="flex-1 space-y-1">
-              <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
-              <div className="h-[20px] w-full animate-pulse rounded bg-ods-border"></div>
-              <div className="h-[20px] w-2/3 animate-pulse rounded bg-ods-border"></div>
+              <UnifiedSkeleton className="h-[20px] w-full rounded" />
+              <UnifiedSkeleton className="h-[20px] w-full rounded" />
+              <UnifiedSkeleton className="h-[20px] w-2/3 rounded" />
             </div>
           </div>
         </div>
 
         {/* Right: Badge skeleton - two stacked badges */}
         <div className="flex flex-shrink-0 flex-col gap-2 self-start">
-          <div className="h-[32px] w-[100px] animate-pulse rounded bg-ods-border"></div>
-          <div className="h-[32px] w-[120px] animate-pulse rounded bg-ods-border"></div>
+          <UnifiedSkeleton className="h-[32px] w-[100px] rounded" />
+          <UnifiedSkeleton className="h-[32px] w-[120px] rounded" />
         </div>
       </div>
     </div>

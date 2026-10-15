@@ -1,11 +1,9 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
@@ -46,8 +44,6 @@ class ScriptResultDeserializerTest {
     private ScriptRepository scriptRepository;
 
     private final ObjectMapper mapper = JsonMapper.builder()
-            .addModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .build();
     private ScriptResultDeserializer deserializer;
 
@@ -157,7 +153,7 @@ class ScriptResultDeserializerTest {
 
         JsonNode result = mapper.readTree(deserializer.getResult(after));
 
-        assertThat(result.get("output").asText()).isEqualTo("ok\n");
+        assertThat(result.get("output").asString()).isEqualTo("ok\n");
         assertThat(result.get("exit_code").asInt()).isZero();
         assertThat(result.get("execution_time_ms").asLong()).isEqualTo(7L);
     }
@@ -352,27 +348,27 @@ class ScriptResultDeserializerTest {
         JsonNode result = mapper.readTree(deserializer.getResult(after));
 
         // verifications
-        assertThat(result.get("output").asText()).isEqualTo("ok");
+        assertThat(result.get("output").asString()).isEqualTo("ok");
         JsonNode input = result.get("input");
         assertThat(input.has("id")).isFalse();
         assertThat(input.has("tenantId")).isFalse();
-        assertThat(input.get("name").asText()).isEqualTo("Disk cleanup");
-        assertThat(input.get("shell").asText()).isEqualTo("BASH");
-        assertThat(input.get("privilegeLevel").asText()).isEqualTo("ADMIN");
-        assertThat(input.get("scriptBody").asText()).isEqualTo("echo hi");
-        assertThat(input.get("supportedPlatforms")).extracting(JsonNode::asText).containsExactly("MAC_OS");
+        assertThat(input.get("name").asString()).isEqualTo("Disk cleanup");
+        assertThat(input.get("shell").asString()).isEqualTo("BASH");
+        assertThat(input.get("privilegeLevel").asString()).isEqualTo("ADMIN");
+        assertThat(input.get("scriptBody").asString()).isEqualTo("echo hi");
+        assertThat(input.get("supportedPlatforms")).extracting(JsonNode::asString).containsExactly("MAC_OS");
         assertThat(input.get("defaultTimeoutSeconds").asInt()).isEqualTo(300);
-        assertThat(input.get("defaultArgs")).extracting(JsonNode::asText).containsExactly("-a", "--verbose");
-        assertThat(input.get("createdBy").asText()).isEqualTo("user-1");
-        assertThat(input.get("creationSource").asText()).isEqualTo("AI_ASSISTANT");
-        assertThat(input.get("createdAt").asText()).isEqualTo("2026-09-28T17:58:16.101Z");
-        assertThat(input.get("status").asText()).isEqualTo("ACTIVE");
+        assertThat(input.get("defaultArgs")).extracting(JsonNode::asString).containsExactly("-a", "--verbose");
+        assertThat(input.get("createdBy").asString()).isEqualTo("user-1");
+        assertThat(input.get("creationSource").asString()).isEqualTo("AI_ASSISTANT");
+        assertThat(input.get("createdAt").asString()).isEqualTo("2026-09-28T17:58:16.101Z");
+        assertThat(input.get("status").asString()).isEqualTo("ACTIVE");
         assertThat(input.has("contentHash")).isFalse();
         assertThat(input.has("description")).isFalse();
         assertThat(input.has("updatedAt")).isFalse();
-        assertThat(input.get("envVars").get(0).get("value").asText()).isEqualTo("eu");
+        assertThat(input.get("envVars").get(0).get("value").asString()).isEqualTo("eu");
         JsonNode secret = input.get("envVars").get(1);
-        assertThat(secret.get("name").asText()).isEqualTo("API_KEY");
+        assertThat(secret.get("name").asString()).isEqualTo("API_KEY");
         assertThat(secret.has("value")).isFalse();
         assertThat(secret.get("secret").asBoolean()).isTrue();
     }

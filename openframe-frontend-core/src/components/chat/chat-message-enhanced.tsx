@@ -23,6 +23,7 @@ import { EscalationOfferMessage } from './escalation-offer-message';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
+import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
 import { TicketEscalatedMessage } from './ticket-escalated-message';
@@ -647,6 +648,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const run = askRuns.get(index);
                     if (!run) return null;
                     return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />;
+                  } else if (segment.type === 'suggestions') {
+                    return <SuggestionsDisplay key={index} segment={segment} />;
                   } else if (segment.type === 'tool_execution') {
                     return (
                       <ToolExecutionDisplay

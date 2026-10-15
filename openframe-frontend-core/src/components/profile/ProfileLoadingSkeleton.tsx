@@ -1,27 +1,31 @@
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 interface ProfileLoadingSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   className?: string;
 }
 
-export function ProfileLoadingSkeleton({ className }: ProfileLoadingSkeletonProps) {
+export function ProfileLoadingSkeleton({ region = true, className }: ProfileLoadingSkeletonProps) {
   return (
-    <div className={cn('space-y-6', className)}>
+    <LoadingRegion label="Loading the profile" announce={region} className={cn('space-y-6', className)}>
       {/* Header skeleton */}
       <div className="flex items-center space-x-4">
-        <div className="h-16 w-16 animate-pulse rounded-full bg-ods-skeleton" />
+        <UnifiedSkeleton className="h-16 w-16 rounded-full" />
         <div className="space-y-2">
-          <div className="h-4 w-32 animate-pulse rounded bg-ods-skeleton" />
-          <div className="h-3 w-24 animate-pulse rounded bg-ods-skeleton" />
+          <UnifiedSkeleton className="h-4 w-32 rounded" />
+          <UnifiedSkeleton className="h-3 w-24 rounded" />
         </div>
       </div>
 
       {/* Content skeleton */}
       <div className="space-y-4">
-        <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton" />
-        <div className="h-4 w-3/4 animate-pulse rounded bg-ods-skeleton" />
-        <div className="h-4 w-1/2 animate-pulse rounded bg-ods-skeleton" />
+        <UnifiedSkeleton className="h-4 w-full rounded" />
+        <UnifiedSkeleton className="h-4 w-3/4 rounded" />
+        <UnifiedSkeleton className="h-4 w-1/2 rounded" />
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

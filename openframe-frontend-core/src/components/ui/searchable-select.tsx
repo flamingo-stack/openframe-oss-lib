@@ -8,6 +8,7 @@ import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
+import { usePortalContainer } from './portal-container';
 import { useRememberedSelection, useSettledOptions } from './server-search-options';
 
 export interface SearchableSelectOption {
@@ -132,6 +133,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const keyboardPadding = useKeyboardCollisionPadding();
+  const portalContainer = usePortalContainer();
 
   // Clear the query on close, while rendering rather than from an effect: the
   // popover closes and reopens without unmounting, so an effect left the
@@ -233,7 +235,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
       ) : (
         triggerElement
       )}
-      <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Portal container={portalContainer ?? undefined}>
         <PopoverPrimitive.Content
           align={align}
           sideOffset={6}

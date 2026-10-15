@@ -1,8 +1,9 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.model.ToolInstallationMessage;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryDispatchListenerTest {
@@ -42,7 +44,7 @@ class DeliveryDispatchListenerTest {
 
     @Captor private ArgumentCaptor<DeliveryRequest<DeliveryPayload>> requestCaptor;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new JsonMapper();
 
     private DeliveryDispatchListener listener;
     private ObjectNode command;
@@ -70,7 +72,8 @@ class DeliveryDispatchListenerTest {
         DeliveryRequest<DeliveryPayload> request = requestCaptor.getValue();
         assertThat(request.isForEveryMachine()).isTrue();
         assertThat(request.getTargetId()).isEqualTo(TARGET_ID);
-        verifyNoInteractions(metrics);
+        verify(metrics).recordDispatchReceived();
+        verifyNoMoreInteractions(metrics);
     }
 
     @Test

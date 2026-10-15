@@ -28,4 +28,3 @@ export {
 // keeps resolving (hub's components/releases/release-detail-page.tsx
 // imports it through this barrel).
 export type { DeliveryResponse } from '../../../types/delivery';
-export { ReleaseDetailSkeleton } from './release-detail-skeleton';

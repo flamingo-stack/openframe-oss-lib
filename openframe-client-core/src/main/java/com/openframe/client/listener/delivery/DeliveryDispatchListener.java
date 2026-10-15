@@ -1,7 +1,8 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.delivery.LocalDeliverySink;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.dispatch.DeliveryDispatchMessage;
@@ -45,13 +46,14 @@ public class DeliveryDispatchListener {
             groupId = "${openframe.delivery.dispatch-group}",
             containerFactory = DeliveryDispatchListenerConfiguration.CONTAINER_FACTORY)
     public void onDispatch(DeliveryDispatchMessage message) {
+        metrics.recordDispatchReceived();
         if (!isComplete(message)) {
             reject(REJECTED_INCOMPLETE, message, null);
             return;
         }
         try {
             dispatchLocally(message);
-        } catch (IllegalArgumentException malformed) {
+        } catch (IllegalArgumentException | JacksonException malformed) {
             reject(REJECTED_MALFORMED, message, malformed);
         }
     }

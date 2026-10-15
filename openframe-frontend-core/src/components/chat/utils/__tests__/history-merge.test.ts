@@ -1583,3 +1583,93 @@ describe('computeHistoryPrepend after a window slide', () => {
     expect(ids(result.newMessages)).toEqual(['cccc0001', 'cccc0002', 'cccc0003']);
   });
 });
+
+describe('ticket lifecycle receipts (standalone TICKET_EVENT rows)', () => {
+  // A dialog Fae never answered this session (e.g. a ticket opened from the
+  // header button): every receipt lands in ONE live bubble, whose streamSeq
+  // follows the newest receipt.
+  const receipt = (kind: string, streamSeq?: number): MessageSegment => ({
+    type: 'ticket_event',
+    data: { kind, actorName: 'Admin' },
+    ...(streamSeq !== undefined ? { streamSeq } : {}),
+  });
+  const kinds = (msgs: TestMessage[]) =>
+    msgs
+      .flatMap(m => (Array.isArray(m.content) ? m.content : []))
+      .flatMap(s => (s.type === 'ticket_event' ? [s.data.kind] : []));
+
+  const U: TestMessage = { id: 'dddd0001', role: 'user', content: 'Printer is down', timestamp: t(100) };
+  const persistedReceipt = (n: number, kind: string, seq: number): TestMessage => ({
+    id: `dddd000${n}`,
+    role: 'assistant',
+    content: [receipt(kind, seq)],
+    timestamp: t(100 + n),
+    streamSeq: seq,
+  });
+
+  it('renders a receipt once when history persisted it but not the newer one in the same bubble', () => {
+    const live: TestMessage[] = [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: [receipt('RESOLVED', 10), receipt('REOPENED', 11)],
+        timestamp: t(5_000),
+        streamSeq: 11,
+      },
+    ];
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U, persistedReceipt(2, 'RESOLVED', 10)],
+      existingMessages: live,
+      streamingMessageId: null,
+      historyFetchedAt: 6_000,
+      historyMaxStreamSeq: 10,
+    });
+    expect(kinds(merged)).toEqual(['RESOLVED', 'REOPENED']);
+    expect(ids(merged)).toEqual(['dddd0001', 'dddd0002', 'assistant-1']);
+  });
+
+  it('keeps a repeated resolve whose seq differs from the persisted one', () => {
+    const live: TestMessage[] = [
+      {
+        id: 'assistant-1',
+        role: 'assistant',
+        content: [receipt('RESOLVED', 10), receipt('REOPENED', 11), receipt('RESOLVED', 12)],
+        timestamp: t(5_000),
+        streamSeq: 12,
+      },
+    ];
+    const merged = mergeHistoryWithRealtime({
+      processedHistory: [U, persistedReceipt(2, 'RESOLVED', 10)],
+      existingMessages: live,
+      streamingMessageId: null,
+      historyFetchedAt: 6_000,
+      historyMaxStreamSeq: 10,
+    });
+    expect(kinds(merged)).toEqual(['RESOLVED', 'REOPENED', 'RESOLVED']);
+  });
+
+  it('drops a kept bubble whose receipts are all persisted, but never the streaming one', () => {
+    // Unstamped bubble minted after the fetch: wall-clock keeps it whole.
+    const stale: TestMessage = {
+      id: 'assistant-1',
+      role: 'assistant',
+      content: [receipt('RESOLVED', 10)],
+      timestamp: t(7_000),
+    };
+    const history = [U, persistedReceipt(2, 'RESOLVED', 10)];
+    const base = { processedHistory: history, historyFetchedAt: 6_000, historyMaxStreamSeq: 10 };
+
+    expect(ids(mergeHistoryWithRealtime({ ...base, existingMessages: [stale], streamingMessageId: null }))).toEqual([
+      'dddd0001',
+      'dddd0002',
+    ]);
+
+    const streaming = mergeHistoryWithRealtime({
+      ...base,
+      existingMessages: [stale],
+      streamingMessageId: 'assistant-1',
+    });
+    expect(ids(streaming)).toEqual(['dddd0001', 'dddd0002', 'assistant-1']);
+    expect(kinds(streaming)).toEqual(['RESOLVED']);
+  });
+});

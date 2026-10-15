@@ -1,6 +1,7 @@
 package com.openframe.delivery.sweep;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
@@ -62,7 +63,7 @@ class DeliverySweepServiceTest {
     private static final String CORRUPT_JSON = "not-json";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long TEN_SECONDS = 10L;
-    private static final long FIRST_RETRY_DELAY = ACK_THRESHOLD * BACKOFF_MULTIPLIER;
+    private static final long FIRST_RETRY_DELAY = (long) (ACK_THRESHOLD * BACKOFF_MULTIPLIER);
     private static final long CLOCK_SLACK_SECONDS = 5L;
     private static final int MANY_ATTEMPTS_ALLOWED = 10;
     private static final int ATTEMPTS_PAST_CAP = 5;
@@ -90,7 +91,7 @@ class DeliverySweepServiceTest {
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();
-        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new DeliveryPayloadJson(new ObjectMapper()));
+        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new DeliveryPayloadJson(new JsonMapper()), new RetryBackoff());
     }
 
     @Test

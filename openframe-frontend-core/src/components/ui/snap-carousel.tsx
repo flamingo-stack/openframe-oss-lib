@@ -3,6 +3,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useAutoplay } from '../../hooks/ui/use-autoplay';
 import { useInView } from '../../hooks/ui/use-in-view';
+import { useResumableTimeout } from '../../hooks/ui/use-resumable-timeout';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
@@ -39,20 +40,31 @@ export interface SnapCarouselProps<T> {
 const GAP_PX = 12;
 
 /**
- * The active dot filling up while the carousel waits to advance. A transition,
- * not a keyframe animation: it mounts empty and is told to be full one frame
- * later, taking the whole interval to get there.
+ * The active dot's fill: how much of the slide's wait has been run. It starts
+ * from where the wait stands (`ranMs`, nothing for a new slide) and runs to
+ * full over what is LEFT of it. While the carousel is not advancing it stands
+ * still at that point; it never empties because the carousel left the screen.
  */
-function DotFill({ durationMs }: { durationMs: number }) {
-  const [full, setFull] = useState(false);
+function DotFill({ durationMs, ranMs, running }: { durationMs: number; ranMs: number; running: boolean }) {
+  // One frame at the starting point, so the browser has it to run from.
+  const [going, setGoing] = useState(false);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setFull(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
+    if (!running) return undefined;
+    const frame = requestAnimationFrame(() => setGoing(true));
+    return () => {
+      cancelAnimationFrame(frame);
+      setGoing(false);
+    };
+  }, [running]);
+  const moving = running && going;
   return (
     <span
-      className="absolute inset-0 origin-left bg-ods-text-primary transition-transform ease-linear"
-      style={{ transform: full ? 'scaleX(1)' : 'scaleX(0)', transitionDuration: `${durationMs}ms` }}
+      className="absolute inset-0 origin-left bg-ods-text-primary ease-linear"
+      style={{
+        transform: `scaleX(${moving ? 1 : durationMs > 0 ? ranMs / durationMs : 0})`,
+        transitionProperty: moving ? 'transform' : 'none',
+        transitionDuration: `${Math.max(0, durationMs - ranMs)}ms`,
+      }}
     />
   );
 }
@@ -122,12 +134,15 @@ export function SnapCarousel<T>({
   const canAutoAdvance = autoAdvanceMs > 0 && count > 1;
   const playing = auto.playing && canAutoAdvance;
 
-  // Restarts on every slide change, so a swipe or an arrow is followed by a full interval.
-  useEffect(() => {
-    if (!playing) return undefined;
-    const timer = setTimeout(() => goTo(index >= count - 1 ? 0 : index + 1), autoAdvanceMs);
-    return () => clearTimeout(timer);
-  }, [playing, index, count, autoAdvanceMs, goTo]);
+  // A new slide starts a whole interval (a swipe or an arrow is followed by a
+  // full one); an interruption (off screen, a hold, another tab) only pauses it.
+  const ranMs = useResumableTimeout({
+    running: playing,
+    durationMs: autoAdvanceMs,
+    resetKey: index,
+    onElapsed: () => goTo(index >= count - 1 ? 0 : index + 1),
+  });
+  const showsWait = canAutoAdvance && !auto.reducedMotion;
 
   const setRefs = useCallback(
     (node: HTMLDivElement | null) => {
@@ -172,12 +187,13 @@ export function SnapCarousel<T>({
               className={cn(
                 'relative h-1.5 overflow-hidden rounded-full transition-[width] duration-200 motion-reduce:transition-none',
                 dotIndex === index ? 'w-6' : 'w-1.5',
-                dotIndex === index && !playing ? 'bg-ods-text-primary' : 'bg-ods-border',
+                // A carousel that never advances by itself marks its slide with a whole dot.
+                dotIndex === index && !showsWait ? 'bg-ods-text-primary' : 'bg-ods-border',
               )}
             >
-              {dotIndex === index && playing && (
-                // Re-keyed per slide so the fill restarts from empty.
-                <DotFill key={index} durationMs={autoAdvanceMs} />
+              {dotIndex === index && showsWait && (
+                // Re-keyed per slide so a NEW slide starts from empty; a pause keeps its place.
+                <DotFill key={index} durationMs={autoAdvanceMs} ranMs={ranMs} running={playing} />
               )}
             </span>
           ))}

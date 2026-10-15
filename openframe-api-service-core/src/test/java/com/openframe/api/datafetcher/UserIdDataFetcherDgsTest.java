@@ -3,7 +3,8 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
-import com.netflix.graphql.dgs.autoconfig.DgsAutoConfiguration;
+import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
@@ -46,7 +47,7 @@ class UserIdDataFetcherDgsTest {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({DgsAutoConfiguration.class, RelayAutoConfiguration.class})
+    @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class, RelayAutoConfiguration.class})
     @Import({UserIdDataFetcher.class, RelayUserNodeQueries.class})
     static class RelayUserNodeGraphQlApp {
     }

@@ -1,6 +1,6 @@
 package com.openframe.kafka.model.debezium;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.openframe.kafka.model.KafkaMessage;
 import lombok.Data;
 import lombok.NoArgsConstructor;

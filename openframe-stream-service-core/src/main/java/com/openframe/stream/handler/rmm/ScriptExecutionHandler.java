@@ -1,6 +1,6 @@
 package com.openframe.stream.handler.rmm;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
@@ -187,7 +187,7 @@ public class ScriptExecutionHandler implements MessageHandler<DeserializedDebezi
 
     private static String stringOrNull(JsonNode node, String field) {
         JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
+        return v == null || v.isNull() ? null : v.asString();
     }
 
     private static Integer intOrNull(JsonNode node, String field) {

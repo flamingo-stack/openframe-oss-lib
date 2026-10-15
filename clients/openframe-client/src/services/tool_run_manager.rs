@@ -69,20 +69,41 @@ async fn shutdown_break(
 
 #[derive(Clone, Default)]
 pub(crate) struct ClientUpdatePendingFlag {
-    since: Arc<RwLock<Option<std::time::Instant>>>,
+    since: Arc<std::sync::Mutex<Option<std::time::Instant>>>,
 }
 
 impl ClientUpdatePendingFlag {
-    pub(crate) async fn mark(&self) {
-        *self.since.write().await = Some(std::time::Instant::now());
+    pub(crate) fn mark(&self) {
+        *self.since() = Some(std::time::Instant::now());
     }
 
-    pub(crate) async fn is_pending(&self, ttl: Duration) -> bool {
-        matches!(*self.since.read().await, Some(since) if since.elapsed() < ttl)
+    pub(crate) fn is_pending(&self, ttl: Duration) -> bool {
+        matches!(*self.since(), Some(since) if since.elapsed() < ttl)
     }
 
-    pub(crate) async fn clear(&self) {
-        *self.since.write().await = None;
+    pub(crate) fn clear(&self) {
+        *self.since() = None;
+    }
+
+    pub(crate) fn view(&self) -> ClientUpdatePending {
+        ClientUpdatePending(self.clone())
+    }
+
+    fn since(&self) -> std::sync::MutexGuard<'_, Option<std::time::Instant>> {
+        self.since
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+#[derive(Clone)]
+pub struct ClientUpdatePending(ClientUpdatePendingFlag);
+
+impl ClientUpdatePending {
+    pub fn is_pending(&self) -> bool {
+        self.0.is_pending(Duration::from_secs(
+            crate::config::update_config::CLIENT_UPDATE_PENDING_TTL_SECS,
+        ))
     }
 }
 
@@ -212,21 +233,21 @@ impl ToolRunManager {
         Ok(())
     }
 
-    pub async fn mark_client_update_pending(&self) {
-        self.client_update_pending.mark().await;
+    pub fn mark_client_update_pending(&self) {
+        self.client_update_pending.mark();
         info!("Client update pending: new tool operations will be parked");
     }
 
-    pub async fn is_client_update_pending(&self) -> bool {
-        self.client_update_pending
-            .is_pending(Duration::from_secs(
-                crate::config::update_config::CLIENT_UPDATE_PENDING_TTL_SECS,
-            ))
-            .await
+    pub fn is_client_update_pending(&self) -> bool {
+        self.client_update_pending.view().is_pending()
     }
 
-    pub async fn clear_client_update_pending(&self) {
-        self.client_update_pending.clear().await;
+    pub fn client_update_pending(&self) -> ClientUpdatePending {
+        self.client_update_pending.view()
+    }
+
+    pub fn clear_client_update_pending(&self) {
+        self.client_update_pending.clear();
         info!("Client update no longer pending: parked tool operations released");
     }
 
@@ -446,10 +467,7 @@ impl ToolRunManager {
                         }
                     };
 
-                debug!(
-                    "Running tool {} with args: {:?}",
-                    tool.tool_agent_id, processed_args
-                );
+                debug!("Running tool {}", tool.tool_agent_id);
 
                 let command_path = params_processor
                     .directory_manager

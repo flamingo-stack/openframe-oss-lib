@@ -4,6 +4,7 @@
  */
 
 import type { ChatRef } from '../chat-ref.types';
+import type { QuickActionIconSpec } from '../quick-action-chip';
 import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types';
 
 // ========== Message Type Definitions ==========
@@ -370,6 +371,34 @@ export type ContextCompactionSegment = {
   summary?: string;
 };
 
+/** One prompt a `suggestions` block offers: the chip shows `label`, and
+ *  picking it hands `prompt` (absent: the label) to be sent. `icon` is a
+ *  quick-action icon (a spec or a node). */
+export type SuggestionPrompt = {
+  label: string;
+  prompt?: string;
+  icon?: ReactNode | QuickActionIconSpec;
+};
+
+/** A titled row of prompts in a `suggestions` block (e.g. "Diagnose"). */
+export type SuggestionGroup = {
+  label: string;
+  prompts: SuggestionPrompt[];
+};
+
+/**
+ * Prompts the assistant offers as chips, grouped under captions, with an
+ * optional line under them. Never on the wire: a host builds it locally (the
+ * "What to ask?" answer, see `useWhatToAsk`). Picking a chip calls `onPick`;
+ * without one, inside an `EmbeddableChat` the prompt is sent in its open chat.
+ */
+export type SuggestionsSegment = {
+  type: 'suggestions';
+  groups: SuggestionGroup[];
+  note?: string;
+  onPick?: (prompt: string) => void;
+};
+
 export type MessageSegment =
   | TextSegment
   | ThinkingSegment
@@ -381,7 +410,8 @@ export type MessageSegment =
   | TicketEscalatedSegment
   | TicketEventSegment
   | ErrorSegment
-  | ContextCompactionSegment;
+  | ContextCompactionSegment
+  | SuggestionsSegment;
 
 export type MessageContent = string | MessageSegment[];
 
