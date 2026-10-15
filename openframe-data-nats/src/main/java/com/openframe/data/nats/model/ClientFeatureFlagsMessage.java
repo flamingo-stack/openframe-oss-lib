@@ -1,5 +1,6 @@
 package com.openframe.data.nats.model;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
 import lombok.Data;
@@ -11,5 +12,5 @@ import java.util.Map;
 public class ClientFeatureFlagsMessage implements DeliveryPayload {
 
     private DeliveryRef delivery;
-    private Map<String, Boolean> flags;
+    private Map<String, ClientFeatureFlag> flags;
 }

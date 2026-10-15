@@ -47,6 +47,12 @@ interface RadioGroupBlockOption {
   disabled?: boolean;
   /** Optional trailing slot rendered at the end of the row (e.g. a discount tag) */
   trailing?: ReactNode;
+  /**
+   * Optional content under the option's row, inside the option and across its
+   * full width (e.g. the fields the option needs on a narrow screen). Rendered
+   * as given, with no wrapper, so a footer hidden at some widths leaves no gap.
+   */
+  footer?: ReactNode;
 }
 
 interface RadioGroupBlockProps extends Omit<ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>, 'children'> {
@@ -99,42 +105,9 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
             const itemId = `${props.name ?? 'radio-block'}-${option.value}`;
             const isDisabled = disabled || option.disabled;
             const isLast = index === options.length - 1;
-            return (
-              <label
-                key={option.value}
-                htmlFor={itemId}
-                aria-disabled={isDisabled || undefined}
-                className={cn(
-                  'flex w-full items-center gap-3',
-                  isHorizontal && 'min-w-0 flex-1',
-                  'transition-colors duration-200',
-                  isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
-                  // Hover / active move the BACKGROUND only, like Input and
-                  // CheckboxBlock — the border stays put so an unselected row
-                  // never flashes "selected" under the cursor.
-                  !isDisabled && 'hover:bg-ods-bg-hover active:bg-ods-bg-active',
-                  isGrouped
-                    ? cn(
-                        'bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]',
-                        !isLast && (isHorizontal ? 'border-r' : 'border-b'),
-                        error ? 'border-ods-error' : 'border-ods-border',
-                      )
-                    : cn(
-                        'rounded-[6px] border bg-ods-card p-[var(--spacing-system-sf)]',
-                        !isDisabled &&
-                          'has-[[data-state=checked]]:bg-[var(--ods-system-greys-soft-grey)]/30 has-[[data-state=checked]]:border-ods-accent/40',
-                        error ? 'border-ods-error' : 'border-ods-border',
-                      ),
-                  // Disabled matches a disabled field: flat `ods-bg` fill and
-                  // greyed text, not a fade of the whole row. The greying lives
-                  // on the TEXT COLUMN below, not here: as a descendant rule on
-                  // the row it also repainted whatever `trailing` renders — a
-                  // `Tag`'s label is a span too, and it went invisible against
-                  // its own fill.
-                  isDisabled && 'bg-ods-bg',
-                  itemClassName,
-                )}
-              >
+            const hasFooter = option.footer != null;
+            const row = (
+              <>
                 <RadioGroupPrimitive.Item
                   id={itemId}
                   value={option.value}
@@ -186,6 +159,48 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   )}
                 </div>
                 {option.trailing && <div className="ml-auto flex shrink-0 items-center">{option.trailing}</div>}
+              </>
+            );
+            return (
+              <label
+                key={option.value}
+                htmlFor={itemId}
+                aria-disabled={isDisabled || undefined}
+                className={cn(
+                  'flex w-full items-center gap-3',
+                  isHorizontal && 'min-w-0 flex-1',
+                  'transition-colors duration-200',
+                  isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
+                  // Hover / active move the BACKGROUND only, like Input and
+                  // CheckboxBlock — the border stays put so an unselected row
+                  // never flashes "selected" under the cursor.
+                  !isDisabled && 'hover:bg-ods-bg-hover active:bg-ods-bg-active',
+                  isGrouped
+                    ? cn(
+                        'bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]',
+                        !isLast && (isHorizontal ? 'border-r' : 'border-b'),
+                        error ? 'border-ods-error' : 'border-ods-border',
+                      )
+                    : cn(
+                        'rounded-[6px] border bg-ods-card p-[var(--spacing-system-sf)]',
+                        !isDisabled &&
+                          'has-[[data-state=checked]]:bg-[var(--ods-system-greys-soft-grey)]/30 has-[[data-state=checked]]:border-ods-accent/40',
+                        error ? 'border-ods-error' : 'border-ods-border',
+                      ),
+                  // Disabled matches a disabled field: flat `ods-bg` fill and
+                  // greyed text, not a fade of the whole row. The greying lives
+                  // on the TEXT COLUMN below, not here: as a descendant rule on
+                  // the row it also repainted whatever `trailing` renders — a
+                  // `Tag`'s label is a span too, and it went invisible against
+                  // its own fill.
+                  isDisabled && 'bg-ods-bg',
+                  // With a footer the option stacks: its row, then the footer.
+                  hasFooter && 'flex-col items-stretch gap-[var(--spacing-system-sf)]',
+                  itemClassName,
+                )}
+              >
+                {hasFooter ? <div className="flex w-full items-center gap-[var(--spacing-system-sf)]">{row}</div> : row}
+                {option.footer}
               </label>
             );
           })}

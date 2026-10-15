@@ -68,6 +68,8 @@ export interface DeviceSelectorProps<T extends DeviceRow = DeviceRow> {
   devices: T[];
   /** Whether the device list is loading. */
   loading: boolean;
+  /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
+  loadingRegion?: boolean;
   /**
    * Currently selected device keys. Optional so a skeleton can render the real
    * picker with nothing selected, the component falls back to an empty set and

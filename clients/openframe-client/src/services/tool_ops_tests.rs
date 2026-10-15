@@ -60,6 +60,18 @@ async fn any_busy_follows_every_tool() {
 }
 
 #[tokio::test]
+async fn a_busy_tools_view_follows_ops_started_after_it() {
+    let ops = ToolOps::default();
+    let view = ops.busy_tools();
+
+    let op = ops.lock(TOOL).await.mark_busy();
+    assert!(view.any());
+
+    drop(op);
+    assert!(!view.any());
+}
+
+#[tokio::test]
 async fn waiting_lock_sees_the_flag_cleared() {
     let ops = ToolOps::default();
     let op = ops.lock(TOOL).await.mark_busy();

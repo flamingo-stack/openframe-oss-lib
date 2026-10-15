@@ -8,4 +8,6 @@ import java.util.List;
 public interface CustomUserRepository {
 
     List<User> findUsersBySearch(UserQueryFilter filter, int limit);
+
+    List<User> findUserPageAfter(UserQueryFilter filter, UserSortKey after, int limit);
 }

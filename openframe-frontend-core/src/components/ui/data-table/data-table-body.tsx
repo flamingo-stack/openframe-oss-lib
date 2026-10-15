@@ -3,6 +3,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
+import { LoadingRegion } from '../../loading/loading-region';
 import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
@@ -19,6 +20,11 @@ export interface DataTableBodyProps<T = unknown> {
   emptyState?: NoDataProps;
   /** Skeleton row count when loading. Default `10`. */
   skeletonRows?: number;
+  /**
+   * The loading state announces itself (`LoadingRegion`: aria-busy plus one "Loading results" status).
+   * `false` when the table sits inside a loading region of its own (a page skeleton). Default `true`.
+   */
+  loadingRegion?: boolean;
   className?: string;
   /**
    * Per-row class name. Prefer `useCallback` for function form to avoid
@@ -95,6 +101,7 @@ export function DataTableBody<T = unknown>({
   emptyMessage,
   emptyState,
   skeletonRows = 10,
+  loadingRegion = true,
   className,
   rowClassName,
   compact,
@@ -121,13 +128,13 @@ export function DataTableBody<T = unknown>({
 
   if (loading && !hasRows) {
     return (
-      <div className={cn(ROW_STACK_CLASSES, className)}>
+      <LoadingRegion label="Loading results" announce={loadingRegion} className={cn(ROW_STACK_CLASSES, className)}>
         <DataTableSkeleton
           rows={skeletonRows}
           className={skeletonRowClassName}
           rowHeightClassName={rowHeightClassName}
         />
-      </div>
+      </LoadingRegion>
     );
   }
 

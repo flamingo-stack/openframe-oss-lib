@@ -6,6 +6,7 @@ import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { PlatformBadge } from '../../features/platform-badge';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { CONTENT_CARD_FRAME_CLASS } from './content-card-frame';
 
 interface PlatformInfo {
@@ -84,7 +85,7 @@ export function AdminContentCard({
       <div className="relative aspect-[3/2] w-full shrink-0 overflow-hidden" style={{ backgroundColor: imageBgColor }}>
         {displayUrl ? (
           <>
-            {!imageLoaded && <div className="absolute inset-0 animate-pulse bg-ods-border/20" />}
+            {!imageLoaded && <UnifiedSkeleton className="absolute inset-0 h-full rounded-none" />}
             <Image
               src={displayUrl}
               alt={title}

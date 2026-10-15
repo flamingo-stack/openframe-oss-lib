@@ -94,6 +94,7 @@ function CustomerCell({ device }: { device: DeviceRow }) {
 export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   devices,
   loading,
+  loadingRegion,
   selectedIds: selectedIdsProp,
   onSelectionChange: onSelectionChangeProp,
   getDeviceKey: getDeviceKeyProp,
@@ -708,6 +709,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
       )}
       <DataTable.Body
         loading={loading}
+        loadingRegion={loadingRegion}
         skeletonRows={8}
         emptyMessage={
           isCriteria

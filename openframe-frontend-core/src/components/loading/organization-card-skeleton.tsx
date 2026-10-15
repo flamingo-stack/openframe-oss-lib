@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from './loading-region';
 import { OrganizationIconSkeleton } from './organization-icon-skeleton';
 import { TextSkeleton, MediaSkeleton } from './unified-skeleton';
 
@@ -47,8 +48,6 @@ export function OrganizationCardSkeleton({
         'flex h-full flex-col overflow-hidden rounded-lg',
         className,
       )}
-      role="status"
-      aria-label="Loading organization card"
     >
       <div className="flex flex-col gap-3 p-4">
         {/* Header Section - Row layout matching OrganizationCard/VendorCard */}
@@ -123,12 +122,15 @@ export function OrganizationCardSkeleton({
  * - Desktop (xl): 3 columns
  */
 export function OrganizationCardSkeletonGrid({
+  region = true,
   count = 12,
   className,
   containerClassName,
   showFooter = true,
   showDescription = true,
 }: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   count?: number;
   className?: string;
   containerClassName?: string;
@@ -136,10 +138,10 @@ export function OrganizationCardSkeletonGrid({
   showDescription?: boolean;
 }) {
   return (
-    <div
+    <LoadingRegion
+      label="Loading organizations"
+      announce={region}
       className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6 content-lg:grid-cols-3', className)}
-      role="status"
-      aria-label={`Loading ${count} organization cards`}
     >
       {Array.from({ length: count }, (_, index) => (
         <OrganizationCardSkeleton
@@ -149,6 +151,6 @@ export function OrganizationCardSkeletonGrid({
           showDescription={showDescription}
         />
       ))}
-    </div>
+    </LoadingRegion>
   );
 }

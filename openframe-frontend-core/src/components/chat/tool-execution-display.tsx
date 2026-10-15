@@ -69,6 +69,11 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     const isConciseRemoteRead = !message.integratedToolType && !!previewText && argEntries.length === 0 && !hasResult;
     const isStaticRow = isClientView || isConciseRemoteRead;
     const hasBody = argEntries.length > 0 || hasResult || isExecuting;
+    // A run with no arguments and no result has nothing behind a chevron either:
+    // its header stays, with no chevron and no click target, so the row never
+    // opens onto an empty box. (A run still executing has a body: its live
+    // "Result:" placeholder.)
+    const isExpanded = expanded && hasBody;
 
     const renderStatusIcon = () => {
       if (isExecuting) return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
@@ -96,7 +101,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
             'min-w-0 flex-1 text-h6',
             isClientView
               ? 'whitespace-pre-wrap break-words text-ods-text-primary'
-              : expanded
+              : isExpanded
                 ? 'whitespace-pre-wrap break-all text-ods-text-primary'
                 : 'line-clamp-2 max-h-10 break-all text-ods-text-secondary',
           )}
@@ -104,9 +109,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           {previewText}
         </div>
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">{renderStatusIcon()}</div>
-        {!isStaticRow && (
+        {!isStaticRow && hasBody && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <ExpandChevron expanded={expanded} />
+            <ExpandChevron expanded={isExpanded} />
           </div>
         )}
       </>
@@ -135,13 +140,19 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           </div>
         ) : (
           <>
-            <button
-              type="button"
-              className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left"
-              onClick={() => setExpanded(prev => !prev)}
-            >
-              {headerContent}
-            </button>
+            {hasBody ? (
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left"
+                onClick={() => setExpanded(prev => !prev)}
+              >
+                {headerContent}
+              </button>
+            ) : (
+              <div className="flex w-full items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left">
+                {headerContent}
+              </div>
+            )}
 
             <div className="w-full" style={containerStyle}>
               <div ref={innerRef}>
