@@ -24,15 +24,16 @@ public class CustomInvitationRepositoryImpl implements CustomInvitationRepositor
     private static final String FIELD_EMAIL = "email";
     private static final String FIELD_STATUS = "status";
     private static final String FIELD_EXPIRES_AT = "expiresAt";
+    private static final String FIELD_ROLES = "roles";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String REGEX_FLAG_CASE_INSENSITIVE = "i";
 
     private final MongoTemplate mongoTemplate;
 
     @Override
-    public List<Invitation> findOpenInvitationsPage(Boolean expired, Instant now, String search, String cursor,
+    public List<Invitation> findOpenInvitationsPage(InvitationListFilter filter, Instant now, String cursor,
                                                     int limit) {
-        List<Criteria> criteria = listCriteria(expired, now, search);
+        List<Criteria> criteria = listCriteria(filter, now);
         InvitationPageCursor.parse(cursor).map(CustomInvitationRepositoryImpl::after).ifPresent(criteria::add);
         Query query = new Query(new Criteria().andOperator(criteria))
                 .with(Sort.by(Sort.Order.desc(FIELD_CREATED_AT), Sort.Order.desc(FIELD_ID)))
@@ -42,22 +43,25 @@ public class CustomInvitationRepositoryImpl implements CustomInvitationRepositor
     }
 
     @Override
-    public long countOpenInvitations(Boolean expired, Instant now, String search) {
-        return mongoTemplate.count(new Query(new Criteria().andOperator(listCriteria(expired, now, search))),
+    public long countOpenInvitations(InvitationListFilter filter, Instant now) {
+        return mongoTemplate.count(new Query(new Criteria().andOperator(listCriteria(filter, now))),
                 Invitation.class);
     }
 
-    private static List<Criteria> listCriteria(Boolean expired, Instant now, String search) {
+    private static List<Criteria> listCriteria(InvitationListFilter filter, Instant now) {
         List<Criteria> criteria = new ArrayList<>();
         criteria.add(Criteria.where(FIELD_STATUS).is(InvitationStatus.PENDING));
-        if (expired != null) {
-            criteria.add(expired
+        if (filter.expired() != null) {
+            criteria.add(filter.expired()
                     ? Criteria.where(FIELD_EXPIRES_AT).lt(now)
                     : Criteria.where(FIELD_EXPIRES_AT).gte(now));
         }
-        if (hasText(search)) {
+        if (filter.roles() != null && !filter.roles().isEmpty()) {
+            criteria.add(Criteria.where(FIELD_ROLES).in(filter.roles()));
+        }
+        if (hasText(filter.search())) {
             criteria.add(Criteria.where(FIELD_EMAIL)
-                    .regex(Pattern.quote(search.trim()), REGEX_FLAG_CASE_INSENSITIVE));
+                    .regex(Pattern.quote(filter.search().trim()), REGEX_FLAG_CASE_INSENSITIVE));
         }
         return criteria;
     }

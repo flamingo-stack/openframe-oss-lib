@@ -11,7 +11,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -26,6 +25,7 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     private static final String FIELD_FIRST_NAME = "firstName";
     private static final String FIELD_LAST_NAME = "lastName";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_ROLES = "roles";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String REGEX_FLAG_CASE_INSENSITIVE = "i";
 
@@ -41,9 +41,8 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     }
 
     @Override
-    public List<User> findUsersPage(Collection<UserStatus> statuses, Collection<String> excludeIds, String search,
-                                    String cursor, int limit) {
-        List<Criteria> criteria = listCriteria(statuses, excludeIds, search);
+    public List<User> findUsersPage(UserListFilter filter, String cursor, int limit) {
+        List<Criteria> criteria = listCriteria(filter);
         UserPageCursor.parse(cursor).ifPresent(after -> criteria.add(new Criteria().orOperator(
                 Criteria.where(FIELD_EMAIL).gt(after.email()),
                 new Criteria().andOperator(
@@ -57,18 +56,22 @@ public class CustomUserRepositoryImpl implements CustomUserRepository {
     }
 
     @Override
-    public long countUsers(Collection<UserStatus> statuses, Collection<String> excludeIds, String search) {
-        return mongoTemplate.count(toQuery(listCriteria(statuses, excludeIds, search)), User.class);
+    public long countUsers(UserListFilter filter) {
+        return mongoTemplate.count(toQuery(listCriteria(filter)), User.class);
     }
 
-    private List<Criteria> listCriteria(Collection<UserStatus> statuses, Collection<String> excludeIds, String search) {
+    private List<Criteria> listCriteria(UserListFilter filter) {
         List<Criteria> criteria = new ArrayList<>();
-        if (statuses != null && !statuses.isEmpty()) {
-            criteria.add(Criteria.where(FIELD_STATUS).in(statuses));
+        if (filter.statuses() != null && !filter.statuses().isEmpty()) {
+            criteria.add(Criteria.where(FIELD_STATUS).in(filter.statuses()));
         }
-        if (excludeIds != null && !excludeIds.isEmpty()) {
-            criteria.add(Criteria.where(FIELD_ID).nin(excludeIds));
+        if (filter.roles() != null && !filter.roles().isEmpty()) {
+            criteria.add(Criteria.where(FIELD_ROLES).in(filter.roles()));
         }
+        if (filter.excludeIds() != null && !filter.excludeIds().isEmpty()) {
+            criteria.add(Criteria.where(FIELD_ID).nin(filter.excludeIds()));
+        }
+        String search = filter.search();
         if (hasText(search)) {
             for (String token : search.trim().split("\\s+")) {
                 String pattern = Pattern.quote(token);

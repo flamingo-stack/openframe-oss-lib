@@ -17,6 +17,7 @@ import com.openframe.core.exception.BaseException;
 import com.openframe.core.validation.ValidEmail;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
+import com.openframe.data.repository.user.InvitationListFilter;
 import com.openframe.data.repository.user.InvitationPageCursor;
 import com.openframe.data.repository.user.InvitationRepository;
 import com.openframe.notification.mail.service.EmailService;
@@ -36,6 +37,8 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import static com.openframe.data.document.user.UserRole.grantedFor;
 
 @Service
 @RequiredArgsConstructor
@@ -156,11 +159,13 @@ public class InvitationService {
     public CountedGenericQueryResult<InvitationResponse> queryInvitations(InvitationFilterInput filter, String search,
                                                                          CursorPaginationCriteria pagination) {
         CursorPaginationCriteria page = pagination.normalize();
-        Boolean expired = filter != null ? filter.expiredOnly() : null;
+        InvitationListFilter listFilter = filter == null
+                ? new InvitationListFilter(null, null, search)
+                : new InvitationListFilter(filter.expiredOnly(), grantedFor(filter.getRoles()), search);
         Instant now = Instant.now();
-        long filteredCount = invitationRepository.countOpenInvitations(expired, now, search);
+        long filteredCount = invitationRepository.countOpenInvitations(listFilter, now);
         List<Invitation> raw = invitationRepository.findOpenInvitationsPage(
-                expired, now, search, page.getCursor(), page.getLimit() + 1);
+                listFilter, now, page.getCursor(), page.getLimit() + 1);
         boolean hasNextPage = raw.size() > page.getLimit();
         List<InvitationResponse> items = (hasNextPage ? raw.subList(0, page.getLimit()) : raw).stream()
                 .map(invitationMapper::toResponse)

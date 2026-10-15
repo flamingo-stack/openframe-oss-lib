@@ -3,6 +3,7 @@ package com.openframe.data.repository.user;
 import com.openframe.data.document.user.Invitation;
 import com.openframe.data.document.user.InvitationStatus;
 import com.openframe.data.document.user.User;
+import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,7 @@ class UserListQueryTest {
 
     private static final String USER_ID = "3f0c2a52-8a51-4d55-9c3b-0f6b7c9d2e11";
     private static final Instant NOW = Instant.ofEpochMilli(1_760_000_000_000L);
+    private static final InvitationListFilter NO_INVITATION_FILTER = new InvitationListFilter(null, null, null);
 
     private final MongoTemplate template = mock(MongoTemplate.class);
     private final CustomUserRepositoryImpl users = new CustomUserRepositoryImpl(template);
@@ -33,7 +35,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: sorted by email asc / _id asc, limited, continued after the (email, id) cursor")
     void usersArePagedByEmailThenId() {
-        users.findUsersPage(null, null, null, UserPageCursor.of("jane_doe@acme.io", USER_ID), 21);
+        users.findUsersPage(new UserListFilter(null, null, null, null), UserPageCursor.of("jane_doe@acme.io", USER_ID), 21);
 
         Query query = captured(User.class);
         assertThat(query.getLimit()).isEqualTo(21);
@@ -50,7 +52,8 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: statuses become $in, and every search word must match a name or a non-placeholder email")
     void usersFilterByStatusAndEverySearchWord() {
-        users.findUsersPage(List.of(UserStatus.ACTIVE, UserStatus.DELETED), null, "  Jane   Doe ", null, 21);
+        users.findUsersPage(
+                new UserListFilter(List.of(UserStatus.ACTIVE, UserStatus.DELETED), null, null, "  Jane   Doe "), null, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(3);
@@ -67,7 +70,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: no filter, no search and no cursor query the whole tenant")
     void usersWithoutConstraintsHaveAnEmptyFilter() {
-        users.findUsersPage(List.of(), List.of(), " ", null, 21);
+        users.findUsersPage(new UserListFilter(List.of(), List.of(), List.of(), " "), null, 21);
 
         assertThat(captured(User.class).getQueryObject()).isEmpty();
     }
@@ -75,7 +78,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("users: excluded ids become a $nin on _id")
     void usersLeaveOutExcludedIds() {
-        users.findUsersPage(List.of(UserStatus.ACTIVE), List.of(USER_ID), null, null, 21);
+        users.findUsersPage(new UserListFilter(List.of(UserStatus.ACTIVE), null, List.of(USER_ID), null), null, 21);
 
         List<Document> and = and(captured(User.class));
         assertThat(and).hasSize(2);
@@ -83,9 +86,20 @@ class UserListQueryTest {
     }
 
     @Test
+    @DisplayName("users: granted roles become $in on roles")
+    void usersFilterByRole() {
+        users.findUsersPage(new UserListFilter(null, List.of(UserRole.ADMIN, UserRole.OWNER), null, null), null, 21);
+
+        List<Document> and = and(captured(User.class));
+        assertThat(and).hasSize(1);
+        assertThat(and.getFirst().get("roles"))
+                .isEqualTo(new Document("$in", List.of(UserRole.ADMIN, UserRole.OWNER)));
+    }
+
+    @Test
     @DisplayName("users: the count applies the filter and search but no position")
     void usersCountHasNoPosition() {
-        users.countUsers(List.of(UserStatus.ACTIVE), null, "jane");
+        users.countUsers(new UserListFilter(List.of(UserStatus.ACTIVE), null, null, "jane"));
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).count(captor.capture(), eq(User.class));
@@ -100,7 +114,7 @@ class UserListQueryTest {
     void invitationsArePagedByCreatedAtThenId() {
         Instant createdAt = Instant.ofEpochMilli(1_750_000_000_000L);
 
-        invitations.findOpenInvitationsPage(null, NOW, null, InvitationPageCursor.of(createdAt, "inv-1"), 21);
+        invitations.findOpenInvitationsPage(NO_INVITATION_FILTER, NOW, InvitationPageCursor.of(createdAt, "inv-1"), 21);
 
         Query query = captured(Invitation.class);
         assertThat(query.getLimit()).isEqualTo(21);
@@ -122,7 +136,7 @@ class UserListQueryTest {
     @Test
     @DisplayName("invitations: past a cursor without createdAt only the rest of that group follows")
     void invitationsAfterACursorWithoutCreatedAt() {
-        invitations.findOpenInvitationsPage(null, NOW, null, InvitationPageCursor.of(null, "inv-1"), 21);
+        invitations.findOpenInvitationsPage(NO_INVITATION_FILTER, NOW, InvitationPageCursor.of(null, "inv-1"), 21);
 
         List<?> tie = (List<?>) and(captured(Invitation.class)).get(1).get("$and");
         assertThat((Document) tie.get(0)).containsEntry("createdAt", null);
@@ -132,13 +146,25 @@ class UserListQueryTest {
     @Test
     @DisplayName("invitations: expired compares expiresAt with now, pending the other way round")
     void invitationsSplitIntoPendingAndExpiredAtNow() {
-        invitations.countOpenInvitations(true, NOW, null);
-        invitations.countOpenInvitations(false, NOW, null);
+        invitations.countOpenInvitations(new InvitationListFilter(true, null, null), NOW);
+        invitations.countOpenInvitations(new InvitationListFilter(false, null, null), NOW);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template, times(2)).count(captor.capture(), eq(Invitation.class));
         assertThat(and(captor.getAllValues().get(0)).get(1).get("expiresAt")).isEqualTo(new Document("$lt", NOW));
         assertThat(and(captor.getAllValues().get(1)).get(1).get("expiresAt")).isEqualTo(new Document("$gte", NOW));
+    }
+
+    @Test
+    @DisplayName("invitations: granted roles become $in on roles, next to the PENDING status")
+    void invitationsFilterByRole() {
+        invitations.countOpenInvitations(new InvitationListFilter(null, List.of(UserRole.ADMIN), null), NOW);
+
+        ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
+        verify(template).count(captor.capture(), eq(Invitation.class));
+        List<Document> and = and(captor.getValue());
+        assertThat(and).hasSize(2);
+        assertThat(and.get(1).get("roles")).isEqualTo(new Document("$in", List.of(UserRole.ADMIN)));
     }
 
     @Test

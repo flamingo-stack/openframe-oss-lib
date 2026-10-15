@@ -9,10 +9,9 @@ public interface CustomInvitationRepository {
 
     /**
      * PENDING invitations ordered by {@code (createdAt desc, _id desc)}, starting after {@code cursor}
-     * (an {@link InvitationPageCursor}). {@code expired}: {@code true} keeps those past {@code expiresAt}
-     * at {@code now}, {@code false} those not yet past it, {@code null} both. {@code search} matches the email.
+     * (an {@link InvitationPageCursor}); expiry is judged at {@code now}.
      */
-    List<Invitation> findOpenInvitationsPage(Boolean expired, Instant now, String search, String cursor, int limit);
+    List<Invitation> findOpenInvitationsPage(InvitationListFilter filter, Instant now, String cursor, int limit);
 
-    long countOpenInvitations(Boolean expired, Instant now, String search);
+    long countOpenInvitations(InvitationListFilter filter, Instant now);
 }

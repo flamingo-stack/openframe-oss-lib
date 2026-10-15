@@ -11,6 +11,8 @@ import com.openframe.data.repository.organization.CustomOrganizationRepositoryIm
 import com.openframe.data.repository.tool.CustomIntegratedToolRepositoryImpl;
 import com.openframe.data.repository.user.CustomInvitationRepositoryImpl;
 import com.openframe.data.repository.user.CustomUserRepositoryImpl;
+import com.openframe.data.repository.user.InvitationListFilter;
+import com.openframe.data.repository.user.UserListFilter;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -128,7 +130,7 @@ class SearchInputQuotingTest {
     @DisplayName("users page search: name and email clauses quote each search word")
     void userPageSearchIsQuoted() {
         MongoTemplate template = mock(MongoTemplate.class);
-        new CustomUserRepositoryImpl(template).findUsersPage(null, null, HOSTILE, null, 10);
+        new CustomUserRepositoryImpl(template).findUsersPage(new UserListFilter(null, null, null, HOSTILE), null, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(User.class));
@@ -139,7 +141,8 @@ class SearchInputQuotingTest {
     @DisplayName("invitations page search: the email clause quotes the input")
     void invitationPageSearchIsQuoted() {
         MongoTemplate template = mock(MongoTemplate.class);
-        new CustomInvitationRepositoryImpl(template).findOpenInvitationsPage(null, Instant.now(), HOSTILE, null, 10);
+        new CustomInvitationRepositoryImpl(template)
+                .findOpenInvitationsPage(new InvitationListFilter(null, null, HOSTILE), Instant.now(), null, 10);
 
         ArgumentCaptor<Query> captor = ArgumentCaptor.forClass(Query.class);
         verify(template).find(captor.capture(), eq(Invitation.class));

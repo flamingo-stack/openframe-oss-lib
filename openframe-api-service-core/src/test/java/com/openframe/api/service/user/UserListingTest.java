@@ -21,7 +21,9 @@ import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
+import com.openframe.data.repository.user.InvitationListFilter;
 import com.openframe.data.repository.user.InvitationRepository;
+import com.openframe.data.repository.user.UserListFilter;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.notification.mail.service.EmailService;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +40,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static com.openframe.api.dto.invitation.InvitationStatus.EXPIRED;
 import static com.openframe.api.dto.invitation.InvitationStatus.PENDING;
@@ -75,8 +78,9 @@ class UserListingTest {
     @DisplayName("users: one extra row decides hasNextPage, cursors follow (email, id), the count is the filtered total")
     void usersPage() {
         List<UserStatus> statuses = List.of(UserStatus.ACTIVE);
-        when(userRepository.countUsers(statuses, List.of("u0"), "jane")).thenReturn(7L);
-        when(userRepository.findUsersPage(statuses, List.of("u0"), "jane", "a@acme.io_u0", 3))
+        UserListFilter listFilter = new UserListFilter(statuses, Set.of(), List.of("u0"), "jane");
+        when(userRepository.countUsers(listFilter)).thenReturn(7L);
+        when(userRepository.findUsersPage(listFilter, "a@acme.io_u0", 3))
                 .thenReturn(List.of(user("u1", "b@acme.io"), user("u2", "c@acme.io"), user("u3", "d@acme.io")));
 
         CountedGenericQueryResult<UserResponse> page = userService().queryUsers(
@@ -96,8 +100,9 @@ class UserListingTest {
     @Test
     @DisplayName("users: the last page has no next page and an empty page has no cursors")
     void usersLastAndEmptyPage() {
-        when(userRepository.countUsers(null, null, null)).thenReturn(1L, 0L);
-        when(userRepository.findUsersPage(null, null, null, null, 21))
+        UserListFilter unfiltered = new UserListFilter(null, null, null, null);
+        when(userRepository.countUsers(unfiltered)).thenReturn(1L, 0L);
+        when(userRepository.findUsersPage(unfiltered, null, 21))
                 .thenReturn(List.of(user("u1", "b@acme.io")), List.of());
 
         CountedGenericQueryResult<UserResponse> last =
@@ -109,6 +114,22 @@ class UserListingTest {
         assertThat(last.getPageInfo().isHasPreviousPage()).isFalse();
         assertThat(empty.getItems()).isEmpty();
         assertThat(empty.getPageInfo().getEndCursor()).isNull();
+    }
+
+    @Test
+    @DisplayName("users: a role filter asks for the granted roles, so ADMIN finds the owners too")
+    void usersRoleFilterMatchesEffectiveRoles() {
+        when(userRepository.findUsersPage(any(), any(), anyInt())).thenReturn(List.of());
+
+        for (List<UserRole> roles : List.of(List.of(UserRole.ADMIN), List.of(UserRole.OWNER), List.<UserRole>of())) {
+            userService().queryUsers(UserFilterInput.builder().roles(roles).build(), null,
+                    CursorPaginationCriteria.builder().build());
+        }
+
+        ArgumentCaptor<UserListFilter> filters = ArgumentCaptor.forClass(UserListFilter.class);
+        verify(userRepository, times(3)).findUsersPage(filters.capture(), any(), anyInt());
+        assertThat(filters.getAllValues()).extracting(UserListFilter::roles).containsExactly(
+                Set.of(UserRole.ADMIN, UserRole.OWNER), Set.of(UserRole.OWNER), Set.of());
     }
 
     @Test
@@ -128,25 +149,40 @@ class UserListingTest {
     @Test
     @DisplayName("invitations: PENDING and EXPIRED narrow by expiry, both or none keep every open invitation")
     void invitationStatusFilter() {
-        when(invitationRepository.countOpenInvitations(any(), any(), any())).thenReturn(0L);
-        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), any(), anyInt())).thenReturn(List.of());
+        when(invitationRepository.countOpenInvitations(any(), any())).thenReturn(0L);
+        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), anyInt())).thenReturn(List.of());
 
         for (InvitationFilterInput filter : Arrays.asList(
                 filter(EXPIRED), filter(PENDING), filter(PENDING, EXPIRED), filter(), null)) {
             invitationService().queryInvitations(filter, null, CursorPaginationCriteria.builder().build());
         }
 
-        ArgumentCaptor<Boolean> expired = ArgumentCaptor.forClass(Boolean.class);
-        verify(invitationRepository, times(5)).findOpenInvitationsPage(expired.capture(), any(), any(), any(), eq(21));
-        assertThat(expired.getAllValues()).containsExactly(true, false, null, null, null);
+        ArgumentCaptor<InvitationListFilter> filters = ArgumentCaptor.forClass(InvitationListFilter.class);
+        verify(invitationRepository, times(5)).findOpenInvitationsPage(filters.capture(), any(), any(), eq(21));
+        assertThat(filters.getAllValues()).extracting(InvitationListFilter::expired)
+                .containsExactly(true, false, null, null, null);
+    }
+
+    @Test
+    @DisplayName("invitations: a role filter asks for the granted roles")
+    void invitationRoleFilter() {
+        when(invitationRepository.findOpenInvitationsPage(any(), any(), any(), anyInt())).thenReturn(List.of());
+
+        invitationService().queryInvitations(InvitationFilterInput.builder().roles(List.of(UserRole.ADMIN)).build(),
+                null, CursorPaginationCriteria.builder().build());
+
+        ArgumentCaptor<InvitationListFilter> filter = ArgumentCaptor.forClass(InvitationListFilter.class);
+        verify(invitationRepository).findOpenInvitationsPage(filter.capture(), any(), any(), anyInt());
+        assertThat(filter.getValue().roles()).isEqualTo(Set.of(UserRole.ADMIN, UserRole.OWNER));
     }
 
     @Test
     @DisplayName("invitations: one extra row decides hasNextPage, the status is computed, cursors follow (createdAt, id)")
     void invitationsPage() {
         Instant createdAt = Instant.ofEpochMilli(1_750_000_000_000L);
-        when(invitationRepository.countOpenInvitations(any(), any(), eq("acme"))).thenReturn(2L);
-        when(invitationRepository.findOpenInvitationsPage(any(), any(), eq("acme"), any(), eq(2)))
+        InvitationListFilter acme = new InvitationListFilter(null, null, "acme");
+        when(invitationRepository.countOpenInvitations(eq(acme), any())).thenReturn(2L);
+        when(invitationRepository.findOpenInvitationsPage(eq(acme), any(), any(), eq(2)))
                 .thenReturn(List.of(invitation("inv-2", createdAt), invitation("inv-1", createdAt.minusSeconds(60))));
 
         CountedGenericQueryResult<InvitationResponse> page = invitationService().queryInvitations(

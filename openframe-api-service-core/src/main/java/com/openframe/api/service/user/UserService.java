@@ -17,6 +17,7 @@ import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.repository.auth.SsoIdentityRepository;
+import com.openframe.data.repository.user.UserListFilter;
 import com.openframe.data.repository.user.UserPageCursor;
 import com.openframe.data.repository.user.UserRepository;
 import com.openframe.notification.mail.service.EmailService;
@@ -35,6 +36,7 @@ import java.util.Optional;
 
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static com.openframe.data.document.user.UserRole.OWNER;
+import static com.openframe.data.document.user.UserRole.grantedFor;
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
 import static com.openframe.data.document.user.UserStatus.DELETED;
 import static com.openframe.data.document.user.UserStatus.SELF_DELETED;
@@ -82,10 +84,12 @@ public class UserService {
     public CountedGenericQueryResult<UserResponse> queryUsers(UserFilterInput filter, String search,
                                                              CursorPaginationCriteria pagination) {
         CursorPaginationCriteria page = pagination.normalize();
-        List<UserStatus> statuses = filter != null ? filter.getStatuses() : null;
-        List<String> excludeIds = filter != null ? filter.getExcludeIds() : null;
-        long filteredCount = userRepository.countUsers(statuses, excludeIds, search);
-        List<User> raw = userRepository.findUsersPage(statuses, excludeIds, search, page.getCursor(), page.getLimit() + 1);
+        UserListFilter listFilter = filter == null
+                ? new UserListFilter(null, null, null, search)
+                : new UserListFilter(filter.getStatuses(), grantedFor(filter.getRoles()), filter.getExcludeIds(),
+                        search);
+        long filteredCount = userRepository.countUsers(listFilter);
+        List<User> raw = userRepository.findUsersPage(listFilter, page.getCursor(), page.getLimit() + 1);
         boolean hasNextPage = raw.size() > page.getLimit();
         List<UserResponse> items = toResponses(hasNextPage ? raw.subList(0, page.getLimit()) : raw);
         return CountedGenericQueryResult.<UserResponse>builder()

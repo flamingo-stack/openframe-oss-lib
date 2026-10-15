@@ -87,6 +87,8 @@ enum UserRole {
 input UserFilterInput {
     "Omit or leave empty for every status."
     statuses: [UserStatus!]
+    "Effective roles, so ADMIN matches the owners too. Omit or leave empty for every role."
+    roles: [UserRole!]
     "Users to leave out, e.g. yourself in a picker of someone to hand something over to."
     excludeIds: [ID!]
 }
@@ -124,6 +126,8 @@ enum InvitationStatus {
 input InvitationFilterInput {
     "Omit or leave empty for both."
     statuses: [InvitationStatus!]
+    "The roles the invitee gets. Omit or leave empty for every role."
+    roles: [UserRole!]
 }
 
 type InvitationConnection {

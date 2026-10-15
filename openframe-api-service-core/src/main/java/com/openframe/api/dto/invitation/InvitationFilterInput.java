@@ -1,5 +1,6 @@
 package com.openframe.api.dto.invitation;
 
+import com.openframe.data.document.user.UserRole;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,6 +15,9 @@ import java.util.List;
 public class InvitationFilterInput {
     /** PENDING and/or EXPIRED; empty means both. */
     private List<InvitationStatus> statuses;
+
+    /** The roles the invitee gets; empty means any. */
+    private List<UserRole> roles;
 
     /** {@code true}: only expired, {@code false}: only pending, {@code null}: both. */
     public Boolean expiredOnly() {

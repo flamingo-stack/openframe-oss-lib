@@ -61,6 +61,7 @@ public class UserDataFetcher {
         }
         return UserFilterInput.builder()
                 .statuses(filter.getStatuses())
+                .roles(filter.getRoles())
                 .excludeIds(relayIdCodec.decodeAll(filter.getExcludeIds(), USER))
                 .build();
     }
