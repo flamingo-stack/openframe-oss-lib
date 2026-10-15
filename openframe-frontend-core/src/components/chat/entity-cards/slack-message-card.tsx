@@ -14,6 +14,7 @@ import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { SlackIcon } from '../../icons-v2-generated/brand-logos/slack-icon';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import type { SlackMessageItem } from '../types/entities/slack-message';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -160,31 +161,31 @@ export function SlackMessageCardSkeleton({
 }) {
   if (variant === 'row') {
     return (
-      <div className={`flex min-w-0 animate-pulse items-center gap-3 ${className ?? ''}`}>
-        <div className="h-3.5 w-3.5 shrink-0 rounded bg-ods-bg" />
-        <div className="h-3 w-32 shrink-0 rounded bg-ods-bg" />
-        <div className="h-3 w-2/3 flex-1 rounded bg-ods-bg/60" />
-        <div className="h-3 w-24 shrink-0 rounded bg-ods-bg/60" />
-        <div className="h-3 w-20 shrink-0 rounded bg-ods-bg/60" />
+      <div className={`flex min-w-0 items-center gap-3 ${className ?? ''}`}>
+        <UnifiedSkeleton className="h-3.5 w-3.5 shrink-0 rounded" />
+        <UnifiedSkeleton className="h-3 w-32 shrink-0 rounded" />
+        <UnifiedSkeleton className="h-3 w-2/3 flex-1 rounded" />
+        <UnifiedSkeleton className="h-3 w-24 shrink-0 rounded" />
+        <UnifiedSkeleton className="h-3 w-20 shrink-0 rounded" />
       </div>
     );
   }
   return (
     <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+      <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
       <span className={COMPACT_CARD_TEXT_COL}>
         <span className={COMPACT_CARD_TITLE_ROW}>
-          <span className="h-3.5 w-2/3 rounded bg-ods-bg" />
+          <UnifiedSkeleton as="span" className="h-3.5 w-2/3 rounded" />
         </span>
         <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className="h-3 w-5/6 rounded bg-ods-bg/60" />
+          <UnifiedSkeleton as="span" className="h-3 w-5/6 rounded" />
         </span>
         <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className="h-3 w-1/3 rounded bg-ods-bg/70" />
+          <UnifiedSkeleton as="span" className="h-3 w-1/3 rounded" />
         </span>
       </span>
       <span className="flex h-5 shrink-0 items-center self-start">
-        <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
+        <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
       </span>
     </span>
   );

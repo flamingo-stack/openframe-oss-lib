@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { type ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../../utils/cn';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
-import { Skeleton } from '../../ui/skeleton';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Tag } from '../../ui/tag';
 import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag';
 
@@ -72,14 +72,14 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
         >
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
             {/* title line */}
-            <Skeleton className="h-5 w-1/2" />
+            <UnifiedSkeleton className="h-5 w-1/2" />
             {/* subtitle line */}
-            <Skeleton className="h-4 w-1/3" />
+            <UnifiedSkeleton className="h-4 w-1/3" />
           </div>
           {/* status tag */}
-          <Skeleton className="h-8 w-20 shrink-0 rounded-r-md" />
+          <UnifiedSkeleton className="h-8 w-20 shrink-0 rounded-r-md" />
           {/* chevron box */}
-          <Skeleton className="size-12 shrink-0 rounded-md" />
+          <UnifiedSkeleton className="size-12 shrink-0 rounded-md" />
         </div>
       );
     }

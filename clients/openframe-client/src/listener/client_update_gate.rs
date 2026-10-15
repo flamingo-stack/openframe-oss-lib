@@ -14,7 +14,7 @@ pub async fn park_or_dispatch<F, Fut>(
     F: FnOnce(Message) -> Fut + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
-    if !manager.is_client_update_pending().await {
+    if !manager.is_client_update_pending() {
         dispatch(message).await;
         return;
     }
@@ -25,7 +25,7 @@ pub async fn park_or_dispatch<F, Fut>(
     );
 
     tokio::spawn(async move {
-        while manager.is_client_update_pending().await {
+        while manager.is_client_update_pending() {
             if let Err(e) = message.ack_with(AckKind::Progress).await {
                 warn!(
                     "Failed to send Progress ack for parked {}: {} — abandoning park, redelivery takes over",

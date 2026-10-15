@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,8 +13,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,7 +20,8 @@ import static org.mockito.Mockito.when;
 class OpenFrameClientConfigurationServiceTest {
 
     private static final String TENANT_ID = "tenant-1";
-    private static final Map<String, Boolean> FLAGS = Map.of("delivery-tool-installation", true);
+    private static final String FLAG = "delivery-tool-installation";
+    private static final Map<String, ClientFeatureFlag> FLAGS = Map.of(FLAG, new ClientFeatureFlag(true, "1.6.0"));
 
     @Mock private OpenFrameClientConfigurationRepository repository;
     @Mock private TenantIdProvider tenantIdProvider;
@@ -38,39 +38,39 @@ class OpenFrameClientConfigurationServiceTest {
     }
 
     @Test
-    void updateFeatureFlags_documentWithoutFlagsYet_flagsStoredAndReportedMoved() {
+    void haveFeatureFlagsMoved_documentWithoutFlagsYet_moved() {
+        // execution + verifications
+        assertThat(service.haveFeatureFlagsMoved(FLAGS)).isTrue();
+    }
+
+    @Test
+    void haveFeatureFlagsMoved_sameFlags_notMoved() {
+        // setup
+        configuration.setFeatureFlags(Map.of(FLAG, new ClientFeatureFlag(true, "1.6.0")));
+
+        // execution + verifications
+        assertThat(service.haveFeatureFlagsMoved(FLAGS)).isFalse();
+    }
+
+    @Test
+    void haveFeatureFlagsMoved_onlyMinVersionRaised_moved() {
+        // setup
+        configuration.setFeatureFlags(Map.of(FLAG, new ClientFeatureFlag(true, "1.5.0")));
+
+        // execution + verifications
+        assertThat(service.haveFeatureFlagsMoved(FLAGS)).isTrue();
+    }
+
+    @Test
+    void updateFeatureFlags_flagsStored() {
+        // setup
+        configuration.setFeatureFlags(Map.of(FLAG, new ClientFeatureFlag(false, null)));
+
         // execution
-        boolean moved = service.updateFeatureFlags(FLAGS);
+        service.updateFeatureFlags(FLAGS);
 
         // verifications
-        assertThat(moved).isTrue();
         assertThat(configuration.getFeatureFlags()).isEqualTo(FLAGS);
         verify(repository).save(configuration);
-    }
-
-    @Test
-    void updateFeatureFlags_sameFlags_nothingSavedNotMoved() {
-        // setup
-        configuration.setFeatureFlags(Map.of("delivery-tool-installation", true));
-
-        // execution
-        boolean moved = service.updateFeatureFlags(FLAGS);
-
-        // verifications
-        assertThat(moved).isFalse();
-        verify(repository, never()).save(any());
-    }
-
-    @Test
-    void updateFeatureFlags_oneFlagFlipped_storedAndMoved() {
-        // setup
-        configuration.setFeatureFlags(Map.of("delivery-tool-installation", false));
-
-        // execution
-        boolean moved = service.updateFeatureFlags(FLAGS);
-
-        // verifications
-        assertThat(moved).isTrue();
-        assertThat(configuration.getFeatureFlags()).containsEntry("delivery-tool-installation", true);
     }
 }

@@ -26,6 +26,18 @@ class DeliveryMetricsTest {
     }
 
     @Test
+    void recordDispatchReceived_everyCall_countedWithoutTags() {
+        // execution
+        metrics.recordDispatchReceived();
+        metrics.recordDispatchReceived();
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.dispatch.received").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(2.0);
+    }
+
+    @Test
     void timeSweepPass_bodyCompletes_timerTaggedOk() {
         // setup
         Runnable body = () -> { };

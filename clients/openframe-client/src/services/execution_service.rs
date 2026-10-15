@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::models::{ExecutionRequest, RmmResult};
@@ -8,14 +10,48 @@ use crate::models::PrivilegePolicy;
 use crate::{executor::Privilege, models::PrivilegeLevel};
 
 #[derive(Clone, Default)]
-pub struct ExecutionService;
+pub struct ExecutionService {
+    running: Arc<AtomicUsize>,
+}
+
+struct Running(Arc<AtomicUsize>);
+
+#[derive(Clone)]
+pub struct RunningScripts(Arc<AtomicUsize>);
+
+impl RunningScripts {
+    pub fn any(&self) -> bool {
+        self.0.load(Ordering::Acquire) > 0
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
 
 impl ExecutionService {
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    pub fn running_scripts(&self) -> RunningScripts {
+        RunningScripts(self.running.clone())
+    }
+
+    fn track(&self) -> Running {
+        self.running.fetch_add(1, Ordering::AcqRel);
+        Running(self.running.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn running_for_tests(&self) -> impl Drop {
+        self.track()
     }
 
     pub async fn execute(&self, req: &ExecutionRequest<'_>, machine_id: &str) -> RmmResult {
+        let _running = self.track();
         let start = Instant::now();
 
         #[cfg(any(unix, windows))]

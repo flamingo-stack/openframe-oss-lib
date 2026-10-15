@@ -39,6 +39,7 @@ export const DEMO_DEVICES = {
   buildServer: { id: 'device-build', hostname: 'BUILD-SRV-01', os: 'LINUX', organization: 'acme' },
   jenSurface: { id: 'device-jen', hostname: 'JEN-SURFACE', os: 'WINDOWS', organization: 'acme' },
   priyaXps: { id: 'device-priya', hostname: 'PRIYA-XPS', os: 'WINDOWS', organization: 'northbridge' },
+  warehouse: { id: 'device-warehouse', hostname: 'WAREHOUSE-PC03', os: 'WINDOWS', organization: 'acme' },
 } as const;
 
 /**
@@ -46,6 +47,12 @@ export const DEMO_DEVICES = {
  * and never drifts between the server and the browser.
  */
 export const DEMO_NOW = '2026-10-06T14:05:00.000Z';
+
+/** The demo day as a local calendar day, so a date field reads the same in every timezone. */
+export function demoDay(): Date {
+  const [year, month, day] = DEMO_NOW.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
 
 /** An instant `minutes` before {@link DEMO_NOW}. */
 export function demoMinutesAgo(minutes: number): string {

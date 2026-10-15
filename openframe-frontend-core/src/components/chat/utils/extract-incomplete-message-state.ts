@@ -134,12 +134,14 @@ export function extractIncompleteMessageState(
       //   outside MESSAGE_START/END — there is no agent turn to continue.
       // - `error` ended the turn; resuming it would re-open a bubble the
       //   backend has already abandoned.
+      // - `suggestions` is built locally by the host and never comes from a turn.
       case 'text':
       case 'thinking':
       case 'ask':
       case 'ticket_escalated':
       case 'ticket_event':
       case 'error':
+      case 'suggestions':
         break;
 
       default: {

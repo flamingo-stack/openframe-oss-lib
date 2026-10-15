@@ -3,6 +3,7 @@ mod auth;
 mod healthcheck;
 mod install;
 mod permissions;
+mod restart;
 mod uninstall;
 
 use crate::doctor::healing::{HealOutcome, HealResult};
@@ -14,6 +15,8 @@ use clap::{Args, Parser, Subcommand};
 use std::process;
 
 use tokio::runtime::Runtime;
+
+pub const RESTART_SERVICE_SUBCOMMAND: &str = "restart-service";
 
 #[derive(Parser)]
 #[command(name = "openframe-client", author, version = env!("OPENFRAME_VERSION"), about, long_about = None)]
@@ -80,6 +83,9 @@ enum Commands {
     CheckPermissions,
     /// Run environment health check (reads config from installed agent)
     Doctor,
+    /// Stop and start the client service (run detached by the client to apply feature flags)
+    #[command(hide = true, name = RESTART_SERVICE_SUBCOMMAND)]
+    RestartService,
 }
 
 /// Parse CLI arguments and run the requested OpenFrame client command.
@@ -97,6 +103,7 @@ pub fn run() -> Result<()> {
         Some(Commands::Run) => agent::run_direct(&rt),
         Some(Commands::RunAsService) => agent::run_as_service(),
         Some(Commands::CheckPermissions) => permissions::run(),
+        Some(Commands::RestartService) => restart::run(&rt),
         None => agent::run_legacy(&rt),
     }
 

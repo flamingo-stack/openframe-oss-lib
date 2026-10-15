@@ -78,7 +78,7 @@ impl OpenFrameClientUpdateService {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
 
-        self.tool_run_manager.mark_client_update_pending().await;
+        self.tool_run_manager.mark_client_update_pending();
 
         if self.tool_ops.any_busy() {
             warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
@@ -123,7 +123,7 @@ impl OpenFrameClientUpdateService {
                 "Already running version {}, ignoring update request",
                 canonical_version
             );
-            self.tool_run_manager.clear_client_update_pending().await;
+            self.tool_run_manager.clear_client_update_pending();
             return Ok(());
         }
 
@@ -148,7 +148,7 @@ impl OpenFrameClientUpdateService {
                             "refusing downgrade to {} — anchored at {}",
                             requested_version, anchor
                         );
-                        self.tool_run_manager.clear_client_update_pending().await;
+                        self.tool_run_manager.clear_client_update_pending();
                         return Ok(());
                     }
                     Ok(_) => {}
@@ -262,7 +262,7 @@ impl OpenFrameClientUpdateService {
             binary_bytes.len()
         );
 
-        self.tool_run_manager.mark_client_update_pending().await;
+        self.tool_run_manager.mark_client_update_pending();
 
         // 3. Extract binary
         update_state.set_phase(UpdatePhase::Extracting);
@@ -433,7 +433,7 @@ impl OpenFrameClientUpdateService {
             );
         }
 
-        self.tool_run_manager.clear_client_update_pending().await;
+        self.tool_run_manager.clear_client_update_pending();
         if let Err(e) = self.tool_run_manager.resume_after_update_failure().await {
             warn!(
                 "Failed to resume tool supervision after the aborted update to {}: {:#}",

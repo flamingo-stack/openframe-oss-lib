@@ -1,8 +1,8 @@
 'use client';
 
 import { lazy, type LazyExoticComponent, Suspense } from 'react';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ProductScreenFrame, type ProductScreenFrameProps } from '../ui/product-screen-frame';
-import { Skeleton } from '../ui/skeleton';
 import { PRODUCT_SCREEN_LOADERS } from './registry';
 import { PRODUCT_SCREEN_KEYS, PRODUCT_SCREEN_LABELS, type ProductScreenKey } from './screen-keys';
 import type { ProductScreenComponent } from './types';
@@ -21,13 +21,15 @@ export const PRODUCT_SCREEN_COMPACT_HEIGHT = 300;
  * host's readable width: the device list's customer column breaks a name
  * mid-word below it, and the logs table beside its open drawer has no room
  * for the message; the software form is laid out wide so the package, the
- * schedule and the picked devices all fit the frame's height. A frame never
+ * schedule and the picked devices all fit the frame's height; the scripts
+ * screen puts a schedule's name, its timing and its repeat on one row. A frame never
  * lays such a screen out narrower.
  */
 const MIN_LAYOUT_WIDTH: Partial<Record<ProductScreenKey, number>> = {
   devices: 1120,
   logs: 1120,
   'software-update': 1400,
+  scripts: 1400,
 };
 
 /**
@@ -57,9 +59,9 @@ export function ProductScreenSkeleton({
   className,
 }: Pick<ProductScreenProps, 'compact' | 'height' | 'className'>) {
   return (
-    <Skeleton
+    <UnifiedSkeleton
       className={className}
-      style={{ height: height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT) }}
+      height={height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT)}
     />
   );
 }
@@ -86,7 +88,7 @@ export function ProductScreen({ screen, compact = false, label, height, designWi
       label={label ?? PRODUCT_SCREEN_LABELS[screen]}
       height={frameHeight}
     >
-      <Suspense fallback={<Skeleton className="h-full w-full" />}>
+      <Suspense fallback={<UnifiedSkeleton className="h-full w-full" />}>
         <Screen compact={compact} />
       </Suspense>
     </ProductScreenFrame>

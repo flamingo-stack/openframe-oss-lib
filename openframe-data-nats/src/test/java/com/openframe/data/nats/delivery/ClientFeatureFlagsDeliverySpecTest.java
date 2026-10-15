@@ -1,5 +1,6 @@
 package com.openframe.data.nats.delivery;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.nats.model.ClientFeatureFlagsMessage;
@@ -15,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ClientFeatureFlagsDeliverySpecTest {
 
     private static final String MACHINE_ID = "mach-42";
-    private static final Map<String, Boolean> FLAGS = Map.of("delivery-tool-installation", true, "delivery-client-uninstall", false);
+    private static final Map<String, ClientFeatureFlag> FLAGS = Map.of("delivery-tool-installation", new ClientFeatureFlag(true, "1.6.0"), "delivery-client-uninstall", new ClientFeatureFlag(false, null));
 
     private final ClientFeatureFlagsDeliverySpec spec = new ClientFeatureFlagsDeliverySpec();
 

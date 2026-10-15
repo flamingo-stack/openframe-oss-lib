@@ -4,6 +4,7 @@ import { Check } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef } from 'react';
 import { UnifiedSkeleton } from '../loading';
+import { LoadingRegion } from '../loading/loading-region';
 import { Badge, Input } from '../ui';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
@@ -78,32 +79,40 @@ interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
   footer?: React.ReactNode;
 }
 
-// Composed from the app-wide UnifiedSkeleton system (components/loading) —
-// the same base every other loading surface uses (bg-ods-skeleton pulse,
-// prefers-reduced-motion support, role="status" a11y). Each skeleton row
+// Composed from the app-wide UnifiedSkeleton system (components/loading),
+// announced once by its LoadingRegion. Each skeleton row
 // mirrors a LOADED option row exactly (bg-ods-bg card, p-4, icon + two
 // 20px-tall text lines + selection box) so the list never jumps on load.
-function PushButtonSelectorSkeleton({ count = 3, hasTitle }: { count?: number; hasTitle?: boolean }) {
+function PushButtonSelectorSkeleton({
+  region = true,
+  count = 3,
+  hasTitle,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  count?: number;
+  hasTitle?: boolean;
+}) {
   return (
-    <div className="space-y-3" role="status" aria-label="Loading options">
-      {hasTitle && <UnifiedSkeleton className="h-5 w-20" aria-label="Loading title" />}
+    <LoadingRegion label="Loading options" announce={region} className="space-y-3">
+      {hasTitle && <UnifiedSkeleton className="h-5 w-20" />}
       <div className="space-y-3">
         {Array.from({ length: count }, (_, i) => (
           <div key={i} className="rounded-lg border border-ods-border bg-ods-bg p-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <UnifiedSkeleton className="h-8 w-8" aria-label="Loading icon" />
+                <UnifiedSkeleton className="h-8 w-8" />
                 <div>
-                  <UnifiedSkeleton variant="text" className="mb-2 h-4 w-24" aria-label="Loading name" />
-                  <UnifiedSkeleton variant="text" className="h-4 w-36" aria-label="Loading description" />
+                  <UnifiedSkeleton variant="text" className="mb-2 h-4 w-24" />
+                  <UnifiedSkeleton variant="text" className="h-4 w-36" />
                 </div>
               </div>
-              <UnifiedSkeleton className="h-6 w-6" aria-label="Loading selection state" />
+              <UnifiedSkeleton className="h-6 w-6" />
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </LoadingRegion>
   );
 }
 
