@@ -12,6 +12,7 @@ import {
   dismissAnnouncement,
   isAnnouncementDismissed,
 } from '../utils/announcement-storage';
+import { isAnnouncementOnSurface } from '../utils/announcement-surface';
 import { getAppType } from '../utils/app-config';
 import { pickReadableTextColor } from '../utils/color-analysis';
 import { pathMatchesAny } from '../utils/path-pattern';
@@ -52,6 +53,9 @@ import { Button } from './ui/button';
  * is platform-agnostic — each server returns ITS OWN announcement via
  * currentPlatform(); the platform is never sent as a parameter.
  *
+ * The one host fact either mode takes is `surface`, where the bar is drawn: a
+ * browser leaves it at `'web'`, an app shell (desktop, mobile) passes its own.
+ *
  * Both modes: freshness is event-driven, no polling — `useSelfFetch`'s
  * visibility revalidation re-fetches on tab refocus when the held data is
  * >60s old (matching the server cache TTL by convention); idle tabs make
@@ -71,6 +75,7 @@ export function AnnouncementBar({
   initialAnnouncement,
   previewMode = false,
   dismissible = true,
+  surface = 'web',
   className,
 }: AnnouncementBarProps = {}) {
   // Namespace for the dismissal cookie/legacy keys. Next hosts inline
@@ -148,7 +153,10 @@ export function AnnouncementBar({
   // Preview always mirrors the draft directly (storage is not consulted there).
   // A page that shows the news itself (a hero's news pill) is listed in the
   // announcement's `excluded_paths` (path patterns); the bar stays collapsed there.
-  const excludedHere = pathMatchesAny(pathname, announcement?.excluded_paths);
+  // So does an announcement for other surfaces.
+  const excludedHere =
+    pathMatchesAny(pathname, announcement?.excluded_paths) ||
+    (announcement != null && !isAnnouncementOnSurface(announcement, surface));
   const expanded = previewMode
     ? announcement != null
     : announcement != null && expandedState && !dismissed && !excludedHere;
