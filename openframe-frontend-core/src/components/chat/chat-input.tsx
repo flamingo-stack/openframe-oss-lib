@@ -179,6 +179,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     onMentionQueryChange,
     onValueChange,
     startIcon,
+    endIcon,
     hideBorder,
     previewText,
     // Remaining textarea-only attrs are intentionally dropped — the editor is a
@@ -743,6 +744,8 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                 )}
               />
             </div>
+
+            {endIcon && <span className="flex h-6 shrink-0 items-center">{endIcon}</span>}
 
             <button
               type="button"
