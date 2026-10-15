@@ -10,13 +10,14 @@ describe('chatDayLabel', () => {
     expect(chatDayLabel(new Date(2026, 9, 14, 0, 0), NOW)).toBe('Yesterday');
   });
 
+  // The day itself follows the viewer's locale ("9 Oct" / "Oct 9").
   it('gives an older day as "9 Oct", with the year outside this one', () => {
-    expect(chatDayLabel(new Date(2026, 9, 9, 12), NOW)).toBe('9 Oct');
-    expect(chatDayLabel(new Date(2025, 9, 9, 12), NOW)).toBe('9 Oct 2025');
+    expect(chatDayLabel(new Date(2026, 9, 9, 12), NOW)).toMatch(/^(9 Oct|Oct 9)$/);
+    expect(chatDayLabel(new Date(2025, 9, 9, 12), NOW)).toMatch(/^(9 Oct 2025|Oct 9, 2025)$/);
   });
 
   it('reads an ISO string, and a clock slightly ahead as today', () => {
-    expect(chatDayLabel(new Date(2026, 9, 9, 12).toISOString(), NOW)).toBe('9 Oct');
+    expect(chatDayLabel(new Date(2026, 9, 9, 12).toISOString(), NOW)).toMatch(/^(9 Oct|Oct 9)$/);
     expect(chatDayLabel(new Date(2026, 9, 15, 11), NOW)).toBe('Today');
   });
 

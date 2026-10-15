@@ -1,8 +1,10 @@
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../../utils/format';
+
 /**
- * The day a chat was last active, as the page header of a chat shows it:
- * "Today", "Yesterday", "9 Oct", or "9 Oct 2025" outside the current year.
- * Local days, the same boundaries the chat lists group by. `null` for a
- * missing or unparsable timestamp, so the caller simply leaves the part out.
+ * The one rule for a chat's day caption — the chat page header ("· owner · day") and the day groups
+ * of the history lists both read it: "Today", "Yesterday", then the day in the viewer's own zone and
+ * locale ("9 Oct" / "Oct 9"), with the year when it is not this one. Local days; a time in the
+ * future counts as today. `null` for a missing or unparsable timestamp, so the caller leaves it out.
  */
 export function chatDayLabel(timestamp: Date | string | null | undefined, now: Date = new Date()): string | null {
   if (!timestamp) return null;
@@ -10,14 +12,13 @@ export function chatDayLabel(timestamp: Date | string | null | undefined, now: D
   const time = date.getTime();
   if (Number.isNaN(time)) return null;
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  // A clock a little ahead of ours still means today.
   if (time >= startOfToday) return 'Today';
   const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).getTime();
   if (time >= startOfYesterday) return 'Yesterday';
-  return new Intl.DateTimeFormat(
-    'en-GB',
-    date.getFullYear() === now.getFullYear()
-      ? { day: 'numeric', month: 'short' }
-      : { day: 'numeric', month: 'short', year: 'numeric' },
-  ).format(date);
+  return formatDateWithTimezone(
+    date,
+    VIEWER_TIMEZONE,
+    { day: 'numeric', month: 'short', year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric' },
+    { viewerLocale: true },
+  );
 }

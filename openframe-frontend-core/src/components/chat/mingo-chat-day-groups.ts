@@ -1,5 +1,5 @@
-import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import type { DialogItem } from './types/component.types';
+import { chatDayLabel } from './utils/chat-day-label';
 
 /** A dialog's time in ms, or null when it has none (or an unparseable one). */
 export function dialogTimestamp(dialog: Pick<DialogItem, 'timestamp'>): number | null {
@@ -19,17 +19,6 @@ export interface DialogDayGroup {
 /** Local midnight of the day `days` away from `date`'s (calendar arithmetic, so DST days are not 24 h). */
 function localMidnight(date: Date, days = 0): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days).getTime();
-}
-
-/** The day's caption: client-only UI in the viewer's own zone and locale. */
-function dayLabel(time: number, now: Date): string {
-  const date = new Date(time);
-  return formatDateWithTimezone(
-    date,
-    VIEWER_TIMEZONE,
-    { day: 'numeric', month: 'short', year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric' },
-    { viewerLocale: true },
-  );
 }
 
 /**
@@ -60,7 +49,7 @@ export function groupDialogsByDay(dialogs: ReadonlyArray<DialogItem>, now: Date 
       label = 'Yesterday';
     } else {
       key = `day-${localMidnight(new Date(time))}`;
-      label = dayLabel(time, now);
+      label = chatDayLabel(new Date(time), now) ?? '';
     }
     const group = groups.get(key);
     if (group) group.items.push(dialog);
