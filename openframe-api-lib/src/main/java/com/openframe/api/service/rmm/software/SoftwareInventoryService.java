@@ -90,6 +90,7 @@ public class SoftwareInventoryService {
     private final com.openframe.api.service.rmm.fleet.FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
+    private final DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -97,8 +98,11 @@ public class SoftwareInventoryService {
     @Value("${openframe.fleet.multi-tenancy.enabled}")
     private boolean fleetMultiTenancyEnabled;
 
-    @Value("${openframe.rmm.software.fleet-paging.enabled:false}")
+    @Value("${openframe.rmm.software.fleet-paging.enabled}")
     private boolean fleetPaging;
+
+    @Value("${openframe.features.software-read-model.enabled}")
+    private boolean softwareReadModel;
 
     private FleetMdmClient fleet;
 
@@ -350,6 +354,11 @@ public class SoftwareInventoryService {
                                                               String search, int page, Integer perPage,
                                                               SortInput sort) {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
+        if (softwareReadModel) {
+            List<SoftwareResponse> rows = deviceSoftwareReadModelQuery
+                    .rowsForDevice(tenantIdProvider.getTenantId(), machineId, filter, search);
+            return paginateList(rows.stream().sorted(order).toList(), page, perPage);
+        }
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
         if (!fleetPaging) {
