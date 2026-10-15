@@ -61,11 +61,7 @@ fn extra_arguments_alone_are_parameterized() {
 
 fn saved_config(remote_access_mode: Option<RemoteAccessMode>) -> InitialConfiguration {
     let dir = tempfile::tempdir().unwrap();
-    let dm = DirectoryManager::with_custom_dirs(
-        dir.path().join("logs"),
-        dir.path().join("app"),
-        dir.path().join("secured"),
-    );
+    let dm = crate::test_support::directories(&dir);
     let mut p = params();
     p.server_url = Some("acme.openframe.ai".to_string());
     p.initial_key = Some("key".to_string());

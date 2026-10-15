@@ -22,7 +22,7 @@ impl RetryTiming {
     }
 
     fn next(self, delay: Duration) -> Duration {
-        (delay * 2).min(self.max)
+        delay.saturating_mul(2).min(self.max)
     }
 }
 

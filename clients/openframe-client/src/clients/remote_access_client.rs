@@ -38,7 +38,11 @@ impl RemoteAccessClient {
     /// Sets this device's remote access override; an `Err` means the call is worth retrying.
     pub async fn set_device_mode(&self, mode: RemoteAccessMode) -> Result<DeviceModeOutcome> {
         let url = format!("{}{}", self.base_url, DEVICE_MODE_PATH);
-        let token = self.config_service.get_access_token().await?;
+        let token = self
+            .config_service
+            .get_access_token()
+            .await
+            .context("Failed to get access token from configuration service")?;
 
         let response = self
             .http_client

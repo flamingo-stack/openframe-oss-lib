@@ -59,7 +59,6 @@ async fn no_pending_mode_makes_no_call() {
     let fx = fixture(server.url.clone(), None).await;
 
     assert!(fx.service.clone().start().is_none());
-    tokio::time::sleep(Duration::from_millis(50)).await;
     assert!(server.requests().is_empty());
 }
 
