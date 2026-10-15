@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp, FileText, Folder, FolderOpen } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { DEFAULT_FOLDER_INDEX_FILE as CANONICAL_FOLDER_INDEX_FILE } from '../../utils/doc-tree-nav';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface NavigationNode {
   id: string;
@@ -93,7 +94,7 @@ export function MultiLevelNavigation({
     return (
       <div className={cn('space-y-2', className)}>
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-12 animate-pulse rounded-lg bg-ods-skeleton p-3" />
+          <UnifiedSkeleton key={i} className="h-12 rounded-lg p-3" />
         ))}
       </div>
     );
@@ -241,7 +242,7 @@ export function MobileNavigationDropdown({
     return (
       <div className={cn('space-y-2', className)}>
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-10 animate-pulse rounded-lg bg-ods-skeleton p-3" />
+          <UnifiedSkeleton key={i} className="h-10 rounded-lg p-3" />
         ))}
       </div>
     );

@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from '../../embed-shims/next-link';
 import { formatLargeNumber } from '../../utils/format';
+import { renderedLinkRel } from '../../utils/markdown-link';
 import type { MediaItem as CarouselMediaItem } from '../../utils/media-carousel-utils-stub';
 import { socialCache } from '../../utils/social-embed-cache';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MediaCarousel } from '../media-carousel';
 import { RedditContainer } from './embed-container';
 import { useRichMarkdownRuntime } from './rich-markdown-runtime';
@@ -159,10 +161,13 @@ type RedditListingResponse = Array<{ data?: { children?: Array<{ data?: RedditPo
 
 interface RedditEmbedProps {
   url: string;
+  /** The `rel` the author wrote on the post's link (`nofollow` …), kept on the card's links to the post. */
+  rel?: string;
   maxWidth?: number;
 }
 
-export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
+export function RedditEmbedClient({ url, maxWidth = 700, rel }: RedditEmbedProps) {
+  const postLinkRel = renderedLinkRel(rel, true);
   const { redditProxyUrl } = useRichMarkdownRuntime();
   const [redditData, setRedditData] = useState<RedditPost | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,22 +227,22 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
   if (loading) {
     return (
       <RedditContainer>
-        <div className="animate-pulse rounded-lg border border-ods-border bg-ods-card p-6">
+        <div className="rounded-lg border border-ods-border bg-ods-card p-6">
           <div className="mb-4 flex items-center space-x-3">
-            <div className="h-12 w-12 rounded-full bg-ods-border"></div>
+            <UnifiedSkeleton className="h-12 w-12 rounded-full" />
             <div>
-              <div className="mb-2 h-4 w-32 rounded bg-ods-border"></div>
-              <div className="h-3 w-24 rounded bg-ods-border"></div>
+              <UnifiedSkeleton className="mb-2 h-4 w-32 rounded" />
+              <UnifiedSkeleton className="h-3 w-24 rounded" />
             </div>
           </div>
           <div className="mb-4 space-y-2">
-            <div className="h-4 w-full rounded bg-ods-border"></div>
-            <div className="h-4 w-3/4 rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-4 w-full rounded" />
+            <UnifiedSkeleton className="h-4 w-3/4 rounded" />
           </div>
           <div className="flex items-center space-x-4">
-            <div className="h-4 w-16 rounded bg-ods-border"></div>
-            <div className="h-4 w-16 rounded bg-ods-border"></div>
-            <div className="h-4 w-16 rounded bg-ods-border"></div>
+            <UnifiedSkeleton className="h-4 w-16 rounded" />
+            <UnifiedSkeleton className="h-4 w-16 rounded" />
+            <UnifiedSkeleton className="h-4 w-16 rounded" />
           </div>
         </div>
       </RedditContainer>
@@ -261,7 +266,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
             <Link
               href={url}
               target="_blank"
-              rel="noopener noreferrer"
+              rel={postLinkRel}
               className="inline-flex items-center space-x-2 rounded-md bg-[#FF4500] px-4 py-2 text-white transition-colors text-h6 hover:bg-[#E03D00]"
             >
               <RedditIcon />
@@ -562,7 +567,7 @@ export function RedditEmbedClient({ url, maxWidth = 700 }: RedditEmbedProps) {
           <Link
             href={url}
             target="_blank"
-            rel="noopener noreferrer"
+            rel={postLinkRel}
             className="inline-flex items-center space-x-2 text-ods-accent transition-colors text-h6 hover:opacity-80"
           >
             <ExternalLinkIcon />

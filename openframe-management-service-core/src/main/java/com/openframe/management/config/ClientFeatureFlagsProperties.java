@@ -1,5 +1,7 @@
 package com.openframe.management.config;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
+
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -13,5 +15,5 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "openframe.client")
 public class ClientFeatureFlagsProperties {
 
-    private Map<String, Boolean> featureFlags = new LinkedHashMap<>();
+    private Map<String, ClientFeatureFlag> featureFlags = new LinkedHashMap<>();
 }

@@ -11,6 +11,8 @@ export interface QueryReportTableProps {
   data: QueryResultRow[];
   /** Show skeleton loading state */
   loading?: boolean;
+  /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
+  loadingRegion?: boolean;
   /** Number of skeleton rows to display (default: 8) */
   skeletonRows?: number;
   /** Number of skeleton columns to display (default: 6) */
@@ -56,4 +58,6 @@ export interface QueryReportTableSkeletonProps {
   columnWidth: number;
   variant?: QueryReportTableVariant;
   className?: string;
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
 }

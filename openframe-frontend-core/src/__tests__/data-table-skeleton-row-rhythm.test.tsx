@@ -76,12 +76,14 @@ type SlotKind = 'row' | 'skeleton' | 'pad';
  * slot is exactly what ships in its class attribute.
  */
 function slots(container: HTMLElement): { kind: SlotKind; classes: string[] }[] {
-  return [...container.innerHTML.matchAll(/class="([^"]*\brounded-md\b[^"]*)"/g)].map(match => {
-    const classes = (match[1] ?? '').split(/\s+/);
-    const kind: SlotKind = classes.includes('animate-pulse')
-      ? 'skeleton'
-      : classes.includes('border-transparent')
-        ? 'pad'
+  // A placeholder bar (`UnifiedSkeleton`, the pulsing surface) is never a slot itself. A skeleton slot is the
+  // row card hidden from assistive technology (its region announces the loading); a pad row is transparent.
+  return [...container.querySelectorAll<HTMLElement>('.rounded-md:not(.animate-pulse)')].map(element => {
+    const classes = element.className.split(/\s+/);
+    const kind: SlotKind = classes.includes('border-transparent')
+      ? 'pad'
+      : element.getAttribute('aria-hidden') === 'true'
+        ? 'skeleton'
         : 'row';
     return { kind, classes };
   });

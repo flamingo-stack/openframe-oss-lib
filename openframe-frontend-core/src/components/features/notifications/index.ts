@@ -2,8 +2,8 @@ export { NotificationsProvider, useNotifications, useOptionalNotifications } fro
 export type { NotificationsProviderProps, NotificationsActions } from './notifications-context';
 export { NotificationDrawer } from './notification-drawer';
 export type { NotificationDrawerProps } from './notification-drawer';
-export { NotificationTile } from './notification-tile';
-export type { NotificationTileProps } from './notification-tile';
+export { NotificationTile, NotificationTileSkeleton } from './notification-tile';
+export type { NotificationTileProps, NotificationTileSkeletonProps } from './notification-tile';
 export { NotificationPopups } from './notification-popups';
 export type { NotificationPopupsProps, NotificationPopupsPosition } from './notification-popups';
 export { ApprovalRequestNotificationTile } from './approval-request-notification-tile';

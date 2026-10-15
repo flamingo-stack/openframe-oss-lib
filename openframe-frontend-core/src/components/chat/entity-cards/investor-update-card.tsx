@@ -11,6 +11,7 @@
 import { Calendar } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { formatInvestorUpdatePeriod, type InvestorUpdate } from '../types/entities/investor-update';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -52,30 +53,30 @@ export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'defau
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={`${COMPACT_CARD_TITLE_ROW} flex-nowrap gap-2`}>
-            <span className="h-3.5 w-1/2 rounded bg-ods-bg" />
-            <span className="h-4 w-8 shrink-0 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-1/2 rounded" />
+            <UnifiedSkeleton as="span" className="h-4 w-8 shrink-0 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-1/3 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-1/3 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
       </span>
     );
   }
   return (
-    <div className={`h-full animate-pulse ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
-      <div className="aspect-[1200/630] bg-ods-border" />
+    <div className={`h-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
+      <UnifiedSkeleton className="aspect-[1200/630]" />
       <div className="space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-border" />
-        <div className="h-3 w-full rounded bg-ods-border" />
-        <div className="h-3 w-4/5 rounded bg-ods-border" />
-        <div className="h-4 w-1/3 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
+        <UnifiedSkeleton className="h-3 w-full rounded" />
+        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
+        <UnifiedSkeleton className="h-4 w-1/3 rounded" />
       </div>
     </div>
   );

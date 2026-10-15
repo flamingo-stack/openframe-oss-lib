@@ -4,6 +4,7 @@ import React, { useRef, useCallback } from 'react';
 import { useOnboardingState, type OnboardingStepConfig } from '../../../hooks/ui/use-onboarding-state';
 import { cn } from '../../../utils/cn';
 import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../../layout/page-heading';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { OnboardingStepCard } from './onboarding-step-card';
 
@@ -194,7 +195,7 @@ export function OnboardingWalkthrough({
         <h2 className={SECTION_HEADING_CLASS}>{accentSentenceMarks(title)}</h2>
 
         {isLoadingCompletion ? (
-          <div className="h-[48px] w-full animate-pulse rounded-[6px] bg-ods-border md:w-[160px]" />
+          <UnifiedSkeleton className="h-[48px] w-full rounded-[6px] md:w-[160px]" />
         ) : isAllComplete ? (
           <Button variant="accent" onClick={handleDismiss} className="w-full md:w-auto">
             Close Onboarding

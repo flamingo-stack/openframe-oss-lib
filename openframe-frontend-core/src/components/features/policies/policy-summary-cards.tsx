@@ -1,8 +1,8 @@
 'use client';
 
 import { formatRelativeTimeFrom } from '../../../utils/date-utils';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { DashboardInfoCard } from '../../ui/dashboard-info-card';
-import { Skeleton } from '../../ui/skeleton';
 import type { PolicySummaryStats } from './compute-policy-summary';
 
 /** What a card shows when there is no value to show. */
@@ -31,7 +31,7 @@ export function PolicySummaryCards({ summary, isLoading = false, hasData = true,
       {isLoading ? (
         // `h-16 content-md:h-[104px]` is `DashboardInfoCard`'s own height, so the
         // grid does not jump when the real cards replace the placeholders.
-        CARD_SKELETON_KEYS.map(key => <Skeleton key={key} className="h-16 w-full content-md:h-[104px]" />)
+        CARD_SKELETON_KEYS.map(key => <UnifiedSkeleton key={key} className="h-16 w-full content-md:h-[104px]" />)
       ) : (
         <>
           <DashboardInfoCard title="Total Policies" value={hasData ? summary.totalPolicies : EMPTY_VALUE} />

@@ -1,5 +1,6 @@
 package com.openframe.data.nats.delivery;
 
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliverySeed;
@@ -15,13 +16,13 @@ public class ClientFeatureFlagsDeliverySeed implements DeliverySeed {
 
     private final DeliveryAudience audience;
     private final String machineId;
-    private final Map<String, Boolean> flags;
+    private final Map<String, ClientFeatureFlag> flags;
 
-    public static ClientFeatureFlagsDeliverySeed forMachine(String machineId, Map<String, Boolean> flags) {
+    public static ClientFeatureFlagsDeliverySeed forMachine(String machineId, Map<String, ClientFeatureFlag> flags) {
         return new ClientFeatureFlagsDeliverySeed(DeliveryAudience.MACHINE, machineId, flags);
     }
 
-    public static ClientFeatureFlagsDeliverySeed forEveryMachine(Map<String, Boolean> flags) {
+    public static ClientFeatureFlagsDeliverySeed forEveryMachine(Map<String, ClientFeatureFlag> flags) {
         return new ClientFeatureFlagsDeliverySeed(DeliveryAudience.EVERY_MACHINE, null, flags);
     }
 

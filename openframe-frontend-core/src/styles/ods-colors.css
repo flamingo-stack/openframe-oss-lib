@@ -285,8 +285,8 @@
      was byte-identical to --color-bg-card, so every `bg-ods-skeleton` pulse
      sitting on a card was invisible — it only appeared while the row's hover
      tint lightened the ground beneath it (people-hub score table, 2026-08).
-     `soft-grey` is what `ui/Skeleton` (bg-ods-border) already pulses with, so
-     the two skeleton primitives now read as one, in both themes. */
+     `soft-grey` is the border's grey too, so a skeleton reads the same on
+     every surface, in both themes. */
   --color-bg-skeleton: var(--ods-system-greys-soft-grey);
   --color-bg-surface: var(--ods-system-greys-soft-grey);
   --color-bg-surface-hover: var(--ods-system-greys-soft-grey-hover);
