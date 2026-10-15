@@ -1,95 +1,8 @@
 use super::*;
 use crate::models::InitialConfiguration;
-use crate::platform::directories::DirectoryManager;
-use crate::services::AgentConfigurationService;
-use std::collections::VecDeque;
+use crate::services::test_support::{directories, mock_server, registered_agent, wait_until, FAST};
 use std::sync::Mutex;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
-
-const FAST: RetryTiming = RetryTiming {
-    initial: Duration::from_millis(20),
-    max: Duration::from_millis(40),
-};
-
-/// Raw HTTP request as the mock server received it.
-#[derive(Debug, Clone)]
-struct Recorded {
-    request_line: String,
-    head: String,
-    body: String,
-}
-
-/// Minimal HTTP/1.1 server answering with `statuses` in order and repeating the last one.
-struct MockServer {
-    url: String,
-    requests: Arc<Mutex<Vec<Recorded>>>,
-}
-
-impl MockServer {
-    fn requests(&self) -> Vec<Recorded> {
-        self.requests.lock().unwrap().clone()
-    }
-}
-
-async fn mock_server(statuses: &[u16]) -> MockServer {
-    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let url = format!("http://{}", listener.local_addr().unwrap());
-    let requests = Arc::new(Mutex::new(Vec::new()));
-    let recorder = requests.clone();
-    let statuses = Arc::new(Mutex::new(
-        statuses.iter().copied().collect::<VecDeque<_>>(),
-    ));
-    tokio::spawn(async move {
-        while let Ok((mut socket, _)) = listener.accept().await {
-            let recorder = recorder.clone();
-            let statuses = statuses.clone();
-            tokio::spawn(async move {
-                let mut buf = vec![0u8; 8192];
-                let mut read = 0;
-                let (head_end, body_len) = loop {
-                    let n = socket.read(&mut buf[read..]).await.unwrap_or(0);
-                    read += n;
-                    let text = String::from_utf8_lossy(&buf[..read]).to_string();
-                    if let Some(end) = text.find("\r\n\r\n") {
-                        let body_len = text
-                            .to_ascii_lowercase()
-                            .lines()
-                            .find_map(|l| l.strip_prefix("content-length:"))
-                            .and_then(|v| v.trim().parse::<usize>().ok())
-                            .unwrap_or(0);
-                        if read >= end + 4 + body_len || n == 0 {
-                            break (end, body_len);
-                        }
-                    } else if n == 0 {
-                        return;
-                    }
-                };
-                let text = String::from_utf8_lossy(&buf[..read]).to_string();
-                let head = text[..head_end].to_string();
-                recorder.lock().unwrap().push(Recorded {
-                    request_line: head.lines().next().unwrap_or_default().to_string(),
-                    body: text[head_end + 4..(head_end + 4 + body_len).min(read)].to_string(),
-                    head,
-                });
-                let status = {
-                    let mut queue = statuses.lock().unwrap();
-                    if queue.len() > 1 {
-                        queue.pop_front().unwrap()
-                    } else {
-                        *queue.front().unwrap()
-                    }
-                };
-                let reply = format!(
-                    "HTTP/1.1 {status} X\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                );
-                let _ = socket.write_all(reply.as_bytes()).await;
-                let _ = socket.shutdown().await;
-            });
-        }
-    });
-    MockServer { url, requests }
-}
 
 struct Fixture {
     _dir: tempfile::TempDir,
@@ -100,11 +13,7 @@ struct Fixture {
 
 async fn fixture(base_url: String, pending: Option<&str>) -> Fixture {
     let dir = tempfile::tempdir().unwrap();
-    let dm = DirectoryManager::with_custom_dirs(
-        dir.path().join("logs"),
-        dir.path().join("app"),
-        dir.path().join("secured"),
-    );
+    let dm = directories(&dir);
     let initial = InitialConfigurationService::new(dm.clone()).unwrap();
     initial
         .save(&InitialConfiguration {
@@ -113,18 +22,13 @@ async fn fixture(base_url: String, pending: Option<&str>) -> Fixture {
             ..Default::default()
         })
         .unwrap();
-    let agent = AgentConfigurationService::new(dm.clone()).unwrap();
-    agent
-        .save_registration_data("machine".into(), "client".into(), "secret".into())
-        .await
-        .unwrap();
-    agent
-        .update_tokens("machine-token".into(), "refresh".into())
-        .await
-        .unwrap();
     let deactivation = DeactivationService::new(&dm);
     let mut service = RemoteAccessModeService::new(
-        RemoteAccessClient::new(reqwest::Client::new(), base_url, agent),
+        RemoteAccessClient::new(
+            reqwest::Client::new(),
+            base_url,
+            registered_agent(&dm).await,
+        ),
         initial.clone(),
         deactivation.clone(),
     );
@@ -147,16 +51,6 @@ async fn run_to_completion(fx: &Fixture) {
         .await
         .expect("the task settles the pending mode")
         .unwrap();
-}
-
-async fn wait_until(condition: impl Fn() -> bool) {
-    tokio::time::timeout(Duration::from_secs(5), async {
-        while !condition() {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    })
-    .await
-    .expect("condition met within the deadline");
 }
 
 #[tokio::test]

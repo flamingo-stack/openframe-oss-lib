@@ -1,31 +1,17 @@
 use std::sync::Arc;
 
-use tokio::time::{sleep, Duration};
+use tokio::task::JoinHandle;
+use tokio::time::Duration;
 use tracing::{error, info, warn};
 
 use crate::clients::{DeviceModeOutcome, RemoteAccessClient};
 use crate::models::RemoteAccessMode;
+use crate::services::backend_call_retry::{retry_until_settled, RetryTiming};
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::InitialConfigurationService;
 
 const RETRY_INITIAL: Duration = Duration::from_secs(30);
 const RETRY_MAX: Duration = Duration::from_secs(30 * 60);
-
-/// Retry delays; production values by default, shrunk in tests.
-#[derive(Debug, Clone, Copy)]
-struct RetryTiming {
-    initial: Duration,
-    max: Duration,
-}
-
-impl Default for RetryTiming {
-    fn default() -> Self {
-        Self {
-            initial: RETRY_INITIAL,
-            max: RETRY_MAX,
-        }
-    }
-}
 
 /// Forwards the install-time `--remote-access-mode` to the backend as the device override.
 pub struct RemoteAccessModeService {
@@ -45,12 +31,15 @@ impl RemoteAccessModeService {
             client,
             initial_config_service,
             deactivation,
-            timing: RetryTiming::default(),
+            timing: RetryTiming {
+                initial: RETRY_INITIAL,
+                max: RETRY_MAX,
+            },
         }
     }
 
     /// Sends a pending mode in the background until the backend settles it; no-op without one.
-    pub fn start(self: Arc<Self>) -> Option<tokio::task::JoinHandle<()>> {
+    pub fn start(self: Arc<Self>) -> Option<JoinHandle<()>> {
         let name = match self.initial_config_service.get_remote_access_mode() {
             Ok(Some(name)) => name,
             Ok(None) => return None,
@@ -74,42 +63,25 @@ impl RemoteAccessModeService {
 
     async fn apply(&self, mode: RemoteAccessMode) {
         let name = mode.wire_name();
-        let mut delay = self.timing.initial;
-        loop {
-            if self.deactivation.is_suspended() {
-                sleep(delay).await;
-                continue;
-            }
-            match self.client.set_device_mode(mode).await {
-                Ok(outcome) => {
-                    match outcome {
-                        DeviceModeOutcome::Applied => {
-                            info!("Remote access mode {} set on this device", name)
-                        }
-                        DeviceModeOutcome::NotSupported => warn!(
-                            "Backend does not support setting the remote access mode; dropping {}",
-                            name
-                        ),
-                        DeviceModeOutcome::OverrideExists => warn!(
-                            "Device already has a different remote access mode; keeping it and dropping {}",
-                            name
-                        ),
-                    }
-                    self.clear();
-                    return;
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to set remote access mode {}: {:#}. Retrying in {}s",
-                        name,
-                        e,
-                        delay.as_secs()
-                    );
-                    sleep(delay).await;
-                    delay = (delay * 2).min(self.timing.max);
-                }
-            }
+        let outcome = retry_until_settled(
+            &self.deactivation,
+            self.timing,
+            &format!("set remote access mode {}", name),
+            || self.client.set_device_mode(mode),
+        )
+        .await;
+        match outcome {
+            DeviceModeOutcome::Applied => info!("Remote access mode {} set on this device", name),
+            DeviceModeOutcome::NotSupported => warn!(
+                "Backend does not support setting the remote access mode; dropping {}",
+                name
+            ),
+            DeviceModeOutcome::OverrideExists => warn!(
+                "Device already has a different remote access mode; keeping it and dropping {}",
+                name
+            ),
         }
+        self.clear();
     }
 
     fn clear(&self) {

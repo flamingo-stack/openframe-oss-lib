@@ -1,6 +1,7 @@
 pub mod agent_auth_service;
 pub mod agent_configuration_service;
 pub mod agent_registration_service;
+pub mod backend_call_retry;
 pub mod deactivation_service;
 pub mod deregistration_service;
 pub mod device_data_fetcher;
@@ -47,6 +48,9 @@ pub mod tool_url_params_resolver;
 pub mod update_cleanup_service;
 pub mod update_handler_service;
 pub mod update_state_service;
+
+#[cfg(test)]
+pub(crate) mod test_support;
 
 pub use agent_auth_service::AgentAuthService;
 pub use agent_configuration_service::AgentConfigurationService;

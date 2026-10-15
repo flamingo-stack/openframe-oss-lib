@@ -704,7 +704,7 @@ impl Client {
             error!("Failed to record boot attempt: {:#}", e);
         }
 
-        self.initial_key_service.clone().ensure_initial_key().await;
+        self.initial_key_service.clone().start();
 
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
