@@ -89,6 +89,9 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
     }
 
     private Optional<JsonNode> parseJson(JsonNode rawNode) {
+        if (rawNode != null && rawNode.isObject()) {
+            return Optional.of(rawNode);
+        }
         return Optional.ofNullable(rawNode)
                 .map(node -> node.asString(""))
                 .filter(StringUtils::isNotBlank)
@@ -135,6 +138,11 @@ public class MeshCentralEventDeserializer extends IntegratedToolEventDeserialize
                     }
                     return Optional.empty();
                 });
+    }
+
+    @Override
+    protected JsonNode toEventNode(JsonNode after) {
+        return parseJson(after).orElse(after);
     }
 
     @Override

@@ -169,6 +169,23 @@ class MeshCentralEventDeserializerTest {
     }
 
     @Test
+    void deserialize_parsesTheEventJsonOnce() {
+        // setup
+        CountingMapper counting = new CountingMapper();
+        MeshCentralEventDeserializer countingDeserializer = new MeshCentralEventDeserializer(counting);
+        CommonDebeziumMessage message = message(CLIPBOARD_PASTE_JSON);
+
+        // execution
+        DeserializedDebeziumMessage result = countingDeserializer.deserialize(message, MessageType.MESHCENTRAL_EVENT);
+
+        // verifications
+        assertThat(result.getUnifiedEventType()).isEqualTo(UnifiedEventType.REMOTE_CLIPBOARD_PASTED);
+        assertThat(result.getAgentId()).isEqualTo(MESH_NODE_ID);
+        assertThat(result.getDebeziumMessage()).isEqualTo(StringNode.valueOf(CLIPBOARD_PASTE_JSON).toString());
+        assertThat(counting.eventReads).isEqualTo(1);
+    }
+
+    @Test
     void deserialize_eventWithoutMsgId_detailsEmpty() {
         // setup
         CommonDebeziumMessage message = message(LOGIN_JSON);
@@ -193,6 +210,18 @@ class MeshCentralEventDeserializerTest {
         CommonDebeziumMessage message = new CommonDebeziumMessage();
         message.setPayload(payload);
         return message;
+    }
+
+    static class CountingMapper extends JsonMapper {
+        int eventReads;
+
+        @Override
+        public JsonNode readTree(String content) {
+            if (content.equals(CLIPBOARD_PASTE_JSON)) {
+                eventReads++;
+            }
+            return super.readTree(content);
+        }
     }
 
     private static JsonNode event(String json) {
