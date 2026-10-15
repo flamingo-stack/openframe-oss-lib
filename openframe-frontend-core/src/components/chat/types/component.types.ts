@@ -512,6 +512,9 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   /** Start adornment rendered inside the textarea's left edge (e.g. the
    *  composer `+` context-menu trigger). Forwarded to `Textarea.startIcon`. */
   startIcon?: ReactNode;
+  /** End adornment between the editor and the Send / Stop button (e.g. the
+   *  composer's ⋯ actions menu). */
+  endIcon?: ReactNode;
   /** Suppress the textarea's own border/bg/radius — an outer card draws it
    *  instead (composer context-chip layout). Forwarded to `Textarea.hideBorder`. */
   hideBorder?: boolean;
@@ -682,6 +685,11 @@ export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
   inputTokens?: number;
   /** Answer call's output tokens — pairs with `inputTokens`. */
   outputTokens?: number;
+  /** Makes the provider icon + model name a button (e.g. the host's AI
+   *  settings, where the model is chosen). The token tail stays plain text. */
+  onModelClick?: () => void;
+  /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
+  modelTooltip?: string;
 }
 
 /**
