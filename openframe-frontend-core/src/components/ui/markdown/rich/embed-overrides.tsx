@@ -11,7 +11,6 @@
  */
 import type { ElementContent } from 'hast';
 import type { Components } from 'react-markdown';
-import { isYouTubeUrl } from '../../../../utils/youtube-url';
 import { ClaudeEmbed } from '../../../embeds/claude-embed';
 import { FigmaEmbed } from '../../../embeds/figma-embed';
 import { LinkedInEmbedClient } from '../../../embeds/linkedin-embed-client';
@@ -19,7 +18,7 @@ import { MarkdownImage } from '../../../embeds/markdown-image';
 import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { RedditEmbedClient } from '../../../embeds/reddit-embed-client';
 import { TwitterEmbedClient } from '../../../embeds/twitter-embed-client';
-import { Video } from '../../../features/video';
+import { extractYouTubeId, Video } from '../../../features/video';
 import { buildStandardLeafRenderers, hasRenderableSrc, type MdRenderProps } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
@@ -231,7 +230,7 @@ export function buildRichEmbedOverrides({
     iframe: ({ node: _node, src, ...rest }: MdRenderProps<'iframe'>) => {
       if (!hasRenderableSrc(src)) return null;
       const url = src.trim();
-      if (isYouTubeUrl(url)) return <Video kind="youtube" url={url} />;
+      if (extractYouTubeId(url)) return <Video kind="youtube" url={url} />;
       return <iframe {...rest} src={url} loading="lazy" />;
     },
 
