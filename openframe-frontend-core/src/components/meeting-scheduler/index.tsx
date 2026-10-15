@@ -57,6 +57,7 @@ import { cn } from '../../utils/cn';
 import { FORM_RESCUE_ATTEMPT_FIELD, type FormRescueDefinition } from '../../utils/form-rescue';
 import { formatDurationCompact, formatDateWithTimezone } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
+import { LoadingRegion } from '../loading/loading-region';
 import { Alert, AlertDescription, Button } from '../ui';
 import {
   BookingForm,
@@ -808,10 +809,10 @@ export function HubSpotMeetingScheduler({
   if (modal && isLoadingAvailability && !availability) {
     return (
       <div className={cn(MODAL_STACK_CLASS, className)}>
-        <div className={MODAL_CARD_CLASS}>
+        <LoadingRegion label="Loading available times" className={MODAL_CARD_CLASS}>
           <SchedulerModalHeaderSkeleton />
           <SlotPickerSkeleton monthOffset={monthOffset} layout="modal" />
-        </div>
+        </LoadingRegion>
         <ModalFooter
           onCancel={onBack}
           primary={
@@ -831,7 +832,7 @@ export function HubSpotMeetingScheduler({
     // shifts when it swaps.
     return (
       <div className={cardClass}>
-        <div className={innerClass}>
+        <LoadingRegion label="Loading available times" className={innerClass}>
           {!formOnly && <ContextPanelSkeleton onBack={backEdge} className={CONTEXT_PANEL_CLASS} />}
           <div className={actionPanelClass}>
             {/* Both terms matter. Without `flow` this stays a calendar where
@@ -852,7 +853,7 @@ export function HubSpotMeetingScheduler({
               <SlotPickerSkeleton monthOffset={monthOffset} />
             )}
           </div>
-        </div>
+        </LoadingRegion>
       </div>
     );
   }
