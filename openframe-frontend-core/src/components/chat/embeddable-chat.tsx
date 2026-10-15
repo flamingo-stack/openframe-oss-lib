@@ -91,7 +91,7 @@ import { useEmptyStateConfig } from './hooks/use-empty-state-config';
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
 import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
-import { useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
+import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader } from './mingo-chat-header';
 import { ChatDialogModals } from './mingo-chat-modals';
@@ -502,7 +502,7 @@ export interface EmbeddableChatProps {
    * v2: the "What to ask?" exchange the list's entry shows (when no
    * `onWhatToAsk` takes it over): added at the end of the open conversation,
    * or a new chat opens with it. Local - never sent, never stored. Picking a
-   * chip puts its prompt into the composer.
+   * chip sends its prompt in that chat, like a quick action.
    *
    * A function is called on each click and the exchange appears, whole, once
    * its promise settles (prompts built from live data, e.g. the workspace's
@@ -1646,10 +1646,13 @@ function EmbeddableChatInner({
   // saved scroll position over the freshly-loaded destination page.
   // Source chips already route through `handleNavigationClose`; inline
   // cards now match. New-tab clicks never invoke `closeChat`.
+  // `sendPrompt` goes through a ref: what it sends with is declared further
+  // down (`sendPromptRef.current` is set next to `handleSend`).
+  const sendPromptRef = useRef<(text: string) => void>(() => {});
   const chatPanelHandle = useMemo<ChatPanelHandle>(
     () => ({
       closeChat: handleNavigationClose,
-      fillComposer: (text: string) => chatInputRef.current?.setValue(text),
+      sendPrompt: (text: string) => sendPromptRef.current(text),
     }),
     [handleNavigationClose],
   );
@@ -2301,18 +2304,49 @@ function EmbeddableChatInner({
     resetToNewChat();
   }, [clearWhatToAskDraft, resetToNewChat]);
 
+  // The open chat cannot take a message now: the composer is locked, a turn is
+  // running, or it waits on an approval / escalation nobody has answered.
+  const activeDialogStatus = activeDialog && dialogStatusOf ? dialogStatusOf(activeDialog) : undefined;
+  const isChatBlocked =
+    !!composerLock ||
+    chatLoading ||
+    activeDialogStatus === 'working' ||
+    activeDialogStatus === 'approval' ||
+    (pendingApprovals?.length ?? 0) > 0 ||
+    awaitsDecision(hostMessages);
+
   // "What to ask Mingo?" with `whatToAsk`: the exchange goes at the end of the
-  // open conversation; with none (or an archived one, which is read-only) a
-  // new chat opens with it. A new chat already holding one gets another.
+  // open conversation when it can go on right now. Otherwise (none open, an
+  // archived one, one still loading or blocked as above) a new chat opens with
+  // it: adding prompts under a pending approval or a running turn would mix
+  // two conversations. A new chat with nothing sent yet gets another exchange.
   const showWhatToAsk = (content: WhatToAskContent) => {
-    if (activeDialogId && hasConversation && !isViewingArchived) {
+    if (activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
       whatToAsk.ask('current', content);
       return;
     }
-    if (activeDialogId != null || isViewingArchived) resetToNewChat();
+    const isUnsentNewChat = activeDialogId == null && hostMessages.length === 0 && !isViewingArchived;
+    if (!isUnsentNewChat) {
+      whatToAsk.clearDraft();
+      resetToNewChat();
+    }
     setComposeOpen(true);
     whatToAsk.ask('draft', content);
   };
+
+  // A "What to ask?" chip: its prompt goes out on its own, like a quick action
+  // (whatever is staged in the composer stays staged), into the chat the chip
+  // sits in - not while that chat is blocked. From a new chat that send
+  // creates the dialog the exchange moves to.
+  useEffect(() => {
+    sendPromptRef.current = text => {
+      if (isChatBlocked) return;
+      noteWhatToAskSend();
+      void sendMessage(text).catch((err: unknown) => {
+        console.error('[EmbeddableChat] sendPrompt failed:', err);
+      });
+    };
+  });
   // An async `whatToAsk` settles renders later: by then the panel may be in
   // another state, so it is shown through the latest `showWhatToAsk`.
   const showWhatToAskRef = useRef(showWhatToAsk);

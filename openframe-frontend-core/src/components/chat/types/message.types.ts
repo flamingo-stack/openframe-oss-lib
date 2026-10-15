@@ -372,7 +372,7 @@ export type ContextCompactionSegment = {
 };
 
 /** One prompt a `suggestions` block offers: the chip shows `label`, and
- *  picking it hands `prompt` (absent: the label) to the composer. `icon` is a
+ *  picking it hands `prompt` (absent: the label) to be sent. `icon` is a
  *  quick-action icon (a spec or a node). */
 export type SuggestionPrompt = {
   label: string;
@@ -390,7 +390,7 @@ export type SuggestionGroup = {
  * Prompts the assistant offers as chips, grouped under captions, with an
  * optional line under them. Never on the wire: a host builds it locally (the
  * "What to ask?" answer, see `useWhatToAsk`). Picking a chip calls `onPick`;
- * without one, inside an `EmbeddableChat` the prompt goes into its composer.
+ * without one, inside an `EmbeddableChat` the prompt is sent in its open chat.
  */
 export type SuggestionsSegment = {
   type: 'suggestions';

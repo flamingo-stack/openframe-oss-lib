@@ -33,7 +33,7 @@ export interface UseWhatToAskOptions {
   content?: WhatToAskContent;
   user?: WhatToAskAuthor;
   assistant?: WhatToAskAuthor;
-  /** Where a picked prompt goes. Absent: the composer of the surrounding chat panel. */
+  /** Where a picked prompt goes (typically: sent). Absent: sent in the surrounding chat panel. */
   onPick?: (prompt: string) => void;
 }
 
@@ -161,6 +161,25 @@ function exchangeMessages(
       assistantType: assistant?.assistantType,
     },
   ];
+}
+
+/**
+ * Whether the thread waits on the user before it can go on: an approval or an
+ * escalation offer nobody has answered. "What to ask?" opens a new chat then,
+ * rather than adding prompts to a conversation that cannot take them.
+ */
+export function awaitsDecision(messages: readonly Message[]): boolean {
+  return messages.some(
+    message =>
+      Array.isArray(message.content) &&
+      message.content.some(
+        segment =>
+          (segment.type === 'approval_request' ||
+            segment.type === 'approval_batch' ||
+            segment.type === 'escalation_offer') &&
+          (segment.status ?? 'pending') === 'pending',
+      ),
+  );
 }
 
 /**

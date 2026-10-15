@@ -11,11 +11,11 @@ export interface SuggestionsDisplayProps {
 /**
  * A `suggestions` segment: each group's caption over a wrapping row of
  * sentence chips, then the optional note. A chip hands its prompt to the
- * segment's `onPick`, else to the composer of the chat panel it sits in.
+ * segment's `onPick`, else sends it in the chat panel it sits in.
  */
 export function SuggestionsDisplay({ segment }: SuggestionsDisplayProps) {
   const panel = useChatPanel();
-  const pick = segment.onPick ?? panel?.fillComposer;
+  const pick = segment.onPick ?? panel?.sendPrompt;
 
   return (
     <div className="flex min-w-0 flex-col gap-[var(--spacing-system-sf)]">

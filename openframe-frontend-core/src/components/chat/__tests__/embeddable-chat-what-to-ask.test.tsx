@@ -3,7 +3,7 @@
  *
  * With a conversation open the exchange is added at its end; with none a new
  * chat opens holding it, and the send from there keeps it in the dialog the
- * send creates. A chip puts its prompt into the composer, nothing is sent.
+ * send creates. A chip sends its prompt in that chat, like a quick action.
  * The ⋯ menu takes the host's extra items after the chat's own.
  */
 
@@ -38,7 +38,7 @@ const WHAT_TO_ASK: WhatToAskContent = {
   question: 'What can I ask you?',
   reply: 'Describe the outcome you want.',
   groups: [{ label: 'Check', prompts: [{ label: 'Which devices went offline today?' }] }],
-  note: 'Click one to put it in the composer, then send.',
+  note: 'A note under the chips.',
 };
 
 const HELLO: UnifiedChatMessage = { id: 'm-1', role: 'user', content: 'hello', timestamp: new Date(0) };
@@ -47,10 +47,18 @@ const HELLO: UnifiedChatMessage = { id: 'm-1', role: 'user', content: 'hello', t
 function Host({
   initialDialogId = null,
   onReset,
+  onSend,
+  openChat = [HELLO],
+  busy = false,
   whatToAsk = WHAT_TO_ASK,
 }: {
   initialDialogId?: string | null;
   onReset?: () => void;
+  onSend?: (text: string) => void;
+  /** What the open chat `d-1` holds. */
+  openChat?: UnifiedChatMessage[];
+  /** A turn is running in the open chat. */
+  busy?: boolean;
   whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
 }) {
   const [activeDialogId, setActiveDialogId] = useState<string | null>(initialDialogId);
@@ -58,10 +66,11 @@ function Host({
   const noop = () => {};
   const asyncNoop = async () => {};
   const state: UnifiedChatState = {
-    messages: activeDialogId === 'd-1' ? [HELLO] : activeDialogId === 'd-new' ? sent : [],
-    isLoading: false,
+    messages: activeDialogId === 'd-1' ? openChat : activeDialogId === 'd-new' ? sent : [],
+    isLoading: busy && activeDialogId === 'd-1',
     streamingPhase: 'idle',
     sendMessage: text => {
+      onSend?.(text);
       setSent([{ id: 'sent', role: 'user', content: text, timestamp: new Date() }]);
       setActiveDialogId(current => current ?? 'd-new');
       return Promise.resolve();
@@ -159,26 +168,58 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
-  it('puts a picked prompt into the composer without sending it', () => {
-    renderHost({ initialDialogId: 'd-1' });
+  it('sends a picked prompt in the open chat and leaves the composer alone', () => {
+    const onSend = vi.fn();
+    renderHost({ initialDialogId: 'd-1', onSend });
 
     fireEvent.click(whatToAsk());
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
 
-    expect(editor()).toHaveTextContent('Which devices went offline today?');
-    expect(screen.queryByText('Sent')).not.toBeInTheDocument();
+    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
+    expect(editor()).toHaveTextContent('');
   });
 
-  it('keeps a new chat exchange in the dialog its send creates', async () => {
+  it('keeps a new chat exchange in the dialog a picked prompt creates', async () => {
     renderHost();
 
     fireEvent.click(whatToAsk());
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
-    fireEvent.keyDown(editor(), { key: 'Enter' });
 
     // The send went out and made its dialog (it is in the list now).
     expect((await screen.findAllByText('Sent')).length).toBeGreaterThan(0);
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+  });
+
+  it('opens a new chat instead when the open one waits on an approval', () => {
+    const pendingApproval: UnifiedChatMessage = {
+      id: 'm-2',
+      role: 'assistant',
+      content: '',
+      segments: [
+        {
+          type: 'approval_request',
+          data: { requestId: 'r-1', command: 'restart spooler', explanation: 'Restart it', approvalType: 'COMMAND' },
+        },
+      ],
+      timestamp: new Date(1),
+    };
+    renderHost({ initialDialogId: 'd-1', openChat: [HELLO, pendingApproval] });
+
+    fireEvent.click(whatToAsk());
+
+    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+  });
+
+  it('opens a new chat instead while a turn runs in the open one, and a chip there sends', () => {
+    const onSend = vi.fn();
+    renderHost({ initialDialogId: 'd-1', busy: true, onSend });
+
+    fireEvent.click(whatToAsk());
+
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
+    expect(onSend).toHaveBeenCalledWith('Which devices went offline today?');
   });
 
   it('waits for an async whatToAsk and shows the exchange whole, once per pending click', async () => {

@@ -11,7 +11,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Message } from '../../types/message.types';
-import { mergeByTime, useWhatToAsk, type WhatToAskContent } from '../use-what-to-ask';
+import { awaitsDecision, mergeByTime, useWhatToAsk, type WhatToAskContent } from '../use-what-to-ask';
 
 const content: WhatToAskContent = {
   question: 'What can I ask you?',
@@ -142,5 +142,24 @@ describe('mergeByTime', () => {
   it('never moves a local message past a thread message without a time', () => {
     const untimed: Message = { id: 'u', role: 'assistant', content: 'u' };
     expect(ids(mergeByTime([untimed, message('b', 30)], [message('l', 20)]))).toEqual(['u', 'l', 'b']);
+  });
+});
+
+describe('awaitsDecision', () => {
+  const withSegment = (segment: Exclude<Message['content'], string>[number]): Message => ({
+    id: 'a',
+    role: 'assistant',
+    content: [segment],
+  });
+  const request = { requestId: 'r', command: 'c', explanation: 'e', approvalType: 'COMMAND' };
+
+  it('is true for an approval nobody has answered', () => {
+    expect(awaitsDecision([withSegment({ type: 'approval_request', data: request })])).toBe(true);
+    expect(awaitsDecision([withSegment({ type: 'approval_request', data: request, status: 'pending' })])).toBe(true);
+  });
+
+  it('is false once it is answered, and for plain text', () => {
+    expect(awaitsDecision([withSegment({ type: 'approval_request', data: request, status: 'approved' })])).toBe(false);
+    expect(awaitsDecision([message('a', 1)])).toBe(false);
   });
 });

@@ -27,9 +27,9 @@ export interface ChatPanelHandle {
   /** Close the chat panel. Called by inline cards' nav click handler
    *  ONLY when the resolved navigation is same-tab. */
   closeChat: () => void;
-  /** Put `text` into the panel's composer (replacing the draft) and focus
-   *  it, without sending. Used by `suggestions` chips. */
-  fillComposer?: (text: string) => void;
+  /** Send `text` in the panel's open chat (a new chat: the send creates it),
+   *  leaving the composer's draft alone. Used by `suggestions` chips. */
+  sendPrompt?: (text: string) => void;
 }
 
 export const ChatPanelContext = createContext<ChatPanelHandle | null>(null);
