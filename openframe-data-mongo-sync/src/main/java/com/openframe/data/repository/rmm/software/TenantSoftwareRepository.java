@@ -14,5 +14,8 @@ public interface TenantSoftwareRepository extends MongoRepository<TenantSoftware
 
     List<TenantSoftware> findByTenantIdAndSoftwareTitleIdIn(String tenantId, List<Long> softwareTitleIds);
 
+    // Cross-tenant: a title is global, so a name change fans out to every tenant that has it.
+    List<TenantSoftware> findBySoftwareTitleId(Long softwareTitleId);
+
     long deleteByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
 }

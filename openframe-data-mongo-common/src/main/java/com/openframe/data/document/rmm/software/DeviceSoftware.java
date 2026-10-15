@@ -17,9 +17,12 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "device_software")
 @CompoundIndex(
-        name = "tenant_machine_title",
-        def = "{'tenantId': 1, 'machineId': 1, 'softwareTitleId': 1}",
+        name = "tenant_machine_software",
+        def = "{'tenantId': 1, 'machineId': 1, 'softwareId': 1}",
         unique = true)
+@CompoundIndex(
+        name = "tenant_machine",
+        def = "{'tenantId': 1, 'machineId': 1}")
 @CompoundIndex(
         name = "tenant_title",
         def = "{'tenantId': 1, 'softwareTitleId': 1}")

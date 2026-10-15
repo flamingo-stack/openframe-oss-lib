@@ -10,6 +10,13 @@ import java.util.Optional;
 @Repository
 public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware, String> {
 
+    Optional<DeviceSoftware> findByTenantIdAndMachineIdAndSoftwareId(
+            String tenantId, String machineId, Long softwareId);
+
+    long deleteByTenantIdAndMachineIdAndSoftwareId(String tenantId, String machineId, Long softwareId);
+
+    List<DeviceSoftware> findBySoftwareId(Long softwareId);
+
     Optional<DeviceSoftware> findByTenantIdAndMachineIdAndSoftwareTitleId(
             String tenantId, String machineId, Long softwareTitleId);
 
