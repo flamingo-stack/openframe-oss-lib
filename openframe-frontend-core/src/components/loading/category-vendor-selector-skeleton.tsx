@@ -1,18 +1,25 @@
 import { cn } from '../../utils/cn';
+import { LoadingRegion } from './loading-region';
 import { TextSkeleton, UnifiedSkeleton } from './unified-skeleton';
 
 interface CategoryVendorSelectorSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   /** number of subcategory blocks to render */
   subcategories?: number;
   className?: string;
 }
 
-export function CategoryVendorSelectorSkeleton({ subcategories = 3, className }: CategoryVendorSelectorSkeletonProps) {
+export function CategoryVendorSelectorSkeleton({
+  region = true,
+  subcategories = 3,
+  className,
+}: CategoryVendorSelectorSkeletonProps) {
   return (
-    <div
+    <LoadingRegion
+      label="Loading categories"
+      announce={region}
       className={cn('rounded-lg border border-ods-border bg-ods-card p-6', className)}
-      role="status"
-      aria-label="Loading category section"
     >
       {/* Header */}
       <div className="mb-6 max-w-xl space-y-2">
@@ -35,6 +42,6 @@ export function CategoryVendorSelectorSkeleton({ subcategories = 3, className }:
           </div>
         ))}
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

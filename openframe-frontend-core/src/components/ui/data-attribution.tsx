@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { formatDate } from '../../utils/format';
+import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface DataAttributionProps {
   /** The source's mark, sized by the caller (e.g. `<CartaIcon className="h-4 w-4" />`). */
@@ -40,6 +41,23 @@ export function DataAttribution({ icon, source, lastUpdated, action }: DataAttri
       <Separator />
       <span className="text-ods-text-secondary">Last updated: {lastUpdated ? formatDate(lastUpdated) : 'Never'}</span>
       {action ? <div className="flex content-sm:pl-[var(--spacing-system-xs)]">{action}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * `DataAttribution` while its date loads: the same line (two lines below
+ * `content-sm`, one row above it) with text bars, so the line does not move
+ * when it fills in.
+ */
+export function DataAttributionSkeleton() {
+  return (
+    <div className={LINE_CLASS} aria-hidden="true">
+      <div className={ITEM_CLASS}>
+        <UnifiedSkeleton className="size-4 rounded" />
+        <TextSkeleton.Body className="w-40" />
+      </div>
+      <TextSkeleton.Body className="w-52" />
     </div>
   );
 }

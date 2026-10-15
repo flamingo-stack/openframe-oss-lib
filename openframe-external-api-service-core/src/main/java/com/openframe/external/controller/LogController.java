@@ -1,5 +1,6 @@
 package com.openframe.external.controller;
 
+import com.openframe.api.service.LogDetailsService;
 import com.openframe.api.service.LogService;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.external.web.ApiCaller;
@@ -40,6 +41,7 @@ import static org.springframework.http.HttpStatus.*;
 public class LogController {
 
     private final LogService logService;
+    private final LogDetailsService logDetailsService;
     private final LogMapper logMapper;
 
     @Operation(summary = "Get logs", description = "Retrieve logs with optional filtering, search, and pagination")
@@ -154,10 +156,10 @@ public class LogController {
             @RequestParam String toolEventId,
             @Parameter(hidden = true) ApiCaller caller) {
 
-        log.debug("Getting log details - ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {} - userId: {}, apiKeyId: {}", 
+        log.debug("Getting log details - ingestDay: {}, toolType: {}, eventType: {}, timestamp: {}, toolEventId: {} - userId: {}, apiKeyId: {}",
                 ingestDay, toolType, eventType, timestamp, toolEventId, caller.userId(), caller.apiKeyId());
-        
-        var logDetails = logService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId)
+
+        var logDetails = logDetailsService.findLogDetails(ingestDay, toolType, eventType, timestamp, toolEventId)
                 .orElseThrow(() -> new LogNotFoundException(
                     String.format("Log not found for toolEventId: %s, ingestDay: %s, toolType: %s, eventType: %s, timestamp: %s",
                         toolEventId, ingestDay, toolType, eventType, timestamp)));

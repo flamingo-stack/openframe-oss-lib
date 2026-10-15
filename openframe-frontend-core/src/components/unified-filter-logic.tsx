@@ -397,7 +397,7 @@ export function useUnifiedFiltering(config: FilterConfig) {
   };
 }
 
-import { formatClassification, formatPricingModel } from '../utils/format-text-stub';
+import { formatClassification, formatPricingModel } from '../utils/format';
 
 // Helper functions for filter labels
 function getFilterLabel(filterKey: string): string {

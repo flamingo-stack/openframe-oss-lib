@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Card } from './card';
 import { StatusBadge } from './status-badge';
 
@@ -80,11 +81,6 @@ function fourColumnBorders(index: number, count: number): string {
   classes.push(index % 4 !== 3 && index < count - 1 ? 'content-lg:border-r' : 'content-lg:border-r-0');
   classes.push(Math.floor(index / 4) < lgRows - 1 ? 'content-lg:border-b' : 'content-lg:border-b-0');
   return ` ${classes.join(' ')}`;
-}
-
-/** A text row's placeholder: a bar exactly one line of its element's own typography tall. */
-function LineBar({ width }: { width: string }) {
-  return <span className={`block h-[1lh] ${width} animate-pulse rounded bg-ods-border`} />;
 }
 
 export function FeatureCardGrid({
@@ -230,15 +226,27 @@ export function FeatureCardGrid({
                         <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xsf)]">
                           {item.eyebrow && (
                             <span className="text-ods-text-secondary text-h5">
-                              {loading ? <LineBar width="w-6" /> : item.eyebrow}
+                              {loading ? (
+                                <UnifiedSkeleton as="span" className="block h-[1lh] w-6 rounded" />
+                              ) : (
+                                item.eyebrow
+                              )}
                             </span>
                           )}
                           <h3 className={`text-ods-text-primary text-h2 ${titleClassName}`}>
-                            {loading ? <LineBar width="w-1/2" /> : item.title}
+                            {loading ? (
+                              <UnifiedSkeleton as="span" className="block h-[1lh] w-1/2 rounded" />
+                            ) : (
+                              item.title
+                            )}
                           </h3>
                           {item.subtitle && (
                             <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
-                              {loading ? <LineBar width="w-3/4" /> : item.subtitle}
+                              {loading ? (
+                                <UnifiedSkeleton as="span" className="block h-[1lh] w-3/4 rounded" />
+                              ) : (
+                                item.subtitle
+                              )}
                             </p>
                           )}
                           {item.content}
@@ -248,15 +256,23 @@ export function FeatureCardGrid({
                       <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
                         {item.eyebrow && (
                           <span className="text-ods-text-secondary text-h5">
-                            {loading ? <LineBar width="w-6" /> : item.eyebrow}
+                            {loading ? (
+                              <UnifiedSkeleton as="span" className="block h-[1lh] w-6 rounded" />
+                            ) : (
+                              item.eyebrow
+                            )}
                           </span>
                         )}
                         <h3 className={`whitespace-pre-line text-ods-text-primary text-h2 ${titleClassName}`}>
-                          {loading ? <LineBar width="w-1/2" /> : item.title}
+                          {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-1/2 rounded" /> : item.title}
                         </h3>
                         {item.subtitle && (
                           <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
-                            {loading ? <LineBar width="w-3/4" /> : item.subtitle}
+                            {loading ? (
+                              <UnifiedSkeleton as="span" className="block h-[1lh] w-3/4 rounded" />
+                            ) : (
+                              item.subtitle
+                            )}
                           </p>
                         )}
                       </div>

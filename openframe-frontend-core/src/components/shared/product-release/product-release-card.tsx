@@ -436,6 +436,8 @@ export function ProductReleaseCard({
       // affordance, so explicit ring styles match the `<span role>` form.
       'my-1.5 flex w-full items-start gap-3 p-2',
       'rounded-lg border border-ods-border bg-ods-card no-underline',
+      // The play mark on a video cover shows on the card's hover.
+      'group',
       isInteractive
         ? 'cursor-pointer transition-colors hover:border-ods-text-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-1 focus-visible:ring-offset-ods-card'
         : 'cursor-default',

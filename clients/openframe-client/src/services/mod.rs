@@ -6,6 +6,7 @@ pub mod deregistration_service;
 pub mod device_data_fetcher;
 pub mod encryption_service;
 pub mod execution_service;
+pub mod feature_flags_service;
 pub mod github_download_service;
 pub mod hostname_report_publisher;
 pub mod initial_authentication_processor;
