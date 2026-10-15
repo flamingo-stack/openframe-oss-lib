@@ -1,7 +1,7 @@
 'use client';
 
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
-import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
+import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 
@@ -15,8 +15,10 @@ export interface MingoChatHeaderProps {
   onToggleList?: () => void;
   /** The list is on screen beside the chat; drives the toggle's state. */
   listOpen?: boolean;
-  /** The chat's ⋯ menu. Empty or omitted leaves it out. */
+  /** The chat's ⋯ menu. Empty or omitted (with no `extraMenuItems`) leaves it out. */
   menuItems?: ActionsMenuItem[];
+  /** Items under the chat's own, after a separator: actions that are not about this chat. */
+  extraMenuItems?: ActionsMenuItem[];
   /** An archived chat: offers "Unarchive". */
   onRestore?: () => void;
   /** Collapse the chat back to the list alone (the panel's minimum). */
@@ -38,10 +40,15 @@ export function MingoChatHeader({
   onToggleList,
   listOpen = false,
   menuItems = [],
+  extraMenuItems = [],
   onRestore,
   onCollapse,
   onClose,
 }: MingoChatHeaderProps) {
+  const menuGroups: ActionsMenuGroup[] = [
+    ...(menuItems.length > 0 ? [{ items: menuItems, separator: true }] : []),
+    ...(extraMenuItems.length > 0 ? [{ items: extraMenuItems }] : []),
+  ];
   return (
     <div className="flex h-14 w-full shrink-0 overflow-hidden border-b border-ods-border">
       {onToggleList && (
@@ -77,11 +84,11 @@ export function MingoChatHeader({
           <Refresh01LeftIcon size={24} />
         </ChatHeaderIconButton>
       )}
-      {menuItems.length > 0 && (
+      {menuGroups.length > 0 && (
         <ActionsMenuDropdown
           triggerAriaLabel="Chat actions"
           onCloseAutoFocus={e => e.preventDefault()}
-          groups={[{ items: menuItems }]}
+          groups={menuGroups}
           customTrigger={
             <ChatHeaderIconButton aria-label="Chat actions">
               <Ellipsis01Icon size={24} />

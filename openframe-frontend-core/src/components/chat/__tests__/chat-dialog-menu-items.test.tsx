@@ -1,7 +1,7 @@
 /**
  * `chatDialogMenuItems` — the one ⋯ menu shared by every conversation surface.
  *
- * Pins the design order (link, rename, compact, archive) and that an action
+ * Pins the design order (rename, link, compact, archive) and that an action
  * appears only when its handler is wired, so no surface advertises something
  * the host has not implemented.
  */
@@ -20,8 +20,8 @@ describe('chatDialogMenuItems', () => {
     });
 
     expect(items.map(item => item.label)).toEqual([
-      'Copy Chat Link',
       'Rename Chat',
+      'Copy Chat Link',
       'Compact Chat Memory',
       'Archive Chat',
     ]);

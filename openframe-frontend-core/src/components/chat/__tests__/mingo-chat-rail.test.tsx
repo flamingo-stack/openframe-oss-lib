@@ -75,6 +75,26 @@ describe('MingoChatHeader', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Chat actions' })).not.toBeInTheDocument();
   });
+
+  it('lists the extra items after the chat ones, and offers the menu for them alone', () => {
+    const onReset = vi.fn();
+    const extra = [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }];
+    const { rerender } = render(
+      <MingoChatHeader
+        title="Check new device"
+        menuItems={[{ id: 'rename', label: 'Rename Chat', onClick: vi.fn() }]}
+        extraMenuItems={extra}
+      />,
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Chat actions' }), { button: 0, pointerType: 'mouse' });
+    const items = screen.getAllByRole('menuitem').map(item => item.textContent);
+    expect(items).toEqual(['Rename Chat', 'Reset Onboarding']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reset Onboarding' }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+
+    rerender(<MingoChatHeader title="New Chat" extraMenuItems={extra} />);
+    expect(screen.getByRole('button', { name: 'Chat actions' })).toBeInTheDocument();
+  });
 });
 
 describe('MingoArchiveList', () => {
