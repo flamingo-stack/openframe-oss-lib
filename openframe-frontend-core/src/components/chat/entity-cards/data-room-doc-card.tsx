@@ -16,6 +16,7 @@
 import { ExternalLink } from 'lucide-react';
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { StatusBadge } from '../../ui/status-badge';
 import type { DataRoomDocCardItem } from '../types/entities/data-room-doc';
 import {
@@ -104,17 +105,17 @@ export function DataRoomDocCardSkeleton({ className }: { className?: string }) {
     <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
       <span className={COMPACT_CARD_TEXT_COL}>
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="h-3.5 w-2/3 rounded bg-ods-bg" />
-          <span className="h-4 w-16 rounded-full bg-ods-bg/60" />
+          <UnifiedSkeleton as="span" className="h-3.5 w-2/3 rounded" />
+          <UnifiedSkeleton as="span" className="h-4 w-16 rounded-full" />
         </span>
-        <span className="h-4 w-1/2 rounded bg-ods-bg/60" />
+        <UnifiedSkeleton as="span" className="h-4 w-1/2 rounded" />
         <span className="flex min-w-0 flex-col gap-0">
-          <span className="h-5 w-5/6 rounded bg-ods-bg/60" />
-          <span className="h-5 w-3/4 rounded bg-ods-bg/60" />
+          <UnifiedSkeleton as="span" className="h-5 w-5/6 rounded" />
+          <UnifiedSkeleton as="span" className="h-5 w-3/4 rounded" />
         </span>
       </span>
       <span className="flex h-5 shrink-0 items-center self-start">
-        <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
+        <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
       </span>
     </span>
   );

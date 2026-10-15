@@ -30,8 +30,9 @@ import { contentFetch } from '../../utils/embed-content-fetch';
 import { formatDurationCompact, formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { pageCount } from '../../utils/search-params';
 import { EmptyState } from '../empty-state';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { PersistentPaginationWrapper } from '../persistent-pagination';
-import { AvatarStack, StatusBadge, Skeleton } from '../ui';
+import { AvatarStack, StatusBadge } from '../ui';
 
 export interface MeetingSchedulerDirectoryProps {
   /** Endpoints prefix, default '' (same-origin `/api/meetings`). */
@@ -127,16 +128,16 @@ export function MeetingSchedulerDirectoryRowSkeleton() {
   return (
     <div className="flex min-h-20 w-full items-center gap-4 rounded-lg border border-ods-border bg-ods-card px-4 py-3">
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-        <Skeleton className="h-5 w-1/2" />
-        <Skeleton className="h-4 w-1/3" />
+        <UnifiedSkeleton className="h-5 w-1/2" />
+        <UnifiedSkeleton className="h-4 w-1/3" />
       </div>
-      <Skeleton className="hidden h-6 w-28 shrink-0 content-sm:block" />
-      <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+      <UnifiedSkeleton className="hidden h-6 w-28 shrink-0 content-sm:block" />
+      <UnifiedSkeleton className="h-10 w-10 shrink-0 rounded-full" />
       <div className="hidden w-44 shrink-0 flex-col items-end gap-1 content-md:flex">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-5 w-32" />
+        <UnifiedSkeleton className="h-4 w-24" />
+        <UnifiedSkeleton className="h-5 w-32" />
       </div>
-      <Skeleton className="size-12 shrink-0 rounded-md" />
+      <UnifiedSkeleton className="size-12 shrink-0 rounded-md" />
     </div>
   );
 }
@@ -205,7 +206,7 @@ export function MeetingSchedulerDirectory({
           ))}
         </div>
         <div className={cn('mt-8 flex w-full items-center justify-center', PAGINATION_SLOT_H)}>
-          <Skeleton className="h-10 w-64" />
+          <UnifiedSkeleton className="h-10 w-64" />
         </div>
       </div>
     );

@@ -48,6 +48,6 @@ class ClientUninstallDeliverySpecTest {
         String subject = spec.subject(MACHINE_ID);
 
         // verifications
-        assertThat(subject).isEqualTo("machine.mach-42.client-uninstall");
+        assertThat(subject).isEqualTo("machine.mach-42.client-uninstall.v2");
     }
 }

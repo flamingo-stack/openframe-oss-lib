@@ -16,6 +16,8 @@ export interface DevicesGridProps<T extends DeviceRow = DeviceRow> {
   isFetchingNextPage?: boolean;
   sentinelRef?: React.RefObject<HTMLDivElement | null>;
   emptyMessage?: string;
+  /** The loading state announces itself ("Loading devices"). `false` inside another loading region. Default `true`. */
+  loadingRegion?: boolean;
 }
 
 export function DevicesGrid<T extends DeviceRow = DeviceRow>({
@@ -25,6 +27,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   isFetchingNextPage,
   sentinelRef,
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
+  loadingRegion = true,
 }: DevicesGridProps<T>) {
   const router = useRouter();
   const { getDeviceHref } = useDevicesViewConfig();
@@ -37,7 +40,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   return (
     <div className="space-y-4">
       {isLoading && devices.length === 0 ? (
-        <DeviceCardSkeletonGrid count={12} />
+        <DeviceCardSkeletonGrid count={12} region={loadingRegion} />
       ) : devices.length === 0 ? (
         <div className="flex h-64 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card">
           <p className="text-ods-text-secondary">{emptyMessage}</p>

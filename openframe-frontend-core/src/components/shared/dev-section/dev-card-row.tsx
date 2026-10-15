@@ -26,6 +26,8 @@
  */
 
 import type { ReactNode } from 'react';
+import { LoadingRegion } from '../../loading/loading-region';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 
 export interface DevCardRowContentProps {
   title: string;
@@ -78,22 +80,22 @@ export function DevCardRowSkeleton() {
       <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
         <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
           <div className="flex min-h-[24px] items-center">
-            <div className="h-[20px] w-full animate-pulse rounded bg-ods-border" />
+            <UnifiedSkeleton className="h-[20px] w-full rounded" />
           </div>
           <div className="flex min-h-[20px] items-center">
-            <div className="h-[20px] w-1/2 animate-pulse rounded bg-ods-border" />
+            <UnifiedSkeleton className="h-[20px] w-1/2 rounded" />
           </div>
           <div className="flex min-h-[72px] items-center">
             <div className="flex-1 space-y-1">
-              <div className="h-[20px] w-full animate-pulse rounded bg-ods-border" />
-              <div className="h-[20px] w-full animate-pulse rounded bg-ods-border" />
-              <div className="h-[20px] w-2/3 animate-pulse rounded bg-ods-border" />
+              <UnifiedSkeleton className="h-[20px] w-full rounded" />
+              <UnifiedSkeleton className="h-[20px] w-full rounded" />
+              <UnifiedSkeleton className="h-[20px] w-2/3 rounded" />
             </div>
           </div>
         </div>
         <div className="flex flex-shrink-0 flex-col gap-2 self-start">
-          <div className="h-[32px] w-[100px] animate-pulse rounded bg-ods-border" />
-          <div className="h-[32px] w-[120px] animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-[32px] w-[100px] rounded" />
+          <UnifiedSkeleton className="h-[32px] w-[120px] rounded" />
         </div>
       </div>
     </div>
@@ -105,12 +107,23 @@ export function DevCardRowSkeleton() {
  * used by every list shell. Both delivery (`delivery-table.tsx`) and
  * tickets (`tickets-list.tsx`) mount this directly.
  */
-export function DevCardRowSkeletonList({ rows = 5 }: { rows?: number }) {
+export function DevCardRowSkeletonList({
+  region = true,
+  rows = 5,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  rows?: number;
+}) {
   return (
-    <div className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+    <LoadingRegion
+      label="Loading"
+      announce={region}
+      className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card"
+    >
       {Array.from({ length: rows }, (_, i) => (
         <DevCardRowSkeleton key={i} />
       ))}
-    </div>
+    </LoadingRegion>
   );
 }

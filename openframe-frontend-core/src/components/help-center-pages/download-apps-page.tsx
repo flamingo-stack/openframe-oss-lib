@@ -59,6 +59,7 @@ import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-l
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
+import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { LoadError } from '../ui/error-state';
@@ -248,7 +249,7 @@ function WebCard({ web }: { web: DownloadAppsWebOption }) {
 /** A section's cards while the server's answer loads: the same grid and card frame, a button's box in each. */
 function CardsSkeleton({ label }: { label: string }) {
   return (
-    <div className={CARDS_GRID_CLASS} aria-busy="true" aria-label={label}>
+    <LoadingRegion label={label} className={CARDS_GRID_CLASS}>
       {[0, 1].map(card => (
         <div key={card} className={CARD_CLASS}>
           <UnifiedSkeleton className="h-6 w-32 rounded" />
@@ -256,7 +257,7 @@ function CardsSkeleton({ label }: { label: string }) {
           <UnifiedSkeleton className="h-14 w-full rounded-md" />
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
 }
 

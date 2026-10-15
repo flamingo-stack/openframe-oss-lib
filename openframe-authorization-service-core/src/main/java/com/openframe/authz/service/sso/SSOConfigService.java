@@ -81,6 +81,18 @@ public class SSOConfigService {
     }
 
     /**
+     * Providers the tenant configured with its own app — active per-tenant configs only, no
+     * defaults and no built-in login toggle.
+     */
+    public List<String> getCustomProvidersForTenant(String tenantId) {
+        return getActiveForTenant(tenantId).stream()
+                .map(cfg -> cfg.getProvider().toLowerCase(Locale.ROOT))
+                .filter(provider -> !SSOConfig.OPENFRAME_PROVIDER.equals(provider))
+                .distinct()
+                .toList();
+    }
+
+    /**
      * Whether the built-in OpenFrame (password) login is enabled for the tenant. Controlled by a
      * pseudo-provider document ({@link SSOConfig#OPENFRAME_PROVIDER}) in {@code sso_configs};
      * absence means enabled — the toggle only ever opts a tenant out.
