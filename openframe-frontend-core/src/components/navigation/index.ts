@@ -31,6 +31,15 @@ export type { UseScrollSpyOptions } from '../docs/use-scroll-spy';
 
 export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
 export type { NavigationSidebarProps } from './navigation-sidebar';
+export { resolveNavigationActive } from './navigation-sidebar-match';
+export type { NavigationActiveState, ResolveNavigationActiveOptions } from './navigation-sidebar-match';
+export { AccountPopover } from './account-popover';
+export type {
+  AccountPopoverDivider,
+  AccountPopoverEntry,
+  AccountPopoverItem,
+  AccountPopoverProps,
+} from './account-popover';
 
 export { AppHeader } from './app-header';
 export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
@@ -98,6 +107,10 @@ export type {
   NavigationItem,
   NavigationSidebarConfig,
   NavigationSidebarItem,
+  NavigationSidebarLocation,
+  NavigationSidebarMatch,
+  NavigationSidebarMatchRule,
+  NavigationSidebarSlot,
   SiteNav,
   SiteNavPrimaryCta,
   SlidingSidebarConfig,
