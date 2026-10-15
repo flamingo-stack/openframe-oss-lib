@@ -31,6 +31,13 @@ export type { UseScrollSpyOptions } from '../docs/use-scroll-spy';
 
 export { NAVIGATION_SIDEBAR_WIDTH_VAR, NavigationSidebar } from './navigation-sidebar';
 export type { NavigationSidebarProps } from './navigation-sidebar';
+export { AccountPopover } from './account-popover';
+export type {
+  AccountPopoverDivider,
+  AccountPopoverEntry,
+  AccountPopoverItem,
+  AccountPopoverProps,
+} from './account-popover';
 
 export { AppHeader } from './app-header';
 export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
