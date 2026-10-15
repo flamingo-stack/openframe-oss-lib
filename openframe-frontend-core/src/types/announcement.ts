@@ -184,7 +184,7 @@ export interface AnnouncementFormData {
   short_title?: string;
   /** Paths the bar is not shown on, as the form holds them. */
   excluded_paths?: string[];
-  /** The surfaces the bar is shown on. Empty: every surface. */
+  /** The ticked surfaces. Never empty in a form: stored empty means every surface. */
   surfaces?: AnnouncementSurface[];
 }
 

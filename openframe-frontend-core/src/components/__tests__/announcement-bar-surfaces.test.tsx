@@ -27,7 +27,7 @@ describe('AnnouncementBar surfaces', () => {
     expect(bar()).toBeInTheDocument();
   });
 
-  it('is drawn on the web when the host names no surface', () => {
+  it('treats a host that names no surface as the web: a phone-only announcement stays collapsed', () => {
     render(<AnnouncementBar initialAnnouncement={announcement(['mobile'])} />);
     expect(bar()).not.toBeInTheDocument();
   });
