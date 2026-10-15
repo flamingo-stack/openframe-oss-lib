@@ -8,25 +8,25 @@ import java.util.List;
 public enum MessageType {
 
     MESHCENTRAL_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     COMMAND_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT, Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT, Destination.CASSANDRA_COMMAND_RESULT, Destination.MONGO_COMMAND_HISTORY), EventHandlerType.COMMON_TYPE),
     SCRIPT_EXECUTED(IntegratedToolType.RMM, DataEnrichmentServiceType.RMM_RESULTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT, Destination.MONGO_HISTORY), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT, Destination.MONGO_HISTORY), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_QUERY_RESULT_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_POLICY_ACTIVITY_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_POLICY_MEMBERSHIP_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     MICROSOFT_365_AUDIT_EVENT(IntegratedToolType.MICROSOFT_365, DataEnrichmentServiceType.PRE_ENRICHED,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     GOOGLE_WORKSPACE_AUDIT_EVENT(IntegratedToolType.GOOGLE_WORKSPACE, DataEnrichmentServiceType.PRE_ENRICHED,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE),
     REMOTE_SESSION_AUDIT_EVENT(IntegratedToolType.MESHCENTRAL, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE);
+            List.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;
 

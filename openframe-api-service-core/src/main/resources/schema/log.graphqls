@@ -11,13 +11,13 @@ extend type Query {
         sort: LogSortInput
     ): LogConnection!
 
-    # Get full audit details from Cassandra when user clicks on a audit
-    # Requires complete composite key for efficient Cassandra lookup
+    # Full details of one event, opened from the Logs list.
+    # Requires the complete key of the event
     logDetails(
         ingestDay: String!      # YYYY-MM-DD format
-        toolType: String!       # Tool type (meshcentral, fleet-mdm, etc.)
-        eventType: String!      # Event type (login, logout, script, etc.)
-        timestamp: Instant!     # Timestamp of the audit
+        toolType: String!       # IntegratedToolType name (RMM, MESHCENTRAL, FLEET, MICROSOFT_365, GOOGLE_WORKSPACE)
+        eventType: String!      # UnifiedEventType name (LOGIN, SCRIPT_EXECUTED, ...)
+        timestamp: Instant!     # Event time, millisecond precision
         toolEventId: String!    # Tool event ID
     ): LogDetails
 }
@@ -87,7 +87,7 @@ type LogEvent implements Node {
     timestamp: Instant!
 }
 
-# Full audit details from Cassandra
+# Full audit details of one event
 type LogDetails implements Node {
     id: ID!
     toolEventId: String!
