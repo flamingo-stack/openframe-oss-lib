@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import type { DataSync } from '../../types/data-sync';
 import { formatDate } from '../../utils/format';
-import { ClickupLogoIcon } from '../icons-v2-generated/brand-logos/clickup-logo-icon';
-import { GithubLogoIcon } from '../icons-v2-generated/brand-logos/github-logo-icon';
-import { HubspotLogoIcon } from '../icons-v2-generated/brand-logos/hubspot-logo-icon';
+import { ClickupIcon } from '../icons-v2-generated/brand-logos/clickup-icon';
+import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
+import { HubspotIcon } from '../icons-v2-generated/brand-logos/hubspot-icon';
 import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface DataAttributionProps {
@@ -66,11 +66,12 @@ export function DataAttributionSkeleton() {
   );
 }
 
-/** The systems a shared page's records are mirrored from, by the `source` an API states in its `sync`. */
+/** The systems a shared page's records are mirrored from, by the `source` an API states in its `sync`, each with the
+ *  mark the rest of the app draws for it (`ClickupIcon`, `HubspotIcon`, `GithubClassicIcon`). */
 const DATA_SYNC_SOURCES = {
-  clickup: { name: 'ClickUp', Icon: ClickupLogoIcon },
-  hubspot: { name: 'HubSpot', Icon: HubspotLogoIcon },
-  github: { name: 'GitHub', Icon: GithubLogoIcon },
+  clickup: { name: 'ClickUp', Icon: ClickupIcon },
+  hubspot: { name: 'HubSpot', Icon: HubspotIcon },
+  github: { name: 'GitHub', Icon: GithubClassicIcon },
 } as const;
 
 /**
