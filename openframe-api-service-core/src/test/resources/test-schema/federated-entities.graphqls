@@ -13,3 +13,8 @@ type Machine @key(fields: "machineId") {
     machineId: String!
     hostname: String
 }
+
+type Organization @key(fields: "organizationId") {
+    organizationId: String!
+    name: String
+}

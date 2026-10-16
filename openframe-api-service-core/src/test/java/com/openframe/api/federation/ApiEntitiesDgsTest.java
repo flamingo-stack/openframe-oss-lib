@@ -15,6 +15,7 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.user.UserService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.organization.Organization;
 import com.openframe.data.service.OrganizationService;
 import com.openframe.graphql.node.NodeAutoConfiguration;
 import com.openframe.graphql.relay.NodeType;
@@ -43,13 +44,14 @@ import static org.mockito.Mockito.when;
         classes = ApiEntitiesDgsTest.EntitiesApp.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = "dgs.graphql.schema-locations=classpath:test-schema/federated-entities.graphqls")
-@MockitoBean(types = {OrganizationService.class, ToolService.class, TagService.class, ToolConnectionService.class,
+@MockitoBean(types = {ToolService.class, TagService.class, ToolConnectionService.class,
         InstalledAgentService.class, ScriptService.class, ScriptExecutionService.class, ScheduleScriptService.class,
         ScheduleRunService.class})
 class ApiEntitiesDgsTest {
 
     private static final String USER_ID = "665f1c2ab3e4d5f6a7b8c9a1";
     private static final String MACHINE_ID = "machine-1";
+    private static final String ORGANIZATION_ID = "org-1";
     private static final String TYPENAME = "__typename";
     private static final String REPRESENTATIONS = "representations";
     private static final String ENTITIES_QUERY = """
@@ -57,12 +59,14 @@ class ApiEntitiesDgsTest {
               _entities(representations: $representations) {
                 ... on User { id firstName }
                 ... on Machine { machineId hostname }
+                ... on Organization { organizationId name }
               }
             }
             """;
 
     @MockitoBean private UserService userService;
     @MockitoBean private DeviceService deviceService;
+    @MockitoBean private OrganizationService organizationService;
 
     @Autowired private DgsQueryExecutor queryExecutor;
 
@@ -70,6 +74,7 @@ class ApiEntitiesDgsTest {
 
     private UserResponse user;
     private Machine machine;
+    private Organization organization;
 
     @BeforeEach
     void setUp() {
@@ -77,6 +82,9 @@ class ApiEntitiesDgsTest {
         machine = new Machine();
         machine.setMachineId(MACHINE_ID);
         machine.setHostname("host-1");
+        organization = new Organization();
+        organization.setOrganizationId(ORGANIZATION_ID);
+        organization.setName("Acme");
     }
 
     @Test
@@ -113,6 +121,38 @@ class ApiEntitiesDgsTest {
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.<Map<String, Object>>getData())
                 .containsEntry("_entities", List.of(Map.of("id", USER_ID, "firstName", "Ada")));
+    }
+
+    @Test
+    void entities_organizationIdKey_resolvedByTheOrganizationLoader() {
+        // setup
+        when(organizationService.getOrganizationByOrganizationId(ORGANIZATION_ID)).thenReturn(Optional.of(organization));
+        Map<String, Object> organizationKey = Map.of(TYPENAME, "Organization", "organizationId", ORGANIZATION_ID);
+        Map<String, Object> variables = Map.of(REPRESENTATIONS, List.of(organizationKey));
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(ENTITIES_QUERY, variables);
+
+        // verifications
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.<Map<String, Object>>getData())
+                .containsEntry("_entities", List.of(Map.of("organizationId", ORGANIZATION_ID, "name", "Acme")));
+    }
+
+    @Test
+    void entities_unknownOrganizationId_nullWithoutError() {
+        // setup
+        when(organizationService.getOrganizationByOrganizationId(ORGANIZATION_ID)).thenReturn(Optional.empty());
+        Map<String, Object> organizationKey = Map.of(TYPENAME, "Organization", "organizationId", ORGANIZATION_ID);
+        Map<String, Object> variables = Map.of(REPRESENTATIONS, List.of(organizationKey));
+        List<Object> expected = Collections.singletonList(null);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(ENTITIES_QUERY, variables);
+
+        // verifications
+        assertThat(result.getErrors()).isEmpty();
+        assertThat(result.<Map<String, Object>>getData()).containsEntry("_entities", expected);
     }
 
     @Test

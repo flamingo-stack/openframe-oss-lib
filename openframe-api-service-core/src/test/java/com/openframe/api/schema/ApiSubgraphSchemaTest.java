@@ -130,6 +130,31 @@ class ApiSubgraphSchemaTest {
     }
 
     @ParameterizedTest
+    @ValueSource(strings = {"id", "name"})
+    void organization_nonKeyFieldServedByAiAgent_shareable(String field) {
+        // setup
+        GraphQLFieldDefinition definition = schema.getObjectType("Organization").getFieldDefinition(field);
+
+        // execution
+        boolean shareable = definition.hasAppliedDirective("shareable");
+
+        // verifications
+        assertThat(shareable).isTrue();
+    }
+
+    @Test
+    void organization_key_resolvableHere() {
+        // setup
+        GraphQLObjectType definition = schema.getObjectType("Organization");
+
+        // execution
+        Object resolvable = appliedArgument(definition, "key", "resolvable");
+
+        // verifications
+        assertThat(resolvable).isEqualTo(true);
+    }
+
+    @ParameterizedTest
     @MethodSource("ticketEnumFields")
     void ticketCopy_enumTypedLikeAiAgent(String field, String type) {
         // setup
@@ -168,6 +193,7 @@ class ApiSubgraphSchemaTest {
         return Stream.of(
                 Arguments.of("User", "id"),
                 Arguments.of("Machine", "machineId"),
+                Arguments.of("Organization", "organizationId"),
                 Arguments.of("Ticket", "id"),
                 Arguments.of("TicketStatusDefinition", "id"));
     }
