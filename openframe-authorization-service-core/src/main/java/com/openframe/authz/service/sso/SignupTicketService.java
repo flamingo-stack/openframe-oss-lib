@@ -1,5 +1,6 @@
 package com.openframe.authz.service.sso;
 
+import com.openframe.authz.dto.RegistrationAttribution;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import lombok.RequiredArgsConstructor;
@@ -39,7 +40,8 @@ public class SignupTicketService {
                                       boolean emailVerified,
                                       String subject,
                                       String userId,
-                                      String tenantId) {
+                                      String tenantId,
+                                      RegistrationAttribution attribution) {
 
         public boolean bound() {
             return userId != null && tenantId != null;
@@ -47,11 +49,12 @@ public class SignupTicketService {
     }
 
     public String create(String email, String firstName, String lastName, String provider,
-                         boolean emailVerified, String subject) {
+                         boolean emailVerified, String subject, RegistrationAttribution attribution) {
         byte[] raw = new byte[32];
         RANDOM.nextBytes(raw);
         String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
-        write(ticket, new SignupTicketPayload(email, firstName, lastName, provider, emailVerified, subject, null, null), TTL);
+        write(ticket, new SignupTicketPayload(email, firstName, lastName, provider, emailVerified, subject, null, null,
+                attribution), TTL);
         return ticket;
     }
 
@@ -71,7 +74,7 @@ public class SignupTicketService {
         Long remaining = redisTemplate.getExpire(k);
         Duration ttl = remaining != null && remaining > 0 ? Duration.ofSeconds(remaining) : TTL;
         write(ticket, new SignupTicketPayload(p.email(), p.firstName(), p.lastName(), p.provider(),
-                p.emailVerified(), p.subject(), userId, tenantId), ttl);
+                p.emailVerified(), p.subject(), userId, tenantId, p.attribution()), ttl);
     }
 
     /** Atomic single use — the token mint, and only it, calls this. */
