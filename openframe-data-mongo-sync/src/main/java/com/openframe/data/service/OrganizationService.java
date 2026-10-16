@@ -1,5 +1,6 @@
 package com.openframe.data.service;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
@@ -117,6 +118,7 @@ public class OrganizationService {
      * @param newStatus target status (ACTIVE or ARCHIVED)
      * @throws OrganizationHasMachinesException if archiving and organization has active devices
      */
+    @RetryOnOptimisticLockingFailure
     public void updateOrganizationStatus(String id, OrganizationStatus newStatus) {
         log.info("Attempting to update organization {} status to {}", id, newStatus);
 
@@ -162,6 +164,7 @@ public class OrganizationService {
      * @deprecated Use {@link #archiveOrganization(String)} instead. Deletion is not supported — archived
      * organizations must remain in the database because devices with DELETED status may come back online.
      */
+    @RetryOnOptimisticLockingFailure
     @Deprecated
     public void deleteOrganization(String id) {
         log.info("Attempting to soft delete organization with ID: {}", id);

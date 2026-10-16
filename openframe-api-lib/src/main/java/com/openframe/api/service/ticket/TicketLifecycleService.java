@@ -1,5 +1,6 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.github.pravin.raha.lexorank4j.LexoRank;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.core.exception.ConflictException;
@@ -64,6 +65,7 @@ public class TicketLifecycleService {
     private final TicketStatusHistoryService historyService;
     private final List<TicketEventListener> listeners;
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket transition(AuthPrincipal principal, @Valid TransitionTicketInput input) {
         return doTransition(principal, input, TransitionSource.MANUAL);
@@ -127,6 +129,7 @@ public class TicketLifecycleService {
     }
 
     /** Transitions a ticket to the system status of the given kind, resolving its status id for this tenant. */
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket transitionToKind(AuthPrincipal principal, String ticketId, TicketStatusKind kind, String reason) {
         TicketStatusDefinition target = requireByKind(kind);
@@ -142,6 +145,7 @@ public class TicketLifecycleService {
      * The client-reopen entry: same transition as {@link #transitionToKind}, plus the modal's
      * "what's still not working" text riding along into the reopen effects.
      */
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public void reopenToKind(AuthPrincipal principal, String ticketId, TicketStatusKind kind,
                              String reason, String reopenReason) {
@@ -231,6 +235,7 @@ public class TicketLifecycleService {
         return resolvedIds;
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket reorderTicket(AuthPrincipal principal, @Valid ReorderTicketInput input) {
         validateAdminAccess(principal);

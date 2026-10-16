@@ -1,5 +1,6 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
@@ -265,6 +266,7 @@ public class TicketService {
         return Optional.of(ticketRepository.save(transitioned));
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket updateTicket(AuthPrincipal principal, @NotBlank String ticketId, UpdateTicketInput input) {
         validateAdminAccess(principal);
@@ -293,6 +295,7 @@ public class TicketService {
         return savedTicket;
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket assignTicket(AuthPrincipal principal, @NotBlank String ticketId, @NotBlank String assigneeId) {
         validateAdminAccess(principal);
@@ -305,6 +308,7 @@ public class TicketService {
         return savedTicket;
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public void autoAssignToSelfIfUnassigned(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
@@ -322,6 +326,7 @@ public class TicketService {
         log.info("Auto-assigned ticket {} to admin {} on direct chat start", ticketId, adminId);
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket unassignTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
@@ -334,6 +339,7 @@ public class TicketService {
         return ticketRepository.save(ticket);
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket unlinkDeviceFromTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
@@ -346,6 +352,7 @@ public class TicketService {
         return ticketRepository.save(ticket);
     }
 
+    @RetryOnOptimisticLockingFailure
     @Transactional
     public Ticket unlinkOrganizationFromTicket(AuthPrincipal principal, @NotBlank String ticketId) {
         validateAdminAccess(principal);
