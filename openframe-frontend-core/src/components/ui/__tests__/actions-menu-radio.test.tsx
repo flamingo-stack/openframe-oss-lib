@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ActionsMenu, ActionsMenuDropdown } from '../actions-menu';
 
-const scope = (checked: 'my' | 'all', onPick = vi.fn()) => [
+const scope = (checked: 'my' | 'all', onPick: (scope: 'my' | 'all') => void = vi.fn()) => [
   { id: 'my', label: 'My chats', type: 'radio' as const, checked: checked === 'my', onClick: () => onPick('my') },
   { id: 'all', label: 'All chats', type: 'radio' as const, checked: checked === 'all', onClick: () => onPick('all') },
 ];
