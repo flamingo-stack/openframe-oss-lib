@@ -113,6 +113,7 @@ export type {
   NavigationSidebarMatch,
   NavigationSidebarMatchRule,
   NavigationSidebarSlot,
+  NavigationSidebarSlotState,
   SiteNav,
   SiteNavPrimaryCta,
   SlidingSidebarConfig,

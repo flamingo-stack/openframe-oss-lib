@@ -75,6 +75,15 @@ export interface AppLayoutProps {
    */
   composerDock?: ReactNode;
   /**
+   * Paints the page column — the page and the `composerDock` under it — as one
+   * surface: that surface's ground and the accent corner glow, so a chat page's
+   * background runs under the composer to the bottom of the window (`'mingo'`,
+   * with the dock's `EmbeddableChat` portalling its thread into the page). Takes
+   * effect on a column with a dock or a `contentCorner`. Omitted: the column is
+   * transparent, as before.
+   */
+  pageSurface?: 'mingo';
+  /**
    * The desktop `AppHeader`. `false` drops it from md up — the sidebar and the
    * page start at the top of the window — and keeps the phone top bar (burger,
    * logo, action cells) below md. Decided in CSS, so the first paint is right
@@ -125,6 +134,7 @@ export function AppLayout({
   topBar,
   sidePanel,
   composerDock,
+  pageSurface,
   desktopHeader = true,
   contentCorner,
   mobileMenuOpen: mobileMenuOpenProp,
@@ -297,10 +307,12 @@ export function AppLayout({
                   with Mingo v2, the dock behind the paywall) must not change
                   the element types above the page, or React remounts it. */}
                 <div
+                  data-surface={columnIsBox ? pageSurface : undefined}
                   className={
                     columnIsBox
                       ? cn(
                           'relative flex min-h-0 min-w-0 flex-1 flex-col',
+                          pageSurface && 'ods-glow-accent-corner bg-ods-bg',
                           contentCovered && 'hidden',
                           contentOverlapped && 'isolate',
                         )

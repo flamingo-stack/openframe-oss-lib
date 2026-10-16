@@ -46,6 +46,10 @@ export interface ChatComposerProps {
    *  (e.g. "Compact Chat Memory"). Empty or omitted → no menu. Not shown on an
    *  archived chat (there is no input), inert while `lock` is set. */
   menuItems?: ActionsMenuItem[];
+  /** Controls at the end of the row under the input, after the model and its
+   *  usage (e.g. "Compact chat memory"). Draws that row on its own if there is
+   *  no model. */
+  footerActions?: ReactNode;
 
   // ─── Entity-context picker (Figma 31:28708 / 1:5699) ──────────────────────
   // When `contextPicker` is set the composer renders the `+` "Assign Item"
@@ -127,6 +131,7 @@ export function ChatComposer({
   onValueChange,
   previewText,
   menuItems,
+  footerActions,
   safeAreaBottom = true,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
@@ -173,7 +178,7 @@ export function ChatComposer({
   // The row under the input: the legacy attachment `+` and the model. Neither →
   // no row at all, rather than an empty one under the input.
   const showLegacyAttach = !contextEnabled && showAttachmentButton && !!onAddFiles;
-  const showFooterRow = showLegacyAttach || !!model;
+  const showFooterRow = showLegacyAttach || !!model || !!footerActions;
 
   // The input is identical in both layouts; only `hideBorder` (context mode
   // lets the outer card own the chrome) and the `+` adornment differ.
@@ -300,6 +305,7 @@ export function ChatComposer({
             />
           )}
           <div className="min-w-0 flex-1">{model && <ModelDisplay {...model} />}</div>
+          {footerActions && <div className="flex shrink-0 items-center">{footerActions}</div>}
         </div>
       )}
     </div>

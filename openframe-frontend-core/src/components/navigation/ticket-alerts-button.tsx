@@ -49,8 +49,8 @@ export interface TicketAlertsButtonProps {
   disabled?: boolean;
   /**
    * - `cell` (default): a cell of the top bar.
-   * - `compact`: a 32px icon button with a 20px glyph and the same count pill,
-   *   for the navigation sidebar's header (`NavigationSidebarConfig.headerSlot`).
+   * - `compact`: `HeaderButton`'s compact cell with a 20px glyph and the same count pill,
+   *   for the navigation sidebar's foot, beside the account row (`footerSlot`).
    */
   variant?: 'cell' | 'compact';
   className?: string;

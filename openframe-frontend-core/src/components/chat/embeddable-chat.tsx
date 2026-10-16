@@ -546,6 +546,8 @@ export interface EmbeddableChatProps {
    * latest message (its data is the host's `mingoState`). Meant for
    * `shell="inline"`; the host must not clip the composer's root — the
    * context picker, `@` / slash menus and the memory popover open above it.
+   * The portalled thread paints no background: the host paints the area that
+   * holds the thread and the composer (`AppLayout`'s `pageSurface="mingo"`).
    */
   threadContainer?: HTMLElement | null;
 
@@ -559,6 +561,9 @@ export interface EmbeddableChatProps {
   /** The composer's own ⋯ menu, at the end of its input row (e.g. "Compact
    *  Chat Memory", disabled when there is nothing to compact). */
   composerMenuItems?: ActionsMenuItem[];
+  /** Controls under the input, at the end of the model row (e.g. "Compact chat
+   *  memory" as a button rather than in the composer's ⋯). */
+  composerFooterActions?: React.ReactNode;
   /** The composer's prompt. Default: "Enter your Request..." (v2) /
    *  "Ask a question..." (classic). Uploads in flight still say so instead. */
   composerPlaceholder?: string;
@@ -1167,6 +1172,7 @@ function EmbeddableChatInner({
   onModelClick,
   modelTooltip,
   composerMenuItems,
+  composerFooterActions,
   composerPlaceholder,
   renameMode = 'modal',
   safeAreaBottom = true,
@@ -3033,6 +3039,7 @@ function EmbeddableChatInner({
       onMentionQueryChange={handleMentionQueryChange}
       onValueChange={handleContextValueChange}
       menuItems={composerMenuItems}
+      footerActions={composerFooterActions}
       model={
         showModel
           ? {
@@ -3438,11 +3445,12 @@ function EmbeddableChatInner({
   // The header + thread, portalled into the host's node. Its own portal host
   // and collision boundary keep its menus inside it. The modals live here too:
   // they only open from this header, and the page area is where a host's own
-  // modals already render.
+  // modals already render. It paints no surface of its own: the host paints
+  // the one area that holds both the thread and the composer (`AppLayout`'s
+  // `pageSurface`), so the background does not stop at the thread's edge.
   const threadRegion = (
     <div
       ref={setThreadBoundary}
-      data-surface={isV2 ? 'mingo' : undefined}
       className={cn(
         'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden',
         previewMode && 'pointer-events-none select-none',
@@ -3452,9 +3460,7 @@ function EmbeddableChatInner({
         <CollisionBoundaryContext.Provider value={threadBoundary}>
           {pageHeader}
           {activeMode === 'guide' && hasMingoMode && <GuideModeBanner className="duration-200 animate-in fade-in-0" />}
-          <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', isV2 && 'ods-glow-accent-corner')}>
-            {archiveOpen ? archiveListNode : threadArea}
-          </div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{archiveOpen ? archiveListNode : threadArea}</div>
           {galleryModal}
           {dialogModals}
           <div ref={setThreadPortalHost} style={{ display: 'contents' }} />

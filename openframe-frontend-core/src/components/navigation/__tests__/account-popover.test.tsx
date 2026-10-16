@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, isInaccessible, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AccountPopover, type AccountPopoverEntry } from '../account-popover';
 
@@ -29,10 +29,12 @@ describe('AccountPopover', () => {
 
     const menu = await openMenu(trigger);
     expect(menu).toHaveTextContent('ada@example.com');
-    expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveAttribute('href', '/settings');
-    expect(screen.getByRole('menuitem', { name: 'Help Center' })).toHaveAttribute('href', '/help-center');
-    expect(screen.getByRole('separator')).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveClass('text-ods-error');
+    // The design system's menu: links for places, a danger row for Log out.
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    expect(screen.getByRole('link', { name: 'Help Center' })).toHaveAttribute('href', '/help-center');
+    expect(within(screen.getByRole('menuitem', { name: 'Log out' })).getByText('Log out')).toHaveClass(
+      'text-ods-error',
+    );
     expect(menu).toHaveAttribute('data-side', 'top');
   });
 
@@ -74,7 +76,8 @@ describe('AccountPopover', () => {
     render(<AccountPopover collapsed name="Ada Lovelace" subtitle="acme.openframe.ai" items={entries()} />);
 
     const trigger = screen.getByRole('button', { name: 'Account: Ada Lovelace' });
-    expect(trigger).not.toHaveTextContent('acme.openframe.ai');
+    // The name stays in the row (it fades with the rail's width) but is not read.
+    expect(isInaccessible(screen.getByText('acme.openframe.ai'))).toBe(true);
     expect(trigger).toHaveTextContent('AL');
 
     const menu = await openMenu(trigger);

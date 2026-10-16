@@ -1,6 +1,6 @@
 'use client';
 
-import { cloneElement, isValidElement, useId, useState, type MouseEvent, type ReactNode } from 'react';
+import { cloneElement, isValidElement, type MouseEvent, type ReactNode, useId, useState } from 'react';
 import Link from '../../embed-shims/next-link';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
@@ -15,13 +15,12 @@ import { UnreadDot } from './unread-dot';
  * an active pill that covers only a child's label.
  *
  * Expanded vs. collapsed is read off the RAIL'S WIDTH (`@[140px]/of-nav-sidebar:`,
- * the container `navigation-sidebar.tsx` declares), not off `minimized`. Unlike
- * the flat rows, which fade a `flex-1` label that a 56px rail leaves no room
- * for, these rows change geometry between the two states — a centred 40px cell
- * vs. an 8px inset — and a JS flag cannot be right on the first paint (before
- * hydration it can only carry the server's answer). The width can. Collapsed is
- * the default because container queries are min-width; the burger menu declares
- * the same container at its full width, so it always gets the expanded rows.
+ * the container `navigation-sidebar.tsx` declares), not off `minimized`: the
+ * labels fade and the inset glides as the width crosses 140px, and a JS flag
+ * cannot be right on the first paint (before hydration it can only carry the
+ * server's answer). The width can. Collapsed is the default because container
+ * queries are min-width; the burger menu declares the same container at its
+ * full width, so it always gets the expanded rows.
  *
  * `showLabel` is still taken, for the one thing CSS cannot carry: the rail's
  * `title` tooltip.
@@ -68,28 +67,96 @@ export function useOpenNavigationGroup(activeGroupId: string | null) {
  */
 const ACTIVE_PILL = 'bg-ods-accent-secondary text-ods-accent';
 
-const ROW_HOVER_LAYER =
-  "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:rounded-md after:bg-ods-bg-hover after:opacity-0 after:transition-opacity after:duration-150 after:content-['']";
+/** The motion curve of the grouped sidebar: quick off the mark, a long soft landing. */
+const EASE = '[transition-timing-function:cubic-bezier(0.2,0,0,1)]';
+
+/**
+ * The hover wash — the design system's `bg-hover`, a press its `bg-active` — on
+ * its own `::after` layer so the active pill never fades (see the hover-layer
+ * note in `navigation-sidebar-item.tsx`). Quick to answer the cursor, slower to
+ * let it go.
+ */
+const HOVER_LAYER = cn(
+  "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:rounded-md after:content-['']",
+  'after:bg-ods-bg-hover after:opacity-0 after:transition-opacity after:duration-200 after:ease-out',
+  'hover:after:duration-75 active:after:bg-ods-bg-active',
+  'motion-reduce:after:transition-none',
+);
+
+/** Keyboard focus, drawn inside the row so the card and the scroller do not clip it. */
+const FOCUS_RING = 'outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus';
+
+/**
+ * The 44px row geometry shared by a top-level entry, a group's parent and an
+ * action row. The icon keeps its place while the rail widens or narrows: 10px
+ * in (centred in the rail's 40px cell), 8px once expanded — a 2px glide. A row
+ * that re-centred its icon (`justify-center` in the rail) moved it ~50px in the
+ * frame the width crossed 140px, mid-toggle.
+ */
+const ROW_CLASSES = cn(
+  'relative isolate flex h-11 w-full items-center overflow-hidden rounded-md text-left',
+  'pl-2.5 pr-0 @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]',
+  'transition-[padding] duration-300 motion-reduce:transition-none',
+  EASE,
+  FOCUS_RING,
+  HOVER_LAYER,
+);
+
+/**
+ * The idle icon brightens with its row's hover. Lit icons get no transition, so
+ * the accent arrives in the commit that makes the row the page, like the pill.
+ */
+const idleIcon = (group: 'row' | 'child') =>
+  cn(
+    'text-ods-text-secondary transition-colors duration-150',
+    group === 'row' ? 'group-hover/nav-row:text-ods-text-primary' : 'group-hover/nav-child:text-ods-text-primary',
+  );
+
+/**
+ * What only the expanded sidebar shows (labels, stamps, counts). In the rail it
+ * is still there, zero-wide and transparent, so crossing 140px fades it rather
+ * than popping it in or out.
+ */
+const EXPANDED_ONLY =
+  'opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none';
 
 interface RowStateProps {
   showLabel: boolean;
   disabled: boolean;
 }
 
+/** The count pill: 24px, widening for "99+". */
+function CountPill({ count, className }: { count: number; className?: string }) {
+  return (
+    <span
+      className={cn(
+        'flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xxs)]',
+        className,
+      )}
+    >
+      <span className="text-ods-text-on-accent text-h5">{count > 99 ? '99+' : count}</span>
+    </span>
+  );
+}
+
+/** The row's end, flush right where every row's count sits. */
+function RowEnd({ count }: { count: number }) {
+  return count > 0 ? <CountPill count={count} className="ml-auto" /> : null;
+}
+
 function RowLabel({ item }: { item: NavigationSidebarItem }) {
   const unreadCount = item.unreadCount ?? 0;
   return (
-    <>
-      <span className="ml-[var(--spacing-system-xsf)] hidden min-w-0 flex-1 items-center @[140px]/of-nav-sidebar:flex">
-        <span className="min-w-0 truncate text-h4">{item.label}</span>
-        {item.badge && <NavigationItemBadge label={item.badge} className="ml-[var(--spacing-system-xs)] shrink-0" />}
-      </span>
-      {unreadCount > 0 && (
-        <span className="ml-[var(--spacing-system-xs)] hidden size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2 @[140px]/of-nav-sidebar:flex">
-          <span className="text-ods-text-on-accent text-h5">{unreadCount > 99 ? '99+' : unreadCount}</span>
-        </span>
+    <span
+      className={cn(
+        'ml-[var(--spacing-system-xsf)] flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] overflow-hidden',
+        EXPANDED_ONLY,
       )}
-    </>
+    >
+      <span className="min-w-0 truncate text-h4">{item.label}</span>
+      {item.badge && <NavigationItemBadge label={item.badge} compact />}
+      <RowEnd count={unreadCount} />
+    </span>
   );
 }
 
@@ -103,13 +170,6 @@ function RowIcon({ item, size, className }: { item: NavigationSidebarItem; size:
     </span>
   );
 }
-
-/** The 44px row geometry shared by a top-level entry and a group's parent. */
-const ROW_CLASSES = cn(
-  'relative isolate flex h-11 w-full items-center justify-center rounded-md px-0 text-left',
-  '@[140px]/of-nav-sidebar:justify-start @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]',
-  ROW_HOVER_LAYER,
-);
 
 /** An entry without children: a link (or a button for `onClick` / disabled). */
 function GroupedLeafRow({
@@ -126,22 +186,18 @@ function GroupedLeafRow({
   onClick: (item: NavigationSidebarItem, event?: MouseEvent) => void;
 }) {
   const name = accessibleName(item);
+  const lit = isActive && !disabled;
   const className = cn(
+    'group/nav-row',
     ROW_CLASSES,
     !disabled && !isActive && 'text-ods-text-primary hover:after:opacity-100',
     !disabled && !isActive && isPending && 'after:opacity-100',
-    // The pill is a statement of fact, so it switches in one frame rather than
-    // fading — see the hover-layer note in `navigation-sidebar-item.tsx`.
-    !disabled && isActive && ACTIVE_PILL,
+    lit && ACTIVE_PILL,
     disabled && 'cursor-not-allowed text-ods-text-secondary opacity-50',
   );
   const content = (
     <>
-      <RowIcon
-        item={item}
-        size={20}
-        className={isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-secondary'}
-      />
+      <RowIcon item={item} size={20} className={lit ? 'text-ods-accent' : idleIcon('row')} />
       <RowLabel item={item} />
     </>
   );
@@ -169,6 +225,7 @@ function GroupedLeafRow({
  * One child of an open group: a 20px column holding the 16px icon between two
  * connector segments, then the label. The active pill covers the label only;
  * in the rail, where there is no label, the active child is its accent icon.
+ * The hover wash is the pill's shape, lit by the whole row.
  */
 function GroupedChildRow({
   item,
@@ -186,8 +243,13 @@ function GroupedChildRow({
   const name = accessibleName(item);
   const lit = isActive && !disabled;
   const className = cn(
-    'group/nav-child relative flex h-11 w-full items-stretch justify-center text-left',
-    '@[140px]/of-nav-sidebar:justify-start @[140px]/of-nav-sidebar:gap-[var(--spacing-system-xxs)]',
+    'group/nav-child relative flex h-11 w-full items-stretch gap-[var(--spacing-system-xxs)] rounded-md text-left',
+    // The icon column under the parent's icon: 2px in while the card is the
+    // rail's (centred in its 24px), flush once expanded — as the parent glides.
+    'pl-0.5 @[140px]/of-nav-sidebar:pl-0',
+    'transition-[padding] duration-300 motion-reduce:transition-none',
+    EASE,
+    FOCUS_RING,
     disabled && 'cursor-not-allowed opacity-50',
   );
   const content = (
@@ -197,32 +259,24 @@ function GroupedChildRow({
         <RowIcon
           item={item}
           size={16}
-          className={cn(
-            'my-[var(--spacing-system-xxs)]',
-            lit ? 'text-ods-accent' : 'text-ods-text-secondary',
-            !lit && !disabled && 'group-hover/nav-child:text-ods-text-primary',
-          )}
+          className={cn('my-[var(--spacing-system-xxs)]', lit ? 'text-ods-accent' : idleIcon('child'))}
         />
         <span className="h-2.5 w-px shrink-0 bg-ods-border" />
       </span>
       <span
         className={cn(
-          'hidden min-w-0 flex-1 items-center rounded-md px-[var(--spacing-system-xsf)] @[140px]/of-nav-sidebar:flex',
+          'relative isolate flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] overflow-hidden rounded-md px-[var(--spacing-system-xsf)]',
+          EXPANDED_ONLY,
+          HOVER_LAYER,
           lit && ACTIVE_PILL,
           !lit &&
-            (disabled ? 'text-ods-text-secondary' : 'text-ods-text-primary group-hover/nav-child:bg-ods-bg-hover'),
-          !lit && !disabled && isPending && 'bg-ods-bg-hover',
+            (disabled ? 'text-ods-text-secondary' : 'text-ods-text-primary group-hover/nav-child:after:opacity-100'),
+          !lit && !disabled && isPending && 'after:opacity-100',
         )}
       >
         <span className="min-w-0 truncate text-h4">{item.label}</span>
-        {item.badge && <NavigationItemBadge label={item.badge} className="ml-[var(--spacing-system-xs)] shrink-0" />}
-        {(item.unreadCount ?? 0) > 0 && (
-          <span className="ml-auto flex size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2">
-            <span className="text-ods-text-on-accent text-h5">
-              {(item.unreadCount ?? 0) > 99 ? '99+' : item.unreadCount}
-            </span>
-          </span>
-        )}
+        {item.badge && <NavigationItemBadge label={item.badge} compact />}
+        <RowEnd count={item.unreadCount ?? 0} />
       </span>
     </>
   );
@@ -247,9 +301,18 @@ function GroupedChildRow({
 }
 
 /**
- * A parent and, while open, its card. The parent row stays the wrapper's first
- * child in both states, so opening a group re-styles the button rather than
- * remounting it — keyboard focus stays on the parent the user just toggled.
+ * A parent and its card. The parent row stays the wrapper's first child in
+ * both states, so opening a group re-styles the button rather than remounting
+ * it — keyboard focus stays on the parent the user just toggled.
+ *
+ * The children stay mounted so the card can open and fold as a motion: the
+ * grid row eases between `0fr` and `1fr` (the design system's collapse, see
+ * `AnnouncementBar`), the rows fade and settle, the card's border and ground
+ * fade in. A folded group is `inert` and, once folded, `invisible`: out of the
+ * tab order and the accessibility tree, as an unmounted one was.
+ *
+ * The border is transparent while folded, and the `-m-px` hands its pixel back,
+ * so a folded group's row sits exactly where a leaf row does.
  */
 function GroupedGroup({
   item,
@@ -271,17 +334,25 @@ function GroupedGroup({
   const groupDomId = `${useId()}-group`;
   const name = accessibleName(item);
   const children = item.children ?? [];
+  const lit = isOpen && !disabled;
   return (
-    <div className={cn(isOpen && 'rounded-md border border-ods-border bg-ods-bg')}>
+    <div
+      className={cn(
+        '-m-px rounded-md border transition-[border-color,background-color] duration-300 motion-reduce:transition-none',
+        EASE,
+        isOpen ? 'border-ods-border bg-ods-bg' : 'border-transparent',
+      )}
+    >
       <button
         type="button"
         onClick={() => onGroupClick(item)}
         disabled={disabled}
         aria-expanded={isOpen}
-        aria-controls={isOpen ? groupDomId : undefined}
+        aria-controls={groupDomId}
         aria-label={name}
         title={showLabel ? undefined : name}
         className={cn(
+          'group/nav-row',
           ROW_CLASSES,
           // The open group's parent is accent with no background, whether or
           // not one of its children is the current page.
@@ -290,33 +361,43 @@ function GroupedGroup({
           disabled && 'cursor-not-allowed text-ods-text-secondary opacity-50',
         )}
       >
-        <RowIcon
-          item={item}
-          size={20}
-          className={isOpen && !disabled ? 'text-ods-accent' : 'text-ods-text-secondary'}
-        />
+        <RowIcon item={item} size={20} className={lit ? 'text-ods-accent' : idleIcon('row')} />
         <RowLabel item={item} />
       </button>
-      {isOpen && (
-        <div
-          id={groupDomId}
-          role="group"
-          aria-label={item.label}
-          className="flex flex-col px-[var(--spacing-system-xsf)] pb-[var(--spacing-system-xsf)]"
-        >
-          {children.map(child => (
-            <GroupedChildRow
-              key={child.id}
-              item={child}
-              isActive={child.id === activeId}
-              isPending={child.id === pendingId}
-              showLabel={showLabel}
-              disabled={disabled}
-              onClick={onItemClick}
-            />
-          ))}
+      <div
+        id={groupDomId}
+        role="group"
+        aria-label={item.label}
+        inert={!isOpen}
+        className={cn(
+          'grid transition-[grid-template-rows,visibility] duration-300 motion-reduce:transition-none',
+          EASE,
+          isOpen ? 'visible grid-rows-[1fr]' : 'invisible grid-rows-[0fr]',
+        )}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div
+            className={cn(
+              'flex flex-col px-[var(--spacing-system-xsf)] pb-[var(--spacing-system-xsf)]',
+              'transition-[opacity,transform] duration-300 motion-reduce:transition-none',
+              EASE,
+              isOpen ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0',
+            )}
+          >
+            {children.map(child => (
+              <GroupedChildRow
+                key={child.id}
+                item={child}
+                isActive={child.id === activeId}
+                isPending={child.id === pendingId}
+                showLabel={showLabel}
+                disabled={disabled}
+                onClick={onItemClick}
+              />
+            ))}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -398,8 +479,8 @@ export interface NavigationSidebarActionRowProps {
 
 /**
  * A row for a grouped sidebar's slots (`topSlot`): the nav entry's geometry —
- * 44px with an 8px inset, a centred 40px cell in the rail — its active pill and
- * count pill, for what is not a nav entry: an action ("New chat",
+ * 44px with an 8px inset, the icon centred in the rail — its hover, active pill
+ * and count pill, for what is not a nav entry: an action ("New chat",
  * `variant="outline"`) or a host-owned destination with its own count ("Needs
  * approval"). Renders in the mobile burger menu too, expanded.
  */
@@ -422,6 +503,7 @@ export function NavigationSidebarActionRow({
   const outline = variant === 'outline';
   const name = ariaLabel ?? (count > 0 ? `${label} (${count > 99 ? '99+' : count})` : label);
   const classes = cn(
+    'group/nav-row',
     ROW_CLASSES,
     outline && 'border border-ods-border',
     !disabled && !lit && 'text-ods-text-primary hover:after:opacity-100',
@@ -431,11 +513,7 @@ export function NavigationSidebarActionRow({
   );
   const content = (
     <>
-      <RowIcon
-        item={entry}
-        size={20}
-        className={lit || (outline && !disabled) ? 'text-ods-accent' : 'text-ods-text-secondary'}
-      />
+      <RowIcon item={entry} size={20} className={lit || (outline && !disabled) ? 'text-ods-accent' : idleIcon('row')} />
       <RowLabel item={entry} />
     </>
   );
@@ -458,11 +536,11 @@ export function NavigationSidebarActionRow({
 export function NavigationSidebarGroupedSkeleton() {
   return (
     <div
-      className="flex h-11 w-full items-center justify-center @[140px]/of-nav-sidebar:justify-start @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]"
+      className="flex h-11 w-full items-center overflow-hidden pl-2.5 @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)]"
       aria-hidden="true"
     >
       <UnifiedSkeleton className="size-5 shrink-0 rounded" />
-      <UnifiedSkeleton className="ml-[var(--spacing-system-xsf)] hidden h-4 flex-1 rounded @[140px]/of-nav-sidebar:block" />
+      <UnifiedSkeleton className={cn('ml-[var(--spacing-system-xsf)] h-4 min-w-0 flex-1 rounded', EXPANDED_ONLY)} />
     </div>
   );
 }

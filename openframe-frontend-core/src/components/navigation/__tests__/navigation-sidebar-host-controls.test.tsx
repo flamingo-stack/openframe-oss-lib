@@ -1,14 +1,13 @@
 /**
- * What a host puts into the grouped sidebar besides its entries: controls in
- * the 56px header (`headerSlot`), a reveal command (`revealSignal`) and rows
- * for its own actions (`NavigationSidebarActionRow`).
+ * What a host puts into the grouped sidebar besides its entries: a reveal
+ * command (`revealSignal`) and rows for its own actions
+ * (`NavigationSidebarActionRow`).
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NavigationSidebarConfig } from '../../../types/navigation';
-import { MobileBurgerMenu } from '../mobile-burger-menu';
 import { NavigationSidebar } from '../navigation-sidebar';
 import { NavigationSidebarActionRow } from '../navigation-sidebar-grouped';
 
@@ -37,59 +36,6 @@ const footer: NavigationSidebarConfig['footerSlot'] = ({ minimized }) => (minimi
 
 beforeEach(() => window.localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
-
-describe('NavigationSidebar headerSlot', () => {
-  // The header is a role-less box: these read the sidebar's serialized markup.
-  const sidebarMarkup = () => screen.getByRole('complementary', { name: 'Main navigation sidebar' }).outerHTML;
-
-  it('leaves the header as it was without one', () => {
-    render(<NavigationSidebar config={{ variant: 'grouped', items: [] }} />);
-    expect(sidebarMarkup()).toMatch(
-      /^<aside [^>]*><div class="flex h-14 items-center justify-start border-b border-ods-border p-\[var\(--spacing-system-m\)\]">/,
-    );
-    expect(sidebarMarkup()).not.toMatch(/flex-wrap/);
-  });
-
-  it('draws the controls in the header: beside the logo from 140px, stacked under it in the rail', () => {
-    render(
-      <NavigationSidebar
-        config={{ variant: 'grouped', items: [], headerSlot: <button type="button">Notifications</button> }}
-      />,
-    );
-    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
-    const markup = sidebarMarkup();
-    // The header comes first and holds the controls, above the nav: collapsed
-    // (a column) by default, the rail's width takes it to the 56px row.
-    expect(markup).toMatch(
-      /^<aside [^>]*><div class="flex shrink-0 flex-col items-center border-b [^"]*@\[140px\]\/of-nav-sidebar:h-14 @\[140px\]\/of-nav-sidebar:flex-row[^"]*">/,
-    );
-    expect(markup).toMatch(
-      /<div class="flex shrink-0 flex-col items-center [^"]*@\[140px\]\/of-nav-sidebar:flex-row[^"]*"><button type="button">Notifications<\/button><\/div><\/div>/,
-    );
-    expect(markup.indexOf('Notifications')).toBeLessThan(markup.indexOf('<nav'));
-    // The wordmark wraps away, whole, when the controls leave it no room.
-    expect(markup).toMatch(/<div class="flex h-\[15px\] flex-wrap overflow-hidden">/);
-  });
-
-  it('hands a render function the sidebar’s own minimized state', () => {
-    window.localStorage.setItem(STORAGE_KEY, 'true');
-    const slot = vi.fn(({ minimized }: { minimized: boolean }) => (minimized ? 'rail controls' : 'row controls'));
-    render(<NavigationSidebar config={{ variant: 'grouped', items: [], headerSlot: slot }} />);
-    expect(screen.getByText('rail controls')).toBeInTheDocument();
-    expect(slot).toHaveBeenLastCalledWith({ minimized: true });
-  });
-
-  it('is not drawn in the mobile burger menu (the top bar carries those controls)', () => {
-    render(
-      <MobileBurgerMenu
-        isOpen
-        onClose={vi.fn()}
-        config={{ variant: 'grouped', items: [], headerSlot: <button type="button">Notifications</button> }}
-      />,
-    );
-    expect(screen.queryByRole('button', { name: 'Notifications' })).not.toBeInTheDocument();
-  });
-});
 
 describe('NavigationSidebar revealSignal', () => {
   function Host({ initial, config }: { initial: number; config?: Partial<NavigationSidebarConfig> }) {

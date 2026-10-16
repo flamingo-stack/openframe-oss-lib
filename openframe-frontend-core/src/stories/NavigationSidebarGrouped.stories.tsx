@@ -170,7 +170,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "`variant: 'grouped'` — the Figma navigation sidebar: parents open into a bordered card, one group open at a time (the one holding the current page), a closed parent goes to its first child, an open one folds. Active entries resolve from `currentPath` through `match` / `path`.",
+          "`variant: 'grouped'` — the Figma navigation sidebar: parents open into a bordered card, one group open at a time (the one holding the current page); a parent only opens and folds its group, with a motion. Active entries resolve from `currentPath` through `match` / `path`.",
       },
     },
   },
@@ -205,11 +205,6 @@ export const GroupOpenWithoutActiveChild: Story = {
       }}
     />
   ),
-};
-
-/** `groupParentClick: 'expand'` — a closed parent only opens. */
-export const ExpandOnly: Story = {
-  render: () => <GroupedHost initialPath="/devices" config={{ groupParentClick: 'expand' }} />,
 };
 
 /** The 56px rail (controlled): icon cells, the open group's card with its child icons on the connector. */
@@ -358,27 +353,32 @@ const TRACKER: TimeTrackerData = {
 };
 
 /**
- * The header controls (`headerSlot`): the compact time tracker and bell, and —
- * standing in for `TicketAlertsButton variant="compact"`, which needs a live
- * ticket stream — a 32px button with the same count pill. In the rail
- * (`minimized`) the tracker's panel opens to the right.
+ * The foot (`footerSlot`): the account row, and beside it the compact time
+ * tracker and bell (stacked over the avatar in the rail) — standing in for
+ * `TicketAlertsButton variant="compact"`, which needs a live ticket stream, a
+ * 32px button with the same count pill.
  */
-function headerControls({ minimized }: { minimized: boolean }) {
+function footerControls({ minimized }: { minimized: boolean }) {
   return (
-    <>
-      <TimeTrackerHeaderButton variant="compact" popoverSide={minimized ? 'right' : 'bottom'} />
-      <NotificationsBellButton variant="compact" />
-      <HeaderButton
-        size="compact"
-        aria-label="Support tickets — 2 unread updates"
-        icon={
-          <span className="relative inline-flex">
-            <LifeBuoyIcon className="h-5 w-5" />
-            <UnreadCountBadge count={2} />
-          </span>
-        }
-      />
-    </>
+    <div className="flex flex-col-reverse items-center gap-[var(--spacing-system-xxs)] @[140px]/of-nav-sidebar:flex-row">
+      <div className="w-full min-w-0 @[140px]/of-nav-sidebar:flex-1">
+        <AccountPopover collapsed={minimized} name="Ada Lovelace" email="ada@acme.example" items={ACCOUNT_ITEMS} />
+      </div>
+      <div className="flex w-full shrink-0 flex-col gap-[var(--spacing-system-xxs)] @[140px]/of-nav-sidebar:w-auto @[140px]/of-nav-sidebar:flex-row @[140px]/of-nav-sidebar:items-center">
+        <TimeTrackerHeaderButton variant="compact" popoverSide="right" popoverAlign="end" />
+        <NotificationsBellButton variant="compact" />
+        <HeaderButton
+          size="compact"
+          aria-label="Support tickets — 2 unread updates"
+          icon={
+            <span className="relative inline-flex">
+              <LifeBuoyIcon className="h-5 w-5" />
+              <UnreadCountBadge count={2} />
+            </span>
+          }
+        />
+      </div>
+    </div>
   );
 }
 
@@ -426,7 +426,7 @@ function HeaderControlsHost({ initialCollapsed }: { initialCollapsed: boolean })
               onNavigate: setCurrentPath,
               collapsed,
               onCollapsedChange: setCollapsed,
-              headerSlot: headerControls,
+              footerSlot: footerControls,
               topSlot: mingoRows(currentPath, setCurrentPath),
               sectionSlot: <ChatHistoryPlaceholder />,
             }}
@@ -441,16 +441,15 @@ function HeaderControlsHost({ initialCollapsed }: { initialCollapsed: boolean })
 }
 
 /**
- * The Mingo-first sidebar: the time tracker, bell and ticket alerts in the 56px
- * header beside the logo (`headerSlot`, compact buttons) — with all three the
- * wordmark gives way — and the Mingo rows above the tree
- * (`NavigationSidebarActionRow`).
+ * The Mingo-first sidebar: the Mingo rows above the tree
+ * (`NavigationSidebarActionRow`), and the time tracker, bell and ticket alerts
+ * as compact buttons beside the account row; the header is the logo alone.
  */
 export const HeaderControlsAndActionRows: Story = {
   render: () => <HeaderControlsHost initialCollapsed={false} />,
 };
 
-/** The same in the 56px rail: the header controls stacked under the logo mark, the rows as 40px cells. */
+/** The same in the 56px rail: every row an icon cell, the foot's buttons stacked over the avatar. */
 export const HeaderControlsCollapsed: Story = {
   render: () => <HeaderControlsHost initialCollapsed />,
 };
@@ -509,14 +508,10 @@ function PagedHistory() {
 }
 
 /**
- * The Mingo-first sidebar in a short window: `expandedWidth: 264` (room for
- * "Needs approval" with its count and "Cloud tenants" with its chip) and
- * `sectionMinHeight: 320` in an 800px-tall frame. The Mingo rows, the open
- * Inventory card and the tree leave the history less than 320px, so the whole
+ * The Mingo-first sidebar in an 800px-tall frame, `expandedWidth: 264` (room
+ * for "Needs approval" with its count and "Cloud tenants" with its chip). The
  * body scrolls as one — rows, tree and the history at full height — and the
- * next page loads as the end of the history scrolls into the body. Fold
- * Inventory, or give the frame more height, and the history fills the rest and
- * scrolls on its own again.
+ * next page loads as the end of the history scrolls into the body.
  */
 export const ShortWindowWideSidebar: Story = {
   render: function ShortWindowWideSidebarStory() {
@@ -530,7 +525,6 @@ export const ShortWindowWideSidebar: Story = {
             currentPath,
             onNavigate: setCurrentPath,
             expandedWidth: 264,
-            sectionMinHeight: 320,
             topSlot: mingoRows(currentPath, setCurrentPath),
             sectionSlot: <PagedHistory />,
             footerSlot: ({ minimized }) => (

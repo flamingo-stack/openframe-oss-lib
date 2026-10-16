@@ -15,8 +15,7 @@ import {
 } from './navigation-sidebar-grouped';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item';
-import { firstNavigableChild, resolveNavigationActive } from './navigation-sidebar-match';
-import { navigationSectionLayout, useNavigationSectionScroller } from './navigation-sidebar-section';
+import { resolveNavigationActive } from './navigation-sidebar-match';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
@@ -377,25 +376,11 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     [config, isTablet, committedActiveId],
   );
 
-  // A group parent (grouped variant). An open one folds. A closed one opens —
-  // the one-open rule closes whichever was open — and, unless the host asked
-  // for `'expand'`, also goes to its first child, through the same path as a
-  // click on that child (pending hint, `onNavigate`, the tablet overlay closing
-  // behind it). A closed group that holds the current page (the user folded
-  // it) only re-opens: navigating would take them OFF the page they are on.
+  // A group parent (grouped variant) only opens and folds; it goes nowhere. The
+  // one-open rule closes whichever group was open.
   const handleGroupClick = useCallback(
-    (item: NavigationSidebarItem) => {
-      if (openGroupId === item.id) {
-        setOpenGroupId(null);
-        return;
-      }
-      setOpenGroupId(item.id);
-      if ((config.groupParentClick ?? 'first-child') !== 'first-child' || activeGroupId === item.id) return;
-      const first = firstNavigableChild(item);
-      // Without `onNavigate` a button has nowhere to send a path; it only opens.
-      if (first && (first.onClick || config.onNavigate)) handleItemClick(first);
-    },
-    [openGroupId, setOpenGroupId, config.groupParentClick, config.onNavigate, activeGroupId, handleItemClick],
+    (item: NavigationSidebarItem) => setOpenGroupId(current => (current === item.id ? null : item.id)),
+    [setOpenGroupId],
   );
 
   const { primaryItems, secondaryItems } = useMemo(
@@ -421,30 +406,22 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     };
   }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary]);
 
+  // The grouped rows glide and fade with the width, on the same curve.
+  const widthTransition = cn(
+    'transition-[width] duration-300',
+    grouped && '[transition-timing-function:cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+  );
+
   const sidebarWidth = useMemo(
     () => (minimized ? `${MINIMIZED_WIDTH}px` : `${expandedWidth}px`),
     [minimized, expandedWidth],
   );
 
-  // `sectionMinHeight`: who scrolls the section, measured. Only while expanded
-  // — in the rail a node section is hidden and a function one is the host's to
-  // size, so there the section keeps its old floor.
-  const sectionMinHeight = grouped && !minimized ? config.sectionMinHeight : undefined;
-  const section = useNavigationSectionScroller(sectionMinHeight);
-  const sectionRailHidden = typeof config.sectionSlot !== 'function' && 'hidden @[140px]/of-nav-sidebar:flex';
-  const sectionLayout =
-    sectionMinHeight === undefined
-      ? {
-          className: cn(
-            'my-[var(--spacing-system-mf)] flex min-h-40 flex-1 flex-col overflow-y-auto',
-            sectionRailHidden,
-          ),
-        }
-      : navigationSectionLayout(
-          section.scroller,
-          sectionMinHeight,
-          cn('my-[var(--spacing-system-mf)]', sectionRailHidden),
-        );
+  // Shown from 140px, fading in as it arrives (the rows' labels fade the same
+  // way, and a node section has no width to fade in below that).
+  const sectionRailHidden =
+    typeof config.sectionSlot !== 'function' &&
+    'hidden @[140px]/of-nav-sidebar:flex animate-in fade-in duration-300 motion-reduce:animate-none';
 
   // Published to CSS from an EFFECT, never from render. Before hydration the
   // width belongs to whatever seeded `NAVIGATION_SIDEBAR_WIDTH_VAR` in `<head>`
@@ -537,7 +514,7 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
               ? 'w-56'
               : 'w-[var(--of-navigation-sidebar-expanded-width)]'
             : 'w-14',
-          transitionsEnabled && 'transition-[width] duration-300',
+          transitionsEnabled && widthTransition,
         )}
         style={expandedWidthStyle}
         aria-hidden="true"
@@ -557,13 +534,13 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
             : customExpandedWidth === null
               ? SIDEBAR_TABLET_WIDTH.overlay
               : SIDEBAR_TABLET_WIDTH.customOverlay,
-          transitionsEnabled && 'transition-[width] duration-300',
+          transitionsEnabled && widthTransition,
           config.className,
         )}
         style={expandedWidthStyle}
         aria-label="Main navigation sidebar"
       >
-        <NavigationSidebarHeader minimized={minimized} slot={config.headerSlot} />
+        <NavigationSidebarHeader minimized={minimized} />
 
         <div
           className={cn(
@@ -571,9 +548,9 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
             grouped ? 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-mf)]' : 'py-4',
           )}
         >
-          {/* The top slot and the primary nav are ONE `justify-between` child.
-              As siblings they would be three, and the spare space would open
-              between the slot and the nav instead of between the two navs. */}
+          {/* The top slot, the primary nav and the section are ONE
+              `justify-between` child. As siblings the spare space would open
+              between them instead of above the secondary nav. */}
           <div className="flex flex-col">
             {config.topSlot?.({ minimized })}
 
@@ -586,21 +563,25 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
             >
               {renderEntries(loadingRows?.primary ?? null, primaryItems)}
             </nav>
-          </div>
 
-          {/* The host's section (the chat history): the remaining height, its own
-              scroll, so the tree above stays in view. Kept from collapsing to
-              nothing on a short window — below its minimum the whole body scrolls
-              instead; with `sectionMinHeight`, the body scrolls the section too,
-              drawn at its full height (`useNavigationSectionScroller`). A node has
-              no use for a 56px rail and is hidden there by the rail's width
-              (mounted, so its scroll and search survive a toggle); a function
-              decides for itself. */}
-          {hasNavigationSidebarSlot(config.sectionSlot) && (
-            <div ref={sectionMinHeight === undefined ? undefined : section.ref} {...sectionLayout}>
-              {renderNavigationSidebarSlot(config.sectionSlot, minimized)}
-            </div>
-          )}
+            {/* The host's section (the chat history), in the flow at its full
+                height: the body scrolls the tree and the section as one, so
+                there is one scroll to follow and none to get caught in. A node
+                has no use for a 56px rail and is hidden there by the rail's
+                width (mounted, so its search survives a toggle); a function
+                decides for itself. */}
+            {hasNavigationSidebarSlot(config.sectionSlot) && (
+              // A divider between the tree and the section, as under the top slot's rows.
+              <div
+                className={cn(
+                  'mt-[var(--spacing-system-xsf)] flex flex-col border-t border-ods-border pt-[var(--spacing-system-sf)]',
+                  sectionRailHidden,
+                )}
+              >
+                {renderNavigationSidebarSlot(config.sectionSlot, { minimized, inDrawer: false })}
+              </div>
+            )}
+          </div>
 
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
             <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
@@ -614,7 +595,7 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
             `minimized`, a node is clipped to the rail. */}
         {hasNavigationSidebarSlot(config.footerSlot) && (
           <div className="shrink-0 overflow-hidden border-t border-ods-border px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]">
-            {renderNavigationSidebarSlot(config.footerSlot, minimized)}
+            {renderNavigationSidebarSlot(config.footerSlot, { minimized, inDrawer: false })}
           </div>
         )}
 

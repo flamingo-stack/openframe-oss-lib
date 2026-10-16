@@ -35,7 +35,9 @@ describe('MobileBurgerMenu grouped', () => {
           items,
           currentPath: '/devices',
           sectionSlot: <p>Chat history</p>,
-          footerSlot: ({ minimized }) => <span>{minimized ? 'rail' : 'account row'}</span>,
+          footerSlot: ({ minimized, inDrawer }) => (
+            <span>{minimized ? 'rail' : inDrawer ? 'account row' : 'sidebar'}</span>
+          ),
         }}
       />,
     );

@@ -7,6 +7,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { groupDialogsByDay } from '../mingo-chat-day-groups';
+import { MingoChatSearchModal } from '../mingo-chat-history-section';
 import { MingoChatRail } from '../mingo-chat-rail';
 import type { DialogItem } from '../types/component.types';
 
@@ -149,42 +150,48 @@ describe('MingoChatRail variant="section"', () => {
     expect(onOpenArchive).toHaveBeenCalledTimes(1);
   });
 
-  it('opens the search through the host when controlled, and closes it on Escape with the term cleared', async () => {
+  it('asks the host to open the search when controlled, and leaves the modal to it', () => {
     const onSearchOpenChange = vi.fn();
-    const onSearchChange = vi.fn();
-    const props = { variant: 'section' as const, dialogs: DIALOGS, onSearchOpenChange, onSearchChange };
+    const props = { variant: 'section' as const, dialogs: DIALOGS, onSearchOpenChange, onSearchChange: vi.fn() };
     const { rerender } = render(<MingoChatRail {...props} searchOpen={false} />);
-    expect(screen.queryByPlaceholderText('Search for Chats')).not.toBeInTheDocument();
-
     fireEvent.click(screen.getByRole('button', { name: 'Search chats' }));
     expect(onSearchOpenChange).toHaveBeenCalledWith(true);
-    // The host owns the state: nothing opens until it says so.
-    expect(screen.queryByPlaceholderText('Search for Chats')).not.toBeInTheDocument();
-
-    // e.g. the host's ⌘K
+    // Drawn twice in a sidebar (the sidebar and the phone drawer): the host's one modal.
     rerender(<MingoChatRail {...props} searchOpen />);
-    const input = screen.getByPlaceholderText('Search for Chats');
-    expect(input).toHaveFocus();
-
-    fireEvent.change(input, { target: { value: 'vpn' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-    expect(onSearchChange).toHaveBeenLastCalledWith('');
-    await waitFor(() => expect(onSearchOpenChange).toHaveBeenLastCalledWith(false));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('closes an empty search field on blur', async () => {
-    const onSearchOpenChange = vi.fn();
+  it('MingoChatSearchModal: focuses the field, sends the term, and clears it on Escape', async () => {
+    const onOpenChange = vi.fn();
+    const onSearchChange = vi.fn();
+    render(<MingoChatSearchModal open onOpenChange={onOpenChange} onSearchChange={onSearchChange} dialogs={DIALOGS} />);
+    const input = screen.getByPlaceholderText('Search for Chats');
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: 'vpn' } });
+    await waitFor(() => expect(onSearchChange).toHaveBeenLastCalledWith('vpn'));
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onSearchChange).toHaveBeenLastCalledWith('');
+    expect(onOpenChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('MingoChatSearchModal: picking a result opens it and closes the search', () => {
+    const onSelectDialog = vi.fn();
+    const onOpenChange = vi.fn();
     render(
-      <MingoChatRail
-        variant="section"
-        dialogs={DIALOGS}
-        searchOpen
-        onSearchOpenChange={onSearchOpenChange}
+      <MingoChatSearchModal
+        open
+        onOpenChange={onOpenChange}
         onSearchChange={vi.fn()}
+        onSelectDialog={onSelectDialog}
+        dialogs={DIALOGS}
       />,
     );
-    fireEvent.blur(screen.getByPlaceholderText('Search for Chats'));
-    await waitFor(() => expect(onSearchOpenChange).toHaveBeenCalledWith(false));
+    const modal = screen.getByRole('dialog');
+    expect(within(modal).getByRole('heading', { name: 'Search chats' })).toBeInTheDocument();
+    fireEvent.click(within(modal).getByRole('button', { name: 'osquery check' }));
+    expect(onSelectDialog).toHaveBeenCalledWith('a');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
   it('keeps its own search state without a host one', async () => {
@@ -229,19 +236,22 @@ describe('MingoChatRail variant="section"', () => {
     expect(screen.queryByRole('img', { name: 'Owner: Roman Smith' })).not.toBeInTheDocument();
   });
 
-  it('draws the scope as the small (32px) selector', () => {
-    render(<MingoChatRail variant="section" dialogs={[]} scope="my" onScopeChange={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'My Chats' })).toHaveClass('text-h6');
-    expect(screen.getByRole('button', { name: 'All Chats' })).toHaveClass('text-h6');
-  });
-
-  it('switches the scope', () => {
+  it('switches the scope from the filter menu, and lights the filter while all chats show', () => {
     const onScopeChange = vi.fn();
-    render(<MingoChatRail variant="section" dialogs={[]} scope="my" onScopeChange={onScopeChange} />);
+    const { rerender } = render(
+      <MingoChatRail variant="section" dialogs={[]} scope="my" onScopeChange={onScopeChange} />,
+    );
     // Offered on an empty "My Chats" too.
     expect(screen.getByText('No Current Chats')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'All Chats' }));
+    const filter = screen.getByRole('button', { name: 'Filter chats' });
+    expect(filter).not.toHaveClass('text-ods-accent');
+    fireEvent.pointerDown(filter, { button: 0, pointerType: 'mouse' });
+    expect(screen.getByRole('menuitemradio', { name: 'My chats' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'All chats' }));
     expect(onScopeChange).toHaveBeenCalledWith('all');
+
+    rerender(<MingoChatRail variant="section" dialogs={[]} scope="all" onScopeChange={onScopeChange} />);
+    expect(screen.getByRole('button', { name: 'Filter chats' })).toHaveClass('text-ods-accent');
   });
 
   it('loads the next page when the end of the list shows, once per page', () => {
@@ -286,9 +296,8 @@ describe('MingoChatRail variant="section"', () => {
   });
 
   it('watches the end of the list against the viewport, so the sidebar body may scroll it too', () => {
-    // A root on the list would see the sentinel in view for good once the
-    // sidebar body scrolls the list at full height (`sectionMinHeight`), and
-    // load every page. The viewport clips by whichever box scrolls.
+    // A root on the list would see the sentinel in view for good: the sidebar
+    // body scrolls the list at full height. The viewport clips by the body.
     const options: IntersectionObserverInit[] = [];
     vi.stubGlobal(
       'IntersectionObserver',
@@ -306,7 +315,11 @@ describe('MingoChatRail variant="section"', () => {
     );
     render(<MingoChatRail variant="section" dialogs={DIALOGS} hasMore onLoadMore={vi.fn()} />);
     expect(options).toHaveLength(1);
-    expect(options[0]).toMatchObject({ root: null, rootMargin: '120px', scrollMargin: '120px' });
+    expect(options[0]).toMatchObject({
+      root: null,
+      rootMargin: '0px 0px 600px 0px',
+      scrollMargin: '0px 0px 600px 0px',
+    });
   });
 
   it('shows the loading, failed and empty states', () => {

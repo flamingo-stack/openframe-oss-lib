@@ -62,12 +62,13 @@ export interface MingoChatListProps {
    *  receives the debounced input. Without a handler there is no search. */
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
-  /** Whether the search field is open. Controlled with `onSearchOpenChange`
-   *  (e.g. a host that opens it on ⌘K); without it the list keeps its own
-   *  state, open from the start while `searchQuery` holds a term. Escape, or
-   *  leaving the field empty, clears the term and asks to close. The section's
-   *  Search tooltip names ⌘K / Ctrl K: binding that key is the host's (it may
-   *  have to open a collapsed sidebar first), the list listens for none. */
+  /** Whether the search is open. Controlled with `onSearchOpenChange` (e.g. a
+   *  host that opens it on ⌘K); without it the list keeps its own state, open
+   *  from the start while `searchQuery` holds a term (the rail). The rail's is a
+   *  field in its header; the section's is a modal — `MingoChatSearchModal`,
+   *  which a host controlling this renders once itself. The section's Search
+   *  tooltip names ⌘K / Ctrl K: binding that key is the host's (it may have to
+   *  open a collapsed sidebar first), the list listens for none. */
   searchOpen?: boolean;
   onSearchOpenChange?: (open: boolean) => void;
   hasMore?: boolean;
@@ -148,13 +149,18 @@ export interface LoadMoreSentinelOptions {
    * The scrolling element the sentinel is clipped by. Omitted: the viewport —
    * which still clips by every scroll box between it and the sentinel, so a
    * list works whichever ancestor scrolls it (the sidebar's history section:
-   * its own list, or the sidebar body under `sectionMinHeight`).
+   * the sidebar body).
    */
   rootRef?: RefObject<HTMLElement | null>;
 }
 
-/** How far ahead of the end of the list the next page starts loading. */
-const LOAD_AHEAD = '120px';
+/**
+ * How far ahead of the end of the list the next page starts loading: about a
+ * screen of rows, so a reader scrolling at a normal pace never reaches the end
+ * and never sees the placeholder. Below only — a list off to the side (the
+ * closed phone drawer, translated out of view) must not count as near.
+ */
+const LOAD_AHEAD = '0px 0px 600px 0px';
 
 /**
  * Infinite scroll for a chat list: put the returned ref on a 1px sentinel after

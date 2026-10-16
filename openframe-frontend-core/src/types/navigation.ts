@@ -186,36 +186,14 @@ export interface NavigationSidebarConfig {
    */
   currentPath?: string;
   /**
-   * What a click on a CLOSED group parent does (grouped variant). `'first-child'`
-   * (default): open the group and navigate to its first child — through
-   * `onNavigate`, so without one it only opens. `'expand'`: only open it. A click
-   * on an OPEN parent always folds it; a closed parent whose group holds the
-   * current page only re-opens. The mobile burger menu always expands: there a
-   * navigation closes the menu over the children the user asked to see.
-   */
-  groupParentClick?: 'first-child' | 'expand';
-  /**
-   * Host content below the navigation tree that takes the remaining height and
-   * scrolls on its own (the chat history), so the tree above it stays in view
-   * (see `sectionMinHeight` for a short window).
+   * Host content right below the navigation tree (the chat history), in the
+   * flow at its full height: the sidebar body scrolls the tree and the section
+   * as one, so the section must not scroll on its own.
    * A node is hidden in the collapsed rail (it stays mounted); a function is
    * called with the sidebar's own `minimized` state and decides for itself.
    * Rendered in the mobile burger menu too, with `minimized: false`.
    */
   sectionSlot?: NavigationSidebarSlot;
-  /**
-   * The least height `sectionSlot` may get, in px (grouped variant; the
-   * sidebar's expanded width and the mobile burger menu). While the body has
-   * that much room below the tree, the section fills the remaining height and
-   * scrolls on its own, as without this. When it has less, the tree and the
-   * section no longer split the body: the whole body (top slot, tree, section)
-   * scrolls as one, and the section is drawn at its full height — at least this
-   * tall — so the tree is never squeezed and the section never shrinks to a
-   * row or two. Decided by measuring the body (`ResizeObserver`); the section's
-   * wrapper carries `data-section-scroll="section" | "body"`. Omitted: the
-   * section keeps today's 160px floor and the body scrolls only below it.
-   */
-  sectionMinHeight?: number;
   /**
    * The expanded sidebar's width in px (grouped variant; default 224). Applied
    * to the desktop sidebar, the tablet overlay and its push slot, and written to
@@ -259,17 +237,17 @@ export interface NavigationSidebarConfig {
    * chat search in `sectionSlot`.
    */
   revealSignal?: number;
+}
+
+/** What a slot render function is told about the place it is drawn in. */
+export interface NavigationSidebarSlotState {
+  minimized: boolean;
   /**
-   * Host controls in the sidebar's 56px header: to the right of the logo while
-   * expanded, stacked under the logo mark in the 56px rail (the layout follows
-   * the rail's width, so the first paint is right). Meant for 32px icon
-   * buttons — `NotificationsBellButton`, `TimeTrackerHeaderButton` and
-   * `TicketAlertsButton` with `variant="compact"`. When they leave the wordmark
-   * no room, the wordmark gives way rather than being cut. A function receives
-   * `minimized` (e.g. to open a popover to the right in the rail). Not drawn in
-   * the mobile burger menu: below md the top bar carries these controls.
+   * `true` in the mobile burger menu. The menu stays mounted at every width
+   * (hidden from md up), so content that must exist once — a popover over state
+   * its sidebar copy shares — renders only where this is `false`.
    */
-  headerSlot?: NavigationSidebarSlot;
+  inDrawer: boolean;
 }
 
 /**
@@ -277,7 +255,7 @@ export interface NavigationSidebarConfig {
  * host cannot derive `minimized` — it comes from a persisted preference, the
  * tablet breakpoint and any open overlay).
  */
-export type NavigationSidebarSlot = React.ReactNode | ((state: { minimized: boolean }) => React.ReactNode);
+export type NavigationSidebarSlot = React.ReactNode | ((state: NavigationSidebarSlotState) => React.ReactNode);
 
 /** The location a `NavigationSidebarItem.match` function is asked about. */
 export interface NavigationSidebarLocation {
@@ -348,8 +326,8 @@ export interface NavigationSidebarItem {
   onClick?: () => void;
   /**
    * The group's entries (grouped variant only; one level). The flat variant
-   * ignores them. A parent's click opens the group (see
-   * `NavigationSidebarConfig.groupParentClick`), so a parent needs no `path`.
+   * ignores them. A parent's click only opens and folds the group, so a parent
+   * needs no `path`.
    */
   children?: NavigationSidebarItem[];
   section?: 'primary' | 'secondary'; // To separate top and bottom sections

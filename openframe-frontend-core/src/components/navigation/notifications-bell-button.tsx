@@ -14,9 +14,9 @@ export interface NotificationsBellButtonProps {
    * - `cell` (default): a cell of the top bar, as `AppHeader` draws it.
    * - `floating`: a 36px bordered square for a place with no bar around it —
    *   `AppLayout`'s `contentCorner`.
-   * - `compact`: a 32px borderless icon button (20px glyph, pressed while the
-   *   drawer is open) for the navigation sidebar's header
-   *   (`NavigationSidebarConfig.headerSlot`).
+   * - `compact`: `HeaderButton`'s compact cell (20px glyph, pressed while the
+   *   drawer is open) for the navigation sidebar's foot
+   *   (beside the account row, `NavigationSidebarConfig.footerSlot`).
    */
   variant?: 'cell' | 'floating' | 'compact';
   className?: string;
@@ -29,7 +29,7 @@ export interface NotificationsBellButtonProps {
  *
  * `AppHeader` renders it under `showNotifications`. Without a header (the
  * `AppLayout` `desktopHeader={false}` shell), render it in `contentCorner`
- * (`floating`) or in the sidebar's `headerSlot` (`compact`); the drawer
+ * (`floating`) or at the sidebar's foot (`compact`); the drawer
  * `AppLayout` mounts follows the same provider either way.
  */
 export function NotificationsBellButton({

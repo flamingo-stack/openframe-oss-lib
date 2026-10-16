@@ -3,7 +3,11 @@
 import { usePreventScroll } from '@react-aria/overlays';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/ui/use-focus-trap';
-import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
+import type {
+  NavigationSidebarConfig,
+  NavigationSidebarItem,
+  NavigationSidebarSlotState,
+} from '../../types/navigation';
 import { cn } from '../../utils';
 import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated';
 import { Button, SquareAvatar } from '../ui';
@@ -13,11 +17,13 @@ import { NavigationItemBadge } from './navigation-item-badge';
 import { isModifiedClick } from './navigation-sidebar';
 import { NavigationSidebarGroupedEntries, useOpenNavigationGroup } from './navigation-sidebar-grouped';
 import { resolveNavigationActive } from './navigation-sidebar-match';
-import { navigationSectionLayout, useNavigationSectionScroller } from './navigation-sidebar-section';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
 const HEADER_HEIGHT = 56;
+
+/** The drawer always lays its slots out expanded. */
+const DRAWER_SLOT_STATE: NavigationSidebarSlotState = { minimized: false, inDrawer: true };
 
 export interface MobileBurgerMenuProps {
   /** Whether the menu is open */
@@ -80,8 +86,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
   const secondaryItems = config.items.filter(item => item.section === 'secondary');
 
   // Grouped variant: the sidebar's own tree and active resolution. A parent
-  // here only opens and folds — `groupParentClick` is not consulted, because a
-  // navigation closes this menu over the children the user just asked to see.
+  // only opens and folds, as in the sidebar.
   const grouped = config.variant === 'grouped';
   const { activeId, groupId: activeGroupId } = useMemo(
     () => resolveNavigationActive(config.items, { currentPath: config.currentPath, includeChildren: true }),
@@ -107,10 +112,6 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
     (item: NavigationSidebarItem) => setOpenGroupId(current => (current === item.id ? null : item.id)),
     [setOpenGroupId],
   );
-  // `sectionMinHeight`: the drawer's body scrolls the section too once the
-  // tree leaves it less than that (the sidebar's rule, same measurement).
-  const sectionMinHeight = grouped ? config.sectionMinHeight : undefined;
-  const section = useNavigationSectionScroller(sectionMinHeight);
 
   const renderNavigationItem = (item: NavigationSidebarItem, isGridItem = false) => {
     const isActive = item.isActive ?? false;
@@ -295,16 +296,11 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
                   />
                 </nav>
 
-                {hasNavigationSidebarSlot(sectionSlot) &&
-                  (sectionMinHeight === undefined ? (
-                    <div className="flex min-h-40 flex-1 flex-col overflow-y-auto">
-                      {renderNavigationSidebarSlot(sectionSlot, false)}
-                    </div>
-                  ) : (
-                    <div ref={section.ref} {...navigationSectionLayout(section.scroller, sectionMinHeight)}>
-                      {renderNavigationSidebarSlot(sectionSlot, false)}
-                    </div>
-                  ))}
+                {/* In the flow at its full height, as in the sidebar: the drawer's
+                    body scrolls the tree and the section as one. */}
+                {hasNavigationSidebarSlot(sectionSlot) && (
+                  <div className="flex flex-col">{renderNavigationSidebarSlot(sectionSlot, DRAWER_SLOT_STATE)}</div>
+                )}
 
                 {secondaryItems.length > 0 && (
                   <nav aria-label="Secondary navigation" className="flex flex-col">
@@ -326,7 +322,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
 
               {hasNavigationSidebarSlot(footerSlot) && (
                 <div className="shrink-0 border-t border-ods-border px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]">
-                  {renderNavigationSidebarSlot(footerSlot, false)}
+                  {renderNavigationSidebarSlot(footerSlot, DRAWER_SLOT_STATE)}
                 </div>
               )}
             </div>

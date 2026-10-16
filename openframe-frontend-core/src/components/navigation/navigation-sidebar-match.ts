@@ -150,8 +150,3 @@ export function resolveNavigationActive(
     groupId: includeChildren && (best.top.children?.length ?? 0) > 0 ? best.top.id : null,
   };
 }
-
-/** The child a closed parent navigates to: the first one that goes somewhere. */
-export function firstNavigableChild(item: NavigationSidebarItem): NavigationSidebarItem | undefined {
-  return item.children?.find(child => child.path !== undefined || child.onClick !== undefined);
-}

@@ -47,6 +47,7 @@ export * from './mingo-chat-history';
 export * from './mingo-archive-list';
 export * from './mingo-chat-header';
 export * from './mingo-chat-rail';
+export { MingoChatSearchModal, type MingoChatSearchModalProps } from './mingo-chat-history-section';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
 export * from './chat-header-icon-button';

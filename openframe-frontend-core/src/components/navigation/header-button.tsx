@@ -16,9 +16,10 @@ export interface HeaderButtonProps extends React.ButtonHTMLAttributes<HTMLButton
   /**
    * - `cell` (default): a full-height cell of a top bar, as wide as the bar's
    *   `--top-nav-cell` (56px standalone).
-   * - `compact`: a 32px rounded icon button for a place with no bar around it —
-   *   the navigation sidebar's 56px header (`NavigationSidebarConfig.headerSlot`).
-   *   Pass a 20px icon.
+   * - `compact`: for the grouped navigation sidebar's foot (`footerSlot`). In the
+   *   56px rail it is a row's cell — the rail's width, 44px tall, the rows' hover —
+   *   so the foot's icons sit like the tree's; from 140px of sidebar width, a 32px
+   *   rounded icon button beside the account row. Pass a 20px icon.
    */
   size?: 'cell' | 'compact';
   /** Additional class names */
@@ -41,7 +42,7 @@ export function HeaderButton({
         'transition-colors duration-200',
         compact
           ? cn(
-              'size-8 rounded-md',
+              'h-11 w-full rounded-md @[140px]/of-nav-sidebar:size-8',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
               'disabled:cursor-not-allowed disabled:opacity-50',
             )

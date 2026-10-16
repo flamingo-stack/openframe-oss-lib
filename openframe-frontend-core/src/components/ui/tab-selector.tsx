@@ -41,13 +41,6 @@ export interface TabSelectorProps {
    * the row scroll (`overflow-x-auto`).
    */
   scrollable?: boolean;
-  /**
-   * `default`: a 44px row (48px from content-md) with h4 labels. `small`: a
-   * fixed 32px row with h6 labels and 16px icons, for a narrow column such as
-   * the navigation sidebar's chat history. Inside an ActionsMenu header the
-   * selector is flush at 40px either way.
-   */
-  size?: 'default' | 'small';
   /** Additional CSS classes for the root container */
   className?: string;
 }
@@ -60,10 +53,8 @@ export function TabSelector({
   label,
   disabled,
   scrollable = false,
-  size = 'default',
   className,
 }: TabSelectorProps) {
-  const small = size === 'small';
   // Inside an ActionsMenu header row the selector renders FLUSH - no border,
   // no row rounding (the menu's row border and rounding are the frame) and a
   // fixed 40px height, while the inner 4px padding, the segment gap and the
@@ -87,11 +78,7 @@ export function TabSelector({
           'flex gap-[var(--spacing-system-xxs)] bg-ods-bg p-[var(--spacing-system-xxs)]',
           flush
             ? 'h-10 w-full'
-            : cn(
-                'rounded-md border border-ods-border',
-                small ? 'h-8' : 'h-11 content-md:h-12',
-                scrollable ? 'overflow-x-auto' : 'w-full',
-              ),
+            : cn('h-11 rounded-md border border-ods-border content-md:h-12', scrollable ? 'overflow-x-auto' : 'w-full'),
         )}
       >
         {items.map(item => {
@@ -109,8 +96,7 @@ export function TabSelector({
                 // Bold on BOTH states (text-h3 = DM Sans bold) — a medium↔bold
                 // flip between the active and inactive tabs read as inconsistent
                 // weight (and nudged label widths on every switch).
-                'flex items-center justify-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-xs transition-colors duration-200',
-                small ? 'px-[var(--spacing-system-xsf)] py-0 text-h6' : 'p-[var(--spacing-system-xsf)] text-h4',
+                'flex items-center justify-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-xs p-[var(--spacing-system-xsf)] transition-colors duration-200 text-h4',
                 // scrollable: intrinsic widths must sum past the container or
                 // nothing ever overflows (flex-1's basis-0 defeats the scroll).
                 scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',
@@ -126,9 +112,7 @@ export function TabSelector({
               )}
             >
               {item.icon && (
-                <span className={cn('flex size-4 shrink-0 items-center justify-center', !small && 'content-md:size-6')}>
-                  {item.icon}
-                </span>
+                <span className="flex size-4 shrink-0 items-center justify-center content-md:size-6">{item.icon}</span>
               )}
               {item.label}
               {item.badge && item.badge}

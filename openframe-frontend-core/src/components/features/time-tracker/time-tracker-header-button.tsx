@@ -23,8 +23,8 @@ export interface TimeTrackerHeaderButtonProps {
   /**
    * - `cell` (default): a cell of the top bar; while a session runs it widens
    *   to show the live clock from md up.
-   * - `compact`: a 32px icon button with a 20px glyph for the navigation
-   *   sidebar's header (`NavigationSidebarConfig.headerSlot`). It never widens:
+   * - `compact`: `HeaderButton`'s compact cell with a 20px glyph for the navigation
+   *   sidebar's foot, beside the account row (`footerSlot`). It never widens:
    *   a running session is the accent glyph, and the clock is in its tooltip.
    */
   variant?: 'cell' | 'compact';

@@ -106,21 +106,24 @@ describe('NavigationSidebar grouped — active resolution', () => {
         .getAllByRole('link')
         .map(link => link.textContent),
     ).toEqual(['Customers', 'Devices']);
-    expect(screen.queryByRole('link', { name: 'Scripts' })).not.toBeInTheDocument();
+    // A folded group stays mounted, so it can fold and open as a motion — inert.
+    expect(group).not.toHaveAttribute('inert');
+    expect(screen.getByRole('group', { name: 'Automation' })).toHaveAttribute('inert');
   });
 });
 
 describe('NavigationSidebar grouped — one open group', () => {
-  it('a closed parent opens and navigates to its first child; the other group closes', () => {
+  it('a closed parent only opens, going nowhere; the other group closes', () => {
     const onNavigate = vi.fn();
     render(<Host initialPath="/devices" onNavigate={onNavigate} />);
 
     fireEvent.click(parent('Automation'));
 
-    expect(onNavigate).toHaveBeenCalledWith('/scripts');
+    expect(onNavigate).not.toHaveBeenCalled();
     expect(parent('Automation')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('group', { name: 'Automation' })).not.toHaveAttribute('inert');
     expect(parent('Inventory')).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByRole('link', { name: 'Scripts' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Devices' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('an open parent folds, keeping focus on the same button', () => {
@@ -135,7 +138,7 @@ describe('NavigationSidebar grouped — one open group', () => {
     expect(parent('Inventory')).toBe(button);
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(button).toHaveFocus();
-    expect(screen.queryByRole('group', { name: 'Inventory' })).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Inventory' })).toHaveAttribute('inert');
   });
 
   it('re-opening the folded group of the current page does not navigate away from it', () => {
@@ -147,17 +150,6 @@ describe('NavigationSidebar grouped — one open group', () => {
 
     expect(onNavigate).not.toHaveBeenCalled();
     expect(parent('Inventory')).toHaveAttribute('aria-expanded', 'true');
-  });
-
-  it("'expand' only opens a closed parent", () => {
-    const onNavigate = vi.fn();
-    render(<Host initialPath="/devices" onNavigate={onNavigate} extra={{ groupParentClick: 'expand' }} />);
-
-    fireEvent.click(parent('Automation'));
-
-    expect(onNavigate).not.toHaveBeenCalled();
-    expect(parent('Automation')).toHaveAttribute('aria-expanded', 'true');
-    expect(parent('Inventory')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('navigating to a top-level entry closes every group', () => {
@@ -182,7 +174,7 @@ describe('NavigationSidebar grouped — one open group', () => {
 });
 
 describe('NavigationSidebar — slots', () => {
-  it('renders the section and the footer, and hands render functions `minimized`', () => {
+  it('renders the section and the footer, and hands render functions `minimized`, not in the drawer', () => {
     const footer = vi.fn(({ minimized }: { minimized: boolean }) => <span>{minimized ? 'rail' : 'account'}</span>);
     render(
       <NavigationSidebar
@@ -196,7 +188,7 @@ describe('NavigationSidebar — slots', () => {
     );
     expect(screen.getByText('Chat history')).toBeInTheDocument();
     expect(screen.getByText('account')).toBeInTheDocument();
-    expect(footer).toHaveBeenLastCalledWith({ minimized: false });
+    expect(footer).toHaveBeenLastCalledWith({ minimized: false, inDrawer: false });
   });
 
   it('hands a section render function the collapsed state', () => {

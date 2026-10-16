@@ -1,7 +1,8 @@
 /**
  * The `compact` header buttons: the bell, the time tracker and the ticket alerts
- * as 32px icon buttons for the navigation sidebar's 56px header, so a host puts
- * them there without restyling a top-bar cell.
+ * for the navigation sidebar's foot — a row's cell in the 56px rail, a 32px icon
+ * button beside the account row once expanded — so a host puts them there without
+ * restyling a top-bar cell.
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -48,15 +49,15 @@ const tracker: TimeTrackerData = {
 const glyphIs20px = (button: HTMLElement) => expect(button.innerHTML).toMatch(/<svg[^>]*class="[^"]*\bh-5 w-5\b/);
 const hasDot = (button: HTMLElement) => /class="[^"]*\bbg-ods-warning\b/.test(button.innerHTML);
 
-/** The 32px rounded box, never the bar's full-height cell. */
+/** The rail's row cell (44px, the rail's width), 32px from 140px of sidebar; never the bar's full-height cell. */
 function expectCompactBox(button: HTMLElement) {
-  expect(button).toHaveClass('size-8', 'rounded-md');
+  expect(button).toHaveClass('h-11', 'w-full', '@[140px]/of-nav-sidebar:size-8', 'rounded-md');
   expect(button.className).not.toMatch(/--top-nav-cell/);
   expect(button.className).not.toMatch(/\bh-full\b/);
 }
 
 describe('HeaderButton size="compact"', () => {
-  it('is a 32px icon button with a pressed look and the fixed unread dot', () => {
+  it('is the compact cell with a pressed look and the fixed unread dot', () => {
     const { rerender } = render(<HeaderButton size="compact" aria-label="Thing" icon={<svg />} showUnreadDot />);
     const button = screen.getByRole('button', { name: 'Thing' });
     expectCompactBox(button);
@@ -94,7 +95,7 @@ describe('NotificationsBellButton variant="compact"', () => {
 });
 
 describe('TimeTrackerHeaderButton variant="compact"', () => {
-  it('stays 32px while a session runs: the glyph turns accent and the clock goes to the tooltip', () => {
+  it('stays the compact cell while a session runs: the glyph turns accent and the clock goes to the tooltip', () => {
     render(
       <TimeTrackerProvider {...tracker} status="tracking" runningSince={Date.now() - 65_000}>
         <TimeTrackerHeaderButton variant="compact" />
@@ -128,7 +129,7 @@ describe('TimeTrackerHeaderButton variant="compact"', () => {
 });
 
 describe('TicketAlertsButton variant="compact"', () => {
-  it('is a 32px button with a 20px glyph and the count pill, routing to the newest unread ticket', () => {
+  it('is the compact cell with a 20px glyph and the count pill, routing to the newest unread ticket', () => {
     const onNavigate = vi.fn();
     render(<TicketAlertsButton variant="compact" href="/help-center/tickets" onNavigate={onNavigate} />);
     const button = screen.getByRole('button', { name: /Support tickets/ });

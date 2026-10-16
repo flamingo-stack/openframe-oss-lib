@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { NavigationSidebarItem } from '../../../types/navigation';
-import { firstNavigableChild, parseNavigationLocation, resolveNavigationActive } from '../navigation-sidebar-match';
+import { parseNavigationLocation, resolveNavigationActive } from '../navigation-sidebar-match';
 
 const icon = null;
 
@@ -163,20 +163,5 @@ describe('resolveNavigationActive — flat', () => {
     expect(resolveNavigationActive(TREE)).toEqual({ activeId: null, groupId: null });
     expect(resolveNavigationActive(TREE, { currentPath: '/scripts' })).toEqual({ activeId: null, groupId: null });
     expect(resolveNavigationActive(TREE, { currentPath: '/dashboard' }).activeId).toBe('dashboard');
-  });
-});
-
-describe('firstNavigableChild', () => {
-  it('skips children that go nowhere', () => {
-    const parent: NavigationSidebarItem = {
-      id: 'p',
-      label: 'P',
-      icon,
-      children: [
-        { id: 'none', label: 'None', icon },
-        { id: 'go', label: 'Go', icon, path: '/go' },
-      ],
-    };
-    expect(firstNavigableChild(parent)?.id).toBe('go');
   });
 });
