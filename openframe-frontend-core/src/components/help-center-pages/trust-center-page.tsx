@@ -94,6 +94,12 @@ export interface TrustCenterPageProps {
    * page's full width, then the FAQ. Absent: the FAQ closes the sections column.
    */
   beforeFaq?: ReactNode;
+  /**
+   * The "Data synced from <source>" line in the status row. Default true. Pass false when the host's own header
+   * already states it (the hub's admin preview draws it in its page header), so the page never says it twice; the
+   * monitoring status and the PDF download stay.
+   */
+  attribution?: boolean;
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -145,6 +151,7 @@ export function TrustCenterPage({
   subtitle = TRUST_CENTER_TAGLINE,
   ask,
   beforeFaq,
+  attribution = true,
 }: TrustCenterPageProps) {
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
@@ -254,7 +261,7 @@ export function TrustCenterPage({
       <>
         <div className={TRUST_STATUS_ROW_CLASS}>
           <StatusIndicator status={status.status} label={status.label} />
-          {data.connected ? (
+          {data.connected && attribution ? (
             <DataAttribution
               icon={
                 data.dataSource.logoUrl ? (
