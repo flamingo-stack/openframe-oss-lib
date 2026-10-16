@@ -63,4 +63,5 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private Long version = 0L;
 }
