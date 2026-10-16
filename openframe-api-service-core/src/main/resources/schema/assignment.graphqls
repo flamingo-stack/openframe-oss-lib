@@ -58,6 +58,11 @@ enum AssignmentTargetType {
     KNOWLEDGE_ARTICLE
 }
 
+input AssignmentTargetInput {
+    targetType: AssignmentTargetType!
+    targetId: ID!
+}
+
 # Extend existing types to implement AssignableTarget
 extend type Organization implements AssignableTarget
 extend type Machine implements AssignableTarget

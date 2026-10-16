@@ -6,7 +6,7 @@ extend type Query {
         after: String
     ): KnowledgeBaseItemConnection!
     knowledgeBaseItem(id: ID!): KnowledgeBaseItem
-    knowledgeBaseTags(folderId: ID, archived: Boolean): [Tag!]!
+    knowledgeBaseTags(folderId: ID, archived: Boolean, assignedTo: AssignmentTargetInput): [Tag!]!
     knowledgeBaseFolderTree: [KnowledgeBaseItem!]!
     knowledgeBaseArticleTree: [KnowledgeBaseItem!]!
     archivedArticles(
@@ -27,6 +27,7 @@ input KnowledgeBaseFilterInput {
     DESCENDANTS when the listing carries a search or tagIds.
     """
     scope: KnowledgeBaseScope
+    assignedTo: AssignmentTargetInput
 }
 
 """

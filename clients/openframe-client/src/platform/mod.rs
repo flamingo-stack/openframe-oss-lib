@@ -1,5 +1,6 @@
 pub mod binary_writer;
 pub mod console;
+pub mod detached_process;
 pub mod directories;
 pub mod dmg_extractor;
 pub mod file_acl;

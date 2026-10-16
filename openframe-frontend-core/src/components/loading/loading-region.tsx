@@ -40,16 +40,11 @@ export function LoadingRegion({
   children,
   ...props
 }: LoadingRegionProps) {
-  if (!announce) {
-    return (
-      <Tag className={className} {...props}>
-        {children}
-      </Tag>
-    );
-  }
+  // One tree for both states: `children` keeps its slot whether or not the status is drawn, so an
+  // `announce` that flips at runtime does not remount the content (and drop its state and focus).
   return (
-    <Tag aria-busy="true" className={className} {...props}>
-      {status && (
+    <Tag aria-busy={announce ? 'true' : undefined} className={className} {...props}>
+      {announce && status && (
         <span role="status" aria-live="polite" className="sr-only">
           {label}
         </span>

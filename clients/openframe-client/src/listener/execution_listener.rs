@@ -13,7 +13,8 @@ use crate::config::update_config::{
     FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS, RECONNECTION_DELAY_MS,
 };
 use crate::models::{
-    is_ack_subject, ExecutionAck, ExecutionMessage, ExecutionRequest, RmmResult, EXECUTION_ACK_KIND,
+    requires_stream_ack, ExecutionAck, ExecutionMessage, ExecutionRequest, RmmResult,
+    EXECUTION_ACK_KIND,
 };
 use crate::services::execution_service::ExecutionService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
@@ -254,7 +255,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
 
     fn spawn_fallback_publish(&self, subject: String, bytes: Vec<u8>) {
         let publisher = self.nats_message_publisher.clone();
-        let acked = is_ack_subject(&subject);
+        let acked = requires_stream_ack(&subject);
         tokio::spawn(async move {
             let max_backoff = Duration::from_millis(FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS);
             let mut backoff = Duration::from_millis(FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS);

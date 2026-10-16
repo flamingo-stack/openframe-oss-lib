@@ -31,11 +31,14 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../../embed-shims';
 import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
+import type { DataSync } from '../../../types/data-sync';
 import type { DeliveryItem, DeliveryResponse } from '../../../types/delivery';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
+import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
 import { DeliveryTable } from './delivery-table';
 
@@ -47,13 +50,15 @@ const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
 const DEFAULT_TASK_TYPE_PARAM_KEY = DEV_SECTION_PARAM_KEYS.deliveryTaskType;
 
 /**
- * Wire shape of ONE bucket endpoint — `{ items, count, pagination }`. Only
- * `items` is read here; `items` stays optional because an embedder's proxy is
+ * Wire shape of ONE bucket endpoint — `{ items, count, pagination, sync }`. Only
+ * `items` and `sync` are read here; `items` stays optional because an embedder's proxy is
  * free to answer with an empty envelope, and the render treats "no items" and
  * "empty items" identically.
  */
 interface DeliveryBucketResponse {
   items?: DeliveryItem[];
+  /** Where the tasks are mirrored from and when it last read them (both buckets read the same mirror). */
+  sync?: DataSync;
 }
 
 export interface DeliveryListsProps {
@@ -84,6 +89,7 @@ export function DeliveryLists({
   const [data, setData] = useState<DeliveryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sync, setSync] = useState<DataSync | null>(null);
 
   // Get filter state from URL
   const searchQuery = searchParams.get(searchParamKey) || '';
@@ -134,6 +140,7 @@ export function DeliveryLists({
           completed: completedResult.items ?? [],
           inProgress: inProgressResult.items ?? [],
         });
+        setSync(completedResult.sync ?? inProgressResult.sync ?? null);
       } catch (err) {
         if (cancelled) return;
         console.error('Error fetching delivery items:', err);
@@ -160,6 +167,8 @@ export function DeliveryLists({
   // by RoadmapView). 96 matches the sticky-header offset every
   // hash-scroll surface in the app uses.
   useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
+  // The page states the sync under its title; the lists shown without that page draw it above themselves.
+  const syncInPage = usePageDataSync(sync, isLoading && !data);
 
   const showCompleted = true;
   const showInProgress = true;
@@ -180,6 +189,7 @@ export function DeliveryLists({
 
   return (
     <div className="flex w-full flex-col gap-[40px]">
+      {!syncInPage && <DataSyncLine sync={sync} loading={isLoading && !data} />}
       {/* Empty state if no results after filtering */}
       {!isLoading && !hasResults && (
         <ListEmptyState
