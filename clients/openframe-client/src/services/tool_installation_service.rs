@@ -111,15 +111,6 @@ impl ToolInstallationService {
         let effective_version = tool_installation_message.effective_version().to_string();
         let run_args_clone = tool_installation_message.run_command_args.clone();
         let reinstall = tool_installation_message.reinstall;
-        let download_configs = tool_installation_message
-            .download_configurations
-            .as_ref()
-            .with_context(|| format!("No download configurations for tool {}", tool_agent_id))?;
-        let resolved_config = self
-            .github_download_service
-            .find_config_for_current_os(download_configs)
-            .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
-            .with_version_override(&version_clone, &effective_version);
         let mut reinstall_dir_cleared = false;
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
@@ -130,12 +121,42 @@ impl ToolInstallationService {
             FirstRunState::Done
         };
 
-        // Check if tool is already installed
-        if let Some(installed_tool) = self
+        let installed_tool = self
             .installed_tools_service
             .get_by_tool_agent_id(tool_agent_id)
-            .await?
-        {
+            .await?;
+        // A repeated install of a present tool is a no-op and needs no download config
+        if let Some(installed_tool) = installed_tool.as_ref().filter(|_| !reinstall) {
+            let agent_path = self.directory_manager.get_tool_executable_path(
+                tool_agent_id,
+                installed_tool.installation.executable_path(),
+            );
+            let binary_present = self
+                .directory_manager
+                .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
+                .await;
+            if binary_present {
+                info!(
+                    "Tool {} is already installed with version {}, skipping installation",
+                    tool_agent_id, installed_tool.version
+                );
+                return Ok(());
+            }
+            warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
+        }
+
+        // Resolve the download before any destructive step
+        let download_configs = tool_installation_message
+            .download_configurations
+            .as_ref()
+            .with_context(|| format!("No download configurations for tool {}", tool_agent_id))?;
+        let resolved_config = self
+            .github_download_service
+            .find_config_for_current_os(download_configs)
+            .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
+            .with_version_override(&version_clone, &effective_version);
+
+        if let Some(installed_tool) = installed_tool {
             first_run = installed_tool.first_run;
             if reinstall {
                 info!(
@@ -297,22 +318,6 @@ impl ToolInstallationService {
                     tool_agent_id
                 );
             } else {
-                let agent_path = self.directory_manager.get_tool_executable_path(
-                    tool_agent_id,
-                    installed_tool.installation.executable_path(),
-                );
-                let binary_present = self
-                    .directory_manager
-                    .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
-                    .await;
-                if binary_present {
-                    info!(
-                        "Tool {} is already installed with version {}, skipping installation",
-                        tool_agent_id, installed_tool.version
-                    );
-                    return Ok(());
-                }
-                warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
                 if let Err(e) = self
                     .installed_tools_service
                     .set_state(tool_agent_id, ToolRecordState::Installing)
