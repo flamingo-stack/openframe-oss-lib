@@ -13,6 +13,7 @@ import { NavigationItemBadge } from './navigation-item-badge';
 import { isModifiedClick } from './navigation-sidebar';
 import { NavigationSidebarGroupedEntries, useOpenNavigationGroup } from './navigation-sidebar-grouped';
 import { resolveNavigationActive } from './navigation-sidebar-match';
+import { navigationSectionLayout, useNavigationSectionScroller } from './navigation-sidebar-section';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
@@ -106,6 +107,10 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
     (item: NavigationSidebarItem) => setOpenGroupId(current => (current === item.id ? null : item.id)),
     [setOpenGroupId],
   );
+  // `sectionMinHeight`: the drawer's body scrolls the section too once the
+  // tree leaves it less than that (the sidebar's rule, same measurement).
+  const sectionMinHeight = grouped ? config.sectionMinHeight : undefined;
+  const section = useNavigationSectionScroller(sectionMinHeight);
 
   const renderNavigationItem = (item: NavigationSidebarItem, isGridItem = false) => {
     const isActive = item.isActive ?? false;
@@ -290,11 +295,16 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
                   />
                 </nav>
 
-                {hasNavigationSidebarSlot(sectionSlot) && (
-                  <div className="flex min-h-40 flex-1 flex-col overflow-y-auto">
-                    {renderNavigationSidebarSlot(sectionSlot, false)}
-                  </div>
-                )}
+                {hasNavigationSidebarSlot(sectionSlot) &&
+                  (sectionMinHeight === undefined ? (
+                    <div className="flex min-h-40 flex-1 flex-col overflow-y-auto">
+                      {renderNavigationSidebarSlot(sectionSlot, false)}
+                    </div>
+                  ) : (
+                    <div ref={section.ref} {...navigationSectionLayout(section.scroller, sectionMinHeight)}>
+                      {renderNavigationSidebarSlot(sectionSlot, false)}
+                    </div>
+                  ))}
 
                 {secondaryItems.length > 0 && (
                   <nav aria-label="Secondary navigation" className="flex flex-col">
