@@ -83,6 +83,10 @@ export interface ChatComposerProps {
   /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
    *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */
   previewText?: string;
+  /** Clear the bottom safe-area inset (the iOS home bar) under the composer.
+   *  Default `true`. `false` for a composer docked inside a layout that already
+   *  owns that inset (a native shell's root), where it would be doubled. */
+  safeAreaBottom?: boolean;
 }
 
 /**
@@ -123,6 +127,7 @@ export function ChatComposer({
   onValueChange,
   previewText,
   menuItems,
+  safeAreaBottom = true,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
   const locked = lock != null;
@@ -224,10 +229,11 @@ export function ChatComposer({
     <div
       className="flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)]"
       // Tight `xxs` bottom padding (the model/usage row already sits just below
-      // the input); `max(…, safe-area-inset)` still clears the iOS home bar.
-      style={{
-        paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))',
-      }}
+      // the input); `max(…, safe-area-inset)` still clears the iOS home bar —
+      // unless the host's layout already does (`safeAreaBottom={false}`).
+      style={
+        safeAreaBottom ? { paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))' } : undefined
+      }
     >
       <div>
         <ChatFooter className="!p-0" fullWidth>

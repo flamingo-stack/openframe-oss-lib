@@ -357,3 +357,91 @@ describe('EmbeddableChat renameMode="inline"', () => {
     expect(screen.getByText('Exchange migration')).toBeInTheDocument();
   });
 });
+
+describe('EmbeddableChat safeAreaBottom', () => {
+  // The composer's root carries the inset inline; nothing else in a lone composer does.
+  const insetInMarkup = () => document.body.innerHTML.includes('safe-area-inset-bottom');
+
+  it('clears the bottom safe-area inset by default', () => {
+    renderChat(createState(), { threadContainer: null });
+    expect(insetInMarkup()).toBe(true);
+  });
+
+  it('leaves it to the host layout with safeAreaBottom={false}', () => {
+    renderChat(createState(), { threadContainer: null, safeAreaBottom: false });
+    expect(editor()).toBeInTheDocument();
+    expect(insetInMarkup()).toBe(false);
+  });
+});
+
+describe('EmbeddableChat onDialogCreated', () => {
+  /** A send from no dialog, left in flight: the host is creating the dialog. */
+  function startNewChatSend(onDialogCreated: (id: string) => void) {
+    const sendMessage = vi.fn<UnifiedChatState['sendMessage']>(() => new Promise<void>(() => {}));
+    const empty = { messages: [], activeDialogId: null, activeDialog: null, sendMessage };
+    const props: ChatProps = { threadContainer: null, onDialogCreated };
+    const view = renderChat(createState(empty), props);
+    type('check the backups');
+    fireEvent.keyDown(editor(), { key: 'Enter' });
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    return {
+      land: (id: string) =>
+        view.rerender({
+          ...props,
+          mingoState: createState({ activeDialogId: id, activeDialog: { id, title: '' }, sendMessage }),
+        }),
+    };
+  }
+
+  it('tells the host the id a send created, once', () => {
+    const onDialogCreated = vi.fn();
+    const send = startNewChatSend(onDialogCreated);
+    expect(onDialogCreated).not.toHaveBeenCalled();
+    send.land('d-new');
+    expect(onDialogCreated).toHaveBeenCalledExactlyOnceWith('d-new');
+    // Later switches are no creation.
+    send.land('d-1');
+    expect(onDialogCreated).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays quiet when an existing dialog is opened', () => {
+    const onDialogCreated = vi.fn();
+    const empty = createState({ messages: [], activeDialogId: null, activeDialog: null });
+    const { rerender } = renderChat(empty, { threadContainer: null, onDialogCreated });
+    rerender({ threadContainer: null, onDialogCreated, mingoState: createState() });
+    expect(onDialogCreated).not.toHaveBeenCalled();
+  });
+});
+
+describe('EmbeddableChat composerPreviewText', () => {
+  const ghost = () => screen.queryByText('Find devices with less than 10% free disk');
+
+  it('shows the host’s preview as ghost text in the composer, and drops it when cleared', () => {
+    const empty = createState({ messages: [], activeDialogId: null, activeDialog: null });
+    const { rerender } = renderChat(empty, {
+      threadContainer: null,
+      composerPreviewText: 'Find devices with less than 10% free disk',
+    });
+    expect(ghost()).toBeInTheDocument();
+    expect(editor()).toHaveTextContent('');
+
+    rerender({ threadContainer: null, composerPreviewText: null });
+    expect(ghost()).not.toBeInTheDocument();
+  });
+
+  it('gives way to typing, as the chip hover preview does', () => {
+    renderChat(createState({ messages: [], activeDialogId: null, activeDialog: null }), {
+      threadContainer: null,
+      composerPreviewText: 'Find devices with less than 10% free disk',
+    });
+    expect(ghost()).toBeInTheDocument();
+    type('my own question');
+    expect(ghost()).not.toBeInTheDocument();
+    expect(editor()).toHaveTextContent('my own question');
+  });
+
+  it('shows nothing without one', () => {
+    renderChat(createState({ messages: [], activeDialogId: null, activeDialog: null }), { threadContainer: null });
+    expect(ghost()).not.toBeInTheDocument();
+  });
+});
