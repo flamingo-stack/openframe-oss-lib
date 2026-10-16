@@ -13,6 +13,7 @@ import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/mu
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { PersistentSidebar, PersistentMobileDropdown } from '../persistent-filter-controls';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
+import { DataSyncLine } from '../ui/data-attribution';
 import { useDocNavigation } from './doc-navigation-context';
 import { useDocsResolveLink } from './use-docs-resolve-link';
 import { useDocumentTree } from './use-document-tree';
@@ -361,7 +362,10 @@ function DocViewerContent({
                           <p className="text-ods-text-secondary text-h4">{resolvedEmptyText}</p>
                         </div>
                       ) : (
-                        renderedContent
+                        <>
+                          <DataSyncLine sync={content.sync} />
+                          {renderedContent}
+                        </>
                       )}
                     </article>
                   </div>

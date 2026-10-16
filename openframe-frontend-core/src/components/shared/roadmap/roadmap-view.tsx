@@ -15,15 +15,19 @@ import { useMemo } from 'react';
 import { useSearchParams } from '../../../embed-shims';
 import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
 import { useSelfFetch } from '../../../hooks/use-self-fetch';
+import type { DataSync } from '../../../types/data-sync';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
+import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
 import { RoadmapGrid } from './roadmap-grid';
 import { RoadmapGridSkeleton } from './roadmap-grid-skeleton';
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_ENDPOINT = '/api/roadmap';
+/** The list under its sync line (the line the endpoint's `sync` states). */
+const SYNCED_LIST_CLASS = 'flex w-full flex-col gap-[var(--spacing-system-lf)]';
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
 // reads, so the chrome's written `?key=` and this view's read can't silently diverge.
 const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
@@ -73,7 +77,9 @@ export function RoadmapView({
   // hook's initialData re-sync effect fires every render and clobbers the
   // optimistic vote patch below.
   const initialData = useMemo(() => (initialItems ? { items: initialItems } : undefined), [initialItems]);
-  const { data, setData, isLoading, error, reload } = useSelfFetch<{ items?: RoadmapItem[] }>(url, { initialData });
+  const { data, setData, isLoading, error, reload } = useSelfFetch<{ items?: RoadmapItem[]; sync?: DataSync }>(url, {
+    initialData,
+  });
   const items = data?.items ?? [];
 
   // Deep-link hash dispatch — `?search=<id>#roadmap-<id>` from a chat card.
@@ -91,27 +97,35 @@ export function RoadmapView({
   // Skeleton only while the FIRST fetch is in flight (no data yet) — a malformed
   // body lacking `items` renders the grid (empty), never a stuck skeleton.
   if (isLoading && !data) {
-    return <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />;
+    return (
+      <div className={SYNCED_LIST_CLASS}>
+        <DataSyncLine loading />
+        <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
+      </div>
+    );
   }
 
   return (
-    <RoadmapGrid
-      items={items}
-      showLeftMargin={showLeftMargin}
-      buildRefreshUrl={buildRefreshUrl}
-      votingOptions={votingOptions}
-      // Full-page roadmap → collapsible quarter grouping (the shared RoadmapGrid
-      // capability; flat grids stay the RoadmapGrid default). When the chrome's
-      // search / status filter is active, expand every quarter so matches aren't hidden.
-      groupByQuarter
-      hasActiveFilters={search !== '' || status !== 'all'}
-      // After a vote refreshes a single task, patch it into the fetched list so
-      // the displayed counts stay live.
-      onItemUpdate={updated =>
-        setData(prev =>
-          prev ? { ...prev, items: (prev.items ?? []).map(it => (it.id === updated.id ? updated : it)) } : prev,
-        )
-      }
-    />
+    <div className={SYNCED_LIST_CLASS}>
+      <DataSyncLine sync={data?.sync} />
+      <RoadmapGrid
+        items={items}
+        showLeftMargin={showLeftMargin}
+        buildRefreshUrl={buildRefreshUrl}
+        votingOptions={votingOptions}
+        // Full-page roadmap → collapsible quarter grouping (the shared RoadmapGrid
+        // capability; flat grids stay the RoadmapGrid default). When the chrome's
+        // search / status filter is active, expand every quarter so matches aren't hidden.
+        groupByQuarter
+        hasActiveFilters={search !== '' || status !== 'all'}
+        // After a vote refreshes a single task, patch it into the fetched list so
+        // the displayed counts stay live.
+        onItemUpdate={updated =>
+          setData(prev =>
+            prev ? { ...prev, items: (prev.items ?? []).map(it => (it.id === updated.id ? updated : it)) } : prev,
+          )
+        }
+      />
+    </div>
   );
 }
