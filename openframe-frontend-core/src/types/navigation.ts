@@ -223,6 +223,28 @@ export interface NavigationSidebarConfig {
    * desktop (not for the tablet overlay). Pair with `collapsed`.
    */
   onCollapsedChange?: (collapsed: boolean) => void;
+  /**
+   * A reveal command: every CHANGE of this number (not its first value) shows
+   * the expanded sidebar at the current width — on tablet it opens the overlay
+   * (even when `collapsed` is already `false`, where a change of `collapsed`
+   * cannot), on desktop it expands a collapsed sidebar through
+   * `onCollapsedChange(false)` (controlled) or the stored preference
+   * (uncontrolled). Below md it does nothing: there the sidebar is the burger
+   * menu (`AppLayout` `mobileMenuOpen`). E.g. ⌘K bumps it before focusing the
+   * chat search in `sectionSlot`.
+   */
+  revealSignal?: number;
+  /**
+   * Host controls in the sidebar's 56px header: to the right of the logo while
+   * expanded, stacked under the logo mark in the 56px rail (the layout follows
+   * the rail's width, so the first paint is right). Meant for 32px icon
+   * buttons — `NotificationsBellButton`, `TimeTrackerHeaderButton` and
+   * `TicketAlertsButton` with `variant="compact"`. When they leave the wordmark
+   * no room, the wordmark gives way rather than being cut. A function receives
+   * `minimized` (e.g. to open a popover to the right in the rail). Not drawn in
+   * the mobile burger menu: below md the top bar carries these controls.
+   */
+  headerSlot?: NavigationSidebarSlot;
 }
 
 /**
