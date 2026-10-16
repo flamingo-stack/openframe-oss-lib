@@ -20,6 +20,22 @@ export interface TimeTrackerHeaderButtonProps {
   /** Dimming/disabled passthrough from the header. */
   className?: string;
   disabled?: boolean;
+  /**
+   * - `cell` (default): a cell of the top bar; while a session runs it widens
+   *   to show the live clock from md up.
+   * - `compact`: a 32px icon button with a 20px glyph for the navigation
+   *   sidebar's header (`NavigationSidebarConfig.headerSlot`). It never widens:
+   *   a running session is the accent glyph, and the clock is in its tooltip.
+   */
+  variant?: 'cell' | 'compact';
+  /**
+   * Where the panel opens against the button. Default: below it, aligned to its
+   * end (`cell`, the right end of a top bar) or its start (`compact`, the left
+   * edge of the window, so the panel opens over the page). In the collapsed
+   * 56px rail pass `side="right"`.
+   */
+  popoverSide?: 'top' | 'right' | 'bottom' | 'left';
+  popoverAlign?: 'start' | 'center' | 'end';
 }
 
 /**
@@ -32,7 +48,14 @@ export interface TimeTrackerHeaderButtonProps {
  * it closes any open in-layout drawer and vice versa. Outside AppLayout it
  * falls back to a viewport-wide backdrop.
  */
-export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHeaderButtonProps) {
+export function TimeTrackerHeaderButton({
+  className,
+  disabled,
+  variant = 'cell',
+  popoverSide = 'bottom',
+  popoverAlign,
+}: TimeTrackerHeaderButtonProps) {
+  const compact = variant === 'compact';
   const ctx = useOptionalTimeTracker();
   const elapsedLabel = useTrackerClock({
     status: ctx?.status ?? 'ready',
@@ -83,23 +106,30 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
       <PopoverPrimitive.Trigger asChild>
         <HeaderButton
           aria-label="Time tracker"
+          // Compact never shows the clock inline, so its tooltip carries it.
+          title={compact ? (isActive ? `Time tracker · ${elapsedLabel}` : 'Time tracker') : undefined}
           isActive={isOpen}
           disabled={disabled}
+          size={variant}
           className={cn(
-            'outline-none',
+            !compact && 'outline-none',
             // ODS top-navigation spec (Figma 2797-5978): the active cell keeps
             // its square icon-only footprint on mobile and becomes a fixed
             // 144px cell with the live clock from md up.
             isActive &&
+              !compact &&
               'md:w-auto md:min-w-[144px] md:justify-center md:gap-[var(--spacing-system-xsf)] md:px-[var(--spacing-system-sf)]',
             className,
           )}
           icon={
             <>
               <ClockHistoryIcon
-                className={cn('h-6 w-6', isPaused ? 'text-ods-text-secondary' : isActive && 'text-ods-accent')}
+                className={cn(
+                  compact ? 'h-5 w-5' : 'h-6 w-6',
+                  isPaused ? 'text-ods-text-secondary' : isActive && 'text-ods-accent',
+                )}
               />
-              {isActive && (
+              {isActive && !compact && (
                 <span
                   className={cn(
                     'hidden !font-mono text-h5 md:inline md:text-h4',
@@ -133,7 +163,8 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
       </PopoverPrimitive.Portal>
       <PopoverPrimitive.Portal container={portalContainer ?? undefined}>
         <PopoverPrimitive.Content
-          align="end"
+          side={popoverSide}
+          align={popoverAlign ?? (compact ? 'start' : 'end')}
           sideOffset={8}
           collisionPadding={8}
           className={cn(
