@@ -1,7 +1,5 @@
 package com.openframe.graphql.node;
 
-import com.netflix.graphql.dgs.exceptions.MissingDgsEntityFetcherException;
-import com.netflix.graphql.dgs.exceptions.MissingFederatedQueryArgument;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
@@ -144,44 +142,44 @@ class NodeEntityFinderTest {
     }
 
     @Test
-    void findEntity_noTypename_throwsMissingFederatedQueryArgument() {
+    void findEntity_noTypename_throwsUnresolvableRepresentation() {
         // setup
         Map<String, Object> representation = Map.of(KEY, TICKET_ID);
 
         // execution
-        MissingFederatedQueryArgument exception = assertThrows(MissingFederatedQueryArgument.class,
+        UnresolvableRepresentationException exception = assertThrows(UnresolvableRepresentationException.class,
                 () -> finder.findEntity(principal, representation));
 
         // verifications
-        assertThat(exception.getMessage()).isEqualTo("The federated query is missing field(s) __typename");
+        assertThat(exception.getMessage()).isEqualTo("Representation has no __typename");
         verifyNoInteractions(registry);
     }
 
     @Test
-    void findEntity_typeWithoutLoader_throwsMissingEntityFetcher() {
+    void findEntity_typeWithoutLoader_throwsUnresolvableRepresentation() {
         // setup
         when(registry.hasLoader(NodeType.DIALOG)).thenReturn(false);
         Map<String, Object> representation = Map.of(TYPENAME, "Dialog", KEY, TICKET_ID);
 
         // execution
-        MissingDgsEntityFetcherException exception = assertThrows(MissingDgsEntityFetcherException.class,
+        UnresolvableRepresentationException exception = assertThrows(UnresolvableRepresentationException.class,
                 () -> finder.findEntity(principal, representation));
 
         // verifications
-        assertThat(exception.getMessage()).isEqualTo("Missing @DgsEntityFetcher for type Dialog");
+        assertThat(exception.getMessage()).isEqualTo("No node loader for type Dialog");
     }
 
     @Test
-    void findEntity_typenameOutsideNodeType_throwsMissingEntityFetcher() {
+    void findEntity_typenameOutsideNodeType_throwsUnresolvableRepresentation() {
         // setup
         Map<String, Object> representation = Map.of(TYPENAME, "Foo", KEY, TICKET_ID);
 
         // execution
-        MissingDgsEntityFetcherException exception = assertThrows(MissingDgsEntityFetcherException.class,
+        UnresolvableRepresentationException exception = assertThrows(UnresolvableRepresentationException.class,
                 () -> finder.findEntity(principal, representation));
 
         // verifications
-        assertThat(exception.getMessage()).isEqualTo("Missing @DgsEntityFetcher for type Foo");
+        assertThat(exception.getMessage()).isEqualTo("No node loader for type Foo");
         verifyNoInteractions(registry);
     }
 

@@ -2,7 +2,9 @@ package com.openframe.api.federation;
 
 import com.netflix.graphql.dgs.DgsQueryExecutor;
 import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
+import com.netflix.graphql.types.errors.ErrorType;
 import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.exception.GraphQLExceptionHandler;
 import com.openframe.api.relay.ApiNodeLoaderConfiguration;
 import com.openframe.api.service.InstalledAgentService;
 import com.openframe.api.service.TagService;
@@ -22,6 +24,7 @@ import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
 import com.openframe.graphql.relay.RelayIdCodec;
 import graphql.ExecutionResult;
+import graphql.GraphQLError;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,12 +35,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(
@@ -171,10 +176,29 @@ class ApiEntitiesDgsTest {
         assertThat(result.<Map<String, Object>>getData()).containsEntry("_entities", expected);
     }
 
+    @Test
+    void entities_typeWithoutApiLoader_badRequestAtItsIndexNotAnInternalError() {
+        // setup
+        when(userService.getUsersByIds(List.of(USER_ID))).thenReturn(List.of(user));
+        Map<String, Object> userKey = Map.of(TYPENAME, "User", "id", USER_ID);
+        Map<String, Object> dialogKey = Map.of(TYPENAME, "Dialog", "id", USER_ID);
+        Map<String, Object> variables = Map.of(REPRESENTATIONS, List.of(userKey, dialogKey));
+        List<Object> expected = Arrays.asList(Map.of("id", USER_ID, "firstName", "Ada"), null);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(ENTITIES_QUERY, variables);
+
+        // verifications
+        assertThat(result.<Map<String, Object>>getData()).containsEntry("_entities", expected);
+        assertThat(result.getErrors())
+                .extracting(GraphQLError::getPath, GraphQLError::getErrorType, GraphQLError::getMessage)
+                .containsExactly(tuple(List.of("_entities", 1), ErrorType.BAD_REQUEST, "No node loader for type Dialog"));
+    }
+
     @SpringBootConfiguration
     @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class,
             RelayAutoConfiguration.class, NodeAutoConfiguration.class})
-    @Import(ApiNodeLoaderConfiguration.class)
+    @Import({ApiNodeLoaderConfiguration.class, GraphQLExceptionHandler.class})
     static class EntitiesApp {
     }
 }

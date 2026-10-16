@@ -2,17 +2,21 @@ package com.openframe.graphql.node;
 
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.netflix.graphql.dgs.federation.DefaultDgsFederationResolver;
+import com.netflix.graphql.types.errors.TypedGraphQLError;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.GraphQLError;
 import graphql.execution.DataFetcherExceptionHandler;
 import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.execution.DataFetcherExceptionHandlerResult;
 import graphql.execution.DataFetcherResult;
+import graphql.execution.ResultPath;
 import graphql.execution.SimpleDataFetcherExceptionHandler;
+import graphql.language.SourceLocation;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.TypeResolver;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.dataloader.Try;
 
 import java.util.ArrayList;
@@ -21,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RequiredArgsConstructor
+@Slf4j
 public class NodeFederationResolver extends DefaultDgsFederationResolver {
 
     private static final String REPRESENTATIONS = "representations";
@@ -81,6 +86,10 @@ public class NodeFederationResolver extends DefaultDgsFederationResolver {
 
     private List<GraphQLError> errorsAt(DataFetchingEnvironment environment, int index, Throwable failure) {
         DgsDataFetchingEnvironment entityEnvironment = createDataFetchingEnvironmentWithPath(environment, index);
+        if (failure instanceof UnresolvableRepresentationException unresolvable) {
+            GraphQLError badRequest = badRequestAt(entityEnvironment, unresolvable);
+            return List.of(badRequest);
+        }
         DataFetcherExceptionHandlerParameters parameters = DataFetcherExceptionHandlerParameters.newExceptionParameters()
                 .dataFetchingEnvironment(entityEnvironment)
                 .exception(failure)
@@ -88,6 +97,20 @@ public class NodeFederationResolver extends DefaultDgsFederationResolver {
         DataFetcherExceptionHandler handler = exceptionHandler();
         DataFetcherExceptionHandlerResult result = handler.handleException(parameters).join();
         return result.getErrors();
+    }
+
+    // A client input error: answered here, not by the service handler, which would report it as an internal error.
+    private static GraphQLError badRequestAt(DataFetchingEnvironment entityEnvironment,
+                                             UnresolvableRepresentationException failure) {
+        ResultPath path = entityEnvironment.getExecutionStepInfo().getPath();
+        SourceLocation location = entityEnvironment.getField().getSourceLocation();
+        String message = failure.getMessage();
+        log.debug("Unresolvable _entities representation at {}: {}", path, message);
+        return TypedGraphQLError.newBadRequestBuilder()
+                .message(message)
+                .location(location)
+                .path(path)
+                .build();
     }
 
     private DataFetcherExceptionHandler exceptionHandler() {

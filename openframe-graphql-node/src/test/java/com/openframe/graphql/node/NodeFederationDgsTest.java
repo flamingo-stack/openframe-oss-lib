@@ -5,12 +5,15 @@ import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
 import com.netflix.graphql.dgs.InputArgument;
 import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
+import com.netflix.graphql.types.errors.ErrorType;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
 import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.security.authentication.AuthPrincipal;
 import graphql.ExecutionResult;
 import graphql.GraphQLError;
+import graphql.execution.DataFetcherExceptionHandler;
+import graphql.execution.DataFetcherExceptionHandlerParameters;
 import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLSchema;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -34,7 +38,10 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -69,6 +76,7 @@ class NodeFederationDgsTest {
 
     @MockitoBean private NodeLookups lookups;
     @MockitoBean private EntityCallerAuthorizer callerAuthorizer;
+    @MockitoSpyBean private DataFetcherExceptionHandler exceptionHandler;
 
     @Autowired private DgsQueryExecutor queryExecutor;
 
@@ -202,7 +210,7 @@ class NodeFederationDgsTest {
     }
 
     @Test
-    void entities_typeWithoutLoader_errorOnlyAtItsIndex() {
+    void entities_typeWithoutLoader_badRequestOnlyAtItsIndex() {
         // setup
         when(callerAuthorizer.authorizeCaller()).thenReturn(CALLER);
         when(lookups.findTicket(CALLER, TICKET_ID)).thenReturn(Optional.of(ticket));
@@ -217,13 +225,29 @@ class NodeFederationDgsTest {
         // verifications
         assertThat(result.<Map<String, Object>>getData()).containsEntry("_entities", expected);
         assertThat(result.getErrors())
-                .extracting(GraphQLError::getPath)
-                .containsExactly(List.of("_entities", 1));
-        assertThat(result.getErrors())
-                .extracting(GraphQLError::getMessage)
-                .singleElement(as(STRING))
-                .contains("Missing @DgsEntityFetcher for type Dialog");
+                .extracting(GraphQLError::getPath, GraphQLError::getErrorType, GraphQLError::getMessage)
+                .containsExactly(tuple(List.of("_entities", 1), ErrorType.BAD_REQUEST, "No node loader for type Dialog"));
         verify(callerAuthorizer).authorizeCaller();
+        verifyNoInteractions(exceptionHandler);
+    }
+
+    @Test
+    void entities_noTypename_badRequestAtItsIndex() {
+        // setup
+        when(callerAuthorizer.authorizeCaller()).thenReturn(CALLER);
+        Map<String, Object> keyWithoutTypename = Map.of("id", TICKET_ID);
+        Map<String, Object> variables = Map.of(REPRESENTATIONS, List.of(keyWithoutTypename));
+        List<Object> expected = Collections.singletonList(null);
+
+        // execution
+        ExecutionResult result = queryExecutor.execute(ENTITIES_QUERY, variables);
+
+        // verifications
+        assertThat(result.<Map<String, Object>>getData()).containsEntry("_entities", expected);
+        assertThat(result.getErrors())
+                .extracting(GraphQLError::getPath, GraphQLError::getErrorType, GraphQLError::getMessage)
+                .containsExactly(tuple(List.of("_entities", 0), ErrorType.BAD_REQUEST, "Representation has no __typename"));
+        verifyNoInteractions(exceptionHandler, lookups);
     }
 
     @Test
@@ -245,6 +269,7 @@ class NodeFederationDgsTest {
                 .containsExactly(List.of("_entities", 0), List.of("_entities", 1));
         verify(callerAuthorizer).authorizeCaller();
         verifyNoInteractions(lookups);
+        verify(exceptionHandler, times(2)).handleException(any(DataFetcherExceptionHandlerParameters.class));
     }
 
     interface NodeLookups {

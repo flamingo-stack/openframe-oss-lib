@@ -1,7 +1,5 @@
 package com.openframe.graphql.node;
 
-import com.netflix.graphql.dgs.exceptions.MissingDgsEntityFetcherException;
-import com.netflix.graphql.dgs.exceptions.MissingFederatedQueryArgument;
 import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -31,12 +29,12 @@ public class NodeEntityFinder {
     private NodeType loadableTypeOf(Map<String, Object> representation) {
         Object typeName = representation.get(TYPENAME);
         if (typeName == null) {
-            throw new MissingFederatedQueryArgument(TYPENAME);
+            throw UnresolvableRepresentationException.missingTypename();
         }
         String name = typeName.toString();
         return NodeType.findByTypeName(name)
                 .filter(registry::hasLoader)
-                .orElseThrow(() -> new MissingDgsEntityFetcherException(name));
+                .orElseThrow(() -> UnresolvableRepresentationException.noLoaderFor(name));
     }
 
     // The @key field is the type's raw id property (machineId for a Machine, whose id differs per subgraph; mostly id).
