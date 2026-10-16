@@ -140,6 +140,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       contentClassName,
       assistantType,
       approvalVariant,
+      selfAuthorType,
       appearance = CHAT_APPEARANCE.CLASSIC,
       assistantIcon,
       pendingApprovals,
@@ -1047,6 +1048,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         assistantType={message.assistantType || assistantType}
                         approvalVariant={approvalVariant}
                         authorType={message.authorType}
+                        selfAuthorType={selfAuthorType}
                         assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                         contextItems={message.contextItems}
                         resolveContextIcon={resolveContextIcon}
