@@ -20,6 +20,7 @@ import { ChatListEmptyState } from './chat-list-empty-state';
 import { groupDialogsByDay } from './mingo-chat-day-groups';
 import {
   ChatListLoadError,
+  dialogOwnedByOther,
   MINGO_DIALOG_STATUS_GLYPHS,
   type MingoChatListProps,
   type MingoDialogStatus,
@@ -66,6 +67,7 @@ export function MingoChatHistorySection({
   loadError = false,
   onRetry,
   ownedByOther,
+  currentUserId,
   className,
 }: MingoChatListProps) {
   const captionId = useId();
@@ -143,7 +145,9 @@ export function MingoChatHistorySection({
                 title={dialog.title || UNTITLED}
                 active={dialog.id === activeDialogId}
                 status={mingoDialogStatusOf(dialog, statusOf)}
-                ownerName={ownedByOther?.(dialog) ? dialog.owner?.name || undefined : undefined}
+                ownerName={
+                  dialogOwnedByOther(dialog, ownedByOther, currentUserId) ? dialog.owner?.name || undefined : undefined
+                }
                 ownerAvatarUrl={dialog.owner?.avatarUrl || undefined}
                 onSelect={onSelectDialog}
                 menuItems={chatDialogMenuItems({
@@ -239,6 +243,7 @@ export function MingoChatHistorySection({
         {scope && onScopeChange && !loadError && (
           <TabSelector
             className="shrink-0"
+            size="small"
             value={scope}
             onValueChange={value => onScopeChange(value as MingoHistoryScope)}
             items={[

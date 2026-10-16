@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
@@ -169,6 +169,17 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     if (isTablet && config.collapsed !== undefined) setTabletMinimized(config.collapsed);
   }
 
+  // `revealSignal`: each change shows the expanded sidebar. The tablet overlay
+  // is this component's own state, so it opens while rendering, like the
+  // `collapsed` command above — and unlike it, also when `collapsed` is already
+  // `false`. Desktop is the host's preference (or the stored one): that is
+  // written from the effect below, never during render.
+  const [revealSeen, setRevealSeen] = useState(config.revealSignal);
+  if (revealSeen !== config.revealSignal) {
+    setRevealSeen(config.revealSignal);
+    if (isTablet && config.revealSignal !== undefined) setTabletMinimized(false);
+  }
+
   // Entering tablet always starts minimized. Adjusted while rendering — React's
   // documented pattern for a reset driven by a value the render already has —
   // rather than from an effect, which committed the crossover frame with the
@@ -218,6 +229,19 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
   const closeOverlay = useCallback(() => {
     setTabletMinimized(true);
   }, []);
+
+  // The desktop half of `revealSignal`: expand a collapsed sidebar — through
+  // the host when it owns the value, through the stored preference otherwise.
+  // Only a CHANGE counts; the value the sidebar mounted with is no command.
+  const revealHandledRef = useRef(config.revealSignal);
+  const { revealSignal, onCollapsedChange } = config;
+  useEffect(() => {
+    if (revealHandledRef.current === revealSignal) return;
+    revealHandledRef.current = revealSignal;
+    if (revealSignal === undefined || !isLgUp || !desktopMinimized) return;
+    if (!isControlled) setStoredMinimized(false);
+    onCollapsedChange?.(false);
+  }, [revealSignal, isLgUp, desktopMinimized, isControlled, setStoredMinimized, onCollapsedChange]);
 
   // Dismiss the tablet overlay with Escape so it behaves like a transient panel
   useEffect(() => {
@@ -459,7 +483,7 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
         )}
         aria-label="Main navigation sidebar"
       >
-        <NavigationSidebarHeader minimized={minimized} />
+        <NavigationSidebarHeader minimized={minimized} slot={config.headerSlot} />
 
         <div
           className={cn(

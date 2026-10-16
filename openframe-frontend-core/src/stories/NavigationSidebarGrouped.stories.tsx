@@ -2,6 +2,12 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 
+import { NotificationsProvider } from '../components/features/notifications/notifications-context';
+import {
+  TimeTrackerHeaderButton,
+  TimeTrackerProvider,
+  type TimeTrackerData,
+} from '../components/features/time-tracker';
 import {
   ActivityIcon,
   AlertTriangleIcon,
@@ -16,17 +22,24 @@ import {
   HeadsetIcon,
   IdCardIcon,
   LaptopMobileIcon,
+  LifeBuoyIcon,
   Logout02Icon,
   MonitorIcon,
   Parcel02Icon,
+  PlusCircleIcon,
   QuestionCircleIcon,
   Settings02Icon,
+  ShieldCheckIcon,
   TagIcon,
   TimerIcon,
 } from '../components/icons-v2-generated';
 import { AccountPopover, type AccountPopoverEntry } from '../components/navigation/account-popover';
+import { HeaderButton } from '../components/navigation/header-button';
 import { MobileBurgerMenu } from '../components/navigation/mobile-burger-menu';
 import { NavigationSidebar } from '../components/navigation/navigation-sidebar';
+import { NavigationSidebarActionRow } from '../components/navigation/navigation-sidebar-grouped';
+import { NotificationsBellButton } from '../components/navigation/notifications-bell-button';
+import { UnreadCountBadge } from '../components/navigation/unread-dot';
 import type { NavigationSidebarConfig, NavigationSidebarItem } from '../types/navigation';
 
 /** The Figma `navigation-sidebar` tree, with the app's real routes. */
@@ -320,4 +333,121 @@ export const MobileBurgerGrouped: Story = {
       </div>
     );
   },
+};
+
+const HEADER_NOTIFICATIONS = [{ id: 'n1', title: 'Disk almost full on ELK-PROD-07', createdAt: Date.now() }];
+
+/** What the time tracker's panel needs; a session started a minute ago. */
+const TRACKER: TimeTrackerData = {
+  status: 'tracking',
+  runningSince: Date.now() - 64_000,
+  ticketOptions: [],
+  selectedTicketId: null,
+  onSelectedTicketChange: fn(),
+  notes: '',
+  onNotesChange: fn(),
+  lastEntries: [],
+  onStart: fn(),
+  onPause: fn(),
+  onResume: fn(),
+  onCancel: fn(),
+  onSubmit: fn(),
+};
+
+/**
+ * The header controls (`headerSlot`): the compact time tracker and bell, and —
+ * standing in for `TicketAlertsButton variant="compact"`, which needs a live
+ * ticket stream — a 32px button with the same count pill. In the rail
+ * (`minimized`) the tracker's panel opens to the right.
+ */
+function headerControls({ minimized }: { minimized: boolean }) {
+  return (
+    <>
+      <TimeTrackerHeaderButton variant="compact" popoverSide={minimized ? 'right' : 'bottom'} />
+      <NotificationsBellButton variant="compact" />
+      <HeaderButton
+        size="compact"
+        aria-label="Support tickets — 2 unread updates"
+        icon={
+          <span className="relative inline-flex">
+            <LifeBuoyIcon className="h-5 w-5" />
+            <UnreadCountBadge count={2} />
+          </span>
+        }
+      />
+    </>
+  );
+}
+
+/** The Mingo rows in `topSlot`: "New chat" (outline action) and "Needs approval" (a destination with a count). */
+function mingoRows(currentPath: string, onNavigate: (path: string) => void) {
+  return function MingoRows({ minimized }: { minimized: boolean }) {
+    return (
+      <div className="mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-xxs)] border-b border-ods-border pb-[var(--spacing-system-xsf)]">
+        <NavigationSidebarActionRow
+          variant="outline"
+          icon={<PlusCircleIcon />}
+          label="New chat"
+          minimized={minimized}
+          onClick={() => onNavigate('/mingo')}
+        />
+        <NavigationSidebarActionRow
+          icon={<ShieldCheckIcon />}
+          label="Needs approval"
+          href="/approvals"
+          active={currentPath === '/approvals'}
+          count={3}
+          minimized={minimized}
+          onClick={event => {
+            event.preventDefault();
+            onNavigate('/approvals');
+          }}
+        />
+      </div>
+    );
+  };
+}
+
+function HeaderControlsHost({ initialCollapsed }: { initialCollapsed: boolean }) {
+  const [currentPath, setCurrentPath] = useState('/approvals');
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
+  return (
+    <NotificationsProvider initialNotifications={HEADER_NOTIFICATIONS}>
+      <TimeTrackerProvider {...TRACKER}>
+        <div className="flex h-screen bg-ods-bg">
+          <NavigationSidebar
+            config={{
+              variant: 'grouped',
+              items: GROUPED_ITEMS,
+              currentPath,
+              onNavigate: setCurrentPath,
+              collapsed,
+              onCollapsedChange: setCollapsed,
+              headerSlot: headerControls,
+              topSlot: mingoRows(currentPath, setCurrentPath),
+              sectionSlot: <ChatHistoryPlaceholder />,
+            }}
+          />
+          <main className="flex-1 p-[var(--spacing-system-l)] text-ods-text-primary">
+            <p className="text-h4">{currentPath}</p>
+          </main>
+        </div>
+      </TimeTrackerProvider>
+    </NotificationsProvider>
+  );
+}
+
+/**
+ * The Mingo-first sidebar: the time tracker, bell and ticket alerts in the 56px
+ * header beside the logo (`headerSlot`, compact buttons) — with all three the
+ * wordmark gives way — and the Mingo rows above the tree
+ * (`NavigationSidebarActionRow`).
+ */
+export const HeaderControlsAndActionRows: Story = {
+  render: () => <HeaderControlsHost initialCollapsed={false} />,
+};
+
+/** The same in the 56px rail: the header controls stacked under the logo mark, the rows as 40px cells. */
+export const HeaderControlsCollapsed: Story = {
+  render: () => <HeaderControlsHost initialCollapsed />,
 };

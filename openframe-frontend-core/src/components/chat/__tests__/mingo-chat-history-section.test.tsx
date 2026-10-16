@@ -195,6 +195,46 @@ describe('MingoChatRail variant="section"', () => {
     await waitFor(() => expect(screen.queryByPlaceholderText('Search for Chats')).not.toBeInTheDocument());
   });
 
+  it('derives someone else’s chat from owner.id and the viewer’s id', () => {
+    render(
+      <MingoChatRail
+        variant="section"
+        currentUserId="u-me"
+        dialogs={[
+          { id: 'mine', title: 'My chat', owner: { id: 'u-me', name: 'Pavlo Shylo' } },
+          { id: 'theirs', title: 'Their chat', owner: { id: 'u-roman', name: 'Roman Smith' } },
+          { id: 'unknown', title: 'Old chat', owner: { name: 'Ann Lee' } },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Owner: Roman Smith' })).toHaveTextContent('RS');
+    expect(screen.queryByRole('img', { name: 'Owner: Pavlo Shylo' })).not.toBeInTheDocument();
+    // No owner id: taken as the viewer's, never a stranger's initials on a guess.
+    expect(screen.queryByRole('img', { name: 'Owner: Ann Lee' })).not.toBeInTheDocument();
+  });
+
+  it('lets the host’s ownedByOther win over the ids', () => {
+    render(
+      <MingoChatRail
+        variant="section"
+        currentUserId="u-me"
+        ownedByOther={dialog => dialog.id === 'mine'}
+        dialogs={[
+          { id: 'mine', title: 'My chat', owner: { id: 'u-me', name: 'Pavlo Shylo' } },
+          { id: 'theirs', title: 'Their chat', owner: { id: 'u-roman', name: 'Roman Smith' } },
+        ]}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Owner: Pavlo Shylo' })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Owner: Roman Smith' })).not.toBeInTheDocument();
+  });
+
+  it('draws the scope as the small (32px) selector', () => {
+    render(<MingoChatRail variant="section" dialogs={[]} scope="my" onScopeChange={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'My Chats' })).toHaveClass('text-h6');
+    expect(screen.getByRole('button', { name: 'All Chats' })).toHaveClass('text-h6');
+  });
+
   it('switches the scope', () => {
     const onScopeChange = vi.fn();
     render(<MingoChatRail variant="section" dialogs={[]} scope="my" onScopeChange={onScopeChange} />);

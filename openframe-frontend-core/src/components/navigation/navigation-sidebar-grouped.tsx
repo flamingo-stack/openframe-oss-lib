@@ -375,6 +375,85 @@ export function NavigationSidebarGroupedEntries({
   );
 }
 
+export interface NavigationSidebarActionRowProps {
+  icon: ReactNode;
+  label: string;
+  /** A link (prefetch, open in a new tab); without it the row is a button. */
+  href?: string;
+  /** Runs on click, before a link's own navigation (e.g. to close a menu). */
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
+  /** The page the row leads to is open: the active pill and, on a link, `aria-current="page"`. */
+  active?: boolean;
+  /** A count pill after the label (capped at "99+"); a dot on the icon in the rail. 0 = none. */
+  count?: number;
+  /** `'outline'`: a bordered row with an accent icon — an action rather than a place ("New chat"). */
+  variant?: 'default' | 'outline';
+  disabled?: boolean;
+  /** The sidebar's `minimized` (from the slot's render function): the rail's tooltip. The geometry follows the rail's width on its own. */
+  minimized?: boolean;
+  /** Accessible name. Default: the label, with the count — "Needs approval (3)". */
+  'aria-label'?: string;
+  className?: string;
+}
+
+/**
+ * A row for a grouped sidebar's slots (`topSlot`): the nav entry's geometry —
+ * 44px with an 8px inset, a centred 40px cell in the rail — its active pill and
+ * count pill, for what is not a nav entry: an action ("New chat",
+ * `variant="outline"`) or a host-owned destination with its own count ("Needs
+ * approval"). Renders in the mobile burger menu too, expanded.
+ */
+export function NavigationSidebarActionRow({
+  icon,
+  label,
+  href,
+  onClick,
+  active = false,
+  count = 0,
+  variant = 'default',
+  disabled = false,
+  minimized = false,
+  'aria-label': ariaLabel,
+  className,
+}: NavigationSidebarActionRowProps) {
+  // The nav row's own parts, fed a stand-in entry: one geometry, one pill.
+  const entry: NavigationSidebarItem = { id: 'action', label, icon, unreadCount: count };
+  const lit = active && !disabled;
+  const outline = variant === 'outline';
+  const name = ariaLabel ?? (count > 0 ? `${label} (${count > 99 ? '99+' : count})` : label);
+  const classes = cn(
+    ROW_CLASSES,
+    outline && 'border border-ods-border',
+    !disabled && !lit && 'text-ods-text-primary hover:after:opacity-100',
+    lit && ACTIVE_PILL,
+    disabled && 'cursor-not-allowed text-ods-text-secondary opacity-50',
+    className,
+  );
+  const content = (
+    <>
+      <RowIcon
+        item={entry}
+        size={20}
+        className={lit || (outline && !disabled) ? 'text-ods-accent' : 'text-ods-text-secondary'}
+      />
+      <RowLabel item={entry} />
+    </>
+  );
+  const shared = { className: classes, title: minimized ? name : undefined, 'aria-label': name };
+  if (href && !disabled) {
+    return (
+      <Link href={href} onClick={onClick} aria-current={lit ? 'page' : undefined} {...shared}>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} {...shared}>
+      {content}
+    </button>
+  );
+}
+
 /** A placeholder row in the grouped geometry, for `NavigationSidebarConfig.loading`. */
 export function NavigationSidebarGroupedSkeleton() {
   return (

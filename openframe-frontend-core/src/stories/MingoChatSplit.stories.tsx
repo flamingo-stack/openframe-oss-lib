@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { fn } from 'storybook/test';
 
 import { EmbeddableChat } from '../components/chat/embeddable-chat';
+import { QuickActionChipButton } from '../components/chat/quick-action-chip';
 import type { UnifiedChatMessage, UnifiedChatState } from '../components/chat/types/unified-chat-state.types';
 import { PackageCheckIcon } from '../components/icons-v2-generated';
 import { type ChatRuntime, ChatRuntimeContext } from '../contexts/chat-runtime-context';
@@ -103,8 +104,15 @@ type Page = 'chat' | 'devices' | 'home';
  * thread in and out (`threadContainer`), so a draft typed on one page is still
  * there on the next.
  */
+/** Home chips the host draws itself: hovering one previews its prompt in the docked composer. */
+const HOME_ACTIONS = [
+  { id: 'disk', label: 'Low disk space', prompt: 'Find devices with less than 10% free disk and suggest a cleanup' },
+  { id: 'patch', label: 'Missing patches', prompt: 'Which Windows devices are missing security patches this month?' },
+];
+
 function Shell({ page: initialPage }: { page: Page }) {
   const [page, setPage] = useState<Page>(initialPage);
+  const [preview, setPreview] = useState<string | null>(null);
   // The story's control picks the page too; the buttons above move within it.
   const [controlPage, setControlPage] = useState<Page>(initialPage);
   if (controlPage !== initialPage) {
@@ -140,6 +148,19 @@ function Shell({ page: initialPage }: { page: Page }) {
             <p className="text-ods-text-secondary text-h6">
               No thread on this page: the dock below is the composer alone.
             </p>
+            {page === 'home' && (
+              <div className="mt-[var(--spacing-system-l)] flex flex-wrap gap-[var(--spacing-system-xsf)]">
+                {HOME_ACTIONS.map(action => (
+                  <QuickActionChipButton
+                    key={action.id}
+                    label={action.label}
+                    onSelect={fn()}
+                    onHoverStart={() => setPreview(action.prompt)}
+                    onHoverEnd={() => setPreview(null)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -163,6 +184,8 @@ function Shell({ page: initialPage }: { page: Page }) {
           onModelClick={fn()}
           modelTooltip="Change in Settings → AI Settings"
           composerPlaceholder={page === 'home' ? 'Ask Mingo or describe a task…' : 'Reply to Mingo…'}
+          composerPreviewText={page === 'home' ? preview : null}
+          onDialogCreated={fn()}
           composerMenuItems={
             page === 'home'
               ? undefined
@@ -215,5 +238,5 @@ export const ChatPage: Story = {};
 /** Any other page: the dock is the composer alone (model row, ⋯ menu). */
 export const ComposerOnlyDock: Story = { args: { page: 'devices' } };
 
-/** Home: the composer without the model row, a new chat. */
+/** Home: the composer without the model row, a new chat. Hover a chip: its prompt ghosts in the composer (`composerPreviewText`). */
 export const Home: Story = { args: { page: 'home' } };

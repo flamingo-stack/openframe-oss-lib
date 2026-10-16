@@ -569,6 +569,30 @@ export interface EmbeddableChatProps {
    * and page headers; chat-list rows and the classic headers keep the modal.
    */
   renameMode?: 'modal' | 'inline';
+  /**
+   * Whether the composer clears the bottom safe-area inset (the iOS home bar)
+   * itself. Default `true`. Pass `false` when the composer sits in a layout
+   * that already owns that inset — a dock in a native shell whose root pads
+   * it — where the two would add up.
+   */
+  safeAreaBottom?: boolean;
+  /**
+   * Called with the new dialog's id when a send from this panel created it:
+   * the id the panel lands on while the send that started from "no dialog"
+   * is in flight (the composer, a quick-action chip, a clarification card,
+   * the Guide launcher prompt). Fired once per dialog, after the commit that
+   * shows it. Opening an existing dialog never fires it, and neither does a
+   * dialog the host creates itself (outside this panel's sends).
+   */
+  onDialogCreated?: (dialogId: string) => void;
+  /**
+   * Host-set ghost text in the composer: the same non-destructive preview a
+   * hovered quick-action chip shows (the prompt that clicking it would send),
+   * for chips the host draws itself (e.g. a home page beside a docked
+   * composer). `null` / omitted = none. The panel's own chip hover wins while
+   * it lasts.
+   */
+  composerPreviewText?: string | null;
 }
 
 // =============================================================================
@@ -1145,6 +1169,9 @@ function EmbeddableChatInner({
   composerMenuItems,
   composerPlaceholder,
   renameMode = 'modal',
+  safeAreaBottom = true,
+  onDialogCreated,
+  composerPreviewText = null,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
   // `shell` 'none' / 'inline' means the consumer hosts us inside their own panel
@@ -1554,11 +1581,16 @@ function EmbeddableChatInner({
   const scopeDialogId = activeDialogId ?? null;
   const [composerScope, setComposerScope] = useState({ dialogId: scopeDialogId, mode: activeMode });
   const [composerKey, setComposerKey] = useState(0);
+  // The dialog a send of this panel created (`onDialogCreated`) — exactly the
+  // `named` transition below, kept for the effect that tells the host.
+  const [createdDialogId, setCreatedDialogId] = useState<string | null>(null);
   if (composerScope.dialogId !== scopeDialogId || composerScope.mode !== activeMode) {
     const named =
       namingNewChat && composerScope.dialogId == null && scopeDialogId != null && composerScope.mode === activeMode;
     setComposerScope({ dialogId: scopeDialogId, mode: activeMode });
-    if (!named) {
+    if (named) {
+      setCreatedDialogId(scopeDialogId);
+    } else {
       setComposerKey(k => k + 1);
       setContextItems(NO_CONTEXT_ITEMS);
       setContextPickerOpen(false);
@@ -1569,6 +1601,16 @@ function EmbeddableChatInner({
     mentionKeysRef.current.clear();
     clearAttachments();
   }, [composerKey, clearAttachments]);
+  // Told after the commit that shows the new dialog: the host typically
+  // navigates on it, which must not happen while this panel renders. Keyed on
+  // the id alone, so a host callback that changes identity is not re-told.
+  const onDialogCreatedRef = useRef(onDialogCreated);
+  useEffect(() => {
+    onDialogCreatedRef.current = onDialogCreated;
+  });
+  useEffect(() => {
+    if (createdDialogId != null) onDialogCreatedRef.current?.(createdDialogId);
+  }, [createdDialogId]);
 
   // Map each entity type to its backend mention marker (host-declared on the
   // entity type). Drives the committed `@marker:id` token; missing markers fall
@@ -2972,7 +3014,8 @@ function EmbeddableChatInner({
       }
       autoFocus={previewMode ? false : autoFocusInput}
       slashCommands={slashCommandsProp}
-      previewText={quickActionPreview ?? undefined}
+      previewText={quickActionPreview ?? composerPreviewText ?? undefined}
+      safeAreaBottom={safeAreaBottom}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}

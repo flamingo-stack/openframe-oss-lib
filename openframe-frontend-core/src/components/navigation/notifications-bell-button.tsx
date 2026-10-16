@@ -14,8 +14,11 @@ export interface NotificationsBellButtonProps {
    * - `cell` (default): a cell of the top bar, as `AppHeader` draws it.
    * - `floating`: a 36px bordered square for a place with no bar around it —
    *   `AppLayout`'s `contentCorner`.
+   * - `compact`: a 32px borderless icon button (20px glyph, pressed while the
+   *   drawer is open) for the navigation sidebar's header
+   *   (`NavigationSidebarConfig.headerSlot`).
    */
-  variant?: 'cell' | 'floating';
+  variant?: 'cell' | 'floating' | 'compact';
   className?: string;
 }
 
@@ -25,8 +28,9 @@ export interface NotificationsBellButtonProps {
  * a close "X" while the drawer is open. Disabled with no provider above it.
  *
  * `AppHeader` renders it under `showNotifications`. Without a header (the
- * `AppLayout` `desktopHeader={false}` shell), render it in `contentCorner`; the
- * drawer `AppLayout` mounts follows the same provider either way.
+ * `AppLayout` `desktopHeader={false}` shell), render it in `contentCorner`
+ * (`floating`) or in the sidebar's `headerSlot` (`compact`); the drawer
+ * `AppLayout` mounts follows the same provider either way.
  */
 export function NotificationsBellButton({
   fallbackUnreadCount = 0,
@@ -39,7 +43,7 @@ export function NotificationsBellButton({
   const isActive = ctx?.isOpen ?? false;
   const onClick = ctx?.toggle;
   const floating = variant === 'floating';
-  const iconClassName = floating ? 'h-5 w-5' : 'h-6 w-6';
+  const iconClassName = variant === 'cell' ? 'h-6 w-6' : 'h-5 w-5';
 
   return (
     <HeaderButton
@@ -51,6 +55,7 @@ export function NotificationsBellButton({
       onClick={onClick}
       isActive={isActive}
       disabled={disabled || !onClick}
+      size={variant === 'compact' ? 'compact' : 'cell'}
       className={cn(
         // Overrides the cell's bar-driven `h-full w-[--top-nav-cell]` box.
         floating && 'h-9 w-9 rounded-md border border-ods-border',

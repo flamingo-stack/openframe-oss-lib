@@ -95,6 +95,22 @@ export interface AppLayoutProps {
    * Optional; without it the layout is unchanged.
    */
   contentCorner?: ReactNode;
+  /**
+   * Controlled phone burger menu (below md). With it the host owns whether the
+   * menu is open — e.g. a top-bar cell that opens it on its chat history, or a
+   * navigation started from one of its slots that has to close it. Omitted:
+   * the layout keeps its own state, as before.
+   */
+  mobileMenuOpen?: boolean;
+  /**
+   * Every open / close the layout asks for, controlled or not: the burger
+   * toggle, a nav entry clicked in the menu, an in-layout drawer opening over
+   * it, and — when `sidebarConfig.currentPath` is set — any change of that
+   * location while the menu is open (so a navigation started anywhere, a slot
+   * included, closes it). A host opening it through `mobileMenuOpen` also
+   * closes any open in-layout drawer, as the toggle does.
+   */
+  onMobileMenuOpenChange?: (open: boolean) => void;
 }
 
 export function AppLayout({
@@ -111,8 +127,12 @@ export function AppLayout({
   composerDock,
   desktopHeader = true,
   contentCorner,
+  mobileMenuOpen: mobileMenuOpenProp,
+  onMobileMenuOpenChange,
 }: AppLayoutProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuControlled = mobileMenuOpenProp !== undefined;
+  const [uncontrolledMenuOpen, setUncontrolledMenuOpen] = useState(false);
+  const mobileMenuOpen = menuControlled ? mobileMenuOpenProp : uncontrolledMenuOpen;
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
   const [mainElement, setMainElement] = useState<HTMLElement | null>(null);
   const [contentWidth, setContentWidth] = useState<number | null>(null);
@@ -154,13 +174,24 @@ export function AppLayout({
   const contentCovered = sidePanelState?.coversContent === true;
   const contentOverlapped = sidePanelState?.overlapsContent === true;
 
-  // Mirrors `mobileMenuOpen` so the toggle callback can stay identity-stable.
-  // Refreshed after every commit rather than in the render body: the only
-  // reader is the burger click, which is always past a commit.
+  // Mirrors `mobileMenuOpen` (and the host's control of it) so the callbacks
+  // below can stay identity-stable. Refreshed after every commit rather than in
+  // the render body: the readers are clicks and effects, always past a commit.
   const mobileMenuOpenRef = useRef(mobileMenuOpen);
+  const menuControlledRef = useRef(menuControlled);
+  const onMobileMenuOpenChangeRef = useRef(onMobileMenuOpenChange);
   useEffect(() => {
     mobileMenuOpenRef.current = mobileMenuOpen;
+    menuControlledRef.current = menuControlled;
+    onMobileMenuOpenChangeRef.current = onMobileMenuOpenChange;
   });
+
+  // Every open / close goes through here: the layout's own state when it owns
+  // it, and the host hears of each actual change either way.
+  const setMobileMenuOpen = useCallback((next: boolean) => {
+    if (!menuControlledRef.current) setUncontrolledMenuOpen(next);
+    if (next !== mobileMenuOpenRef.current) onMobileMenuOpenChangeRef.current?.(next);
+  }, []);
 
   const drawerHandlesRef = useRef(new Set<AppLayoutDrawerHandle>());
 
@@ -172,11 +203,33 @@ export function AppLayout({
       for (const handle of drawerHandlesRef.current) handle.close();
     }
     setMobileMenuOpen(opening);
-  }, []);
+  }, [setMobileMenuOpen]);
 
   const handleCloseMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
-  }, []);
+  }, [setMobileMenuOpen]);
+
+  // A host that opens the menu itself gets what the toggle does: no in-layout
+  // drawer left open over it. Before paint, so the two never show together.
+  const menuWasOpenRef = useRef(mobileMenuOpen);
+  useIsomorphicLayoutEffect(() => {
+    const opened = mobileMenuOpen && !menuWasOpenRef.current;
+    menuWasOpenRef.current = mobileMenuOpen;
+    if (opened && menuControlled) {
+      for (const handle of drawerHandlesRef.current) handle.close();
+    }
+  }, [mobileMenuOpen, menuControlled]);
+
+  // A navigation closes the menu wherever it started — a nav entry already
+  // does, a slot (the chat history, an account item) cannot tell the menu.
+  // Only a CHANGE of the location counts, and only with one to watch.
+  const currentPath = sidebarConfig.currentPath;
+  const menuPathRef = useRef(currentPath);
+  useEffect(() => {
+    if (menuPathRef.current === currentPath) return;
+    menuPathRef.current = currentPath;
+    if (mobileMenuOpenRef.current) setMobileMenuOpen(false);
+  }, [currentPath, setMobileMenuOpen]);
 
   const drawerCoordination = useMemo<AppLayoutDrawerCoordination>(
     () => ({
@@ -193,7 +246,7 @@ export function AppLayout({
         return () => drawerHandlesRef.current.delete(handle);
       },
     }),
-    [],
+    [setMobileMenuOpen],
   );
 
   return (
