@@ -717,6 +717,9 @@ export interface DialogItem {
   /** Dialog owner (creator) — drives the trailing avatar in the chat-history
    *  rows (Figma 113:63224). Omit to render the row without an avatar. */
   owner?: {
+    /** The owner's user id. With the viewer's (`currentUserId` on the chat
+     *  lists) a list tells someone else's chat from the viewer's own. */
+    id?: string | null;
     /** Full display name — initials fallback + `title` tooltip. */
     name?: string | null;
     /** Absolute avatar URL; falls back to initials when absent or failing. */

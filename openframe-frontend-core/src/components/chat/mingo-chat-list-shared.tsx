@@ -80,9 +80,29 @@ export interface MingoChatListProps {
   onRetry?: () => void;
   /** Section only: the chat belongs to someone other than the viewer, so its
    *  row shows the owner's (`dialog.owner`) initials. The row cannot tell on
-   *  its own: hosts set `owner` on the viewer's chats too. */
+   *  its own: hosts set `owner` on the viewer's chats too. Wins over
+   *  `currentUserId`. */
   ownedByOther?: (dialog: DialogItem) => boolean;
+  /** Section only: the viewer's user id. Without `ownedByOther`, a chat whose
+   *  `owner.id` is set and differs from it is someone else's; a chat with no
+   *  `owner.id` is taken as the viewer's. */
+  currentUserId?: string | null;
   className?: string;
+}
+
+/**
+ * Whether a row is someone else's chat: the host's answer when it gives one
+ * (`ownedByOther`), else `owner.id` against the viewer's id. Unknown = the
+ * viewer's own, so no row shows a stranger's initials on a guess.
+ */
+export function dialogOwnedByOther(
+  dialog: DialogItem,
+  ownedByOther: ((dialog: DialogItem) => boolean) | undefined,
+  currentUserId: string | null | undefined,
+): boolean {
+  if (ownedByOther) return ownedByOther(dialog);
+  const ownerId = dialog.owner?.id;
+  return !!currentUserId && !!ownerId && ownerId !== currentUserId;
 }
 
 /** The host's status for the row, else an unread reply when the row counts one. */
