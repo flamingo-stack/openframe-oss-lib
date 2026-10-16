@@ -21,6 +21,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import type { DataSync } from '../../../types/data-sync';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { PAGE_PARAM_LIMITS, pageCount, positiveInt } from '../../../utils/search-params';
 import type { TicketData } from '../types';
@@ -36,6 +37,8 @@ interface FindTicketResponse {
   pageSize?: number;
   totalPages?: number;
   scope?: 'self' | 'all';
+  /** Where the tickets are mirrored from and when it last read them. */
+  sync?: DataSync;
 }
 
 export interface UseTicketsListFilters {
@@ -71,6 +74,9 @@ export interface UseTicketsListReturn {
   /** Wall-clock timestamp of the last successful fetch; null while
    *  loading the first time. */
   lastUpdatedAt: number | null;
+  /** Where the tickets are mirrored from and when that mirror last read them (the endpoint's `sync`); null when the
+   *  host states none. */
+  sync: DataSync | null;
   /** Total ticket count across all pages (NOT just the current page).
    *  Drives the `<UnifiedPagination>` total-pages calculation. */
   totalCount: number;
@@ -168,6 +174,7 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
       void query.refetch();
     },
     lastUpdatedAt: query.dataUpdatedAt || null,
+    sync: data?.sync ?? null,
     totalCount,
     page: echoedPage,
     pageSize: echoedPageSize,
