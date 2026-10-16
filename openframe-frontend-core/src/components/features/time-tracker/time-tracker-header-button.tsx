@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn';
 import { ClockHistoryIcon } from '../../icons-v2-generated/date-and-time/clock-history-icon';
 import {
   type AppLayoutDrawerHandle,
+  NAVIGATION_SIDEBAR_ATTRIBUTE,
   useAppLayoutDrawerContainer,
   useAppLayoutDrawerCoordination,
 } from '../../navigation/app-layout-context';
@@ -31,8 +32,9 @@ export interface TimeTrackerHeaderButtonProps {
   /**
    * Where the panel opens against the button. Default: below it, aligned to its
    * end (`cell`, the right end of a top bar) or its start (`compact`, the left
-   * edge of the window, so the panel opens over the page). In the collapsed
-   * 56px rail pass `side="right"`.
+   * edge of the window, so the panel opens over the page). In the sidebar pass
+   * `side="right"`: a compact button inside the navigation sidebar measures its
+   * side from the sidebar's edge, so the panel opens beside the sidebar, not over it.
    */
   popoverSide?: 'top' | 'right' | 'bottom' | 'left';
   popoverAlign?: 'start' | 'center' | 'end';
@@ -67,6 +69,17 @@ export function TimeTrackerHeaderButton({
   const coordination = useAppLayoutDrawerCoordination();
 
   const isOpen = ctx?.isOpen ?? false;
+  // The compact panel's anchor: the trigger's height on the navigation sidebar's right
+  // edge (the trigger itself outside a sidebar). Measured when the popup positions.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const sidebarEdgeRef = useRef({
+    getBoundingClientRect: () => {
+      const trigger = triggerRef.current;
+      const rect = trigger?.getBoundingClientRect() ?? new DOMRect();
+      const sidebar = trigger?.closest(`[${NAVIGATION_SIDEBAR_ATTRIBUTE}]`)?.getBoundingClientRect();
+      return sidebar ? new DOMRect(sidebar.right, rect.y, 0, rect.height) : rect;
+    },
+  });
   // Latest-refs the stable handle below reads. Refreshed in an unconditional
   // effect, not the render body: `close()` is only ever invoked by the
   // coordinator in response to ANOTHER panel opening, which is always past a
@@ -103,7 +116,7 @@ export function TimeTrackerHeaderButton({
 
   return (
     <PopoverPrimitive.Root open={isOpen} onOpenChange={next => (next ? open() : close())}>
-      <PopoverPrimitive.Trigger asChild>
+      <PopoverPrimitive.Trigger asChild ref={triggerRef}>
         <HeaderButton
           aria-label="Time tracker"
           // Compact never shows the clock inline, so its tooltip carries it.
@@ -143,6 +156,9 @@ export function TimeTrackerHeaderButton({
           }
         />
       </PopoverPrimitive.Trigger>
+      {/* After the trigger: Radix keeps the anchor the last mounted one set, and the
+          trigger sets itself while it mounts. */}
+      {compact && <PopoverPrimitive.Anchor virtualRef={sidebarEdgeRef} />}
       {/* Popovers have no built-in overlay — portal a dim backdrop behind the
           panel. Clicks land on it (outside Content), so Radix still closes the
           popover. Own Portal: Radix's Portal slots a single child. Inside

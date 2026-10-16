@@ -281,26 +281,32 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
               <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-mf)] overflow-y-auto overflow-x-hidden overscroll-contain px-[var(--spacing-system-xsf)] py-[var(--spacing-system-mf)]">
                 {userCard}
 
-                {config.topSlot?.({ minimized: false })}
+                {/* The top slot, the tree and the section as one block, spaced as in
+                    the sidebar: no gap between them, a divider before the section. */}
+                <div className="flex flex-col">
+                  {config.topSlot?.({ minimized: false })}
 
-                <nav aria-label="Primary navigation" className="flex flex-col gap-[var(--spacing-system-xxs)]">
-                  <NavigationSidebarGroupedEntries
-                    items={primaryItems}
-                    activeId={activeId}
-                    pendingId={null}
-                    openGroupId={openGroupId}
-                    showLabel
-                    disabled={disabled}
-                    onItemClick={handleGroupedItemClick}
-                    onGroupClick={handleGroupClick}
-                  />
-                </nav>
+                  <nav aria-label="Primary navigation" className="flex flex-col gap-[var(--spacing-system-xxs)]">
+                    <NavigationSidebarGroupedEntries
+                      items={primaryItems}
+                      activeId={activeId}
+                      pendingId={null}
+                      openGroupId={openGroupId}
+                      showLabel
+                      disabled={disabled}
+                      onItemClick={handleGroupedItemClick}
+                      onGroupClick={handleGroupClick}
+                    />
+                  </nav>
 
-                {/* In the flow at its full height, as in the sidebar: the drawer's
-                    body scrolls the tree and the section as one. */}
-                {hasNavigationSidebarSlot(sectionSlot) && (
-                  <div className="flex flex-col">{renderNavigationSidebarSlot(sectionSlot, DRAWER_SLOT_STATE)}</div>
-                )}
+                  {/* In the flow at its full height, as in the sidebar: the drawer's
+                      body scrolls the tree and the section as one. */}
+                  {hasNavigationSidebarSlot(sectionSlot) && (
+                    <div className="mt-[var(--spacing-system-xsf)] flex flex-col border-t border-ods-border pt-[var(--spacing-system-sf)]">
+                      {renderNavigationSidebarSlot(sectionSlot, DRAWER_SLOT_STATE)}
+                    </div>
+                  )}
+                </div>
 
                 {secondaryItems.length > 0 && (
                   <nav aria-label="Secondary navigation" className="flex flex-col">

@@ -83,4 +83,21 @@ describe('AccountPopover', () => {
     const menu = await openMenu(trigger);
     expect(menu).toHaveAttribute('data-side', 'right');
   });
+
+  it("puts an item's unread count on its icon, and the unread dot on the avatar", async () => {
+    const hasDot = () =>
+      /class="[^"]*\bbg-ods-warning\b/.test(screen.getByRole('button', { name: /Ada Lovelace/ }).innerHTML);
+    const { rerender } = render(<AccountPopover name="Ada Lovelace" items={entries()} />);
+    expect(hasDot()).toBe(false);
+
+    const withReplies: AccountPopoverEntry[] = [
+      { id: 'replies', label: 'Support replies', icon: <svg />, href: '/help-center/tickets?ticket=t-1', count: 3 },
+      ...entries(),
+    ];
+    rerender(<AccountPopover name="Ada Lovelace" items={withReplies} />);
+    expect(hasDot()).toBe(true);
+
+    await openMenu(screen.getByRole('button', { name: /Ada Lovelace/ }));
+    expect(screen.getByRole('link', { name: /Support replies/ })).toHaveTextContent('3');
+  });
 });

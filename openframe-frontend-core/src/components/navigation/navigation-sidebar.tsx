@@ -8,6 +8,7 @@ import { useLocalStorage } from '../../hooks/ui/use-local-storage';
 import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query';
 import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { NAVIGATION_SIDEBAR_ATTRIBUTE } from './app-layout-context';
 import {
   NavigationSidebarGroupedEntries,
   NavigationSidebarGroupedSkeleton,
@@ -539,6 +540,7 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
         )}
         style={expandedWidthStyle}
         aria-label="Main navigation sidebar"
+        {...{ [NAVIGATION_SIDEBAR_ATTRIBUTE]: '' }}
       >
         <NavigationSidebarHeader minimized={minimized} />
 

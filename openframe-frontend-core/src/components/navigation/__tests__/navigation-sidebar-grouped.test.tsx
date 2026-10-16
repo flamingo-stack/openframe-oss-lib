@@ -188,6 +188,10 @@ describe('NavigationSidebar — slots', () => {
     );
     expect(screen.getByText('Chat history')).toBeInTheDocument();
     expect(screen.getByText('account')).toBeInTheDocument();
+    // A popup opened from the foot measures from this root's edge (the compact tracker).
+    expect(screen.getByRole('complementary', { name: 'Main navigation sidebar' })).toHaveAttribute(
+      'data-navigation-sidebar',
+    );
     expect(footer).toHaveBeenLastCalledWith({ minimized: false, inDrawer: false });
   });
 

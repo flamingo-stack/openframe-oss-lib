@@ -62,8 +62,7 @@ export function useOpenNavigationGroup(activeGroupId: string | null) {
 
 /**
  * The active pill. Figma paints it `yellow sec` #614c12, which has no ODS token;
- * `accent-secondary` is the nearest semantic one — swap it here once design
- * names the token.
+ * the palette's `accent-secondary` stands in (design: no new colours, palette only).
  */
 const ACTIVE_PILL = 'bg-ods-accent-secondary text-ods-accent';
 

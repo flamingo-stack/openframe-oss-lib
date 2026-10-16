@@ -6,6 +6,7 @@ import { cn } from '../../utils';
 import { Chevron02DownIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
 import { SquareAvatar } from '../ui/square-avatar';
+import { UnreadCountBadge, UnreadDot } from './unread-dot';
 
 /** One action in the account menu: a link (`href`) or a callback (`onSelect`). */
 export interface AccountPopoverItem {
@@ -20,6 +21,11 @@ export interface AccountPopoverItem {
   /** `'danger'` draws the row in the error colour — Log out. Default `'default'`. */
   tone?: 'default' | 'danger';
   disabled?: boolean;
+  /**
+   * Unread updates behind the item (e.g. support replies): the count pill on its
+   * icon, and the unread dot on the avatar so the closed row says so too.
+   */
+  count?: number;
 }
 
 /** A rule between two runs of items. */
@@ -78,11 +84,12 @@ function toMenuGroups(entries: AccountPopoverEntry[]): ActionsMenuGroup[] {
       icon: entry.icon ? (
         <span
           className={cn(
-            'flex size-full items-center justify-center [&>svg]:size-full',
+            'relative flex size-full items-center justify-center [&>svg]:size-full',
             !danger && 'text-ods-text-secondary',
           )}
         >
           {entry.icon}
+          <UnreadCountBadge count={entry.count ?? 0} />
         </span>
       ) : undefined,
       href: entry.href,
@@ -116,6 +123,7 @@ export function AccountPopover({
   disabled = false,
   className,
 }: AccountPopoverProps) {
+  const unread = items.some(entry => entry.type !== 'divider' && (entry.count ?? 0) > 0);
   const [open = false, setOpen] = useControllableState({
     prop: openProp,
     defaultProp: false,
@@ -156,15 +164,17 @@ export function AccountPopover({
             className,
           )}
         >
-          <SquareAvatar
-            src={avatarUrl ?? undefined}
-            alt={name}
-            fallback={name}
-            sizePx={28}
-            variant="round"
-            className="shrink-0"
-            aria-hidden="true"
-          />
+          <span className="relative inline-flex shrink-0">
+            <SquareAvatar
+              src={avatarUrl ?? undefined}
+              alt={name}
+              fallback={name}
+              sizePx={28}
+              variant="round"
+              aria-hidden="true"
+            />
+            {unread && <UnreadDot size="fixed" />}
+          </span>
           <span
             className="flex min-w-0 flex-1 flex-col opacity-0 transition-opacity duration-150 @[140px]/of-nav-sidebar:opacity-100 motion-reduce:transition-none"
             aria-hidden={collapsed || undefined}

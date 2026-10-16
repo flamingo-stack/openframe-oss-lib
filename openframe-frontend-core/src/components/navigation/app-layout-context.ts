@@ -44,3 +44,9 @@ export const AppLayoutDrawerCoordinationContext = createContext<AppLayoutDrawerC
 export function useAppLayoutDrawerCoordination(): AppLayoutDrawerCoordination | null {
   return useContext(AppLayoutDrawerCoordinationContext);
 }
+
+/**
+ * Marks the navigation sidebar's root, so a popup opened from a button inside it can
+ * start past the sidebar's edge instead of over it (the compact time tracker).
+ */
+export const NAVIGATION_SIDEBAR_ATTRIBUTE = 'data-navigation-sidebar';
