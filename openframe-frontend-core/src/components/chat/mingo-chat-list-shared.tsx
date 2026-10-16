@@ -144,9 +144,17 @@ export interface LoadMoreSentinelOptions {
   onLoadMore?: () => void;
   /** Rows rendered so far: a landed page re-arms the observer. */
   itemCount: number;
-  /** The scrolling element the sentinel is clipped by. Omitted: the viewport. */
+  /**
+   * The scrolling element the sentinel is clipped by. Omitted: the viewport —
+   * which still clips by every scroll box between it and the sentinel, so a
+   * list works whichever ancestor scrolls it (the sidebar's history section:
+   * its own list, or the sidebar body under `sectionMinHeight`).
+   */
   rootRef?: RefObject<HTMLElement | null>;
 }
+
+/** How far ahead of the end of the list the next page starts loading. */
+const LOAD_AHEAD = '120px';
 
 /**
  * Infinite scroll for a chat list: put the returned ref on a 1px sentinel after
@@ -175,12 +183,19 @@ export function useLoadMoreSentinel({
     const sentinel = sentinelRef.current;
     const root = rootRef ? rootRef.current : null;
     if (!sentinel || (rootRef && !root) || !hasMore || typeof IntersectionObserver === 'undefined') return undefined;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && !isLoadingMoreRef.current) onLoadMoreRef.current?.();
-      },
-      { root, rootMargin: '120px', threshold: 0.1 },
-    );
+    // `rootMargin` grows the root only. `scrollMargin` grows every scroll box
+    // between the sentinel and the root as well, so the page also loads ahead
+    // inside a nested list; an engine without it ignores the key and loads
+    // once the sentinel shows.
+    const options: IntersectionObserverInit & { scrollMargin?: string } = {
+      root,
+      rootMargin: LOAD_AHEAD,
+      scrollMargin: LOAD_AHEAD,
+      threshold: 0.1,
+    };
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting && !isLoadingMoreRef.current) onLoadMoreRef.current?.();
+    }, options);
     observer.observe(sentinel);
     return () => observer.disconnect();
     // `itemCount`/`isLoadingMore` re-arm the observer after every page lands:

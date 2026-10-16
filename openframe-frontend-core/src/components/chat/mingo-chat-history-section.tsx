@@ -82,12 +82,16 @@ export function MingoChatHistorySection({
   const showSearch = searchOpen && !!onSearchChange;
 
   const { scrollRef, fadeTop, fadeBottom, update: updateFade } = useScrollFade<HTMLDivElement>();
+  // The viewport root, not the list: in a sidebar with `sectionMinHeight` the
+  // list scrolls itself only while it has the room, and otherwise the sidebar
+  // body scrolls it at full height — where a list root would see its sentinel
+  // in view forever and load every page. The viewport clips by whichever of the
+  // two scrolls (and sees nothing in a closed drawer or a collapsed rail).
   const sentinelRef = useLoadMoreSentinel({
     hasMore,
     isLoadingMore,
     onLoadMore,
     itemCount: dialogs.length,
-    rootRef: scrollRef,
   });
 
   const shortcut = visitor.known ? shortcutLabel(visitor.os, 'K') : null;
