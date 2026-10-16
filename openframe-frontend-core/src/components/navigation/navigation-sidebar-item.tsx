@@ -120,7 +120,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
       </span>
 
       {hasUnread && showLabel && (
-        <span className="ml-[var(--spacing-system-xs)] flex size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2">
+        <span className="ml-[var(--spacing-system-xs)] flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)]">
           <span className="text-ods-text-on-accent text-h5">{unreadCount > 99 ? '99+' : unreadCount}</span>
         </span>
       )}

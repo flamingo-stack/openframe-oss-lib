@@ -13,6 +13,7 @@ import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/mu
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { PersistentSidebar, PersistentMobileDropdown } from '../persistent-filter-controls';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
+import { DataSyncLine } from '../ui/data-attribution';
 import { useDocNavigation } from './doc-navigation-context';
 import { useDocsResolveLink } from './use-docs-resolve-link';
 import { useDocumentTree } from './use-document-tree';
@@ -119,6 +120,11 @@ export interface DocViewerProps {
   /** Whether to render the doc-search bar (bound to chat). */
   showAIChat?: boolean;
 
+  /** This source's documents are mirrored from another system and carry a `sync` (the knowledge base, from GitHub):
+   *  the page then states it in the first row under its title, holding the row with a skeleton while a document
+   *  loads. Default false: a source nothing syncs (the data room) never draws the row. */
+  synced?: boolean;
+
   /** Folder-index filename (default `'README.md'`). */
   folderIndexFile?: string;
 
@@ -153,6 +159,7 @@ function DocViewerContent({
   baseRoute,
   emptyStateText,
   showAIChat = false,
+  synced = false,
   folderIndexFile,
   backButton,
 }: DocViewerProps) {
@@ -271,6 +278,8 @@ function DocViewerContent({
     <div style={{ ...bgStyle, ...containerBgStyle }}>
       <PageLayout title={title} subtitle={subtitle} titleSize="h1" titleWrap backButton={backCfg ?? undefined}>
         <div className="flex w-full flex-col gap-10">
+          {/* Where the document is mirrored from: the first row under the title, as on every synced page. */}
+          {synced && <DataSyncLine sync={content?.sync} loading={isLoadingContent && !content} />}
           {showAIChat && (
             <DocSearchBar
               placeholder={`Search ${sidebarLabel?.toLowerCase() || 'documents'}...`}

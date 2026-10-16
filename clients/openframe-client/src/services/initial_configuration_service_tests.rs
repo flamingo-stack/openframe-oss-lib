@@ -49,3 +49,31 @@ fn configured_when_server_host_is_present() {
     );
     assert!(service_in(&dir).is_configured());
 }
+
+#[test]
+fn config_without_remote_access_mode_has_none_pending() {
+    let dir = TempDir::new().unwrap();
+    write_config(
+        &dir,
+        r#"{"server_host":"acme.openframe.ai","initial_key":"k","local_mode":false}"#,
+    );
+    assert_eq!(service_in(&dir).get_remote_access_mode().unwrap(), None);
+}
+
+#[test]
+fn clearing_the_remote_access_mode_keeps_the_rest_of_the_config() {
+    let dir = TempDir::new().unwrap();
+    write_config(
+        &dir,
+        r#"{"server_host":"acme.openframe.ai","initial_key":"k","local_mode":false,"org_id":"org","remote_access_mode":"SILENT_ACCESS"}"#,
+    );
+    let service = service_in(&dir);
+
+    service.clear_remote_access_mode().unwrap();
+
+    assert_eq!(service.get_remote_access_mode().unwrap(), None);
+    assert_eq!(service.get_org_id().unwrap(), "org");
+    assert_eq!(service.get_initial_key().unwrap(), "k");
+    let raw = std::fs::read_to_string(dir.path().join("secured/initial_config.json")).unwrap();
+    assert!(!raw.contains("remote_access_mode"));
+}

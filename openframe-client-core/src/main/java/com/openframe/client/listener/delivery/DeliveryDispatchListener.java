@@ -46,6 +46,7 @@ public class DeliveryDispatchListener {
             groupId = "${openframe.delivery.dispatch-group}",
             containerFactory = DeliveryDispatchListenerConfiguration.CONTAINER_FACTORY)
     public void onDispatch(DeliveryDispatchMessage message) {
+        metrics.recordDispatchReceived();
         if (!isComplete(message)) {
             reject(REJECTED_INCOMPLETE, message, null);
             return;

@@ -2320,8 +2320,10 @@ function EmbeddableChatInner({
   // archived one, one still loading or blocked as above) a new chat opens with
   // it: adding prompts under a pending approval or a running turn would mix
   // two conversations. A new chat with nothing sent yet gets another exchange.
-  const showWhatToAsk = (content: WhatToAskContent) => {
-    if (activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
+  // `newChat`: asked from a screen with no chat open (the archive list), where
+  // the conversation open before it is not the one the user is looking at.
+  const showWhatToAsk = (content: WhatToAskContent, newChat = false) => {
+    if (!newChat && activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
       whatToAsk.ask('current', content);
       return;
     }
@@ -2354,16 +2356,16 @@ function EmbeddableChatInner({
     showWhatToAskRef.current = showWhatToAsk;
   });
   const whatToAskPendingRef = useRef(false);
-  const requestWhatToAsk = () => {
+  const requestWhatToAsk = (newChat: boolean) => {
     if (!whatToAskContent) return;
     if (typeof whatToAskContent !== 'function') {
-      showWhatToAsk(whatToAskContent);
+      showWhatToAsk(whatToAskContent, newChat);
       return;
     }
     if (whatToAskPendingRef.current) return;
     whatToAskPendingRef.current = true;
     whatToAskContent()
-      .then(content => showWhatToAskRef.current(content))
+      .then(content => showWhatToAskRef.current(content, newChat))
       .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
       .finally(() => {
         whatToAskPendingRef.current = false;
@@ -2528,7 +2530,9 @@ function EmbeddableChatInner({
     };
   const mingoRailProps = {
     dialogs,
-    activeDialogId: activeDialogId ?? undefined,
+    // The archive takes the chat column: the open chat stays selected (closing
+    // the archive returns to it) but is not what the list marks as on screen.
+    activeDialogId: archiveOpen ? undefined : (activeDialogId ?? undefined),
     // Beside a new chat (wide only: narrow, the list is its own screen).
     // A new chat holding only "What to ask?" exchanges is still that new chat.
     draftTitle:
@@ -2538,7 +2542,12 @@ function EmbeddableChatInner({
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     // The suggestions a new chat opens on, unless the host has a surface of its own.
-    onWhatToAsk: () => leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? requestWhatToAsk : handleNewChat))(),
+    // From the archive list no chat is on screen, even though the one open
+    // before it is still the active dialog: that click opens a new chat.
+    onWhatToAsk: () => {
+      const fromArchive = archiveOpen;
+      leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? () => requestWhatToAsk(fromArchive) : handleNewChat))();
+    },
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
@@ -2563,16 +2572,18 @@ function EmbeddableChatInner({
     isV2 && !stackedListView ? (
       <div className="col-start-2 row-start-1 min-w-0">
         <MingoChatHeader
-          title={headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
-          subtitle={headerPersonName}
-          avatar={headerAvatar}
+          // Over the archive the header is the archive's: the chat still open
+          // underneath is not on screen, so neither its name nor its actions are.
+          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+          subtitle={archiveOpen ? undefined : headerPersonName}
+          avatar={archiveOpen ? undefined : headerAvatar}
           // Wide: shows / hides the list beside the chat. Narrow: back to the
           // list, the only one of the two that fits.
           onToggleList={wideMingo ? toggleRailCollapsed : headerShowBack ? headerOnBack : () => setComposeOpen(false)}
           listOpen={splitActive}
-          menuItems={headerShowBack && !isViewingArchived ? splitHeaderMenuItems : []}
+          menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? splitHeaderMenuItems : []}
           extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
-          onRestore={isViewingArchived ? headerOnRestore : undefined}
+          onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
           // Only while the list and the chat both fit: narrow, the toggle is
           // already the way back to the list.
           onCollapse={

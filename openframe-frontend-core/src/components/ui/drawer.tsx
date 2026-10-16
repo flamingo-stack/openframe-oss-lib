@@ -21,6 +21,7 @@ import { useHeaderHeight } from '../../hooks/ui/use-header-height';
 import { type PanelDefaultSize, useResizablePanelSize } from '../../hooks/ui/use-resizable-panel-size';
 import { cn } from '../../utils/cn';
 import { PanelResizeHandle } from './panel-resize-handle';
+import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 /** Unified overlay backdrop — dimmed, no blur. Single source of truth for
  *  every full-screen backdrop (Drawer, AppLayoutDrawer, MobileBurgerMenu,
@@ -259,6 +260,7 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
     // resize handle, stay reachable.
     const available = useViewportExtent(resizable, isHorizontal);
     const panelRef = useRef<HTMLDivElement>(null);
+    const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
     const {
       size: resizedSize,
       setSize,
@@ -310,8 +312,17 @@ const DrawerContent = forwardRef<ComponentRef<typeof DialogPrimitive.Content>, D
             className={cn(drawerPanelVariants({ side, flush, size }), className, panelClassName)}
             style={{ ...sizeStyle, ...panelStyle }}
           >
-            <ViewportBreakpoints>{children}</ViewportBreakpoints>
+            {/* Menus, selects and pickers opened inside portal into this drawer, so they stack over the panel instead
+                of under the drawer's `z-[9998]` on <body>, and Radix never hides the drawer around them (the
+                ModalV2 arrangement). The boundary resets: a menu follows the window, not the panel's clip. */}
+            <PortalContainerContext.Provider value={portalHost}>
+              <CollisionBoundaryContext.Provider value={null}>
+                <ViewportBreakpoints>{children}</ViewportBreakpoints>
+              </CollisionBoundaryContext.Provider>
+            </PortalContainerContext.Provider>
           </div>
+          {/* Outside the panel: its `overflow-hidden` would clip a menu at the panel's edge. */}
+          <div ref={setPortalHost} className="contents" />
         </DialogPrimitive.Content>
       </DrawerPortal>
     );

@@ -48,7 +48,7 @@ public class ToolEventLogRepository {
     public Optional<ToolEventLog> find(String tenantId, String toolType, Instant timestamp, String toolEventId) {
         String query = "{job=%s, tenant_id=%s, tool_type=%s} | tool_event_id=%s".formatted(
                 LogQl.quote(JOB), LogQl.quote(tenantId), LogQl.quote(toolType), LogQl.quote(toolEventId));
-        List<LokiLogEntry> page = queryRange(query, timestamp.toEpochMilli() * NANOS_PER_MILLI, tenantId);
+        List<LokiLogEntry> page = queryRange(query, timestamp.toEpochMilli() * NANOS_PER_MILLI - 1, tenantId);
         if (page.isEmpty()) {
             return Optional.empty();
         }
@@ -56,7 +56,7 @@ public class ToolEventLogRepository {
         Map<Integer, String> parts = new TreeMap<>();
         collect(page, parts);
         while (parts.size() < partCount && page.size() == PARTS_PER_READ) {
-            page = queryRange(query, page.getLast().timestampNanos() + 1, tenantId);
+            page = queryRange(query, page.getLast().timestampNanos(), tenantId);
             collect(page, parts);
         }
         if (parts.size() != partCount) {
@@ -70,7 +70,7 @@ public class ToolEventLogRepository {
 
     private List<LokiLogEntry> queryRange(String query, long startNanos, String tenantId) {
         try {
-            return lokiClient.queryRange(query, startNanos, startNanos + PARTS_PER_READ, PARTS_PER_READ,
+            return lokiClient.queryRange(query, startNanos, startNanos + 1 + PARTS_PER_READ, PARTS_PER_READ,
                     LokiDirection.FORWARD, tenantId);
         } catch (LokiQueryRejectedException e) {
             throw new LokiQueryException(e.getMessage(), e);
