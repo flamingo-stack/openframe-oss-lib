@@ -285,6 +285,30 @@ describe('MingoChatRail variant="section"', () => {
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 
+  it('watches the end of the list against the viewport, so the sidebar body may scroll it too', () => {
+    // A root on the list would see the sentinel in view for good once the
+    // sidebar body scrolls the list at full height (`sectionMinHeight`), and
+    // load every page. The viewport clips by whichever box scrolls.
+    const options: IntersectionObserverInit[] = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(_callback: IntersectionObserverCallback, init: IntersectionObserverInit) {
+          options.push(init);
+        }
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+        takeRecords() {
+          return [];
+        }
+      },
+    );
+    render(<MingoChatRail variant="section" dialogs={DIALOGS} hasMore onLoadMore={vi.fn()} />);
+    expect(options).toHaveLength(1);
+    expect(options[0]).toMatchObject({ root: null, rootMargin: '120px', scrollMargin: '120px' });
+  });
+
   it('shows the loading, failed and empty states', () => {
     const onRetry = vi.fn();
     const { rerender } = render(<MingoChatRail variant="section" dialogs={[]} isLoadingHistory />);

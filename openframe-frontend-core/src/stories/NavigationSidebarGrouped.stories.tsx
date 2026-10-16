@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 
+import { MingoChatRail } from '../components/chat/mingo-chat-rail';
+import type { DialogItem } from '../components/chat/types/component.types';
 import { NotificationsProvider } from '../components/features/notifications/notifications-context';
 import {
   TimeTrackerHeaderButton,
@@ -18,6 +20,7 @@ import {
   ChartDonutIcon,
   ClipboardListIcon,
   ClockHistoryIcon,
+  CloudIcon,
   FolderShieldIcon,
   HeadsetIcon,
   IdCardIcon,
@@ -450,4 +453,101 @@ export const HeaderControlsAndActionRows: Story = {
 /** The same in the 56px rail: the header controls stacked under the logo mark, the rows as 40px cells. */
 export const HeaderControlsCollapsed: Story = {
   render: () => <HeaderControlsHost initialCollapsed />,
+};
+
+/** The Mingo-first tree (KB the last row, no bottom block), with "Cloud tenants" + Beta in Inventory. */
+const MINGO_ITEMS: NavigationSidebarItem[] = [
+  ...GROUPED_ITEMS.filter(item => item.section !== 'secondary').map(item =>
+    item.id === 'inventory'
+      ? {
+          ...item,
+          children: [
+            ...(item.children ?? []),
+            { id: 'cloud-tenants', label: 'Cloud tenants', icon: <CloudIcon />, path: '/cloud-tenants', badge: 'Beta' },
+          ],
+        }
+      : item,
+  ),
+  { id: 'kb', label: 'Knowledge Base', icon: <BookBookmarkIcon />, path: '/knowledge-base' },
+];
+
+const HOUR = 60 * 60 * 1000;
+
+/** 120 chats, an hour apart, served 20 at a time. */
+const HISTORY: DialogItem[] = Array.from({ length: 120 }, (_, i) => ({
+  id: `chat-${i}`,
+  title: `Chat about device #${i + 1}`,
+  timestamp: new Date(Date.now() - (i + 1) * 3 * HOUR),
+}));
+const HISTORY_PAGE = 20;
+
+/** `MingoChatRail variant="section"` with paging: the next 20 chats land 600ms after the sentinel shows. */
+function PagedHistory() {
+  const [count, setCount] = useState(HISTORY_PAGE);
+  const [loading, setLoading] = useState(false);
+  const [scope, setScope] = useState<'my' | 'all'>('my');
+  return (
+    <MingoChatRail
+      variant="section"
+      dialogs={HISTORY.slice(0, count)}
+      activeDialogId="chat-1"
+      scope={scope}
+      onScopeChange={setScope}
+      onSearchChange={fn()}
+      onOpenArchive={fn()}
+      hasMore={count < HISTORY.length}
+      isLoadingMore={loading}
+      onLoadMore={() => {
+        setLoading(true);
+        setTimeout(() => {
+          setCount(current => Math.min(current + HISTORY_PAGE, HISTORY.length));
+          setLoading(false);
+        }, 600);
+      }}
+    />
+  );
+}
+
+/**
+ * The Mingo-first sidebar in a short window: `expandedWidth: 264` (room for
+ * "Needs approval" with its count and "Cloud tenants" with its chip) and
+ * `sectionMinHeight: 320` in an 800px-tall frame. The Mingo rows, the open
+ * Inventory card and the tree leave the history less than 320px, so the whole
+ * body scrolls as one — rows, tree and the history at full height — and the
+ * next page loads as the end of the history scrolls into the body. Fold
+ * Inventory, or give the frame more height, and the history fills the rest and
+ * scrolls on its own again.
+ */
+export const ShortWindowWideSidebar: Story = {
+  render: function ShortWindowWideSidebarStory() {
+    const [currentPath, setCurrentPath] = useState('/devices');
+    return (
+      <div className="flex h-[800px] bg-ods-bg">
+        <NavigationSidebar
+          config={{
+            variant: 'grouped',
+            items: MINGO_ITEMS,
+            currentPath,
+            onNavigate: setCurrentPath,
+            expandedWidth: 264,
+            sectionMinHeight: 320,
+            topSlot: mingoRows(currentPath, setCurrentPath),
+            sectionSlot: <PagedHistory />,
+            footerSlot: ({ minimized }) => (
+              <AccountPopover
+                collapsed={minimized}
+                name="Ada Lovelace"
+                email="ada@acme.example"
+                subtitle="acme.openframe.ai"
+                items={ACCOUNT_ITEMS}
+              />
+            ),
+          }}
+        />
+        <main className="flex-1 p-[var(--spacing-system-l)] text-ods-text-primary">
+          <p className="text-h4">{currentPath}</p>
+        </main>
+      </div>
+    );
+  },
 };

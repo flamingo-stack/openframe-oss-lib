@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { MouseEvent, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { useLocalStorage } from '../../hooks/ui/use-local-storage';
@@ -16,11 +16,14 @@ import {
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item';
 import { firstNavigableChild, resolveNavigationActive } from './navigation-sidebar-match';
+import { navigationSectionLayout, useNavigationSectionScroller } from './navigation-sidebar-section';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
 const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
-const EXPANDED_WIDTH = 224; // 14rem = 224px
+const EXPANDED_WIDTH = 224; // 14rem = 224px — the default; a grouped config may set its own
+/** The narrowest custom `expandedWidth`: the rows read 140px and up as expanded. */
+const MIN_CUSTOM_EXPANDED_WIDTH = 141;
 const STORAGE_KEY = 'of.navigationSidebar.minimized';
 
 /**
@@ -43,6 +46,16 @@ const STORAGE_KEY = 'of.navigationSidebar.minimized';
 export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width';
 
 /**
+ * A grouped config's own `expandedWidth`, as an inline custom property on the
+ * sidebar and its tablet push slot. Unlike the width above it is a prop, the
+ * same on the server and the client, so it can sit in the markup: the tablet
+ * overlay, the push slot and the desktop fallback read it on the first paint.
+ * Set only when the config gives a width, so a config without one renders the
+ * literal classes it always did.
+ */
+const EXPANDED_WIDTH_VAR = '--of-navigation-sidebar-expanded-width';
+
+/**
  * The rail as a query container, so the parts of the sidebar that follow its
  * collapsed state can read that state off the rail's own width — currently the
  * collapse chevron's direction, in `navigation-sidebar-toggle.tsx`.
@@ -58,7 +71,8 @@ export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width';
  * backwards under it.
  *
  * Queried as `@[140px]/of-nav-sidebar:` — 140px is the midpoint between the 56px
- * rail and the 224px expanded sidebar, so the width only crosses it mid-toggle.
+ * rail and the 224px expanded sidebar, so the width only crosses it mid-toggle
+ * (a custom `expandedWidth` is kept above it).
  * Container queries are min-width, so a follower styles its COLLAPSED look as the
  * default and lets the query take it back. Written out literally at each use
  * rather than interpolated from a constant: Tailwind scans source text, and a
@@ -91,17 +105,26 @@ const SIDEBAR_CONTAINER = '@container/of-nav-sidebar';
  * `EXPANDED_WIDTH`, as is the `14rem` fallback below. Keep them in step; a class
  * string cannot interpolate a constant.
  */
-const SIDEBAR_GEOMETRY_CLASSES = [
+const SIDEBAR_POSITION_CLASSES = [
   // Tablet: float over the content, anchored to the layout row (`absolute`
   // within AppLayout's `relative` row) — NOT the viewport — so an optional
   // `topBar` above the row is not overlapped. With no topBar the row spans the
   // full viewport, so this is visually identical to a viewport-fixed sidebar.
   'md:absolute md:inset-y-0 md:left-0 md:z-[45]',
-  // Desktop: back in the flex flow, width from the persisted preference. The
-  // fallback IS the default, so the property needs no global declaration and an
-  // unseeded consumer gets the full sidebar rather than a rail with no labels.
-  'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width,14rem)]',
-].join(' ');
+  // Desktop: back in the flex flow, width from the persisted preference.
+  'lg:relative lg:inset-auto lg:z-auto lg:h-full',
+];
+const SIDEBAR_GEOMETRY_CLASSES = {
+  // The fallback IS the default, so the property needs no global declaration
+  // and an unseeded consumer gets the full sidebar rather than a rail with no
+  // labels.
+  default: [...SIDEBAR_POSITION_CLASSES, 'lg:w-[var(--of-navigation-sidebar-width,14rem)]'].join(' '),
+  // With a config width the fallback is that width (`EXPANDED_WIDTH_VAR`).
+  custom: [
+    ...SIDEBAR_POSITION_CLASSES,
+    'lg:w-[var(--of-navigation-sidebar-width,var(--of-navigation-sidebar-expanded-width))]',
+  ].join(' '),
+} as const;
 
 /**
  * The tablet width, as ONE `md:` class rather than a rail plus an override.
@@ -117,7 +140,11 @@ const SIDEBAR_GEOMETRY_CLASSES = [
  * `lg:` still governs desktop either way: it is emitted after `md:`, so an
  * overlay left open while the window widens does not leak into the desktop width.
  */
-const SIDEBAR_TABLET_WIDTH = { rail: 'md:w-14', overlay: 'md:w-56' } as const;
+const SIDEBAR_TABLET_WIDTH = {
+  rail: 'md:w-14',
+  overlay: 'md:w-56',
+  customOverlay: 'md:w-[var(--of-navigation-sidebar-expanded-width)]',
+} as const;
 
 /** A click the browser will resolve itself — new tab, new window, middle button. */
 export const isModifiedClick = (event?: MouseEvent): boolean =>
@@ -211,6 +238,26 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
 
   // Enable transitions only after the correct width is painted
   const [transitionsEnabled, setTransitionsEnabled] = useState(false);
+
+  // A grouped config's own expanded width (`expandedWidth`); `null` = the
+  // default 224px through the literal classes, exactly as before.
+  const customExpandedWidth =
+    config.variant === 'grouped' && config.expandedWidth !== undefined
+      ? Math.max(config.expandedWidth, MIN_CUSTOM_EXPANDED_WIDTH)
+      : null;
+  const expandedWidth = customExpandedWidth ?? EXPANDED_WIDTH;
+  const expandedWidthStyle =
+    customExpandedWidth === null ? undefined : ({ [EXPANDED_WIDTH_VAR]: `${customExpandedWidth}px` } as CSSProperties);
+
+  // A new expanded width (the host swapped configs — e.g. a placeholder for
+  // the grouped tree) is a different sidebar, not a toggle: it snaps instead of
+  // animating. The transition is dropped in the same commit that moves the
+  // width and comes back a frame later (the effect below).
+  const [widthFor, setWidthFor] = useState(expandedWidth);
+  if (widthFor !== expandedWidth) {
+    setWidthFor(expandedWidth);
+    setTransitionsEnabled(false);
+  }
 
   const isOverlayOpen = isTablet && !minimized;
 
@@ -374,7 +421,30 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     };
   }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary]);
 
-  const sidebarWidth = useMemo(() => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`), [minimized]);
+  const sidebarWidth = useMemo(
+    () => (minimized ? `${MINIMIZED_WIDTH}px` : `${expandedWidth}px`),
+    [minimized, expandedWidth],
+  );
+
+  // `sectionMinHeight`: who scrolls the section, measured. Only while expanded
+  // — in the rail a node section is hidden and a function one is the host's to
+  // size, so there the section keeps its old floor.
+  const sectionMinHeight = grouped && !minimized ? config.sectionMinHeight : undefined;
+  const section = useNavigationSectionScroller(sectionMinHeight);
+  const sectionRailHidden = typeof config.sectionSlot !== 'function' && 'hidden @[140px]/of-nav-sidebar:flex';
+  const sectionLayout =
+    sectionMinHeight === undefined
+      ? {
+          className: cn(
+            'my-[var(--spacing-system-mf)] flex min-h-40 flex-1 flex-col overflow-y-auto',
+            sectionRailHidden,
+          ),
+        }
+      : navigationSectionLayout(
+          section.scroller,
+          sectionMinHeight,
+          cn('my-[var(--spacing-system-mf)]', sectionRailHidden),
+        );
 
   // Published to CSS from an EFFECT, never from render. Before hydration the
   // width belongs to whatever seeded `NAVIGATION_SIDEBAR_WIDTH_VAR` in `<head>`
@@ -462,9 +532,14 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
       <div
         className={cn(
           'hidden h-full flex-shrink-0 md:block lg:hidden',
-          isOverlayOpen && pushOnTablet ? 'w-56' : 'w-14',
+          isOverlayOpen && pushOnTablet
+            ? customExpandedWidth === null
+              ? 'w-56'
+              : 'w-[var(--of-navigation-sidebar-expanded-width)]'
+            : 'w-14',
           transitionsEnabled && 'transition-[width] duration-300',
         )}
+        style={expandedWidthStyle}
         aria-hidden="true"
       />
 
@@ -473,14 +548,19 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
           SIDEBAR_CONTAINER,
           'hidden flex-shrink-0 flex-col md:flex',
           'border-r border-ods-border bg-ods-card',
-          SIDEBAR_GEOMETRY_CLASSES,
+          customExpandedWidth === null ? SIDEBAR_GEOMETRY_CLASSES.default : SIDEBAR_GEOMETRY_CLASSES.custom,
           // The one width a viewport cannot imply: an overlay the user opened on
           // tablet. Only ever true after a click, so the first paint always gets
           // the rail.
-          isOverlayOpen ? SIDEBAR_TABLET_WIDTH.overlay : SIDEBAR_TABLET_WIDTH.rail,
+          !isOverlayOpen
+            ? SIDEBAR_TABLET_WIDTH.rail
+            : customExpandedWidth === null
+              ? SIDEBAR_TABLET_WIDTH.overlay
+              : SIDEBAR_TABLET_WIDTH.customOverlay,
           transitionsEnabled && 'transition-[width] duration-300',
           config.className,
         )}
+        style={expandedWidthStyle}
         aria-label="Main navigation sidebar"
       >
         <NavigationSidebarHeader minimized={minimized} slot={config.headerSlot} />
@@ -511,16 +591,13 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
           {/* The host's section (the chat history): the remaining height, its own
               scroll, so the tree above stays in view. Kept from collapsing to
               nothing on a short window — below its minimum the whole body scrolls
-              instead. A node has no use for a 56px rail and is hidden there by the
-              rail's width (mounted, so its scroll and search survive a toggle); a
-              function decides for itself. */}
+              instead; with `sectionMinHeight`, the body scrolls the section too,
+              drawn at its full height (`useNavigationSectionScroller`). A node has
+              no use for a 56px rail and is hidden there by the rail's width
+              (mounted, so its scroll and search survive a toggle); a function
+              decides for itself. */}
           {hasNavigationSidebarSlot(config.sectionSlot) && (
-            <div
-              className={cn(
-                'my-[var(--spacing-system-mf)] flex min-h-40 flex-1 flex-col overflow-y-auto',
-                typeof config.sectionSlot !== 'function' && 'hidden @[140px]/of-nav-sidebar:flex',
-              )}
-            >
+            <div ref={sectionMinHeight === undefined ? undefined : section.ref} {...sectionLayout}>
               {renderNavigationSidebarSlot(config.sectionSlot, minimized)}
             </div>
           )}

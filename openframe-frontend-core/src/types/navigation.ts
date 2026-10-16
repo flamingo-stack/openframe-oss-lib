@@ -196,12 +196,37 @@ export interface NavigationSidebarConfig {
   groupParentClick?: 'first-child' | 'expand';
   /**
    * Host content below the navigation tree that takes the remaining height and
-   * scrolls on its own (the chat history), so the tree above it stays in view.
+   * scrolls on its own (the chat history), so the tree above it stays in view
+   * (see `sectionMinHeight` for a short window).
    * A node is hidden in the collapsed rail (it stays mounted); a function is
    * called with the sidebar's own `minimized` state and decides for itself.
    * Rendered in the mobile burger menu too, with `minimized: false`.
    */
   sectionSlot?: NavigationSidebarSlot;
+  /**
+   * The least height `sectionSlot` may get, in px (grouped variant; the
+   * sidebar's expanded width and the mobile burger menu). While the body has
+   * that much room below the tree, the section fills the remaining height and
+   * scrolls on its own, as without this. When it has less, the tree and the
+   * section no longer split the body: the whole body (top slot, tree, section)
+   * scrolls as one, and the section is drawn at its full height — at least this
+   * tall — so the tree is never squeezed and the section never shrinks to a
+   * row or two. Decided by measuring the body (`ResizeObserver`); the section's
+   * wrapper carries `data-section-scroll="section" | "body"`. Omitted: the
+   * section keeps today's 160px floor and the body scrolls only below it.
+   */
+  sectionMinHeight?: number;
+  /**
+   * The expanded sidebar's width in px (grouped variant; default 224). Applied
+   * to the desktop sidebar, the tablet overlay and its push slot, and written to
+   * `NAVIGATION_SIDEBAR_WIDTH_VAR` while expanded — so a host's pre-paint seed
+   * must write the same number (`'<expandedWidth>px'`, or `'56px'` when the
+   * stored preference is minimized). The 56px rail does not change. A width at
+   * or below 140px is raised to 141px: the rows switch to their expanded layout
+   * at 140px. The flat variant ignores it; the mobile burger menu keeps its own
+   * width.
+   */
+  expandedWidth?: number;
   /**
    * Host content pinned above the "Hide Menu" toggle (the account row). A node
    * renders as-is in both widths; a function receives `minimized` and adapts
