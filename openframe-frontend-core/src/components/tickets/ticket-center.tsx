@@ -19,13 +19,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast as defaultToast } from '../../hooks/use-toast';
-import { formatRelativeTime } from '../../utils/date-utils';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { usePageDataSync } from '../layout/page-data-sync';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
-import { Skeleton } from '../ui/skeleton';
+import { DataSyncLine } from '../ui/data-attribution';
 import { useTicketActions } from './hooks/use-ticket-actions';
 import { useTicketsList } from './hooks/use-tickets-list';
 import { TicketOpenForm } from './ticket-open-form';
@@ -70,7 +72,7 @@ function TicketCenterAuthed({
   sessionEmail: string;
 }) {
   const queryClient = useQueryClient();
-  const { tickets, isLoading, isFetching, refetch, lastUpdatedAt } = useTicketsList({
+  const { tickets, isLoading, isFetching, refetch, sync } = useTicketsList({
     customerEmail: sessionEmail,
   });
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([]);
@@ -116,6 +118,9 @@ function TicketCenterAuthed({
     setExpandedTicketId(prev => (prev === id ? null : id));
   }, []);
 
+  // The page states the sync under its title; the ticket list shown without that page draws it in its own header.
+  const syncInPage = usePageDataSync(sync, isLoading);
+
   const merged: AnyTicket[] = [...optimisticTickets, ...tickets];
 
   return (
@@ -130,7 +135,7 @@ function TicketCenterAuthed({
         <div className="flex items-center justify-between gap-3">
           <p className="text-ods-text-secondary text-h5">Your Current Tickets</p>
           <div className="flex items-center gap-3 text-ods-text-secondary text-h6">
-            {lastUpdatedAt && <span>Updated {formatRelativeTime(new Date(lastUpdatedAt))}</span>}
+            {!syncInPage && <DataSyncLine sync={sync} inline />}
             <Button
               type="button"
               variant="transparent"
@@ -178,16 +183,21 @@ function TicketCenterAuthed({
   );
 }
 
-function TicketCenterSkeleton() {
+function TicketCenterSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
-    <div className="flex flex-col gap-6">
+    <LoadingRegion label="Loading tickets" announce={region} className="flex flex-col gap-6">
       <Card className="p-6">
-        <Skeleton className="mb-4 h-7 w-48" />
-        <Skeleton className="mb-3 h-10 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <UnifiedSkeleton className="mb-4 h-7 w-48" />
+        <UnifiedSkeleton className="mb-3 h-10 w-full" />
+        <UnifiedSkeleton className="h-24 w-full" />
       </Card>
       <TicketListSkeleton />
-    </div>
+    </LoadingRegion>
   );
 }
 
@@ -197,11 +207,11 @@ function TicketListSkeleton() {
       {[0, 1, 2].map(i => (
         <div key={i} className="flex h-20 items-center gap-4 border-b border-ods-border px-4 last:border-b-0">
           <div className="flex flex-1 flex-col gap-2">
-            <Skeleton className="h-4 w-2/3" />
-            <Skeleton className="h-3 w-full" />
+            <UnifiedSkeleton className="h-4 w-2/3" />
+            <UnifiedSkeleton className="h-3 w-full" />
           </div>
-          <Skeleton className="h-8 w-20" />
-          <Skeleton className="h-8 w-16" />
+          <UnifiedSkeleton className="h-8 w-20" />
+          <UnifiedSkeleton className="h-8 w-16" />
         </div>
       ))}
     </Card>

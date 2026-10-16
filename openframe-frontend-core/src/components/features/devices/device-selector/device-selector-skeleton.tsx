@@ -10,7 +10,13 @@ const NO_DEVICES: never[] = [];
  * whichever the caller hands its real `DeviceSelector` it must hand this one too,
  * or the two disagree on how tall the block is.
  */
-type DeviceSelectorSkeletonProps = Pick<DeviceSelectorProps, 'showSelectionModeRadio' | 'singleSelect' | 'hideColumns'>;
+type DeviceSelectorSkeletonProps = Pick<
+  DeviceSelectorProps,
+  'showSelectionModeRadio' | 'singleSelect' | 'hideColumns'
+> & {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+};
 
 /**
  * Suspense fallback for a `DeviceSelector` whose devices come from a suspending
@@ -27,6 +33,6 @@ type DeviceSelectorSkeletonProps = Pick<DeviceSelectorProps, 'showSelectionModeR
  * stands in for, and everything below it jumped down the moment the devices
  * landed.
  */
-export function DeviceSelectorSkeleton(props: DeviceSelectorSkeletonProps) {
-  return <DeviceSelector {...props} devices={NO_DEVICES} loading disabled />;
+export function DeviceSelectorSkeleton({ region = true, ...props }: DeviceSelectorSkeletonProps) {
+  return <DeviceSelector {...props} devices={NO_DEVICES} loading loadingRegion={region} disabled />;
 }

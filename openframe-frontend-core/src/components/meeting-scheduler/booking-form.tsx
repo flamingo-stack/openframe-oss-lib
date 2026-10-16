@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import type { Control, Path, UseFormRegister } from 'react-hook-form';
@@ -29,6 +29,7 @@ import {
 import { cn } from '../../utils/cn';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import {
   Button,
   FieldWrapper,
@@ -44,7 +45,6 @@ import {
   CheckboxBlock,
   RadioGroup,
   RadioGroupItem,
-  Skeleton,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
 
@@ -397,6 +397,16 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /** The form element's id, so a host can submit it from a button outside it
+   *  (`<button form={id}>`): the modal layout keeps its actions in a footer
+   *  under the card. */
+  formId?: string;
+  /** Leave the submit button out: the host draws one of its own (see `formId`). */
+  hideSubmit?: boolean;
+  /** Whether the answers would pass validation as they stand, reported on every
+   *  change: a host drawing its own submit keeps it disabled until this says
+   *  true. The form's own button never needs it - its click validates. */
+  onValidityChange?: (valid: boolean) => void;
   /** Per-field display overrides, keyed by field name — see `BookingFieldCopy`. */
   fieldCopy?: Record<string, BookingFieldCopy>;
   /** Email domains this form refuses, with the message it shows — see `DeniedEmailDomains`.
@@ -441,6 +451,9 @@ export function BookingForm({
   submitLabel,
   footerNote,
   fieldRows,
+  formId,
+  hideSubmit = false,
+  onValidityChange,
   fieldCopy,
   deniedEmailDomains,
   consent,
@@ -506,6 +519,19 @@ export function BookingForm({
   const [consented, setConsented] = useState(initialValues?.[HOST_CONSENT_KEY] === true);
   const [consentError, setConsentError] = useState<string | null>(null);
   const consentMissing = Boolean(consent) && !consented;
+
+  // Live validity for a host-drawn submit. `watch()` re-renders on every
+  // change; the parse is the same schema the submit runs, so the two can never
+  // disagree. Reported only when asked for, and only when it changes.
+  const watchedValues = watch();
+  const liveValid = onValidityChange ? schema.safeParse(watchedValues).success && !consentMissing : false;
+  const lastValidRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!onValidityChange) return;
+    if (lastValidRef.current === liveValid) return;
+    lastValidRef.current = liveValid;
+    onValidityChange(liveValid);
+  });
 
   // The seeded availability is refetched immediately on mount, so the link's
   // consent set can change WHILE this form is open. Reconcile rather than
@@ -685,7 +711,7 @@ export function BookingForm({
 
   // Opted out of HubSpot's collected-forms script — see HUBSPOT_DO_NOT_COLLECT_FORM_PROPS.
   return (
-    <form onSubmit={submit} className={FORM_STACK} noValidate {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
+    <form id={formId} onSubmit={submit} className={FORM_STACK} noValidate {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
       <HoneypotField {...honeypotInputProps} />
 
       {/* Email first, name pair below — the order the desktop and mobile mocks
@@ -806,7 +832,7 @@ export function BookingForm({
       {/* Two shapes, not one with a placeholder: without a note this must stay
           the bare `flex` row it has always been, or the submit slides from the
           left edge to the right on every existing slot-first booking. */}
-      {footerNote ? (
+      {hideSubmit ? null : footerNote ? (
         <div className={FOOTER_ROW_CLASS}>
           <p className="text-ods-text-secondary text-h6">{footerNote}</p>
           {submitButton}
@@ -848,21 +874,24 @@ export function BookingFormSkeleton({
       {skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS).map(row => (
         <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
           {row.map((slot, slotIndex) => (
-            <Skeleton key={slot.name} className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))} />
+            <UnifiedSkeleton
+              key={slot.name}
+              className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))}
+            />
           ))}
         </div>
       ))}
       {/* Without rows there is no telling how many questions the link declares: one long answer stands for them. */}
-      {!fieldRows && <Skeleton className="h-[7.75rem] w-full" />}
-      {consent && <Skeleton className="h-[4.25rem] w-full" />}
+      {!fieldRows && <UnifiedSkeleton className="h-[7.75rem] w-full" />}
+      {consent && <UnifiedSkeleton className="h-[4.25rem] w-full" />}
       {footerNote ? (
         <div className={FOOTER_ROW_CLASS}>
-          <Skeleton className="h-5 min-w-40 flex-1" />
-          <Skeleton className={cn('h-12 w-full', SUBMIT_WIDE_CLASS)} />
+          <UnifiedSkeleton className="h-5 min-w-40 flex-1" />
+          <UnifiedSkeleton className={cn('h-12 w-full', SUBMIT_WIDE_CLASS)} />
         </div>
       ) : (
         <div className={FOOTER_BARE_CLASS}>
-          <Skeleton className="h-12 w-40" />
+          <UnifiedSkeleton className="h-12 w-40" />
         </div>
       )}
     </div>

@@ -144,7 +144,7 @@ export function DropdownButton({
           href={action.href}
           download={action.download}
           openInNewTab={action.openInNewTab}
-          onClick={action.onClick as React.MouseEventHandler<HTMLButtonElement> | undefined}
+          onClick={action.onClick}
           disabled={disabled}
           loading={loading}
           leftIcon={icon}

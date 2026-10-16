@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 
 import { cn } from '../../utils/cn';
 import { Filter02Icon } from '../icons-v2-generated/sort-and-filter/filter-02-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { DateFilterPanel, type DateFilterResult, type DateRange } from './date-picker';
 import { FilterCheckboxItem } from './filter-checkbox-item';
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { ScrollFadeOverlay, useScrollFade } from './scroll-fade';
-import { Skeleton } from './skeleton';
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item';
 import type { TableFilters } from './table/types';
 import { TagKeyValueFilter, type TagKeyConfig } from './tag-key-value-filter';
@@ -203,16 +203,16 @@ export function FilterModal({
               <>
                 {[0, 1].map(group => (
                   <div key={group} className="flex flex-col gap-1">
-                    <Skeleton className="h-5 w-24" />
+                    <UnifiedSkeleton className="h-5 w-24" />
                     <div className="overflow-hidden rounded-md border border-ods-border">
                       {[0, 1, 2].map(row => (
                         <div
                           key={row}
                           className="flex items-center gap-3 border-b border-ods-border bg-ods-card px-4 py-3 last:border-b-0"
                         >
-                          <Skeleton className="h-6 w-6 shrink-0 rounded-[6px]" />
-                          <Skeleton className="h-4 max-w-[60%] flex-1" />
-                          <Skeleton className="h-4 w-10 shrink-0" />
+                          <UnifiedSkeleton className="h-6 w-6 shrink-0 rounded-[6px]" />
+                          <UnifiedSkeleton className="h-4 max-w-[60%] flex-1" />
+                          <UnifiedSkeleton className="h-4 w-10 shrink-0" />
                         </div>
                       ))}
                     </div>

@@ -87,6 +87,34 @@ export interface EmbedAuthAdapter {
    */
   refresh?: () => Promise<boolean>;
   /**
+   * Optional guard, run before every request goes out — the first attempt
+   * and the retry after a `refresh`. Throw — or reject — to refuse the
+   * request: `embedAuthedFetch` rejects with that error and nothing reaches
+   * the network.
+   *
+   * For a host-wide state that makes every request pointless. openframe's
+   * mobile force-update is the case it exists for: once the gateway has
+   * refused this client build, every later request is refused locally, so no
+   * surface's retry or reconnect loop keeps hitting the gateway. Runs inside
+   * the returned promise (after the synchronous same-origin guard), so
+   * callers see a rejection, never a synchronous throw.
+   */
+  beforeRequest?: () => void | Promise<void>;
+  /**
+   * Optional response hook, run on every response (the post-refresh retry's
+   * too) BEFORE the 401 self-heal. Throw — or reject — to fail the request
+   * with that error: `embedAuthedFetch` rejects with it, and neither
+   * `refresh` nor a retry runs. Return to let the response continue through
+   * the wrapper unchanged.
+   *
+   * For a status the host handles app-wide rather than per surface — e.g.
+   * openframe's gateway answering `426 Upgrade Required` to a too-old mobile
+   * build, which swaps the whole app for an "update required" screen and
+   * must never be retried or read as an auth failure. Read the body from
+   * `response.clone()`: once the hook returns, the caller reads the original.
+   */
+  onResponse?: (response: Response) => void | Promise<void>;
+  /**
    * Exact extra origins (`scheme://host[:port]`, as produced by `URL.origin`)
    * the same-origin guard additionally accepts. The guard normally rejects
    * every cross-origin URL in production — but native-shell hosts serve the
@@ -253,6 +281,11 @@ export function needsBearerAssetFetch(url: string): boolean {
  * no longer need a host-side `window.fetch` monkey-patch to survive an
  * expired access token mid-chat. With no adapter (or no `refresh`), the
  * 401 passes straight through unchanged.
+ *
+ * **Host hooks:** an adapter's `beforeRequest` may refuse a request before it
+ * is sent, and its `onResponse` sees every response ahead of the 401
+ * self-heal and may fail the request instead (see their docs). Without them
+ * the wrapper behaves exactly as described above.
  */
 export function embedAuthedFetch(url: string, init: RequestInit = {}): Promise<Response> {
   // Same-origin guard runs SYNCHRONOUSLY (not awaited inside the async
@@ -354,6 +387,11 @@ async function fetchWithRefresh(
   baseHeaders: Record<string, string>,
   isRetry: boolean,
 ): Promise<Response> {
+  const adapter = getRegisteredAuthAdapter();
+  // Per attempt, so a retry after `refresh` is refused too when the host's
+  // state changed while the refresh was in flight.
+  await adapter?.beforeRequest?.();
+
   // Re-run the merge each attempt: `applyProxyAuth` reads the latest stored
   // proxy creds and `getHeaders()` reads the latest bearer, so a retry after
   // refresh carries the rotated token rather than the stale one. `{...baseHeaders}`
@@ -365,7 +403,6 @@ async function fetchWithRefresh(
   // is the host's explicit "this is my auth model" override, intentionally
   // last-writer-wins. When no adapter is registered, this is a zero-cost
   // no-op (object spread of `{}`).
-  const adapter = getRegisteredAuthAdapter();
   if (adapter?.getHeaders) {
     // Filter `undefined` values — the adapter type allows them so consumers
     // don't have to narrow `{ Authorization: token ? '…' : undefined }`-shaped
@@ -386,6 +423,10 @@ async function fetchWithRefresh(
     // `SameSite=None` must be configured server-side for that to work).
     credentials,
   });
+
+  // Ahead of the 401 self-heal: a status the host claims by throwing must
+  // never reach `refresh` or a retry.
+  await adapter?.onResponse?.(response);
 
   // 401 self-heal: refresh the token once and retry. Only when an adapter
   // opted into `refresh`, and only on the first attempt — a 401 on the

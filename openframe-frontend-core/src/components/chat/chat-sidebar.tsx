@@ -59,7 +59,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
         {/* Right side indicator - always visible */}
         <div className="ml-2 flex-shrink-0">
           {dialog.unreadMessagesCount && dialog.unreadMessagesCount > 0 ? (
-            <div className="flex size-6 items-center justify-center rounded-md bg-ods-accent p-2">
+            <div className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)]">
               <span className="text-ods-text-on-accent text-h6">
                 {dialog.unreadMessagesCount > 99 ? '99+' : dialog.unreadMessagesCount}
               </span>

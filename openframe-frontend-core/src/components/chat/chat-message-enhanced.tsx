@@ -23,6 +23,7 @@ import { EscalationOfferMessage } from './escalation-offer-message';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
+import { SuggestionsDisplay } from './suggestions-display';
 import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
 import { TicketEscalatedMessage } from './ticket-escalated-message';
@@ -101,6 +102,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       approvalVariant,
       appearance: appearanceProp,
       authorType: authorTypeProp,
+      selfAuthorType,
       assistantIcon,
       contextItems,
       resolveContextIcon,
@@ -114,12 +116,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     },
     ref,
   ) => {
-    const isUser = role === 'user';
+    // A `user` row is a PERSON (the end user, a technician, a system line); the
+    // agent's turns are `assistant`. Which person is the viewer is the thread's
+    // call (`selfAuthorType`): the viewer's own turns draw as the bubble on the
+    // right, another person's as an incoming reply.
+    const isHuman = role === 'user';
     const isError = role === 'error';
     const inheritedAppearance = useChatAppearance();
     const appearance = appearanceProp ?? inheritedAppearance;
     const isV2 = appearance === CHAT_APPEARANCE.V2;
-    const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
+    const authorType = authorTypeProp ?? (isHuman ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
+    const isOtherPerson =
+      isHuman && selfAuthorType !== undefined && authorType !== 'system' && authorType !== selfAuthorType;
+    const isUser = isHuman && !isOtherPerson;
 
     // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
     // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
@@ -523,18 +532,19 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // its own short line above the message (on the right for the user), never
     // beside it: a face in the row indents every line of the message by its
     // width. The NAME is written only where it is the information itself: a
-    // system line and a human technician answering. Mingo sends the admin's
-    // own turns as `admin` too; those are the user's words and draw as such.
-    // Every face carries its name for assistive tech and on hover.
-    const showName = isSystem || (authorType === 'admin' && !isUser);
-    const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    // system line and another person answering (a technician in the end
+    // user's thread). Mingo sends the admin's own turns as `admin` too; those
+    // are the user's words and draw as such. Every face carries its name for
+    // assistive tech and on hover.
+    const showName = isSystem || isOtherPerson || (authorType === 'admin' && !isUser);
+    const displayName = name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
     const faceBox = 'h-5 w-5 flex-shrink-0';
     const face: ReactNode =
-      !showAvatar || isSystem ? null : !isUser && !avatar && assistantIcon ? (
+      !showAvatar || isSystem ? null : !isHuman && !avatar && assistantIcon ? (
         <span title={displayName} className={cn('flex items-center justify-center', faceBox)}>
           {assistantIcon}
         </span>
-      ) : !isUser && !avatar && assistantType ? (
+      ) : !isHuman && !avatar && assistantType ? (
         // An agent with no picture shows its packaged mark, never initials.
         <span role="img" aria-label={displayName} title={displayName} className={cn('inline-flex', faceBox)}>
           <AgentMark agent={assistantType} className="h-full w-full rounded-full" />
@@ -647,6 +657,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     const run = askRuns.get(index);
                     if (!run) return null;
                     return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />;
+                  } else if (segment.type === 'suggestions') {
+                    return <SuggestionsDisplay key={index} segment={segment} />;
                   } else if (segment.type === 'tool_execution') {
                     return (
                       <ToolExecutionDisplay
@@ -752,6 +764,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.approvalVariant === nextProps.approvalVariant &&
     prevProps.appearance === nextProps.appearance &&
     prevProps.authorType === nextProps.authorType &&
+    prevProps.selfAuthorType === nextProps.selfAuthorType &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&
     // Reference equality — the host re-uses the same array instance per

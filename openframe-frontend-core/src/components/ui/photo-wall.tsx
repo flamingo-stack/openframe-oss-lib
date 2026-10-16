@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image, { resizedImageUrl } from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MarqueeWall } from './marquee-wall';
 
 export interface PhotoWallImage {
@@ -292,16 +293,12 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
             </MarqueeWall>
           ))
         : Array.from({ length: columns }, (_, index) => (
-            <div
-              key={index}
-              className="flex h-full animate-pulse flex-col overflow-hidden"
-              style={{ gap: COLUMN_GAP_PX }}
-            >
+            <div key={index} className="flex h-full flex-col overflow-hidden" style={{ gap: COLUMN_GAP_PX }}>
               {(index % 2 === 0 ? (['tall', 'wide', 'square'] as const) : (['wide', 'tall', 'wide'] as const)).map(
                 (orientation, i) => (
-                  <div
+                  <UnifiedSkeleton
                     key={i}
-                    className="w-full shrink-0 rounded-lg bg-ods-card"
+                    className="h-auto w-full shrink-0 rounded-lg"
                     style={{ aspectRatio: PHOTO_WALL_FRAME[orientation] }}
                   />
                 ),

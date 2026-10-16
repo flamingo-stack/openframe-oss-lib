@@ -5,6 +5,7 @@ import { RemoveScroll } from 'react-remove-scroll';
 import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 import { XmarkIcon } from '../icons-v2-generated';
+import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 // Duration of the open/close animation in ms — keep in sync with the
 // `duration-200` utilities applied to the backdrop and panel below.
@@ -66,8 +67,9 @@ interface ModalTwoColumnProps {
 // TOP one may contain focus, or they fight each other.
 const modalStack: symbol[] = [];
 
-// Radix popups (Select/DropdownMenu/Popover content) PORTAL to <body>, so a
-// dropdown opened from inside the modal focuses nodes OUTSIDE the panel.
+// Radix popups (Select/DropdownMenu/Popover content) PORTAL out of the panel —
+// to <body> or the modal's own portal host — so a dropdown opened from inside
+// the modal focuses nodes OUTSIDE the panel.
 // Focus landing there is NOT an escape — yanking it back (containFocus /
 // reasserts / Tab trap) fights Radix's own item-focus management and strands
 // stale `data-highlighted` on items it never got to blur-clean (observed:
@@ -82,6 +84,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className, size = 'default' }, ref) => {
     // Keep the modal mounted while the exit animation plays.
     const [isMounted, setIsMounted] = useState(isOpen);
+    const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const restoreFocusRef = useRef<HTMLElement | null>(null);
     const stackIdRef = useRef<symbol>(Symbol('modal'));
@@ -307,9 +310,20 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
             aria-modal="true"
           >
             <ModalContext.Provider value={{ onClose }}>
-              <ViewportBreakpoints>{children}</ViewportBreakpoints>
+              {/* Menus and tooltips opened inside portal into this layer, so they
+                  stack over the panel instead of under the `z-[1300]` overlay. The
+                  boundary resets too: a modal follows the window, not the surface
+                  it was opened from. */}
+              <PortalContainerContext.Provider value={portalHost}>
+                <CollisionBoundaryContext.Provider value={null}>
+                  <ViewportBreakpoints>{children}</ViewportBreakpoints>
+                </CollisionBoundaryContext.Provider>
+              </PortalContainerContext.Provider>
             </ModalContext.Provider>
           </div>
+          {/* Outside the panel: its open/close zoom is a transform, which would
+              anchor the menus' `position: fixed` to the panel. */}
+          <div ref={setPortalHost} className="contents" />
         </div>
       </RemoveScroll>
     );

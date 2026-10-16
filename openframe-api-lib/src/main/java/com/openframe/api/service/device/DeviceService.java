@@ -24,6 +24,7 @@ import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
 import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.machine.MachineWriteResult;
@@ -104,6 +105,18 @@ public class DeviceService {
         log.debug("Querying devices with filter: {}, pagination: {}, search: {}, sort: {}",
                 filterOptions, paginationCriteria, search, sort);
         return paginate(machineFilter(filterOptions, null, null), search, paginationCriteria, sort);
+    }
+
+    public List<Machine> findDevicesAfter(DeviceFilterCriteria filterOptions, String afterMachineId, int limit) {
+        String tenantId = tenantIdProvider.getTenantId();
+        MachineQueryFilter filter = machineFilter(filterOptions, null, null);
+        return machineRepository.findMachinesAfter(tenantId, filter, afterMachineId, limit);
+    }
+
+    public MachineNameMatches findMatchingNames(DeviceFilterCriteria filterOptions) {
+        String tenantId = tenantIdProvider.getTenantId();
+        MachineQueryFilter filter = machineFilter(filterOptions, null, null);
+        return machineRepository.findMatchingNames(tenantId, filter);
     }
 
     public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
@@ -251,20 +264,23 @@ public class DeviceService {
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
                                              Collection<OsType> osTypeScope,
                                              Collection<String> restrictToMachineIds) {
-        MachineQueryFilter out = new MachineQueryFilter();
+        MachineQueryFilter.MachineQueryFilterBuilder builder = MachineQueryFilter.builder();
         List<OsType> filterOsTypes = null;
         if (filter != null) {
-            out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setOrganizationIds(filter.getOrganizationIds());
-            out.setManageableByPackageManagers(filter.getManageableByPackageManagers());
+            builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .organizationIds(filter.getOrganizationIds())
+                    .manageableByPackageManagers(filter.getManageableByPackageManagers())
+                    .pattern(filter.getPattern())
+                    .hostnames(filter.getHostnames())
+                    .nicknames(filter.getNicknames())
+                    .tagKeys(filter.getTagKeys())
+                    .tagValues(filter.getTagValues());
             filterOsTypes = filter.getOsTypes();
         }
-        out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));
-        List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
-        out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
-
-        return out;
+        return builder.osTypes(resolveOsTypes(filterOsTypes, osTypeScope))
+                .restrictToMachineIds(restrictToMachineIds)
+                .build();
     }
 
     private static List<OsType> resolveOsTypes(Collection<OsType> filterOsTypes, Collection<OsType> osTypeScope) {

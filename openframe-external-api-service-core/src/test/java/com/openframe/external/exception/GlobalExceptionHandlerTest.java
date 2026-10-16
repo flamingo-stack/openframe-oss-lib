@@ -3,12 +3,16 @@ package com.openframe.external.exception;
 import com.openframe.core.dto.ErrorResponse;
 import com.openframe.core.exception.BaseGlobalExceptionHandler;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.data.loki.client.LokiQueryException;
 import com.openframe.data.pinot.repository.exception.PinotQueryException;
 import com.openframe.external.support.ExternalApiMockMvc;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -21,8 +25,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.io.IOException;
 import java.time.Instant;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -38,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@ExtendWith(OutputCaptureExtension.class)
 class GlobalExceptionHandlerTest {
 
     private static final String SECRET_DETAIL = "mongo-primary.internal:27017 refused connection";
@@ -162,6 +169,25 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleLokiQueryException_lokiQueryFailure_answers503WithoutLeakingTheCause() throws Exception {
+        mockMvc.perform(get("/failing/throw/loki"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("LOKI_QUERY_ERROR"))
+                .andExpect(jsonPath("$.message").value("Logs are temporarily unavailable. Please try again later."))
+                .andExpect(jsonPath("$.timestamp").isNotEmpty())
+                .andExpect(content().string(not(containsString(SECRET_DETAIL))));
+    }
+
+    @Test
+    void handleLokiQueryException_lokiQueryFailure_logsItWithItsCause(CapturedOutput output) {
+        handler.handleLokiQueryException(
+                new LokiQueryException("Loki query failed: I/O error", new IOException("connection refused")));
+
+        assertThat(output.getOut()).contains("Loki query error: ", "Loki query failed: I/O error",
+                "java.io.IOException", "connection refused");
+    }
+
+    @Test
     void dataAccessFailureWrappedInAPlainRuntimeExceptionIsStill503() throws Exception {
         mockMvc.perform(get("/failing/throw/wrapped-database"))
                 .andExpect(status().isServiceUnavailable())
@@ -242,6 +268,7 @@ class GlobalExceptionHandlerTest {
         String fail(@PathVariable("kind") String kind) {
             switch (kind) {
                 case "pinot" -> throw new PinotQueryException(SECRET_DETAIL);
+                case "loki" -> throw new LokiQueryException(SECRET_DETAIL);
                 case "database" -> throw new DataAccessResourceFailureException(SECRET_DETAIL);
                 case "duplicate-key" -> throw new DuplicateKeyException(SECRET_DETAIL);
                 case "wrapped-database" ->

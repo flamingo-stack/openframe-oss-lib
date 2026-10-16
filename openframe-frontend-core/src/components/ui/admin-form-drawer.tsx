@@ -2,10 +2,11 @@
 
 import { useId, useState, type ReactNode } from 'react';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { Drawer, DrawerBody, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from './drawer';
 import { UnsavedChangesChip } from './modal-guarded-close';
-import { Skeleton } from './skeleton';
 
 const SKELETON_FIELD_WIDTHS = ['w-24', 'w-32', 'w-20', 'w-40', 'w-28', 'w-36'];
 
@@ -117,15 +118,14 @@ export function AdminFormDrawer({
             }}
           >
             {loading ? (
-              <div aria-busy="true" className="flex flex-col gap-[var(--spacing-system-lf)]">
-                <span className="sr-only">Loading</span>
+              <LoadingRegion label="Loading" className="flex flex-col gap-[var(--spacing-system-lf)]">
                 {SKELETON_FIELD_WIDTHS.map((labelWidth, i) => (
-                  <div key={i} className="space-y-[var(--spacing-system-xsf)]" aria-hidden="true">
-                    <Skeleton className={`h-4 ${labelWidth}`} />
-                    <Skeleton className="h-10 w-full" />
+                  <div key={i} className="space-y-[var(--spacing-system-xsf)]">
+                    <UnifiedSkeleton className={`h-4 ${labelWidth}`} />
+                    <UnifiedSkeleton className="h-10 w-full" />
                   </div>
                 ))}
-              </div>
+              </LoadingRegion>
             ) : (
               children
             )}

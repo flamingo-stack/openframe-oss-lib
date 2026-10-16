@@ -94,6 +94,12 @@ export interface TrustCenterPageProps {
    * page's full width, then the FAQ. Absent: the FAQ closes the sections column.
    */
   beforeFaq?: ReactNode;
+  /**
+   * The "Data synced from <source>" line and its PDF download in the status row. Default true. Pass false when the
+   * host's own header states both (the hub's admin preview draws them in its page header), so the page never says
+   * them twice; the monitoring status stays.
+   */
+  attribution?: boolean;
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -145,6 +151,7 @@ export function TrustCenterPage({
   subtitle = TRUST_CENTER_TAGLINE,
   ask,
   beforeFaq,
+  attribution = true,
 }: TrustCenterPageProps) {
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
@@ -254,7 +261,7 @@ export function TrustCenterPage({
       <>
         <div className={TRUST_STATUS_ROW_CLASS}>
           <StatusIndicator status={status.status} label={status.label} />
-          {data.connected ? (
+          {data.connected && attribution ? (
             <DataAttribution
               icon={
                 data.dataSource.logoUrl ? (
@@ -270,9 +277,9 @@ export function TrustCenterPage({
               lastUpdated={data.syncedAt}
               action={download}
             />
-          ) : (
+          ) : attribution ? (
             download
-          )}
+          ) : null}
         </div>
 
         <div className={TRUST_BODY_GRID_CLASS}>
@@ -376,10 +383,14 @@ export function TrustCenterPageSkeleton({
   backButton = false,
   title = TRUST_CENTER_TITLE,
   subtitle = TRUST_CENTER_TAGLINE,
-}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'>) {
+  region = true,
+}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'> & {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}) {
   return (
     <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton}>
-      <TrustCenterSkeleton />
+      <TrustCenterSkeleton region={region} />
     </TrustCenterChrome>
   );
 }

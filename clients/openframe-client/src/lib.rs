@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub mod clients;
 mod config;
@@ -29,6 +29,9 @@ pub mod service_adapter;
 pub mod system;
 pub mod utils;
 
+#[cfg(test)]
+mod test_support;
+
 pub mod cli;
 pub use cli::run;
 
@@ -36,9 +39,13 @@ pub use cli::run;
 pub mod executor;
 
 use crate::clients::build_agent_http_client;
-use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
-use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::clients::{AuthClient, RegistrationClient, RemoteAccessClient, ToolApiClient};
+use crate::config::update_config::{
+    DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS, SELF_RESTART_EXIT_CODE,
+    SELF_RESTART_HANDOFF_SECS,
+};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
+use crate::listener::command::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -58,6 +65,7 @@ use crate::services::deactivation_service::DeactivationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
+use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::hostname_report_publisher::HostnameReportPublisher;
 use crate::services::initial_authentication_processor::InitialAuthenticationProcessor;
@@ -76,6 +84,7 @@ use crate::services::package_manager::report_publisher::PackageManagerReportPubl
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
+use crate::services::remote_access_mode_service::RemoteAccessModeService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
 use crate::services::shared_token_service::SharedTokenService;
@@ -171,6 +180,8 @@ pub struct Client {
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
+    feature_flags_listener: CommandListener<FeatureFlagsHandler>,
+    restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
@@ -195,6 +206,7 @@ pub struct Client {
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
     initial_key_service: Arc<InitialKeyService>,
+    remote_access_mode_service: Arc<RemoteAccessModeService>,
     deactivation_service: Arc<DeactivationService>,
 }
 
@@ -330,6 +342,16 @@ impl Client {
             deactivation_service.clone(),
         ));
 
+        let remote_access_mode_service = Arc::new(RemoteAccessModeService::new(
+            RemoteAccessClient::new(
+                http_client.clone(),
+                http_url.clone(),
+                config_service.clone(),
+            ),
+            initial_configuration_service.clone(),
+            deactivation_service.clone(),
+        ));
+
         // Initialize installed tools service
         let installed_tools_service = InstalledToolsService::new(directory_manager.clone())
             .context("Failed to initialize installed tools service")?;
@@ -360,6 +382,11 @@ impl Client {
         let tool_kill_service = ToolKillService::new();
 
         let tool_ops = ToolOps::default();
+
+        let feature_flags_service = Arc::new(FeatureFlagsService::load(
+            directory_manager.secured_dir().join("feature_flags.json"),
+            env!("OPENFRAME_VERSION").to_string(),
+        ));
 
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
@@ -546,6 +573,24 @@ impl Client {
         );
         let result_store_for_recovery = result_store.clone();
 
+        let restart_gate = RestartGate::new(
+            tool_ops.busy_tools(),
+            execution_service.running_scripts(),
+            tool_run_manager.client_update_pending(),
+        );
+        let command_context = CommandContext::new(
+            nats_connection_manager.clone(),
+            config_service.clone(),
+            restart_gate.clone(),
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
+        let feature_flags_listener = CommandListener::new(
+            FeatureFlagsHandler::new(feature_flags_service),
+            command_context,
+        );
+
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
             nats_message_publisher.clone(),
@@ -628,6 +673,8 @@ impl Client {
             tool_agent_update_listener,
             client_uninstall_message_listener,
             remote_access_message_listener,
+            feature_flags_listener,
+            restart_gate,
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
@@ -651,6 +698,7 @@ impl Client {
             agent_configuration_service: config_service,
             installed_tools_service,
             initial_key_service,
+            remote_access_mode_service,
             deactivation_service,
         })
     }
@@ -684,7 +732,7 @@ impl Client {
             error!("Failed to record boot attempt: {:#}", e);
         }
 
-        self.initial_key_service.clone().ensure_initial_key().await;
+        self.initial_key_service.clone().start();
 
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
@@ -701,6 +749,8 @@ impl Client {
 
         self.token_refresh_run_manager.start();
 
+        self.remote_access_mode_service.clone().start();
+
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
 
@@ -711,6 +761,59 @@ impl Client {
             error!("Failed to handle pending update: {:#}", e);
             // Continue startup even if update handling fails - don't block the client
         }
+
+        self.feature_flags_listener.start().await?;
+        let restart_gate = self.restart_gate.clone();
+        tokio::spawn(async move {
+            restart_gate.requested().await;
+            match crate::platform::detached_process::spawn_detached(
+                &crate::service::Service::get_install_location(),
+                cli::RESTART_SERVICE_SUBCOMMAND,
+            ) {
+                Ok(mut child) => {
+                    info!(
+                        pid = child.id(),
+                        "Service restart handed to a detached process"
+                    );
+                    let finished = tokio::time::timeout(
+                        Duration::from_secs(SELF_RESTART_HANDOFF_SECS),
+                        tokio::task::spawn_blocking(move || child.wait()),
+                    )
+                    .await;
+                    match finished {
+                        Ok(Ok(Ok(status))) => warn!(
+                            %status,
+                            "Detached restart finished but did not stop this process, exiting instead"
+                        ),
+                        Ok(Ok(Err(e))) => {
+                            warn!(
+                                "Cannot wait for the detached restart, exiting instead: {:#}",
+                                e
+                            )
+                        }
+                        Ok(Err(e)) => {
+                            warn!(
+                                "Cannot wait for the detached restart, exiting instead: {:#}",
+                                e
+                            )
+                        }
+                        Err(_) => warn!(
+                            "Detached restart still running after {}s, exiting instead",
+                            SELF_RESTART_HANDOFF_SECS
+                        ),
+                    }
+                }
+                Err(e) => warn!(
+                    "Cannot hand the service restart off, exiting instead: {:#}",
+                    e
+                ),
+            }
+            info!(
+                code = SELF_RESTART_EXIT_CODE,
+                "Exiting so the service manager restarts the client"
+            );
+            std::process::exit(SELF_RESTART_EXIT_CODE);
+        });
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();

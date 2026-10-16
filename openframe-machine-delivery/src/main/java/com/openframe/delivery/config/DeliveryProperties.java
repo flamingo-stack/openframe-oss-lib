@@ -3,6 +3,8 @@ package com.openframe.delivery.config;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
@@ -61,6 +63,7 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long interval;
+
         @NotNull
         @Positive
         private Integer batchSize;
@@ -73,26 +76,49 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long ackThresholdSeconds;
+
         @NotNull
         @Positive
         private Integer maxAttempts;
+
+        @Valid
         @NotNull
-        @Positive
-        private Integer backoffMultiplier;
-        @NotNull
-        @Positive
-        private Long maxRetryIntervalSeconds;
+        private Backoff backoff;
+
         @NotNull
         private DeliveryOfflineBehavior offlineBehavior;
+
         @NotNull
         @Positive
         private Long reconnectWindowSeconds;
+
         @NotNull
         @Positive
         private Long resultTimeoutSeconds;
+
         @NotNull
         @Positive
         private Long ttlSeconds;
+    }
+
+    // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
+    // ±jitter. multiplier 1 is the NATS way, the same wait every time; a type that wants to grow sets its own
+    @Getter
+    @Setter
+    public static class Backoff {
+
+        @NotNull
+        @DecimalMin("1.0")
+        private Double multiplier;
+
+        @NotNull
+        @Positive
+        private Long maxIntervalSeconds;
+
+        @NotNull
+        @DecimalMin("0.0")
+        @DecimalMax("1.0")
+        private Double jitter;
     }
 
     @Getter
@@ -101,8 +127,7 @@ public class DeliveryProperties {
 
         private Long ackThresholdSeconds;
         private Integer maxAttempts;
-        private Integer backoffMultiplier;
-        private Long maxRetryIntervalSeconds;
+        private BackoffOverride backoff;
         private DeliveryOfflineBehavior offlineBehavior;
         private Long reconnectWindowSeconds;
         private Long resultTimeoutSeconds;
@@ -112,12 +137,28 @@ public class DeliveryProperties {
             Policy merged = new Policy();
             merged.setAckThresholdSeconds(requireNonNullElse(ackThresholdSeconds, base.getAckThresholdSeconds()));
             merged.setMaxAttempts(requireNonNullElse(maxAttempts, base.getMaxAttempts()));
-            merged.setBackoffMultiplier(requireNonNullElse(backoffMultiplier, base.getBackoffMultiplier()));
-            merged.setMaxRetryIntervalSeconds(requireNonNullElse(maxRetryIntervalSeconds, base.getMaxRetryIntervalSeconds()));
+            merged.setBackoff(backoff == null ? base.getBackoff() : backoff.mergeOver(base.getBackoff()));
             merged.setOfflineBehavior(requireNonNullElse(offlineBehavior, base.getOfflineBehavior()));
             merged.setReconnectWindowSeconds(requireNonNullElse(reconnectWindowSeconds, base.getReconnectWindowSeconds()));
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
+            return merged;
+        }
+    }
+
+    @Getter
+    @Setter
+    public static class BackoffOverride {
+
+        private Double multiplier;
+        private Long maxIntervalSeconds;
+        private Double jitter;
+
+        Backoff mergeOver(Backoff base) {
+            Backoff merged = new Backoff();
+            merged.setMultiplier(requireNonNullElse(multiplier, base.getMultiplier()));
+            merged.setMaxIntervalSeconds(requireNonNullElse(maxIntervalSeconds, base.getMaxIntervalSeconds()));
+            merged.setJitter(requireNonNullElse(jitter, base.getJitter()));
             return merged;
         }
     }

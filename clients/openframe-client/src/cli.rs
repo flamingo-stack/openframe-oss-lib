@@ -3,16 +3,20 @@ mod auth;
 mod healthcheck;
 mod install;
 mod permissions;
+mod restart;
 mod uninstall;
 
 use crate::doctor::healing::{HealOutcome, HealResult};
 use crate::doctor::{CheckResult, Remediation};
 use crate::installation_initial_config_service::InstallConfigParams;
+use crate::models::RemoteAccessMode;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use std::process;
 
 use tokio::runtime::Runtime;
+
+pub const RESTART_SERVICE_SUBCOMMAND: &str = "restart-service";
 
 #[derive(Parser)]
 #[command(name = "openframe-client", author, version = env!("OPENFRAME_VERSION"), about, long_about = None)]
@@ -40,6 +44,10 @@ struct InstallArgs {
 
     #[arg(long = "tag")]
     tags: Vec<String>,
+
+    /// Remote access mode to set on this device once it registers (default: the customer's)
+    #[arg(long = "remote-access-mode", value_enum)]
+    remote_access_mode: Option<RemoteAccessMode>,
 }
 
 impl InstallArgs {
@@ -51,6 +59,7 @@ impl InstallArgs {
             user_id: self.user_id.clone(),
             local_mode: self.local_mode,
             tags: self.tags.clone(),
+            remote_access_mode: self.remote_access_mode,
         }
     }
 }
@@ -74,6 +83,9 @@ enum Commands {
     CheckPermissions,
     /// Run environment health check (reads config from installed agent)
     Doctor,
+    /// Stop and start the client service (run detached by the client to apply feature flags)
+    #[command(hide = true, name = RESTART_SERVICE_SUBCOMMAND)]
+    RestartService,
 }
 
 /// Parse CLI arguments and run the requested OpenFrame client command.
@@ -91,6 +103,7 @@ pub fn run() -> Result<()> {
         Some(Commands::Run) => agent::run_direct(&rt),
         Some(Commands::RunAsService) => agent::run_as_service(),
         Some(Commands::CheckPermissions) => permissions::run(),
+        Some(Commands::RestartService) => restart::run(&rt),
         None => agent::run_legacy(&rt),
     }
 
@@ -135,3 +148,7 @@ fn print_heal_outcomes(heals: &[HealResult]) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cli_tests.rs"]
+mod tests;

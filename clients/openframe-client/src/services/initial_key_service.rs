@@ -2,13 +2,15 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use serde::Deserialize;
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::task::JoinHandle;
+use tokio::time::Duration;
 use tracing::{error, info};
 
+use crate::services::backend_call_retry::{retry_until_settled, RetryTiming};
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 
-const RETRY_INTERVAL_SECS: u64 = 60;
+const RETRY_INTERVAL: Duration = Duration::from_secs(60);
 
 #[derive(Deserialize)]
 struct RegistrationSecretResponse {
@@ -21,6 +23,7 @@ pub struct InitialKeyService {
     initial_config_service: InitialConfigurationService,
     agent_config_service: AgentConfigurationService,
     deactivation: Arc<DeactivationService>,
+    timing: RetryTiming,
 }
 
 impl InitialKeyService {
@@ -37,42 +40,29 @@ impl InitialKeyService {
             initial_config_service,
             agent_config_service,
             deactivation,
+            timing: RetryTiming::fixed(RETRY_INTERVAL),
         }
     }
 
-    pub async fn ensure_initial_key(self: Arc<Self>) {
+    /// Fetches the initial key in the background when the config lacks one; no-op otherwise.
+    pub fn start(self: Arc<Self>) -> Option<JoinHandle<()>> {
         if !self.is_key_missing() {
-            return;
+            return None;
         }
 
         info!("Initial key missing in config, starting background fetch (legacy upgrade)");
 
-        tokio::spawn(async move {
-            loop {
-                // Tenant gone: don't hammer the gateway; the backoff probe drives recovery.
-                if self.deactivation.is_suspended() {
-                    sleep(Duration::from_secs(RETRY_INTERVAL_SECS)).await;
-                    continue;
-                }
-                match self.fetch_registration_secret().await {
-                    Ok(secret) => {
-                        if let Err(e) = self.initial_config_service.update_initial_key(secret) {
-                            error!("Failed to save initial key: {:#}", e);
-                        } else {
-                            info!("Successfully fetched and saved initial key from server");
-                        }
-                        return;
-                    }
-                    Err(e) => {
-                        error!(
-                            "Failed to fetch initial key: {:#}. Retrying in {}s...",
-                            e, RETRY_INTERVAL_SECS
-                        );
-                        sleep(Duration::from_secs(RETRY_INTERVAL_SECS)).await;
-                    }
-                }
+        Some(tokio::spawn(async move {
+            let secret =
+                retry_until_settled(&self.deactivation, self.timing, "fetch initial key", || {
+                    self.fetch_registration_secret()
+                })
+                .await;
+            match self.initial_config_service.update_initial_key(secret) {
+                Ok(()) => info!("Successfully fetched and saved initial key from server"),
+                Err(e) => error!("Failed to save initial key: {:#}", e),
             }
-        });
+        }))
     }
 
     fn is_key_missing(&self) -> bool {
@@ -103,3 +93,7 @@ impl InitialKeyService {
         Ok(resp.key)
     }
 }
+
+#[cfg(test)]
+#[path = "initial_key_service_tests.rs"]
+mod tests;
