@@ -35,6 +35,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -179,6 +180,7 @@ class NodeFederationDgsTest {
         assertThat(result.getErrors()).isEmpty();
         assertThat(result.<Map<String, Object>>getData())
                 .containsEntry("_entities", List.of(Map.of("title", TICKET_TITLE), Map.of("name", POLICY_NAME)));
+        verify(callerAuthorizer).authorizeCaller();
     }
 
     @Test
@@ -221,6 +223,7 @@ class NodeFederationDgsTest {
                 .extracting(GraphQLError::getMessage)
                 .singleElement(as(STRING))
                 .contains("Missing @DgsEntityFetcher for type Dialog");
+        verify(callerAuthorizer).authorizeCaller();
     }
 
     @Test
@@ -240,6 +243,7 @@ class NodeFederationDgsTest {
         assertThat(result.getErrors())
                 .extracting(GraphQLError::getPath)
                 .containsExactly(List.of("_entities", 0), List.of("_entities", 1));
+        verify(callerAuthorizer).authorizeCaller();
         verifyNoInteractions(lookups);
     }
 

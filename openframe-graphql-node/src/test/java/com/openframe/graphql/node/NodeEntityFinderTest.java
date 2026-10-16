@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -34,18 +35,15 @@ import static org.mockito.Mockito.when;
 class NodeEntityFinderTest {
 
     private static final String TICKET_ID = "665f1c2ab3e4d5f6a7b8c9d0";
-    private static final String MACHINE_ID = "machine-1";
-    private static final String MACHINE_DOCUMENT_ID = "665f1c2ab3e4d5f6a7b8c9b2";
+    private static final String PROPERTY_KEY_VALUE = "key-1";
+    private static final String DOCUMENT_ID = "665f1c2ab3e4d5f6a7b8c9b2";
     private static final String TYPENAME = "__typename";
     private static final String KEY = "id";
-    private static final String MACHINE_KEY = "machineId";
 
     @Mock private NodeLoaderRegistry registry;
     @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private NodeEntityFinder finder;
-
-    private final RelayIdCodec codec = new RelayIdCodec();
 
     private AuthPrincipal principal;
     private SupportTicket ticket;
@@ -75,7 +73,7 @@ class NodeEntityFinderTest {
         // setup
         when(registry.hasLoader(NodeType.TICKET)).thenReturn(true);
         when(registry.find(principal, NodeType.TICKET, TICKET_ID)).thenReturn(Optional.<Object>of(ticket));
-        String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
+        String ticketGlobalId = relayIdCodec.encode(NodeType.TICKET, TICKET_ID);
         Map<String, Object> representation = Map.of(TYPENAME, "Ticket", KEY, ticketGlobalId);
 
         // execution
@@ -85,12 +83,14 @@ class NodeEntityFinderTest {
         assertThat(entity).containsSame(ticket);
     }
 
-    @Test
-    void findEntity_machineKey_loadedByTheMachineIdNotTheDocumentId() {
+    @ParameterizedTest
+    @CsvSource({"MACHINE, Machine, machineId", "ORGANIZATION, Organization, organizationId"})
+    void findEntity_typeWithOwnKeyProperty_loadedByThatPropertyNotTheDocumentId(NodeType type, String typeName,
+                                                                                String keyProperty) {
         // setup
-        when(registry.hasLoader(NodeType.MACHINE)).thenReturn(true);
-        when(registry.find(principal, NodeType.MACHINE, MACHINE_ID)).thenReturn(Optional.<Object>of(ticket));
-        Map<String, Object> representation = Map.of(TYPENAME, "Machine", MACHINE_KEY, MACHINE_ID, KEY, MACHINE_DOCUMENT_ID);
+        when(registry.hasLoader(type)).thenReturn(true);
+        when(registry.find(principal, type, PROPERTY_KEY_VALUE)).thenReturn(Optional.<Object>of(ticket));
+        Map<String, Object> representation = Map.of(TYPENAME, typeName, keyProperty, PROPERTY_KEY_VALUE, KEY, DOCUMENT_ID);
 
         // execution
         Optional<Object> entity = finder.findEntity(principal, representation);
@@ -99,25 +99,26 @@ class NodeEntityFinderTest {
         assertThat(entity).containsSame(ticket);
     }
 
-    @Test
-    void findEntity_machineWithoutMachineId_emptyWithoutLookup() {
+    @ParameterizedTest
+    @CsvSource({"MACHINE, Machine", "ORGANIZATION, Organization"})
+    void findEntity_typeWithOwnKeyPropertyButOnlyId_emptyWithoutLookup(NodeType type, String typeName) {
         // setup
-        when(registry.hasLoader(NodeType.MACHINE)).thenReturn(true);
-        Map<String, Object> representation = Map.of(TYPENAME, "Machine", KEY, MACHINE_DOCUMENT_ID);
+        when(registry.hasLoader(type)).thenReturn(true);
+        Map<String, Object> representation = Map.of(TYPENAME, typeName, KEY, DOCUMENT_ID);
 
         // execution
         Optional<Object> entity = finder.findEntity(principal, representation);
 
         // verifications
         assertThat(entity).isEmpty();
-        verify(registry, never()).find(eq(principal), eq(NodeType.MACHINE), anyString());
+        verify(registry, never()).find(eq(principal), eq(type), anyString());
     }
 
     @Test
     void findEntity_foreignTypedKey_emptyWithoutLookup() {
         // setup
         when(registry.hasLoader(NodeType.TICKET)).thenReturn(true);
-        String dialogGlobalId = codec.encode(NodeType.DIALOG, TICKET_ID);
+        String dialogGlobalId = relayIdCodec.encode(NodeType.DIALOG, TICKET_ID);
         Map<String, Object> representation = Map.of(TYPENAME, "Ticket", KEY, dialogGlobalId);
 
         // execution

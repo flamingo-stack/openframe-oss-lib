@@ -61,7 +61,8 @@ public class NodeFederationResolver extends DefaultDgsFederationResolver {
     }
 
     private static Object entityOrNull(Try<Optional<Object>> outcome) {
-        Optional<Object> entity = outcome.orElse(Optional.empty());
+        Optional<Object> noEntity = Optional.empty();
+        Optional<Object> entity = outcome.orElse(noEntity);
         return entity.orElse(null);
     }
 

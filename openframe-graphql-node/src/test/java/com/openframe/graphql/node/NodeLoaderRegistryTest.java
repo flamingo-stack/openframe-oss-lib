@@ -30,6 +30,7 @@ class NodeLoaderRegistryTest {
 
     @Mock private NodeLoader<SupportTicket> ticketLoader;
     @Mock private NodeLoader<Policy> policyLoader;
+    @Mock private NodeLoader<UrgentTicket> urgentTicketLoader;
 
     private AuthPrincipal principal;
     private SupportTicket ticket;
@@ -152,6 +153,54 @@ class NodeLoaderRegistryTest {
     }
 
     @Test
+    void findTypeName_exactClassAndAssignableLoaderRegisteredFirst_exactClassWins() {
+        // setup
+        stubTicketLoader();
+        stubUrgentTicketLoader();
+        List<NodeLoader<?>> loaders = List.of(ticketLoader, urgentTicketLoader);
+        NodeLoaderRegistry registry = new NodeLoaderRegistry(loaders);
+        UrgentTicket urgentTicket = new UrgentTicket(TICKET_ID, "Server down");
+
+        // execution
+        Optional<String> typeName = registry.findTypeName(urgentTicket);
+
+        // verifications
+        assertThat(typeName).contains("TicketNote");
+    }
+
+    @Test
+    void findTypeName_twoAssignableLoaders_firstRegisteredWins() {
+        // setup
+        stubTicketLoader();
+        stubUrgentTicketLoader();
+        List<NodeLoader<?>> loaders = List.of(ticketLoader, urgentTicketLoader);
+        NodeLoaderRegistry registry = new NodeLoaderRegistry(loaders);
+        CriticalTicket criticalTicket = new CriticalTicket(TICKET_ID, "Data loss");
+
+        // execution
+        Optional<String> typeName = registry.findTypeName(criticalTicket);
+
+        // verifications
+        assertThat(typeName).contains("Ticket");
+    }
+
+    @Test
+    void findTypeName_twoAssignableLoadersRegisteredInReverse_firstRegisteredWins() {
+        // setup
+        stubTicketLoader();
+        stubUrgentTicketLoader();
+        List<NodeLoader<?>> loaders = List.of(urgentTicketLoader, ticketLoader);
+        NodeLoaderRegistry registry = new NodeLoaderRegistry(loaders);
+        CriticalTicket criticalTicket = new CriticalTicket(TICKET_ID, "Data loss");
+
+        // execution
+        Optional<String> typeName = registry.findTypeName(criticalTicket);
+
+        // verifications
+        assertThat(typeName).contains("TicketNote");
+    }
+
+    @Test
     void findTypeName_objectOfNoLoaderClass_empty() {
         // setup
         stubTicketLoader();
@@ -200,6 +249,11 @@ class NodeLoaderRegistryTest {
         when(ticketLoader.nodeClass()).thenReturn(SupportTicket.class);
     }
 
+    private void stubUrgentTicketLoader() {
+        when(urgentTicketLoader.type()).thenReturn(NodeType.TICKET_NOTE);
+        when(urgentTicketLoader.nodeClass()).thenReturn(UrgentTicket.class);
+    }
+
     private NodeLoaderRegistry ticketRegistry() {
         List<NodeLoader<?>> loaders = List.of(ticketLoader);
         return new NodeLoaderRegistry(loaders);
@@ -208,6 +262,13 @@ class NodeLoaderRegistryTest {
     static class UrgentTicket extends SupportTicket {
 
         UrgentTicket(String id, String title) {
+            super(id, title);
+        }
+    }
+
+    static class CriticalTicket extends UrgentTicket {
+
+        CriticalTicket(String id, String title) {
             super(id, title);
         }
     }

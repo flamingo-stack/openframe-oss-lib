@@ -7,8 +7,6 @@ import graphql.schema.GraphQLCodeRegistry;
 import graphql.schema.idl.TypeDefinitionRegistry;
 import lombok.RequiredArgsConstructor;
 
-import java.util.Optional;
-
 @DgsComponent
 @RequiredArgsConstructor
 public class NodeInterfaceWiring {
@@ -28,7 +26,7 @@ public class NodeInterfaceWiring {
     }
 
     private static boolean declaresNodeInterface(TypeDefinitionRegistry typeRegistry) {
-        Optional<InterfaceTypeDefinition> node = typeRegistry.getType(NODE_INTERFACE, InterfaceTypeDefinition.class);
-        return node.isPresent();
+        InterfaceTypeDefinition node = typeRegistry.getTypeOrNull(NODE_INTERFACE, InterfaceTypeDefinition.class);
+        return node != null;
     }
 }

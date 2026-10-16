@@ -46,8 +46,6 @@ class RelayNodeFinderTest {
 
     @InjectMocks private RelayNodeFinder finder;
 
-    private final RelayIdCodec codec = new RelayIdCodec();
-
     private AuthPrincipal principal;
     private SupportTicket ticket;
     private GraphQLSchema schema;
@@ -63,7 +61,7 @@ class RelayNodeFinderTest {
     @Test
     void findNode_typeWithLoader_nodeFromTheLoader() {
         // setup
-        String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
+        String ticketGlobalId = relayIdCodec.encode(NodeType.TICKET, TICKET_ID);
         when(registry.hasLoader(NodeType.TICKET)).thenReturn(true);
         when(registry.find(principal, NodeType.TICKET, TICKET_ID)).thenReturn(Optional.<Object>of(ticket));
 
@@ -77,7 +75,7 @@ class RelayNodeFinderTest {
     @Test
     void findNode_loaderFindsNothing_empty() {
         // setup
-        String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
+        String ticketGlobalId = relayIdCodec.encode(NodeType.TICKET, TICKET_ID);
         when(registry.hasLoader(NodeType.TICKET)).thenReturn(true);
         when(registry.find(principal, NodeType.TICKET, TICKET_ID)).thenReturn(Optional.empty());
 
@@ -91,7 +89,7 @@ class RelayNodeFinderTest {
     @Test
     void findNode_referenceStub_referenceWithTheRawId() {
         // setup
-        String dialogGlobalId = codec.encode(NodeType.DIALOG, DIALOG_ID);
+        String dialogGlobalId = relayIdCodec.encode(NodeType.DIALOG, DIALOG_ID);
         when(registry.hasLoader(NodeType.DIALOG)).thenReturn(false);
         when(stubDetector.isReferenceStub(schema, NodeType.DIALOG)).thenReturn(true);
 
@@ -109,7 +107,7 @@ class RelayNodeFinderTest {
     @Test
     void findNode_typeWithoutLoaderOrStub_throwsUnsupportedNodeType() {
         // setup
-        String dialogGlobalId = codec.encode(NodeType.DIALOG, DIALOG_ID);
+        String dialogGlobalId = relayIdCodec.encode(NodeType.DIALOG, DIALOG_ID);
         when(registry.hasLoader(NodeType.DIALOG)).thenReturn(false);
         when(stubDetector.isReferenceStub(schema, NodeType.DIALOG)).thenReturn(false);
 
@@ -147,7 +145,7 @@ class RelayNodeFinderTest {
     @Test
     void findNodeIfResolvable_typeWithLoader_nodeFromTheLoader() {
         // setup
-        String ticketGlobalId = codec.encode(NodeType.TICKET, TICKET_ID);
+        String ticketGlobalId = relayIdCodec.encode(NodeType.TICKET, TICKET_ID);
         when(registry.hasLoader(NodeType.TICKET)).thenReturn(true);
         when(registry.find(principal, NodeType.TICKET, TICKET_ID)).thenReturn(Optional.<Object>of(ticket));
 
@@ -161,7 +159,7 @@ class RelayNodeFinderTest {
     @Test
     void findNodeIfResolvable_referenceStub_reference() {
         // setup
-        String dialogGlobalId = codec.encode(NodeType.DIALOG, DIALOG_ID);
+        String dialogGlobalId = relayIdCodec.encode(NodeType.DIALOG, DIALOG_ID);
         when(registry.hasLoader(NodeType.DIALOG)).thenReturn(false);
         when(stubDetector.isReferenceStub(schema, NodeType.DIALOG)).thenReturn(true);
 
@@ -178,7 +176,7 @@ class RelayNodeFinderTest {
     @Test
     void findNodeIfResolvable_typeWithoutLoaderOrStub_emptyWithoutLookup() {
         // setup
-        String dialogGlobalId = codec.encode(NodeType.DIALOG, DIALOG_ID);
+        String dialogGlobalId = relayIdCodec.encode(NodeType.DIALOG, DIALOG_ID);
         when(registry.hasLoader(NodeType.DIALOG)).thenReturn(false);
         when(stubDetector.isReferenceStub(schema, NodeType.DIALOG)).thenReturn(false);
 

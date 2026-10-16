@@ -13,10 +13,12 @@ import static org.springframework.util.StringUtils.hasText;
 
 public class NodeLoaderRegistry {
 
+    private final List<NodeLoader<?>> registeredLoaders;
     private final Map<NodeType, NodeLoader<?>> loadersByType;
     private final Map<Class<?>, String> typeNamesByNodeClass;
 
     public NodeLoaderRegistry(List<NodeLoader<?>> loaders) {
+        this.registeredLoaders = List.copyOf(loaders);
         this.loadersByType = loaders.stream()
                 .collect(Collectors.toUnmodifiableMap(NodeLoaderRegistry::typeOf, Function.identity()));
         this.typeNamesByNodeClass = loaders.stream()
@@ -47,9 +49,9 @@ public class NodeLoaderRegistry {
         return Optional.ofNullable(loader);
     }
 
-    // A subclass (e.g. a @SuperBuilder document) answers the type of the loader whose class it extends.
+    // A subclass (e.g. a @SuperBuilder document) answers the type of the first-registered loader whose class it extends.
     private Optional<String> findAssignableTypeName(Object node) {
-        return loadersByType.values().stream()
+        return registeredLoaders.stream()
                 .filter(loader -> isNodeOf(loader, node))
                 .map(NodeLoaderRegistry::typeNameOf)
                 .findFirst();
