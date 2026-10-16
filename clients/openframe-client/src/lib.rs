@@ -40,7 +40,7 @@ pub mod executor;
 
 use crate::clients::build_agent_http_client;
 use crate::clients::tool_agent_file_client::ToolAgentFileClient;
-use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
+use crate::clients::{AuthClient, RegistrationClient, RemoteAccessClient, ToolApiClient};
 use crate::config::update_config::{
     DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS, SELF_RESTART_EXIT_CODE,
     SELF_RESTART_HANDOFF_SECS,
@@ -85,6 +85,7 @@ use crate::services::package_manager::report_publisher::PackageManagerReportPubl
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
+use crate::services::remote_access_mode_service::RemoteAccessModeService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
 use crate::services::shared_token_service::SharedTokenService;
@@ -206,6 +207,7 @@ pub struct Client {
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
     initial_key_service: Arc<InitialKeyService>,
+    remote_access_mode_service: Arc<RemoteAccessModeService>,
     deactivation_service: Arc<DeactivationService>,
 }
 
@@ -342,6 +344,16 @@ impl Client {
             http_url.clone(),
             initial_configuration_service.clone(),
             config_service.clone(),
+            deactivation_service.clone(),
+        ));
+
+        let remote_access_mode_service = Arc::new(RemoteAccessModeService::new(
+            RemoteAccessClient::new(
+                http_client.clone(),
+                http_url.clone(),
+                config_service.clone(),
+            ),
+            initial_configuration_service.clone(),
             deactivation_service.clone(),
         ));
 
@@ -693,6 +705,7 @@ impl Client {
             agent_configuration_service: config_service,
             installed_tools_service,
             initial_key_service,
+            remote_access_mode_service,
             deactivation_service,
         })
     }
@@ -726,7 +739,7 @@ impl Client {
             error!("Failed to record boot attempt: {:#}", e);
         }
 
-        self.initial_key_service.clone().ensure_initial_key().await;
+        self.initial_key_service.clone().start();
 
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
@@ -742,6 +755,8 @@ impl Client {
         self.auth_processor.process().await?;
 
         self.token_refresh_run_manager.start();
+
+        self.remote_access_mode_service.clone().start();
 
         // Connect to NATS
         self.nats_connection_manager.connect().await?;

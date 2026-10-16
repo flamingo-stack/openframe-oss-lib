@@ -223,6 +223,12 @@ describe('TrustCenterPage', () => {
     expect(screen.getAllByText('Download PDF')).toHaveLength(1);
   });
 
+  it('attribution={false}: the host states the sync line and its download, so the page keeps only the monitoring status', () => {
+    render(<TrustCenterPage initialData={makeData()} attribution={false} />);
+    expect(screen.queryByText(/Data synced from/)).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Download PDF' })).toBeNull();
+  });
+
   it('still offers the PDF when monitoring is not connected (no source line to end)', () => {
     render(<TrustCenterPage initialData={makeData({ connected: false, syncedAt: null })} />);
     expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/trust-center/pdf');
