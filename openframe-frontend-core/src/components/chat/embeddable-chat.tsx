@@ -2530,7 +2530,9 @@ function EmbeddableChatInner({
     };
   const mingoRailProps = {
     dialogs,
-    activeDialogId: activeDialogId ?? undefined,
+    // The archive takes the chat column: the open chat stays selected (closing
+    // the archive returns to it) but is not what the list marks as on screen.
+    activeDialogId: archiveOpen ? undefined : (activeDialogId ?? undefined),
     // Beside a new chat (wide only: narrow, the list is its own screen).
     // A new chat holding only "What to ask?" exchanges is still that new chat.
     draftTitle:
@@ -2570,16 +2572,18 @@ function EmbeddableChatInner({
     isV2 && !stackedListView ? (
       <div className="col-start-2 row-start-1 min-w-0">
         <MingoChatHeader
-          title={headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
-          subtitle={headerPersonName}
-          avatar={headerAvatar}
+          // Over the archive the header is the archive's: the chat still open
+          // underneath is not on screen, so neither its name nor its actions are.
+          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+          subtitle={archiveOpen ? undefined : headerPersonName}
+          avatar={archiveOpen ? undefined : headerAvatar}
           // Wide: shows / hides the list beside the chat. Narrow: back to the
           // list, the only one of the two that fits.
           onToggleList={wideMingo ? toggleRailCollapsed : headerShowBack ? headerOnBack : () => setComposeOpen(false)}
           listOpen={splitActive}
-          menuItems={headerShowBack && !isViewingArchived ? splitHeaderMenuItems : []}
+          menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? splitHeaderMenuItems : []}
           extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
-          onRestore={isViewingArchived ? headerOnRestore : undefined}
+          onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
           // Only while the list and the chat both fit: narrow, the toggle is
           // already the way back to the list.
           onCollapse={

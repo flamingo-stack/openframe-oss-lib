@@ -19,14 +19,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast as defaultToast } from '../../hooks/use-toast';
-import { formatRelativeTime } from '../../utils/date-utils';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { usePageDataSync } from '../layout/page-data-sync';
 import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
+import { DataSyncLine } from '../ui/data-attribution';
 import { useTicketActions } from './hooks/use-ticket-actions';
 import { useTicketsList } from './hooks/use-tickets-list';
 import { TicketOpenForm } from './ticket-open-form';
@@ -71,7 +72,7 @@ function TicketCenterAuthed({
   sessionEmail: string;
 }) {
   const queryClient = useQueryClient();
-  const { tickets, isLoading, isFetching, refetch, lastUpdatedAt } = useTicketsList({
+  const { tickets, isLoading, isFetching, refetch, sync } = useTicketsList({
     customerEmail: sessionEmail,
   });
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([]);
@@ -117,6 +118,9 @@ function TicketCenterAuthed({
     setExpandedTicketId(prev => (prev === id ? null : id));
   }, []);
 
+  // The page states the sync under its title; the ticket list shown without that page draws it in its own header.
+  const syncInPage = usePageDataSync(sync, isLoading);
+
   const merged: AnyTicket[] = [...optimisticTickets, ...tickets];
 
   return (
@@ -131,7 +135,7 @@ function TicketCenterAuthed({
         <div className="flex items-center justify-between gap-3">
           <p className="text-ods-text-secondary text-h5">Your Current Tickets</p>
           <div className="flex items-center gap-3 text-ods-text-secondary text-h6">
-            {lastUpdatedAt && <span>Updated {formatRelativeTime(new Date(lastUpdatedAt))}</span>}
+            {!syncInPage && <DataSyncLine sync={sync} inline />}
             <Button
               type="button"
               variant="transparent"
