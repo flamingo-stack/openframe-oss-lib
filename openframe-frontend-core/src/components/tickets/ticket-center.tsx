@@ -22,6 +22,7 @@ import { toast as defaultToast } from '../../hooks/use-toast';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
+import { usePageDataSync } from '../layout/page-data-sync';
 import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
@@ -117,6 +118,9 @@ function TicketCenterAuthed({
     setExpandedTicketId(prev => (prev === id ? null : id));
   }, []);
 
+  // The page states the sync under its title; the ticket list shown without that page draws it in its own header.
+  const syncInPage = usePageDataSync(sync, isLoading);
+
   const merged: AnyTicket[] = [...optimisticTickets, ...tickets];
 
   return (
@@ -131,7 +135,7 @@ function TicketCenterAuthed({
         <div className="flex items-center justify-between gap-3">
           <p className="text-ods-text-secondary text-h5">Your Current Tickets</p>
           <div className="flex items-center gap-3 text-ods-text-secondary text-h6">
-            <DataSyncLine sync={sync} inline />
+            {!syncInPage && <DataSyncLine sync={sync} inline />}
             <Button
               type="button"
               variant="transparent"

@@ -272,6 +272,8 @@ function DocViewerContent({
     <div style={{ ...bgStyle, ...containerBgStyle }}>
       <PageLayout title={title} subtitle={subtitle} titleSize="h1" titleWrap backButton={backCfg ?? undefined}>
         <div className="flex w-full flex-col gap-10">
+          {/* Where the document is mirrored from: the first row under the title, as on every synced page. */}
+          <DataSyncLine sync={content?.sync} loading={isLoadingContent && !content} />
           {showAIChat && (
             <DocSearchBar
               placeholder={`Search ${sidebarLabel?.toLowerCase() || 'documents'}...`}
@@ -362,10 +364,7 @@ function DocViewerContent({
                           <p className="text-ods-text-secondary text-h4">{resolvedEmptyText}</p>
                         </div>
                       ) : (
-                        <>
-                          <DataSyncLine sync={content.sync} />
-                          {renderedContent}
-                        </>
+                        renderedContent
                       )}
                     </article>
                   </div>

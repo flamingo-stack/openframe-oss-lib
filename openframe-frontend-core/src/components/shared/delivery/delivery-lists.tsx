@@ -36,6 +36,7 @@ import type { DeliveryItem, DeliveryResponse } from '../../../types/delivery';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
@@ -166,6 +167,8 @@ export function DeliveryLists({
   // by RoadmapView). 96 matches the sticky-header offset every
   // hash-scroll surface in the app uses.
   useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
+  // The page states the sync under its title; the lists shown without that page draw it above themselves.
+  const syncInPage = usePageDataSync(sync, isLoading && !data);
 
   const showCompleted = true;
   const showInProgress = true;
@@ -186,7 +189,7 @@ export function DeliveryLists({
 
   return (
     <div className="flex w-full flex-col gap-[40px]">
-      <DataSyncLine sync={sync} loading={isLoading && !data} />
+      {!syncInPage && <DataSyncLine sync={sync} loading={isLoading && !data} />}
       {/* Empty state if no results after filtering */}
       {!isLoading && !hasResults && (
         <ListEmptyState

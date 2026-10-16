@@ -19,6 +19,7 @@ import type { DataSync } from '../../../types/data-sync';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
+import { usePageDataSync } from '../../layout/page-data-sync';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
 import { RoadmapGrid } from './roadmap-grid';
@@ -90,6 +91,8 @@ export function RoadmapView({
   // them when `hasActiveFilters` is true (chat URL carries `?search=<id>`).
   // The card mounts one tick after `data` lands; the hook waits.
   useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
+  // The page states the sync under its title; a roadmap shown without that page draws it above the list.
+  const syncInPage = usePageDataSync(data?.sync, isLoading && !data);
 
   if (error) {
     return <LoadError message="Failed to load roadmap." onRetry={reload} />;
@@ -99,7 +102,7 @@ export function RoadmapView({
   if (isLoading && !data) {
     return (
       <div className={SYNCED_LIST_CLASS}>
-        <DataSyncLine loading />
+        {!syncInPage && <DataSyncLine loading />}
         <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
       </div>
     );
@@ -107,7 +110,7 @@ export function RoadmapView({
 
   return (
     <div className={SYNCED_LIST_CLASS}>
-      <DataSyncLine sync={data?.sync} />
+      {!syncInPage && <DataSyncLine sync={data?.sync} />}
       <RoadmapGrid
         items={items}
         showLeftMargin={showLeftMargin}

@@ -95,9 +95,9 @@ export interface TrustCenterPageProps {
    */
   beforeFaq?: ReactNode;
   /**
-   * The "Data synced from <source>" line in the status row. Default true. Pass false when the host's own header
-   * already states it (the hub's admin preview draws it in its page header), so the page never says it twice; the
-   * monitoring status and the PDF download stay.
+   * The "Data synced from <source>" line and its PDF download in the status row. Default true. Pass false when the
+   * host's own header states both (the hub's admin preview draws them in its page header), so the page never says
+   * them twice; the monitoring status stays.
    */
   attribution?: boolean;
 }
@@ -277,9 +277,9 @@ export function TrustCenterPage({
               lastUpdated={data.syncedAt}
               action={download}
             />
-          ) : (
+          ) : attribution ? (
             download
-          )}
+          ) : null}
         </div>
 
         <div className={TRUST_BODY_GRID_CLASS}>

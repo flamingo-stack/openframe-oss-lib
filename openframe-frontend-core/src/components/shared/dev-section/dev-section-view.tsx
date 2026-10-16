@@ -23,6 +23,7 @@ import {
   type OpenframeDevSectionKey,
 } from '../../../utils/dev-sections/openframe-dev-sections';
 import { StatusFilterComponent } from '../../features';
+import { PageDataSyncProvider, PageDataSyncRow } from '../../layout/page-data-sync';
 import { SearchInput } from '../../ui';
 
 export interface DevSectionViewProps {
@@ -123,50 +124,60 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
+  // The list reports where its records are mirrored from; the row states it right under the section's title (the
+  // page's title when this view shows no heading of its own), the place every synced page states it.
   return (
-    <div className="flex w-full flex-col gap-10">
-      {showHeading &&
-        (hero ? (
-          <div className="space-y-4">
-            <h1 className="flex items-center gap-3 tracking-[-1.12px] text-ods-text-primary text-h1">
-              {hero.icon}
-              {hero.title ?? section.hero.title}
-            </h1>
-            <p className="max-w-3xl text-ods-text-secondary text-h4">{hero.description}</p>
+    <PageDataSyncProvider>
+      <div className="flex w-full flex-col gap-10">
+        {showHeading ? (
+          <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+            {hero ? (
+              <div className="space-y-4">
+                <h1 className="flex items-center gap-3 tracking-[-1.12px] text-ods-text-primary text-h1">
+                  {hero.icon}
+                  {hero.title ?? section.hero.title}
+                </h1>
+                <p className="max-w-3xl text-ods-text-secondary text-h4">{hero.description}</p>
+              </div>
+            ) : (
+              <div className="flex w-full items-center justify-between">
+                <h2 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[40px] tracking-[-0.64px] text-ods-text-primary content-md:text-[40px] content-md:leading-[48px] content-md:tracking-[-0.8px] content-lg:text-[48px] content-lg:leading-[56px] content-lg:tracking-[-0.96px]">
+                  {section.hero.title}
+                  <span className="text-ods-accent">:</span>
+                </h2>
+              </div>
+            )}
+            <PageDataSyncRow />
           </div>
         ) : (
-          <div className="flex w-full items-center justify-between">
-            <h2 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[40px] tracking-[-0.64px] text-ods-text-primary content-md:text-[40px] content-md:leading-[48px] content-md:tracking-[-0.8px] content-lg:text-[48px] content-lg:leading-[56px] content-lg:tracking-[-0.96px]">
-              {section.hero.title}
-              <span className="text-ods-accent">:</span>
-            </h2>
+          <PageDataSyncRow />
+        )}
+
+        {preControls}
+
+        {(search || filter) && (
+          <div className="space-y-4">
+            {search && (
+              <SearchInput
+                showDropdown={false}
+                placeholder={search.placeholder}
+                value={searchValue}
+                onChange={handleSearchChange}
+                onSubmit={handleSearchSubmit}
+              />
+            )}
+            {filter && (
+              <StatusFilterComponent
+                selectedStatus={currentFilterValue}
+                onStatusChange={handleFilterChange}
+                statusOptions={[...filter.options]}
+              />
+            )}
           </div>
-        ))}
+        )}
 
-      {preControls}
-
-      {(search || filter) && (
-        <div className="space-y-4">
-          {search && (
-            <SearchInput
-              showDropdown={false}
-              placeholder={search.placeholder}
-              value={searchValue}
-              onChange={handleSearchChange}
-              onSubmit={handleSearchSubmit}
-            />
-          )}
-          {filter && (
-            <StatusFilterComponent
-              selectedStatus={currentFilterValue}
-              onStatusChange={handleFilterChange}
-              statusOptions={[...filter.options]}
-            />
-          )}
-        </div>
-      )}
-
-      {children}
-    </div>
+        {children}
+      </div>
+    </PageDataSyncProvider>
   );
 }
