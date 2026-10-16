@@ -4,7 +4,14 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use macos::{get_console_user, is_gui_session_ready, is_process_running, launch_as_user};
+pub use macos::{
+    console_logon_id, get_console_user, is_gui_session_ready, is_process_running, launch_as_user,
+};
 
 #[cfg(windows)]
-pub(crate) use self::windows::launch_in_user_session;
+pub(crate) use self::windows::{console_logon_id, launch_in_user_session};
+
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn console_logon_id() -> Option<u64> {
+    None
+}

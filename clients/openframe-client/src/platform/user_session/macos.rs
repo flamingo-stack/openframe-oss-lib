@@ -180,3 +180,12 @@ async fn launch_via_sudo(
 #[cfg(test)]
 #[path = "macos_tests.rs"]
 mod tests;
+
+/// Identifies the current logon at the console: loginwindow hands `/dev/console` to the user
+/// at logon, which moves its change time. `None` while root owns the console (nobody logged on).
+pub fn console_logon_id() -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+
+    let console = std::fs::metadata("/dev/console").ok()?;
+    (console.uid() != 0).then(|| console.ctime() as u64)
+}

@@ -3,6 +3,8 @@ use crate::config::update_config::SELF_RESTART_IDLE_WAIT_SECS;
 use crate::services::execution_service::ExecutionService;
 use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ClientUpdatePendingFlag;
+use crate::utils::in_progress::InProgress;
+use crate::utils::latch::Latch;
 use tokio::time::timeout;
 
 const BOUND: Duration = Duration::from_secs(10);
@@ -12,6 +14,8 @@ struct Work {
     tool_ops: ToolOps,
     scripts: ExecutionService,
     client_update: ClientUpdatePendingFlag,
+    package_upgrades: InProgress,
+    closing: Latch,
 }
 
 impl Work {
@@ -20,6 +24,8 @@ impl Work {
             self.tool_ops.busy_tools(),
             self.scripts.running_scripts(),
             self.client_update.view(),
+            self.package_upgrades.clone(),
+            self.closing.clone(),
         )
     }
 }
@@ -95,6 +101,27 @@ async fn drain_waits_for_a_running_script() {
     let script = work.scripts.running_for_tests();
 
     drain_waits_until_released(&gate, || drop(script)).await;
+}
+
+#[tokio::test]
+async fn drain_waits_for_a_running_package_upgrade() {
+    let work = Work::default();
+    let gate = work.gate();
+    let upgrade = work.package_upgrades.begin();
+
+    drain_waits_until_released(&gate, || drop(upgrade)).await;
+}
+
+#[tokio::test]
+async fn draining_sets_the_shared_closing_latch() {
+    let work = Work::default();
+    let gate = work.gate();
+    assert!(!work.closing.is_set());
+
+    let _draining = start_drain(&gate);
+    until_closed(&gate).await;
+
+    assert!(work.closing.is_set());
 }
 
 #[tokio::test]

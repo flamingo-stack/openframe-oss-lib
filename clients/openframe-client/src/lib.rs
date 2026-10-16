@@ -46,7 +46,9 @@ use crate::config::update_config::{
     SELF_RESTART_HANDOFF_SECS,
 };
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
-use crate::listener::command::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
+use crate::listener::command::{
+    CommandContext, CommandListener, FeatureFlagsHandler, PackagePolicyHandler, RestartGate,
+};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -56,7 +58,7 @@ use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
 use crate::listener::tool_uninstall_message_listener::ToolUninstallMessageListener;
 use crate::logging::nats_streaming::LogStreamingRunManager;
 use crate::models::{
-    BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
+    BootstrapScriptMessage, CommandMessage, Feature, ScriptMessage, ScriptScheduleExecutionMessage,
     SoftwareScriptMessage,
 };
 use crate::platform::DirectoryManager;
@@ -81,9 +83,11 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
+use crate::services::package_manager::auto_update::{
+    PackageAutoUpdateRunManager, PolicyStore, RestartSignals,
+};
 use crate::services::package_manager::report_publisher::PackageManagerReportPublisher;
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
-use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
 use crate::services::remote_access_mode_service::RemoteAccessModeService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
@@ -107,6 +111,8 @@ use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
+use crate::utils::in_progress::InProgress;
+use crate::utils::latch::Latch;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -182,6 +188,8 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
+    package_policy_listener: Option<CommandListener<PackagePolicyHandler>>,
+    package_auto_update: Option<PackageAutoUpdateRunManager>,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
@@ -194,7 +202,6 @@ pub struct Client {
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     machine_heartbeat_run_manager: MachineHeartbeatRunManager,
     package_manager_report_run_manager: PackageManagerReportRunManager,
-    package_manager_update_run_manager: PackageManagerUpdateRunManager,
     hostname_report_publisher: HostnameReportPublisher,
     machine_timezone_run_manager: MachineTimezoneRunManager,
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
@@ -387,11 +394,16 @@ impl Client {
         let tool_kill_service = ToolKillService::new();
 
         let tool_ops = ToolOps::default();
+        let package_upgrades = InProgress::default();
+        let agent_restart = Latch::default();
 
         let feature_flags_service = Arc::new(FeatureFlagsService::load(
             directory_manager.secured_dir().join("feature_flags.json"),
             env!("OPENFRAME_VERSION").to_string(),
         ));
+        let package_auto_update_enabled = feature_flags_service
+            .flags()
+            .is_enabled(Feature::PackageAutoUpdate);
 
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
@@ -489,6 +501,7 @@ impl Client {
             last_known_good_service.clone(),
             tool_run_manager.clone(),
             tool_ops.clone(),
+            package_upgrades.clone(),
             update_handler_service.clone(),
         );
 
@@ -584,6 +597,8 @@ impl Client {
             tool_ops.busy_tools(),
             execution_service.running_scripts(),
             tool_run_manager.client_update_pending(),
+            package_upgrades.clone(),
+            agent_restart.clone(),
         );
         let command_context = CommandContext::new(
             nats_connection_manager.clone(),
@@ -593,6 +608,30 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
+        let (package_policy_listener, package_auto_update) = if package_auto_update_enabled {
+            let store = Arc::new(PolicyStore::load(
+                directory_manager.secured_dir().join("package_policy.json"),
+            ));
+            let listener = CommandListener::new(
+                PackagePolicyHandler::new(store.clone()),
+                command_context.clone(),
+            );
+            let (manager, _force_now) = PackageAutoUpdateRunManager::new(
+                store,
+                directory_manager
+                    .secured_dir()
+                    .join("package_update_state.json"),
+                RestartSignals {
+                    client_update: tool_run_manager.client_update_pending(),
+                    agent_restart: agent_restart.clone(),
+                },
+                package_upgrades.clone(),
+                tool_kill_service.clone(),
+            );
+            (Some(listener), Some(manager))
+        } else {
+            (None, None)
+        };
         let feature_flags_listener = CommandListener::new(
             FeatureFlagsHandler::new(feature_flags_service),
             command_context,
@@ -653,8 +692,6 @@ impl Client {
         let machine_heartbeat_run_manager =
             MachineHeartbeatRunManager::new(machine_heartbeat_publisher);
 
-        let package_manager_update_run_manager = PackageManagerUpdateRunManager::new();
-
         let hostname_report_publisher = HostnameReportPublisher::new(
             nats_message_publisher.clone(),
             config_service.clone(),
@@ -681,6 +718,8 @@ impl Client {
             client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
+            package_policy_listener,
+            package_auto_update,
             restart_gate,
             command_execution_listener,
             script_execution_listener,
@@ -693,7 +732,6 @@ impl Client {
             tool_connection_processing_manager,
             machine_heartbeat_run_manager,
             package_manager_report_run_manager,
-            package_manager_update_run_manager,
             hostname_report_publisher,
             machine_timezone_run_manager,
             result_outbox_run_manager,
@@ -770,6 +808,9 @@ impl Client {
         }
 
         self.feature_flags_listener.start().await?;
+        if let Some(listener) = &self.package_policy_listener {
+            listener.start().await?;
+        }
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
             restart_gate.requested().await;
@@ -826,8 +867,6 @@ impl Client {
         self.machine_heartbeat_run_manager.start();
         self.machine_timezone_run_manager.start();
 
-        self.package_manager_update_run_manager.start();
-
         // One-shot hostname report: client startup covers both machine and client restarts.
         self.hostname_report_publisher.publish().await;
 
@@ -874,6 +913,9 @@ impl Client {
         info!("Script schedule execution listener started");
 
         self.package_manager_report_run_manager.start();
+        if let Some(auto_update) = &self.package_auto_update {
+            auto_update.start();
+        }
 
         if let Err(e) = self.tool_run_manager.run().await {
             error!("Failed to start tool run manager: {:#}", e);

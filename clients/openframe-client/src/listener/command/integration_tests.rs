@@ -27,6 +27,8 @@ use crate::services::{
     InstalledToolsService, MachineIdService, ToolCommandParamsResolver, ToolKillService, ToolOps,
 };
 use crate::test_support::NatsServer;
+use crate::utils::in_progress::InProgress;
+use crate::utils::latch::Latch;
 
 const MACHINE: &str = "it-machine";
 const BOUND: Duration = Duration::from_secs(10);
@@ -143,6 +145,8 @@ impl Agent {
             ToolOps::default().busy_tools(),
             ExecutionService::new().running_scripts(),
             self.tool_run_manager.client_update_pending(),
+            InProgress::default(),
+            Latch::default(),
         );
         let context = CommandContext::new(
             self.manager.clone(),
