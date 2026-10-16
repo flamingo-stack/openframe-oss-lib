@@ -19,7 +19,9 @@ public class BackfillCascadeSourceVersionChangeUnit {
 
     private static final String VERSION_FIELD = "version";
     private static final String TENANT_ID_FIELD = "tenantId";
-    private static final List<String> COLLECTIONS = List.of("users", "organizations", "machines", "tickets");
+    // The two directory configs exist only in SaaS; in OSS the update matches nothing.
+    private static final List<String> COLLECTIONS = List.of("users", "organizations", "machines", "tickets",
+            "microsoft365_configs", "google_workspace_configs");
 
     @Execution
     public void execution(MongoTemplate mongoTemplate, TenantIdProvider tenantIdProvider) {
