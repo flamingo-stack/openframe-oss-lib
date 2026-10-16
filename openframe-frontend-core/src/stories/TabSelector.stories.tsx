@@ -26,6 +26,11 @@ const meta = {
       control: 'text',
       description: 'Optional label above the selector',
     },
+    size: {
+      control: 'select',
+      options: ['default', 'small'],
+      description: 'Row height: 44px (48px from content-md) or a fixed 32px',
+    },
   },
   decorators: [
     Story => (
@@ -277,5 +282,32 @@ export const WithBadges: Story = {
       },
     ];
     return <TabSelector value={value} onValueChange={setValue} items={items} variant="primary" label="Plan" />;
+  },
+};
+
+/**
+ * `size="small"`: a fixed 32px row with h6 labels, for a narrow column — the
+ * My Chats / All Chats scope in the sidebar's chat history (208px here).
+ */
+export const Small: Story = {
+  args: {
+    value: 'my',
+    size: 'small',
+    items: [
+      { id: 'my', label: 'My Chats' },
+      { id: 'all', label: 'All Chats' },
+    ],
+    onValueChange: () => {},
+  },
+  decorators: [
+    Story => (
+      <div style={{ width: '208px' }}>
+        <Story />
+      </div>
+    ),
+  ],
+  render: function Render(args) {
+    const [value, setValue] = useState(args.value);
+    return <TabSelector {...args} value={value} onValueChange={setValue} />;
   },
 };
