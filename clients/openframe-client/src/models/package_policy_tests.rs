@@ -46,26 +46,3 @@ fn unknown_policy_fields_are_ignored() {
 
     assert_eq!(entry.policy, UpdatePolicy::default());
 }
-
-#[test]
-fn the_persisted_state_round_trips() {
-    let state = PackagePolicyState {
-        machine_id: "m-1".to_string(),
-        sequence: 7,
-        packages: vec![PolicyEntry {
-            package: PackageRef::Winget {
-                id: "Vendor.App".to_string(),
-            },
-            policy: UpdatePolicy {
-                force_after_seconds: Some(60),
-            },
-        }],
-    };
-
-    let bytes = serde_json::to_vec(&state).unwrap();
-
-    assert_eq!(
-        serde_json::from_slice::<PackagePolicyState>(&bytes).unwrap(),
-        state
-    );
-}

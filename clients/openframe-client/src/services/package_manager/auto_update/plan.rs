@@ -1,5 +1,3 @@
-//! What to do with one outdated package right now. Pure.
-
 use crate::models::UpdatePolicy;
 use crate::services::package_manager::update_gate::GateDecision;
 

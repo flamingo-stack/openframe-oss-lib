@@ -11,7 +11,7 @@ use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
-use crate::utils::in_progress::InProgress;
+use crate::utils::in_progress::InProgressView;
 use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
@@ -48,7 +48,7 @@ pub struct OpenFrameClientUpdateService {
     last_known_good_service: LastKnownGoodService,
     tool_run_manager: ToolRunManager,
     tool_ops: ToolOps,
-    package_upgrades: InProgress,
+    package_upgrades: InProgressView,
     update_handler_service: UpdateHandlerService,
     /// Set from the update request until the updater is done with this process
     update_in_progress: Arc<AtomicBool>,
@@ -63,7 +63,7 @@ impl OpenFrameClientUpdateService {
         last_known_good_service: LastKnownGoodService,
         tool_run_manager: ToolRunManager,
         tool_ops: ToolOps,
-        package_upgrades: InProgress,
+        package_upgrades: InProgressView,
         update_handler_service: UpdateHandlerService,
     ) -> Self {
         Self {
@@ -106,7 +106,6 @@ impl OpenFrameClientUpdateService {
         self.process_update_internal(message, guard).await
     }
 
-    /// Internal update processing with version validation and safety checks
     /// What must finish before the agent may be replaced; the client update waits for it.
     fn busy_with(&self) -> Option<&'static str> {
         if self.tool_ops.any_busy() {
@@ -118,6 +117,7 @@ impl OpenFrameClientUpdateService {
         }
     }
 
+    /// Internal update processing with version validation and safety checks
     async fn process_update_internal(
         &self,
         message: OpenFrameClientUpdateMessage,

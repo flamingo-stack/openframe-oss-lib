@@ -16,10 +16,6 @@ fn cask(name: &str) -> PackageRef {
     }
 }
 
-fn is_winget(package: &PackageRef) -> bool {
-    matches!(package, PackageRef::Winget { .. })
-}
-
 fn safe(package: PackageRef) -> PolicyEntry {
     PolicyEntry {
         package,
@@ -55,8 +51,8 @@ fn passed_at(at: u64, logon: u64) -> UpdateState {
 fn a_new_package_starts_its_clock_and_keeps_it() {
     let mut state = UpdateState::default();
 
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0);
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0 + DAY);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0 + DAY);
 
     assert_eq!(state.outdated_since(&winget("A")), Some(T0));
 }
@@ -64,21 +60,39 @@ fn a_new_package_starts_its_clock_and_keeps_it() {
 #[test]
 fn a_package_no_longer_outdated_is_forgotten_and_restarts_later() {
     let mut state = UpdateState::default();
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0);
 
-    state.observe(&wide_policy(), is_winget, &[], T0 + HOUR);
+    state.observe(&wide_policy(), ManagerId::Winget, &[], T0 + HOUR);
     assert_eq!(state.outdated_since(&winget("A")), None);
 
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0 + DAY);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0 + DAY);
     assert_eq!(state.outdated_since(&winget("A")), Some(T0 + DAY));
+}
+
+#[test]
+fn an_upgraded_package_starts_a_new_clock_for_its_next_release() {
+    let policy = vec![forced_after(winget("A"), DAY), safe(winget("B"))];
+    let mut state = UpdateState::default();
+    state.observe(&policy, ManagerId::Winget, &[winget("A"), winget("B")], T0);
+
+    state.upgraded(&winget("A"));
+    state.observe(
+        &policy,
+        ManagerId::Winget,
+        &[winget("A"), winget("B")],
+        T0 + DAY,
+    );
+
+    assert_eq!(state.outdated_since(&winget("A")), Some(T0 + DAY));
+    assert_eq!(state.outdated_since(&winget("B")), Some(T0));
 }
 
 #[test]
 fn observing_one_manager_leaves_the_others_clocks_alone() {
     let mut state = UpdateState::default();
-    state.observe(&wide_policy(), |p| !is_winget(p), &[cask("postman")], T0);
+    state.observe(&wide_policy(), ManagerId::Brew, &[cask("postman")], T0);
 
-    state.observe(&wide_policy(), is_winget, &[], T0 + HOUR);
+    state.observe(&wide_policy(), ManagerId::Winget, &[], T0 + HOUR);
 
     assert_eq!(state.outdated_since(&cask("postman")), Some(T0));
 }
@@ -86,7 +100,12 @@ fn observing_one_manager_leaves_the_others_clocks_alone() {
 #[test]
 fn packages_dropped_from_the_policy_are_forgotten() {
     let mut state = UpdateState::default();
-    state.observe(&wide_policy(), is_winget, &[winget("A"), winget("B")], T0);
+    state.observe(
+        &wide_policy(),
+        ManagerId::Winget,
+        &[winget("A"), winget("B")],
+        T0,
+    );
 
     state.retain(&[safe(winget("B"))]);
 
@@ -129,7 +148,7 @@ fn a_force_deadline_wakes_one_pass_and_only_one() {
     let force_after = 5 * DAY + HOUR;
     let policy = [forced_after(winget("A"), force_after)];
     let mut state = passed_at(T0, 1);
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0);
     let deadline = T0 + force_after;
 
     let mut ran_at = T0;
@@ -152,7 +171,7 @@ fn a_force_deadline_wakes_one_pass_and_only_one() {
 fn a_deadline_passed_while_the_machine_was_off_is_due_at_once() {
     let policy = [forced_after(winget("A"), 5 * DAY)];
     let mut state = passed_at(T0, 1);
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0);
 
     assert!(state.is_due(T0 + 9 * DAY, None, &policy));
 }
@@ -162,7 +181,7 @@ fn the_state_survives_a_reload() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("package_update_state.json");
     let mut state = passed_at(T0, 7);
-    state.observe(&wide_policy(), is_winget, &[winget("A")], T0);
+    state.observe(&wide_policy(), ManagerId::Winget, &[winget("A")], T0);
 
     state.save(&path).unwrap();
 
@@ -185,7 +204,7 @@ fn packages_outside_the_policy_are_never_tracked() {
 
     state.observe(
         &[safe(winget("A"))],
-        is_winget,
+        ManagerId::Winget,
         &[winget("A"), winget("NotTicked")],
         T0,
     );

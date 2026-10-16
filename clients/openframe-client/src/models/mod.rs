@@ -59,7 +59,7 @@ pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
-pub use package_policy::{PackagePolicyMessage, PackagePolicyState, PolicyEntry, UpdatePolicy};
+pub use package_policy::{PackagePolicyMessage, PolicyEntry, UpdatePolicy};
 pub use package_ref::{BrewKind, PackageRef};
 pub use remote_access_mode::RemoteAccessMode;
 pub use tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};

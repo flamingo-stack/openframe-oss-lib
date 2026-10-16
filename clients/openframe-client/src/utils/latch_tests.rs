@@ -14,7 +14,7 @@ fn starts_unset_and_stays_set() {
 #[test]
 fn clones_observe_the_same_latch() {
     let setter = Latch::default();
-    let reader = setter.clone();
+    let reader = setter.view();
 
     setter.set();
 

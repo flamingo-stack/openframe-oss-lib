@@ -1,5 +1,3 @@
-//! A one-way flag: set once, observed by any clone, never cleared for the life of the process.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -11,6 +9,19 @@ impl Latch {
         self.0.store(true, Ordering::Release);
     }
 
+    pub fn is_set(&self) -> bool {
+        self.0.load(Ordering::Acquire)
+    }
+
+    pub fn view(&self) -> LatchView {
+        LatchView(self.0.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct LatchView(Arc<AtomicBool>);
+
+impl LatchView {
     pub fn is_set(&self) -> bool {
         self.0.load(Ordering::Acquire)
     }

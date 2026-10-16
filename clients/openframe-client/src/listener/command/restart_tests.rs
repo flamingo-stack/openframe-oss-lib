@@ -24,7 +24,7 @@ impl Work {
             self.tool_ops.busy_tools(),
             self.scripts.running_scripts(),
             self.client_update.view(),
-            self.package_upgrades.clone(),
+            self.package_upgrades.view(),
             self.closing.clone(),
         )
     }

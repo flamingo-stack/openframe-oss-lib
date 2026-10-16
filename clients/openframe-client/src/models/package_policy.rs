@@ -24,15 +24,6 @@ pub struct UpdatePolicy {
     pub force_after_seconds: Option<u64>,
 }
 
-/// The last applied policy, persisted so a restart keeps it.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct PackagePolicyState {
-    #[serde(default)]
-    pub machine_id: String,
-    pub sequence: i64,
-    pub packages: Vec<PolicyEntry>,
-}
-
 #[cfg(test)]
 #[path = "package_policy_tests.rs"]
 mod tests;

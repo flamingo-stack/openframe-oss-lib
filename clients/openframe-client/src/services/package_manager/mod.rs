@@ -1,10 +1,12 @@
 pub mod auto_update;
+pub(crate) mod brew;
 pub mod report_publisher;
 pub mod report_run_manager;
 mod state;
 mod support;
 pub mod update_gate;
 
+use crate::models::PackageRef;
 use serde::Serialize;
 use std::path::Path;
 
@@ -24,14 +26,20 @@ pub enum Presence {
 }
 
 impl ManagerId {
+    pub fn of(package: &PackageRef) -> Self {
+        match package {
+            PackageRef::Winget { .. } => ManagerId::Winget,
+            PackageRef::Brew { .. } => ManagerId::Brew,
+            PackageRef::Choco { .. } => ManagerId::Choco,
+        }
+    }
+
     pub const ALL: &'static [ManagerId] = &[ManagerId::Brew, ManagerId::Choco, ManagerId::Winget];
 
     pub async fn presence(self) -> Presence {
         match self {
             ManagerId::Brew => {
-                if Path::new("/opt/homebrew/bin/brew").exists()
-                    || Path::new("/usr/local/bin/brew").exists()
-                {
+                if brew::PATHS.iter().any(|path| Path::new(path).exists()) {
                     Presence::Present
                 } else {
                     Presence::Absent

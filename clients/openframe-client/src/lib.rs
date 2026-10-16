@@ -173,6 +173,11 @@ impl Default for ClientConfiguration {
     }
 }
 
+struct PackageAutoUpdate {
+    policy_listener: CommandListener<PackagePolicyHandler>,
+    manager: PackageAutoUpdateRunManager,
+}
+
 pub struct Client {
     config: Arc<RwLock<ClientConfiguration>>,
     directory_manager: DirectoryManager,
@@ -188,8 +193,7 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
-    package_policy_listener: Option<CommandListener<PackagePolicyHandler>>,
-    package_auto_update: Option<PackageAutoUpdateRunManager>,
+    package_auto_update: Option<PackageAutoUpdate>,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
@@ -501,7 +505,7 @@ impl Client {
             last_known_good_service.clone(),
             tool_run_manager.clone(),
             tool_ops.clone(),
-            package_upgrades.clone(),
+            package_upgrades.view(),
             update_handler_service.clone(),
         );
 
@@ -597,7 +601,7 @@ impl Client {
             tool_ops.busy_tools(),
             execution_service.running_scripts(),
             tool_run_manager.client_update_pending(),
-            package_upgrades.clone(),
+            package_upgrades.view(),
             agent_restart.clone(),
         );
         let command_context = CommandContext::new(
@@ -608,11 +612,11 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
-        let (package_policy_listener, package_auto_update) = if package_auto_update_enabled {
+        let package_auto_update = package_auto_update_enabled.then(|| {
             let store = Arc::new(PolicyStore::load(
                 directory_manager.secured_dir().join("package_policy.json"),
             ));
-            let listener = CommandListener::new(
+            let policy_listener = CommandListener::new(
                 PackagePolicyHandler::new(store.clone()),
                 command_context.clone(),
             );
@@ -623,15 +627,15 @@ impl Client {
                     .join("package_update_state.json"),
                 RestartSignals {
                     client_update: tool_run_manager.client_update_pending(),
-                    agent_restart: agent_restart.clone(),
+                    agent_restart: agent_restart.view(),
                 },
                 package_upgrades.clone(),
-                tool_kill_service.clone(),
             );
-            (Some(listener), Some(manager))
-        } else {
-            (None, None)
-        };
+            PackageAutoUpdate {
+                policy_listener,
+                manager,
+            }
+        });
         let feature_flags_listener = CommandListener::new(
             FeatureFlagsHandler::new(feature_flags_service),
             command_context,
@@ -718,7 +722,6 @@ impl Client {
             client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
-            package_policy_listener,
             package_auto_update,
             restart_gate,
             command_execution_listener,
@@ -808,8 +811,8 @@ impl Client {
         }
 
         self.feature_flags_listener.start().await?;
-        if let Some(listener) = &self.package_policy_listener {
-            listener.start().await?;
+        if let Some(auto_update) = &self.package_auto_update {
+            auto_update.policy_listener.start().await?;
         }
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
@@ -914,7 +917,7 @@ impl Client {
 
         self.package_manager_report_run_manager.start();
         if let Some(auto_update) = &self.package_auto_update {
-            auto_update.start();
+            auto_update.manager.start();
         }
 
         if let Err(e) = self.tool_run_manager.run().await {

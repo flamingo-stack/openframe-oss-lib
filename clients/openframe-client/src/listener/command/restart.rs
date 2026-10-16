@@ -8,7 +8,7 @@ use crate::config::update_config::{SELF_RESTART_IDLE_POLL_SECS, SELF_RESTART_IDL
 use crate::services::execution_service::RunningScripts;
 use crate::services::tool_ops::BusyTools;
 use crate::services::tool_run_manager::ClientUpdatePending;
-use crate::utils::in_progress::InProgress;
+use crate::utils::in_progress::InProgressView;
 use crate::utils::latch::Latch;
 
 #[derive(Clone)]
@@ -19,7 +19,7 @@ pub struct RestartGate {
     busy_tools: BusyTools,
     running_scripts: RunningScripts,
     client_update: ClientUpdatePending,
-    package_upgrades: InProgress,
+    package_upgrades: InProgressView,
 }
 
 impl RestartGate {
@@ -27,7 +27,7 @@ impl RestartGate {
         busy_tools: BusyTools,
         running_scripts: RunningScripts,
         client_update: ClientUpdatePending,
-        package_upgrades: InProgress,
+        package_upgrades: InProgressView,
         closing: Latch,
     ) -> Self {
         Self {

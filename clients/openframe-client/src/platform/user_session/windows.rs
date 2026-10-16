@@ -298,7 +298,7 @@ fn launch_process_in_target_session(
 /// Identifies the current logon at the console: its logon time as a FILETIME. A new value means
 /// a new logon (boot, Fast Startup power-on, sign-out and back in, user switch); agent restarts
 /// keep it. `None` when nobody is logged on at the console.
-pub(crate) fn console_logon_id() -> Option<u64> {
+pub fn console_logon_id() -> Option<u64> {
     unsafe {
         let session = WTSGetActiveConsoleSessionId();
         if session == u32::MAX {

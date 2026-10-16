@@ -9,7 +9,9 @@ pub use macos::{
 };
 
 #[cfg(windows)]
-pub(crate) use self::windows::{console_logon_id, launch_in_user_session};
+pub use self::windows::console_logon_id;
+#[cfg(windows)]
+pub(crate) use self::windows::launch_in_user_session;
 
 #[cfg(not(any(windows, target_os = "macos")))]
 pub fn console_logon_id() -> Option<u64> {

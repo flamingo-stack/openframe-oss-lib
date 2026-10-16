@@ -1,6 +1,3 @@
-//! The client's own auto-update bookkeeping: when passes ran and how long each package has
-//! been waiting. Pure apart from `load` / `save`.
-
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -8,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::models::{PackageRef, PolicyEntry};
+use crate::services::package_manager::ManagerId;
 use crate::utils::fs::atomic_write;
 
-/// The regular cadence between passes.
 pub(super) const TICK_SECS: u64 = 4 * 60 * 60;
 
 #[derive(Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -57,12 +54,12 @@ impl UpdateState {
     pub(super) fn observe(
         &mut self,
         policy: &[PolicyEntry],
-        of_manager: impl Fn(&PackageRef) -> bool,
+        manager: ManagerId,
         outdated: &[PackageRef],
         now: u64,
     ) {
         self.outdated
-            .retain(|o| !of_manager(&o.package) || outdated.contains(&o.package));
+            .retain(|o| ManagerId::of(&o.package) != manager || outdated.contains(&o.package));
         let in_policy = |package: &PackageRef| policy.iter().any(|e| &e.package == package);
         for package in outdated.iter().filter(|package| in_policy(package)) {
             if !self.outdated.iter().any(|o| &o.package == package) {
@@ -77,6 +74,11 @@ impl UpdateState {
     pub(super) fn retain(&mut self, policy: &[PolicyEntry]) {
         self.outdated
             .retain(|o| policy.iter().any(|entry| entry.package == o.package));
+    }
+
+    /// Stops the clock of a package that is now up to date, so its next release starts a new one.
+    pub(super) fn upgraded(&mut self, package: &PackageRef) {
+        self.outdated.retain(|o| &o.package != package);
     }
 
     pub(super) fn outdated_since(&self, package: &PackageRef) -> Option<u64> {

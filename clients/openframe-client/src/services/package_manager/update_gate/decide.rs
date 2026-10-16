@@ -25,10 +25,13 @@ pub fn decide(identity: &AppIdentity, processes: &[RunningProcess]) -> GateDecis
             })
         })
         .filter(|p| match main_images {
-            MainImages::Derived(names) => p.image.file_name().is_some_and(|name| {
-                let name = name.to_string_lossy().to_lowercase();
+            MainImages::Derived(names) => {
+                let image = p.image.to_string_lossy().to_lowercase();
+                let name = image
+                    .rsplit_once(['\\', '/'])
+                    .map_or(&*image, |(_, name)| name);
                 names.iter().any(|main| main.to_lowercase() == name)
-            }),
+            }
             MainImages::Unknown => true,
         })
         .map(|p| Holder {

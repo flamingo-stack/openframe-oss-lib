@@ -1,5 +1,3 @@
-//! Which processes are running, and from where — the OS facts behind the update gate.
-
 use std::path::{Path, PathBuf};
 use sysinfo::{ProcessRefreshKind, System, UpdateKind};
 
@@ -40,5 +38,14 @@ pub fn snapshot() -> Vec<RunningProcess> {
                 is_service,
             })
         })
+        .collect()
+}
+
+/// Which of `pids` are still running, read the same way as [`snapshot`].
+pub fn alive(pids: &[u32]) -> Vec<u32> {
+    let processes = snapshot();
+    pids.iter()
+        .copied()
+        .filter(|pid| processes.iter().any(|p| p.pid == *pid))
         .collect()
 }

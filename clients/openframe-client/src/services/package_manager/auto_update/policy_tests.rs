@@ -83,3 +83,26 @@ async fn re_delivering_the_same_set_does_not_wake_readers() {
         .is_err());
     assert_eq!(store.applied_sequence("m-1"), 2);
 }
+
+#[test]
+fn the_persisted_state_round_trips() {
+    let state = PackagePolicyState {
+        machine_id: "m-1".to_string(),
+        sequence: 7,
+        packages: vec![PolicyEntry {
+            package: PackageRef::Winget {
+                id: "Vendor.App".to_string(),
+            },
+            policy: UpdatePolicy {
+                force_after_seconds: Some(60),
+            },
+        }],
+    };
+
+    let bytes = serde_json::to_vec(&state).unwrap();
+
+    assert_eq!(
+        serde_json::from_slice::<PackagePolicyState>(&bytes).unwrap(),
+        state
+    );
+}

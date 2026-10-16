@@ -3,13 +3,13 @@ use super::*;
 #[test]
 fn idle_until_an_operation_begins() {
     let ops = InProgress::default();
-    assert!(!ops.is_active());
+    assert!(!ops.view().is_active());
 
     let guard = ops.begin();
-    assert!(ops.is_active());
+    assert!(ops.view().is_active());
 
     drop(guard);
-    assert!(!ops.is_active());
+    assert!(!ops.view().is_active());
 }
 
 #[test]
@@ -19,16 +19,16 @@ fn active_while_any_overlapping_operation_runs() {
     let second = ops.begin();
 
     drop(first);
-    assert!(ops.is_active());
+    assert!(ops.view().is_active());
 
     drop(second);
-    assert!(!ops.is_active());
+    assert!(!ops.view().is_active());
 }
 
 #[test]
 fn clones_observe_the_same_operations() {
     let producer = InProgress::default();
-    let reader = producer.clone();
+    let reader = producer.view();
 
     let _guard = producer.begin();
 
@@ -47,5 +47,5 @@ fn a_panicking_operation_still_ends() {
     .join();
 
     assert!(result.is_err());
-    assert!(!ops.is_active());
+    assert!(!ops.view().is_active());
 }

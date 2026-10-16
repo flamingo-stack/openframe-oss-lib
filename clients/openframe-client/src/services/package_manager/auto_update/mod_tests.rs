@@ -1,6 +1,7 @@
 use super::*;
-use crate::models::UpdatePolicy;
+use crate::models::{PolicyEntry, UpdatePolicy};
 use crate::services::tool_run_manager::ClientUpdatePendingFlag;
+use crate::utils::latch::Latch;
 use tempfile::TempDir;
 use tokio::time::timeout;
 
@@ -42,10 +43,9 @@ impl Fixture {
             self.state_path(),
             RestartSignals {
                 client_update: ClientUpdatePendingFlag::default().view(),
-                agent_restart: self.agent_restart.clone(),
+                agent_restart: self.agent_restart.view(),
             },
             InProgress::default(),
-            ToolKillService::new(),
         )
     }
 }
@@ -64,7 +64,10 @@ async fn force_rejects_a_package_outside_the_policy() {
     let (manager, _force_now) = fixture.manager();
 
     assert_eq!(
-        manager.worker.force(&winget("Other.App")).await,
+        manager
+            .worker
+            .force(&mut UpdateState::default(), &winget("Other.App"))
+            .await,
         ForceResult::NotInPolicy
     );
 }
@@ -76,7 +79,10 @@ async fn force_is_unavailable_while_the_agent_is_restarting() {
     fixture.agent_restart.set();
 
     assert!(matches!(
-        manager.worker.force(&choco("git")).await,
+        manager
+            .worker
+            .force(&mut UpdateState::default(), &choco("git"))
+            .await,
         ForceResult::Unavailable(_)
     ));
 }
@@ -87,7 +93,10 @@ async fn force_on_an_unsupported_manager_is_unavailable() {
     let (manager, _force_now) = fixture.manager();
 
     assert!(matches!(
-        manager.worker.force(&choco("git")).await,
+        manager
+            .worker
+            .force(&mut UpdateState::default(), &choco("git"))
+            .await,
         ForceResult::Unavailable(_)
     ));
 }
@@ -126,76 +135,8 @@ async fn a_pass_over_an_unsupported_manager_completes_and_is_saved() {
     let (_requests, mut force) = mpsc::channel(1);
     let mut state = UpdateState::default();
 
-    let not_before = manager.worker.pass(&mut state, &mut force).await;
+    let retry_at = manager.worker.pass(&mut state, &mut force).await;
 
-    assert_eq!(not_before, 0, "an unsupported manager is not a silent one");
+    assert_eq!(retry_at, None, "an unsupported manager is not a silent one");
     assert!(!UpdateState::load(&fixture.state_path()).is_due(unix_now(), None, &[]));
-}
-
-#[test]
-fn managers_come_once_each_whatever_the_policy_order() {
-    let policy: Vec<PolicyEntry> = [winget("A"), choco("b"), winget("C")]
-        .into_iter()
-        .map(|package| PolicyEntry {
-            package,
-            policy: UpdatePolicy::default(),
-        })
-        .collect();
-
-    assert_eq!(
-        managers_in(&policy),
-        vec![ManagerId::Choco, ManagerId::Winget]
-    );
-}
-
-#[test]
-fn last_line_skips_trailing_blank_lines() {
-    assert_eq!(last_line("one\ntwo\n\n  \n"), "two");
-    assert_eq!(last_line(""), "");
-}
-
-#[tokio::test]
-async fn closing_holders_stops_them_even_when_they_ignore_the_request() {
-    let fixture = Fixture::with_policy(&[]);
-    let (manager, _force_now) = fixture.manager();
-    let mut app = if cfg!(target_os = "windows") {
-        std::process::Command::new("ping")
-            .args(["-n", "120", "127.0.0.1"])
-            .stdout(std::process::Stdio::null())
-            .spawn()
-            .unwrap()
-    } else {
-        std::process::Command::new("sleep")
-            .arg("120")
-            .spawn()
-            .unwrap()
-    };
-
-    timeout(CLOSE_GRACE + BOUND, manager.worker.close(&[app.id()]))
-        .await
-        .expect("closing the holders hung");
-
-    let exited = timeout(BOUND, async {
-        loop {
-            if app.try_wait().unwrap().is_some() {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    })
-    .await;
-    if exited.is_err() {
-        let _ = app.kill();
-        panic!("the holder survived its forced close");
-    }
-}
-
-#[tokio::test]
-async fn closing_nothing_returns_at_once() {
-    let fixture = Fixture::with_policy(&[]);
-    let (manager, _force_now) = fixture.manager();
-
-    timeout(Duration::from_secs(1), manager.worker.close(&[]))
-        .await
-        .expect("an empty close waited");
 }

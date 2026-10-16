@@ -1,5 +1,3 @@
-//! A count of long operations in flight that other components wait for before acting.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -12,6 +10,15 @@ impl InProgress {
         InProgressGuard(self.0.clone())
     }
 
+    pub fn view(&self) -> InProgressView {
+        InProgressView(self.0.clone())
+    }
+}
+
+#[derive(Clone)]
+pub struct InProgressView(Arc<AtomicUsize>);
+
+impl InProgressView {
     pub fn is_active(&self) -> bool {
         self.0.load(Ordering::Acquire) > 0
     }

@@ -3,19 +3,14 @@ use serde::Deserialize;
 use super::{last_line, QueryError, UpgradeOutcome, OUTDATED_TIMEOUT_SECS, UPGRADE_TIMEOUT_SECS};
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::{BrewKind, PackageRef};
+use crate::services::package_manager::brew;
 
 /// `brew update` first: without it `outdated` compares against stale tap metadata.
-const OUTDATED_SCRIPT: &str = r#"#!/bin/bash
-set -euo pipefail
-BREW="$( [ -x /opt/homebrew/bin/brew ] && echo /opt/homebrew/bin/brew || echo /usr/local/bin/brew )"
-"$BREW" update >/dev/null
+const OUTDATED: &str = r#""$BREW" update >/dev/null
 HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" outdated --json=v2
 "#;
 
-const UPGRADE_SCRIPT: &str = r#"#!/bin/bash
-set -euo pipefail
-BREW="$( [ -x /opt/homebrew/bin/brew ] && echo /opt/homebrew/bin/brew || echo /usr/local/bin/brew )"
-NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" upgrade "$@"
+const UPGRADE: &str = r#"NONINTERACTIVE=1 HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" upgrade "$@"
 "#;
 
 const COULD_NOT_LAUNCH: i32 = 85;
@@ -35,7 +30,7 @@ struct Named {
 
 pub(super) async fn outdated() -> Result<Vec<PackageRef>, QueryError> {
     let result = execute_script(ScriptParams {
-        code: OUTDATED_SCRIPT,
+        code: &brew::script(OUTDATED),
         shell: "bash",
         args: &[],
         timeout_secs: OUTDATED_TIMEOUT_SECS,
@@ -63,7 +58,7 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     };
     let args = [flag.to_string(), name.clone()];
     let result = execute_script(ScriptParams {
-        code: UPGRADE_SCRIPT,
+        code: &brew::script(UPGRADE),
         shell: "bash",
         args: &args,
         timeout_secs: UPGRADE_TIMEOUT_SECS,

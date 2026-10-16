@@ -1,5 +1,3 @@
-//! May a package's installer run right now? See docs/designs/2026-10-08-update-gate.md.
-
 #[cfg(target_os = "macos")]
 mod brew;
 mod decide;
@@ -44,6 +42,17 @@ pub struct Holder {
 pub enum GateDecision {
     Clear,
     Blocked(BlockReason),
+}
+
+impl GateDecision {
+    pub fn holder_pids(&self) -> Vec<u32> {
+        match self {
+            GateDecision::Blocked(BlockReason::Running { holders }) => {
+                holders.iter().map(|h| h.pid).collect()
+            }
+            _ => Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

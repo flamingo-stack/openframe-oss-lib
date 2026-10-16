@@ -1,6 +1,3 @@
-//! Asks running apps to close the way their user would, so a forced upgrade gives them a chance
-//! to save before whatever is left gets terminated.
-
 use tracing::warn;
 
 /// Windows: `CloseMainWindow` from the console user's session — the same message as the close

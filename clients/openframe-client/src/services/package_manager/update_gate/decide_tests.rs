@@ -130,6 +130,58 @@ fn derived_names_match_whatever_their_case() {
 }
 
 #[test]
+fn macos_app_bundles() {
+    const LAUNCHD: &str = "/sbin/launchd";
+    const CODE: &str = "/Applications/Visual Studio Code.app/Contents/MacOS/Code";
+    const HELPER: &str = "/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Renderer).app/Contents/MacOS/Code Helper (Renderer)";
+    let identity = AppIdentity::App {
+        install_dir: PathBuf::from("/Applications/Visual Studio Code.app"),
+        main_images: MainImages::Derived(vec!["Code".to_string()]),
+    };
+    let cases: &[(&str, Vec<RunningProcess>, Vec<u32>)] = &[
+        (
+            "app open, started by launchd",
+            vec![process(1, CODE, Some(LAUNCHD))],
+            vec![1],
+        ),
+        (
+            "helpers in nested bundles do not count",
+            vec![
+                process(1, CODE, Some(LAUNCHD)),
+                process(2, HELPER, Some(CODE)),
+            ],
+            vec![1],
+        ),
+        (
+            "same-image children do not count",
+            vec![
+                process(1, CODE, Some(LAUNCHD)),
+                process(2, CODE, Some(CODE)),
+            ],
+            vec![1],
+        ),
+        (
+            "only a helper left running",
+            vec![process(2, HELPER, Some(LAUNCHD))],
+            vec![],
+        ),
+        (
+            "same name in another bundle",
+            vec![process(
+                1,
+                "/Applications/Other.app/Contents/MacOS/Code",
+                Some(LAUNCHD),
+            )],
+            vec![],
+        ),
+    ];
+
+    for (name, processes, expected) in cases {
+        assert_eq!(&holder_pids(&identity, processes), expected, "{name}");
+    }
+}
+
+#[test]
 fn unknown_main_images_hold_on_any_root_non_service_process() {
     let tray = r"C:\Program Files\App\tray.exe";
     let cases: &[(&str, Vec<RunningProcess>, Vec<u32>)] = &[

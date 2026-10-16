@@ -145,7 +145,7 @@ impl Agent {
             ToolOps::default().busy_tools(),
             ExecutionService::new().running_scripts(),
             self.tool_run_manager.client_update_pending(),
-            InProgress::default(),
+            InProgress::default().view(),
             Latch::default(),
         );
         let context = CommandContext::new(

@@ -2,11 +2,20 @@ use std::path::PathBuf;
 use std::sync::{Mutex, PoisonError};
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
 use tracing::{info, warn};
 
-use crate::models::{PackagePolicyState, PolicyEntry};
+use crate::models::PolicyEntry;
 use crate::utils::fs::atomic_write;
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+struct PackagePolicyState {
+    #[serde(default)]
+    machine_id: String,
+    sequence: i64,
+    packages: Vec<PolicyEntry>,
+}
 
 /// The backend's desired set of auto-updated packages, as last delivered. Replaced wholesale;
 /// readers learn about a change through [`PolicyStore::changed`].
