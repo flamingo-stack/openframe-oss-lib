@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { DataSync } from '../../types/data-sync';
+import { DATA_SYNC_SOURCES, type DataSync, type DataSyncSource } from '../../types/data-sync';
 import { formatDate } from '../../utils/format';
 import { ClickupIcon } from '../icons-v2-generated/brand-logos/clickup-icon';
 import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
@@ -66,13 +66,12 @@ export function DataAttributionSkeleton() {
   );
 }
 
-/** The systems a shared page's records are mirrored from, by the `source` an API states in its `sync`, each with the
- *  mark the rest of the app draws for it (`ClickupIcon`, `HubspotIcon`, `GithubClassicIcon`). */
-const DATA_SYNC_SOURCES = {
-  clickup: { name: 'ClickUp', Icon: ClickupIcon },
-  hubspot: { name: 'HubSpot', Icon: HubspotIcon },
-  github: { name: 'GitHub', Icon: GithubClassicIcon },
-} as const;
+/** The mark each sync source is drawn with (the app's standard brand marks); its name is `DATA_SYNC_SOURCES`'. */
+const DATA_SYNC_ICONS: Record<DataSyncSource, typeof ClickupIcon> = {
+  clickup: ClickupIcon,
+  hubspot: HubspotIcon,
+  github: GithubClassicIcon,
+};
 
 /**
  * THE sync line of a shared page whose records an API reads from a mirror (the roadmap and the delivery board:
@@ -91,15 +90,15 @@ export function DataSyncLine({
   inline?: boolean;
   action?: ReactNode;
 }) {
-  if (!loading && !sync) return null;
-  const known = sync ? DATA_SYNC_SOURCES[sync.source as keyof typeof DATA_SYNC_SOURCES] : undefined;
+  if (!loading && !(sync && sync.source in DATA_SYNC_ICONS)) return null;
+  const Icon = sync ? DATA_SYNC_ICONS[sync.source] : null;
   const line =
-    loading || !sync ? (
+    loading || !sync || !Icon ? (
       <DataAttributionSkeleton />
     ) : (
       <DataAttribution
-        icon={known ? <known.Icon size={16} /> : undefined}
-        source={known?.name ?? sync.source}
+        icon={<Icon size={16} />}
+        source={DATA_SYNC_SOURCES[sync.source]}
         lastUpdated={sync.syncedAt}
         action={action}
       />

@@ -24,26 +24,14 @@ import {
 } from '../../../utils/dev-sections/openframe-dev-sections';
 import { StatusFilterComponent } from '../../features';
 import { PageDataSyncProvider, PageDataSyncRow } from '../../layout/page-data-sync';
+import { SectionHeading } from '../../layout/page-heading';
 import { SearchInput } from '../../ui';
 
 export interface DevSectionViewProps {
   /** Which section to render — drives title, search, and filter
    *  config via the `OPENFRAME_DEV_SECTIONS` registry. */
   sectionKey: OpenframeDevSectionKey;
-  /** When set, renders the rich page-level hero (icon + h1 + description).
-   *  Omit for the compact tab-context heading. */
-  hero?: {
-    /** Pre-rendered icon JSX. Server components render the icon themselves
-     *  and pass the element here — function references can't cross the
-     *  server→client boundary, but React elements can. */
-    icon: ReactNode;
-    /** Hero title. Falls back to `OPENFRAME_DEV_SECTIONS[sectionKey].hero.title`
-     *  when omitted, so embedders can override the (OpenFrame-specific) default
-     *  copy without forking the registry. */
-    title?: string;
-    description: string;
-  };
-  /** Optional slot rendered BETWEEN the hero and the search/filter
+  /** Optional slot rendered BETWEEN the heading and the search/filter
    *  controls. Use this for an entry-action surface that should sit
    *  above the list (e.g. the Help Center's "Open a new ticket" form).
    *  The slot is wrapped in the same `gap-10` flex column so spacing
@@ -53,7 +41,7 @@ export interface DevSectionViewProps {
   /** The page-specific list body. Reads URL params written by this
    *  component (search input + filter pills). */
   children: ReactNode;
-  /** Render this component's own title heading (hero or compact `h2`). Default
+  /** Render this component's own title heading (the section's `h2`). Default
    *  `true` — the tab context renders the compact heading itself. Pass `false`
    *  when the host already renders the title elsewhere (e.g. `DevSectionPage`
    *  routes it through the unified `PageLayout` `TitleBlock`): then only the
@@ -61,7 +49,7 @@ export interface DevSectionViewProps {
   showHeading?: boolean;
 }
 
-export function DevSectionView({ sectionKey, hero, preControls, children, showHeading = true }: DevSectionViewProps) {
+export function DevSectionView({ sectionKey, preControls, children, showHeading = true }: DevSectionViewProps) {
   const section = OPENFRAME_DEV_SECTIONS[sectionKey];
   const router = useRouter();
   const pathname = usePathname();
@@ -124,31 +112,13 @@ export function DevSectionView({ sectionKey, hero, preControls, children, showHe
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
-  // The list reports where its records are mirrored from; the row states it right under the section's title (the
-  // page's title when this view shows no heading of its own), the place every synced page states it.
+  // The list reports where its records are mirrored from; the line states it at the end of the section's heading row
+  // (under the page's title when this view shows no heading of its own).
   return (
     <PageDataSyncProvider>
       <div className="flex w-full flex-col gap-10">
         {showHeading ? (
-          <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-            {hero ? (
-              <div className="space-y-4">
-                <h1 className="flex items-center gap-3 tracking-[-1.12px] text-ods-text-primary text-h1">
-                  {hero.icon}
-                  {hero.title ?? section.hero.title}
-                </h1>
-                <p className="max-w-3xl text-ods-text-secondary text-h4">{hero.description}</p>
-              </div>
-            ) : (
-              <div className="flex w-full items-center justify-between">
-                <h2 className="font-['Azeret_Mono'] text-[32px] font-semibold leading-[40px] tracking-[-0.64px] text-ods-text-primary content-md:text-[40px] content-md:leading-[48px] content-md:tracking-[-0.8px] content-lg:text-[48px] content-lg:leading-[56px] content-lg:tracking-[-0.96px]">
-                  {section.hero.title}
-                  <span className="text-ods-accent">:</span>
-                </h2>
-              </div>
-            )}
-            <PageDataSyncRow />
-          </div>
+          <SectionHeading title={section.hero.title} punctuation=":" action={<PageDataSyncRow inline />} />
         ) : (
           <PageDataSyncRow />
         )}

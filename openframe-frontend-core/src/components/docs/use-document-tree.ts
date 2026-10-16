@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import type { DataSync } from '../../types/data-sync';
+import { type DataSync, isDataSyncSource } from '../../types/data-sync';
 import type { DocNode, DocContent, DocumentType } from '../../types/doc-source';
 import { apiErrorMessage } from '../../utils/common';
 import {
@@ -187,7 +187,7 @@ function toDocContent(value: unknown, requestedPath: string): DocContent | null 
 function toDataSync(value: unknown): DataSync | undefined {
   if (!isRecord(value)) return undefined;
   const source = readString(value, 'source');
-  if (!source) return undefined;
+  if (!isDataSyncSource(source)) return undefined;
   return { source, syncedAt: readString(value, 'syncedAt') ?? null };
 }
 

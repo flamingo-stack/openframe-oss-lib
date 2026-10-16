@@ -32,11 +32,14 @@ export function PageDataSyncProvider({ children }: { children: ReactNode }) {
   return <PageDataSyncContext.Provider value={value}>{children}</PageDataSyncContext.Provider>;
 }
 
-/** The page's sync row: what a list below reported, its skeleton while it loads, nothing when it states none. */
-export function PageDataSyncRow() {
+/**
+ * The page's sync row: what a list below reported, its skeleton while it loads, nothing when it states none. `inline`
+ * when it sits in a heading's action slot (`SectionHeading`), which places it itself.
+ */
+export function PageDataSyncRow({ inline = false }: { inline?: boolean }) {
   const context = useContext(PageDataSyncContext);
   if (!context) return null;
-  return <DataSyncLine sync={context.state.sync} loading={context.state.loading} />;
+  return <DataSyncLine sync={context.state.sync} loading={context.state.loading} inline={inline} />;
 }
 
 /**

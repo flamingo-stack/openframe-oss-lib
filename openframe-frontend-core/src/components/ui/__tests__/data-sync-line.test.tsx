@@ -9,9 +9,9 @@ describe('DataSyncLine', () => {
     expect(screen.getByText(/^Last updated: /)).not.toHaveTextContent('Never');
   });
 
-  it('shows an unknown source by its name, and a mirror that never ran as never', () => {
-    render(<DataSyncLine sync={{ source: 'Linear', syncedAt: null }} />);
-    expect(screen.getByText('Data synced from Linear')).toBeInTheDocument();
+  it('says a mirror that never ran never synced', () => {
+    render(<DataSyncLine sync={{ source: 'github', syncedAt: null }} />);
+    expect(screen.getByText('Data synced from GitHub')).toBeInTheDocument();
     expect(screen.getByText('Last updated: Never')).toBeInTheDocument();
   });
 
