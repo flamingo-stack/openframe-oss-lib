@@ -22,7 +22,13 @@ export interface ApprovalRequestNotificationTileProps {
   notification: Notification;
   onApprove: (approvalRequestId: string) => void | Promise<void>;
   onReject: (approvalRequestId: string) => void | Promise<void>;
-  onComplete: (id: string) => void;
+  /**
+   * Marks the notification complete: the tile's ✓, and after a successful
+   * Approve / Reject. Omit it for a card with no notification behind it (built
+   * from a chat's or a ticket's pending approval): no ✓ is drawn, and a
+   * decision completes nothing.
+   */
+  onComplete?: (id: string) => void;
   onSettle?: (id: string) => void;
   liveDurationMs?: number;
   defaultExpanded?: boolean;
@@ -100,7 +106,7 @@ export function ApprovalRequestNotificationTile({
     }
     // Outside the try: a throwing consumer callback must not roll back a request
     // that already succeeded server-side.
-    onComplete(notification.id);
+    onComplete?.(notification.id);
   };
 
   return (

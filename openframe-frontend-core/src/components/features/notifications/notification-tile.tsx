@@ -45,7 +45,12 @@ const headerControlClass =
 export interface NotificationTileProps {
   notification: Notification;
   liveDurationMs?: number;
-  onComplete: (id: string) => void;
+  /**
+   * The ✓ "Mark notification complete" control once the tile is no longer
+   * live. Omit it for a tile with no notification behind it (an approval card
+   * built from a chat or a ticket): no ✓ is drawn.
+   */
+  onComplete?: (id: string) => void;
   onSettle?: (id: string) => void;
   className?: string;
   /** Action row rendered below the body inside the padded section (e.g. approval buttons). */
@@ -191,7 +196,8 @@ export function NotificationTile({
             </time>
           ) : null}
 
-          {!lockscreen && (
+          {/* Nothing to dismiss and nothing to complete: no slot at all. */}
+          {!lockscreen && (isLive || onComplete) && (
             <>
               {/* Live X and settled check swap in the same 16px slot; the inactive
               one is removed from the a11y tree and disabled, not just faded. */}
@@ -203,12 +209,16 @@ export function NotificationTile({
                     icon: <XmarkIcon size={16} />,
                     onClick: () => onSettle?.(id),
                   },
-                  {
-                    active: !isLive,
-                    label: 'Mark notification complete',
-                    icon: <CheckCircleIcon size={16} />,
-                    onClick: () => onComplete(id),
-                  },
+                  ...(onComplete
+                    ? [
+                        {
+                          active: !isLive,
+                          label: 'Mark notification complete',
+                          icon: <CheckCircleIcon size={16} />,
+                          onClick: () => onComplete(id),
+                        },
+                      ]
+                    : []),
                 ].map(({ active, label, icon: actionIcon, onClick }) => (
                   <button
                     key={label}
