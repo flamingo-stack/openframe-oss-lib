@@ -310,7 +310,7 @@ describe('EmbeddableChat renameMode="inline"', () => {
     renderChat(createState({ renameDialog }), { threadContainer: page, renameMode: 'inline' });
     openMenu('Chat actions');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Rename Chat' }));
-    return { field: screen.getByRole('textbox', { name: 'Chat name' }) as HTMLInputElement, renameDialog };
+    return { field: screen.getByRole<HTMLInputElement>('textbox', { name: 'Chat name' }), renameDialog };
   }
 
   it('turns the title into a field with its text selected', () => {

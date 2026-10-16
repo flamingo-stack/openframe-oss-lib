@@ -7,13 +7,18 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-const ticketLive = vi.hoisted(() => ({
-  value: { authed: true, unreadTotal: 3, nextUnreadTicketId: 't-9' } as {
-    authed: boolean;
-    unreadTotal: number;
-    nextUnreadTicketId: string | null;
-  } | null,
-}));
+/** What `TicketAlertsButton` reads from the live ticket stream. */
+interface TicketLiveStub {
+  authed: boolean;
+  unreadTotal: number;
+  nextUnreadTicketId: string | null;
+}
+const ticketLive = vi.hoisted(() => {
+  const state: { value: TicketLiveStub | null } = {
+    value: { authed: true, unreadTotal: 3, nextUnreadTicketId: 't-9' },
+  };
+  return state;
+});
 vi.mock('../../tickets/ticket-live-provider', () => ({ useOptionalTicketLive: () => ticketLive.value }));
 
 import { NotificationsProvider } from '../../features/notifications/notifications-context';
