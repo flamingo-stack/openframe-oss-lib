@@ -39,7 +39,7 @@ public class NodeEntityFinder {
                 .orElseThrow(() -> new MissingDgsEntityFetcherException(name));
     }
 
-    // The @key field is the type's raw id property: machineId for a Machine (its id differs per subgraph), id otherwise.
+    // The @key field is the type's raw id property (machineId for a Machine, whose id differs per subgraph; mostly id).
     private static Optional<String> keyOf(NodeType type, Map<String, Object> representation) {
         String keyField = type.getRawIdProperty();
         Object key = representation.get(keyField);
