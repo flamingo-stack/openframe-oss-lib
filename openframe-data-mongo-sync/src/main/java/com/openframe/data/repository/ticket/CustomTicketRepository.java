@@ -38,6 +38,14 @@ public interface CustomTicketRepository {
 
     void updateTitle(String ticketId, String title);
 
+    long updateAssignedName(String assignedTo, String assignedName);
+
+    long updateResolvedByName(String resolvedById, String resolvedByName);
+
+    long updateOrganizationName(String organizationId, String organizationName);
+
+    long updateDeviceHostname(String deviceId, String deviceHostname);
+
     /**
      * Stamps the ticket's last activity and returns the stamped document, so a caller that has to
      * broadcast the change gets {@code statusId} and {@code awaitingClientSince} from the same round

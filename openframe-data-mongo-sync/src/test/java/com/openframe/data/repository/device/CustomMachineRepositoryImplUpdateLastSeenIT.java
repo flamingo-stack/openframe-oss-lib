@@ -105,4 +105,14 @@ class CustomMachineRepositoryImplUpdateLastSeenIT extends BaseMongoIntegrationTe
         assertThat(reload(OTHER_MACHINE).getLastSeen()).isEqualTo(SEEN);
         assertThat(reload(OTHER_MACHINE).getStatus()).isEqualTo(DeviceStatus.OFFLINE);
     }
+
+    @Test
+    @DisplayName("T15: updateLastSeen leaves the version unchanged, so a user edit never conflicts with a heartbeat")
+    void keepsVersion() {
+        Long savedVersion = save(MACHINE, DeviceStatus.ONLINE, SEEN).getVersion();
+
+        repository.updateLastSeen(MACHINE, LATER);
+
+        assertThat(reload(MACHINE).getVersion()).isEqualTo(savedVersion);
+    }
 }

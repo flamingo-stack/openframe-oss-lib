@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.CompoundIndexes;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -66,8 +67,8 @@ public class Ticket implements TenantScoped {
     private String resolvedById;
     private String resolvedByName;
     private Integer reopenCount;
-    @Builder.Default
-    private Long version = 0L;
+    @Version
+    private Long version;
 
     public Instant effectiveLastActivityAt() {
         return lastActivityAt != null ? lastActivityAt : createdAt;

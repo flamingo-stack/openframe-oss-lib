@@ -54,6 +54,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_DEVICE_HOSTNAME = "deviceHostname";
     private static final String FIELD_ORGANIZATION_NAME = "organizationName";
     private static final String FIELD_ASSIGNED_NAME = "assignedName";
+    private static final String FIELD_RESOLVED_BY_ID = "resolvedById";
+    private static final String FIELD_RESOLVED_BY_NAME = "resolvedByName";
     private static final String FIELD_CREATED_AT = "createdAt";
     private static final String FIELD_UPDATED_AT = "updatedAt";
     private static final String FIELD_RESOLVED_AT = "resolvedAt";
@@ -439,6 +441,34 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 .set(FIELD_UPDATED_AT, Instant.now());
 
         mongoTemplate.updateFirst(query, update, Ticket.class);
+    }
+
+    @Override
+    public long updateAssignedName(String assignedTo, String assignedName) {
+        return updateCopiedField(FIELD_ASSIGNED_TO, assignedTo, FIELD_ASSIGNED_NAME, assignedName);
+    }
+
+    @Override
+    public long updateResolvedByName(String resolvedById, String resolvedByName) {
+        return updateCopiedField(FIELD_RESOLVED_BY_ID, resolvedById, FIELD_RESOLVED_BY_NAME, resolvedByName);
+    }
+
+    @Override
+    public long updateOrganizationName(String organizationId, String organizationName) {
+        return updateCopiedField(FIELD_ORGANIZATION_ID, organizationId, FIELD_ORGANIZATION_NAME, organizationName);
+    }
+
+    @Override
+    public long updateDeviceHostname(String deviceId, String deviceHostname) {
+        return updateCopiedField(FIELD_DEVICE_ID, deviceId, FIELD_DEVICE_HOSTNAME, deviceHostname);
+    }
+
+    // Passing Ticket.class makes Spring add $inc on @Version, so a stale copy of a renamed ticket fails to save.
+    private long updateCopiedField(String sourceField, String sourceId, String copyField, String value) {
+        Criteria outdatedCopies = Criteria.where(sourceField).is(sourceId).and(copyField).ne(value);
+        Query query = new Query(outdatedCopies);
+        Update update = new Update().set(copyField, value);
+        return mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
     }
 
     /**
