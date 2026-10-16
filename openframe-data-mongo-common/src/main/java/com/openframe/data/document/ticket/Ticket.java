@@ -66,6 +66,8 @@ public class Ticket implements TenantScoped {
     private String resolvedById;
     private String resolvedByName;
     private Integer reopenCount;
+    @Builder.Default
+    private Long version = 0L;
 
     public Instant effectiveLastActivityAt() {
         return lastActivityAt != null ? lastActivityAt : createdAt;
