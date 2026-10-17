@@ -5,12 +5,12 @@ import { Autocomplete } from './autocomplete';
 import { Button } from './button';
 import { ColorSwatch } from './color-swatch';
 import { ModalV2, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
-import { SquareAvatar } from './square-avatar';
 import {
   renderTicketAssigneeOption,
   renderTicketStatusOption,
   type TakeOverAssigneeOption,
   type TakeOverStatusOption,
+  withTicketAssigneeAvatars,
 } from './take-over-ticket-modal';
 import { Textarea } from './textarea';
 
@@ -44,6 +44,22 @@ export interface ReopenTicketModalProps {
   initialAssigneeId?: string | null;
   /** Confirm in-flight: buttons lock and the modal refuses to close. */
   isPending?: boolean;
+  /**
+   * Server search for the Assigned picker. When set, `assigneeOptions` is the
+   * server's answer to the query reported here and is not filtered locally:
+   * called with the raw query on every keystroke (debounce in the caller) and
+   * with `''` when the picker resets (a pick, closing it, the clear button).
+   * While `assigneesLoading`, the previous rows stay listed, and the picked
+   * assignee keeps their name and avatar after leaving `assigneeOptions`.
+   */
+  onAssigneeSearchChange?: (query: string) => void;
+  /**
+   * The pre-selected assignee as an option, for when `assigneeOptions` does
+   * not include them (a server search's first page) — the field would read
+   * the raw id otherwise. Only renders the selection; `initialAssigneeId`
+   * still decides it.
+   */
+  initialAssigneeOption?: TakeOverAssigneeOption;
   onConfirm: (selection: ReopenTicketSelection) => void;
 }
 
@@ -69,6 +85,8 @@ export function ReopenTicketModal({
   initialAssigneeId,
   isPending = false,
   onConfirm,
+  onAssigneeSearchChange,
+  initialAssigneeOption,
 }: ReopenTicketModalProps) {
   const [statusId, setStatusId] = useState<string | null>(initialStatusId ?? null);
   const [assigneeId, setAssigneeId] = useState<string | null>(initialAssigneeId ?? null);
@@ -95,7 +113,6 @@ export function ReopenTicketModal({
 
   const selectedStatusId = statusId ?? statusOptions[0]?.value ?? null;
   const selectedStatus = statusOptions.find(o => o.value === selectedStatusId);
-  const selectedAssignee = assigneeOptions.find(o => o.value === assigneeId);
 
   const handleConfirm = () => {
     if (!selectedStatusId || !assigneeId || isPending) return;
@@ -133,22 +150,13 @@ export function ReopenTicketModal({
         <div className="min-w-0 flex-1">
           <Autocomplete
             label="Assigned"
-            options={assigneeOptions}
+            options={withTicketAssigneeAvatars(assigneeOptions)}
             value={assigneeId}
             onChange={setAssigneeId}
             placeholder="Select Technician"
             loading={assigneesLoading}
-            startAdornment={
-              selectedAssignee ? (
-                <SquareAvatar
-                  src={selectedAssignee.imageUrl}
-                  alt={selectedAssignee.label}
-                  fallback={selectedAssignee.label}
-                  size="sm"
-                  variant="round"
-                />
-              ) : undefined
-            }
+            onSearchChange={onAssigneeSearchChange}
+            selectedOptions={initialAssigneeOption ? withTicketAssigneeAvatars([initialAssigneeOption]) : undefined}
             renderOption={renderTicketAssigneeOption}
           />
         </div>

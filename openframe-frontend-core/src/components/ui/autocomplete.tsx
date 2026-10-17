@@ -26,6 +26,7 @@ import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { FieldWrapper } from './field-wrapper';
 import { HiddenTagsPopup } from './hidden-tags-popup';
+import { useRememberedSelection, useSettledOptions } from './server-search-options';
 import { Tag } from './tag';
 import { TruncateText } from './truncate-text';
 
@@ -110,6 +111,30 @@ interface AutocompleteBaseProps<T = string> {
   isDeletingOption?: boolean;
   /** When true, disables built-in client-side filtering (useful when options are filtered server-side via onInputChange) */
   disableClientFilter?: boolean;
+  /**
+   * Server search. When set, `options` is the server's answer to the query
+   * reported here, not a list to filter:
+   *
+   * - called with the raw query on every keystroke (debounce in the caller),
+   *   and with `''` whenever the field resets — a pick, closing the dropdown,
+   *   Escape, the clear button — so the caller can go back to its unfiltered
+   *   first page. Repeats are not reported.
+   * - nothing is filtered locally (`filterOptions` / `disableClientFilter` are
+   *   moot).
+   * - while `loading`, the options stay listed (the field's spinner still
+   *   turns), and an `options` emptied mid-load falls back to the last list
+   *   that settled; `loadingText` shows only with nothing to list yet.
+   * - a selected value missing from the current answer keeps the label and
+   *   icon of the last option seen for it (see also `selectedOptions`).
+   */
+  onSearchChange?: (query: string) => void;
+  /**
+   * Options for the current value(s) that `options` may not include — e.g. a
+   * pre-selected value the server's first page never returned. Consulted only
+   * to render the selection (field label, icon, tags) when `options` has no
+   * match; never listed.
+   */
+  selectedOptions?: AutocompleteOption<T>[];
   /** Whether to show the chevron icon. Default true */
   showChevron?: boolean;
   /** Whether to clear the input when the dropdown opens (single mode only). Default true */
@@ -185,9 +210,12 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     onDeleteOption,
     isDeletingOption = false,
     disableClientFilter = false,
+    onSearchChange,
+    selectedOptions: selectedOptionsProp,
     showChevron = true,
     clearOnOpen = true,
   } = props;
+  const serverSearch = onSearchChange !== undefined;
 
   const multiple = props.multiple ?? false;
   const placeholder = props.placeholder ?? (multiple ? 'Add More...' : 'Select...');
@@ -213,11 +241,26 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
   const isInputControlled = inputValueProp !== undefined;
   const inputValue = isInputControlled ? inputValueProp : internalInputValue;
 
+  // The last query handed to `onSearchChange`: every close resets the field,
+  // and a reset of a field that was never searched is not news to the caller.
+  // Read and written from event handlers only.
+  const reportedQueryRef = useRef('');
+  const reportQuery = (value: string, reason: AutocompleteInputChangeReason) => {
+    if (!onSearchChange) return;
+    // A reset or clear is never a query, even when it refills the field with
+    // the selected label (`clearOnOpen={false}`).
+    const query = reason === 'input' ? value : '';
+    if (query === reportedQueryRef.current) return;
+    reportedQueryRef.current = query;
+    onSearchChange(query);
+  };
+
   const updateInputValue = (value: string, reason: AutocompleteInputChangeReason) => {
     if (!isInputControlled) {
       setInternalInputValue(value);
     }
     onInputChange?.(value, reason);
+    reportQuery(value, reason);
   };
 
   const [isOpen, setIsOpen] = useState(false);
@@ -231,10 +274,20 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
   // Combine refs
   useImperativeHandle(ref, () => containerRef.current as HTMLDivElement);
 
+  // Server search: what to list (steady between keystrokes) and the last
+  // option seen per selected value. Both pass through untouched otherwise.
+  const listedOptions = useSettledOptions(options, loading, serverSearch);
+  const rememberedSelection = useRememberedSelection(listedOptions, valueArray, serverSearch);
+
   // Get selected options
   const selectedOptions = useMemo(() => {
-    return valueArray.map(v => options.find(opt => opt.value === v) ?? { label: String(v), value: v });
-  }, [valueArray, options]);
+    return valueArray.map(
+      v =>
+        listedOptions.find(opt => opt.value === v) ??
+        selectedOptionsProp?.find(opt => opt.value === v) ??
+        rememberedSelection.get(v) ?? { label: String(v), value: v },
+    );
+  }, [valueArray, listedOptions, selectedOptionsProp, rememberedSelection]);
 
   // Single mode: the currently selected option
   const selectedOption = !multiple && selectedOptions.length > 0 ? selectedOptions[0] : null;
@@ -303,6 +356,11 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
   // Filter options based on inputValue
   const filteredOptions = useMemo(() => {
+    // The server already filtered: its answer is the list.
+    if (serverSearch) {
+      return listedOptions;
+    }
+
     if (disableClientFilter) {
       return options;
     }
@@ -317,7 +375,11 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
     const lowerInput = inputValue.toLowerCase();
     return options.filter(opt => opt.label.toLowerCase().includes(lowerInput));
-  }, [options, inputValue, filterOptions, disableClientFilter]);
+  }, [options, listedOptions, serverSearch, inputValue, filterOptions, disableClientFilter]);
+
+  // The list gives way to `loadingText` while loading — except under server
+  // search with something to show, where the rows stay until the answer lands.
+  const showLoadingText = loading && (!serverSearch || filteredOptions.length === 0);
 
   // Show "+ Create" option when creatable is on, user typed something, and nothing matched
   const showCreateOption = creatable && inputValue.trim().length > 0 && filteredOptions.length === 0;
@@ -401,6 +463,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
       setInternalInputValue('');
     }
     onInputChange?.('', 'clear');
+    reportQuery('', 'clear');
     setIsOpen(false);
   };
 
@@ -646,7 +709,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
         <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
           <ScrollAreaPrimitive.Viewport className="max-h-[240px] min-h-0 w-full [&>div]:!block">
             <div role="listbox">
-              {loading ? (
+              {showLoadingText ? (
                 <div className="px-3 py-2 text-ods-text-secondary text-h6">{loadingText}</div>
               ) : filteredOptions.length === 0 ? (
                 showCreateOption ? (
