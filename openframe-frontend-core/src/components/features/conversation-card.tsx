@@ -10,7 +10,7 @@ import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Button } from '../ui/button/button';
+import { BUTTON_ICON_SM_SIZE, Button } from '../ui/button/button';
 import { Tag } from '../ui/tag';
 
 /** The card's frame, its parts' blocks and its footer row: ONE string each, read by the card and its skeleton. */
@@ -130,11 +130,9 @@ export function ConversationCard({
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
         <p
           id={requestId}
-          className={cn(
-            'm-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3',
-            // Clears the corner mark: its width plus a gap.
-            selection && 'pr-[calc(2rem+var(--spacing-system-xsf))]',
-          )}
+          className="m-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3"
+          // Clears the corner mark: its width plus a gap.
+          style={selection ? { paddingRight: `calc(${BUTTON_ICON_SM_SIZE} + var(--spacing-system-xsf))` } : undefined}
           title={request}
         >
           &ldquo;{request}&rdquo;
@@ -199,8 +197,11 @@ export function ConversationCardSkeleton({
   avatarPx,
   context = false,
   footer = false,
+  label = 'Loading a conversation',
   className,
 }: {
+  /** What a screen reader hears while it loads (several cards in a row each say it). */
+  label?: string;
   /** The speakers' avatar size, as the host draws it. */
   avatarPx: number;
   /** The loaded card has a context part ("Today"). */
@@ -210,7 +211,7 @@ export function ConversationCardSkeleton({
   className?: string;
 }) {
   return (
-    <LoadingRegion label="Loading" className={cn(CARD_FRAME_CLASS, className)}>
+    <LoadingRegion label={label} className={cn(CARD_FRAME_CLASS, className)}>
       <TurnSkeleton avatarPx={avatarPx}>
         <TextLineSkeleton lines={2} type="h3" />
       </TurnSkeleton>

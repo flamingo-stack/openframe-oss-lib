@@ -48,8 +48,8 @@ describe('FaqAccordionSkeleton', () => {
 describe('ConversationCardSkeleton', () => {
   it('renders with or without its optional parts and announces itself as loading', () => {
     const { rerender } = render(<ConversationCardSkeleton avatarPx={32} />);
-    expect(screen.getByText('Loading')).toBeInTheDocument();
+    expect(screen.getByText('Loading a conversation')).toBeInTheDocument();
     rerender(<ConversationCardSkeleton avatarPx={32} context footer />);
-    expect(screen.getByText('Loading')).toBeInTheDocument();
+    expect(screen.getByText('Loading a conversation')).toBeInTheDocument();
   });
 });

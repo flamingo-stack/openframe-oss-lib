@@ -17,6 +17,7 @@ import {
   emailDomainDenied,
   type DeniedEmailDomains,
   MULTI_VALUE_SEPARATOR,
+  bookingFormAsks,
   normalizeFormFields,
   splitMultiValue,
   type BuiltInBookingField,
@@ -562,9 +563,7 @@ export function BookingForm({
   // `optionalFields` narrows the optional ones to the questions this form asks.
   const supportedFields = useMemo(
     () =>
-      normalizeFormFields(formFields).filter(
-        field => field.required || !optionalFields || optionalFields.includes(field.name),
-      ),
+      normalizeFormFields(formFields).filter(field => bookingFormAsks(field, optionalFields)),
     [formFields, optionalFields],
   );
   // The DEFERRED schema in both flows: it is the wider of the two, and a strict

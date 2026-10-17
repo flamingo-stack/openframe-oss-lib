@@ -13,6 +13,9 @@ import {
 } from './button-styles';
 
 // Default layout: centered single content area, padding/gap on the button itself.
+/** The `icon-sm` button's size (its `h-8 w-8`), for a layout that must leave room for one. */
+export const BUTTON_ICON_SM_SIZE = '2rem';
+
 const buttonVariants = cva(
   [
     'relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]',
@@ -60,6 +63,7 @@ const buttonVariants = cva(
         // ≥ the 24px WCAG 2.5.8 target floor). For icon actions that read as
         // metadata rather than CTAs — author-page social rows, share rows.
         // Pair with variant="transparent" for the ghost treatment.
+        // `BUTTON_ICON_SM_SIZE` states the same 32px for a layout that must clear one.
         'icon-sm': 'h-8 w-8 p-[var(--spacing-system-xxs)] [&_svg]:h-4 [&_svg]:w-4',
         // 20px inline glyph for affordances that sit INSIDE a line of text —
         // an info hint beside a badge, a copy glyph after an id. `icon-sm`'s
