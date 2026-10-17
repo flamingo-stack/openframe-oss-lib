@@ -127,7 +127,9 @@ export function TextLineSkeleton({
 }
 
 /**
- * Text skeleton variants for consistent typography loading
+ * Text skeleton variants at fixed heights. A skeleton that must take exactly
+ * the space of the text it stands for (a card whose loaded and loading boxes
+ * are one size) is `TextLineSkeleton`, sized by the text's own type step.
  */
 export const TextSkeleton = {
   /**

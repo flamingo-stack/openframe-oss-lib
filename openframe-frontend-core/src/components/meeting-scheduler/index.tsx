@@ -159,13 +159,12 @@ export interface HubSpotMeetingSchedulerProps {
    * The DATA form of the same override: `fieldRows`, a host consent row and
    * per-field display copy, spread onto whichever form renders. Serialisable,
    * so a Server Component can pass it across the RSC boundary where a component
-   * cannot. `initialValues` pre-fills answers the page already knows (a
-   * choice made higher up the page); the form reads them when it mounts, and
-   * what the visitor typed before a back edge wins over them.
+   * cannot. `answers` are what the page took outside the form (a choice made
+   * higher up the page), written into questions the visitor has not answered.
    */
   detailsFormProps?: Pick<
     BookingFormProps,
-    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'initialValues' | 'answers'
+    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'answers'
   >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
@@ -1097,7 +1096,7 @@ export function HubSpotMeetingScheduler({
                 deferSlot={detailsFirst}
                 submitLabel={preset.submitLabel}
                 footerNote={preset.footerNote}
-                initialValues={(detailsFirst ? stash?.payload : undefined) ?? detailsFormProps?.initialValues}
+                initialValues={detailsFirst ? stash?.payload : undefined}
                 isSubmitting={isSubmitting}
                 onSubmit={detailsFirst ? stashDetails : handleSubmit}
                 honeypotInputProps={honeypotInputProps}

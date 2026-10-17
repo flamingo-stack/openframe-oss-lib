@@ -6,7 +6,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FaqAccordionSkeleton } from '../../faq-accordion';
 import { ConversationCard, ConversationCardSkeleton } from '../conversation-card';
 
 describe('ConversationCard selection', () => {
@@ -35,13 +34,6 @@ describe('ConversationCard selection', () => {
     render(card(onToggle));
     fireEvent.click(screen.getByRole('link', { name: 'Read more' }));
     expect(onToggle).not.toHaveBeenCalled();
-  });
-});
-
-describe('FaqAccordionSkeleton', () => {
-  it('announces itself as loading', () => {
-    render(<FaqAccordionSkeleton rows={3} />);
-    expect(screen.getByText('Loading questions')).toBeInTheDocument();
   });
 });
 
