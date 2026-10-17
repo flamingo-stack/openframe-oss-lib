@@ -198,6 +198,13 @@ export default defineConfig([
       // every `[id]` in the container and asserts the set size, which is the only
       // formulation of that claim.
       'src/components/ui/__tests__/store-badges.test.tsx',
+      // The sidebar's room knobs: what is under test is the layout of two
+      // role-less boxes — the section's wrapper (who scrolls it: classes, the
+      // inline min-height, `data-section-scroll`) and the tablet push slot (its
+      // width) — so the test walks up from the section's text and across from
+      // the <aside>. jsdom has no layout either, so the size mocks have to tell
+      // the sidebar's body and tree apart by what they contain.
+      'src/components/navigation/__tests__/navigation-sidebar-section-room.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

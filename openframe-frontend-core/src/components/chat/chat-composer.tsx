@@ -2,7 +2,8 @@
 
 import { type ComponentProps, type ReactNode, type Ref, useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
-import { BoxArchiveIcon } from '../icons-v2-generated';
+import { BoxArchiveIcon, Ellipsis01Icon } from '../icons-v2-generated';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { ChatAttachmentAddButton } from './chat-attachment-bar';
 import { ChatFooter } from './chat-container';
 import { ChatContextMemoryBar } from './chat-context-memory-bar';
@@ -38,8 +39,17 @@ export interface ChatComposerProps {
   attachmentsCount?: number;
   onAddFiles?: (files: FileList | File[]) => void;
   attachmentsDisabled?: boolean;
-  /** Model + usage row props, forwarded to `<ModelDisplay>`. */
-  model: ModelDisplayProps;
+  /** Model + usage row props, forwarded to `<ModelDisplay>`. Omitted → no
+   *  model row (e.g. a composer docked on a home page, before any chat). */
+  model?: ModelDisplayProps;
+  /** The composer's own ⋯ menu, at the end of the input row before Send
+   *  (e.g. "Compact Chat Memory"). Empty or omitted → no menu. Not shown on an
+   *  archived chat (there is no input), inert while `lock` is set. */
+  menuItems?: ActionsMenuItem[];
+  /** Controls at the end of the row under the input, after the model and its
+   *  usage (e.g. "Compact chat memory"). Draws that row on its own if there is
+   *  no model. */
+  footerActions?: ReactNode;
 
   // ─── Entity-context picker (Figma 31:28708 / 1:5699) ──────────────────────
   // When `contextPicker` is set the composer renders the `+` "Assign Item"
@@ -77,6 +87,10 @@ export interface ChatComposerProps {
   /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
    *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */
   previewText?: string;
+  /** Clear the bottom safe-area inset (the iOS home bar) under the composer.
+   *  Default `true`. `false` for a composer docked inside a layout that already
+   *  owns that inset (a native shell's root), where it would be doubled. */
+  safeAreaBottom?: boolean;
 }
 
 /**
@@ -116,6 +130,9 @@ export function ChatComposer({
   onMentionQueryChange,
   onValueChange,
   previewText,
+  menuItems,
+  footerActions,
+  safeAreaBottom = true,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
   const locked = lock != null;
@@ -133,6 +150,35 @@ export function ChatComposer({
     return map;
   }, [entityTypes]);
   const resolveContextIcon = useCallback((item: ChatContextItem) => iconByType.get(item.type), [iconByType]);
+
+  const menu =
+    menuItems && menuItems.length > 0 ? (
+      <ActionsMenuDropdown
+        triggerAriaLabel="Composer actions"
+        side="top"
+        align="end"
+        onCloseAutoFocus={e => e.preventDefault()}
+        groups={[{ items: menuItems }]}
+        customTrigger={
+          <button
+            type="button"
+            aria-label="Composer actions"
+            disabled={locked}
+            className={cn(
+              'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
+              'cursor-pointer hover:text-ods-text-primary focus-visible:text-ods-accent focus-visible:outline-none',
+              'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
+            )}
+          >
+            <Ellipsis01Icon size={20} />
+          </button>
+        }
+      />
+    ) : undefined;
+  // The row under the input: the legacy attachment `+` and the model. Neither →
+  // no row at all, rather than an empty one under the input.
+  const showLegacyAttach = !contextEnabled && showAttachmentButton && !!onAddFiles;
+  const showFooterRow = showLegacyAttach || !!model || !!footerActions;
 
   // The input is identical in both layouts; only `hideBorder` (context mode
   // lets the outer card own the chrome) and the `+` adornment differ.
@@ -156,6 +202,7 @@ export function ChatComposer({
       onMentionQueryChange={contextEnabled ? onMentionQueryChange : undefined}
       onValueChange={contextEnabled ? onValueChange : undefined}
       hideBorder={contextEnabled}
+      endIcon={menu}
       // `+` lives INSIDE the input (start adornment, Figma 31:28275) and opens
       // the single context dropdown directly. The picker is passed as the
       // button's `dropdown` so it anchors to the `+`, not the input row.
@@ -187,10 +234,11 @@ export function ChatComposer({
     <div
       className="flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)]"
       // Tight `xxs` bottom padding (the model/usage row already sits just below
-      // the input); `max(…, safe-area-inset)` still clears the iOS home bar.
-      style={{
-        paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))',
-      }}
+      // the input); `max(…, safe-area-inset)` still clears the iOS home bar —
+      // unless the host's layout already does (`safeAreaBottom={false}`).
+      style={
+        safeAreaBottom ? { paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))' } : undefined
+      }
     >
       <div>
         <ChatFooter className="!p-0" fullWidth>
@@ -244,21 +292,22 @@ export function ChatComposer({
         </ChatFooter>
       </div>
 
-      <div className="flex w-full items-center gap-2">
-        {/* Legacy (Guide-mode, no context picker) inline attachment `+`. With the
-            context picker on, uploads live in the in-input `+` menu instead. */}
-        {!contextEnabled && showAttachmentButton && onAddFiles && (
-          <ChatAttachmentAddButton
-            attachmentsEnabled
-            attachmentsCount={attachmentsCount}
-            onAddFiles={onAddFiles}
-            disabled={attachmentsDisabled || locked}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <ModelDisplay {...model} />
+      {showFooterRow && (
+        <div className="flex w-full items-center gap-2">
+          {/* Legacy (Guide-mode, no context picker) inline attachment `+`. With the
+              context picker on, uploads live in the in-input `+` menu instead. */}
+          {showLegacyAttach && onAddFiles && (
+            <ChatAttachmentAddButton
+              attachmentsEnabled
+              attachmentsCount={attachmentsCount}
+              onAddFiles={onAddFiles}
+              disabled={attachmentsDisabled || locked}
+            />
+          )}
+          <div className="min-w-0 flex-1">{model && <ModelDisplay {...model} />}</div>
+          {footerActions && <div className="flex shrink-0 items-center">{footerActions}</div>}
         </div>
-      </div>
+      )}
     </div>
   );
 }

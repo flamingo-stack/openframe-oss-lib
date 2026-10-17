@@ -58,6 +58,68 @@ export interface AppLayoutProps {
    * over the content area. Optional; without it the layout is unchanged.
    */
   sidePanel?: AppLayoutSidePanelConfig;
+  /**
+   * A bar docked under the page (the Mingo composer). It sits below the
+   * scrolling `<main>`, outside it, so it stays put while the page scrolls and
+   * the page's scroll area ends above it: nothing is ever hidden under it. It
+   * spans the page column — left of a `sidePanel` — and, on a phone, sits at
+   * the bottom of the screen; the bottom safe-area inset belongs to the layout
+   * root (the host's `className`), not to the dock.
+   *
+   * With it, the page column is an adaptive content area, as with `sidePanel`:
+   * `<main>` and the dock each follow the column's width in their tokens and
+   * `content-md:` / `content-lg:` classes, and `useContentBreakpoint()` answers
+   * from it on both. Pass `null` to keep that (and the slot) while drawing
+   * nothing, e.g. behind a paywall; `undefined` removes it. Either way the page
+   * stays mounted. Optional; without it the layout is unchanged.
+   */
+  composerDock?: ReactNode;
+  /**
+   * Paints the page column — the page and the `composerDock` under it — as one
+   * surface: that surface's ground and the accent corner glow, so a chat page's
+   * background runs under the composer to the bottom of the window (`'mingo'`,
+   * with the dock's `EmbeddableChat` portalling its thread into the page). Takes
+   * effect on a column with a dock or a `contentCorner`. Omitted: the column is
+   * transparent, as before.
+   */
+  pageSurface?: 'mingo';
+  /**
+   * The desktop `AppHeader`. `false` drops it from md up — the sidebar and the
+   * page start at the top of the window — and keeps the phone top bar (burger,
+   * logo, action cells) below md. Decided in CSS, so the first paint is right
+   * at every width. Default `true`.
+   *
+   * Without the header the notifications bell has no place of its own: render
+   * a `NotificationsBellButton variant="floating"` in `contentCorner`. The
+   * `NotificationDrawer` this layout mounts follows the `NotificationsProvider`,
+   * not the header.
+   */
+  desktopHeader?: boolean;
+  /**
+   * Controls pinned to the top-right corner of the page column (the
+   * notifications bell when `desktopHeader` is off). Floats over the page at
+   * the header's layer and does not scroll with it; in-layout drawers cover it.
+   * From md up only — below md it is not displayed, as the phone top bar
+   * carries those controls. Leave room for it in the page's title row.
+   * Optional; without it the layout is unchanged.
+   */
+  contentCorner?: ReactNode;
+  /**
+   * Controlled phone burger menu (below md). With it the host owns whether the
+   * menu is open — e.g. a top-bar cell that opens it on its chat history, or a
+   * navigation started from one of its slots that has to close it. Omitted:
+   * the layout keeps its own state, as before.
+   */
+  mobileMenuOpen?: boolean;
+  /**
+   * Every open / close the layout asks for, controlled or not: the burger
+   * toggle, a nav entry clicked in the menu, an in-layout drawer opening over
+   * it, and — when `sidebarConfig.currentPath` is set — any change of that
+   * location while the menu is open (so a navigation started anywhere, a slot
+   * included, closes it). A host opening it through `mobileMenuOpen` also
+   * closes any open in-layout drawer, as the toggle does.
+   */
+  onMobileMenuOpenChange?: (open: boolean) => void;
 }
 
 export function AppLayout({
@@ -71,23 +133,41 @@ export function AppLayout({
   drawer,
   topBar,
   sidePanel,
+  composerDock,
+  pageSurface,
+  desktopHeader = true,
+  contentCorner,
+  mobileMenuOpen: mobileMenuOpenProp,
+  onMobileMenuOpenChange,
 }: AppLayoutProps) {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuControlled = mobileMenuOpenProp !== undefined;
+  const [uncontrolledMenuOpen, setUncontrolledMenuOpen] = useState(false);
+  const mobileMenuOpen = menuControlled ? mobileMenuOpenProp : uncontrolledMenuOpen;
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
   const [mainElement, setMainElement] = useState<HTMLElement | null>(null);
   const [contentWidth, setContentWidth] = useState<number | null>(null);
 
   const hasSidePanel = sidePanel !== undefined;
+  const hasDock = composerDock !== undefined;
+  const hasCorner = contentCorner !== undefined;
+  // The page column lays out by its own width: something narrows it (the
+  // panel) or shares it with the page (the dock).
+  const adaptive = hasSidePanel || hasDock;
+  // The column needs a box of its own only to stack the dock under <main> and
+  // to anchor the corner; otherwise it is `contents` and <main> stays the row's
+  // flex item exactly as before.
+  const columnIsBox = hasDock || hasCorner;
   const sidePanelState = useAppLayoutSidePanel(sidePanel, drawerContainer);
 
   useIsomorphicLayoutEffect(() => {
-    if (!hasSidePanel || !mainElement) return undefined;
+    if (!adaptive || !mainElement) return undefined;
     const update = () => setContentWidth(mainElement.clientWidth);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(mainElement);
     return () => observer.disconnect();
-  }, [hasSidePanel, mainElement]);
+  }, [adaptive, mainElement]);
+  const contentAreaWidth = adaptive ? contentWidth : null;
 
   // With a side panel the header's Mingo button only exists while the panel
   // cannot dock: it opens the panel over the content and closes it again.
@@ -102,14 +182,26 @@ export function AppLayout({
           mingoAICloseWhenActive: true,
         };
   const contentCovered = sidePanelState?.coversContent === true;
+  const contentOverlapped = sidePanelState?.overlapsContent === true;
 
-  // Mirrors `mobileMenuOpen` so the toggle callback can stay identity-stable.
-  // Refreshed after every commit rather than in the render body: the only
-  // reader is the burger click, which is always past a commit.
+  // Mirrors `mobileMenuOpen` (and the host's control of it) so the callbacks
+  // below can stay identity-stable. Refreshed after every commit rather than in
+  // the render body: the readers are clicks and effects, always past a commit.
   const mobileMenuOpenRef = useRef(mobileMenuOpen);
+  const menuControlledRef = useRef(menuControlled);
+  const onMobileMenuOpenChangeRef = useRef(onMobileMenuOpenChange);
   useEffect(() => {
     mobileMenuOpenRef.current = mobileMenuOpen;
+    menuControlledRef.current = menuControlled;
+    onMobileMenuOpenChangeRef.current = onMobileMenuOpenChange;
   });
+
+  // Every open / close goes through here: the layout's own state when it owns
+  // it, and the host hears of each actual change either way.
+  const setMobileMenuOpen = useCallback((next: boolean) => {
+    if (!menuControlledRef.current) setUncontrolledMenuOpen(next);
+    if (next !== mobileMenuOpenRef.current) onMobileMenuOpenChangeRef.current?.(next);
+  }, []);
 
   const drawerHandlesRef = useRef(new Set<AppLayoutDrawerHandle>());
 
@@ -121,11 +213,33 @@ export function AppLayout({
       for (const handle of drawerHandlesRef.current) handle.close();
     }
     setMobileMenuOpen(opening);
-  }, []);
+  }, [setMobileMenuOpen]);
 
   const handleCloseMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
-  }, []);
+  }, [setMobileMenuOpen]);
+
+  // A host that opens the menu itself gets what the toggle does: no in-layout
+  // drawer left open over it. Before paint, so the two never show together.
+  const menuWasOpenRef = useRef(mobileMenuOpen);
+  useIsomorphicLayoutEffect(() => {
+    const opened = mobileMenuOpen && !menuWasOpenRef.current;
+    menuWasOpenRef.current = mobileMenuOpen;
+    if (opened && menuControlled) {
+      for (const handle of drawerHandlesRef.current) handle.close();
+    }
+  }, [mobileMenuOpen, menuControlled]);
+
+  // A navigation closes the menu wherever it started — a nav entry already
+  // does, a slot (the chat history, an account item) cannot tell the menu.
+  // Only a CHANGE of the location counts, and only with one to watch.
+  const currentPath = sidebarConfig.currentPath;
+  const menuPathRef = useRef(currentPath);
+  useEffect(() => {
+    if (menuPathRef.current === currentPath) return;
+    menuPathRef.current = currentPath;
+    if (mobileMenuOpenRef.current) setMobileMenuOpen(false);
+  }, [currentPath, setMobileMenuOpen]);
 
   const drawerCoordination = useMemo<AppLayoutDrawerCoordination>(
     () => ({
@@ -142,7 +256,7 @@ export function AppLayout({
         return () => drawerHandlesRef.current.delete(handle);
       },
     }),
-    [],
+    [setMobileMenuOpen],
   );
 
   return (
@@ -169,11 +283,14 @@ export function AppLayout({
             <div className="flex flex-1 flex-col overflow-hidden">
               <AppHeader
                 {...resolvedHeaderProps}
+                className={
+                  desktopHeader ? resolvedHeaderProps.className : cn(resolvedHeaderProps.className, 'md:hidden')
+                }
                 isMobileMenuOpen={mobileMenuOpen}
                 onToggleMobileMenu={handleToggleMobileMenu}
                 disabled={disabled}
               />
-              <NotificationDrawer />
+              <NotificationDrawer showClose={!desktopHeader} />
 
               {/* Main + AppLayoutDrawer portal target. `relative` so the drawer
               can absolutely position within just this area (not over
@@ -185,27 +302,60 @@ export function AppLayout({
                 ref={setDrawerContainer}
                 className={cn('relative flex flex-1 overflow-hidden', sidePanel ? 'flex-row' : 'flex-col')}
               >
-                {sidePanel ? (
-                  // `hidden` while the panel covers the area: the page stays
-                  // mounted, it just takes no room.
+                {/* The page column. One element tree whatever the slots: a
+                  slot that comes or goes (the side panel on every cold load
+                  with Mingo v2, the dock behind the paywall) must not change
+                  the element types above the page, or React remounts it. */}
+                <div
+                  data-surface={columnIsBox ? pageSurface : undefined}
+                  className={
+                    columnIsBox
+                      ? cn(
+                          'relative flex min-h-0 min-w-0 flex-1 flex-col',
+                          pageSurface && 'ods-glow-accent-corner bg-ods-bg',
+                          contentCovered && 'hidden',
+                          contentOverlapped && 'isolate',
+                        )
+                      : 'contents'
+                  }
+                >
+                  {hasCorner && (
+                    // z-40: the layer of the sticky header it stands in for —
+                    // over the page's own layers, under in-layout drawers.
+                    // Desktop only: the phone top bar holds these controls.
+                    <div className="absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-40 hidden items-center gap-[var(--spacing-system-xsf)] md:flex">
+                      {contentCorner}
+                    </div>
+                  )}
+                  {/* `hidden` while the panel covers the area: the page stays
+                    mounted, it just takes no room. */}
                   <main
                     ref={setMainElement}
                     className={cn(
-                      'ods-content-area min-w-0 flex-1 overflow-y-auto',
+                      adaptive ? 'ods-content-area min-w-0 flex-1 overflow-y-auto' : 'flex-1 overflow-y-auto',
                       contentCovered && 'hidden',
                       // While the panel is drawn over the page, keep the page's own
                       // z-indexed layers (sticky headers, fixed bars) under it.
-                      sidePanelState?.overlapsContent && 'isolate',
+                      contentOverlapped && 'isolate',
                       mainClassName,
                     )}
                   >
-                    <ContentAreaWidthContext.Provider value={contentWidth}>
-                      <div className="ods-content-scope">{children}</div>
+                    <ContentAreaWidthContext.Provider value={contentAreaWidth}>
+                      {/* `display: contents` either way; it carries the content
+                        tokens only inside an adaptive area. */}
+                      <div className={adaptive ? 'ods-content-scope' : 'contents'}>{children}</div>
                     </ContentAreaWidthContext.Provider>
                   </main>
-                ) : (
-                  <main className={cn('flex-1 overflow-y-auto', mainClassName)}>{children}</main>
-                )}
+                  {hasDock && (
+                    // Its own container + token scope: a container query cannot
+                    // reach from <main> to a sibling. Same column width.
+                    <div className="ods-content-area shrink-0">
+                      <ContentAreaWidthContext.Provider value={contentAreaWidth}>
+                        <div className="ods-content-scope">{composerDock}</div>
+                      </ContentAreaWidthContext.Provider>
+                    </div>
+                  )}
+                </div>
                 {sidePanel && sidePanelState && <AppLayoutSidePanel config={sidePanel} state={sidePanelState} />}
                 {/* `drawer` slot — rendered here so it sits inside the
                 AppLayoutDrawerContainerContext and can portal into this exact

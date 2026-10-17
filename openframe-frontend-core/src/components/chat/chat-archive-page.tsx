@@ -6,6 +6,7 @@ import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
 import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history';
+import { ChatListLoadError } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
 interface ChatArchivePageBaseProps {
@@ -23,6 +24,13 @@ interface ChatArchivePageBaseProps {
   hasMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /** The first page failed with nothing to show: "Couldn’t load your chats"
+   *  (`ChatListLoadError`) instead of the empty state. Ignored while archived
+   *  chats are listed (they stay on screen) and while `isLoading` (a retry's
+   *  skeleton shows). */
+  loadError?: boolean;
+  /** "Try again" under the load error. Without it the error has no button. */
+  onRetry?: () => void;
 }
 
 /** Standalone (default): renders its own back/close header. `onBack` is
@@ -53,7 +61,16 @@ export type ChatArchivePageProps = ChatArchivePageStandaloneProps | ChatArchiveP
  * the list can slot into the split layout's left rail.
  */
 export function ChatArchivePage(props: ChatArchivePageProps) {
-  const { dialogs, onSelectDialog, isLoading = false, isFetching = false, hasMore = false, onLoadMore } = props;
+  const {
+    dialogs,
+    onSelectDialog,
+    isLoading = false,
+    isFetching = false,
+    hasMore = false,
+    onLoadMore,
+    loadError = false,
+    onRetry,
+  } = props;
 
   // A first, uncached load is in flight but the delayed skeleton hasn't
   // appeared yet (the 120ms window). Render nothing rather than flashing
@@ -112,8 +129,14 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
         ) : isLoading ? (
           // First-load skeleton — the SAME grouped/bordered placeholder the
           // active list uses, so the archive loads and lands without a layout
-          // shift or a mismatched flat-list skeleton.
+          // shift or a mismatched flat-list skeleton. Also over a load error
+          // while a retry is loading: the click on "Try again" shows.
           <MingoChatHistorySkeleton />
+        ) : loadError ? (
+          // A failed first page: the wording every Mingo chat list uses, with
+          // the host's retry — never the "No Archived Chats" empty state, which
+          // would claim there is nothing archived.
+          <ChatListLoadError onRetry={onRetry} className="min-h-0 flex-1 justify-center p-[var(--spacing-system-l)]" />
         ) : suppressEmptyStateWhileFetching ? null : (
           // Empty state — mirrors the "Current Chats" rail empty state
           // (Figma 113:60939): centred 24px muted glyph + h4 title + h6 caption.

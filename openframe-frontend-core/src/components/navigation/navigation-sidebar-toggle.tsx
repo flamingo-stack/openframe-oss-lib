@@ -7,17 +7,37 @@ export interface NavigationSidebarToggleProps {
   minimized: boolean;
   showLabel: boolean;
   onToggle: () => void;
+  /**
+   * The grouped variant's footer: a 44px row cell inset like the tree's rows,
+   * with their hover and a 20px chevron on their icons' line, and the label
+   * beside it. Default false: the flat sidebar's 56px row with a 24px chevron.
+   */
+  compact?: boolean;
 }
 
-export function NavigationSidebarToggle({ minimized, showLabel, onToggle }: NavigationSidebarToggleProps) {
+export function NavigationSidebarToggle({
+  minimized,
+  showLabel,
+  onToggle,
+  compact = false,
+}: NavigationSidebarToggleProps) {
   return (
-    <div className="border-t border-ods-border">
+    <div
+      className={cn(
+        'border-t border-ods-border',
+        compact && 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]',
+      )}
+    >
       <button
         onClick={onToggle}
         className={cn(
           'relative flex w-full items-center justify-start',
-          'h-14 p-[var(--spacing-system-m)]',
-          'transition-colors duration-300',
+          // Compact: the tree's row geometry — inset, rounded, the chevron on the
+          // rows' icon line in both widths — so the rail's cells are all one kind.
+          compact
+            ? 'h-11 overflow-hidden rounded-md pl-2.5 pr-0 transition-[padding,background-color] [transition-timing-function:cubic-bezier(0.2,0,0,1)] @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)] motion-reduce:transition-none'
+            : 'h-14 p-[var(--spacing-system-m)] transition-colors',
+          'duration-300',
           '[&_svg]:transition-colors [&_svg]:duration-300',
           'text-ods-text-primary hover:bg-ods-bg-hover',
         )}
@@ -34,13 +54,24 @@ export function NavigationSidebarToggle({ minimized, showLabel, onToggle }: Navi
               Collapsed is the default because container queries are min-width —
               the rail is narrower than every threshold, so it needs no query of
               its own. */}
-          <Chevrons03LeftIcon className="h-6 w-6 rotate-180 text-ods-text-secondary transition-transform duration-300 @[140px]/of-nav-sidebar:rotate-0" />
+          <Chevrons03LeftIcon
+            className={cn(
+              'rotate-180 text-ods-text-secondary transition-transform duration-300 @[140px]/of-nav-sidebar:rotate-0',
+              compact ? 'size-5' : 'h-6 w-6',
+            )}
+          />
         </div>
 
         <span
           className={cn(
             'flex-1 truncate text-left transition-[opacity,margin-left] duration-300 text-h4',
-            showLabel ? 'ml-[var(--spacing-system-xs)] opacity-100' : 'ml-0 opacity-0',
+            // Compact: the width, not `showLabel`, says when it is the rail — the
+            // label fades as the width crosses 140px, as the rows' labels do.
+            compact
+              ? 'ml-[var(--spacing-system-xs)] min-w-0 opacity-0 duration-150 @[140px]/of-nav-sidebar:opacity-100'
+              : showLabel
+                ? 'ml-[var(--spacing-system-xs)] opacity-100'
+                : 'ml-0 opacity-0',
           )}
           aria-hidden={!showLabel}
         >

@@ -40,6 +40,7 @@ import { usePreventScroll } from '@react-aria/overlays';
 import { isIOS } from '@react-aria/utils';
 import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
 import Link from '../../embed-shims/next-link';
@@ -114,6 +115,7 @@ import type {
 } from './types/unified-chat-state.types';
 import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
+import { chatDayLabel } from './utils/chat-day-label';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
 import { FALLBACK_TOP_RETRIEVED, splitCitedSources } from './utils/cited-sources';
@@ -516,6 +518,86 @@ export interface EmbeddableChatProps {
    * every chat that is not archived, a new one included.
    */
   chatMenuExtraItems?: ActionsMenuItem[];
+
+  /**
+   * Who draws the chat list. `'auto'` (default): the panel does, from its own
+   * width — the rail beside the chat when it fits, the "Current Chats" screen
+   * when it does not. `'none'`: the host owns the list (e.g. in its main
+   * sidebar), so the panel never draws one at any width: no rail, no list
+   * screen, no list toggle or back-to-list control; with no conversation open
+   * it shows the new chat. Rename / archive from the panel still work.
+   */
+  rail?: 'auto' | 'none';
+
+  /**
+   * Splits the panel for a host that keeps ONE chat mounted for the session:
+   * the composer renders in place (a dock under every page) while the header
+   * and the thread go elsewhere.
+   *  - `undefined` (default): everything in place, as before.
+   *  - an element: the header and the thread (pending-approvals bar, jump to
+   *    latest, load older, a new chat's welcome) render into it through a
+   *    portal; the composer stays here.
+   *  - `null`: no header and no thread at all — the composer alone.
+   * Either of the last two implies `rail="none"`, and the header is the page
+   * one (`MingoChatHeader variant="page"`): no close, collapse or list control,
+   * no Compact (it belongs in `composerMenuItems`). The composer never remounts
+   * when this changes, so the draft, staged context, picker and uploads
+   * survive it; the thread remounts in each new container and opens on the
+   * latest message (its data is the host's `mingoState`). Meant for
+   * `shell="inline"`; the host must not clip the composer's root — the
+   * context picker, `@` / slash menus and the memory popover open above it.
+   * The portalled thread paints no background: the host paints the area that
+   * holds the thread and the composer (`AppLayout`'s `pageSurface="mingo"`).
+   */
+  threadContainer?: HTMLElement | null;
+
+  /** The model + token row under the composer. `false` hides it (e.g. a home
+   *  page that has no chat yet). Default `true`. */
+  showModel?: boolean;
+  /** Makes the model name in that row a button (e.g. to the AI settings). */
+  onModelClick?: () => void;
+  /** Tooltip over the model name (e.g. "Change in Settings → AI Settings"). */
+  modelTooltip?: string;
+  /** The composer's own ⋯ menu, at the end of its input row (e.g. "Compact
+   *  Chat Memory", disabled when there is nothing to compact). */
+  composerMenuItems?: ActionsMenuItem[];
+  /** Controls under the input, at the end of the model row (e.g. "Compact chat
+   *  memory" as a button rather than in the composer's ⋯). */
+  composerFooterActions?: React.ReactNode;
+  /** The composer's prompt. Default: "Enter your Request..." (v2) /
+   *  "Ask a question..." (classic). Uploads in flight still say so instead. */
+  composerPlaceholder?: string;
+  /**
+   * How "Rename Chat" in the chat header's ⋯ renames. `'modal'` (default): the
+   * Rename Chat modal. `'inline'`: the title turns into a field with its text
+   * selected — Enter saves, Escape cancels, blur saves. Applies to the Mingo v2
+   * and page headers; chat-list rows and the classic headers keep the modal.
+   */
+  renameMode?: 'modal' | 'inline';
+  /**
+   * Whether the composer clears the bottom safe-area inset (the iOS home bar)
+   * itself. Default `true`. Pass `false` when the composer sits in a layout
+   * that already owns that inset — a dock in a native shell whose root pads
+   * it — where the two would add up.
+   */
+  safeAreaBottom?: boolean;
+  /**
+   * Called with the new dialog's id when a send from this panel created it:
+   * the id the panel lands on while the send that started from "no dialog"
+   * is in flight (the composer, a quick-action chip, a clarification card,
+   * the Guide launcher prompt). Fired once per dialog, after the commit that
+   * shows it. Opening an existing dialog never fires it, and neither does a
+   * dialog the host creates itself (outside this panel's sends).
+   */
+  onDialogCreated?: (dialogId: string) => void;
+  /**
+   * Host-set ghost text in the composer: the same non-destructive preview a
+   * hovered quick-action chip shows (the prompt that clicking it would send),
+   * for chips the host draws itself (e.g. a home page beside a docked
+   * composer). `null` / omitted = none. The panel's own chip hover wins while
+   * it lasts.
+   */
+  composerPreviewText?: string | null;
 }
 
 // =============================================================================
@@ -1084,6 +1166,18 @@ function EmbeddableChatInner({
   onWhatToAsk,
   whatToAsk: whatToAskContent,
   chatMenuExtraItems,
+  rail = 'auto',
+  threadContainer,
+  showModel = true,
+  onModelClick,
+  modelTooltip,
+  composerMenuItems,
+  composerFooterActions,
+  composerPlaceholder,
+  renameMode = 'modal',
+  safeAreaBottom = true,
+  onDialogCreated,
+  composerPreviewText = null,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
   // `shell` 'none' / 'inline' means the consumer hosts us inside their own panel
@@ -1092,6 +1186,11 @@ function EmbeddableChatInner({
   // we don't double-up with the host's behaviour.
   const shellLess = shell !== 'drawer';
   const isV2 = appearance === CHAT_APPEARANCE.V2;
+  // Split: the composer renders here, the header + thread in the host's node
+  // (or nowhere). See `threadContainer`.
+  const splitMode = threadContainer !== undefined;
+  // The host draws the chat list, so the panel never does (see `rail`).
+  const hostOwnsList = rail === 'none' || splitMode;
   const runtime = useRequiredChatRuntime();
   // Optional on embedders (platform-agnostic); '' is a harmless sentinel for the
   // `ask-ai:open-with-ref` event filter below. Deliberately NOT the hub's
@@ -1488,11 +1587,16 @@ function EmbeddableChatInner({
   const scopeDialogId = activeDialogId ?? null;
   const [composerScope, setComposerScope] = useState({ dialogId: scopeDialogId, mode: activeMode });
   const [composerKey, setComposerKey] = useState(0);
+  // The dialog a send of this panel created (`onDialogCreated`) — exactly the
+  // `named` transition below, kept for the effect that tells the host.
+  const [createdDialogId, setCreatedDialogId] = useState<string | null>(null);
   if (composerScope.dialogId !== scopeDialogId || composerScope.mode !== activeMode) {
     const named =
       namingNewChat && composerScope.dialogId == null && scopeDialogId != null && composerScope.mode === activeMode;
     setComposerScope({ dialogId: scopeDialogId, mode: activeMode });
-    if (!named) {
+    if (named) {
+      setCreatedDialogId(scopeDialogId);
+    } else {
       setComposerKey(k => k + 1);
       setContextItems(NO_CONTEXT_ITEMS);
       setContextPickerOpen(false);
@@ -1503,6 +1607,16 @@ function EmbeddableChatInner({
     mentionKeysRef.current.clear();
     clearAttachments();
   }, [composerKey, clearAttachments]);
+  // Told after the commit that shows the new dialog: the host typically
+  // navigates on it, which must not happen while this panel renders. Keyed on
+  // the id alone, so a host callback that changes identity is not re-told.
+  const onDialogCreatedRef = useRef(onDialogCreated);
+  useEffect(() => {
+    onDialogCreatedRef.current = onDialogCreated;
+  });
+  useEffect(() => {
+    if (createdDialogId != null) onDialogCreatedRef.current?.(createdDialogId);
+  }, [createdDialogId]);
 
   // Map each entity type to its backend mention marker (host-declared on the
   // entity type). Drives the committed `@marker:id` token; missing markers fall
@@ -2097,6 +2211,11 @@ function EmbeddableChatInner({
   // detached from its card). `portalHost` can't serve here — it is
   // `display: contents` and has no box to measure.
   const [panelBoundary, setPanelBoundary] = useState<HTMLDivElement | null>(null);
+  // The same pair for the thread when it renders into the host's node
+  // (`threadContainer`): its menus portal and collide inside the thread, not
+  // inside the composer's dock.
+  const [threadPortalHost, setThreadPortalHost] = useState<HTMLDivElement | null>(null);
+  const [threadBoundary, setThreadBoundary] = useState<HTMLDivElement | null>(null);
 
   // ── Split (wide) Mingo layout ─────────────────────────────────────────────
   // The panel measures its own width and, in Mingo mode, promotes the inline
@@ -2192,7 +2311,9 @@ function EmbeddableChatInner({
   const splitEligible = historyListMode;
   // Embedded previews (hero demo tabs) always use the compact single-column
   // header, never the two-column split — so `previewMode` opts out of `wideMingo`.
-  const wideMingo = splitEligible && canSplit && !previewMode;
+  // …and a host that owns the list (`rail="none"`) never gets either wide
+  // layout: both exist to put the panel's own list beside the chat.
+  const wideMingo = splitEligible && canSplit && !previewMode && !hostOwnsList;
   const splitActive = wideMingo && !railCollapsed;
   // Keep the "Current Chats" rail (header cell + list column) mounted through
   // its width/opacity collapse so it eases away instead of hard-cutting; both
@@ -2237,8 +2358,10 @@ function EmbeddableChatInner({
     dialogs.length === 0 &&
     !dialogsInitialLoading &&
     !mingoCaps.searchQuery;
+  // Never with `rail="none"`: the list is the host's, so no conversation open
+  // means the new chat, not a list screen.
   const stackedListView =
-    isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen && !emptyListSkipped;
+    isMingoMode && !hasConversation && !archiveOpen && !wideMingo && !composeOpen && !emptyListSkipped && !hostOwnsList;
 
   // Shared header derivations — consumed by the stacked `ChatPanelHeader`, its
   // mobile fallback, and the desktop split header's right cell, so the title /
@@ -2473,6 +2596,41 @@ function EmbeddableChatInner({
     onArchive: headerOnArchive,
   });
 
+  // Inline rename (`renameMode="inline"`) in the Mingo v2 / page header: the
+  // title becomes a field. Held as the id of the chat being renamed, so opening
+  // another chat drops the field without an effect.
+  const [inlineRenameId, setInlineRenameId] = useState<string | null>(null);
+  const inlineRenaming = inlineRenameId != null && inlineRenameId === activeDialogId;
+  const mingoHeaderOnRename =
+    renameMode === 'inline' && headerOnRename && activeDialogId
+      ? () => setInlineRenameId(activeDialogId)
+      : headerOnRename;
+  const submitInlineRename = (value: string) => {
+    setInlineRenameId(null);
+    const target = activeDialog;
+    const next = value.trim();
+    // Empty or unchanged: nothing to save, the title simply comes back.
+    if (!target || !next || next === target.title) return;
+    renameDialog(target.id, next).catch((err: unknown) => {
+      console.error('[EmbeddableChat] inline rename failed:', err);
+    });
+  };
+  const cancelInlineRename = () => setInlineRenameId(null);
+  // The v2 header's ⋯: the split header's, with the inline rename when asked.
+  const mingoHeaderMenuItems = chatDialogMenuItems({
+    onCopyLink: headerOnCopyLink,
+    onRename: mingoHeaderOnRename,
+    onCompact: headerOnCompact,
+    onArchive: headerOnArchive,
+  });
+  // The page header's ⋯ (`threadContainer`): no Compact — in that layout it
+  // lives in the composer's own ⋯ (`composerMenuItems`).
+  const pageHeaderMenuItems = chatDialogMenuItems({
+    onCopyLink: headerOnCopyLink,
+    onRename: mingoHeaderOnRename,
+    onArchive: headerOnArchive,
+  });
+
   // Narrow (single-column) header. The Mingo empty state splits into a "Current
   // Chats" list header (search + archive, no back) and a "New Chat" compose
   // header (back to the list); conversations + guide keep the shared header
@@ -2482,15 +2640,17 @@ function EmbeddableChatInner({
   // would be half of the empty screen the skip exists to remove. The
   // else-branch header keeps the assistant name and the archive entry point.
   const narrowMingoEmpty = isMingoMode && !hasConversation && !archiveOpen && !emptyListSkipped;
+  // With the list the host's (`rail="none"`) the empty state IS the new chat,
+  // and there is no list to go back to.
   const narrowHeaderProps: ChatPanelHeaderProps = narrowMingoEmpty
-    ? composeOpen
+    ? composeOpen || hostOwnsList
       ? {
-          showBack: true,
+          showBack: !hostOwnsList,
           title: freshConversationTitle,
           subtitle: headerUserName,
           avatar: headerAvatar,
           backAriaLabel: 'Back to chats',
-          onBack: () => setComposeOpen(false),
+          onBack: hostOwnsList ? undefined : () => setComposeOpen(false),
           onClose: closeControl,
         }
       : {
@@ -2578,10 +2738,22 @@ function EmbeddableChatInner({
           subtitle={archiveOpen ? undefined : headerPersonName}
           avatar={archiveOpen ? undefined : headerAvatar}
           // Wide: shows / hides the list beside the chat. Narrow: back to the
-          // list, the only one of the two that fits.
-          onToggleList={wideMingo ? toggleRailCollapsed : headerShowBack ? headerOnBack : () => setComposeOpen(false)}
+          // list, the only one of the two that fits. None when the list is the
+          // host's (`rail="none"`).
+          onToggleList={
+            hostOwnsList
+              ? undefined
+              : wideMingo
+                ? toggleRailCollapsed
+                : headerShowBack
+                  ? headerOnBack
+                  : () => setComposeOpen(false)
+          }
           listOpen={splitActive}
-          menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? splitHeaderMenuItems : []}
+          menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? mingoHeaderMenuItems : []}
+          renaming={inlineRenaming && !archiveOpen}
+          onRenameSubmit={submitInlineRename}
+          onRenameCancel={cancelInlineRename}
           extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
           onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
           // Only while the list and the chat both fit: narrow, the toggle is
@@ -2601,12 +2773,316 @@ function EmbeddableChatInner({
       </div>
     ) : null;
 
+  // ── The parts both layouts render (see `threadContainer`) ─────────────────
+  // v2: the archive opens in the chat column under the chat's header; the
+  // list stays, and "Chat Archive" there toggles back.
+  const archiveListNode = (
+    <MingoArchiveList
+      dialogs={archivedDialogs}
+      onSelectDialog={handleArchivedSelect}
+      isLoading={archivedLoading}
+      hasMore={archivedCursor != null}
+      isLoadingMore={archivedPending}
+      onLoadMore={() => {
+        void loadArchivedPage(archivedCursor ?? undefined);
+      }}
+    />
+  );
+
+  // The thread — or a new chat's welcome — scrolling above the composer.
+  const threadArea = (
+    <div ref={galleryPanelRef} className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
+      <div key={contentViewKey} className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0">
+        {hasConversation ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {messagesInitialLoading ? (
+              // Match the real list's `fullWidth` layout so swapping
+              // skeleton → bubbles doesn't shift the column. The panel
+              // wrapper above already pads (`p-[var(--spacing-system-m)]`),
+              // so the skeleton sits flush (no inner px/pb).
+              //
+              // In `previewMode` the chat lives in a fixed-height host box
+              // (e.g. the Mingo hero demo). The default bottom-anchored
+              // skeleton overflows a short panel and grows its OWN
+              // scrollbar — ugly. `fill` top-anchors + clips overflow so
+              // it reads as "the whole panel is loading" and never scrolls.
+              <ChatMessageListSkeleton fullWidth fill={previewMode} className="flex-1" />
+            ) : (
+              <ChatMessageList
+                messages={messages}
+                // v2 thread: names without the colon, 24px
+                // faces, 16px between messages (shared with fae v2).
+                appearance={appearance}
+                isTyping={chatLoading}
+                // The stage the turn reports while the user waits
+                // ("Searching 28 sources"); the generic phrase otherwise.
+                typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
+                // Sticky footer for approvals the host lifted out of the
+                // thread — see the prop's docblock.
+                pendingApprovals={pendingApprovals}
+                // Real drawer: the library's smart follow. Passive in-page
+                // demo (previewMode): deterministic hard pin instead — a
+                // scripted assistant-only stream from a cold mount never
+                // satisfies the library's "at bottom" gate, so the reply
+                // landed below the fold. `pinBottom` snaps to bottom on
+                // every frame; identical mechanism to the Fae demo box, so
+                // both surfaces behave 1:1.
+                autoScroll={!previewMode}
+                pinBottom={previewMode}
+                // Passive in-page demos (previewMode) let the surrounding
+                // page scroll over the thread; the real drawer keeps
+                // containment (deck slide-scroll fix).
+                overscrollContain={!previewMode}
+                assistantType="mingo"
+                assistantIcon={mingoAssistantIcon}
+                renderEntityCard={renderEntityCard}
+                resolveContextIcon={resolveContextIcon}
+                renderContextItem={renderContextItem}
+                renderMention={renderMention}
+                renderAfterMessage={renderMessageSources}
+                // Gated on `chatLoading` for the same reason the composer
+                // is: no second send while a turn is in flight. Passive
+                // demo hosts (previewMode) stay read-only.
+                onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
+                NavLinkAnchor={NavLinkAnchorViaRuntime}
+                // Real Mingo drawer: hide the message-list scrollbar
+                // (scroll stays functional). Scoped here via `className`
+                // instead of `ChatMessageList` itself, so other list
+                // consumers (host chat, tickets) keep their thin bar.
+                //
+                // `previewMode` (the passive in-page demo) instead:
+                //  • KEEP the default thin scrollbar — the "elevator" —
+                //    so the Mingo demo's scroll controls match the Fae
+                //    demo box (which renders the default ChatMessageList
+                //    scrollbar) 1:1.
+                //  • Re-enable pointer events on the scroller: previewMode
+                //    puts `pointer-events-none` on the whole panel (line
+                //    ~1981) so the demo doesn't trap clicks, but that also
+                //    killed wheel/touch scroll on the thread (the Mingo
+                //    embed couldn't scroll while the Fae box could). Only
+                //    the scroller re-enables; composer + chrome stay inert.
+                className={
+                  previewMode
+                    ? 'pointer-events-auto flex-1'
+                    : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                }
+                // No inner `px`/`pb`: the panel wrapper already pads with
+                // `p-[var(--spacing-system-m)]`. The default content class
+                // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
+                // double-inset the thread; `pb-0` overrides via twMerge.
+                contentClassName="max-w-none pb-0"
+                fullWidth
+                hasNextPage={hasMoreMessages}
+                isFetchingNextPage={isMessagesLoading}
+                onLoadMore={loadMoreMessages}
+              />
+            )}
+          </div>
+        ) : activeMode === 'mingo' ? (
+          /* Figma node 7532:222444 — default (Mingo-mode) empty state:
+             centred greeting + capability grid + Guide-chat promo +
+             quick-action chips. Guide mode keeps the slash-command
+             onboarding list below. */
+          <MingoWelcome
+            onStartGuideChat={effectiveModes.guide ? () => handleActiveModeChange('guide') : undefined}
+            {...mingoWelcome}
+            // History now lives in its own list view (the wide rail or
+            // the narrow "Current Chats" list), so the welcome is always
+            // the new-user compose surface: greeting + grid + promo +
+            // primary Guide chip.
+            hasExistingChats={false}
+            // Hover/focus PREVIEWS the action's full prompt as ghost text
+            // in the empty composer (see `quickActionPreview` /
+            // `ChatInput.previewText`). Wired after the `{...mingoWelcome}`
+            // spread so the host can't override it.
+            onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
+            onQuickActionHoverEnd={() => setQuickActionPreview(null)}
+            // A built-in agent caps the quick-action wall at 2 rows;
+            // this is the Mingo surface, so fall back to 'mingo'.
+            agentSlug={activeAgentSlug ?? 'mingo'}
+          />
+        ) : (
+          /* Figma node 7532:328214 — Guide-mode empty state: greeting
+             + slash-command onboarding list share one scroll region,
+             with a pinned quick-action chip row above the composer. */
+          <GuideWelcome
+            // Admin/host greeting customises the guide subtitle; an
+            // explicit `guideWelcome.subtitle` still wins (spread below).
+            subtitle={effectiveGreeting ?? undefined}
+            // While the admin greeting is still being fetched, render a
+            // subtitle skeleton instead of flashing empty → text.
+            subtitleLoading={emptyStateLoading}
+            {...guideWelcome}
+            // Agent identity (name → title, icon → empty-state glyph)
+            // wins over the host `guideWelcome` spread + built-in
+            // defaults; falls back to the host value when no agent is
+            // active. Placed after the spread so resolution is
+            // deterministic.
+            title={effectiveAssistantName ?? guideWelcome?.title}
+            icon={effectiveAssistantIcon ?? guideWelcome?.icon}
+            // Admin "try-asking chips" → Guide quick-action chips.
+            // Precedence: when an AGENT is active and its fetched chips
+            // arrived, the agent's chips win — the host array is the
+            // platform default, not the agent's. (`agentConfigUrl` is
+            // the same derived value that drives the config fetch, so
+            // this can never disagree with what was fetched; while the
+            // fetch is in-flight the fetched list is [] and host chips
+            // show.) Outside agent mode the host-provided
+            // `guideWelcome.quickActions` wins as before.
+            quickActions={
+              agentConfigUrl && guideSuggestedActions.length > 0
+                ? guideSuggestedActions
+                : (guideWelcome?.quickActions ?? guideSuggestedActions)
+            }
+            // Quick-action chips SEND the prompt immediately on click.
+            onQuickAction={action => {
+              setQuickActionPreview(null);
+              handleSend(action.prompt ?? action.label);
+            }}
+            // Hover/focus PREVIEWS the action's full prompt as ghost text
+            // in the empty composer (the chip label is short; this reveals
+            // what will be sent). Declarative + non-destructive — see
+            // `quickActionPreview` / `ChatInput.previewText`.
+            onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
+            onQuickActionHoverEnd={() => setQuickActionPreview(null)}
+            // In agent mode a built-in agent (fae/mingo) caps the wall at
+            // 2 rows; host/guide mode (no active agent) keeps the default.
+            agentSlug={activeAgentSlug}
+          >
+            {/* Figma node 7363:205938 — single-column slash-command
+                list. No own scroll (GuideWelcome's region scrolls); the
+                rounded-md frame holds the cards on the dark surface. */}
+            {(chipCommands.length > 0 || !commandsLoaded) && (
+              <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
+                {!commandsLoaded &&
+                  chipCommands.length === 0 &&
+                  SKELETON_ROW_VARIANTS.map((variant, i) => (
+                    <MingoOnboardingCardSkeleton
+                      key={`chip-skeleton-${i}`}
+                      titleWidth={variant.titleWidth}
+                      slashWidth={variant.slashWidth}
+                      descriptionLines={variant.descriptionLines}
+                    />
+                  ))}
+                {chipCommands.map(cmd => {
+                  const Icon = resolveIcon(cmd.iconName);
+                  const cmdId = cmd.id;
+                  const label = cmd.label ?? `/${cmdId}`;
+                  const cardActions = cmd.actions.map(action => ({
+                    id: action.id,
+                    label: action.label,
+                    onClick: () => dispatchSlashCommandAction(action.id, cmdId, chatInputRef),
+                  }));
+                  return (
+                    <MingoOnboardingCard
+                      key={cmdId}
+                      icon={<Icon size={16} />}
+                      title={label}
+                      slashCommand={`/${cmdId}`}
+                      description={cmd.description}
+                      actions={cardActions}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </GuideWelcome>
+        )}
+      </div>
+    </div>
+  );
+
+  // Host block pinned above the composer (`aboveComposer`): the thread's own
+  // bottom padding separates them, the composer's horizontal inset is repeated
+  // so the two line up.
+  const aboveComposerNode =
+    aboveComposer != null && aboveComposer !== false ? (
+      <div className="shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">{aboveComposer}</div>
+    ) : null;
+
+  const attachmentStrip = (
+    <ChatAttachmentChipStrip attachments={stagedAttachments} onRemove={removeAttachment} disabled={chatLoading} />
+  );
+
+  const composerNode = (
+    <ChatComposer
+      key={composerKey}
+      archived={isViewingArchived}
+      lock={composerLock}
+      inputRef={chatInputRef}
+      onSend={handleSend}
+      onStop={stopMessage}
+      sending={chatLoading || hasInflightUploads}
+      placeholder={
+        hasInflightUploads
+          ? 'Waiting for uploads to finish…'
+          : (composerPlaceholder ?? (isV2 ? 'Enter your Request...' : 'Ask a question...'))
+      }
+      autoFocus={previewMode ? false : autoFocusInput}
+      slashCommands={slashCommandsProp}
+      previewText={quickActionPreview ?? composerPreviewText ?? undefined}
+      safeAreaBottom={safeAreaBottom}
+      showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
+      attachmentsCount={stagedAttachments.length}
+      onAddFiles={addAttachmentFiles}
+      attachmentsDisabled={chatLoading}
+      contextPicker={contextPickerForMode}
+      selectedContextItems={contextItems}
+      onToggleContextItem={toggleContextItem}
+      onRemoveContextItem={removeContextItem}
+      contextMemoryItems={contextMemory?.items}
+      onRemoveContextMemoryItem={contextMemory?.onRemove}
+      contextPickerOpen={contextPickerOpen}
+      onOpenContextPicker={openContextPicker}
+      onCloseContextPicker={closeContextPicker}
+      mentionQuery={mentionQuery}
+      onMentionQueryChange={handleMentionQueryChange}
+      onValueChange={handleContextValueChange}
+      menuItems={composerMenuItems}
+      footerActions={composerFooterActions}
+      model={
+        showModel
+          ? {
+              provider: currentProvider ?? 'anthropic',
+              modelName: currentModelLabel ?? 'Claude',
+              usedTokens:
+                currentInputTokens != null ? (currentInputTokens ?? 0) + (currentOutputTokens ?? 0) : undefined,
+              contextWindow: currentContextWindowMaxTokens ?? undefined,
+              inputTokens: currentInputTokens ?? undefined,
+              outputTokens: currentOutputTokens ?? undefined,
+              hitRatePct: currentCacheHitRatePct ?? undefined,
+              breakdown: currentUsageBreakdown ?? undefined,
+              onModelClick,
+              modelTooltip,
+            }
+          : undefined
+      }
+    />
+  );
+
+  // Rename / Archive / Unarchive chat modals (Figma 7592:225962, 7592:226181).
+  // Triggered from the header ⋯ and the dialog-history rows; rendered inside the
+  // panel so they overlay the chat.
+  const dialogModals = (
+    <ChatDialogModals
+      renameTarget={renameTarget}
+      setRenameTarget={setRenameTarget}
+      onConfirmRename={handleConfirmRename}
+      archiveTarget={archiveTarget}
+      setArchiveTarget={setArchiveTarget}
+      onConfirmArchive={handleConfirmArchive}
+      restoreTarget={restoreTarget}
+      setRestoreTarget={setRestoreTarget}
+      onConfirmRestore={handleConfirmRestore}
+    />
+  );
+
   // Chat body — defined once, then rendered inside whichever shell applies.
   // Radix overlays (⋯ menus, tooltips) portal into `portalHost` — a node inside
   // this panel — so they inherit the drawer's stacking context and need only a
   // small, local z-index instead of escalating to beat the drawer at the
   // document root. See `PortalContainerContext`.
-  const body = (
+  const classicBody = (
     // The whole panel reads the appearance (the composer's footer too), not
     // only the thread `ChatMessageList` provides it to.
     <ChatAppearanceContext.Provider value={appearance}>
@@ -2879,16 +3355,7 @@ function EmbeddableChatInner({
                     {isV2 && archiveOpen ? (
                       // v2: the archive opens in the chat column under the chat's
                       // header; the list stays, and "Chat Archive" there toggles back.
-                      <MingoArchiveList
-                        dialogs={archivedDialogs}
-                        onSelectDialog={handleArchivedSelect}
-                        isLoading={archivedLoading}
-                        hasMore={archivedCursor != null}
-                        isLoadingMore={archivedPending}
-                        onLoadMore={() => {
-                          void loadArchivedPage(archivedCursor ?? undefined);
-                        }}
-                      />
+                      archiveListNode
                     ) : stackedListView && isV2 ? (
                       <MingoChatRail
                         {...mingoRailProps}
@@ -2934,274 +3401,10 @@ function EmbeddableChatInner({
                       />
                     ) : (
                       <>
-                        <div ref={galleryPanelRef} className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
-                          <div
-                            key={contentViewKey}
-                            className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0"
-                          >
-                            {hasConversation ? (
-                              <div className="flex min-h-0 flex-1 flex-col">
-                                {messagesInitialLoading ? (
-                                  // Match the real list's `fullWidth` layout so swapping
-                                  // skeleton → bubbles doesn't shift the column. The panel
-                                  // wrapper above already pads (`p-[var(--spacing-system-m)]`),
-                                  // so the skeleton sits flush (no inner px/pb).
-                                  //
-                                  // In `previewMode` the chat lives in a fixed-height host box
-                                  // (e.g. the Mingo hero demo). The default bottom-anchored
-                                  // skeleton overflows a short panel and grows its OWN
-                                  // scrollbar — ugly. `fill` top-anchors + clips overflow so
-                                  // it reads as "the whole panel is loading" and never scrolls.
-                                  <ChatMessageListSkeleton fullWidth fill={previewMode} className="flex-1" />
-                                ) : (
-                                  <ChatMessageList
-                                    messages={messages}
-                                    // v2 thread: names without the colon, 24px
-                                    // faces, 16px between messages (shared with fae v2).
-                                    appearance={appearance}
-                                    isTyping={chatLoading}
-                                    // The stage the turn reports while the user waits
-                                    // ("Searching 28 sources"); the generic phrase otherwise.
-                                    typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
-                                    // Sticky footer for approvals the host lifted out of the
-                                    // thread — see the prop's docblock.
-                                    pendingApprovals={pendingApprovals}
-                                    // Real drawer: the library's smart follow. Passive in-page
-                                    // demo (previewMode): deterministic hard pin instead — a
-                                    // scripted assistant-only stream from a cold mount never
-                                    // satisfies the library's "at bottom" gate, so the reply
-                                    // landed below the fold. `pinBottom` snaps to bottom on
-                                    // every frame; identical mechanism to the Fae demo box, so
-                                    // both surfaces behave 1:1.
-                                    autoScroll={!previewMode}
-                                    pinBottom={previewMode}
-                                    // Passive in-page demos (previewMode) let the surrounding
-                                    // page scroll over the thread; the real drawer keeps
-                                    // containment (deck slide-scroll fix).
-                                    overscrollContain={!previewMode}
-                                    assistantType="mingo"
-                                    assistantIcon={mingoAssistantIcon}
-                                    renderEntityCard={renderEntityCard}
-                                    resolveContextIcon={resolveContextIcon}
-                                    renderContextItem={renderContextItem}
-                                    renderMention={renderMention}
-                                    renderAfterMessage={renderMessageSources}
-                                    // Gated on `chatLoading` for the same reason the composer
-                                    // is: no second send while a turn is in flight. Passive
-                                    // demo hosts (previewMode) stay read-only.
-                                    onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
-                                    NavLinkAnchor={NavLinkAnchorViaRuntime}
-                                    // Real Mingo drawer: hide the message-list scrollbar
-                                    // (scroll stays functional). Scoped here via `className`
-                                    // instead of `ChatMessageList` itself, so other list
-                                    // consumers (host chat, tickets) keep their thin bar.
-                                    //
-                                    // `previewMode` (the passive in-page demo) instead:
-                                    //  • KEEP the default thin scrollbar — the "elevator" —
-                                    //    so the Mingo demo's scroll controls match the Fae
-                                    //    demo box (which renders the default ChatMessageList
-                                    //    scrollbar) 1:1.
-                                    //  • Re-enable pointer events on the scroller: previewMode
-                                    //    puts `pointer-events-none` on the whole panel (line
-                                    //    ~1981) so the demo doesn't trap clicks, but that also
-                                    //    killed wheel/touch scroll on the thread (the Mingo
-                                    //    embed couldn't scroll while the Fae box could). Only
-                                    //    the scroller re-enables; composer + chrome stay inert.
-                                    className={
-                                      previewMode
-                                        ? 'pointer-events-auto flex-1'
-                                        : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-                                    }
-                                    // No inner `px`/`pb`: the panel wrapper already pads with
-                                    // `p-[var(--spacing-system-m)]`. The default content class
-                                    // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
-                                    // double-inset the thread; `pb-0` overrides via twMerge.
-                                    contentClassName="max-w-none pb-0"
-                                    fullWidth
-                                    hasNextPage={hasMoreMessages}
-                                    isFetchingNextPage={isMessagesLoading}
-                                    onLoadMore={loadMoreMessages}
-                                  />
-                                )}
-                              </div>
-                            ) : activeMode === 'mingo' ? (
-                              /* Figma node 7532:222444 — default (Mingo-mode) empty state:
-                     centred greeting + capability grid + Guide-chat promo +
-                     quick-action chips. Guide mode keeps the slash-command
-                     onboarding list below. */
-                              <MingoWelcome
-                                onStartGuideChat={
-                                  effectiveModes.guide ? () => handleActiveModeChange('guide') : undefined
-                                }
-                                {...mingoWelcome}
-                                // History now lives in its own list view (the wide rail or
-                                // the narrow "Current Chats" list), so the welcome is always
-                                // the new-user compose surface: greeting + grid + promo +
-                                // primary Guide chip.
-                                hasExistingChats={false}
-                                // Hover/focus PREVIEWS the action's full prompt as ghost text
-                                // in the empty composer (see `quickActionPreview` /
-                                // `ChatInput.previewText`). Wired after the `{...mingoWelcome}`
-                                // spread so the host can't override it.
-                                onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
-                                onQuickActionHoverEnd={() => setQuickActionPreview(null)}
-                                // A built-in agent caps the quick-action wall at 2 rows;
-                                // this is the Mingo surface, so fall back to 'mingo'.
-                                agentSlug={activeAgentSlug ?? 'mingo'}
-                              />
-                            ) : (
-                              /* Figma node 7532:328214 — Guide-mode empty state: greeting
-                     + slash-command onboarding list share one scroll region,
-                     with a pinned quick-action chip row above the composer. */
-                              <GuideWelcome
-                                // Admin/host greeting customises the guide subtitle; an
-                                // explicit `guideWelcome.subtitle` still wins (spread below).
-                                subtitle={effectiveGreeting ?? undefined}
-                                // While the admin greeting is still being fetched, render a
-                                // subtitle skeleton instead of flashing empty → text.
-                                subtitleLoading={emptyStateLoading}
-                                {...guideWelcome}
-                                // Agent identity (name → title, icon → empty-state glyph)
-                                // wins over the host `guideWelcome` spread + built-in
-                                // defaults; falls back to the host value when no agent is
-                                // active. Placed after the spread so resolution is
-                                // deterministic.
-                                title={effectiveAssistantName ?? guideWelcome?.title}
-                                icon={effectiveAssistantIcon ?? guideWelcome?.icon}
-                                // Admin "try-asking chips" → Guide quick-action chips.
-                                // Precedence: when an AGENT is active and its fetched chips
-                                // arrived, the agent's chips win — the host array is the
-                                // platform default, not the agent's. (`agentConfigUrl` is
-                                // the same derived value that drives the config fetch, so
-                                // this can never disagree with what was fetched; while the
-                                // fetch is in-flight the fetched list is [] and host chips
-                                // show.) Outside agent mode the host-provided
-                                // `guideWelcome.quickActions` wins as before.
-                                quickActions={
-                                  agentConfigUrl && guideSuggestedActions.length > 0
-                                    ? guideSuggestedActions
-                                    : (guideWelcome?.quickActions ?? guideSuggestedActions)
-                                }
-                                // Quick-action chips SEND the prompt immediately on click.
-                                onQuickAction={action => {
-                                  setQuickActionPreview(null);
-                                  handleSend(action.prompt ?? action.label);
-                                }}
-                                // Hover/focus PREVIEWS the action's full prompt as ghost text
-                                // in the empty composer (the chip label is short; this reveals
-                                // what will be sent). Declarative + non-destructive — see
-                                // `quickActionPreview` / `ChatInput.previewText`.
-                                onQuickActionHover={action => setQuickActionPreview(action.prompt ?? action.label)}
-                                onQuickActionHoverEnd={() => setQuickActionPreview(null)}
-                                // In agent mode a built-in agent (fae/mingo) caps the wall at
-                                // 2 rows; host/guide mode (no active agent) keeps the default.
-                                agentSlug={activeAgentSlug}
-                              >
-                                {/* Figma node 7363:205938 — single-column slash-command
-                        list. No own scroll (GuideWelcome's region scrolls); the
-                        rounded-md frame holds the cards on the dark surface. */}
-                                {(chipCommands.length > 0 || !commandsLoaded) && (
-                                  <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
-                                    {!commandsLoaded &&
-                                      chipCommands.length === 0 &&
-                                      SKELETON_ROW_VARIANTS.map((variant, i) => (
-                                        <MingoOnboardingCardSkeleton
-                                          key={`chip-skeleton-${i}`}
-                                          titleWidth={variant.titleWidth}
-                                          slashWidth={variant.slashWidth}
-                                          descriptionLines={variant.descriptionLines}
-                                        />
-                                      ))}
-                                    {chipCommands.map(cmd => {
-                                      const Icon = resolveIcon(cmd.iconName);
-                                      const cmdId = cmd.id;
-                                      const label = cmd.label ?? `/${cmdId}`;
-                                      const cardActions = cmd.actions.map(action => ({
-                                        id: action.id,
-                                        label: action.label,
-                                        onClick: () => dispatchSlashCommandAction(action.id, cmdId, chatInputRef),
-                                      }));
-                                      return (
-                                        <MingoOnboardingCard
-                                          key={cmdId}
-                                          icon={<Icon size={16} />}
-                                          title={label}
-                                          slashCommand={`/${cmdId}`}
-                                          description={cmd.description}
-                                          actions={cardActions}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </GuideWelcome>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Host block pinned above the composer (`aboveComposer`):
-                            the thread's own bottom padding separates them, the
-                            composer's horizontal inset is repeated so the two line up. */}
-                        {aboveComposer != null && aboveComposer !== false && (
-                          <div className="shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
-                            {aboveComposer}
-                          </div>
-                        )}
-
-                        <ChatAttachmentChipStrip
-                          attachments={stagedAttachments}
-                          onRemove={removeAttachment}
-                          disabled={chatLoading}
-                        />
-
-                        <ChatComposer
-                          key={composerKey}
-                          archived={isViewingArchived}
-                          lock={composerLock}
-                          inputRef={chatInputRef}
-                          onSend={handleSend}
-                          onStop={stopMessage}
-                          sending={chatLoading || hasInflightUploads}
-                          placeholder={
-                            hasInflightUploads
-                              ? 'Waiting for uploads to finish…'
-                              : isV2
-                                ? 'Enter your Request...'
-                                : 'Ask a question...'
-                          }
-                          autoFocus={previewMode ? false : autoFocusInput}
-                          slashCommands={slashCommandsProp}
-                          previewText={quickActionPreview ?? undefined}
-                          showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
-                          attachmentsCount={stagedAttachments.length}
-                          onAddFiles={addAttachmentFiles}
-                          attachmentsDisabled={chatLoading}
-                          contextPicker={contextPickerForMode}
-                          selectedContextItems={contextItems}
-                          onToggleContextItem={toggleContextItem}
-                          onRemoveContextItem={removeContextItem}
-                          contextMemoryItems={contextMemory?.items}
-                          onRemoveContextMemoryItem={contextMemory?.onRemove}
-                          contextPickerOpen={contextPickerOpen}
-                          onOpenContextPicker={openContextPicker}
-                          onCloseContextPicker={closeContextPicker}
-                          mentionQuery={mentionQuery}
-                          onMentionQueryChange={handleMentionQueryChange}
-                          onValueChange={handleContextValueChange}
-                          model={{
-                            provider: currentProvider ?? 'anthropic',
-                            modelName: currentModelLabel ?? 'Claude',
-                            usedTokens:
-                              currentInputTokens != null
-                                ? (currentInputTokens ?? 0) + (currentOutputTokens ?? 0)
-                                : undefined,
-                            contextWindow: currentContextWindowMaxTokens ?? undefined,
-                            inputTokens: currentInputTokens ?? undefined,
-                            outputTokens: currentOutputTokens ?? undefined,
-                            hitRatePct: currentCacheHitRatePct ?? undefined,
-                            breakdown: currentUsageBreakdown ?? undefined,
-                          }}
-                        />
+                        {threadArea}
+                        {aboveComposerNode}
+                        {attachmentStrip}
+                        {composerNode}
                       </>
                     )}
                   </div>
@@ -3211,20 +3414,7 @@ function EmbeddableChatInner({
           </div>
           {galleryModal}
 
-          {/* Rename / Archive / Unarchive chat modals (Figma 7592:225962,
-                7592:226181). Triggered from the header ⋯ and the dialog-history
-                rows; rendered inside the panel so they overlay the chat. */}
-          <ChatDialogModals
-            renameTarget={renameTarget}
-            setRenameTarget={setRenameTarget}
-            onConfirmRename={handleConfirmRename}
-            archiveTarget={archiveTarget}
-            setArchiveTarget={setArchiveTarget}
-            onConfirmArchive={handleConfirmArchive}
-            restoreTarget={restoreTarget}
-            setRestoreTarget={setRestoreTarget}
-            onConfirmRestore={handleConfirmRestore}
-          />
+          {dialogModals}
 
           {/* Portal target for in-panel Radix overlays — `display: contents`
                 so it adds no box; content is positioned `fixed` by Radix. */}
@@ -3232,6 +3422,81 @@ function EmbeddableChatInner({
         </CollisionBoundaryContext.Provider>
       </PortalContainerContext.Provider>
     </ChatAppearanceContext.Provider>
+  );
+
+  // ── Split layout (`threadContainer`) ───────────────────────────────────────
+  // The header over a chat that IS the page: nothing closes, collapses or
+  // toggles a list. The title, "· owner · day", and the chat's ⋯.
+  const pageHeader = (
+    <MingoChatHeader
+      variant="page"
+      // Over the archive the header is the archive's (see the v2 header).
+      title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+      meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}
+      menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? pageHeaderMenuItems : []}
+      extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
+      onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
+      renaming={inlineRenaming && !archiveOpen}
+      onRenameSubmit={submitInlineRename}
+      onRenameCancel={cancelInlineRename}
+    />
+  );
+
+  // The header + thread, portalled into the host's node. Its own portal host
+  // and collision boundary keep its menus inside it. The modals live here too:
+  // they only open from this header, and the page area is where a host's own
+  // modals already render. It paints no surface of its own: the host paints
+  // the one area that holds both the thread and the composer (`AppLayout`'s
+  // `pageSurface`), so the background does not stop at the thread's edge.
+  const threadRegion = (
+    <div
+      ref={setThreadBoundary}
+      className={cn(
+        'flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden',
+        previewMode && 'pointer-events-none select-none',
+      )}
+    >
+      <PortalContainerContext.Provider value={threadPortalHost}>
+        <CollisionBoundaryContext.Provider value={threadBoundary}>
+          {pageHeader}
+          {activeMode === 'guide' && hasMingoMode && <GuideModeBanner className="duration-200 animate-in fade-in-0" />}
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{archiveOpen ? archiveListNode : threadArea}</div>
+          {galleryModal}
+          {dialogModals}
+          <div ref={setThreadPortalHost} style={{ display: 'contents' }} />
+        </CollisionBoundaryContext.Provider>
+      </PortalContainerContext.Provider>
+    </div>
+  );
+
+  // The composer where the panel is mounted (the host's dock). The thread
+  // portal holds the FIRST slot whether or not it renders, so the composer keeps
+  // its place in the tree — and its draft — when the container comes and goes.
+  // No `overflow-hidden` and no fixed height: the picker, the `@` / slash menus
+  // and the memory popover open above the composer, outside this box. Its
+  // overlays collide with whatever boundary the host provides (the viewport by
+  // default), never with this short box.
+  const body = splitMode ? (
+    <ChatAppearanceContext.Provider value={appearance}>
+      <PortalContainerContext.Provider value={portalHost}>
+        <div
+          ref={setPanelNode}
+          data-surface={isV2 ? 'mingo' : undefined}
+          className={cn('flex min-w-0 flex-col', previewMode && 'pointer-events-none select-none')}
+        >
+          {threadContainer ? createPortal(threadRegion, threadContainer) : null}
+          {aboveComposerNode}
+          {attachmentStrip}
+          {composerNode}
+        </div>
+        {/* With no thread on screen nothing can open them; mounted anyway so
+            a target set just before the thread left still resolves. */}
+        {threadContainer ? null : dialogModals}
+        <div ref={setPortalHost} style={{ display: 'contents' }} />
+      </PortalContainerContext.Provider>
+    </ChatAppearanceContext.Provider>
+  ) : (
+    classicBody
   );
 
   // Conditional shell: inline (shell-less host, e.g. AppLayoutDrawer, which
