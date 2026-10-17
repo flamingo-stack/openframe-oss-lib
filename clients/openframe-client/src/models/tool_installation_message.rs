@@ -80,8 +80,6 @@ impl LocalFilenameConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AssetSource {
-    #[serde(rename = "ARTIFACTORY")]
-    Artifactory,
     #[serde(rename = "TOOL_API")]
     ToolApi,
     #[serde(rename = "GITHUB")]
