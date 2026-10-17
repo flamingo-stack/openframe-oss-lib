@@ -45,6 +45,8 @@ import {
   CheckboxBlock,
   RadioGroup,
   RadioGroupItem,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
 
@@ -77,6 +79,12 @@ export type BookingFieldRow = BookingFieldSlot[];
 export interface BookingFieldCopy {
   label?: string;
   placeholder?: string;
+  /**
+   * How a CHOICE question (`select`, `radio`) is drawn: `chips` puts every
+   * option on the form as a one-tap chip instead of a dropdown or a radio list.
+   * The answer, its name and its validation are the question's own.
+   */
+  display?: 'chips';
 }
 
 /**
@@ -206,6 +214,38 @@ const canonicalNumber = (v: unknown): string => {
  * (`Input`, `Textarea`, `SelectTrigger` — the lib's error border), so a refused
  * field reads as refused at the control, not only in the line beneath it.
  */
+/** The field types a host may draw as chips (`BookingFieldCopy.display`): one answer from a list. */
+const CHIP_FIELD_TYPES: ReadonlySet<string> = new Set(['select', 'radio']);
+
+/** A choice question as one-tap chips: the lib's single `ToggleGroup`, one item per option. */
+const chipsControl = ({ field, id, registerName, error, control }: ControlArgs): ReactNode => (
+  <Controller
+    control={control}
+    name={registerName as never}
+    render={({ field: rhf }) => (
+      <ToggleGroup
+        id={id}
+        type="single"
+        variant="outline"
+        value={rhf.value ?? ''}
+        // A tap on the chosen chip reports '': the answer stays (clearing is not a choice the form offers).
+        onValueChange={(value: string) => {
+          if (value) rhf.onChange(value);
+        }}
+        aria-required={field.required || undefined}
+        aria-invalid={Boolean(error)}
+        className="flex flex-wrap justify-start gap-[var(--spacing-system-xsf)]"
+      >
+        {(field.options ?? []).map(opt => (
+          <ToggleGroupItem key={opt} value={opt}>
+            {optionLabel(field, opt)}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    )}
+  />
+);
+
 const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => ReactNode> = {
   text: ({ field, id, registerName, error, register }) => (
     <Input
@@ -648,7 +688,7 @@ export function BookingForm({
         required={shown.required}
         error={where.error}
       >
-        {FIELD_CONTROLS[shown.type]({
+        {(copy?.display === 'chips' && CHIP_FIELD_TYPES.has(shown.type) ? chipsControl : FIELD_CONTROLS[shown.type])({
           field: shown,
           id: where.id,
           registerName: where.registerName,

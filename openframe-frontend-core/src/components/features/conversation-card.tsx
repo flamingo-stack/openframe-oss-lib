@@ -5,6 +5,8 @@ import { cn } from '../../utils/cn';
 import { useAgentTint } from '../agent-identity';
 import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
+import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
+import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { Tag } from '../ui/tag';
 
 export interface ConversationCardSpeaker {
@@ -26,10 +28,15 @@ export interface ConversationCardProps {
   outcome: string;
   /** Beside the outcome (the person who approved it). */
   outcomeAside?: ReactNode;
-  /** The footer's question ("Your part"). */
-  footerLabel: string;
+  /**
+   * Between the request and the answer: how it is today, before the agent
+   * ("Today" and a line). A pain card's status quo; omitted on a request card.
+   */
+  context?: { label: string; text: string };
+  /** The footer's question ("Your part"). Omitted: no footer. */
+  footerLabel?: string;
   /** The footer's answer ("Nothing", "One tap"). */
-  footerValue: string;
+  footerValue?: string;
   /** `attention` paints the answer in the warning colour: it needs a person. */
   footerTone?: 'default' | 'attention';
   /**
@@ -38,6 +45,12 @@ export interface ConversationCardProps {
    * agent, never a colour.
    */
   agent?: string | null;
+  /**
+   * The card is a toggle the reader picks ("this sounds like me"): the whole
+   * card is one button with `aria-pressed`, a mark in its corner says whether it
+   * is picked, and a picked card takes the accent ring.
+   */
+  selection?: { pressed: boolean; onToggle: () => void };
   className?: string;
 }
 
@@ -56,23 +69,49 @@ export function ConversationCard({
   footerValue,
   footerTone = 'default',
   agent,
+  selection,
+  context,
   className,
 }: ConversationCardProps) {
   const tint = useAgentTint(agent);
+  const Card = selection ? 'button' : 'div';
   return (
-    <div
+    <Card
+      {...(selection ? { type: 'button' as const, 'aria-pressed': selection.pressed, onClick: selection.onToggle } : {})}
       className={cn(
         'flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
+        selection &&
+          'relative w-full cursor-pointer text-left transition-colors hover:border-ods-text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ods-accent',
+        selection?.pressed && 'border-ods-accent ring-1 ring-ods-accent',
         className,
       )}
       style={tint}
     >
+      {selection && (
+        <span
+          aria-hidden
+          className={cn(
+            'absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] flex size-6 items-center justify-center rounded-sm border text-h5',
+            selection.pressed ? 'border-ods-accent bg-ods-accent text-ods-bg' : 'border-ods-border text-ods-text-secondary',
+          )}
+        >
+          {selection.pressed ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
+        </span>
+      )}
       {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
-        <p className="m-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3" title={request}>
+        <p className={cn('m-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3', selection && 'pr-8')} title={request}>
           &ldquo;{request}&rdquo;
         </p>
       </ChatTurn>
+      {context && (
+        <div className="flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]">
+          <span className="text-ods-text-secondary text-h6">{context.label}</span>
+          <p className="m-0 line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4" title={context.text}>
+            {context.text}
+          </p>
+        </div>
+      )}
       {/* The answer is a command block: who did it, what was done, and its check. */}
       <ChatTurn
         avatar={responder.avatar}
@@ -91,10 +130,12 @@ export function ConversationCard({
           </span>
         </div>
       </ChatTurn>
-      <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h6">
-        <span>{footerLabel}</span>
-        <Tag as="span" label={footerValue} variant={footerTone === 'attention' ? 'warning' : 'badge'} />
-      </div>
-    </div>
+      {footerLabel && footerValue && (
+        <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h6">
+          <span>{footerLabel}</span>
+          <Tag as="span" label={footerValue} variant={footerTone === 'attention' ? 'warning' : 'badge'} />
+        </div>
+      )}
+    </Card>
   );
 }

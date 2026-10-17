@@ -7,6 +7,8 @@ import { StackedRowsPanel } from '../ui';
 export interface EntityQuotesPanelProps {
   /** A record's `quotes` column (case study, customer interview, prospect call). */
   quotes: readonly EntityQuote[] | null | undefined;
+  /** The caption over the quotes. Omitted: "Key Quotes · N". `null`: no caption (one quote standing alone). */
+  title?: string | null;
   className?: string;
 }
 
@@ -15,12 +17,12 @@ export interface EntityQuotesPanelProps {
  * with its speaker beneath, under a "Key Quotes · N" caption. Renders nothing
  * when there are none.
  */
-export function EntityQuotesPanel({ quotes, className }: EntityQuotesPanelProps) {
+export function EntityQuotesPanel({ quotes, title, className }: EntityQuotesPanelProps) {
   if (!quotes || quotes.length === 0) return null;
   return (
     <StackedRowsPanel
       className={className}
-      title={`${ENTITY_QUOTES_TITLE} · ${quotes.length}`}
+      title={title === undefined ? `${ENTITY_QUOTES_TITLE} · ${quotes.length}` : (title ?? undefined)}
       rows={quotes.map(q => ({
         id: q.key,
         columns: [
