@@ -28,7 +28,7 @@ public class PasswordResetService {
     private final EmailService emailService;
     private final MongoAuthorizationService authorizationService;
 
-    @Value("${openframe.password-reset.ttlMinutes:30}")
+    @Value("${openframe.password-reset.ttlMinutes}")
     private int ttlMinutes;
 
     public void createResetToken(String email) {
@@ -64,5 +64,4 @@ public class PasswordResetService {
         redisTemplate.delete(key);
     }
 }
-
 

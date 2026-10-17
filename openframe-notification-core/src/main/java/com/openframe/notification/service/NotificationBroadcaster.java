@@ -39,7 +39,7 @@ public class NotificationBroadcaster {
     private final AudienceResolver audienceResolver;
     private final NotificationSettingsRepository settingsRepository;
 
-    @Value("${openframe.features.notifications.enabled:false}")
+    @Value("${openframe.features.notifications.enabled}")
     private boolean notificationsEnabled;
 
     public Notification broadcast(NotificationCommand command) {

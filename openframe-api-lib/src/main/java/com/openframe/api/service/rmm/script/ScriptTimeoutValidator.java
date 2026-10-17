@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ScriptTimeoutValidator {
 
-    @Value("${openframe.rmm.script.max-timeout-seconds:600}")
+    @Value("${openframe.rmm.script.max-timeout-seconds}")
     private int maxTimeoutSeconds;
 
     public void validate(Integer timeoutSeconds) {
@@ -27,3 +27,4 @@ public class ScriptTimeoutValidator {
         }
     }
 }
+

@@ -25,7 +25,7 @@ public class SsoFlowCookies {
 
     private final String sameSite;
 
-    public SsoFlowCookies(@Value("${openframe.sso.flow-cookie.same-site:Lax}") String sameSite) {
+    public SsoFlowCookies(@Value("${openframe.sso.flow-cookie.same-site}") String sameSite) {
         this.sameSite = sameSite;
     }
 
