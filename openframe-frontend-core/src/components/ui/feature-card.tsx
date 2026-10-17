@@ -6,6 +6,8 @@ import { Card } from './card';
 import { StatusBadge } from './status-badge';
 
 export interface FeatureCardItem {
+  /** The item's key. Required for an item to be selectable (`FeatureCardGridProps.selection`). */
+  id?: string;
   icon?: React.ComponentType<{ size?: number; color?: string; className?: string }>;
   iconColor?: string;
   title: string;
@@ -57,7 +59,25 @@ export interface FeatureCardGridProps {
   subtitleClassName?: string;
   /** The subtitle's colour. Defaults to the platform accent. */
   accentClassName?: string;
+  /**
+   * The cells are toggles: each item with an `id` is a button the visitor can
+   * pick (`aria-pressed`), drawn with the accent ring while picked. The caller
+   * owns the picks; the grid only draws them and reports a tap.
+   */
+  selection?: FeatureCardSelection;
 }
+
+/** Which items are picked, and what a tap on one does. */
+export interface FeatureCardSelection {
+  selectedIds: readonly string[];
+  onToggle: (id: string) => void;
+}
+
+/** A picked cell: the card surface and an accent ring inside its hairlines. */
+const SELECTED_CELL_CLASS = 'bg-ods-card ring-1 ring-inset ring-ods-accent';
+/** A pickable cell that is not picked: the same box, lit on hover and focus. */
+const SELECTABLE_CELL_CLASS =
+  'w-full cursor-pointer text-left transition-colors hover:bg-ods-card focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ods-accent';
 
 const GRID_COLUMNS = {
   2: 'grid-cols-1 content-md:grid-cols-2',
@@ -98,6 +118,7 @@ export function FeatureCardGrid({
   titleClassName = '',
   subtitleClassName = '',
   accentClassName = 'text-ods-accent',
+  selection,
 }: FeatureCardGridProps) {
   const gridCols = GRID_COLUMNS[columns];
   const itemsPerRow = columns;
@@ -182,10 +203,19 @@ export function FeatureCardGrid({
                 finalItemClassName += ' rounded-lg';
               }
 
+              const selectable = !!selection && !!item.id && !loading;
+              const selected = selectable && selection.selectedIds.includes(item.id as string);
+              const Cell = selectable ? 'button' : 'div';
+              const cellProps = selectable
+                ? { type: 'button' as const, 'aria-pressed': selected, onClick: () => selection.onToggle(item.id as string) }
+                : {};
+              const selectionClasses = selectable ? ` ${SELECTABLE_CELL_CLASS}${selected ? ` ${SELECTED_CELL_CLASS}` : ''}` : '';
+
               return (
-                <div
-                  key={globalIndex}
-                  className={`${finalItemClassName}${finalBorderClasses} relative`}
+                <Cell
+                  key={item.id ?? globalIndex}
+                  {...cellProps}
+                  className={`${finalItemClassName}${finalBorderClasses}${selectionClasses} relative`}
                   style={item.customBackground ? { backgroundColor: item.customBackground } : undefined}
                 >
                   <div
@@ -284,7 +314,7 @@ export function FeatureCardGrid({
 
                     {item.footer && <div className="mt-auto">{item.footer}</div>}
                   </div>
-                </div>
+                </Cell>
               );
             })}
           </div>
