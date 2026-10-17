@@ -1,6 +1,7 @@
 package com.openframe.authz.controller;
 
 import com.openframe.authz.dto.InvitationRegistrationRequest;
+import com.openframe.authz.security.SessionPrincipalBinder;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoInviteCookiePayload;
 import com.openframe.authz.security.SsoLoginCookiePayload;
@@ -59,6 +60,7 @@ public class SsoJoinController {
     private final InvitationRegistrationService invitationRegistrationService;
     private final SsoOidcUserService ssoOidcUserService;
     private final TenantService tenantService;
+    private final SessionPrincipalBinder sessionPrincipalBinder;
 
     public record JoinPendingResponse(String email,
                                       String firstName,
@@ -121,6 +123,7 @@ public class SsoJoinController {
                     payload.invitationId(), names[0], names[1], resolvePictureUrl(user),
                     Boolean.TRUE.equals(payload.switchTenant()));
             AuthUser created = invitationRegistrationService.registerByInvitation(req);
+            sessionPrincipalBinder.bind(authentication, created, request, response);
             clearCookie(response, OF_SSO_INVITE);
             continueInto(response, created.getTenantId(), payload.redirectTo(), payload.authMobile());
             return;

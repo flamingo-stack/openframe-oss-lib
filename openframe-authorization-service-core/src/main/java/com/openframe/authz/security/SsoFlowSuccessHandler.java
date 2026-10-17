@@ -1,6 +1,7 @@
 package com.openframe.authz.security;
 
 import com.openframe.authz.security.flow.SsoFlowHandler;
+import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.web.AuthStateUtils;
@@ -37,6 +38,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
     private final AppleWebTokenCapture appleWebTokenCapture;
     private final MicrosoftLoginEmailGate microsoftLoginEmailGate;
     private final SsoIdentityCapture ssoIdentityCapture;
+    private final SsoOidcUserService ssoOidcUserService;
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -56,6 +58,16 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                     microsoftLoginEmailGate.require(authentication);
                 } catch (IllegalStateException e) {
                     authErrorResponder.send(response, request, "sso-login-unverified-email", e, EMAIL_NOT_VERIFIED);
+                    return;
+                }
+                // Only a plain login may auto-provision: an invitation or registration callback
+                // creates its own user, and provisioning the IdP email alongside it would mint a
+                // second account that skips that flow's rules (switch-tenant, consent gate).
+                try {
+                    ssoOidcUserService.autoProvisionForTenantLogin(authentication);
+                } catch (Exception e) {
+                    authErrorResponder.send(response, request, "sso-login-auto-provision", e,
+                            "SSO login failed. Please try again.");
                     return;
                 }
                 super.onAuthenticationSuccess(request, response, authentication);

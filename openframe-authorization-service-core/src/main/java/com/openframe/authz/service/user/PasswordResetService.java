@@ -12,7 +12,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.util.Optional;
 
 import static com.openframe.authz.util.ResetTokenUtil.generateResetToken;
 
@@ -32,8 +31,7 @@ public class PasswordResetService {
     private int ttlMinutes;
 
     public void createResetToken(String email) {
-        Optional<?> userOpt = userService.findActiveByEmail(email);
-        if (userOpt.isEmpty()) {
+        if (!userService.existsActiveByEmail(email)) {
             log.warn("Password reset requested for non-existing email: {}", email);
             return;
         }

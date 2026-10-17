@@ -13,19 +13,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.registration.ClientRegistration;
-import org.springframework.security.oauth2.core.AuthorizationGrantType;
-import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
+import static com.openframe.authz.support.SsoTestFixtures.authentication;
 import static com.openframe.authz.support.SsoTestFixtures.oidcUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -34,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -71,20 +67,9 @@ class SsoOidcUserServiceTest {
         return cfg;
     }
 
-    private static OidcUserRequest request(String registrationId) {
-        ClientRegistration registration = ClientRegistration.withRegistrationId(registrationId)
-                .clientId("c").clientSecret("s")
-                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-                .redirectUri("https://auth/cb").authorizationUri("https://idp/a").tokenUri("https://idp/t")
-                .jwkSetUri("https://idp/jwks").userNameAttributeName("sub").build();
-        OAuth2AccessToken accessToken = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, "at",
-                Instant.now(), Instant.now().plusSeconds(60));
-        return new OidcUserRequest(registration, accessToken, oidcUser(Map.of()).getIdToken());
-    }
-
     private void provisionDuringLogin(String provider, OidcUser user) {
         TenantContext.setTenantId(TENANT);
-        ReflectionTestUtils.invokeMethod(service, "autoProvisionIfNeeded", request(provider), user);
+        service.autoProvisionForTenantLogin(authentication(provider, user));
     }
 
     @Test
@@ -137,15 +122,26 @@ class SsoOidcUserServiceTest {
     }
 
     @Test
-    void shouldNeverFailLoginWhenProvisioningFails() {
+    void shouldFailLoginWhenProvisioningFails() {
         when(ssoConfigService.getSSOConfig(TENANT, "google")).thenThrow(new IllegalStateException("db down"));
+
+        assertThatThrownBy(() -> provisionDuringLogin("google", newcomer)).hasMessage("db down");
+    }
+
+    @Test
+    void shouldNotFailLoginWhenOnlyPostProcessingFails() {
+        when(ssoConfigService.getSSOConfig(TENANT, "google"))
+                .thenReturn(Optional.of(tenantApp(true, true, List.of("acme.com"))));
+        AuthUser existing = activeUser("user-1", TENANT, "new@acme.com");
+        when(userService.findActiveByEmailAndTenant("new@acme.com", TENANT)).thenReturn(Optional.of(existing));
+        doThrow(new IllegalStateException("avatar down")).when(registrationProcessor).postProcessAutoProvision(existing, null);
 
         assertThatCode(() -> provisionDuringLogin("google", newcomer)).doesNotThrowAnyException();
     }
 
     @Test
     void shouldSkipProvisioningWithoutTenantOrEmail() {
-        ReflectionTestUtils.invokeMethod(service, "autoProvisionIfNeeded", request("google"), newcomer);
+        service.autoProvisionForTenantLogin(authentication("google", newcomer));
         provisionDuringLogin("google", oidcUser(Map.of()));
 
         verifyNoInteractions(ssoConfigService, userService);
