@@ -79,6 +79,8 @@ import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-x
 import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -89,7 +91,8 @@ import { VideoHoverPreviewSurface } from './video-hover-preview';
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
- *  stay SEPARATE — YouTube wins when both are set (card matches theater). */
+ *  stay SEPARATE — the stored file wins when both are set (`playsYouTube`):
+ *  only a file previews on hover and resumes in the card. Card matches theater. */
 export interface WalkthroughVideoData {
   /** Row id — used for id-match cookie dismissal (a new video re-shows the
    *  card even after an old one was dismissed). */
@@ -104,6 +107,11 @@ export interface WalkthroughVideoData {
   /** Which bottom corner the collapsed card pins to. Admin-controlled per
    *  video; anything other than 'right' (including absent) means left. */
   position?: 'left' | 'right' | null;
+}
+
+/** Whether the widget plays the video from YouTube: only when there is no stored file. */
+function playsYouTube(video: WalkthroughVideoData | null | undefined): boolean {
+  return Boolean(video?.youtubeUrl) && !video?.mainVideoUrl;
 }
 
 /**
@@ -169,8 +177,12 @@ export interface FloatingWalkthroughVideoProps extends WalkthroughVideoBaseProps
   pathname?: string;
 }
 
-/** <InlineWalkthroughVideo>: the shared contract and nothing else — see above. */
-export type InlineWalkthroughVideoProps = WalkthroughVideoBaseProps;
+/** <InlineWalkthroughVideo>: the shared contract, plus its loading state. */
+export interface InlineWalkthroughVideoProps extends WalkthroughVideoBaseProps {
+  /** The host is still reading the video: the block draws a skeleton in the
+   *  card's own 16:9 box, so the page never moves when the card arrives. */
+  loading?: boolean;
+}
 
 /** Engine props. Internal: `placement` never reaches a call site. */
 type WalkthroughVideoProps = FloatingWalkthroughVideoProps & { placement: 'floating' | 'inline' };
@@ -364,7 +376,7 @@ function WalkthroughVideo({
   // `autoPlayCard` seeds the same state a muted theater close leaves behind, so
   // the card starts in resume mode with nothing else to special-case.
   const [handoff, setHandoff] = useState<Handoff | null>(() =>
-    autoPlayCard && !video?.youtubeUrl ? { time: 0, muted: true, playing: true } : null,
+    autoPlayCard && !playsYouTube(video) ? { time: 0, muted: true, playing: true } : null,
   );
   const [suspended, setSuspended] = useState(false);
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
@@ -379,7 +391,7 @@ function WalkthroughVideo({
   // `cardMuted`: that also tracks policy-forced mutes.
   const [userMuted, setUserMuted] = useState(false);
 
-  const isYouTube = Boolean(video?.youtubeUrl);
+  const isYouTube = playsYouTube(video);
   // PRESENCE-based: any handoff means "the card owns this video at this
   // timestamp"; `playing` only seeds the pause toggle. Keying it on `playing`
   // made a paused close (or a tab-switch) a one-way door — the card lost its
@@ -1245,8 +1257,8 @@ function WalkthroughVideo({
           >
             <DialogPrimitive.Title className="sr-only">{summaryTitle || 'Walkthrough video'}</DialogPrimitive.Title>
             <Video
-              kind={video.youtubeUrl ? 'youtube' : 'file'}
-              url={(video.youtubeUrl || video.mainVideoUrl) as string}
+              kind={isYouTube ? 'youtube' : 'file'}
+              url={(isYouTube ? video.youtubeUrl : video.mainVideoUrl) as string}
               poster={video.posterUrl}
               captionsUrl={video.captionsUrl}
               title={summaryTitle}
@@ -1311,6 +1323,13 @@ export function FloatingWalkthroughVideo(props: FloatingWalkthroughVideoProps): 
  * floating card's per-platform cookie (`dismissal={false}`). Both are stated
  * once here instead of at every call site, where forgetting either is silent.
  */
-export function InlineWalkthroughVideo(props: InlineWalkthroughVideoProps): React.ReactElement {
+export function InlineWalkthroughVideo({ loading, ...props }: InlineWalkthroughVideoProps): React.ReactElement {
+  if (loading && !props.video) {
+    return (
+      <LoadingRegion label="Loading the video" className={cn('w-full', props.className)}>
+        <UnifiedSkeleton className="aspect-video w-full rounded-md" />
+      </LoadingRegion>
+    );
+  }
   return <WalkthroughVideo {...props} placement="inline" appearDelayMs={0} dismissal={false} />;
 }

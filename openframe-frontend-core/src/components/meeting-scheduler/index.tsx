@@ -163,7 +163,10 @@ export interface HubSpotMeetingSchedulerProps {
    * choice made higher up the page); the form reads them when it mounts, and
    * what the visitor typed before a back edge wins over them.
    */
-  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'initialValues'>;
+  detailsFormProps?: Pick<
+    BookingFormProps,
+    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'initialValues'
+  >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
   rescue?: FormRescueDefinition | null;

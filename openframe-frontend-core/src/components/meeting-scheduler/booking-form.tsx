@@ -467,6 +467,15 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /**
+   * The OPTIONAL questions of the link this form asks, by name. A link is often
+   * shared by several pages, and a question added to it for one page must not
+   * appear on the others: with this set, an optional question it does not name
+   * is left out (in `fieldRows` and in the default layout alike). A REQUIRED
+   * question is always asked, named or not: a required field with no control
+   * is a submit that cannot succeed. Omitted: every declared question is asked.
+   */
+  optionalFields?: readonly string[];
   /** The form element's id, so a host can submit it from a button outside it
    *  (`<button form={id}>`): the modal layout keeps its actions in a footer
    *  under the card. */
@@ -521,6 +530,7 @@ export function BookingForm({
   submitLabel,
   footerNote,
   fieldRows,
+  optionalFields,
   formId,
   hideSubmit = false,
   onValidityChange,
@@ -537,7 +547,14 @@ export function BookingForm({
   // Every declared question resolved to a control (`resolveFormFieldControl`) —
   // an unfamiliar HubSpot type is drawn as its nearest control, never dropped
   // silently and never a reason to hide the form.
-  const supportedFields = useMemo(() => normalizeFormFields(formFields), [formFields]);
+  // `optionalFields` narrows the optional ones to the questions this form asks.
+  const supportedFields = useMemo(
+    () =>
+      normalizeFormFields(formFields).filter(
+        field => field.required || !optionalFields || optionalFields.includes(field.name),
+      ),
+    [formFields, optionalFields],
+  );
   // The DEFERRED schema in both flows: it is the wider of the two, and a strict
   // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
   // schema is the server's contract — see `makeBookingSchema`'s docblock.

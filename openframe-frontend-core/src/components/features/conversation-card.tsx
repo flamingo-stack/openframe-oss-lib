@@ -7,6 +7,7 @@ import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
+import { Button } from '../ui/button/button';
 import { Tag } from '../ui/tag';
 
 export interface ConversationCardSpeaker {
@@ -80,33 +81,31 @@ export function ConversationCard({
     <div
       className={cn(
         'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
-        selection && 'transition-colors hover:border-ods-text-secondary',
+        selection && 'cursor-pointer transition-colors hover:border-ods-text-secondary',
         selection?.pressed && 'border-ods-accent ring-1 ring-ods-accent',
         className,
       )}
       style={tint}
+      onClick={selection?.onToggle}
     >
       {selection && (
-        // ONE toggle, over the whole card: the card's text is its content, not a button's.
-        <button
+        // The toggle is a regular boxed Button in the card's corner, named by the
+        // request; a click anywhere on the card toggles it too (a pointer
+        // convenience: the Button is the control keyboards and screen readers use).
+        <Button
           type="button"
+          variant={selection.pressed ? 'accent' : 'outline'}
+          size="icon-sm"
           aria-pressed={selection.pressed}
           aria-labelledby={requestId}
-          onClick={selection.onToggle}
-          className="absolute inset-0 z-10 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus"
+          onClick={event => {
+            event.stopPropagation();
+            selection.onToggle();
+          }}
+          className="absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-10"
         >
-          <span
-            aria-hidden
-            className={cn(
-              'absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] flex size-6 items-center justify-center rounded-sm border',
-              selection.pressed
-                ? 'border-ods-accent bg-ods-accent text-ods-text-on-accent'
-                : 'border-ods-border text-ods-text-secondary',
-            )}
-          >
-            {selection.pressed ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-          </span>
-        </button>
+          {selection.pressed ? <CheckIcon /> : <PlusIcon />}
+        </Button>
       )}
       {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
@@ -115,7 +114,7 @@ export function ConversationCard({
           className={cn(
             'm-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3',
             // Clears the corner mark: its width plus a gap.
-            selection && 'pr-[calc(var(--spacing-system-lf)+var(--spacing-system-xsf))]',
+            selection && 'pr-[calc(2rem+var(--spacing-system-xsf))]',
           )}
           title={request}
         >
