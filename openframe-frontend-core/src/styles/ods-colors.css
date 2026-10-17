@@ -600,6 +600,22 @@
   --ods-accent: var(--ods-flamingo-cyan-base);
 }
 
+[data-app-type='coding-hub'] {
+  --color-accent-primary: var(--ods-system-greys-white);
+  --color-accent-hover: var(--ods-system-greys-white-hover);
+  --color-accent-active: var(--ods-system-greys-white-action);
+  --color-accent-secondary: var(--ods-system-greys-black);
+  --color-accent-secondary-hover: var(--ods-system-greys-black-hover);
+  --color-accent-secondary-active: var(--ods-system-greys-black-action);
+  --color-accent-focus: var(--ods-system-greys-white);
+  --color-focus-ring: var(--ods-system-greys-white);
+  --color-focus-visible: var(--ods-system-greys-white);
+  --color-link: var(--ods-system-greys-white);
+  --color-link-hover: var(--ods-system-greys-white-hover);
+  --ods-current: var(--ods-system-greys-white);
+  --ods-accent: var(--ods-system-greys-white);
+}
+
 [data-app-type='company-hub'] {
   --color-accent-primary: var(--ods-attention-red-error);
   --color-accent-hover: var(--ods-attention-red-error-hover);
