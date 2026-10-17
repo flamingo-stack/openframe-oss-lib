@@ -1,7 +1,7 @@
 /**
  * `answers`: what a host took outside the form (a landing hero's one-tap
- * question) reaches the question without a remount, and never over what the
- * visitor typed into the form.
+ * question) reaches the question on mount and without a remount, never over
+ * what the visitor typed into the form, and a withdrawn answer clears itself.
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -51,5 +51,17 @@ describe('BookingForm answers', () => {
     rerender({ not_declared: 'x', message: 'Asked' });
     await waitFor(() => expect(screen.getByLabelText(/^Anything else\?/)).toHaveValue('Asked'));
     expect(screen.queryByDisplayValue('x')).not.toBeInTheDocument();
+  });
+
+  it('applies an answer the host already holds when the form mounts', async () => {
+    renderForm({ message: 'Picked before the form' });
+    await waitFor(() => expect(screen.getByLabelText(/^Anything else\?/)).toHaveValue('Picked before the form'));
+  });
+
+  it('clears what it wrote when the host withdraws the answer', async () => {
+    const { rerender } = renderForm({ message: 'Fix these first: patching' });
+    await waitFor(() => expect(screen.getByLabelText(/^Anything else\?/)).toHaveValue('Fix these first: patching'));
+    rerender({});
+    await waitFor(() => expect(screen.getByLabelText(/^Anything else\?/)).toHaveValue(''));
   });
 });

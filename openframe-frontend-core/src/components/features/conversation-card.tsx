@@ -8,11 +8,14 @@ import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-c
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { Tag } from '../ui/tag';
 
 /** The card's frame and the answer's command block: ONE string each, read by the card and its skeleton. */
+/** What already acts on a click by itself, so a click on it is not the card's. */
+const INTERACTIVE_SELECTOR = 'a, button, input, select, textarea, label, [role="button"], [role="link"]';
+
 const CARD_FRAME_CLASS =
   'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
 const ANSWER_BLOCK_CLASS = 'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]';
@@ -96,8 +99,11 @@ export function ConversationCard({
       onClick={
         selection &&
         (event => {
-          // A pointer convenience: the primary button only, and never the end of a text selection.
+          // A pointer convenience: the primary button only, never the end of a text selection,
+          // and never a click on another control or link inside the card (it does its own thing).
           if (event.button !== 0 || window.getSelection()?.toString()) return;
+          const control = (event.target as Element).closest(INTERACTIVE_SELECTOR);
+          if (control && control !== event.currentTarget) return;
           selection.onToggle();
         })
       }
@@ -172,18 +178,13 @@ export function ConversationCard({
 }
 
 /** A text bar `lines` lines tall, at the type step of the text it stands for. */
-function LineBar({ lines, type, className }: { lines: number; type: 'text-h3' | 'text-h4' | 'text-h6'; className?: string }) {
-  const height = { 1: 'h-[1lh]', 2: 'h-[2lh]', 3: 'h-[3lh]' }[lines];
-  return <UnifiedSkeleton className={cn(type, height, 'rounded', className)} />;
-}
-
 /** A speaker's turn while loading: the avatar box, the name line, then the turn's own lines. */
 function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: ReactNode }) {
   return (
     <div className="flex min-w-0 items-start gap-[var(--spacing-system-sf)]">
       <UnifiedSkeleton className="shrink-0 rounded-md" width={avatarPx} height={avatarPx} />
       <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-        <LineBar lines={1} type="text-h4" className="w-1/2" />
+        <TextLineSkeleton lines={1} type="h4" className="w-1/2" />
         {children}
       </div>
     </div>
@@ -213,22 +214,22 @@ export function ConversationCardSkeleton({
   return (
     <LoadingRegion label="Loading" className={cn(CARD_FRAME_CLASS, className)}>
       <TurnSkeleton avatarPx={avatarPx}>
-        <LineBar lines={2} type="text-h3" />
+        <TextLineSkeleton lines={2} type="h3" />
       </TurnSkeleton>
       {context && (
         <div className="flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]">
-          <LineBar lines={1} type="text-h6" className="w-1/4" />
-          <LineBar lines={3} type="text-h4" />
+          <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
+          <TextLineSkeleton lines={3} type="h4" />
         </div>
       )}
       <div className={ANSWER_BLOCK_CLASS}>
         <TurnSkeleton avatarPx={avatarPx}>
-          <LineBar lines={3} type="text-h4" />
+          <TextLineSkeleton lines={3} type="h4" />
         </TurnSkeleton>
       </div>
       {footer && (
         <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]">
-          <LineBar lines={1} type="text-h6" className="w-1/4" />
+          <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
           <Tag as="span" label={'\u00a0'} variant="badge" className="invisible" />
         </div>
       )}

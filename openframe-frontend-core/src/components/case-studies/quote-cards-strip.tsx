@@ -31,11 +31,11 @@ export interface QuoteCardTileProps extends Omit<HTMLAttributes<HTMLDivElement>,
  * their logo, and the whole card opening the case study it comes from. The
  * strip draws one per quote; a page that shows a single story draws one alone.
  */
-const QUOTE_CARD_CLASS = 'relative rounded-md border-ods-border bg-ods-card p-[var(--spacing-system-sf)] shadow-none';
+const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
 
 export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteCardTileProps) {
   return (
-    <Card
+    <Card variant="panel"
       aria-hidden={decorative || undefined}
       className={cn(QUOTE_CARD_CLASS, 'hover:border-ods-border-hover', className)}
       {...props}
@@ -49,7 +49,7 @@ export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteC
 /** One quote card while it loads: the same card and the person cell's own skeleton. */
 export function QuoteCardTileSkeleton({ className }: { className?: string }) {
   return (
-    <Card className={cn(QUOTE_CARD_CLASS, className)}>
+    <Card variant="panel" className={cn(QUOTE_CARD_CLASS, className)}>
       <LoadingRegion label="Loading a customer story">
         <PersonCellSkeleton size="lg" />
       </LoadingRegion>

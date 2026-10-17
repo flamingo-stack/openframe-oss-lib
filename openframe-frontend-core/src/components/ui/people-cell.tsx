@@ -1,7 +1,7 @@
 'use client';
 
 import { personFirstName } from '../../utils/format';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { AvatarStack } from './avatar-stack';
 import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
@@ -46,9 +46,6 @@ export interface PersonCellProps {
    */
   size?: 'sm' | 'lg';
 }
-
-/** The name line's type step per size, as a static class (a class built at runtime emits no CSS). */
-const PERSON_CELL_PRIMARY_TYPE = { sm: 'text-h6', lg: 'text-h3' } as const;
 
 const PERSON_CELL_SIZE = {
   sm: { avatar: 'sm', gap: 'gap-3', primary: 'h6' },
@@ -104,8 +101,8 @@ export function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['si
     <div className={`flex min-w-0 items-center ${scale.gap}`}>
       <UnifiedSkeleton className={`shrink-0 rounded-md ${SQUARE_AVATAR_SIZE_CLASS[scale.avatar]}`} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <UnifiedSkeleton className={`h-[1lh] w-3/4 rounded ${PERSON_CELL_PRIMARY_TYPE[size]}`} />
-        <UnifiedSkeleton className="h-[1lh] w-1/2 rounded text-h6" />
+        <TextLineSkeleton type={scale.primary} className="w-3/4" />
+        <TextLineSkeleton type="h6" className="w-1/2" />
       </div>
     </div>
   );

@@ -94,8 +94,7 @@ const INLINE_CARD_BOX_CLASS = 'aspect-video w-full rounded-md border border-ods-
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
- *  stay SEPARATE — the stored file wins when both are set (`playsYouTube`):
- *  only a file previews on hover and resumes in the card. Card matches theater. */
+ *  stay SEPARATE — YouTube wins when both are set (card matches theater). */
 export interface WalkthroughVideoData {
   /** Row id — used for id-match cookie dismissal (a new video re-shows the
    *  card even after an old one was dismissed). */
@@ -110,11 +109,6 @@ export interface WalkthroughVideoData {
   /** Which bottom corner the collapsed card pins to. Admin-controlled per
    *  video; anything other than 'right' (including absent) means left. */
   position?: 'left' | 'right' | null;
-}
-
-/** Whether the widget plays the video from YouTube: only when there is no stored file. */
-export function playsYouTube(video: WalkthroughVideoData | null | undefined): boolean {
-  return Boolean(video?.youtubeUrl) && !video?.mainVideoUrl;
 }
 
 /**
@@ -375,7 +369,7 @@ function WalkthroughVideo({
   // `autoPlayCard` seeds the same state a muted theater close leaves behind, so
   // the card starts in resume mode with nothing else to special-case.
   const [handoff, setHandoff] = useState<Handoff | null>(() =>
-    autoPlayCard && !playsYouTube(video) ? { time: 0, muted: true, playing: true } : null,
+    autoPlayCard && !video?.youtubeUrl ? { time: 0, muted: true, playing: true } : null,
   );
   const [suspended, setSuspended] = useState(false);
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
@@ -390,7 +384,7 @@ function WalkthroughVideo({
   // `cardMuted`: that also tracks policy-forced mutes.
   const [userMuted, setUserMuted] = useState(false);
 
-  const isYouTube = playsYouTube(video);
+  const isYouTube = Boolean(video?.youtubeUrl);
   // PRESENCE-based: any handoff means "the card owns this video at this
   // timestamp"; `playing` only seeds the pause toggle. Keying it on `playing`
   // made a paused close (or a tab-switch) a one-way door — the card lost its
@@ -1260,8 +1254,8 @@ function WalkthroughVideo({
           >
             <DialogPrimitive.Title className="sr-only">{summaryTitle || 'Walkthrough video'}</DialogPrimitive.Title>
             <Video
-              kind={isYouTube ? 'youtube' : 'file'}
-              url={(isYouTube ? video.youtubeUrl : video.mainVideoUrl) as string}
+              kind={video.youtubeUrl ? 'youtube' : 'file'}
+              url={(video.youtubeUrl || video.mainVideoUrl) as string}
               poster={video.posterUrl}
               captionsUrl={video.captionsUrl}
               title={summaryTitle}

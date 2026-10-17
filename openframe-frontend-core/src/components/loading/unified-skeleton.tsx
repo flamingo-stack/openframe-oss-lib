@@ -105,6 +105,27 @@ export function UnifiedSkeleton({
   );
 }
 
+/** The ODS type steps a text line can take, as static classes (a class built at runtime emits no CSS). */
+const TEXT_LINE_TYPE = { h3: 'text-h3', h4: 'text-h4', h5: 'text-h5', h6: 'text-h6' } as const;
+const TEXT_LINE_HEIGHT = { 1: 'h-[1lh]', 2: 'h-[2lh]', 3: 'h-[3lh]' } as const;
+
+/**
+ * A run of text lines while it loads: the bar takes the type step the loaded text
+ * uses and `lines` of its line height (`lh`), so the loaded text takes its place
+ * at every breakpoint without moving the page.
+ */
+export function TextLineSkeleton({
+  type,
+  lines = 1,
+  className,
+}: {
+  type: keyof typeof TEXT_LINE_TYPE;
+  lines?: keyof typeof TEXT_LINE_HEIGHT;
+  className?: string;
+}) {
+  return <UnifiedSkeleton className={cn(TEXT_LINE_TYPE[type], TEXT_LINE_HEIGHT[lines], 'rounded', className)} />;
+}
+
 /**
  * Text skeleton variants for consistent typography loading
  */

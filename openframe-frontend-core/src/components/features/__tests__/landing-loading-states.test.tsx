@@ -1,21 +1,40 @@
 /**
  * The loading states hosts draw while a section reads its data: each is the
- * loaded component's own box, and the walkthrough card's file-over-YouTube rule.
+ * loaded component's own box; and a pickable conversation card answers its own
+ * clicks only.
  */
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { FaqAccordionSkeleton } from '../../faq-accordion';
-import { ConversationCardSkeleton } from '../conversation-card';
-import { playsYouTube } from '../walkthrough-video';
+import { ConversationCard, ConversationCardSkeleton } from '../conversation-card';
 
-describe('playsYouTube', () => {
-  it('plays the stored file when the video has both', () => {
-    expect(playsYouTube({ mainVideoUrl: 'https://cdn/x.m3u8', youtubeUrl: 'https://youtu.be/x' })).toBe(false);
+describe('ConversationCard selection', () => {
+  const speaker = { name: 'Dana', avatar: null };
+  const card = (onToggle: () => void) => (
+    <ConversationCard
+      requester={speaker}
+      request="The printer is down"
+      responder={speaker}
+      outcome="Fixed it"
+      outcomeAside={<a href="#more">Read more</a>}
+      selection={{ pressed: false, onToggle }}
+    />
+  );
+
+  it('toggles on a click on the card and on its button', () => {
+    const onToggle = vi.fn();
+    render(card(onToggle));
+    fireEvent.click(screen.getByText(/Fixed it/));
+    fireEvent.click(screen.getByRole('button', { pressed: false }));
+    expect(onToggle).toHaveBeenCalledTimes(2);
   });
-  it('plays YouTube only when there is no stored file', () => {
-    expect(playsYouTube({ youtubeUrl: 'https://youtu.be/x' })).toBe(true);
-    expect(playsYouTube(null)).toBe(false);
+
+  it('leaves a click on a link inside the card to the link', () => {
+    const onToggle = vi.fn();
+    render(card(onToggle));
+    fireEvent.click(screen.getByRole('link', { name: 'Read more' }));
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
 

@@ -457,10 +457,11 @@ export interface BookingFormProps {
   initialValues?: Record<string, unknown>;
   /**
    * Answers the host took OUTSIDE the form, by question name (a landing hero's
-   * one-tap question). Each is written into its question when it arrives or
-   * changes, unless the visitor has edited that question in the form: no
-   * remount, so nothing typed is lost. An answer to a question the form does
-   * not ask is ignored.
+   * one-tap question). Each is written into its question when the form mounts
+   * and whenever it changes, while the question is empty or still holds the
+   * host's last answer: nothing the visitor typed is overwritten, and an answer
+   * the host withdraws clears what it wrote. An answer to a question the form
+   * does not ask is ignored.
    */
   answers?: Readonly<Record<string, string>>;
   /** Defaults to "Confirm Booking"; details-first says "Continue". */
@@ -589,7 +590,6 @@ export function BookingForm({
     handleSubmit,
     setValue,
     getValues,
-    getFieldState,
     watch,
     formState: { errors },
   } = useForm<BookingFormValues>({
@@ -652,20 +652,25 @@ export function BookingForm({
     );
   }, [consentDefaults, priorConsents, getValues, setValue]);
 
-  // The host's outside answers: written into each question the visitor has not edited, without a remount.
-  // The first run is the mount, where `defaultValues` already carry what the host stashed.
-  const answersSeen = useRef(answers);
+  // The host's outside answers, written without a remount, on mount too (an answer given before the form
+  // mounted, or while a later step had it unmounted, still arrives). A question is the host's to write while it
+  // is empty or still holds what this effect last wrote there; once it holds anything else (typed, or restored
+  // from the visitor's own stash) it is the visitor's. An answer the host withdraws clears what it wrote.
+  const written = useRef<Record<string, string>>({});
   useEffect(() => {
-    if (answersSeen.current === answers) return;
-    answersSeen.current = answers;
-    for (const [name, value] of Object.entries(answers ?? {})) {
+    const names = new Set([...Object.keys(answers ?? {}), ...Object.keys(written.current)]);
+    for (const name of names) {
       // Only a question this form asks: an answer to one the link does not declare (or the form leaves out) goes nowhere.
       if (!supportedFields.some(field => field.name === name)) continue;
-      const path = `formFields.${name}` as const;
-      if (getFieldState(path as never).isDirty || getValues('formFields')?.[name] === value) continue;
-      setValue(path as never, value as never, { shouldValidate: true });
+      const next = answers?.[name] ?? '';
+      const current = getValues('formFields')?.[name] ?? '';
+      if (current !== '' && current !== written.current[name]) continue;
+      if (next) written.current[name] = next;
+      else delete written.current[name];
+      if (current === next) continue;
+      setValue(`formFields.${name}` as never, next as never, { shouldValidate: next !== '' });
     }
-  }, [answers, supportedFields, getFieldState, getValues, setValue]);
+  }, [answers, supportedFields, getValues, setValue]);
 
   // Form rescue: the built-ins by name, the declared questions under `formFields.<name>`.
   const rescueFields = useMemo(

@@ -5,11 +5,11 @@ import { cn } from '../utils/cn';
 import { faqItemAnchor } from '../utils/faq-anchor';
 import { Chevron02DownIcon } from './icons-v2-generated/arrows/chevron-02-down-icon';
 import { LoadingRegion } from './loading/loading-region';
-import { UnifiedSkeleton } from './loading/unified-skeleton';
+import { TextLineSkeleton } from './loading/unified-skeleton';
 
 /** The accordion's frame and a row's inset: ONE string each, read by the accordion and its skeleton. */
 const FAQ_ACCORDION_FRAME_CLASS = 'divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent';
-const FAQ_ROW_INSET_CLASS = 'px-6 py-4';
+const FAQ_ROW_INSET_CLASS = 'px-[var(--spacing-system-lf)] py-[var(--spacing-system-mf)]';
 
 export interface FaqItem {
   id: number | string;
@@ -113,9 +113,7 @@ export function FaqAccordionSkeleton({ rows, label = 'Loading questions' }: { ro
     <LoadingRegion label={label} className={FAQ_ACCORDION_FRAME_CLASS}>
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className={FAQ_ROW_INSET_CLASS}>
-          <UnifiedSkeleton as="span" width="auto" height="auto" className="block w-3/4 text-h4 text-transparent">
-            &nbsp;
-          </UnifiedSkeleton>
+          <TextLineSkeleton type="h4" className="w-3/4" />
         </div>
       ))}
     </LoadingRegion>
