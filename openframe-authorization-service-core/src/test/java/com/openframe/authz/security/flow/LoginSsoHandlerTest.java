@@ -1,6 +1,7 @@
 package com.openframe.authz.security.flow;
 
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
+import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
@@ -204,7 +205,7 @@ class LoginSsoHandlerTest {
         handler.handle(request(), response, authentication("google", trustedGoogle));
 
         assertThat(response.getRedirectedUrl()).isEqualTo("/auth/sso-continue");
-        verify(signupTicketService, never()).create(any(), any(), any(), any(), anyBoolean(), any());
+        verify(signupTicketService, never()).create(any(), any(), any(), any(), anyBoolean(), any(), any());
     }
 
     @Test
@@ -221,12 +222,53 @@ class LoginSsoHandlerTest {
         when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.of("g-1"));
-        when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, "g-1")).thenReturn("ticket/1");
+        when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, "g-1", null)).thenReturn("ticket/1");
 
         handler.handle(request("com.openframe.app://auth", true), response, authentication("google", trustedGoogle));
 
         assertThat(response.getHeader("Location")).isEqualTo(
                 "https://auth.example.com/oauth/signup-continue?signupTicket=ticket%2F1&redirectTo=com.openframe.app%3A%2F%2Fauth");
+    }
+
+    @Test
+    void handle_unknownAppUserWithSourceCookie_parksCookieSourceInTicket() throws Exception {
+        when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
+        when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
+        when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.of("g-1"));
+        when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, "g-1",
+                RegistrationAttribution.builder().downloadId("dl-1").utmSource("producthunt").build()))
+                .thenReturn("ticket/1");
+        MockHttpServletRequest request = request("com.openframe.app://auth", true);
+        request.setCookies(request.getCookies()[0], new Cookie("of_src", "id=dl-1&utm_source=producthunt"));
+
+        handler.handle(request, response, authentication("google", trustedGoogle));
+
+        assertThat(response.getHeader("Location")).isEqualTo(
+                "https://auth.example.com/oauth/signup-continue?signupTicket=ticket%2F1&redirectTo=com.openframe.app%3A%2F%2Fauth");
+    }
+
+    @Test
+    void handle_unknownAppUserWithoutProviderSubject_parksTicketWithoutSubject() throws Exception {
+        when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
+        when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
+        when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.empty());
+        when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, null, null)).thenReturn("ticket/1");
+
+        handler.handle(request("com.openframe.app://auth", true), response, authentication("google", trustedGoogle));
+
+        assertThat(response.getHeader("Location")).isEqualTo(
+                "https://auth.example.com/oauth/signup-continue?signupTicket=ticket%2F1&redirectTo=com.openframe.app%3A%2F%2Fauth");
+    }
+
+    @Test
+    void handle_unknownAppUserWithoutRedirectTarget_redirectsToSignupContinuePage() throws Exception {
+        ReflectionTestUtils.setField(handler, "signupContinueUrl", "/auth/sso-continue");
+        when(userService.findActiveByEmail("ada@acme.com")).thenReturn(Optional.empty());
+        when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
+
+        handler.handle(request(null, true), response, authentication("google", trustedGoogle));
+
+        assertThat(response.getRedirectedUrl()).isEqualTo("/auth/sso-continue");
     }
 
     @Test

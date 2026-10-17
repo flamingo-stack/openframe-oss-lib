@@ -88,6 +88,12 @@ public class SsoTenantRegistrationService {
         if (attribution == null || attribution.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
             return attribution;
         }
+        RegistrationAttribution withoutUrls = attribution.toBuilder().referrer(null).landingUrl(null).build();
+        if (withoutUrls.totalLength() <= MAX_ATTRIBUTION_LENGTH) {
+            log.warn("Attribution too large for the SSO cookie ({} chars) — dropping its referrer and landing URL",
+                    attribution.totalLength());
+            return withoutUrls;
+        }
         log.warn("Attribution too large for the SSO cookie ({} chars) — dropping it", attribution.totalLength());
         return null;
     }

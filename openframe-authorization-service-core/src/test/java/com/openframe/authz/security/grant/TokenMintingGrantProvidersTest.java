@@ -127,7 +127,7 @@ class TokenMintingGrantProvidersTest {
     }
 
     private static SignupTicketPayload ticket(String userId, String tenantId) {
-        return new SignupTicketPayload("ada@acme.com", "Ada", "L", "google", true, "g-1", userId, tenantId);
+        return new SignupTicketPayload("ada@acme.com", "Ada", "L", "google", true, "g-1", userId, tenantId, null);
     }
 
     private static void assertOAuthError(Runnable call, String code) {

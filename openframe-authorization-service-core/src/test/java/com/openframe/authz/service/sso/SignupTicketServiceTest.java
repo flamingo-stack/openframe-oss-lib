@@ -1,10 +1,15 @@
 package com.openframe.authz.service.sso;
 
+import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.service.sso.SignupTicketService.SignupTicketPayload;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -41,12 +46,59 @@ class SignupTicketServiceTest {
 
     @Test
     void shouldIssueOpaqueTicketStoredForTenMinutes() {
-        String ticket = service.create("a@acme.com", "A", "B", "google", true, "g-1");
+        String ticket = service.create("a@acme.com", "A", "B", "google", true, "g-1", null);
 
         ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
         verify(values).set(eq(keyFor(ticket)), json.capture(), eq(Duration.ofMinutes(10)));
         assertThat(ticket).matches("^[A-Za-z0-9_-]{43}$");
         assertThat(json.getValue()).contains("\"email\":\"a@acme.com\"").contains("\"subject\":\"g-1\"");
+    }
+
+    @Test
+    void create_calledTwice_issuesDifferentTickets() {
+        String first = service.create("a@acme.com", "A", "B", "google", true, "g-1", null);
+        String second = service.create("a@acme.com", "A", "B", "google", true, "g-1", null);
+
+        assertThat(first).isNotEqualTo(second);
+    }
+
+    @Test
+    void create_withAttribution_storesItInThePayload() {
+        String ticket = service.create("a@acme.com", "A", "B", "google", true, "g-1", attribution());
+
+        assertThat(readBack(ticket, Duration.ofMinutes(10)).attribution()).isEqualTo(attribution());
+    }
+
+    @Test
+    void peek_payloadWrittenBeforeAttribution_returnsPayloadWithoutAttribution() {
+        when(values.get(anyString())).thenReturn("{\"email\":\"a@acme.com\",\"firstName\":\"A\",\"lastName\":\"B\","
+                + "\"provider\":\"google\",\"emailVerified\":true,\"subject\":\"g-1\",\"userId\":\"user-1\",\"tenantId\":\"tenant-1\"}");
+
+        assertThat(service.peek("t")).hasValue(new SignupTicketPayload("a@acme.com", "A", "B", "google", true, "g-1",
+                "user-1", "tenant-1", null));
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(longs = 0)
+    void bind_noPositiveRemainingTtl_storesForTenMinutes(Long remaining) {
+        when(values.get(anyString())).thenReturn("{\"email\":\"a@acme.com\",\"provider\":\"google\",\"emailVerified\":true}");
+        when(redisTemplate.getExpire(anyString())).thenReturn(remaining);
+
+        service.bind("t", "user-1", "tenant-1");
+
+        verify(values).set(anyString(), anyString(), eq(Duration.ofMinutes(10)));
+    }
+
+    @Test
+    void bind_ticketWithAttribution_keepsIt() {
+        when(values.get(anyString())).thenReturn("{\"email\":\"a@acme.com\",\"provider\":\"google\",\"emailVerified\":true,"
+                + "\"attribution\":{\"utmSource\":\"newsletter\",\"gclid\":\"gclid-1\"}}");
+        when(redisTemplate.getExpire(anyString())).thenReturn(120L);
+
+        service.bind("t", "user-1", "tenant-1");
+
+        assertThat(readBack("t", Duration.ofSeconds(120)).attribution()).isEqualTo(attribution());
     }
 
     @Test
@@ -84,6 +136,17 @@ class SignupTicketServiceTest {
         when(values.get(anyString())).thenReturn("{broken");
 
         assertThat(service.peek("t")).isEmpty();
+    }
+
+    private SignupTicketPayload readBack(String ticket, Duration ttl) {
+        ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
+        verify(values).set(eq(keyFor(ticket)), json.capture(), eq(ttl));
+        when(values.get(keyFor(ticket))).thenReturn(json.getValue());
+        return service.peek(ticket).orElseThrow();
+    }
+
+    private static RegistrationAttribution attribution() {
+        return RegistrationAttribution.builder().utmSource("newsletter").gclid("gclid-1").build();
     }
 
     private static String keyFor(String ticket) {

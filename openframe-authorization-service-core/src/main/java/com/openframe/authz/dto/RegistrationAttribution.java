@@ -7,12 +7,13 @@ import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.util.StringUtils;
 
 /**
  * Marketing-attribution signals
  */
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegistrationAttribution {
@@ -41,11 +42,49 @@ public class RegistrationAttribution {
 
     private String ref;
 
+    private String referrer;
+
+    private String landingUrl;
+
+    private String downloadId;
+
+    private String heardFrom;
+
+    private String heardFromOther;
+
     public int totalLength() {
         return Stream.of(fbc, fbclid, fbp, hutk, gclid, rdtCid, liFatId,
-                        utmSource, utmMedium, utmCampaign, utmContent, utmTerm, eventId, ref)
+                        utmSource, utmMedium, utmCampaign, utmContent, utmTerm, eventId, ref,
+                        referrer, landingUrl, downloadId, heardFrom, heardFromOther)
                 .filter(Objects::nonNull)
                 .mapToInt(String::length)
                 .sum();
+    }
+
+    public static RegistrationAttribution merge(RegistrationAttribution primary, RegistrationAttribution fallback) {
+        if (primary == null || fallback == null) {
+            return primary != null ? primary : fallback;
+        }
+        RegistrationAttribution source = primary.hasSourceSignal() ? primary : fallback;
+        return primary.toBuilder()
+                .downloadId(StringUtils.hasText(primary.getDownloadId()) ? primary.getDownloadId() : fallback.getDownloadId())
+                .fbclid(source.getFbclid())
+                .gclid(source.getGclid())
+                .rdtCid(source.getRdtCid())
+                .liFatId(source.getLiFatId())
+                .utmSource(source.getUtmSource())
+                .utmMedium(source.getUtmMedium())
+                .utmCampaign(source.getUtmCampaign())
+                .utmContent(source.getUtmContent())
+                .utmTerm(source.getUtmTerm())
+                .ref(source.getRef())
+                .referrer(source.getReferrer())
+                .landingUrl(source.getLandingUrl())
+                .build();
+    }
+
+    private boolean hasSourceSignal() {
+        return Stream.of(fbclid, gclid, rdtCid, liFatId, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, ref)
+                .anyMatch(StringUtils::hasText);
     }
 }

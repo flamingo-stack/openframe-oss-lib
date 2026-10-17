@@ -1,5 +1,6 @@
 package com.openframe.authz.controller;
 
+import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoFlowCookies;
@@ -50,6 +51,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -123,7 +125,7 @@ class SsoLoginControllerTest {
     @Test
     void shouldDescribePendingIdentityFromSessionOrTicket() {
         when(signupTicketService.peek("tk")).thenReturn(Optional.of(
-                new SignupTicketPayload("m@x.com", "M", "X", "apple", true, "a-1", null, null)));
+                new SignupTicketPayload("m@x.com", "M", "X", "apple", true, "a-1", null, null, null)));
 
         assertThat(controller.pendingSsoIdentity(null, session, withLoginCookie()).email()).isEqualTo("Founder@NewCo.com");
         assertThat(controller.pendingSsoIdentity("tk", null, bind(new MockHttpServletRequest())).provider()).isEqualTo("apple");
@@ -173,7 +175,7 @@ class SsoLoginControllerTest {
     @Test
     void shouldCompleteMobileSignupOnceAndBindTicket() {
         when(signupTicketService.peek("tk")).thenReturn(Optional.of(
-                new SignupTicketPayload("Founder@NewCo.com", "Fo", null, "google", true, "g-1", null, null)));
+                new SignupTicketPayload("Founder@NewCo.com", "Fo", null, "google", true, "g-1", null, null, null)));
         when(ssoIdentityService.findBySubject("google", "g-1")).thenReturn(Optional.empty());
         Tenant registered = tenant("newco", TenantStatus.ACTIVE);
         registered.setOwnerId("owner-1");
@@ -189,7 +191,7 @@ class SsoLoginControllerTest {
     @Test
     void shouldReturnSameTenantForAlreadyBoundTicket() {
         when(signupTicketService.peek("tk")).thenReturn(Optional.of(
-                new SignupTicketPayload("f@newco.com", "F", "", "google", true, "g-1", "owner-1", "newco")));
+                new SignupTicketPayload("f@newco.com", "F", "", "google", true, "g-1", "owner-1", "newco", null)));
 
         assertThat(controller.completeSsoRegistrationByTicket(
                 new SsoLoginController.SignupTicketCompleteRequest("tk", "NewCo", "newco", null)).tenantId()).isEqualTo("newco");
@@ -199,7 +201,7 @@ class SsoLoginControllerTest {
     @Test
     void shouldRefuseMobileSignupOfLinkedSubject() {
         when(signupTicketService.peek("tk")).thenReturn(Optional.of(
-                new SignupTicketPayload("f@newco.com", "F", "", "google", true, "g-1", null, null)));
+                new SignupTicketPayload("f@newco.com", "F", "", "google", true, "g-1", null, null, null)));
         when(ssoIdentityService.findBySubject("google", "g-1")).thenReturn(Optional.of(SsoIdentity.builder().build()));
 
         assertThatThrownBy(() -> controller.completeSsoRegistrationByTicket(
@@ -214,7 +216,7 @@ class SsoLoginControllerTest {
     @Test
     void shouldMapRegistrationErrorsToHttpStatus() {
         when(signupTicketService.peek("tk")).thenReturn(Optional.of(
-                new SignupTicketPayload("f@newco.com", "F", "", "google", true, null, null, null)));
+                new SignupTicketPayload("f@newco.com", "F", "", "google", true, null, null, null, null)));
         when(registrationService.registerTenant(any()))
                 .thenThrow(new IllegalArgumentException("This domain is already in use. Please try a different one."))
                 .thenThrow(new IllegalStateException("gatekeeping"));
@@ -223,5 +225,91 @@ class SsoLoginControllerTest {
                 new SsoLoginController.SignupTicketCompleteRequest("tk", "NewCo", "taken", null)), HttpStatus.BAD_REQUEST);
         assertStatus(() -> controller.completeSsoRegistrationByTicket(
                 new SsoLoginController.SignupTicketCompleteRequest("tk", "NewCo", "taken", null)), HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void completeSsoRegistrationByTicket_ticketExpired_answersConflict() {
+        when(signupTicketService.peek("tk")).thenReturn(Optional.empty());
+
+        assertStatus(() -> controller.completeSsoRegistrationByTicket(
+                new SsoLoginController.SignupTicketCompleteRequest("tk", "NewCo", "newco", null)), HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void completeSsoRegistrationByTicket_ticketWithoutSubject_skipsLinkCheck() {
+        ticketPeeks(new SignupTicketPayload("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null, null));
+        registrationSucceeds();
+
+        controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo", null));
+
+        verifyNoInteractions(ssoIdentityService);
+    }
+
+    @Test
+    void completeSsoRegistrationByTicket_newIdentity_registersTicketIdentityWithRequestedTenant() {
+        ticketPeeks(new SignupTicketPayload("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null, null));
+        registrationSucceeds();
+
+        controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo", null));
+
+        assertThat(registeredRequest())
+                .returns("founder@newco.com", TenantRegistrationRequest::getEmail)
+                .returns("Fo", TenantRegistrationRequest::getFirstName)
+                .returns("Under", TenantRegistrationRequest::getLastName)
+                .returns("New Co", TenantRegistrationRequest::getTenantName)
+                .returns("newco", TenantRegistrationRequest::getTenantDomain)
+                .returns(true, TenantRegistrationRequest::isEmailPreVerified);
+    }
+
+    @Test
+    void completeSsoRegistrationByTicket_ticketWithoutNames_registersBlankNames() {
+        ticketPeeks(new SignupTicketPayload("Founder@NewCo.com", null, null, "apple", true, null, null, null, null));
+        registrationSucceeds();
+
+        controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo", null));
+
+        assertThat(registeredRequest())
+                .returns("", TenantRegistrationRequest::getFirstName)
+                .returns("", TenantRegistrationRequest::getLastName);
+    }
+
+    @Test
+    void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersAppFieldsOverTicketCookie() {
+        ticketPeeks(new SignupTicketPayload("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null,
+                RegistrationAttribution.builder()
+                        .downloadId("download-from-cookie")
+                        .utmSource("google")
+                        .gclid("gclid-1")
+                        .build()));
+        registrationSucceeds();
+
+        controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo",
+                RegistrationAttribution.builder()
+                        .downloadId("download-from-app")
+                        .heardFrom("search")
+                        .build()));
+
+        assertThat(registeredRequest().getAttribution()).isEqualTo(RegistrationAttribution.builder()
+                .downloadId("download-from-app")
+                .heardFrom("search")
+                .utmSource("google")
+                .gclid("gclid-1")
+                .build());
+    }
+
+    private void ticketPeeks(SignupTicketPayload payload) {
+        when(signupTicketService.peek("tk")).thenReturn(Optional.of(payload));
+    }
+
+    private void registrationSucceeds() {
+        Tenant registered = tenant("tenant-1", TenantStatus.ACTIVE);
+        registered.setOwnerId("owner-1");
+        when(registrationService.registerTenant(any(TenantRegistrationRequest.class))).thenReturn(registered);
+    }
+
+    private TenantRegistrationRequest registeredRequest() {
+        ArgumentCaptor<TenantRegistrationRequest> captor = ArgumentCaptor.forClass(TenantRegistrationRequest.class);
+        verify(registrationService).registerTenant(captor.capture());
+        return captor.getValue();
     }
 }

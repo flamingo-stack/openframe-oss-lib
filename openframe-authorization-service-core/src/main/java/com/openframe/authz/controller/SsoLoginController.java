@@ -161,7 +161,7 @@ public class SsoLoginController {
                     .tenantName(body.tenantName())
                     .tenantDomain(body.tenantDomain().toLowerCase(Locale.ROOT))
                     .emailPreVerified(payload.emailVerified())
-                    .attribution(body.attribution())
+                    .attribution(RegistrationAttribution.merge(body.attribution(), payload.attribution()))
                     .build();
 
             var tenant = registrationService.registerTenant(reg);
