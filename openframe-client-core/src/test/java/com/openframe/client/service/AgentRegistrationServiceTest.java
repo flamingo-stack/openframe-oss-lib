@@ -80,6 +80,9 @@ class AgentRegistrationServiceTest {
     @Mock
     private AgentRegistrationClientFeatureFlagsService agentRegistrationClientFeatureFlagsService;
 
+    @Mock
+    private AgentRegistrationClientUpdateService agentRegistrationClientUpdateService;
+
     @Captor
     private ArgumentCaptor<OAuthClient> oauthClientCaptor;
 
@@ -109,7 +112,8 @@ class AgentRegistrationServiceTest {
                 registrationTagAssignmentService,
                 installedAgentService,
                 toolConnectionService,
-                agentRegistrationClientFeatureFlagsService
+                agentRegistrationClientFeatureFlagsService,
+                agentRegistrationClientUpdateService
         );
         request = createTestRequest();
     }

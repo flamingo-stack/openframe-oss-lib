@@ -46,6 +46,7 @@ import { ShieldCheckIcon } from '../icons-v2-generated/security/shield-check-ico
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
+import { LoadingRegion } from '../loading/loading-region';
 import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { ComplianceLogo } from '../ui/compliance-badge';
@@ -666,7 +667,12 @@ function SectionRailSkeleton() {
  * the content replaces it. The status row, then Compliance, Controls and
  * Documents (what fills the first screens), beside the section rail.
  */
-export function TrustCenterSkeleton() {
+export function TrustCenterSkeleton({
+  region = true,
+}: {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+} = {}) {
   return (
     <>
       <div className={TRUST_STATUS_ROW_CLASS} aria-hidden="true">
@@ -683,7 +689,7 @@ export function TrustCenterSkeleton() {
           <TextSkeleton.Body className="w-44" />
         </div>
       </div>
-      <div className={TRUST_BODY_GRID_CLASS} aria-busy="true" aria-label="Loading the trust center">
+      <LoadingRegion label="Loading the trust center" announce={region} className={TRUST_BODY_GRID_CLASS}>
         <div className={TRUST_SECTIONS_COLUMN_CLASS}>
           <SkeletonSection id="compliance">
             <StackedRowsPanel rows={skeletonRows(3, { mark: 'logo', action: 'badge' })} />
@@ -698,7 +704,7 @@ export function TrustCenterSkeleton() {
         <aside className="hidden content-lg:block" aria-hidden="true">
           <SectionRailSkeleton />
         </aside>
-      </div>
+      </LoadingRegion>
     </>
   );
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use tracing::info;
 
-use crate::models::{DeviceTag, InitialConfiguration};
+use crate::models::{DeviceTag, InitialConfiguration, RemoteAccessMode};
 use crate::platform::DirectoryManager;
 use crate::services::InitialConfigurationService;
 
@@ -20,6 +20,7 @@ pub struct InstallConfigParams {
     pub user_id: Option<String>,
     pub local_mode: bool,
     pub tags: Vec<String>,
+    pub remote_access_mode: Option<RemoteAccessMode>,
 }
 
 impl InstallConfigParams {
@@ -37,6 +38,7 @@ impl InstallConfigParams {
             && blank(&self.user_id)
             && !self.local_mode
             && self.tags.is_empty()
+            && self.remote_access_mode.is_none()
     }
 }
 
@@ -70,6 +72,7 @@ impl InstallationInitialConfigService {
             user_id: params.user_id.clone().unwrap_or_default(),
             local_mode: params.local_mode,
             tags: DeviceTag::parse_from_cli(params.tags.clone()),
+            remote_access_mode: params.remote_access_mode.map(RemoteAccessMode::wire_name),
             ..Default::default()
         };
 

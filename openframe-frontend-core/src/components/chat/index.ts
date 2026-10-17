@@ -17,6 +17,7 @@ export * from './context-compaction-display';
 export * from './expand-chevron';
 export * from './thinking-display';
 export * from './ask-display';
+export * from './suggestions-display';
 export * from './error-message-display';
 export * from './chat-container';
 export * from './chat-input';

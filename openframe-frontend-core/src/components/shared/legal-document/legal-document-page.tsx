@@ -20,9 +20,10 @@
 import type { ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
-import { formatLegalDate } from '../../../utils/format';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { PageShell, PageLayout } from '../../ui';
+import { DataSyncLine } from '../../ui/data-attribution';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
 import { useLegalDocuments } from './use-legal-documents';
@@ -55,8 +56,6 @@ export interface LegalDocumentPageProps {
   emptyStateMessage?: string;
   /** SSR-prepared document, if available. */
   initialData?: LegalDocument | null;
-  /** SSR-prepared formatted "Last Updated" label. Stable across hydration. */
-  initialLastUpdatedLabel?: string | null;
   /** Override the default `/api/legal/<docType>` endpoint
    *  (reverse-proxy embedders, alternate API paths). */
   apiEndpoint?: string;
@@ -108,7 +107,6 @@ export function LegalDocumentPage({
   errorTitle: errorTitleProp,
   emptyStateMessage: emptyStateMessageProp,
   initialData = null,
-  initialLastUpdatedLabel = null,
   apiEndpoint,
   MarkdownRenderer = RichMarkdownRenderer,
   documentsEndpoint,
@@ -138,21 +136,16 @@ export function LegalDocumentPage({
   const errorTitle = errorTitleProp ?? `Unable to load ${title}`;
   const emptyStateMessage = emptyStateMessageProp ?? `${title} is not available at this time.`;
 
-  const fallbackLastUpdatedLabel = data?.lastSynced != null ? formatLegalDate(data.lastSynced) : null;
-  const effectiveLastUpdatedLabel = initialLastUpdatedLabel ?? fallbackLastUpdatedLabel;
-
   // Subtitle routes through the frozen `PageLayout` `TitleBlock` (text-h2 title
   // + subtitle) — unified header across all help-center pages. A document that
   // states its own version and effective date shows those (they are what a
-  // reader agreed to); one that states neither shows when it was last read
-  // from its source, else the fallback description.
-  const subtitle =
-    legalDocumentStampLabel(data) ??
-    (effectiveLastUpdatedLabel ? `Last Updated: ${effectiveLastUpdatedLabel}` : fallbackDescription);
+  // reader agreed to), else the fallback description. When it was last read from
+  // its repository is the shared sync line under the title.
+  const subtitle = legalDocumentStampLabel(data) ?? fallbackDescription;
 
   const inner = (
     <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
-      {data?.sourceFile && <p className="text-ods-text-secondary opacity-75 text-h6">Source: {data.sourceFile}</p>}
+      <DataSyncLine sync={data ? { source: 'github', syncedAt: data.lastSynced } : null} loading={isLoading && !data} />
 
       <div className="flex flex-1 flex-col items-start gap-6 lg:flex-row lg:gap-10">
         <div className="flex-1">
@@ -161,16 +154,16 @@ export function LegalDocumentPage({
               {isLoading ? (
                 // Loading skeleton matching Knowledge Hub pattern
                 <div className="space-y-6">
-                  <div className="h-10 w-3/4 animate-pulse rounded-lg bg-ods-skeleton"></div>
+                  <UnifiedSkeleton className="h-10 w-3/4 rounded-lg" />
                   <div className="space-y-4">
-                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-4 w-5/6 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-4 w-full rounded" />
+                    <UnifiedSkeleton className="h-4 w-full rounded" />
+                    <UnifiedSkeleton className="h-4 w-5/6 rounded" />
                   </div>
-                  <div className="h-32 animate-pulse rounded-lg border border-ods-border bg-ods-card"></div>
+                  <UnifiedSkeleton className="h-32 rounded-lg border border-ods-border" />
                   <div className="space-y-4">
-                    <div className="h-4 w-full animate-pulse rounded bg-ods-skeleton"></div>
-                    <div className="h-4 w-4/5 animate-pulse rounded bg-ods-skeleton"></div>
+                    <UnifiedSkeleton className="h-4 w-full rounded" />
+                    <UnifiedSkeleton className="h-4 w-4/5 rounded" />
                   </div>
                 </div>
               ) : error ? (

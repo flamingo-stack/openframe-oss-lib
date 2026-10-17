@@ -22,6 +22,7 @@ import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchRequest;
 import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchResponse;
 import com.openframe.sdk.fleetmdm.model.RunLiveQueryRequest;
 import com.openframe.sdk.fleetmdm.model.Policy;
+import com.openframe.sdk.fleetmdm.model.ScheduledQueriesResponse;
 import com.openframe.sdk.fleetmdm.model.Query;
 import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.UpdatePolicyRequest;
@@ -731,7 +732,15 @@ public class FleetMdmClient {
     }
 
     public CompletableFuture<List<Policy>> listPoliciesAsync() {
-        HttpRequest httpRequest = buildRequest(POLICIES_URL, "GET", null);
+        return listPoliciesAsync(POLICIES_URL);
+    }
+
+    public CompletableFuture<List<Policy>> listPoliciesAsync(Long afterId, int perPage) {
+        return listPoliciesAsync(POLICIES_URL + pageAfterId(afterId, perPage));
+    }
+
+    private CompletableFuture<List<Policy>> listPoliciesAsync(String path) {
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet policies");
@@ -797,7 +806,26 @@ public class FleetMdmClient {
     }
 
     public CompletableFuture<List<Query>> listScheduledQueriesAsync() {
-        HttpRequest httpRequest = buildRequest(QUERIES_URL, "GET", null);
+        return listScheduledQueriesAsync(QUERIES_URL);
+    }
+
+    // Paged by number: Fleet's query list fails with after, unlike the policy list.
+    public CompletableFuture<ScheduledQueriesResponse> listScheduledQueriesPageAsync(int page, int perPage) {
+        String path = QUERIES_URL + "?order_key=id&order_direction=asc&page=" + page + "&per_page=" + perPage;
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "list Fleet scheduled queries");
+                    try {
+                        return MAPPER.readValue(response.body(), ScheduledQueriesResponse.class);
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse list scheduled queries response", e);
+                    }
+                });
+    }
+
+    private CompletableFuture<List<Query>> listScheduledQueriesAsync(String path) {
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet scheduled queries");
@@ -1095,6 +1123,12 @@ public class FleetMdmClient {
             throw new FleetMdmException("Fleet response missing field \"" + fieldName + "\". Body: " + responseBody);
         }
         return node;
+    }
+
+    // Fleet applies "after" only together with an order key.
+    private static String pageAfterId(Long afterId, int perPage) {
+        String page = "?order_key=id&order_direction=asc&per_page=" + perPage;
+        return afterId == null ? page : page + "&after=" + afterId;
     }
 
     private HttpRequest.Builder addHeaders(HttpRequest.Builder builder) {

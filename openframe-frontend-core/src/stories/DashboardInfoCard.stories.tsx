@@ -91,6 +91,21 @@ export const WithProgress: Story = {
 };
 
 /**
+ * The same card while its figure loads: the title stays, the value is a bar, and the ring and
+ * the percentage keep their boxes (`showProgress`, `loadingShowsPercentage`), so the loaded card
+ * replaces it with no movement.
+ */
+export const LoadingWithProgress: Story = {
+  args: {
+    title: 'Storage Used',
+    value: '',
+    showProgress: true,
+    loading: true,
+    loadingShowsPercentage: true,
+  },
+};
+
+/**
  * Card with a custom progress variant.
  */
 export const CustomProgressVariant: Story = {

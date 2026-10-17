@@ -18,6 +18,20 @@ struct OpState {
 #[derive(Debug)]
 pub struct Busy;
 
+#[derive(Clone)]
+pub struct BusyTools(Arc<Mutex<OpState>>);
+
+impl BusyTools {
+    pub fn any(&self) -> bool {
+        !self
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .busy
+            .is_empty()
+    }
+}
+
 pub struct ToolLock {
     ops: ToolOps,
     tool_agent_id: String,
@@ -54,12 +68,11 @@ impl ToolOps {
     }
 
     pub fn any_busy(&self) -> bool {
-        !self
-            .state
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .busy
-            .is_empty()
+        self.busy_tools().any()
+    }
+
+    pub fn busy_tools(&self) -> BusyTools {
+        BusyTools(self.state.clone())
     }
 
     pub(crate) fn is_released(&self, tool_agent_id: &str) -> bool {

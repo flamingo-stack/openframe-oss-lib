@@ -80,6 +80,7 @@ import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-x
 import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -90,6 +91,10 @@ import { VideoHoverPreviewSurface } from './video-hover-preview';
 
 /** The poster width the collapsed card asks for: its widest box (320px) at 2x for retina screens. */
 const CARD_POSTER_WIDTH_PX = 640;
+
+/** The inline card's box: 16:9 across the host's width, rounded and bordered. ONE string, read by the card and
+ *  its skeleton, so the page keeps the same height before and after the player mounts. */
+const INLINE_CARD_BOX_CLASS = 'aspect-video w-full rounded-md border border-ods-border';
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -971,6 +976,7 @@ function WalkthroughVideo({
         // receives pointer events — the media layer is pointer-events-none, so
         // a group inside it can never match :hover.
         'group/card pointer-events-auto relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
+        inline && INLINE_CARD_BOX_CLASS,
         // The lift is what separates a FLOATING card from the page beneath it;
         // an in-flow block sitting inside a host card needs no shadow at all.
         !inline && 'shadow-2xl',
@@ -1202,6 +1208,9 @@ function WalkthroughVideo({
 
   return (
     <>
+      {/* Inline, the card mounts after hydration: until then its skeleton holds the same box, so the page below
+          does not jump when the player appears. A floating card is an overlay and takes no space. */}
+      {inline && !showCard && !dismissed && <InlineWalkthroughVideoSkeleton className={className} />}
       {showCard &&
         (inline ? (
           // No wrapper: a positioning / z-index / safe-area shell around an
@@ -1320,4 +1329,12 @@ export function FloatingWalkthroughVideo(props: FloatingWalkthroughVideoProps): 
  */
 export function InlineWalkthroughVideo(props: InlineWalkthroughVideoProps): React.ReactElement {
   return <WalkthroughVideo {...props} placement="inline" appearDelayMs={0} dismissal={false} />;
+}
+
+/**
+ * The inline video's loading state: the shared skeleton in the card's own box. The inline card draws it itself
+ * until its player mounts; a host whose video data is still loading draws it in the same slot.
+ */
+export function InlineWalkthroughVideoSkeleton({ className }: { className?: string }): React.ReactElement {
+  return <UnifiedSkeleton className={cn(INLINE_CARD_BOX_CLASS, className)} />;
 }

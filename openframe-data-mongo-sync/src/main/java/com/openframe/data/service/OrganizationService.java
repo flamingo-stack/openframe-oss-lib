@@ -194,18 +194,32 @@ public class OrganizationService {
     }
 
     /**
-     * Create a default organization for a newly registered tenant.
-     * This organization will be used for machines that don't have a specific organization assigned.
-     *
+     * Create the default organization for a newly registered tenant, if the tenant does not have one yet.
+     * This organization is used for machines that don't have a specific organization assigned, and is the
+     * customer the onboarding wizard pre-selects for the first device.
+     * <p>
+     * The tenantId is set explicitly rather than left to the tenant-stamping callback: registration runs on
+     * the shared plane, where tenant isolation is off and nothing stamps it, and an unstamped row is
+     * invisible to the tenant's own pods. On a tenant pod the explicit id matches the pod's and passes the
+     * cross-tenant write check.
+     * <p>
      * The default organization has:
      * - name: {@link OrganizationService#DEFAULT_ORGANIZATION_NAME}
      * - category: "General"
      * - auto-generated organizationId (UUID)
+     *
+     * @param tenantId tenant the organization belongs to
      */
-    public void createDefaultOrganization() {
-        log.info("Creating default organization");
+    public void createDefaultOrganization(String tenantId) {
+        if (organizationRepository.existsByTenantIdAndIsDefaultTrue(tenantId)) {
+            log.info("Default organization already exists for tenant {}, skipping creation", tenantId);
+            return;
+        }
+
+        log.info("Creating default organization for tenant {}", tenantId);
 
         Organization defaultOrg = Organization.builder()
+                .tenantId(tenantId)
                 .name(DEFAULT_ORGANIZATION_NAME)
                 .organizationId(UUID.randomUUID().toString())
                 .isDefault(true)
@@ -215,8 +229,8 @@ public class OrganizationService {
 
         Organization created = createOrganization(defaultOrg);
 
-        log.info("Created default organization '{}' with organizationId: {}",
-                created.getName(), created.getOrganizationId());
+        log.info("Created default organization '{}' with organizationId: {} for tenant {}",
+                created.getName(), created.getOrganizationId(), tenantId);
     }
 
 }

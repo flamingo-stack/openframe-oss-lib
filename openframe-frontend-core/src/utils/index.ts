@@ -135,6 +135,8 @@ export * from './color-analysis';
 
 // Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
 export * from './announcement-storage';
+// Which surfaces (browser, desktop app, phone app) an announcement is shown on
+export * from './announcement-surface';
 // cookie id-match dismissal store (walkthrough video widget)
 export * from './dismiss-cookie';
 export * from './after-page-load';
