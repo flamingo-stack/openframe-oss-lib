@@ -318,6 +318,25 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
         assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET)).containsOnly(entry("ticket-2", 1L));
     }
 
+    @Test
+    @DisplayName("Given an insight's notifications unread for two users, read by one, archived and deleted for others, plus another insight, when markEntityAsReadForAllRecipients runs, then only the UNREAD rows on that insight turn READ")
+    void mark_entity_as_read_for_all_recipients_reads_only_unread_rows_on_the_entity() {
+        NotificationEntityRef insight = NotificationEntityRef.of(NotificationEntityType.INSIGHT, "insight-1").orElseThrow();
+        NotificationEntityRef other = NotificationEntityRef.of(NotificationEntityType.INSIGHT, "insight-2").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", insight, U, Set.of(ALICE, BOB));
+        service.createForAudience("n2", CAT_TICKETS, "title", insight, U, Set.of(ALICE));
+        service.createForAudience("n3", CAT_TICKETS, "title", other, U, Set.of(ALICE));
+        service.createForAudience("n4", CAT_TICKETS, "title", insight, M, Set.of(MACHINE_1));
+        archive("n4");
+        service.markRead(ALICE, U, "n2");
+
+        assertThat(service.markEntityAsReadForAllRecipients(NotificationEntityType.INSIGHT, "insight-1")).isEqualTo(2L);
+
+        assertThat(service.hasUnread(BOB, U)).isFalse();
+        assertThat(statusOf("n4")).isEqualTo(ReadStatus.ARCHIVED);
+        assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.INSIGHT)).containsOnly(entry("insight-2", 1L));
+    }
+
     private void archive(String notificationId) {
         mongoTemplate.updateMulti(query(where("notificationId").is(notificationId)),
                 Update.update("status", ReadStatus.ARCHIVED), NotificationReadState.class);

@@ -134,6 +134,30 @@ public class NotificationReadStateService {
         return archived;
     }
 
+    public long markEntityAsReadForAllRecipients(@NotNull NotificationEntityType entityType, @NotBlank String entityId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<NotificationReadState> unreadRows = repository.findUnreadByEntity(entityType, entityId, tenantId);
+        if (unreadRows.isEmpty()) {
+            return 0L;
+        }
+        List<String> unreadIds = distinctNotificationIds(unreadRows);
+        long flipped = repository.markAllRecipientsReadByIds(tenantId, unreadIds);
+        unreadRows.forEach(this::publishRead);
+        return flipped;
+    }
+
+    private void publishRead(NotificationReadState row) {
+        String recipientId = row.getRecipientId();
+        RecipientType recipientType = row.getRecipientType();
+        String notificationId = row.getNotificationId();
+        List<String> notificationIds = List.of(notificationId);
+        publish(recipientId, recipientType, notificationIds, NotificationReadEvent.Transition.READ);
+    }
+
+    private static List<String> distinctNotificationIds(List<NotificationReadState> rows) {
+        return rows.stream().map(NotificationReadState::getNotificationId).distinct().toList();
+    }
+
     public boolean deleteNotification(@NotBlank String recipientId,
                                       @NotNull RecipientType recipientType,
                                       @NotBlank String notificationId) {
