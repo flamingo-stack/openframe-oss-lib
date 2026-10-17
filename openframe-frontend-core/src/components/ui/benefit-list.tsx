@@ -5,19 +5,11 @@ import { FileOffIcon } from '../icons-v2-generated/documents/file-off-icon';
 import { CreditCardXmarkIcon } from '../icons-v2-generated/finance/credit-card-xmark-icon';
 import { FlaskVialIcon } from '../icons-v2-generated/school/flask-vial-icon';
 import { XmarkAltIcon } from '../icons-v2-generated/signs-and-symbols/xmark-alt-icon';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface BenefitItem {
   /** Drawn at 16px in the quiet colour. */
   icon?: ReactNode;
   label: string;
-  /**
-   * The item's figure is still loading: its label is drawn as a skeleton over an
-   * invisible copy of `label`, so the row keeps its width and its wrapping and
-   * nothing moves when the real label arrives. Pass a label of the same shape
-   * ("Trusted by 000 businesses"); it is never shown.
-   */
-  pending?: boolean;
 }
 
 /** The mark of each of the trial's terms, wherever a term is listed. */
@@ -97,13 +89,7 @@ export function BenefitList({
               {item.icon}
             </span>
           )}
-          {item.pending ? (
-            <UnifiedSkeleton as="span" width="auto" height="auto" className="inline-block whitespace-nowrap text-transparent text-h4">
-              {item.label}
-            </UnifiedSkeleton>
-          ) : (
-            <span className="whitespace-nowrap text-ods-text-primary text-h4">{item.label}</span>
-          )}
+          <span className="whitespace-nowrap text-ods-text-primary text-h4">{item.label}</span>
         </li>
       ))}
     </ul>
