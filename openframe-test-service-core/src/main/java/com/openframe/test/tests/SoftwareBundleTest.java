@@ -20,6 +20,7 @@ import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.helpers.ai.SshMachineVerifier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -259,6 +260,7 @@ public class SoftwareBundleTest extends BaseTest {
 
     @Tag("feature")
     @Test
+    @Disabled("No device with WINGET — the box runs Windows Server, where winget is unsupported")
     @DisplayName("Submit a software bundle to install a package now")
     @Order(8)
     public void testSubmitInstallNow() {
@@ -297,6 +299,7 @@ public class SoftwareBundleTest extends BaseTest {
 
     @Tag("feature")
     @Test
+    @Disabled("No device with WINGET — the box runs Windows Server, where winget is unsupported")
     @DisplayName("Resubmit, reassign or delete a submitted software bundle")
     @Order(9)
     public void testSubmittedBundleIsFinal() {
@@ -319,6 +322,7 @@ public class SoftwareBundleTest extends BaseTest {
 
     @Tag("feature")
     @Test
+    @Disabled("No device with WINGET — the box runs Windows Server, where winget is unsupported")
     @DisplayName("The submitted install finishes on the device")
     @Order(10)
     public void testInstallFinishes() {
@@ -342,6 +346,7 @@ public class SoftwareBundleTest extends BaseTest {
 
     @Tag("feature")
     @Test
+    @Disabled("No device with WINGET — the box runs Windows Server, where winget is unsupported")
     @DisplayName("Uninstall the package again over SSH")
     @Order(11)
     public void testUninstallPackage() {
