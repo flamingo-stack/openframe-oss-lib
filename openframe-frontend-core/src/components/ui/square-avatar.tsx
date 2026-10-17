@@ -27,6 +27,19 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   initialsClassName?: string;
 }
 
+/**
+ * The avatar's box at each size: ONE scale, read by the avatar and by every skeleton that stands in for one.
+ * xs (24px): dense card meta rows (avatar stacks on delivery and roadmap cards). Part of the shared scale so no
+ * caller ever bypasses the buckets with raw sizePx for a standard size.
+ */
+export const SQUARE_AVATAR_SIZE_CLASS = {
+  xs: 'h-6 w-6',
+  sm: 'h-8 w-8',
+  md: 'h-10 w-10',
+  lg: 'h-12 w-12',
+  xl: 'h-16 w-16',
+} as const;
+
 const SquareAvatar = memo(
   forwardRef<HTMLDivElement, SquareAvatarProps>(
     (
@@ -46,16 +59,7 @@ const SquareAvatar = memo(
       ref,
     ) => {
       const resolvedSrc = useAuthedImageSrc(src);
-      const sizeClasses = {
-        // xs (24px): dense card meta rows — avatar stacks on delivery/
-        // roadmap cards. Part of the shared scale so no caller ever
-        // bypasses the buckets with raw sizePx for a standard size.
-        xs: 'h-6 w-6',
-        sm: 'h-8 w-8',
-        md: 'h-10 w-10',
-        lg: 'h-12 w-12',
-        xl: 'h-16 w-16',
-      };
+      const sizeClasses = SQUARE_AVATAR_SIZE_CLASS;
 
       const sizePxBySize = {
         xs: 24,

@@ -7,6 +7,10 @@ import { cn } from '../../utils';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
 import { ScrollShadow } from '../ui/scroll-fade';
 
+/** The bar's height, as a class and in px (the offset a page's anchors clear besides the header). */
+export const STICKY_SECTION_NAV_HEIGHT_CLASS = 'h-14';
+export const STICKY_SECTION_NAV_HEIGHT_PX = 56;
+
 export interface StickyNavSection {
   id: string;
   label: string;
@@ -57,7 +61,7 @@ function HorizontalSectionNav({
   }, [activeSection]);
 
   return (
-    <nav ref={navRef} aria-label={label} className={cn('flex h-14 items-stretch gap-6 bg-ods-bg', className)}>
+    <nav ref={navRef} aria-label={label} className={cn('flex items-stretch gap-6 bg-ods-bg', STICKY_SECTION_NAV_HEIGHT_CLASS, className)}>
       {brand && (
         <div className="hidden shrink-0 items-center gap-2.5 border-r border-ods-border pr-6 text-ods-text-primary text-h4 content-lg:flex">
           {brand}

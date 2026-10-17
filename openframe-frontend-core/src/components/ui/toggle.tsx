@@ -12,6 +12,9 @@ const toggleVariants = cva(
       variant: {
         default: 'bg-transparent',
         outline: 'border border-ods-border bg-transparent hover:bg-ods-accent hover:text-ods-text-on-accent',
+        // One answer of several (a form's choice chips): a quiet hover, and the picked one keeps its accent under the pointer.
+        choice:
+          'border border-ods-border bg-transparent data-[state=on]:hover:bg-ods-accent-hover data-[state=on]:hover:text-ods-text-on-accent',
       },
       size: {
         default: 'h-10 px-3',

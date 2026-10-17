@@ -1,10 +1,11 @@
 'use client';
 
 import { personFirstName } from '../../utils/format';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { AvatarStack } from './avatar-stack';
 import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
-import { SquareAvatar } from './square-avatar';
+import { SQUARE_AVATAR_SIZE_CLASS, SquareAvatar } from './square-avatar';
 import { TruncateText } from './truncate-text';
 
 /**
@@ -90,6 +91,20 @@ export function PersonCell({
     >
       {row}
     </Button>
+  );
+}
+
+/** The cell while it loads: the SAME avatar box, gap and two lines (the name's type step, then the caption's). */
+export function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['size'] }) {
+  const scale = PERSON_CELL_SIZE[size];
+  return (
+    <div className={`flex min-w-0 items-center ${scale.gap}`}>
+      <UnifiedSkeleton className={`shrink-0 rounded-md ${SQUARE_AVATAR_SIZE_CLASS[scale.avatar]}`} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TextLineSkeleton type={scale.primary} className="w-3/4" />
+        <TextLineSkeleton type="h6" className="w-1/2" />
+      </div>
+    </div>
   );
 }
 

@@ -232,6 +232,25 @@ export interface SectionHeadingProps {
 }
 
 /**
+ * THE eyebrow: the small label over a heading (Azeret Mono, uppercase, in the accent).
+ * `SectionHeading` draws it, and so does any heading that is not a `SectionHeading`
+ * (a call-to-action band's label), so a change to the eyebrow lands everywhere.
+ */
+export function SectionEyebrow({
+  children,
+  platform,
+  tone = 'accent',
+  className,
+}: {
+  children: ReactNode;
+  platform?: string | null;
+  tone?: HeadingAccentTone;
+  className?: string;
+}) {
+  return <span className={['text-h5', headingAccentClass(platform, tone), className].filter(Boolean).join(' ')}>{children}</span>;
+}
+
+/**
  * THE heading block of a page section or hero: an eyebrow, the heading with its
  * accent punctuation, an intro, and an optional action at the end of the row.
  * Every section on every site composes this, so a change to the layout lands
@@ -252,7 +271,7 @@ export function SectionHeading({
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
   const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
-  const eyebrowNode = eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null;
+  const eyebrowNode = eyebrow ? <SectionEyebrow platform={platform} tone={tone}>{eyebrow}</SectionEyebrow> : null;
   const headingText = (
     <>
       {accentSentenceMarks(title, platform, tone)}

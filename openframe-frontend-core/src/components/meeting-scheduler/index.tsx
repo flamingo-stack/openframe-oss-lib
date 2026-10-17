@@ -159,9 +159,13 @@ export interface HubSpotMeetingSchedulerProps {
    * The DATA form of the same override: `fieldRows`, a host consent row and
    * per-field display copy, spread onto whichever form renders. Serialisable,
    * so a Server Component can pass it across the RSC boundary where a component
-   * cannot.
+   * cannot. `answers` are what the page took outside the form (a choice made
+   * higher up the page), written into questions the visitor has not answered.
    */
-  detailsFormProps?: Pick<BookingFormProps, 'fieldRows' | 'consent' | 'fieldCopy' | 'deniedEmailDomains'>;
+  detailsFormProps?: Pick<
+    BookingFormProps,
+    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'answers'
+  >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
   rescue?: FormRescueDefinition | null;
@@ -1206,6 +1210,7 @@ export function HubSpotMeetingScheduler({
 export {
   BookingForm,
   BookingFormSkeleton,
+  formFieldOptionLabel,
   type BookingFormProps,
   type BookingFieldRow,
   type BookingFieldSlot,

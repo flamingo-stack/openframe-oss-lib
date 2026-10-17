@@ -17,6 +17,7 @@ import {
   emailDomainDenied,
   type DeniedEmailDomains,
   MULTI_VALUE_SEPARATOR,
+  bookingFormAsks,
   normalizeFormFields,
   splitMultiValue,
   type BuiltInBookingField,
@@ -33,6 +34,7 @@ import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import {
   Button,
   FieldWrapper,
+  fieldLabelId,
   Input,
   Textarea,
   Label,
@@ -45,6 +47,8 @@ import {
   CheckboxBlock,
   RadioGroup,
   RadioGroupItem,
+  ToggleGroup,
+  ToggleGroupItem,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
 
@@ -77,6 +81,14 @@ export type BookingFieldRow = BookingFieldSlot[];
 export interface BookingFieldCopy {
   label?: string;
   placeholder?: string;
+  /**
+   * How a CHOICE question (`select`, `radio`) is drawn. Omitted or `dropdown`:
+   * the question's own control (a select, or radio buttons). `chips`: one-tap
+   * chips, when the link offers at most `CHIP_MAX_OPTIONS` answers (past it, the
+   * question's own control). The answers, their name and their validation are
+   * always the link's own.
+   */
+  display?: 'chips' | 'dropdown';
 }
 
 /**
@@ -175,8 +187,10 @@ interface ControlArgs {
 const placeholderFor = (field: ControlArgs['field']): string | undefined =>
   field.placeholder ?? fieldTypeSpec(field.type).placeholder?.(field);
 
-/** An option's display text: HubSpot's label when it differs from the submitted value. */
-const optionLabel = (field: ControlArgs['field'], value: string): string => field.optionLabels?.[value] ?? value;
+/** An option's display text: HubSpot's label when it differs from the submitted value. Exported: a host that asks
+ *  one of the link's questions outside the form (a landing hero) words its answers the same way. */
+export const formFieldOptionLabel = (field: Pick<MeetingFormField, 'optionLabels'>, value: string): string =>
+  field.optionLabels?.[value] ?? value;
 
 /** A free-text answer is sent without the whitespace a paste drags in. */
 const trimmed = (v: unknown): string => String(v ?? '').trim();
@@ -282,7 +296,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
           <SelectContent>
             {(field.options ?? []).map(opt => (
               <SelectItem key={opt} value={opt}>
-                {optionLabel(field, opt)}
+                {formFieldOptionLabel(field, opt)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -304,7 +318,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
           {(field.options ?? []).map(opt => (
             <div key={opt} className="flex items-center gap-[var(--spacing-system-xs)]">
               <RadioGroupItem id={`${id}-${opt}`} value={opt} />
-              <Label htmlFor={`${id}-${opt}`}>{optionLabel(field, opt)}</Label>
+              <Label htmlFor={`${id}-${opt}`}>{formFieldOptionLabel(field, opt)}</Label>
             </div>
           ))}
         </RadioGroup>
@@ -333,7 +347,7 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
                   onCheckedChange={v => toggle(opt, v === true)}
                   aria-invalid={Boolean(error)}
                 />
-                <Label htmlFor={`${id}-${opt}`}>{optionLabel(field, opt)}</Label>
+                <Label htmlFor={`${id}-${opt}`}>{formFieldOptionLabel(field, opt)}</Label>
               </div>
             ))}
           </div>
@@ -363,6 +377,65 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
   ),
 };
 
+/** The field types that may be drawn as chips (`BookingFieldCopy.display`): one answer from a list. */
+const CHIP_FIELD_TYPES: ReadonlySet<string> = new Set(['select', 'radio']);
+
+/** The most answers a choice question may offer and still be drawn as chips: more read better as a list. */
+export const CHIP_MAX_OPTIONS = 6;
+
+/**
+ * Whether a choice question is drawn as chips: only when the host asks for it
+ * (`display: 'chips'`) and the link offers at most `CHIP_MAX_OPTIONS` answers.
+ * Anything else keeps the question's own control from `FIELD_CONTROLS`.
+ */
+function drawnAsChips(field: { type: string; options?: string[] }, display: BookingFieldCopy['display']): boolean {
+  if (display !== 'chips' || !CHIP_FIELD_TYPES.has(field.type)) return false;
+  const count = field.options?.length ?? 0;
+  return count > 0 && count <= CHIP_MAX_OPTIONS;
+}
+
+/**
+ * A choice question as one-tap chips: the lib's single `ToggleGroup`, one item
+ * per option. The group is named by the question's label (`FieldWrapper` gives
+ * it `fieldLabelId`), a refused question paints the lib's error border on its
+ * chips, and hover is a quiet background so it never reads as the chosen one.
+ */
+const chipsControl = ({ field, id, registerName, error, control }: ControlArgs): ReactNode => (
+  <Controller
+    control={control}
+    name={registerName as never}
+    render={({ field: rhf }) => (
+      <ToggleGroup
+        id={id}
+        type="single"
+        variant="choice"
+        value={rhf.value ?? ''}
+        // A tap on the chosen chip reports '': the answer stays (clearing is not a choice the form offers).
+        onValueChange={(value: string) => {
+          if (value) rhf.onChange(value);
+        }}
+        // The form focuses a question that failed validation through its ref: the group passes that to its first chip.
+        ref={(group: HTMLDivElement | null) => rhf.ref(group && { focus: () => group.querySelector('button')?.focus() })}
+        onBlur={rhf.onBlur}
+        aria-labelledby={fieldLabelId(id)}
+        aria-required={field.required || undefined}
+        aria-invalid={Boolean(error)}
+        className="flex flex-wrap justify-start gap-[var(--spacing-system-xsf)]"
+      >
+        {(field.options ?? []).map(opt => (
+          <ToggleGroupItem
+            key={opt}
+            value={opt}
+            className={cn(error && 'data-[state=off]:border-ods-error')}
+          >
+            {formFieldOptionLabel(field, opt)}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    )}
+  />
+);
+
 /** `firstName` → `ms-first-name`; the ids the built-ins have always had. */
 const builtInId = (name: string) => `ms-${name.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`)}`;
 
@@ -383,6 +456,15 @@ export interface BookingFormProps {
   deferSlot?: boolean;
   /** Repopulates the form on a remount — the back edge, or an error return. */
   initialValues?: Record<string, unknown>;
+  /**
+   * Answers the host took OUTSIDE the form, by question name (a landing hero's
+   * one-tap question). Each is written into its question when the form mounts
+   * and whenever it changes, while the question is empty or still holds the
+   * host's last answer: nothing the visitor typed is overwritten, and an answer
+   * the host withdraws clears what it wrote. An answer to a question the form
+   * does not ask is ignored.
+   */
+  answers?: Readonly<Record<string, string>>;
   /** Defaults to "Confirm Booking"; details-first says "Continue". */
   submitLabel?: string;
   /** Small print beside the submit (details-first sets expectations). */
@@ -397,6 +479,15 @@ export interface BookingFormProps {
    * appended full width. Both are deliberate — see `slotNode`/`unplacedFields`.
    */
   fieldRows?: BookingFieldRow[];
+  /**
+   * The OPTIONAL questions of the link this form asks, by name. A link is often
+   * shared by several pages, and a question added to it for one page must not
+   * appear on the others: with this set, an optional question it does not name
+   * is left out (in `fieldRows` and in the default layout alike). A REQUIRED
+   * question is always asked, named or not: a required field with no control
+   * is a submit that cannot succeed. Omitted: every declared question is asked.
+   */
+  optionalFields?: readonly string[];
   /** The form element's id, so a host can submit it from a button outside it
    *  (`<button form={id}>`): the modal layout keeps its actions in a footer
    *  under the card. */
@@ -448,9 +539,11 @@ export function BookingForm({
   timezone,
   deferSlot = false,
   initialValues,
+  answers,
   submitLabel,
   footerNote,
   fieldRows,
+  optionalFields,
   formId,
   hideSubmit = false,
   onValidityChange,
@@ -467,7 +560,12 @@ export function BookingForm({
   // Every declared question resolved to a control (`resolveFormFieldControl`) —
   // an unfamiliar HubSpot type is drawn as its nearest control, never dropped
   // silently and never a reason to hide the form.
-  const supportedFields = useMemo(() => normalizeFormFields(formFields), [formFields]);
+  // `optionalFields` narrows the optional ones to the questions this form asks.
+  const supportedFields = useMemo(
+    () =>
+      normalizeFormFields(formFields).filter(field => bookingFormAsks(field, optionalFields)),
+    [formFields, optionalFields],
+  );
   // The DEFERRED schema in both flows: it is the wider of the two, and a strict
   // resolver is not assignable to `Resolver<BookingFormValues>`. The strict
   // schema is the server's contract — see `makeBookingSchema`'s docblock.
@@ -552,6 +650,26 @@ export function BookingForm({
       { shouldDirty: false },
     );
   }, [consentDefaults, priorConsents, getValues, setValue]);
+
+  // The host's outside answers, written without a remount, on mount too (an answer given before the form
+  // mounted, or while a later step had it unmounted, still arrives). A question is the host's to write while it
+  // is empty or still holds what this effect last wrote there; once it holds anything else (typed, or restored
+  // from the visitor's own stash) it is the visitor's. An answer the host withdraws clears what it wrote.
+  const written = useRef<Record<string, string>>({});
+  useEffect(() => {
+    const names = new Set([...Object.keys(answers ?? {}), ...Object.keys(written.current)]);
+    for (const name of names) {
+      // Only a question this form asks: an answer to one the link does not declare (or the form leaves out) goes nowhere.
+      if (!supportedFields.some(field => field.name === name)) continue;
+      const next = answers?.[name] ?? '';
+      const current = getValues('formFields')?.[name] ?? '';
+      if (current !== '' && current !== written.current[name]) continue;
+      if (next) written.current[name] = next;
+      else delete written.current[name];
+      if (current === next) continue;
+      setValue(`formFields.${name}` as never, next as never, { shouldValidate: next !== '' });
+    }
+  }, [answers, supportedFields, getValues, setValue]);
 
   // Form rescue: the built-ins by name, the declared questions under `formFields.<name>`.
   const rescueFields = useMemo(
@@ -648,7 +766,7 @@ export function BookingForm({
         required={shown.required}
         error={where.error}
       >
-        {FIELD_CONTROLS[shown.type]({
+        {(drawnAsChips(shown, copy?.display) ? chipsControl : FIELD_CONTROLS[shown.type])({
           field: shown,
           id: where.id,
           registerName: where.registerName,

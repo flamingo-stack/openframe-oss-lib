@@ -154,8 +154,8 @@ out by **its own width** instead. `<main>` becomes an `.ods-content-area` contai
 - Convert hardcoded values to ODS tokens even when copying patterns from existing code.
 - Match Figma by choosing the typography class on **font family + weight + text-transform**, not just size.
 - If Figma uses a token that doesn't exist in ODS, flag it — don't silently hardcode a fallback.
-- **Z-index** — use the established hierarchy, don't invent numbers: in-layout sidebar overlay
-  `z-[40]`, footer `z-[44]` (page-chrome bottom, intentionally below the admin drawer so an open
+- **Z-index** — use the established hierarchy, don't invent numbers: a page's sticky section bar
+  (`PageSectionBar`, under the header) `z-30`, in-layout sidebar overlay `z-[40]`, footer `z-[44]` (page-chrome bottom, intentionally below the admin drawer so an open
   right-drawer covers it), admin `SlidingSidebar` drawer overlay `z-[45]` / panel `z-[46]` (a
   full-viewport `fixed` right-drawer that covers the footer but stays BEHIND the header — its panel
   has a header spacer), sticky header `z-[50]`, modals `z-[50]`/`z-[1300]` (Radix dialogs sit at
