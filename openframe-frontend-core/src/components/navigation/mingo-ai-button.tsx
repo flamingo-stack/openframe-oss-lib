@@ -118,7 +118,8 @@ export function MingoAiButton({
       // The modifier the key cap shows, and only that one: on a Mac Ctrl+K is
       // the text fields' own "delete to the end of the line".
       const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-      if (event.key.toLowerCase() !== 'k' || !modifier) return;
+      // A keydown with no key is real: the browser's autofill fires one when it fills a form field.
+      if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
       openRef.current();
     };
