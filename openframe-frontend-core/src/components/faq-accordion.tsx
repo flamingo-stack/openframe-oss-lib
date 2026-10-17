@@ -4,6 +4,12 @@ import { useState } from 'react';
 import { cn } from '../utils/cn';
 import { faqItemAnchor } from '../utils/faq-anchor';
 import { Chevron02DownIcon } from './icons-v2-generated/arrows/chevron-02-down-icon';
+import { LoadingRegion } from './loading/loading-region';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
+
+/** The accordion's frame and a row's inset: ONE string each, read by the accordion and its skeleton. */
+const FAQ_ACCORDION_FRAME_CLASS = 'divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent';
+const FAQ_ROW_INSET_CLASS = 'px-6 py-4';
 
 export interface FaqItem {
   id: number | string;
@@ -29,7 +35,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   };
 
   return (
-    <div className="divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
+    <div className={FAQ_ACCORDION_FRAME_CLASS}>
       {items.map(item => {
         const isOpen = openSet.has(item.id);
 
@@ -56,7 +62,10 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
                 }
               }}
               aria-expanded={isOpen}
-              className="flex w-full cursor-pointer items-center gap-6 px-6 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus content-md:gap-10"
+              className={cn(
+                FAQ_ROW_INSET_CLASS,
+                'flex w-full cursor-pointer items-center gap-6 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus content-md:gap-10',
+              )}
             >
               <h3 className="min-w-0 flex-1 break-words">{item.question}</h3>
               <Chevron02DownIcon
@@ -91,5 +100,24 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
         );
       })}
     </div>
+  );
+}
+
+/**
+ * The accordion while its questions load: the SAME frame and row inset, one
+ * question-line bar per row, so the loaded accordion takes the skeleton's place
+ * without moving the page.
+ */
+export function FaqAccordionSkeleton({ rows, label = 'Loading questions' }: { rows: number; label?: string }) {
+  return (
+    <LoadingRegion label={label} className={FAQ_ACCORDION_FRAME_CLASS}>
+      {Array.from({ length: rows }, (_, index) => (
+        <div key={index} className={FAQ_ROW_INSET_CLASS}>
+          <UnifiedSkeleton as="span" width="auto" height="auto" className="block w-3/4 text-h4 text-transparent">
+            &nbsp;
+          </UnifiedSkeleton>
+        </div>
+      ))}
+    </LoadingRegion>
   );
 }

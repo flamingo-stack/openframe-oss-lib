@@ -7,8 +7,15 @@ import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { Tag } from '../ui/tag';
+
+/** The card's frame and the answer's command block: ONE string each, read by the card and its skeleton. */
+const CARD_FRAME_CLASS =
+  'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
+const ANSWER_BLOCK_CLASS = 'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]';
 
 export interface ConversationCardSpeaker {
   /** Rendered as given (an avatar, an agent mark). */
@@ -80,13 +87,20 @@ export function ConversationCard({
   return (
     <div
       className={cn(
-        'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
-        selection && 'cursor-pointer transition-colors hover:border-ods-text-secondary',
+        CARD_FRAME_CLASS,
+        selection && 'cursor-pointer transition-colors hover:border-ods-border-hover',
         selection?.pressed && 'border-ods-accent ring-1 ring-ods-accent',
         className,
       )}
       style={tint}
-      onClick={selection?.onToggle}
+      onClick={
+        selection &&
+        (event => {
+          // A pointer convenience: the primary button only, and never the end of a text selection.
+          if (event.button !== 0 || window.getSelection()?.toString()) return;
+          selection.onToggle();
+        })
+      }
     >
       {selection && (
         // The toggle is a regular boxed Button in the card's corner, named by the
@@ -135,7 +149,7 @@ export function ConversationCard({
         name={responder.name}
         meta={responder.meta}
         time={responder.time}
-        className="rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]"
+        className={ANSWER_BLOCK_CLASS}
       >
         <div className="flex items-start gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h4">
           <span className="line-clamp-3 min-h-[3lh] min-w-0 flex-1" title={outcome}>
@@ -154,5 +168,70 @@ export function ConversationCard({
         </div>
       )}
     </div>
+  );
+}
+
+/** A text bar `lines` lines tall, at the type step of the text it stands for. */
+function LineBar({ lines, type, className }: { lines: number; type: 'text-h3' | 'text-h4' | 'text-h6'; className?: string }) {
+  const height = { 1: 'h-[1lh]', 2: 'h-[2lh]', 3: 'h-[3lh]' }[lines];
+  return <UnifiedSkeleton className={cn(type, height, 'rounded', className)} />;
+}
+
+/** A speaker's turn while loading: the avatar box, the name line, then the turn's own lines. */
+function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: ReactNode }) {
+  return (
+    <div className="flex min-w-0 items-start gap-[var(--spacing-system-sf)]">
+      <UnifiedSkeleton className="shrink-0 rounded-md" width={avatarPx} height={avatarPx} />
+      <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+        <LineBar lines={1} type="text-h4" className="w-1/2" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The card while it loads: the SAME frame, then each part at the number of
+ * lines the loaded card keeps for it (the request's two, the context's three,
+ * the outcome's three), so a loaded card takes the skeleton's place without
+ * moving the page. Pass the parts the loaded card will have.
+ */
+export function ConversationCardSkeleton({
+  avatarPx,
+  context = false,
+  footer = false,
+  className,
+}: {
+  /** The speakers' avatar size, as the host draws it. */
+  avatarPx: number;
+  /** The loaded card has a context part ("Today"). */
+  context?: boolean;
+  /** The loaded card has a footer. */
+  footer?: boolean;
+  className?: string;
+}) {
+  return (
+    <LoadingRegion label="Loading" className={cn(CARD_FRAME_CLASS, className)}>
+      <TurnSkeleton avatarPx={avatarPx}>
+        <LineBar lines={2} type="text-h3" />
+      </TurnSkeleton>
+      {context && (
+        <div className="flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]">
+          <LineBar lines={1} type="text-h6" className="w-1/4" />
+          <LineBar lines={3} type="text-h4" />
+        </div>
+      )}
+      <div className={ANSWER_BLOCK_CLASS}>
+        <TurnSkeleton avatarPx={avatarPx}>
+          <LineBar lines={3} type="text-h4" />
+        </TurnSkeleton>
+      </div>
+      {footer && (
+        <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]">
+          <LineBar lines={1} type="text-h6" className="w-1/4" />
+          <Tag as="span" label={'\u00a0'} variant="badge" className="invisible" />
+        </div>
+      )}
+    </LoadingRegion>
   );
 }

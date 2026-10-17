@@ -165,7 +165,7 @@ export interface HubSpotMeetingSchedulerProps {
    */
   detailsFormProps?: Pick<
     BookingFormProps,
-    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'initialValues'
+    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'initialValues' | 'answers'
   >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
@@ -1211,6 +1211,7 @@ export function HubSpotMeetingScheduler({
 export {
   BookingForm,
   BookingFormSkeleton,
+  formFieldOptionLabel,
   type BookingFormProps,
   type BookingFieldRow,
   type BookingFieldSlot,

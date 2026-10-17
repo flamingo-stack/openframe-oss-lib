@@ -113,7 +113,7 @@ export interface WalkthroughVideoData {
 }
 
 /** Whether the widget plays the video from YouTube: only when there is no stored file. */
-function playsYouTube(video: WalkthroughVideoData | null | undefined): boolean {
+export function playsYouTube(video: WalkthroughVideoData | null | undefined): boolean {
   return Boolean(video?.youtubeUrl) && !video?.mainVideoUrl;
 }
 
