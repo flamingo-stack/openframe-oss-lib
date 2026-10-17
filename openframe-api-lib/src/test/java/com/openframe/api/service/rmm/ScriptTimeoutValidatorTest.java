@@ -1,20 +1,14 @@
 package com.openframe.api.service.rmm;
 
+import com.openframe.api.config.ScriptExecutionProperties;
 import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
 import com.openframe.core.exception.BadRequestException;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ScriptTimeoutValidatorTest {
-
-    private static ScriptTimeoutValidator withMax(int max) {
-        ScriptTimeoutValidator validator = new ScriptTimeoutValidator();
-        ReflectionTestUtils.setField(validator, "maxTimeoutSeconds", max);
-        return validator;
-    }
 
     private final ScriptTimeoutValidator validator = withMax(600);
 
@@ -47,5 +41,11 @@ class ScriptTimeoutValidatorTest {
         ScriptTimeoutValidator higher = withMax(7200);
         assertThatCode(() -> higher.validate(700)).doesNotThrowAnyException();
         assertThatThrownBy(() -> higher.validate(7201)).isInstanceOf(BadRequestException.class);
+    }
+
+    private ScriptTimeoutValidator withMax(int max) {
+        ScriptExecutionProperties properties = new ScriptExecutionProperties();
+        properties.setMaxTimeoutSeconds(max);
+        return new ScriptTimeoutValidator(properties);
     }
 }
