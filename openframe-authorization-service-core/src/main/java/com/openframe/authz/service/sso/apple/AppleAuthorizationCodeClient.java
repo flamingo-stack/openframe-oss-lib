@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Map;
 
@@ -76,8 +77,11 @@ public class AppleAuthorizationCodeClient {
                     .body(form)
                     .retrieve()
                     .body(Map.class);
+        } catch (RestClientResponseException e) {
+            log.warn("Apple authorization-code exchange failed for client '{}': HTTP status {}", bundleId, e.getRawStatusCode());
+            throw invalidGrant("Apple rejected the authorization code.");
         } catch (Exception e) {
-            log.warn("Apple authorization-code exchange failed for client '{}': {}", bundleId, e.getMessage());
+            log.warn("Apple authorization-code exchange failed for client '{}': {}", bundleId, e.getClass().getSimpleName());
             throw invalidGrant("Apple rejected the authorization code.");
         }
 
