@@ -61,6 +61,11 @@ public class InMemoryRecreationTracker implements RecreationTracker {
         log.info("Recorded recreation for '{}'", baseName);
     }
 
+    @Override
+    public synchronized boolean hasRecentRecreation(String baseName) {
+        return !prunedQueue(baseName).isEmpty();
+    }
+
     /**
      * Return the base's event queue with entries older than the window dropped.
      * Pruning on read keeps the map bounded without a background sweep.
