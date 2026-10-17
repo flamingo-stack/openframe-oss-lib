@@ -80,11 +80,12 @@ export interface BookingFieldCopy {
   label?: string;
   placeholder?: string;
   /**
-   * How a CHOICE question (`select`, `radio`) is drawn: `chips` puts every
-   * option on the form as a one-tap chip instead of a dropdown or a radio list.
-   * The answer, its name and its validation are the question's own.
+   * How a CHOICE question (`select`, `radio`) is drawn. Omitted: as one-tap
+   * chips when the link offers at most `CHIP_MAX_OPTIONS` answers, else as the
+   * question's own control. `chips` / `dropdown` force one. The answers, their
+   * name and their validation are always the link's own.
    */
-  display?: 'chips';
+  display?: 'chips' | 'dropdown';
 }
 
 /**
@@ -214,8 +215,18 @@ const canonicalNumber = (v: unknown): string => {
  * (`Input`, `Textarea`, `SelectTrigger` — the lib's error border), so a refused
  * field reads as refused at the control, not only in the line beneath it.
  */
-/** The field types a host may draw as chips (`BookingFieldCopy.display`): one answer from a list. */
+/** The field types drawn as chips (`BookingFieldCopy.display`): one answer from a list. */
 const CHIP_FIELD_TYPES: ReadonlySet<string> = new Set(['select', 'radio']);
+
+/** The most answers a choice question may offer and still be drawn as chips by default: more read better as a list. */
+export const CHIP_MAX_OPTIONS = 6;
+
+/** Whether a choice question is drawn as chips: the host's choice, else when it offers few enough answers. */
+function drawnAsChips(field: { type: string; options?: string[] }, display: BookingFieldCopy['display']): boolean {
+  if (!CHIP_FIELD_TYPES.has(field.type)) return false;
+  if (display) return display === 'chips';
+  return (field.options?.length ?? 0) > 0 && (field.options?.length ?? 0) <= CHIP_MAX_OPTIONS;
+}
 
 /** A choice question as one-tap chips: the lib's single `ToggleGroup`, one item per option. */
 const chipsControl = ({ field, id, registerName, error, control }: ControlArgs): ReactNode => (
@@ -688,7 +699,7 @@ export function BookingForm({
         required={shown.required}
         error={where.error}
       >
-        {(copy?.display === 'chips' && CHIP_FIELD_TYPES.has(shown.type) ? chipsControl : FIELD_CONTROLS[shown.type])({
+        {(drawnAsChips(shown, copy?.display) ? chipsControl : FIELD_CONTROLS[shown.type])({
           field: shown,
           id: where.id,
           registerName: where.registerName,

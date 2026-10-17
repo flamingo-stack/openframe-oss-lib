@@ -13,8 +13,8 @@ const availability = availabilityWith([
 ]);
 
 describe('BookingForm — a choice question drawn as chips', () => {
-  it('puts every option on the form as a chip, and submits the chosen one under the question', async () => {
-    const onSubmit = mountBookingForm(availability, { fieldCopy: { team_size: { display: 'chips' } } });
+  it('draws a short choice question as chips by default, and submits the chosen one under the question', async () => {
+    const onSubmit = mountBookingForm(availability);
     expect(screen.queryByRole('combobox')).toBeNull();
     const chip = screen.getByRole('radio', { name: '2-5 people' });
     fireEvent.click(chip);
@@ -27,8 +27,16 @@ describe('BookingForm — a choice question drawn as chips', () => {
     );
   });
 
-  it('keeps the dropdown without the display', () => {
-    mountBookingForm(availability);
+  it('keeps the dropdown when the host asks for it', () => {
+    mountBookingForm(availability, { fieldCopy: { team_size: { display: 'dropdown' } } });
     expect(screen.queryByRole('radio', { name: 'Just me' })).toBeNull();
+  });
+
+  it('keeps the dropdown for a long list of answers', () => {
+    const long = availabilityWith([
+      { name: 'country', label: 'Country', type: 'select', required: false, options: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] },
+    ]);
+    mountBookingForm(long);
+    expect(screen.queryByRole('radio', { name: 'A' })).toBeNull();
   });
 });
