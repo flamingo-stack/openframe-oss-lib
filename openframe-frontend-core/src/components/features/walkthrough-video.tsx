@@ -66,6 +66,7 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { resizedImageUrl } from '../../embed-shims/next-image';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import {
@@ -87,6 +88,9 @@ import { CardHitLayer } from './card-hit-layer';
 import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
+
+/** The poster width the collapsed card asks for: its widest box (320px) at 2x for retina screens. */
+const CARD_POSTER_WIDTH_PX = 640;
 
 /** The inline card's box: 16:9 across the host's width, rounded and bordered. ONE string, read by the card and
  *  its skeleton, so the page keeps the same height before and after the player mounts. */
@@ -1056,7 +1060,10 @@ function WalkthroughVideo({
           // File player only. The theater resolves YouTube-wins; the card must
           // not mount MuxPlayer on a youtube.com URL (it renders the poster).
           url={video.mainVideoUrl || ''}
-          posterUrl={video.posterUrl}
+          // The card is at most 320px wide: ask the host for a poster twice that (retina), not the full-size
+          // original the theater shows (a 1920x1080 file drawn at 333x187, CU-17tkuw5xp4q). The original is kept
+          // where the host registered no resizer.
+          posterUrl={video.posterUrl ? resizedImageUrl(video.posterUrl, CARD_POSTER_WIDTH_PX) : video.posterUrl}
           active={cardActive}
           isClone={false}
           badge="play"
