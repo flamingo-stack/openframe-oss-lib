@@ -81,6 +81,14 @@ type Machine implements Node {
     """False when no enabled package manager can ever work on this device. Software Management then hides it
     from device pickers and skips it at dispatch; inventory and vulnerabilities still show it."""
     softwareManagementSupported: Boolean!
+    enrollment: DeviceEnrollment
+}
+
+type DeviceEnrollment {
+    registeredAt: Instant!
+    connectedAt: Instant
+    inventoryConnectedAt: Instant
+    ready: Boolean!
 }
 
 """Per-manager state reported by the agent. A manager of another OS reads as UNSUPPORTED."""

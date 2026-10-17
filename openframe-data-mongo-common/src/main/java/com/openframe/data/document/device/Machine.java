@@ -34,6 +34,7 @@ public class Machine implements TenantScoped {
     @Indexed
     private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
+    private Instant firstConnectedAt;
     @Indexed
     private String organizationId;
     private String userId;      // User who installed the agent; optional, absent for older registrations
