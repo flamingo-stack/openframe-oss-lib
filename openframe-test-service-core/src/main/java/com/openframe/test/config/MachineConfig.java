@@ -2,16 +2,7 @@ package com.openframe.test.config;
 
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * Coordinates of the SSH verification target used by device E2E cases (channel B). Follows the same
- * lazy env-var pattern as {@link MongoConfig}: values may be injected programmatically via
- * {@link #configure} (e.g. by the runner service), otherwise they are read from the environment on
- * first access and the getter fails fast if a required key is missing.
- *
- * <p>{@code hostname} is the enrolled device's name in the tenant — the assistant is targeted by it in
- * the prompt, and the online precheck confirms it is in the ONLINE device set (no machine id needed).
- * The SSH fields are how the test independently reaches the same box.
- */
+// SSH verification target for device E2E cases; values may be injected via configure() or read lazily from env vars.
 @Slf4j
 public class MachineConfig {
 
@@ -111,19 +102,19 @@ public class MachineConfig {
         return os;
     }
 
-    /** Hostname of the optional control machine, or {@code null} if no second machine is configured. */
+    // Null when no control machine is configured.
     public static String getControlHostname() {
         loadEnv();
         return controlHostname;
     }
 
-    /** SSH host of the optional control machine, or {@code null} if no second machine is configured. */
+    // Null when no control machine is configured.
     public static String getControlSshHost() {
         loadEnv();
         return controlSshHost;
     }
 
-    /** Whether a second (control) machine is configured for multi-host cases. */
+    // True only if both control fields are present, since they're configured together.
     public static boolean hasControlMachine() {
         loadEnv();
         return controlHostname != null && controlSshHost != null;

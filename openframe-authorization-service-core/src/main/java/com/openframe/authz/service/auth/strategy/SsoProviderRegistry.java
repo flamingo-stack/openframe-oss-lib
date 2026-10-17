@@ -14,13 +14,7 @@ import static java.util.Locale.ROOT;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toUnmodifiableMap;
 
-/**
- * The set of SSO providers this deployment actually supports, derived from the registered
- * {@link ClientRegistrationStrategy} beans.
- * <p>
- * Anything that needs to ask "is this a provider we know?" should ask here rather than naming
- * providers inline — adding a provider then means adding its strategy and nothing else.
- */
+// Supported providers are derived from registered ClientRegistrationStrategy beans, so adding a provider only requires adding its strategy.
 @Component
 public class SsoProviderRegistry {
 
@@ -39,10 +33,6 @@ public class SsoProviderRegistry {
         return byProviderId.keySet();
     }
 
-    /**
-     * Extra authorization-request parameters the provider requires (e.g. Apple's
-     * {@code response_mode=form_post}). Empty for providers that need none, or for unknown ids.
-     */
     public Map<String, String> additionalAuthorizationParams(String registrationId) {
         if (registrationId == null) {
             return Map.of();
@@ -51,10 +41,6 @@ public class SsoProviderRegistry {
         return strategy == null ? Map.of() : strategy.additionalAuthorizationParams();
     }
 
-    /**
-     * Extra ID-token validation the provider behind this registration requires, if any.
-     * Empty for providers the OIDC defaults already cover.
-     */
     public Optional<OAuth2TokenValidator<Jwt>> idTokenValidator(ClientRegistration registration) {
         if (registration == null || registration.getRegistrationId() == null) {
             return Optional.empty();

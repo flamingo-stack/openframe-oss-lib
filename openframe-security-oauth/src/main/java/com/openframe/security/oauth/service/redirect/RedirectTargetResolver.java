@@ -5,14 +5,7 @@ import reactor.core.publisher.Mono;
 
 public interface RedirectTargetResolver {
 
-    /**
-     * Resolve where to send the browser after a successful code exchange.
-     *
-     * @param tenantId          tenant the user authenticated into
-     * @param userId            authenticated user's id ({@code sub} claim), or {@code null} when it
-     *                          could not be read from the issued token
-     * @param requestedRedirectTo redirect requested by the client, may be {@code null}
-     */
+    // Resolve where to send the browser after a successful code exchange; userId may be null when it could not be read from the issued token.
     Mono<String> resolve(String tenantId, String userId, String requestedRedirectTo, ServerHttpRequest request);
 
     /**
@@ -24,3 +17,4 @@ public interface RedirectTargetResolver {
         return false;
     }
 }
+

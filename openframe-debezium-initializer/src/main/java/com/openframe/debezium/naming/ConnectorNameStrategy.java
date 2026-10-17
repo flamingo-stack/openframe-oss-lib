@@ -4,12 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-/**
- * Strategy for resolving connector names and recognising versioned variants.
- * Default implementation is {@link IdentityConnectorNameStrategy} — name is used
- * as-is. SaaS shared cluster overrides with a versioned strategy
- * ({@code _v1}, {@code _v2}, …).
- */
+// Strategy for resolving connector names and recognising versioned variants; default is identity, SaaS shared cluster uses versioned.
 public interface ConnectorNameStrategy {
 
     /**

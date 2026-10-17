@@ -5,13 +5,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Centralized Redis key builder that supports global prefixing and optional tenant namespacing.
- * <p>
- * Notes:
- * - For token-based flows where tenantId is not known at read-time, prefer using an "index key"
- * (global key -> tenantId) plus a tenant-scoped key.
- */
+// Centralized Redis key builder that supports global prefixing and optional tenant namespacing.
 public class OpenframeRedisKeyBuilder {
 
     private final OpenframeRedisProperties props;
@@ -20,23 +14,12 @@ public class OpenframeRedisKeyBuilder {
         this.props = props;
     }
 
-    /**
-     * Builds a key under the tenant namespace.
-     * <p>
-     * Tenant id is mandatory; if absent, throws IllegalStateException to fail fast.
-     */
+    // Builds a key under the tenant namespace; tenant id is mandatory and fails fast if absent.
     public String tenantKey(String relativeKey) {
         return build(relativeKey, requireTenantId());
     }
 
-    /**
-     * Builds a key under an explicit tenant namespace, for multi-tenant callers (e.g. a shared
-     * gateway serving many tenants) that resolve the tenant per request rather than from the
-     * pod-wide {@code openframe.redis.tenant-id} property.
-     *
-     * @param relativeKey the relative key suffix
-     * @param tenantId    the tenant to namespace under; must be non-blank
-     */
+    // Builds a key under an explicit tenant namespace, for multi-tenant callers that resolve the tenant per request.
     public String tenantKey(String relativeKey, String tenantId) {
         if (!StringUtils.hasText(tenantId)) {
             throw new IllegalArgumentException("tenantId must not be blank");
@@ -44,10 +27,7 @@ public class OpenframeRedisKeyBuilder {
         return build(relativeKey, tenantId.trim());
     }
 
-    /**
-     * Builds a key outside any tenant namespace, for state shared by the whole installation
-     * (e.g. cross-tenant locks). Cannot collide with tenant keys: those always carry a tenant segment.
-     */
+    // Builds a key outside any tenant namespace, for state shared by the whole installation.
     public String globalKey(String relativeKey) {
         return build(relativeKey, null);
     }
@@ -60,10 +40,7 @@ public class OpenframeRedisKeyBuilder {
         return tenantId.trim();
     }
 
-    /**
-     * A helper to compute the RedisCache prefix (must include cacheName + '::').
-     * Returned string is the full prefix, including global/env/tenant segments.
-     */
+    // Computes the RedisCache prefix (cacheName + '::'), including global/env/tenant segments.
     public String cacheKeyPrefix(String domainPrefix, String cacheName) {
         String prefix = StringUtils.hasText(domainPrefix) ? trimColons(domainPrefix) + ":" : "";
         return tenantKey(prefix + cacheName + "::");

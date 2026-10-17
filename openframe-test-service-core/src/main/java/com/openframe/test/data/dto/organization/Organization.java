@@ -12,10 +12,6 @@ import org.bson.codecs.pojo.annotations.BsonRepresentation;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/**
- * Organization document representing a company or entity in the system.
- * Contains business-related information such as revenue, employees, and contract details.
- */
 @Data
 @Builder
 @NoArgsConstructor

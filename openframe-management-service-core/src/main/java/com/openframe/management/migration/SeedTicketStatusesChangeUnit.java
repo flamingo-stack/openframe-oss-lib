@@ -11,16 +11,8 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
-/**
- * Gives a tenant its ticket status board: the four system statuses plus the "On Hold" custom one
- * every tenant starts with. Admins own the board from there — a status they renamed or deleted must
- * not come back, so seeding only ever adds what is missing.
- *
- * <p>One-shot: a tenant is a cluster of its own with its own database, so a tenant that appears
- * later brings a fresh changelog and seeds on its first boot. The id is new on purpose — under the
- * old one the predecessor is already recorded as executed on every tenant, and a tenant that never
- * seeded (the feature flag that used to gate this was off) would stay without a board forever.
- */
+// New id on purpose: the predecessor id is already recorded as executed on every tenant,
+// so a tenant that never seeded (old feature flag was off) would otherwise stay without a board.
 @Slf4j
 @ChangeUnit(id = "seed-ticket-statuses", order = "003", author = "openframe")
 public class SeedTicketStatusesChangeUnit {
@@ -59,3 +51,4 @@ public class SeedTicketStatusesChangeUnit {
         return mongoTemplate.exists(query, TicketStatusDefinition.class);
     }
 }
+

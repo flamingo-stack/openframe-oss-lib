@@ -15,16 +15,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Per-tenant document holding DB-side overrides for frontend feature flags.
- * Any property present in {@link #flags} takes precedence over the value
- * configured in {@code openframe.fe-feature-flag.*}; missing properties fall
- * back to the yml configuration default.
- *
- * <p>The document is {@link TenantScoped} via {@link #tenantId}, so the
- * collection holds one document per tenant and naturally supports all tenants
- * sharing a single cluster.
- */
+// Per-tenant DB-side overrides for frontend feature flags; flags present here take precedence over yml defaults.
 @Document(collection = "fe_feature_flags")
 @Data
 @Builder
@@ -46,3 +37,4 @@ public class FeFeatureFlags implements TenantScoped {
     @Indexed
     private String tenantId;
 }
+

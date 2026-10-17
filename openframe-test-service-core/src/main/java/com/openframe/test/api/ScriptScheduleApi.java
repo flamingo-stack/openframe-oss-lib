@@ -44,16 +44,12 @@ import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
 import static io.restassured.RestAssured.given;
 
-/**
- * Client for the script-schedule GraphQL API: {@code scriptSchedule}, {@code scriptSchedules},
- * {@code scriptScheduleFilters}, the create/update/archive/unarchive/delete mutations, and the
- * device-targeting mutations plus the two device pickers.
- */
+// Client for the script-schedule GraphQL API, including device-targeting mutations and pickers.
 public class ScriptScheduleApi {
 
     // ---- device targeting ----
 
-    /** The DEVICES count, selection mode and rule, and both pickers narrowed by a hostname search. */
+    // The DEVICES count, selection mode and rule, and both pickers narrowed by a hostname search.
     public static ScheduleDevices getScheduleDevices(String scheduleId, String search, int first) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("id", scheduleId);
@@ -71,45 +67,42 @@ public class ScriptScheduleApi {
                 .extract().jsonPath().getObject("data.scriptSchedule", ScheduleDevices.class);
     }
 
-    /** Incremental assign; already-assigned devices are skipped. {@code machineIds} are Machine global ids. */
+    // Incremental assign; already-assigned devices are skipped. machineIds are Machine global ids.
     public static ScriptSchedule addDevices(String scheduleId, List<String> machineIds) {
         return scheduleMutation(ADD_DEVICES_TO_SCHEDULE, "addDevicesToSchedule",
                 Map.of("scheduleId", scheduleId, "machineIds", machineIds));
     }
 
-    /**
-     * An assign that is expected to be rejected (a device whose OS the schedule does not support);
-     * returns the top-level GraphQL errors, empty when the server accepted it.
-     */
+    // An assign expected to be rejected (unsupported OS); returns top-level GraphQL errors, empty if accepted.
     public static List<GraphqlError> attemptAddDevicesErrors(String scheduleId, List<String> machineIds) {
         return errorsOf(ADD_DEVICES_TO_SCHEDULE, Map.of("scheduleId", scheduleId, "machineIds", machineIds));
     }
 
-    /** Incremental unassign; missing ids are no-ops. */
+    // Incremental unassign; missing ids are no-ops.
     public static ScriptSchedule removeDevices(String scheduleId, List<String> machineIds) {
         return scheduleMutation(REMOVE_DEVICES_FROM_SCHEDULE, "removeDevicesFromSchedule",
                 Map.of("scheduleId", scheduleId, "machineIds", machineIds));
     }
 
-    /** Assigns every device matching the filter/search, scoped to the schedule's platforms. */
+    // Assigns every device matching the filter/search, scoped to the schedule's platforms.
     public static ScriptSchedule addAllDevices(String scheduleId, DeviceFilterInput filter, String search) {
         return scheduleMutation(ADD_ALL_DEVICES_TO_SCHEDULE, "addAllDevicesToSchedule",
                 deviceSelection(scheduleId, filter, search));
     }
 
-    /** Unassigns every assigned device matching the filter/search; with neither, clears the assignment. */
+    // Unassigns every assigned device matching the filter/search; with neither, clears the assignment.
     public static ScriptSchedule removeAllDevices(String scheduleId, DeviceFilterInput filter, String search) {
         return scheduleMutation(REMOVE_ALL_DEVICES_FROM_SCHEDULE, "removeAllDevicesFromSchedule",
                 deviceSelection(scheduleId, filter, search));
     }
 
-    /** PUT semantics: the given set replaces the whole assignment ("Edit Devices"). */
+    // PUT semantics: the given set replaces the whole assignment ("Edit Devices").
     public static ScriptSchedule setDevices(String scheduleId, List<String> machineIds) {
         return scheduleMutation(SET_SCRIPT_SCHEDULE_DEVICES, "setScriptScheduleDevices",
                 Map.of("scheduleId", scheduleId, "machineIds", machineIds));
     }
 
-    /** Switches the schedule to CRITERIA selection and stores the rule. */
+    // Switches the schedule to CRITERIA selection and stores the rule.
     public static ScriptSchedule setDeviceCriteria(String scheduleId, ScheduleDeviceCriteriaInput criteria) {
         return scheduleMutation(SET_SCHEDULE_DEVICE_CRITERIA, "setScheduleDeviceCriteria",
                 Map.of("scheduleId", scheduleId, "criteria", criteria));
@@ -135,7 +128,7 @@ public class ScriptScheduleApi {
                 .extract().jsonPath().getObject("data." + field, ScriptSchedule.class);
     }
 
-    /** Sends a document without the success spec and returns its top-level GraphQL errors (never null). */
+    // Sends a document without the success spec and returns its top-level GraphQL errors (never null).
     private static List<GraphqlError> errorsOf(String document, Map<String, Object> variables) {
         Map<String, Object> body = Map.of("query", document, "variables", variables);
         List<GraphqlError> errors = given(getAuthorizedSpec())
@@ -158,10 +151,7 @@ public class ScriptScheduleApi {
                 .extract().jsonPath().getObject("data.scriptSchedule", ScriptSchedule.class);
     }
 
-    /**
-     * First page of schedules. {@code filter} and {@code search} may be null; a null filter hides
-     * DELETED schedules and returns every other status (the schema default).
-     */
+    // First page of schedules; a null filter hides DELETED schedules and returns every other status.
     public static ScriptScheduleConnection listSchedules(ScriptScheduleFilterInput filter, String search, int first) {
         Map<String, Object> variables = new HashMap<>();
         variables.put("first", first);
@@ -207,13 +197,7 @@ public class ScriptScheduleApi {
                 .extract().jsonPath().getObject("data.createScriptSchedule", ScriptSchedule.class);
     }
 
-    /**
-     * Sends a create that is expected to be rejected and returns the top-level GraphQL errors
-     * (empty when the server accepted it). The schema rejects a {@code startAt} off the 30-minute
-     * grid, a {@code startAt} on a DEVICE_ONLINE schedule and a {@code repeat} that is not a whole
-     * number of 30-minute slots as GraphQL errors, not {@code userErrors}, so this does not use the
-     * {@code graphqlSuccess()} spec.
-     */
+    // Invalid startAt/repeat values are rejected as GraphQL errors, not userErrors, so no success spec here.
     public static List<GraphqlError> attemptCreateScheduleErrors(CreateScriptScheduleInput input) {
         return errorsOf(CREATE_SCRIPT_SCHEDULE, Map.of("input", input));
     }
@@ -251,7 +235,7 @@ public class ScriptScheduleApi {
                 .extract().jsonPath().getObject("data.unarchiveScriptSchedule", ScriptSchedule.class);
     }
 
-    /** Soft-deletes the schedule and returns its id. Idempotent on an already-deleted schedule. */
+    // Soft-deletes the schedule and returns its id. Idempotent on an already-deleted schedule.
     public static String deleteSchedule(String id) {
         Map<String, Object> body = Map.of(
                 "query", DELETE_SCRIPT_SCHEDULE,
@@ -268,19 +252,19 @@ public class ScriptScheduleApi {
     // Each read holds the response in a named local before taking a field out of it, so a failure
     // says which step produced nothing.
 
-    /** Every execution this schedule has dispatched, newest first. */
+    // Every execution this schedule has dispatched, newest first.
     public static ScriptExecutionConnection getScheduleExecutions(String scheduleId, int first) {
         return object(SCHEDULE_EXECUTIONS, "scheduleExecutions",
                 Map.of("scheduleId", scheduleId, "first", first), ScriptExecutionConnection.class);
     }
 
-    /** The facet block beside that list: initiators, statuses and machines. */
+    // The facet block beside that list: initiators, statuses and machines.
     public static ScriptExecutionFilters getScheduleExecutionFilters(String scheduleId) {
         return object(SCHEDULE_EXECUTION_FILTERS, "scheduleExecutionFilters",
                 Map.of("scheduleId", scheduleId), ScriptExecutionFilters.class);
     }
 
-    /** A run is one firing of the schedule across its devices; executions are its per-device legs. */
+    // A run is one firing of the schedule across its devices; executions are its per-device legs.
     public static ScheduleRunConnection getScheduleRuns(String scheduleId, int first) {
         return object(SCHEDULE_RUNS, "scheduleRuns",
                 Map.of("scheduleId", scheduleId, "first", first), ScheduleRunConnection.class);

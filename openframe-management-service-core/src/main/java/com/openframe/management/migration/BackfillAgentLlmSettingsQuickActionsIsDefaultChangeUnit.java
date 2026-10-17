@@ -11,18 +11,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.util.List;
 
-/**
- * Backfills {@code quickActionsIsDefault} on existing {@code agent_llm_settings} records so the
- * frontend can distinguish "quick actions never customized -> inherit the Multi Platform Hub defaults"
- * from "intentionally empty". Sets {@code false} when the record already stores a non-empty quick-actions
- * list (clearly customized) and {@code true} otherwise (no/empty list -> treat as not-yet-customized ->
- * inherit defaults).
- *
- * <p>Tenant-scoped via {@link TenantIdProvider}; idempotent (only touches records that lack the field).
- * Uses the raw collection because {@code AgentLlmSettings} lives in the SaaS lib, which this OSS module
- * does not depend on. Runs after {@code seed-agent-llm-settings} (order 006) so seeded records are
- * covered too.
- */
+// Backfills quickActionsIsDefault so the frontend can tell "never customized" from "intentionally empty".
 @Slf4j
 @ChangeUnit(id = "backfill-agent-llm-settings-quick-actions-is-default", order = "008", author = "openframe")
 public class BackfillAgentLlmSettingsQuickActionsIsDefaultChangeUnit {

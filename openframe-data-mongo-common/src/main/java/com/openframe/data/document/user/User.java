@@ -30,20 +30,13 @@ public class User implements TenantScoped {
     private String lastName;
     @Builder.Default
     private List<UserRole> roles = new ArrayList<>();
-    /**
-     * Indicates whether the user's email is verified.
-     * For SSO users this is typically true on first login.
-     */
+    // For SSO users this is typically true on first login
     @Builder.Default
     private boolean emailVerified = false;
     @Indexed
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
-    /**
-     * CRM (HubSpot) contact sync flag. null/false means the user needs to be (re)synced to the CRM;
-     * set to true by the sync job after a successful sync, and reset to false whenever the user
-     * changes. New users start as null so they are picked up automatically.
-     */
+    // null/false means needs (re)sync to CRM; true set by sync job, reset on user change
     private Boolean crmSynced;
     @CreatedDate
     private LocalDateTime createdAt;
@@ -56,3 +49,4 @@ public class User implements TenantScoped {
         this.email = email == null ? null : email.trim().toLowerCase(Locale.ROOT);
     }
 }
+

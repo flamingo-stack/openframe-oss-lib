@@ -48,11 +48,7 @@ public class DeviceLogDataFetcher {
         return mapper.toConnection(result);
     }
 
-    /**
-     * Null only when neither argument was given, which is what asks for every device of the tenant. The deprecated
-     * single-device argument keeps rejecting a blank value, so a client that sends one still gets its old error
-     * rather than a silent tenant-wide query.
-     */
+    // null result means no device filter was requested, i.e. query all tenant devices
     private static List<String> devices(String machineId, List<String> machineIds) {
         if (machineId == null) {
             return machineIds;
@@ -66,3 +62,4 @@ public class DeviceLogDataFetcher {
         return Stream.concat(Stream.of(machineId), machineIds.stream()).toList();
     }
 }
+

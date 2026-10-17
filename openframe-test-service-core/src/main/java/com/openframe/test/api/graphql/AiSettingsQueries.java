@@ -1,9 +1,6 @@
 package com.openframe.test.api.graphql;
 
-/**
- * GraphQL documents for the assistant AI settings (openframe-saas-ai-agent {@code ai-settings.graphqls}),
- * served on {@code chat/graphql}: the two tenant-wide AI logic configs and the client assistant view.
- */
+// GraphQL documents for the assistant AI settings: tenant-wide AI configs and the client assistant view.
 public class AiSettingsQueries {
 
     private static final String AI_CONFIG_FIELDS = """
