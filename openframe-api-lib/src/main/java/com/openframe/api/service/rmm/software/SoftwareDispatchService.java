@@ -3,9 +3,7 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptExecutionService;
-import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
-import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
 import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
@@ -28,15 +26,14 @@ public class SoftwareDispatchService {
     private final SoftwareNatsPublisher softwareNatsPublisher;
 
     public String dispatch(ScriptResponse script, List<String> machineIds, List<String> args, String initiatedBy,
-                           ExecutionSource source, PackageManagerType packageManager, String packageName,
-                           SoftwareAction action) {
+                           ExecutionSource source, DispatchSoftwareCommand command) {
         deviceService.verifyDispatchable(machineIds);
 
         String executionId = UUID.randomUUID().toString();
 
         scriptExecutionService.createSoftwareBatch(executionId, script.getId(), machineIds,
                 script.getPrivilegeLevel(), script.getDefaultTimeoutSeconds(), initiatedBy, source,
-                packageManager, packageName, action);
+                command.getPackageManager(), command.getPackageName(), command.getAction());
 
         List<String> tokenizedArgs = ScriptArgsTokenizer.tokenize(args);
 
@@ -57,3 +54,4 @@ public class SoftwareDispatchService {
         return executionId;
     }
 }
+
