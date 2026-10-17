@@ -33,6 +33,7 @@ import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import {
   Button,
   FieldWrapper,
+  fieldLabelId,
   Input,
   Textarea,
   Label,
@@ -80,10 +81,11 @@ export interface BookingFieldCopy {
   label?: string;
   placeholder?: string;
   /**
-   * How a CHOICE question (`select`, `radio`) is drawn. Omitted: as one-tap
-   * chips when the link offers at most `CHIP_MAX_OPTIONS` answers, else as the
-   * question's own control. `chips` / `dropdown` force one. The answers, their
-   * name and their validation are always the link's own.
+   * How a CHOICE question (`select`, `radio`) is drawn. Omitted or `dropdown`:
+   * the question's own control (a select, or radio buttons). `chips`: one-tap
+   * chips, when the link offers at most `CHIP_MAX_OPTIONS` answers (past it, the
+   * question's own control). The answers, their name and their validation are
+   * always the link's own.
    */
   display?: 'chips' | 'dropdown';
 }
@@ -215,48 +217,6 @@ const canonicalNumber = (v: unknown): string => {
  * (`Input`, `Textarea`, `SelectTrigger` — the lib's error border), so a refused
  * field reads as refused at the control, not only in the line beneath it.
  */
-/** The field types drawn as chips (`BookingFieldCopy.display`): one answer from a list. */
-const CHIP_FIELD_TYPES: ReadonlySet<string> = new Set(['select', 'radio']);
-
-/** The most answers a choice question may offer and still be drawn as chips by default: more read better as a list. */
-export const CHIP_MAX_OPTIONS = 6;
-
-/** Whether a choice question is drawn as chips: the host's choice, else when it offers few enough answers. */
-function drawnAsChips(field: { type: string; options?: string[] }, display: BookingFieldCopy['display']): boolean {
-  if (!CHIP_FIELD_TYPES.has(field.type)) return false;
-  if (display) return display === 'chips';
-  return (field.options?.length ?? 0) > 0 && (field.options?.length ?? 0) <= CHIP_MAX_OPTIONS;
-}
-
-/** A choice question as one-tap chips: the lib's single `ToggleGroup`, one item per option. */
-const chipsControl = ({ field, id, registerName, error, control }: ControlArgs): ReactNode => (
-  <Controller
-    control={control}
-    name={registerName as never}
-    render={({ field: rhf }) => (
-      <ToggleGroup
-        id={id}
-        type="single"
-        variant="outline"
-        value={rhf.value ?? ''}
-        // A tap on the chosen chip reports '': the answer stays (clearing is not a choice the form offers).
-        onValueChange={(value: string) => {
-          if (value) rhf.onChange(value);
-        }}
-        aria-required={field.required || undefined}
-        aria-invalid={Boolean(error)}
-        className="flex flex-wrap justify-start gap-[var(--spacing-system-xsf)]"
-      >
-        {(field.options ?? []).map(opt => (
-          <ToggleGroupItem key={opt} value={opt}>
-            {optionLabel(field, opt)}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    )}
-  />
-);
-
 const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => ReactNode> = {
   text: ({ field, id, registerName, error, register }) => (
     <Input
@@ -413,6 +373,65 @@ const FIELD_CONTROLS: Record<SupportedFormFieldType, (args: ControlArgs) => Reac
     />
   ),
 };
+
+/** The field types that may be drawn as chips (`BookingFieldCopy.display`): one answer from a list. */
+const CHIP_FIELD_TYPES: ReadonlySet<string> = new Set(['select', 'radio']);
+
+/** The most answers a choice question may offer and still be drawn as chips: more read better as a list. */
+export const CHIP_MAX_OPTIONS = 6;
+
+/**
+ * Whether a choice question is drawn as chips: only when the host asks for it
+ * (`display: 'chips'`) and the link offers at most `CHIP_MAX_OPTIONS` answers.
+ * Anything else keeps the question's own control from `FIELD_CONTROLS`.
+ */
+function drawnAsChips(field: { type: string; options?: string[] }, display: BookingFieldCopy['display']): boolean {
+  if (display !== 'chips' || !CHIP_FIELD_TYPES.has(field.type)) return false;
+  const count = field.options?.length ?? 0;
+  return count > 0 && count <= CHIP_MAX_OPTIONS;
+}
+
+/**
+ * A choice question as one-tap chips: the lib's single `ToggleGroup`, one item
+ * per option. The group is named by the question's label (`FieldWrapper` gives
+ * it `fieldLabelId`), a refused question paints the lib's error border on its
+ * chips, and hover is a quiet background so it never reads as the chosen one.
+ */
+const chipsControl = ({ field, id, registerName, error, control }: ControlArgs): ReactNode => (
+  <Controller
+    control={control}
+    name={registerName as never}
+    render={({ field: rhf }) => (
+      <ToggleGroup
+        id={id}
+        type="single"
+        variant="outline"
+        value={rhf.value ?? ''}
+        // A tap on the chosen chip reports '': the answer stays (clearing is not a choice the form offers).
+        onValueChange={(value: string) => {
+          if (value) rhf.onChange(value);
+        }}
+        aria-labelledby={fieldLabelId(id)}
+        aria-required={field.required || undefined}
+        aria-invalid={Boolean(error)}
+        className="flex flex-wrap justify-start gap-[var(--spacing-system-xsf)]"
+      >
+        {(field.options ?? []).map(opt => (
+          <ToggleGroupItem
+            key={opt}
+            value={opt}
+            className={cn(
+              'hover:bg-ods-bg-hover hover:text-ods-text-primary data-[state=on]:hover:bg-ods-accent-hover data-[state=on]:hover:text-ods-text-on-accent',
+              error && 'data-[state=off]:border-ods-error',
+            )}
+          >
+            {optionLabel(field, opt)}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    )}
+  />
+);
 
 /** `firstName` → `ms-first-name`; the ids the built-ins have always had. */
 const builtInId = (name: string) => `ms-${name.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`)}`;

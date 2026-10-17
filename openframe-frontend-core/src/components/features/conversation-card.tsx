@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
 import { useAgentTint } from '../agent-identity';
 import { ChatTurn } from '../chat/chat-turn';
@@ -46,9 +46,10 @@ export interface ConversationCardProps {
    */
   agent?: string | null;
   /**
-   * The card is a toggle the reader picks ("this sounds like me"): the whole
-   * card is one button with `aria-pressed`, a mark in its corner says whether it
-   * is picked, and a picked card takes the accent ring.
+   * The card is a toggle the reader picks ("this sounds like me"): one button
+   * with `aria-pressed`, named by the request, stretched over the whole card so
+   * a tap anywhere toggles it; a mark in its corner says whether it is picked,
+   * and a picked card takes the accent ring.
    */
   selection?: { pressed: boolean; onToggle: () => void };
   className?: string;
@@ -74,33 +75,50 @@ export function ConversationCard({
   className,
 }: ConversationCardProps) {
   const tint = useAgentTint(agent);
-  const Card = selection ? 'button' : 'div';
+  const requestId = useId();
   return (
-    <Card
-      {...(selection ? { type: 'button' as const, 'aria-pressed': selection.pressed, onClick: selection.onToggle } : {})}
+    <div
       className={cn(
-        'flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
-        selection &&
-          'relative w-full cursor-pointer text-left transition-colors hover:border-ods-text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ods-accent',
+        'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]',
+        selection && 'transition-colors hover:border-ods-text-secondary',
         selection?.pressed && 'border-ods-accent ring-1 ring-ods-accent',
         className,
       )}
       style={tint}
     >
       {selection && (
-        <span
-          aria-hidden
-          className={cn(
-            'absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] flex size-6 items-center justify-center rounded-sm border text-h5',
-            selection.pressed ? 'border-ods-accent bg-ods-accent text-ods-bg' : 'border-ods-border text-ods-text-secondary',
-          )}
+        // ONE toggle, over the whole card: the card's text is its content, not a button's.
+        <button
+          type="button"
+          aria-pressed={selection.pressed}
+          aria-labelledby={requestId}
+          onClick={selection.onToggle}
+          className="absolute inset-0 z-10 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus"
         >
-          {selection.pressed ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
-        </span>
+          <span
+            aria-hidden
+            className={cn(
+              'absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] flex size-6 items-center justify-center rounded-sm border',
+              selection.pressed
+                ? 'border-ods-accent bg-ods-accent text-ods-text-on-accent'
+                : 'border-ods-border text-ods-text-secondary',
+            )}
+          >
+            {selection.pressed ? <CheckIcon size={14} /> : <PlusIcon size={14} />}
+          </span>
+        </button>
       )}
       {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
-        <p className={cn('m-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3', selection && 'pr-8')} title={request}>
+        <p
+          id={requestId}
+          className={cn(
+            'm-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3',
+            // Clears the corner mark: its width plus a gap.
+            selection && 'pr-[calc(var(--spacing-system-lf)+var(--spacing-system-xsf))]',
+          )}
+          title={request}
+        >
           &ldquo;{request}&rdquo;
         </p>
       </ChatTurn>
@@ -136,6 +154,6 @@ export function ConversationCard({
           <Tag as="span" label={footerValue} variant={footerTone === 'attention' ? 'warning' : 'badge'} />
         </div>
       )}
-    </Card>
+    </div>
   );
 }

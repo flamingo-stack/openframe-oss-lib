@@ -23,12 +23,17 @@ describe('ConversationCard', () => {
     expect(screen.queryByText('Your part')).toBeNull();
   });
 
-  it('is one toggle when selectable, stating whether it is picked', () => {
+  it('is one toggle when selectable, named by the request and stating whether it is picked', () => {
     const onToggle = vi.fn();
-    render(<ConversationCard {...base} selection={{ pressed: true, onToggle }} />);
-    const card = screen.getByRole('button');
-    expect(card).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(card);
+    const { rerender } = render(<ConversationCard {...base} selection={{ pressed: true, onToggle }} />);
+    const toggle = screen.getByRole('button', { name: /We need more people, but we can't hire\./ });
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    // The card's content is not inside the button: only the mark is.
+    expect(toggle).not.toContainElement(screen.getByText('Takes the L1 tickets.'));
+    fireEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledTimes(1);
+    rerender(<ConversationCard {...base} selection={{ pressed: false, onToggle }} />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false');
   });
 });
