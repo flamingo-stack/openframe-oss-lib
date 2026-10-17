@@ -15,17 +15,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.util.List;
 
-/**
- * Repairs ticket ordering for the lifecycle (custom-status) board.
- * <p>
- * Tickets created while the lifecycle feature was enabled but before the order calculation was fixed
- * had their {@code order} computed against the legacy {@code status} column (which is unset on migrated
- * tickets), so they collided around {@link LexoRank#middle()} instead of landing at the top of their
- * {@code statusId} column. This re-ranks every statusId column by {@code createdAt} descending — the same
- * "newest on top" default as {@link BackfillTicketOrdersChangeUnit} — restoring a clean order.
- * <p>
- * Note: this resets any manual drag ordering within a column back to createdAt-desc.
- */
+// Re-ranks each statusId column by createdAt descending to fix orders miscomputed against the legacy status column.
 @Slf4j
 @ChangeUnit(id = "normalize-ticket-order-by-status-id", order = "004", author = "openframe")
 public class NormalizeTicketOrderByStatusIdChangeUnit {
