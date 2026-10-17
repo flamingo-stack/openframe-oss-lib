@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { cn } from '../../../utils/cn';
+import { useToast } from '../../../hooks';
 import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message';
 import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
@@ -65,6 +66,7 @@ export function ApprovalRequestNotificationTile({
   const [processing, setProcessing] = useState(false);
   // Optimistic status for this user's own click; backend resolution (below) wins once it arrives.
   const [localStatus, setLocalStatus] = useState<ChatApprovalStatus | null>(null);
+  const { toast } = useToast();
 
   const approval = getApprovalMeta(notification);
   const resolvedStatus = resolutionToStatus(approval?.resolution);
@@ -92,8 +94,14 @@ export function ApprovalRequestNotificationTile({
     setLocalStatus(nextStatus);
     try {
       await action(batchData.approvalRequestId);
-    } catch {
+    } catch (err) {
       setLocalStatus(null); // roll back the optimistic flip; the request failed
+      const message = err instanceof Error ? err.message : 'Please try again.';
+      toast({
+        variant: 'destructive',
+        title: nextStatus === 'approved' ? 'Failed to approve request' : 'Failed to reject request',
+        description: message,
+      });
       return;
     } finally {
       setProcessing(false);

@@ -54,15 +54,30 @@ impl LogShipper {
         loop {
             tokio::select! {
                 // Wait for either a new log message or the batch timeout
-                Some(log) = receiver.recv() => {
-                    batch.push(log);
+                maybe_log = receiver.recv() => {
+                    match maybe_log {
+                        Some(log) => {
+                            batch.push(log);
 
-                    // Ship batch if it reaches max size
-                    if batch.len() >= BATCH_SIZE {
-                        if let Err(e) = Self::send_batch(&client, &endpoint, &agent_id, batch.clone()).await {
-                            tracing::error!("Failed to ship log batch: {:#}", e);
+                            // Ship batch if it reaches max size
+                            if batch.len() >= BATCH_SIZE {
+                                if let Err(e) = Self::send_batch(&client, &endpoint, &agent_id, batch.clone()).await {
+                                    tracing::error!("Failed to ship log batch: {:#}", e);
+                                }
+                                batch.clear();
+                            }
                         }
-                        batch.clear();
+                        None => {
+                            // Channel closed (sender dropped, e.g. shutdown) - flush any
+                            // remaining logs before exiting the loop so nothing is lost.
+                            if !batch.is_empty() {
+                                if let Err(e) = Self::send_batch(&client, &endpoint, &agent_id, batch.clone()).await {
+                                    tracing::error!("Failed to ship log batch: {:#}", e);
+                                }
+                                batch.clear();
+                            }
+                            break;
+                        }
                     }
                 }
                 _ = sleep(BATCH_TIMEOUT) => {

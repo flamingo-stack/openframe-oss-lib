@@ -44,8 +44,11 @@ public class MachinePackageManagersService {
         }
 
         Map<PackageManagerType, PackageManagerState> states = toStates(machineId, reported);
-        if (!states.equals(machine.getPackageManagers())) {
-            machineWriter.update(machineId, machineUpdate().set(PACKAGE_MANAGERS, states));
+        if (!states.isEmpty() && !states.equals(machine.getPackageManagers())) {
+            var update = machineUpdate();
+            states.forEach((manager, state) ->
+                    update.set(PACKAGE_MANAGERS + "." + manager.name(), state));
+            machineWriter.update(machineId, update);
             log.info("Updated package managers for machineId={}: {}", machineId, states);
         }
         states.forEach((manager, state) -> bootstrapIfMissing(machineId, manager, state));

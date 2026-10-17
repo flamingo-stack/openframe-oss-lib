@@ -39,7 +39,7 @@ public class MingoEntityMutationTest extends MingoBaseTest {
     @Test
     @Tag("script")
     @DisplayName("Mingo creates a script")
-    @Disabled("TODO: review and fix later")
+    @Disabled("OFJAVA-009: script-creation tool regression, re-enable once fixed")
     public void testScriptCreate() {
         RunId runId = RunId.next();
         String name = "E2E-" + runId;

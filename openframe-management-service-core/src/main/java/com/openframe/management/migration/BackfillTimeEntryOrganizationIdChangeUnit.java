@@ -52,7 +52,7 @@ public class BackfillTimeEntryOrganizationIdChangeUnit {
                 continue;
             }
 
-            setOrganizationId(mongoTemplate, entry.getId(), organizationId);
+            setOrganizationId(mongoTemplate, entry.getId(), tenantId, organizationId);
             backfilled++;
         }
 
@@ -64,9 +64,11 @@ public class BackfillTimeEntryOrganizationIdChangeUnit {
     public void rollback() {
     }
 
-    private void setOrganizationId(MongoTemplate mongoTemplate, String entryId, String organizationId) {
-        Query byId = new Query(Criteria.where(ID_FIELD).is(entryId));
+    private void setOrganizationId(MongoTemplate mongoTemplate, String entryId, String tenantId, String organizationId) {
+        Query byId = new Query(Criteria.where(ID_FIELD).is(entryId)
+                .and(TENANT_ID_FIELD).is(tenantId));
         Update update = new Update().set(ORGANIZATION_ID_FIELD, organizationId);
         mongoTemplate.updateFirst(byId, update, TimeEntry.class);
     }
 }
+

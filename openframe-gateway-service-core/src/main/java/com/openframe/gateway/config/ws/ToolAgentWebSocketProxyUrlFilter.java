@@ -18,7 +18,11 @@ public class ToolAgentWebSocketProxyUrlFilter extends ToolWebSocketProxyUrlFilte
 
     @Override
     protected String getRequestToolId(String path) {
-        return path.split("/")[4];
+        String[] segments = path.split("/");
+        if (segments.length <= 4) {
+            throw new IllegalArgumentException("Malformed tool agent websocket path: " + path);
+        }
+        return segments[4];
     }
 
     @Override

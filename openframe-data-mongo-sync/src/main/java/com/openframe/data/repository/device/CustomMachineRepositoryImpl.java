@@ -275,27 +275,39 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         }
         int separator = cursor.lastIndexOf(CURSOR_SEPARATOR);
         if (separator < 0) {
-            log.warn("Invalid availableDevices cursor (no separator): '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException("Invalid availableDevices cursor (no separator): '" + cursor + "'");
         }
         ObjectId cursorId;
         try {
             cursorId = new ObjectId(cursor.substring(separator + 1));
         } catch (IllegalArgumentException ex) {
-            log.warn("Invalid availableDevices cursor id: '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException("Invalid availableDevices cursor id: '" + cursor + "'", ex);
         }
         int bucket;
         try {
             bucket = Integer.parseInt(cursor.substring(0, separator));
         } catch (NumberFormatException ex) {
-            log.warn("Unparseable availableDevices bucket in cursor '{}' — falling back to first page", cursor);
-            return;
+            throw new InvalidCursorException("Unparseable availableDevices bucket in cursor '" + cursor + "'", ex);
         }
         Document orExpr = new Document("$or", List.of(
                 new Document(BUCKET_FIELD, new Document("$gt", bucket)),
                 new Document(BUCKET_FIELD, bucket).append(ID_FIELD, new Document("$gt", cursorId))));
         ops.add(ctx -> new Document("$match", orExpr));
+    }
+
+    /**
+     * Thrown when an opaque pagination cursor supplied by a caller cannot be parsed. Per
+     * OFJAVA-013/OFJAVA-017, invalid data must fail loudly instead of silently resetting to
+     * the first page.
+     */
+    public static class InvalidCursorException extends RuntimeException {
+        public InvalidCursorException(String message) {
+            super(message);
+        }
+
+        public InvalidCursorException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     private void applyCursorCriteria(Query query, ObjectId cursorId, String sortField, boolean isDesc) {
@@ -657,3 +669,4 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
 }
+

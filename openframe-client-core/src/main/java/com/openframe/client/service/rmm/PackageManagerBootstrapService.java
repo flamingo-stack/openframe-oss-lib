@@ -14,10 +14,12 @@ import com.openframe.data.nats.rmm.util.ScriptArgsTokenizer;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
+import com.mongodb.DuplicateKeyException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -94,19 +96,25 @@ public class PackageManagerBootstrapService {
         String executionId = UUID.randomUUID().toString();
         Instant now = Instant.now();
 
-        scriptExecutionRepository.save(ScriptExecution.builder()
-                .tenantId(tenantId)
-                .executionId(executionId)
-                .scriptId(script.getId())
-                .machineId(machineId)
-                .privilegeLevel(script.getPrivilegeLevel())
-                .timeoutSeconds(script.getDefaultTimeoutSeconds())
-                .source(ExecutionSource.SYSTEM_BOOTSTRAP)
-                .packageManager(packageManager)
-                .status(ExecutionStatus.RUNNING)
-                .dispatchedAt(now)
-                .statusChangedAt(now)
-                .build());
+        try {
+            scriptExecutionRepository.save(ScriptExecution.builder()
+                    .tenantId(tenantId)
+                    .executionId(executionId)
+                    .scriptId(script.getId())
+                    .machineId(machineId)
+                    .privilegeLevel(script.getPrivilegeLevel())
+                    .timeoutSeconds(script.getDefaultTimeoutSeconds())
+                    .source(ExecutionSource.SYSTEM_BOOTSTRAP)
+                    .packageManager(packageManager)
+                    .status(ExecutionStatus.RUNNING)
+                    .dispatchedAt(now)
+                    .statusChangedAt(now)
+                    .build());
+        } catch (DuplicateKeyException | DataIntegrityViolationException e) {
+            log.debug("Concurrent dispatch detected for machineId={} scriptId={} — skipping duplicate insert",
+                    machineId, script.getId());
+            return;
+        }
 
         scriptBootstrapNatsPublisher.publishBootstrapScript(machineId, ScriptMessage.builder()
                 .executionId(executionId)
