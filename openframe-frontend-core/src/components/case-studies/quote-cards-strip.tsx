@@ -26,16 +26,17 @@ export interface QuoteCardTileProps extends Omit<HTMLAttributes<HTMLDivElement>,
   decorative?: boolean;
 }
 
+const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
+
 /**
  * ONE customer quote card: the line as the person's name, who said it beneath,
  * their logo, and the whole card opening the case study it comes from. The
  * strip draws one per quote; a page that shows a single story draws one alone.
  */
-const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
-
 export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteCardTileProps) {
   return (
-    <Card variant="panel"
+    <Card
+      variant="panel"
       aria-hidden={decorative || undefined}
       className={cn(QUOTE_CARD_CLASS, 'hover:border-ods-border-hover', className)}
       {...props}

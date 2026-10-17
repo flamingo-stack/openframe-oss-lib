@@ -21,13 +21,15 @@ import { cn } from '../../utils/cn';
 import { NavLinkAnchorViaRuntime } from '../chat/nav-link-anchor-via-runtime';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { PageContainer } from '../layout/page-container';
-import { StickySectionNav, type StickyNavSection } from './sticky-section-nav';
+import { STICKY_SECTION_NAV_HEIGHT_PX, StickySectionNav, type StickyNavSection } from './sticky-section-nav';
 
-/** The bar's own height (`StickySectionNav`'s `h-14`): what a section's anchor must clear besides the header. */
-export const SECTION_BAR_HEIGHT_PX = 56;
+/** The bar's own height: what a section's anchor must clear besides the header. */
+export const SECTION_BAR_HEIGHT_PX = STICKY_SECTION_NAV_HEIGHT_PX;
 /**
  * What a section clears when a link lands on it: the site header (72px), this
- * bar (56px) and a breath. The CSS twin of the offset the bar's tabs scroll by.
+ * bar (56px) and the gap (16px), 144px = `scroll-mt-36`. The CSS twin of the
+ * offset the bar's tabs scroll by. Written out twice below (a class built at
+ * runtime emits no CSS); the test pins both to the px sum.
  */
 export const PAGE_ANCHOR_SCROLL_MARGIN_CLASS = 'scroll-mt-36';
 /** The same margin for every anchored element under a page's `<main>` (sections, cards, tabs). */

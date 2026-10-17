@@ -6,7 +6,24 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { PageSectionBar } from '../page-section-bar';
+import {
+  PAGE_ANCHOR_GAP_PX,
+  PAGE_ANCHOR_SCOPE_CLASS,
+  PAGE_ANCHOR_SCROLL_MARGIN_CLASS,
+  PageSectionBar,
+  SECTION_BAR_HEIGHT_PX,
+} from '../page-section-bar';
+
+/** The site header's height the anchor margin clears (the header's own `h-[72px]`). */
+const SITE_HEADER_PX = 72;
+
+describe('the anchor margin', () => {
+  it('is the header, the bar and the gap, in both of its written-out classes', () => {
+    const steps = (SITE_HEADER_PX + SECTION_BAR_HEIGHT_PX + PAGE_ANCHOR_GAP_PX) / 4;
+    expect(PAGE_ANCHOR_SCROLL_MARGIN_CLASS).toBe(`scroll-mt-${steps}`);
+    expect(PAGE_ANCHOR_SCOPE_CLASS).toBe(`[&_[id]]:scroll-mt-${steps}`);
+  });
+});
 
 const SECTIONS = [
   { id: 'kept', label: 'Kept' },

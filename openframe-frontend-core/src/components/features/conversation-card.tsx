@@ -2,6 +2,7 @@
 
 import { type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
+import { isOwnClick } from '../../utils/own-click';
 import { useAgentTint } from '../agent-identity';
 import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
@@ -12,13 +13,12 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { Tag } from '../ui/tag';
 
-/** The card's frame and the answer's command block: ONE string each, read by the card and its skeleton. */
-/** What already acts on a click by itself, so a click on it is not the card's. */
-const INTERACTIVE_SELECTOR = 'a, button, input, select, textarea, label, [role="button"], [role="link"]';
-
+/** The card's frame, its parts' blocks and its footer row: ONE string each, read by the card and its skeleton. */
 const CARD_FRAME_CLASS =
   'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
 const ANSWER_BLOCK_CLASS = 'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]';
+const CONTEXT_BLOCK_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]';
+const FOOTER_ROW_CLASS = 'mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]';
 
 export interface ConversationCardSpeaker {
   /** Rendered as given (an avatar, an agent mark). */
@@ -100,10 +100,9 @@ export function ConversationCard({
         selection &&
         (event => {
           // A pointer convenience: the primary button only, never the end of a text selection,
-          // and never a click on another control or link inside the card (it does its own thing).
+          // and only the card's own click (`isOwnClick`: not a control or link inside it, not a portal).
           if (event.button !== 0 || window.getSelection()?.toString()) return;
-          const control = (event.target as Element).closest(INTERACTIVE_SELECTOR);
-          if (control && control !== event.currentTarget) return;
+          if (!isOwnClick(event.target, event.currentTarget, { controls: true })) return;
           selection.onToggle();
         })
       }
@@ -142,7 +141,7 @@ export function ConversationCard({
         </p>
       </ChatTurn>
       {context && (
-        <div className="flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]">
+        <div className={CONTEXT_BLOCK_CLASS}>
           <span className="text-ods-text-secondary text-h6">{context.label}</span>
           <p className="m-0 line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4" title={context.text}>
             {context.text}
@@ -168,7 +167,7 @@ export function ConversationCard({
         </div>
       </ChatTurn>
       {footerLabel && footerValue && (
-        <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h6">
+        <div className={cn(FOOTER_ROW_CLASS, 'text-ods-text-secondary text-h6')}>
           <span>{footerLabel}</span>
           <Tag as="span" label={footerValue} variant={footerTone === 'attention' ? 'warning' : 'badge'} />
         </div>
@@ -177,7 +176,6 @@ export function ConversationCard({
   );
 }
 
-/** A text bar `lines` lines tall, at the type step of the text it stands for. */
 /** A speaker's turn while loading: the avatar box, the name line, then the turn's own lines. */
 function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: ReactNode }) {
   return (
@@ -217,7 +215,7 @@ export function ConversationCardSkeleton({
         <TextLineSkeleton lines={2} type="h3" />
       </TurnSkeleton>
       {context && (
-        <div className="flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]">
+        <div className={CONTEXT_BLOCK_CLASS}>
           <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
           <TextLineSkeleton lines={3} type="h4" />
         </div>
@@ -228,7 +226,7 @@ export function ConversationCardSkeleton({
         </TurnSkeleton>
       </div>
       {footer && (
-        <div className="mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]">
+        <div className={FOOTER_ROW_CLASS}>
           <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
           <Tag as="span" label={'\u00a0'} variant="badge" className="invisible" />
         </div>
