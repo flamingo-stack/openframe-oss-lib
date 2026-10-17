@@ -30,6 +30,9 @@ public class RefreshTokenHandler {
         validateExpiration(jwt);
 
         Long refreshCount = jwt.getClaim("refresh_count");
+        if (refreshCount == null) {
+            throw new IllegalArgumentException("Refresh token is missing required claim: refresh_count");
+        }
         validateRefreshCount(refreshCount);
 
         String clientId = jwt.getSubject();
@@ -66,3 +69,4 @@ public class RefreshTokenHandler {
     }
 
 }
+

@@ -91,7 +91,11 @@ public class AppleNativeGrantAuthenticationProvider extends AbstractTokenMinting
         }
 
         Jwt identityToken = tokenVerifier.verify(request.getIdentityToken(), request.getNonce());
-        String bundleId = identityToken.getAudience().get(0);
+        List<String> audience = identityToken.getAudience();
+        if (audience == null || audience.isEmpty()) {
+            throw error(OAuth2ErrorCodes.INVALID_GRANT, "Apple identity token carries no audience.");
+        }
+        String bundleId = audience.get(0);
         String appleRefreshToken = codeClient.redeemAndVerify(bundleId, request.getAuthorizationCode(), identityToken.getSubject(), tenantId);
 
         String email = identityToken.getClaimAsString("email");
