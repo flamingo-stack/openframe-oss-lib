@@ -27,6 +27,7 @@ public enum NodeType {
     TICKET_ATTACHMENT("TicketAttachment", "id"),
     TICKET_STATUS_DEFINITION("TicketStatusDefinition", "id"),
     USER("User", "id"),
+    INVITATION("Invitation", "id"),
     KNOWLEDGE_BASE_ITEM("KnowledgeBaseItem", "id"),
     INSIGHT("Insight", "id"),
     ITEM_ASSIGNMENT("ItemAssignment", "id"),

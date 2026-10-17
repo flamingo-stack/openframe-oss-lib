@@ -1,0 +1,240 @@
+extend type Query {
+    """
+    Users of the tenant, ordered by email.
+    search: every whitespace-separated word must match the first name, last name or email
+    (a self-deleted user's placeholder email is not matched). Up to 200 characters.
+    """
+    users(
+        filter: UserFilterInput
+        search: String
+        "1-100, default 20."
+        first: Int
+        after: String
+    ): UserConnection!
+
+    "Open invitations (not accepted, not revoked), newest first. search matches the email; up to 200 characters."
+    invitations(
+        filter: InvitationFilterInput
+        search: String
+        "1-100, default 20."
+        first: Int
+        after: String
+    ): InvitationConnection!
+
+    """
+    The users list's funnels: every status and role, each with how many users the list would show with it ticked
+    alone in its funnel. Counted under the search, the exclusions and the other funnel's ticks, but not its own
+    funnel's, so ticking within a funnel keeps all of it on offer.
+    """
+    userFilters(filter: UserFilterInput, search: String): UserFilters!
+
+    "The open invitations list's funnels, counted the way userFilters counts."
+    invitationFilters(filter: InvitationFilterInput, search: String): InvitationFilters!
+}
+
+extend type Mutation {
+    """
+    One invitation per email, 1-100 emails. An email that cannot be invited (malformed, listed twice, already
+    invited, an existing user, a blocked domain, or its email could not be sent) is a userError with field
+    ["emails", "<index>"]; the rest are sent.
+    """
+    inviteUsers(input: InviteUsersInput!): InviteUsersPayload!
+
+    "Only a pending invitation can be revoked."
+    revokeInvitation(input: RevokeInvitationInput!): RevokeInvitationPayload!
+
+    "Only an expired invitation can be resent: a new invitation replaces it and the old one is revoked."
+    resendInvitation(input: ResendInvitationInput!): ResendInvitationPayload!
+
+    "Renames an ACTIVE user; a null name is kept."
+    updateUser(input: UpdateUserInput!): UpdateUserPayload!
+
+    """
+    Soft delete: DELETED, or SELF_DELETED (anonymized) for your own account. The owner cannot be deleted;
+    transfer ownership first. Deleting a user who is not ACTIVE changes nothing.
+    """
+    deleteUser(input: DeleteUserInput!): DeleteUserPayload!
+
+    "Owner only: the new owner (an ACTIVE user) becomes OWNER, you become ADMIN."
+    transferOwnership(input: TransferOwnershipInput!): TransferOwnershipPayload!
+}
+
+"A person who signs in to the tenant."
+type User implements Node {
+    id: ID!
+    firstName: String
+    lastName: String
+    "The sign-in address; a placeholder once the user deleted their own account."
+    email: String!
+    "Whether the user confirmed the email address."
+    emailVerified: Boolean!
+    status: UserStatus!
+    "Effective roles: an OWNER is an ADMIN too."
+    roles: [UserRole!]!
+    image: UserImage
+}
+
+"A user's avatar."
+type UserImage {
+    imageUrl: String
+    hash: String
+}
+
+enum UserStatus {
+    ACTIVE
+    "Deleted by an admin; personal data is kept and a re-invite revives the account."
+    DELETED
+    "Deleted by the user; personal data is anonymized."
+    SELF_DELETED
+}
+
+enum UserRole {
+    ADMIN
+    "The tenant's owner; also an ADMIN."
+    OWNER
+}
+
+input UserFilterInput {
+    "Omit or leave empty for every status."
+    statuses: [UserStatus!]
+    "Effective roles, so ADMIN matches the owners too. Omit or leave empty for every role."
+    roles: [UserRole!]
+    "Users to leave out, e.g. yourself in a picker of someone to hand something over to."
+    excludeIds: [ID!]
+}
+
+type UserFilters {
+    statuses: [UserStatusFilterOption!]!
+    "Effective roles, as the filter matches them: ADMIN counts the owners too."
+    roles: [UserRoleFilterOption!]!
+}
+
+type UserStatusFilterOption {
+    value: UserStatus!
+    count: Int!
+}
+
+type UserRoleFilterOption {
+    value: UserRole!
+    count: Int!
+}
+
+type UserConnection {
+    edges: [UserEdge!]!
+    pageInfo: PageInfo!
+    "Users matching the filter and search, across all pages."
+    filteredCount: Int!
+}
+
+type UserEdge {
+    node: User!
+    cursor: String!
+}
+
+"An invitation to join the tenant, sent to an email address."
+type Invitation implements Node {
+    id: ID!
+    email: String!
+    "The roles the user gets on accepting."
+    roles: [UserRole!]!
+    status: InvitationStatus!
+    createdAt: Instant
+    expiresAt: Instant!
+}
+
+enum InvitationStatus {
+    "Sent and not yet accepted."
+    PENDING
+    "Pending past expiresAt; can be resent."
+    EXPIRED
+}
+
+input InvitationFilterInput {
+    "Omit or leave empty for both."
+    statuses: [InvitationStatus!]
+    "The roles the invitee gets. Omit or leave empty for every role."
+    roles: [UserRole!]
+}
+
+type InvitationFilters {
+    statuses: [InvitationStatusFilterOption!]!
+    roles: [UserRoleFilterOption!]!
+}
+
+type InvitationStatusFilterOption {
+    value: InvitationStatus!
+    count: Int!
+}
+
+type InvitationConnection {
+    edges: [InvitationEdge!]!
+    pageInfo: PageInfo!
+    "Invitations matching the filter and search, across all pages."
+    filteredCount: Int!
+}
+
+type InvitationEdge {
+    node: Invitation!
+    cursor: String!
+}
+
+input InviteUsersInput {
+    "1-100 addresses."
+    emails: [String!]!
+}
+
+type InviteUsersPayload {
+    "The invitations sent, in input order."
+    invitationEdges: [InvitationEdge!]!
+    "One per email that was not invited."
+    userErrors: [MutationError!]!
+}
+
+input RevokeInvitationInput {
+    id: ID!
+}
+
+type RevokeInvitationPayload {
+    revokedInvitationId: ID!
+}
+
+input ResendInvitationInput {
+    id: ID!
+}
+
+type ResendInvitationPayload {
+    "The replacement, with a new id."
+    invitationEdge: InvitationEdge!
+    revokedInvitationId: ID!
+}
+
+input UpdateUserInput {
+    id: ID!
+    "Up to 128 characters; null keeps the current one."
+    firstName: String
+    "Up to 128 characters; null keeps the current one."
+    lastName: String
+}
+
+type UpdateUserPayload {
+    user: User!
+}
+
+input DeleteUserInput {
+    id: ID!
+}
+
+type DeleteUserPayload {
+    "The user after the delete, with the new status."
+    user: User!
+}
+
+input TransferOwnershipInput {
+    newOwnerId: ID!
+}
+
+type TransferOwnershipPayload {
+    "You, now an ADMIN."
+    previousOwner: User!
+    newOwner: User!
+}

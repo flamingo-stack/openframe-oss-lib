@@ -17,6 +17,9 @@ import com.openframe.api.service.rmm.script.ScriptExecutionService;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
+import com.openframe.api.dto.user.UserResponse;
+import com.openframe.api.service.user.InvitationService;
+import com.openframe.api.service.user.UserService;
 import com.openframe.data.repository.tenant.TenantRepository;
 import com.openframe.data.service.OrganizationService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +27,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @DgsComponent
 @RequiredArgsConstructor
@@ -43,6 +49,8 @@ public class NodeDataFetcher {
     private final ScriptExecutionService scriptExecutionService;
     private final ScheduleScriptService scheduleScriptService;
     private final ScheduleRunService scheduleRunService;
+    private final UserService userService;
+    private final InvitationService invitationService;
     private final ObjectProvider<TenantRepository> tenantRepository;
     private final ObjectProvider<SoftwareBundleService> softwareBundleService;
     private final RelayIdCodec relayIdCodec;
@@ -57,14 +65,37 @@ public class NodeDataFetcher {
     @DgsQuery
     public List<Object> nodes(@InputArgument List<String> ids) {
         log.debug("Resolving {} nodes", ids.size());
+        Map<String, UserResponse> users = loadUsers(ids);
         return ids.stream()
-                .map(this::resolveNodeOrNull)
+                .map(id -> resolveNodeOrNull(id, users))
                 .toList();
     }
 
-    private Object resolveNodeOrNull(String id) {
+    /**
+     * The users among the ids, in one query: a client asks for many at once (the status of every user a
+     * page shows), and a lookup each is a query and an avatar fetch per id.
+     */
+    private Map<String, UserResponse> loadUsers(List<String> ids) {
+        List<String> userIds = ids.stream()
+                .map(relayIdCodec::parse)
+                .flatMap(Optional::stream)
+                .filter(globalId -> globalId.isOfType(NodeType.USER))
+                .map(ParsedRelayId::getRawId)
+                .distinct()
+                .toList();
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return userService.getUsersByIds(userIds).stream()
+                .collect(Collectors.toMap(UserResponse::getId, Function.identity(), (first, second) -> first));
+    }
+
+    private Object resolveNodeOrNull(String id, Map<String, UserResponse> users) {
         try {
             ParsedRelayId globalId = parseNodeId(id);
+            if (globalId.isOfType(NodeType.USER)) {
+                return users.get(globalId.getRawId());
+            }
             return resolveNode(globalId);
         } catch (RuntimeException e) {
             log.warn("Failed to resolve node: {}", id, e);
@@ -98,6 +129,8 @@ public class NodeDataFetcher {
             case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
                     .flatMap(service -> service.findById(rawId))
                     .orElse(null);
+            case USER -> userService.findUserById(rawId).orElse(null);
+            case INVITATION -> invitationService.findOpenInvitation(rawId).orElse(null);
             default -> throw new IllegalArgumentException("Unsupported node type: " + typeName);
         };
     }
