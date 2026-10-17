@@ -12,13 +12,7 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
 
-/**
- * Opaque handle for a mobile SSO signup: the auth sheet's cookies never reach the app's own
- * process, so the pending identity is parked here (server-side, Redis) and the app carries only
- * the random ticket id — it cannot read or alter the identity. Lifecycle mirrors the flow:
- * {@code create} at the callback, {@code peek} while the form is filled (retry-safe),
- * {@code bind} once the tenant is registered, {@code consume} exactly once at token minting.
- */
+// Opaque handle for a mobile SSO signup; the pending identity is parked server-side (Redis) so the app only ever carries the ticket id.
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -60,7 +54,7 @@ public class SignupTicketService {
         return decode(json);
     }
 
-    /** Marks the ticket as belonging to a freshly registered user; keeps the remaining TTL. */
+    // Keeps the remaining TTL when marking the ticket as belonging to a freshly registered user.
     public void bind(String ticket, String userId, String tenantId) {
         String k = key(ticket);
         Optional<SignupTicketPayload> current = decode(redisTemplate.opsForValue().get(k));
@@ -74,7 +68,7 @@ public class SignupTicketService {
                 p.emailVerified(), p.subject(), userId, tenantId), ttl);
     }
 
-    /** Atomic single use — the token mint, and only it, calls this. */
+    // Atomic single use — the token mint, and only it, calls this.
     public Optional<SignupTicketPayload> consume(String ticket) {
         String json = redisTemplate.opsForValue().getAndDelete(key(ticket));
         return decode(json);
@@ -95,7 +89,7 @@ public class SignupTicketService {
         try {
             return Optional.of(objectMapper.readValue(json, SignupTicketPayload.class));
         } catch (Exception e) {
-            log.warn("Undecodable signup ticket payload: {}", e.getMessage());
+            log.warn("Undecodable signup ticket payload", e);
             return Optional.empty();
         }
     }

@@ -198,7 +198,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                     MachinePinotMessage message = buildMachinePinotMessageFromParts(machine, remainingTags, remainingAssignments);
                     ossTenantKafkaProducer.publish(machineEventsTopic, machineId, message);
                 } catch (Exception e) {
-                    log.error("Error processing machine {} for tag deletion: {}", machineId, e.getMessage());
+                    log.error("Error processing machine {} for tag deletion", machineId, e);
                 }
             }
 
@@ -260,7 +260,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                         log.debug("Sent update for machine {} due to tag key change", machineId);
                     }
                 } catch (Exception e) {
-                    log.error("Error processing machine {} for tag key change: {}", machineId, e.getMessage());
+                    log.error("Error processing machine {} for tag key change", machineId, e);
                 }
             }
 
@@ -304,7 +304,7 @@ public class MachineTagEventServiceImpl implements MachineTagEventService {
                     .map(TagAssignment::getEntityId)
                     .toList();
         } catch (Exception e) {
-            log.error("Error fetching machine IDs for tag {}: {}", tagId, e.getMessage(), e);
+            log.error("Error fetching machine IDs for tag {}", tagId, e);
             return List.of();
         }
     }

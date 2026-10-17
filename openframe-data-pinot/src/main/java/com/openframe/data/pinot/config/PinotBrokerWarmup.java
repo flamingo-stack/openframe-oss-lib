@@ -30,7 +30,7 @@ public class PinotBrokerWarmup {
             pinotConnection.execute("SELECT COUNT(*) FROM \"" + devicesTableName + "\" LIMIT 1");
             log.info("Pinot broker warm-up query executed successfully");
         } catch (Exception e) {
-            log.warn("Pinot broker warm-up failed (non-blocking): {}", e.getMessage());
+            log.warn("Pinot broker warm-up failed (non-blocking)", e);
         }
     }
 }
