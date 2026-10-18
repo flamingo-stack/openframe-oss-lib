@@ -37,21 +37,30 @@ const BADGE_CLASS = TAG_BADGE_CLASS;
  */
 /** The row's layout, read by the row and by its skeleton. */
 const TAG_ROW_CLASS = 'flex w-full flex-wrap items-center gap-2';
+/** A row capped by `max` holds one line: it never wraps, and its tags shrink to an ellipsis. */
+const CAPPED_ROW_CLASS = 'flex-nowrap';
+const CAPPED_BADGE_CLASS = 'block min-w-0 truncate';
 /** How many tags a row usually shows: what its loading state draws. */
 export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
+
+/** The "+N" badge's skeleton: the width of a two-digit count. */
+const OVERFLOW_BADGE_SKELETON_CLASS = 'w-5';
 
 /**
  * A tag row while its tags are read: `count` badge boxes of the tag badge's size (the row's fold from tablet width
  * up), and `phoneCount` below that width when a phone's row shows fewer (or more) before it wraps. Hosts pass their
- * row's layout fold (`<THING>_TAG_ROW_FOLD`); the default is `ENTITY_TAG_BADGES_SKELETON_COUNT`.
+ * row's layout fold (`<THING>_TAG_ROW_FOLD`); the default is `ENTITY_TAG_BADGES_SKELETON_COUNT`. `overflow` adds the
+ * "+N" badge a row capped by `max` draws after its tags.
  */
 export function EntityTagBadgesSkeleton({
   count = ENTITY_TAG_BADGES_SKELETON_COUNT,
   phoneCount = count,
+  overflow = false,
   className,
 }: {
   count?: number;
   phoneCount?: number;
+  overflow?: boolean;
   className?: string;
 }) {
   return (
@@ -69,40 +78,65 @@ export function EntityTagBadgesSkeleton({
           )}
         />
       ))}
+      {overflow && <StatusBadgeSkeleton variant="card" className={cn('border', OVERFLOW_BADGE_SKELETON_CLASS)} />}
     </div>
   );
 }
 
 export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBadgesProps) {
-  if (useLoadingScope()) return <EntityTagBadgesSkeleton className={className} />;
+  // A capped row draws its cap and its "+N" badge while it loads, so both states hold the same line.
+  if (useLoadingScope()) {
+    return max == null ? (
+      <EntityTagBadgesSkeleton className={className} />
+    ) : (
+      <EntityTagBadgesSkeleton count={max} overflow className={className} />
+    );
+  }
   const items = (tags || []).filter((t): t is TagAssoc => !!t && !!t.name);
   if (items.length === 0) return null;
 
   // Only null/undefined means "no cap"; max={0} shows none, negatives clamp to 0.
-  const visibleLimit = max == null ? items.length : Math.max(0, max);
+  const capped = max != null;
+  const visibleLimit = capped ? Math.max(0, max) : items.length;
   const shown = items.slice(0, visibleLimit);
   const overflow = items.length - shown.length;
+  // A capped row is ONE line at every width (what its skeleton draws): a tag that does not fit is cut with an
+  // ellipsis, and the "+N" badge always shows whole.
+  const badgeClass = cn(BADGE_CLASS, capped && CAPPED_BADGE_CLASS);
 
   return (
-    <div className={cn(TAG_ROW_CLASS, className)}>
+    <div className={cn(TAG_ROW_CLASS, capped && CAPPED_ROW_CLASS, className)}>
       {shown.map(tag => {
         const key = tag.tag_id ?? tag.id ?? tag.slug ?? tag.name;
         const label = (tag.name || '').toUpperCase();
         if (basePath && tag.slug) {
           return (
-            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className="inline-flex">
+            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className={cn('inline-flex', capped && 'min-w-0')}>
               <StatusBadge
                 text={label}
                 variant="card"
-                className={`${BADGE_CLASS} cursor-pointer transition-colors hover:border-ods-accent`}
+                title={capped ? label : undefined}
+                className={cn(badgeClass, 'cursor-pointer transition-colors hover:border-ods-accent')}
               />
             </Link>
           );
         }
-        return <StatusBadge key={key} text={label} variant="card" className={BADGE_CLASS} />;
+        return (
+          <StatusBadge
+            key={key}
+            text={label}
+            variant="card"
+            title={capped ? label : undefined}
+            className={badgeClass}
+          />
+        );
       })}
       {overflow > 0 && (
-        <StatusBadge text={`+${overflow}`} variant="card" className={`${BADGE_CLASS} text-ods-text-secondary`} />
+        <StatusBadge
+          text={`+${overflow}`}
+          variant="card"
+          className={cn(BADGE_CLASS, 'shrink-0 text-ods-text-secondary')}
+        />
       )}
     </div>
   );

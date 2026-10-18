@@ -21,7 +21,7 @@ import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/ques
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
+import { Autocomplete, type AutocompleteOption, AutocompleteSkeleton } from '../ui/autocomplete';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Slider } from '../ui/slider';
@@ -280,18 +280,10 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
   return (
     <>
       {groups.length > 1 && (
-        <ProviderTabs
-          groups={groups}
-          value={group.providerType}
-          onValueChange={setPicked}
-          className={TABS_ROW_CLASS}
-        />
+        <ProviderTabs groups={groups} value={group.providerType} onValueChange={setPicked} className={TABS_ROW_CLASS} />
       )}
       <div role="table" aria-label={MODEL_TOKEN_RATES_COPY.unit} className="flex min-h-0 flex-1 flex-col">
-        <div
-          role="row"
-          className={HEADER_ROW_CLASS}
-        >
+        <div role="row" className={HEADER_ROW_CLASS}>
           <span role="columnheader" className="min-w-0 flex-1 truncate">
             {MODEL_TOKEN_RATES_COPY.model}
           </span>
@@ -305,11 +297,7 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
         {/* Every model of the provider, scrolling under the pinned header. */}
         <div role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
           {group.rates.map(rate => (
-            <div
-              key={rate.modelName}
-              role="row"
-              className={BODY_ROW_CLASS}
-            >
+            <div key={rate.modelName} role="row" className={BODY_ROW_CLASS}>
               <span role="rowheader" className="min-w-0 flex-1 truncate">
                 {rate.displayName || rate.modelName}
               </span>
@@ -324,9 +312,7 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
         </div>
       </div>
       {/* The unit, stated once, where it has room to wrap. */}
-      <p className={UNIT_LINE_CLASS}>
-        {MODEL_TOKEN_RATES_COPY.unit}
-      </p>
+      <p className={UNIT_LINE_CLASS}>{MODEL_TOKEN_RATES_COPY.unit}</p>
     </>
   );
 }
@@ -479,11 +465,7 @@ function ExchangeFigure({
         {loading ? <TextLineSkeleton type="inherit" as="span" className="w-20" /> : figure}
       </span>
       <span className="min-h-[2lh] text-ods-text-secondary text-h4">
-        {loading ? (
-          <TextLineSkeleton type="inherit" as="span" className="w-full max-w-xs" />
-        ) : (
-          words
-        )}
+        {loading ? <TextLineSkeleton type="inherit" as="span" className="w-full max-w-xs" /> : words}
       </span>
     </div>
   );
@@ -592,41 +574,47 @@ export function ModelTokenExchange({
         {providers.length === 0 && !failed ? (
           <PushButtonSelectorSkeleton count={PROVIDER_ROWS_FOLD} description={false} region={false} />
         ) : (
-        <PushButtonSelector<string>
-          options={providers.map(providerType => {
-                  // What the server stated for the provider rides its models' rows.
-                  const stated =
-                    models.find(option => option.providerType === providerType) ??
-                    (rate?.providerType === providerType ? rate : null);
-                  return {
-                    id: providerType,
-                    name: tokenRateProviderLabel(providerType, stated?.providerLabel),
-                    icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
-                  };
-                })}
-          selectedIds={provider ? [provider] : []}
-          onSelectionChange={ids => {
-            // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
-            if (ids[0]) onProviderChange?.(ids[0]);
-          }}
-          multiSelect={false}
-        />
+          <PushButtonSelector<string>
+            options={providers.map(providerType => {
+              // What the server stated for the provider rides its models' rows.
+              const stated =
+                models.find(option => option.providerType === providerType) ??
+                (rate?.providerType === providerType ? rate : null);
+              return {
+                id: providerType,
+                name: tokenRateProviderLabel(providerType, stated?.providerLabel),
+                icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
+              };
+            })}
+            selectedIds={provider ? [provider] : []}
+            onSelectionChange={ids => {
+              // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
+              if (ids[0]) onProviderChange?.(ids[0]);
+            }}
+            multiSelect={false}
+          />
         )}
-        <Autocomplete<string>
-          label={copy.use.model}
-          value={rate?.modelName ?? null}
-          onChange={modelName => {
-            if (modelName) onPick?.(modelName);
-          }}
-          options={options}
-          inputValue={query}
-          onInputChange={value => onQueryChange?.(value)}
-          disableClientFilter
-          loading={searching}
-          disabled={providers.length === 0}
-          placeholder={copy.use.search}
-          noOptionsText={copy.use.noMatch}
-        />
+        {/* While the rates load (the priming search included): the field's own skeleton, its label real. A spinner
+            is for a search the reader typed. */}
+        {loading ? (
+          <AutocompleteSkeleton label={copy.use.model} />
+        ) : (
+          <Autocomplete<string>
+            label={copy.use.model}
+            value={rate?.modelName ?? null}
+            onChange={modelName => {
+              if (modelName) onPick?.(modelName);
+            }}
+            options={options}
+            inputValue={query}
+            onInputChange={value => onQueryChange?.(value)}
+            disableClientFilter
+            loading={searching && Boolean(query)}
+            disabled={providers.length === 0}
+            placeholder={copy.use.search}
+            noOptionsText={copy.use.noMatch}
+          />
+        )}
       </ExchangeStep>
 
       <ExchangeStep step={3} title={copy.charge.title}>

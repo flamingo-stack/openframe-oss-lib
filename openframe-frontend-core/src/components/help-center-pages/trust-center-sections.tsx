@@ -591,21 +591,32 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Rows each panel's skeleton draws: ONE short fold for every panel, what a Trust Center panel typically holds (two to
- * six frameworks, documents, subprocessors and AI practices; three is the common case). Drawing a screen of rows per
- * panel made each panel collapse by 1,000px or more when the rows landed; a panel holding a different count settles
- * once by a few rows. The count comes from what a trust center lists, never from today's data.
+ * Rows each panel's skeleton draws: what the panel lists, per panel. Each is a short CURATED list (the frameworks the
+ * company is audited against, the documents it publishes, the subprocessors it names, the AI practices it states),
+ * so the skeleton draws the list's own length and the panel does not move when it lands. A single fold for every
+ * panel moved the documents, subprocessors and AI panels by 160 to 420px. Update a count with the list it stands for.
  */
-const TRUST_PANEL_FOLD = 3;
+const TRUST_PANEL_FOLD = {
+  compliance: 3,
+  documents: 1,
+  subprocessors: 6,
+  ai: 5,
+} as const;
 /**
- * The height of each section's row description while loading (`text-h6` lines, measured against the loaded rows):
- * the Vanta descriptions wrap to more lines on a phone than from `content-md` up.
+ * The lines each row's description takes while loading (`text-h6` lines, measured against the loaded rows), per row
+ * of the panel's fold: the descriptions wrap to more lines on a phone than from `content-md` up, and the AI practices
+ * differ in length. A row past the list takes the list's last value.
  */
 const TRUST_SKELETON_LABEL = {
-  oneLine: { phone: 1, wide: 1 },
-  compliance: { phone: 4, wide: 1 },
-  ai: { phone: 7, wide: 2 },
+  oneLine: { phone: [1], wide: [1] },
+  compliance: { phone: [5, 4, 4], wide: [1] },
+  ai: { phone: [7, 4, 10, 6, 9], wide: [2, 2, 3, 2, 3] },
 } as const;
+
+/** One row's line count from a per-row list. */
+function rowLines(lines: readonly number[], index: number): number {
+  return lines[Math.min(index, lines.length - 1)];
+}
 type TrustSkeletonLabel = (typeof TRUST_SKELETON_LABEL)[keyof typeof TRUST_SKELETON_LABEL];
 
 /**
@@ -614,12 +625,13 @@ type TrustSkeletonLabel = (typeof TRUST_SKELETON_LABEL)[keyof typeof TRUST_SKELE
  * a label, and the right-hand badge or button in the page's `ACTION_COLUMN`.
  */
 function skeletonRows(shape: {
+  count: number;
   mark: 'logo' | 'glyph';
   action: 'badge' | 'button' | 'none';
   label?: TrustSkeletonLabel;
 }): PanelRow[] {
   const label = shape.label ?? TRUST_SKELETON_LABEL.oneLine;
-  return Array.from({ length: TRUST_PANEL_FOLD }, (_, index) => ({
+  return Array.from({ length: shape.count }, (_, index) => ({
     id: `skeleton-${index}`,
     columns: [
       {
@@ -634,8 +646,18 @@ function skeletonRows(shape: {
         value: <TextLineSkeleton type="inherit" as="span" className="w-1/3" />,
         label: (
           <>
-            <TextLineSkeleton type="inherit" as="span" lines={label.phone} className="w-full content-md:hidden" />
-            <TextLineSkeleton type="inherit" as="span" lines={label.wide} className="hidden w-full content-md:block" />
+            <TextLineSkeleton
+              type="inherit"
+              as="span"
+              lines={rowLines(label.phone, index)}
+              className="w-full content-md:hidden"
+            />
+            <TextLineSkeleton
+              type="inherit"
+              as="span"
+              lines={rowLines(label.wide, index)}
+              className="hidden w-full content-md:block"
+            />
           </>
         ),
         wrap: true,
@@ -720,6 +742,7 @@ export function TrustCenterSkeleton({
     compliance: (
       <StackedRowsPanel
         rows={skeletonRows({
+          count: TRUST_PANEL_FOLD.compliance,
           mark: 'logo',
           action: 'badge',
           label: TRUST_SKELETON_LABEL.compliance,
@@ -727,9 +750,22 @@ export function TrustCenterSkeleton({
       />
     ),
     controls: <ControlsSectionSkeleton />,
-    documents: <StackedRowsPanel rows={skeletonRows({ mark: 'glyph', action: 'button' })} />,
-    subprocessors: <StackedRowsPanel rows={skeletonRows({ mark: 'glyph', action: 'none' })} />,
-    ai: <StackedRowsPanel rows={skeletonRows({ mark: 'glyph', action: 'none', label: TRUST_SKELETON_LABEL.ai })} />,
+    documents: (
+      <StackedRowsPanel rows={skeletonRows({ count: TRUST_PANEL_FOLD.documents, mark: 'glyph', action: 'button' })} />
+    ),
+    subprocessors: (
+      <StackedRowsPanel rows={skeletonRows({ count: TRUST_PANEL_FOLD.subprocessors, mark: 'glyph', action: 'none' })} />
+    ),
+    ai: (
+      <StackedRowsPanel
+        rows={skeletonRows({
+          count: TRUST_PANEL_FOLD.ai,
+          mark: 'glyph',
+          action: 'none',
+          label: TRUST_SKELETON_LABEL.ai,
+        })}
+      />
+    ),
     contact: <ContactSection onContact={() => undefined} />,
     faq,
   };

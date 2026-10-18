@@ -50,7 +50,8 @@ const MIN_WIDE_RATIO = 1.3;
 
 // The card's zones, read by the card AND its skeleton, so the two are one box.
 const PORTRAIT_BODY = 'flex h-full flex-col gap-6 p-6';
-const PORTRAIT_MEDIA = 'relative flex aspect-[1200/630] w-full shrink-0 items-center justify-center overflow-hidden rounded-sm';
+const PORTRAIT_MEDIA =
+  'relative flex aspect-[1200/630] w-full shrink-0 items-center justify-center overflow-hidden rounded-sm';
 const PORTRAIT_TITLE_ZONE = 'flex h-[72px] shrink-0 flex-col justify-center gap-1.5';
 const PORTRAIT_TITLE = 'break-words leading-6 text-ods-text-primary text-h4';
 const PORTRAIT_FOOTER = 'flex h-[60px] shrink-0 items-center';
@@ -157,15 +158,7 @@ export function EntityPortraitCard({
               className="self-start"
             />
           )}
-          <h3
-            className={cn(
-              PORTRAIT_TITLE,
-              typeLabel ? 'line-clamp-2' : 'line-clamp-3',
-              titleClassName,
-            )}
-          >
-            {title}
-          </h3>
+          <h3 className={cn(PORTRAIT_TITLE, typeLabel ? 'line-clamp-2' : 'line-clamp-3', titleClassName)}>{title}</h3>
         </div>
 
         {/* Person/footer zone — fixed box (kept even when empty so every card
@@ -233,7 +226,7 @@ export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel
               className="self-start"
             />
           )}
-          <UnifiedSkeleton className={cn('rounded leading-6', typeLabel ? 'h-12' : 'h-[72px]', 'w-full')} />
+          <TextLineSkeleton type="h4" lines={typeLabel ? 2 : 3} className="w-full leading-6" />
         </div>
         <div className={PORTRAIT_FOOTER}>
           <div className={PORTRAIT_PERSON_ROW}>

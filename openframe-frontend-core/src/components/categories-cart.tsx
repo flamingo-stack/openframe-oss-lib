@@ -4,16 +4,18 @@ import { ChevronRight } from 'lucide-react';
 import Link from '../embed-shims/next-link';
 import type { RealCategoryCardProps } from '../types/category';
 import { cn } from '../utils/cn';
-import { TextLineSkeleton, UnifiedSkeleton } from './loading/unified-skeleton';
+import { TextLineSkeleton } from './loading/unified-skeleton';
 import { useLoadingScope } from './ui/loading-scope';
-import { VendorIcon } from './vendor-icon';
+import { VendorIcon, VendorIconSkeleton } from './vendor-icon';
 
 /** The card's layout, read by the card and by its skeleton, so the skeleton is the card's size. */
 const CARD_SHELL_CLASS = 'group relative block rounded-lg border border-ods-border bg-ods-card p-3 pb-4 md:p-4 md:pb-6';
 const CARD_STACK_CLASS = 'flex flex-col gap-4 md:gap-6';
 const ICON_STRIP_CLASS = 'relative h-8 w-full overflow-hidden md:h-10';
 const ICON_ROW_CLASS = 'flex w-full gap-2 md:gap-3';
-const ICON_BOX_CLASS = 'h-8 w-8 flex-shrink-0 rounded md:h-10 md:w-10';
+/** The strip's vendor icons: one size and frame for the loaded icon and its skeleton. */
+const VENDOR_ICON_SIZE = 'md';
+const VENDOR_ICON_CLASS = 'overflow-hidden rounded opacity-60 grayscale filter';
 const INFO_STACK_CLASS = 'flex flex-col gap-2';
 const TITLE_STACK_CLASS = 'flex flex-col gap-1';
 const FOOT_ROW_CLASS = 'flex items-start justify-between gap-4 md:items-end md:gap-6';
@@ -21,7 +23,7 @@ const ARROW_BOX_CLASS =
   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-ods-border bg-transparent transition-colors md:h-12 md:w-12';
 const ARROW_ICON_CLASS = 'h-5 w-5 text-ods-text-primary transition-colors md:h-6 md:w-6';
 /** As many icon boxes as the widest strip shows (the strip clips the rest). */
-const SKELETON_ICON_COUNT = 20;
+const ICON_STRIP_FOLD = 20;
 
 /** The strip's fades at both ends. */
 function StripFades() {
@@ -52,25 +54,10 @@ export function CategoriesCart({
         {/* Vendor Icons Grid */}
         <div className={ICON_STRIP_CLASS}>
           <div className={ICON_ROW_CLASS}>
-            {vendors && vendors.length > 0
-              ? vendors.map(vendor => (
-                  <VendorIcon
-                    key={vendor.id}
-                    vendor={vendor}
-                    size="md"
-                    className="overflow-hidden rounded opacity-60 grayscale filter"
-                  />
-                ))
-              : // No vendors found - show placeholder icons
-                Array.from({ length: 6 }).map((_, index) => (
-                  <div
-                    // biome-ignore lint/suspicious/noArrayIndexKey: placeholder icons never reorder
-                    key={index}
-                    className={cn(ICON_BOX_CLASS, 'flex items-center justify-center bg-ods-border opacity-30')}
-                  >
-                    <div className="h-4 w-4 rounded-sm bg-ods-text-muted md:h-6 md:w-6" />
-                  </div>
-                ))}
+            {/* A category with no vendors leaves the strip empty: it keeps its height, and draws no stand-in icons. */}
+            {vendors.map(vendor => (
+              <VendorIcon key={vendor.id} vendor={vendor} size={VENDOR_ICON_SIZE} className={VENDOR_ICON_CLASS} />
+            ))}
           </div>
           <StripFades />
         </div>
@@ -90,7 +77,10 @@ export function CategoriesCart({
             <p className="flex-1 text-ods-text-primary text-h4">{category.description}</p>
 
             {/* Arrow Button */}
-            <div className={cn(ARROW_BOX_CLASS, 'group-hover:bg-ods-accent')} aria-label={`View ${category.name} category`}>
+            <div
+              className={cn(ARROW_BOX_CLASS, 'group-hover:bg-ods-accent')}
+              aria-label={`View ${category.name} category`}
+            >
               <ChevronRight className={cn(ARROW_ICON_CLASS, 'group-hover:text-ods-text-on-accent')} />
             </div>
           </div>
@@ -110,9 +100,9 @@ export function CategoriesCartSkeleton({ className }: { className?: string }) {
       <div className={CARD_STACK_CLASS}>
         <div className={ICON_STRIP_CLASS}>
           <div className={ICON_ROW_CLASS}>
-            {Array.from({ length: SKELETON_ICON_COUNT }, (_, index) => (
+            {Array.from({ length: ICON_STRIP_FOLD }, (_, index) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: skeleton icons never reorder
-              <UnifiedSkeleton key={index} className={ICON_BOX_CLASS} />
+              <VendorIconSkeleton key={index} size={VENDOR_ICON_SIZE} className="rounded" />
             ))}
           </div>
           <StripFades />

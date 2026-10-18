@@ -277,6 +277,15 @@ export function NotificationTile({
  */
 export const LOCKSCREEN_APPROVAL_BUTTON_CLASS = 'h-9 min-w-24';
 
+/**
+ * The Approve and Reject buttons on a card approval tile: one fixed width that holds either label at every
+ * breakpoint, so the tile's skeleton draws the buttons at their loaded width. Shared by the tile and its skeleton.
+ */
+export const APPROVAL_BUTTON_CLASS = 'w-20';
+
+/** The card approval tile's trailing toggle (the command section's chevron). Shared by the tile and its skeleton. */
+export const APPROVAL_TOGGLE_BUTTON_CLASS = 'ml-auto w-6 shrink-0 px-0 md:w-8';
+
 export interface NotificationTileSkeletonProps {
   /** `approval`: the approval tile, which adds a row of small buttons under the body. */
   variant?: 'default' | 'approval';
@@ -331,8 +340,15 @@ export function NotificationTileSkeleton({
         </span>
         {variant === 'approval' && (
           <span className="flex w-full items-center gap-[var(--spacing-system-xs)]">
-            <InteractiveSkeleton.Button size="small" className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : 'w-[5.5rem]'} />
-            <InteractiveSkeleton.Button size="small" className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : 'w-[4.5rem]'} />
+            <InteractiveSkeleton.Button
+              size="small"
+              className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
+            />
+            <InteractiveSkeleton.Button
+              size="small"
+              className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
+            />
+            {!lockscreen && <InteractiveSkeleton.Button size="small" className={APPROVAL_TOGGLE_BUTTON_CLASS} />}
           </span>
         )}
       </span>

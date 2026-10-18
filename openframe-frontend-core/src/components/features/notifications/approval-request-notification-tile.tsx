@@ -7,12 +7,14 @@ import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import type { ChatApprovalStatus } from '../../chat/types';
 import { Button } from '../../ui/button';
-import { LOCKSCREEN_APPROVAL_BUTTON_CLASS, NotificationTile } from './notification-tile';
+import {
+  APPROVAL_BUTTON_CLASS,
+  APPROVAL_TOGGLE_BUTTON_CLASS,
+  LOCKSCREEN_APPROVAL_BUTTON_CLASS,
+  NotificationTile,
+} from './notification-tile';
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
 import type { Notification } from './types';
-
-/** The two buttons on a lock-screen notification (shared with the tile's skeleton). */
-const LOCKSCREEN_BUTTON = LOCKSCREEN_APPROVAL_BUTTON_CLASS;
 
 export interface ApprovalRequestNotificationTileProps {
   notification: Notification;
@@ -122,7 +124,7 @@ export function ApprovalRequestNotificationTile({
                 data-pressed={approvePressed || undefined}
                 className={cn(
                   'ease-[cubic-bezier(.2,0,0,1)] transition-[filter,transform] duration-200 motion-reduce:transition-none',
-                  lockscreen && LOCKSCREEN_BUTTON,
+                  lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS,
                   approvePressed && 'scale-[0.98] brightness-75',
                 )}
               >
@@ -133,7 +135,7 @@ export function ApprovalRequestNotificationTile({
                 size="small"
                 onClick={() => resolve('rejected', onReject)}
                 disabled={processing}
-                className={lockscreen ? LOCKSCREEN_BUTTON : undefined}
+                className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
               >
                 Reject
               </Button>
@@ -156,7 +158,7 @@ export function ApprovalRequestNotificationTile({
               }}
               aria-expanded={expanded}
               aria-label={toggleLabel}
-              className="ml-auto w-6 shrink-0 px-0 md:w-8"
+              className={APPROVAL_TOGGLE_BUTTON_CLASS}
             >
               <ExpandChevron expanded={expanded} />
             </Button>

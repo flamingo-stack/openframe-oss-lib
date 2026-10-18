@@ -5,8 +5,8 @@ import type React from 'react';
 import { useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
 import { cn } from '../../utils/cn';
-import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Badge } from './badge';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Badge, BadgeSkeleton } from './badge';
 import { FadePreview } from './fade-preview';
 import { useLoadingScope } from './loading-scope';
 import { RichMarkdownRenderer } from './markdown';
@@ -108,11 +108,7 @@ export function ReleaseChangelogSection({
     <div className={SECTION_CLASS} data-loading-optional={loadingOptional || undefined}>
       {!hideTitle &&
         (collapsible ? (
-          <button
-            type="button"
-            onClick={() => setCollapsed(!collapsed)}
-            className={COLLAPSIBLE_TITLE_ROW_CLASS}
-          >
+          <button type="button" onClick={() => setCollapsed(!collapsed)} className={COLLAPSIBLE_TITLE_ROW_CLASS}>
             <h2 className={titleClass(isBreaking)}>
               {icon}
               {title}
@@ -120,9 +116,7 @@ export function ReleaseChangelogSection({
                 {entries.length}
               </Badge>
             </h2>
-            <ChevronDown
-              className={`${CHEVRON_CLASS} ${!collapsed ? 'rotate-180' : ''}`}
-            />
+            <ChevronDown className={`${CHEVRON_CLASS} ${!collapsed ? 'rotate-180' : ''}`} />
           </button>
         ) : (
           <h2 className={titleClass(isBreaking)}>
@@ -231,8 +225,8 @@ export function ReleaseChangelogSectionSkeleton({
     <h2 className={titleClass(isBreaking)}>
       {icon}
       {title}
-      {/* Badge: text-xs (16px line) + py-0.5 + a 1px border, px-2.5 around one or two digits. */}
-      <InteractiveSkeleton.Chip className={cn(COUNT_BADGE_CLASS, 'h-[22px] w-7')} />
+      {/* The count badge's own frame; its text is one or two digits. */}
+      <BadgeSkeleton className={cn(COUNT_BADGE_CLASS, 'w-[2ch]')} />
     </h2>
   );
   const inPreviewMode = previewFirst && !collapsible;
