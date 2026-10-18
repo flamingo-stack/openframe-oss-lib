@@ -14,5 +14,7 @@ public interface TenantCveRepository extends MongoRepository<TenantCve, String> 
 
     List<TenantCve> findByTenantIdAndCveIdIn(String tenantId, List<String> cveIds);
 
+    List<TenantCve> findByCveId(String cveId);
+
     long deleteByTenantIdAndCveId(String tenantId, String cveId);
 }
