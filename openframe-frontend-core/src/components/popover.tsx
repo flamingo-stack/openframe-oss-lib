@@ -5,6 +5,7 @@ import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'reac
 
 import { useKeyboardCollisionPadding } from '../hooks/ui/use-keyboard-collision-padding';
 import { cn } from '../utils/cn';
+import { usePortalContainer } from './ui/portal-container';
 
 const Popover = PopoverPrimitive.Root;
 
@@ -18,8 +19,9 @@ const PopoverContent = forwardRef<
   // box — is positioned against a collision viewport that does not know the
   // software keyboard exists. See useKeyboardCollisionPadding.
   const keyboardPadding = useKeyboardCollisionPadding();
+  const container = usePortalContainer();
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={container ?? undefined}>
       <PopoverPrimitive.Content
         ref={ref}
         align={align}

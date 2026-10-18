@@ -165,7 +165,7 @@ class ToolEventLogRepositoryTest {
         verify(lokiClient).queryRange(
                 "{job=\"tool-events\", tenant_id=\"a\\\"b\", tool_type=\"FLEET\\\"} or {tenant_id=~\\\".+\"}"
                         + " | tool_event_id=\"evt\\\\\\\" or tool_event_id=~\\\".+\"",
-                EVENT_NANOS, EVENT_NANOS + PARTS_PER_READ, PARTS_PER_READ, LokiDirection.FORWARD, "a\"b");
+                EVENT_NANOS - 1, EVENT_NANOS + PARTS_PER_READ, PARTS_PER_READ, LokiDirection.FORWARD, "a\"b");
     }
 
     @Test
@@ -200,18 +200,21 @@ class ToolEventLogRepositoryTest {
         Optional<ToolEventLog> found = find();
 
         assertThat(found).contains(fullEvent());
-        verify(lokiClient, never()).queryRange(QUERY, EVENT_NANOS + PARTS_PER_READ,
-                EVENT_NANOS + 2 * PARTS_PER_READ, PARTS_PER_READ, LokiDirection.FORWARD, "tenant-a");
+        verify(lokiClient).queryRange(QUERY, EVENT_NANOS - 1, EVENT_NANOS + PARTS_PER_READ, PARTS_PER_READ,
+                LokiDirection.FORWARD, "tenant-a");
+        verifyNoMoreInteractions(lokiClient);
     }
 
     @Test
-    void find_eventInFiveParts_readsTheFifthFromTheNanosecondAfterTheFirstFour() {
+    void find_eventInFiveParts_readsOnFromTheLastPartSeen() {
         whenLookedUp().thenReturn(List.of(
                 part(0, 5, FULL_LINE.substring(0, 50)),
                 part(1, 5, FULL_LINE.substring(50, 100)),
                 part(2, 5, FULL_LINE.substring(100, 200)),
                 part(3, 5, FULL_LINE.substring(200, 300))));
-        whenLookedUpFrom(EVENT_NANOS + PARTS_PER_READ).thenReturn(List.of(part(4, 5, FULL_LINE.substring(300))));
+        whenLookedUpFrom(EVENT_NANOS + 3).thenReturn(List.of(
+                part(3, 5, FULL_LINE.substring(200, 300)),
+                part(4, 5, FULL_LINE.substring(300))));
 
         Optional<ToolEventLog> found = find();
 
@@ -232,7 +235,7 @@ class ToolEventLogRepositoryTest {
     @Test
     void find_nextReadEmpty_answersNotFoundAndLogsTheParts(CapturedOutput output) {
         whenLookedUp().thenReturn(List.of(part(0, 5, "{"), part(1, 5, "\"a\""), part(2, 5, ":"), part(3, 5, "1")));
-        whenLookedUpFrom(EVENT_NANOS + PARTS_PER_READ).thenReturn(List.of());
+        whenLookedUpFrom(EVENT_NANOS + 3).thenReturn(List.of(part(3, 5, "1")));
 
         Optional<ToolEventLog> found = find();
 
@@ -271,6 +274,11 @@ class ToolEventLogRepositoryTest {
                 copiedPart(0, 4, FULL_LINE.substring(0, 50)),
                 part(1, 4, FULL_LINE.substring(50, 100)),
                 copiedPart(1, 4, FULL_LINE.substring(50, 100))));
+        whenLookedUpFrom(EVENT_NANOS + 1).thenReturn(List.of(
+                part(1, 4, FULL_LINE.substring(50, 100)),
+                copiedPart(1, 4, FULL_LINE.substring(50, 100)),
+                part(2, 4, FULL_LINE.substring(100, 200)),
+                copiedPart(2, 4, FULL_LINE.substring(100, 200))));
         whenLookedUpFrom(EVENT_NANOS + 2).thenReturn(List.of(
                 part(2, 4, FULL_LINE.substring(100, 200)),
                 copiedPart(2, 4, FULL_LINE.substring(100, 200)),
@@ -323,11 +331,11 @@ class ToolEventLogRepositoryTest {
     }
 
     private OngoingStubbing<List<LokiLogEntry>> whenLookedUp() {
-        return whenLookedUpFrom(EVENT_NANOS);
+        return whenLookedUpFrom(EVENT_NANOS - 1);
     }
 
     private OngoingStubbing<List<LokiLogEntry>> whenLookedUpFrom(long startNanos) {
-        return when(lokiClient.queryRange(QUERY, startNanos, startNanos + PARTS_PER_READ, PARTS_PER_READ,
+        return when(lokiClient.queryRange(QUERY, startNanos, startNanos + 1 + PARTS_PER_READ, PARTS_PER_READ,
                 LokiDirection.FORWARD, "tenant-a"));
     }
 

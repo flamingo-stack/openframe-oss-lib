@@ -23,6 +23,7 @@ const PLATFORMS = [
   { appType: 'product-hub', label: 'Product Hub' },
   { appType: 'flamingo', label: 'Flamingo' },
   { appType: 'people-hub', label: 'People Hub' },
+  { appType: 'coding-hub', label: 'Coding Hub' },
 ] as const;
 
 const now = Date.now();

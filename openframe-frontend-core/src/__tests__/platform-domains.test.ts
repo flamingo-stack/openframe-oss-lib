@@ -59,7 +59,7 @@ describe('🔒 cross-subdomain cookie sharing (the SSO invariant — must never 
     }
   });
   it('shares one base domain across all *.flamingo.so hubs (cross-hub SSO)', () => {
-    for (const hub of ['marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub']) {
+    for (const hub of ['marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub', 'coding-hub']) {
       const host = hostOf(getPlatformProductionUrl(hub));
       // `hostOf` returns null for an unparseable URL — that is a registry bug
       // worth naming, not a TypeError inside `toRegistrableBaseDomain`.

@@ -114,7 +114,10 @@ function Host({
       defaultActiveMode="mingo"
       showInternalTrigger={false}
       mingoState={state}
-      mingoDialogCapabilities={{ canRename: true }}
+      mingoDialogCapabilities={{
+        canRename: true,
+        fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
+      }}
       whatToAsk={whatToAsk}
       chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
     />
@@ -188,6 +191,20 @@ describe('EmbeddableChat - whatToAsk', () => {
     // The send went out and made its dialog (it is in the list now).
     expect((await screen.findAllByText('Sent')).length).toBeGreaterThan(0);
     expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+  });
+
+  it('opens a new chat from the archive list, not into the chat open before it', async () => {
+    renderHost({ initialDialogId: 'd-1' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chat Archive' }));
+    // The archive list is up (the chat open before it is still the active dialog).
+    await screen.findAllByText(/archived/i);
+    fireEvent.click(whatToAsk());
+
+    expect(await screen.findByText('What can I ask you?')).toBeInTheDocument();
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
+    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
   it('opens a new chat instead when the open one waits on an approval', () => {
