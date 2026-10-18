@@ -100,7 +100,7 @@ public class SoftwareTitleCatalogHandler implements MessageHandler<DeserializedD
             row.setBrowser(title.getBrowser());
             row.setUpdatedAt(now);
         }
-        tenantSoftwareRepository.saveAll(rows);
+        FanOut.saveInChunks(rows, tenantSoftwareRepository::saveAll);
         log.debug("[software-cdc] title {} name fanned out to {} tenant_software rows",
                 softwareTitleId, rows.size());
     }

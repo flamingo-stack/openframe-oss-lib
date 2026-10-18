@@ -101,7 +101,7 @@ public class SoftwareCatalogHandler implements MessageHandler<DeserializedDebezi
             row.setSource(software.getSource());
             row.setUpdatedAt(now);
         }
-        deviceSoftwareRepository.saveAll(rows);
+        FanOut.saveInChunks(rows, deviceSoftwareRepository::saveAll);
         log.debug("[software-cdc] software {} details fanned out to {} device_software rows",
                 softwareId, rows.size());
     }

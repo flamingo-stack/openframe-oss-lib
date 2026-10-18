@@ -97,7 +97,7 @@ public class OperatingSystemCatalogHandler implements MessageHandler<Deserialize
             row.setPlatform(os.getPlatform());
             row.setUpdatedAt(now);
         }
-        deviceOperatingSystemRepository.saveAll(rows);
+        FanOut.saveInChunks(rows, deviceOperatingSystemRepository::saveAll);
         log.debug("[software-cdc] os {} details fanned out to {} device_operating_system rows",
                 osId, rows.size());
     }
