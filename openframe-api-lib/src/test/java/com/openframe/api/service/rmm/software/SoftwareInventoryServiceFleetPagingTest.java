@@ -58,13 +58,15 @@ class SoftwareInventoryServiceFleetPagingTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private IntegratedToolRepository integratedToolRepository;
     @Mock private DeviceHostInventoryLoader deviceHostInventoryLoader;
+    @Mock private DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    @Mock private TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
 
     private SoftwareInventoryService service;
 
     @BeforeEach
     void setUp() {
         service = new SoftwareInventoryService(integratedToolRepository, deviceCountEnricher, hostMachineResolver,
-                tenantIdProvider, deviceHostInventoryLoader);
+                tenantIdProvider, deviceHostInventoryLoader, deviceSoftwareReadModelQuery, tenantSoftwareReadModelQuery);
         ReflectionTestUtils.setField(service, "fleet", fleet);
         ReflectionTestUtils.setField(service, "fleetPaging", true);
     }

@@ -121,6 +121,9 @@ public class SoftwareInventoryService {
     }
 
     public Optional<SoftwareResponse> findById(String softwareId) {
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.findById(tenantIdProvider.getTenantId(), softwareId);
+        }
         return parseNumericId(softwareId)
                 .map(fleet()::getSoftwareTitle)
                 .map(FleetSoftwareMapper::toResponse)
@@ -306,6 +309,10 @@ public class SoftwareInventoryService {
     public PageResult<SoftwareVulnerabilityResponse> listVulnerabilitiesForSoftware(
             String softwareId, String search, int page, Integer perPage,
             String sortField, boolean sortAsc) {
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.listVulnerabilitiesForSoftware(
+                    tenantIdProvider.getTenantId(), softwareId, search, page, perPage, sortField, sortAsc);
+        }
         Optional<Long> parsed = parseNumericId(softwareId);
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
@@ -341,6 +348,10 @@ public class SoftwareInventoryService {
     public PageResult<SoftwareOnDeviceResponse> listDevicesForSoftware(String softwareId,
                                                                        SoftwareOnDeviceFilterInput filter,
                                                                        String search, int page, Integer perPage) {
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.listDevicesForSoftware(
+                    tenantIdProvider.getTenantId(), softwareId, filter, search, page, perPage);
+        }
         List<SoftwareOnDeviceResponse> all = allDevicesForSoftware(softwareId, search).stream()
                 .filter(row -> matchesStatusFilter(row, filter))
                 .toList();
@@ -373,6 +384,9 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
+        if (softwareReadModel) {
+            return softwareFilters(deviceSoftwareReadModelQuery.rowsForDevice(tenantIdProvider.getTenantId(), machineId, null, search));
+        }
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, null, search);
         return softwareFilters(rows);
@@ -480,7 +494,10 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
-        Map<SoftwareOnDeviceStatus, Long> counts = allDevicesForSoftware(softwareId, search).stream()
+        List<SoftwareOnDeviceResponse> devices = softwareReadModel
+                ? tenantSoftwareReadModelQuery.devicesForSoftwareRows(tenantIdProvider.getTenantId(), softwareId, search)
+                : allDevicesForSoftware(softwareId, search);
+        Map<SoftwareOnDeviceStatus, Long> counts = devices.stream()
                 .map(SoftwareOnDeviceResponse::getStatus)
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
@@ -586,6 +603,9 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareFilters getSoftwareFilters(String search) {
+        if (softwareReadModel) {
+            return softwareFilters(tenantSoftwareReadModelQuery.allForFilters(tenantIdProvider.getTenantId(), search));
+        }
         if (fleetPaging) {
             // counting facets would mean downloading the whole Fleet catalog; the UI reads only versionStatuses,
             // which Fleet never fills
