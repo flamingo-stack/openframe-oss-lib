@@ -7,8 +7,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,8 +38,7 @@ class AgentUninstallServiceTest {
     @Mock private MachineRepository machineRepository;
     @Mock private ToolConnectionService toolConnectionService;
     @Mock private InstalledAgentService installedAgentService;
-    @Mock private ScriptScheduleMachineAssignedRepository scheduleAssignedRepository;
-    @Mock private DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    @Mock private DeletedMachineCleanup deletedMachineCleanup;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private AgentUninstallService service;
@@ -64,8 +62,7 @@ class AgentUninstallServiceTest {
 
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.DELETED);
         verify(machineRepository).save(machine);
-        verify(scheduleAssignedRepository).deleteByTenantIdAndMachineId(TENANT, MACHINE);
-        verify(deviceOnlineDispatchRepository).deleteByTenantIdAndMachineId(TENANT, MACHINE);
+        verify(deletedMachineCleanup).removeFromSchedules(TENANT, MACHINE);
         ArgumentCaptor<DeviceUninstalledEvent> event = ArgumentCaptor.forClass(DeviceUninstalledEvent.class);
         verify(eventPublisher).publishEvent(event.capture());
         assertThat(event.getValue().getMachine().getMachineId()).isEqualTo(MACHINE);
@@ -79,7 +76,7 @@ class AgentUninstallServiceTest {
         service.uninstall(MACHINE, SECRET);
 
         verify(machineRepository, never()).save(any());
-        verifyNoInteractions(scheduleAssignedRepository, deviceOnlineDispatchRepository, eventPublisher);
+        verifyNoInteractions(deletedMachineCleanup, eventPublisher);
     }
 
     @Test

@@ -10,12 +10,10 @@ import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
-import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
-import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
@@ -23,6 +21,7 @@ import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.machine.MachineUpdate;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -59,12 +58,11 @@ class DeviceServiceTest {
     private static final String TENANT_ID = "tenant-1";
 
     @Mock private MachineRepository machineRepository;
-    @Mock private DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    @Mock private DeletedMachineCleanup deletedMachineCleanup;
     @Mock private MachineWriter machineWriter;
     @Mock private TagRepository tagRepository;
     @Mock private TagAssignmentRepository tagAssignmentRepository;
     @Mock private DeviceStatusProcessor deviceStatusProcessor;
-    @Mock private ScheduleScriptDeviceService scheduleScriptDeviceService;
     @Mock private DeviceFilterOptionMapper deviceFilterOptionMapper;
     @Mock
     private TenantIdProvider tenantIdProvider;
@@ -72,9 +70,9 @@ class DeviceServiceTest {
     private ApplicationEventPublisher eventPublisher;
 
     private DeviceService service() {
-        DeviceService s = new DeviceService(machineRepository, deviceOnlineDispatchRepository, machineWriter,
+        DeviceService s = new DeviceService(machineRepository, deletedMachineCleanup, machineWriter,
                 tagRepository, tagAssignmentRepository,
-                deviceStatusProcessor, scheduleScriptDeviceService, deviceFilterOptionMapper, tenantIdProvider,
+                deviceStatusProcessor, deviceFilterOptionMapper, tenantIdProvider,
                 eventPublisher);
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         lenient().when(machineRepository.countMachines(any(), any(MachineQueryFilter.class), any())).thenReturn(0L);
@@ -293,8 +291,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-del", DeviceStatus.DELETED);
 
-        verify(scheduleScriptDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
-        verify(deviceOnlineDispatchRepository).deleteByTenantIdAndMachineId("t-1", "m-del");
+        verify(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
     }
 
     @Test
@@ -306,13 +303,13 @@ class DeviceServiceTest {
         m.setStatus(DeviceStatus.ONLINE);
         when(machineRepository.findByMachineId("m-del")).thenReturn(Optional.of(m));
         doThrow(new RuntimeException("mongo hiccup"))
-                .when(scheduleScriptDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+                .when(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
 
         assertThatThrownBy(() -> service().updateStatusByMachineId("m-del", DeviceStatus.DELETED))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("mongo hiccup");
 
-        verify(scheduleScriptDeviceService).removeDeviceFromAllSchedules("t-1", "m-del");
+        verify(deletedMachineCleanup).removeFromSchedules("t-1", "m-del");
         verify(machineRepository, never()).save(any());
         assertThat(m.getStatus()).isEqualTo(DeviceStatus.ONLINE);
         verifyNoInteractions(deviceStatusProcessor);
@@ -329,8 +326,7 @@ class DeviceServiceTest {
 
         service().updateStatusByMachineId("m-off", DeviceStatus.OFFLINE);
 
-        verify(scheduleScriptDeviceService, never()).removeDeviceFromAllSchedules(any(), any());
-        verify(deviceOnlineDispatchRepository, never()).deleteByTenantIdAndMachineId(any(), any());
+        verify(deletedMachineCleanup, never()).removeFromSchedules(any(), any());
     }
 
 

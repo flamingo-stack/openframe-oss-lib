@@ -7,8 +7,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.oauth.OAuthClient;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.oauth.OAuthClientRepository;
-import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
-import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -26,8 +25,7 @@ public class AgentUninstallService {
     private final MachineRepository machineRepository;
     private final ToolConnectionService toolConnectionService;
     private final InstalledAgentService installedAgentService;
-    private final ScriptScheduleMachineAssignedRepository scheduleAssignedRepository;
-    private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    private final DeletedMachineCleanup deletedMachineCleanup;
     private final ApplicationEventPublisher eventPublisher;
 
     public void uninstall(String machineId, String clientSecret) {
@@ -55,9 +53,7 @@ public class AgentUninstallService {
 
         toolConnectionService.disconnectAll(machineId);
         installedAgentService.disconnectAll(machineId);
-        // same cleanup DeviceService does when DELETED is set through the API
-        scheduleAssignedRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
-        deviceOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
+        deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
 
         eventPublisher.publishEvent(new DeviceUninstalledEvent(this, machine));
 
