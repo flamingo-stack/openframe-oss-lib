@@ -87,6 +87,41 @@ pub async fn write_executable(bytes: &[u8], path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+pub async fn replace_executable(bytes: &[u8], path: &Path) -> Result<()> {
+    let file_name = path
+        .file_name()
+        .with_context(|| format!("No file name in {}", path.display()))?;
+    let mut staged_name = std::ffi::OsString::from(".");
+    staged_name.push(file_name);
+    staged_name.push(".new");
+    let staged = path.with_file_name(staged_name);
+
+    let result = async {
+        write_executable(bytes, &staged).await?;
+        fs::rename(&staged, path).await.with_context(|| {
+            format!(
+                "Failed to replace {} with {}",
+                path.display(),
+                staged.display()
+            )
+        })
+    }
+    .await;
+    if result.is_err() {
+        let _ = fs::remove_file(&staged).await;
+    }
+    result?;
+
+    info!("Binary replaced: {}", path.display());
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub async fn replace_executable(bytes: &[u8], path: &Path) -> Result<()> {
+    write_executable(bytes, path).await
+}
+
 pub async fn set_executable_permissions(path: &Path) -> Result<()> {
     #[cfg(target_family = "unix")]
     {

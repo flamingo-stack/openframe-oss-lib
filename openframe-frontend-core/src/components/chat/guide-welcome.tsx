@@ -2,10 +2,10 @@
 
 import { type ReactNode, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
-import { MingoIcon } from '../icons';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
-import { Skeleton } from '../ui/skeleton';
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip';
 import { QuickActionWall } from './quick-action-wall';
 
@@ -163,12 +163,7 @@ export function GuideWelcome({
               // match the default Mingo mark (48px).
               <EntityIcon icon={{ name: icon.name, url: icon.url, props: icon.props }} size={48} />
             ) : (
-              <MingoIcon
-                className="h-12 w-12"
-                color="white"
-                eyesColor="var(--ods-flamingo-cyan-base)"
-                cornerColor="var(--ods-flamingo-cyan-base)"
-              />
+              <AgentMark agent="mingo" className="h-12 w-12" />
             )}
             <div className="flex w-full flex-col gap-[var(--spacing-system-l)]">
               <p className="text-ods-text-primary text-h2">{title}</p>
@@ -180,7 +175,7 @@ export function GuideWelcome({
                 <p className="text-ods-text-secondary text-h4">{subtitle}</p>
               ) : subtitleLoading ? (
                 <div className="flex w-full justify-center">
-                  <Skeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
+                  <UnifiedSkeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
                 </div>
               ) : null}
             </div>

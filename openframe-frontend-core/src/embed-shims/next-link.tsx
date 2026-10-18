@@ -55,12 +55,14 @@ const Link = forwardRef<HTMLAnchorElement, LinkProps>(function NextLinkShim(prop
   // Real impl path — registered by the host. Hand off untouched so
   // every Next-specific prop (prefetch, replace, scroll, locale…)
   // reaches the real component intact.
-  if (impl) {
+  // A link with nowhere to go (an optional `href` the caller did not get) is a
+  // plain anchor in every host: a router link refuses to render without one.
+  if (impl && props.href) {
     const Real = impl;
     return <Real ref={ref} {...props} />;
   }
 
-  // Fallback path — plain <a>. Drops Next-only props and reduces
+  // Plain <a>: no host link registered, or no `href`. Drops Next-only props and reduces
   // `UrlObject` href to its pathname.
   const {
     href,

@@ -3,7 +3,7 @@ use crate::clients::tool_api_client::ToolApiClient;
 use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
 use crate::models::ToolInstallationMessage;
-use crate::models::{Installation, InstalledTool, ToolRecordState};
+use crate::models::{FirstRunState, Installation, InstalledTool, ToolRecordState};
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::log_file_lock_info;
 use crate::platform::DirectoryManager;
@@ -11,6 +11,7 @@ use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_kill_service::ToolKillService;
+use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -25,7 +26,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Hard cap on how long an external install/uninstall command may run before we abort
 /// it. Prevents a hung installer from pinning the tool-op marker (and therefore the
@@ -44,6 +45,7 @@ pub struct ToolInstallationService {
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     config_service: AgentConfigurationService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -62,6 +64,7 @@ impl ToolInstallationService {
         installed_tools_service: InstalledToolsService,
         directory_manager: DirectoryManager,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         tool_connection_processing_manager: ToolConnectionProcessingManager,
         config_service: AgentConfigurationService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -82,6 +85,7 @@ impl ToolInstallationService {
             installed_tools_service,
             directory_manager,
             tool_run_manager,
+            tool_ops,
             tool_connection_processing_manager,
             config_service,
             installed_agent_publisher,
@@ -93,12 +97,8 @@ impl ToolInstallationService {
     #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
     pub async fn install(&self, tool_installation_message: ToolInstallationMessage) -> Result<()> {
         let tool_agent_id = tool_installation_message.tool_agent_id.clone();
-        let tool_lock = self.tool_run_manager.tool_lock(&tool_agent_id).await;
-        let _guard = tool_lock.lock().await;
-        self.tool_run_manager.mark_updating(&tool_agent_id).await;
-        let result = self.install_inner(tool_installation_message).await;
-        self.tool_run_manager.clear_updating(&tool_agent_id).await;
-        result
+        let _op = self.tool_ops.lock(&tool_agent_id).await.mark_busy();
+        self.install_inner(tool_installation_message).await
     }
 
     async fn install_inner(
@@ -119,6 +119,11 @@ impl ToolInstallationService {
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
+        let mut first_run = if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
+            FirstRunState::Pending
+        } else {
+            FirstRunState::Done
+        };
 
         // Check if tool is already installed
         if let Some(installed_tool) = self
@@ -126,6 +131,7 @@ impl ToolInstallationService {
             .get_by_tool_agent_id(tool_agent_id)
             .await?
         {
+            first_run = installed_tool.first_run;
             if reinstall {
                 info!(
                     "Reinstalling tool {} with version {}",
@@ -687,7 +693,6 @@ impl ToolInstallationService {
                 .command_params_resolver
                 .process(tool_agent_id, command_args)
                 .context("Failed to process installation command params")?;
-            debug!("Processed args: {:?}", installation_command_args);
 
             info!(
                 "Stopping any existing processes for {} before installation",
@@ -789,6 +794,7 @@ impl ToolInstallationService {
             installation,
             assets: Vec::new(),
             state: ToolRecordState::Installed,
+            first_run,
         };
 
         self.installed_tools_service
@@ -804,7 +810,7 @@ impl ToolInstallationService {
                 .process(tool_agent_id, installed_tool.run_command_args.clone())
                 .unwrap_or_else(|_| installed_tool.run_command_args.clone());
             // For openframe-chat, add --background flag to start in tray
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 launch_args.push("--background".to_string());
             }
             let command_path = self

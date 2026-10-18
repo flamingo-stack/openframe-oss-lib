@@ -1,5 +1,6 @@
 package com.openframe.api.exception;
 
+import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.core.exception.BaseException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -36,6 +37,11 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             log.warn("GraphQL access denied ({}): {}", code.getCode(), exception.getMessage());
             return result(buildError(AccessDeniedErrorCode.MESSAGE, code));
         }
+        if (exception instanceof InvalidRelayIdException) {
+            String message = exception.getMessage();
+            log.warn("GraphQL invalid id: {}", message);
+            return result(buildError(message, ErrorCode.INVALID_ID));
+        }
         log.error("GraphQL error occurred", exception);
 
         GraphQLError error;
@@ -47,7 +53,7 @@ public class GraphQLExceptionHandler extends SimpleDataFetcherExceptionHandler {
             error = buildError("This log search covers too much data. Narrow the time range, or filter by device or level.",
                     ErrorCode.LOKI_QUERY_REJECTED);
         } else if (exception instanceof LokiQueryException) {
-            error = buildError("Device logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
+            error = buildError("Logs are temporarily unavailable. Please try again later.", ErrorCode.LOKI_QUERY_ERROR);
         } else if (exception instanceof DataAccessException) {
             error = buildError("Database operation failed. Please try again later.", ErrorCode.DATABASE_ERROR);
         } else if (exception instanceof NotFoundException nfe) {

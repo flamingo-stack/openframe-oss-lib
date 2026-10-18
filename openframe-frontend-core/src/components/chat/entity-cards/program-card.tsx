@@ -30,6 +30,7 @@ import { ArrowRight, ExternalLink, Clock, Play, Video } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
 import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
@@ -37,6 +38,7 @@ import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { CardHoverPlay } from '../../features/video-center-badge';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -82,8 +84,8 @@ const EDITORIAL_META_ROW =
 const EDITORIAL_PERSON_ROW = 'flex h-8 min-w-0 items-center gap-[var(--spacing-system-s)]';
 
 // The default card's boxes, shared by the card and its skeleton: a large SQUARE cover
-// (the picture fills it), a display title, the date and meta row (stacked on a phone,
-// one line from md), a three-line description, a tag row, the gallery and the action,
+// (the picture fills it), a two-line display title, the date and meta row (stacked up to
+// lg, where the text column is wide enough for one line), a three-line description, a tag row, the gallery and the action,
 // so a card is one height whatever its copy and cover.
 const DEFAULT_BODY =
   'flex flex-col gap-[var(--spacing-system-lf)] p-[var(--spacing-system-lf)] md:p-[var(--spacing-system-xlf)]';
@@ -91,9 +93,9 @@ const DEFAULT_HEADER = 'flex flex-col gap-[var(--spacing-system-lf)] md:flex-row
 const DEFAULT_COVER_FRAME =
   'relative aspect-square w-full flex-shrink-0 overflow-hidden rounded-lg md:w-[240px] lg:w-[320px] xl:w-[400px]';
 const DEFAULT_TEXT = 'flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-mf)]';
-const DEFAULT_TITLE = 'line-clamp-2 text-ods-text-primary text-h1';
+const DEFAULT_TITLE = 'line-clamp-2 min-h-[2lh] text-ods-text-primary text-h1';
 const DEFAULT_META_ROW =
-  'flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h4 md:min-h-[1lh] md:flex-row md:items-center md:gap-4';
+  'flex min-h-[calc(2lh+0.5rem)] flex-col gap-2 text-h4 lg:min-h-[1lh] lg:flex-row lg:items-center lg:gap-4';
 const DEFAULT_DESCRIPTION = 'line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4';
 const DEFAULT_TAG_ROW = 'flex flex-wrap gap-[var(--spacing-system-xsf)]';
 const DEFAULT_GALLERY_ROW = 'flex gap-[var(--spacing-system-mf)]';
@@ -118,32 +120,32 @@ export function ProgramCardSkeleton({
   // that row's line height.
   if (size === 'row') {
     return (
-      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, 'animate-pulse')}>
-        <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-border/20')} />
+      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID)}>
+        <UnifiedSkeleton as="span" className={EDITORIAL_ROW_THUMB} />
         <span className={EDITORIAL_ROW_TEXT}>
-          <span className="block h-[2lh] w-full rounded bg-ods-border text-h3" />
+          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h3" />
           <span className={EDITORIAL_META_ROW}>
-            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
           </span>
-          <span className="block h-[2lh] w-full rounded bg-ods-border text-h6" />
+          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h6" />
         </span>
       </span>
     );
   }
   if (size === 'feature') {
     return (
-      <span className={cn(EDITORIAL_FRAME, 'flex animate-pulse flex-col')}>
-        <span className={cn(EDITORIAL_FEATURE_COVER, 'bg-ods-border/20')} />
+      <span className={cn(EDITORIAL_FRAME, 'flex flex-col')}>
+        <UnifiedSkeleton as="span" className={cn(EDITORIAL_FEATURE_COVER, 'rounded-none')} />
         <span className={EDITORIAL_FEATURE_BODY}>
-          {eyebrow && <span className="block h-[1lh] w-28 rounded bg-ods-border text-h5" />}
-          <span className="block h-[2lh] w-full rounded bg-ods-border text-h3" />
+          {eyebrow && <UnifiedSkeleton as="span" className="block h-[1lh] w-28 rounded text-h5" />}
+          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h3" />
           <span className={EDITORIAL_META_ROW}>
-            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
           </span>
-          <span className="block h-[3lh] w-full rounded bg-ods-border text-h4" />
+          <UnifiedSkeleton as="span" className="block h-[3lh] w-full rounded text-h4" />
           <span className={EDITORIAL_PERSON_ROW}>
-            <span className="block h-8 w-8 shrink-0 rounded-full bg-ods-border" />
-            <span className="block h-[1lh] w-40 rounded bg-ods-border text-h6" />
+            <UnifiedSkeleton as="span" className="block h-8 w-8 shrink-0 rounded-full" />
+            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded text-h6" />
           </span>
         </span>
       </span>
@@ -152,43 +154,43 @@ export function ProgramCardSkeleton({
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-2/5 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
         <span className="flex h-5 shrink-0 items-center self-start">
-          <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
+          <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
         </span>
       </span>
     );
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY, 'animate-pulse')}>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY)}>
       <div className={DEFAULT_HEADER}>
-        <div className={`${DEFAULT_COVER_FRAME} bg-ods-border`} />
+        <UnifiedSkeleton className={DEFAULT_COVER_FRAME} />
         <div className={DEFAULT_TEXT}>
           <div className={DEFAULT_TITLE}>
-            <span className="block h-[1lh] w-3/4 rounded bg-ods-border" />
+            <UnifiedSkeleton as="span" className="block h-[2lh] w-3/4 rounded" />
           </div>
           <div className={DEFAULT_META_ROW}>
-            <span className="block h-[1lh] w-32 rounded bg-ods-border" />
-            <span className="block h-[1lh] w-40 rounded bg-ods-border" />
+            <UnifiedSkeleton as="span" className="block h-[1lh] w-32 rounded" />
+            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
           </div>
           <div className={DEFAULT_DESCRIPTION}>
-            <span className="block h-[3lh] w-full rounded bg-ods-border" />
+            <UnifiedSkeleton as="span" className="block h-[3lh] w-full rounded" />
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
-              <span className="block h-8 w-24 rounded bg-ods-border" />
-              <span className="block h-8 w-24 rounded bg-ods-border" />
+              <UnifiedSkeleton as="span" className="block h-8 w-24 rounded" />
+              <UnifiedSkeleton as="span" className="block h-8 w-24 rounded" />
             </div>
           )}
         </div>
@@ -196,12 +198,13 @@ export function ProgramCardSkeleton({
       {media > 0 && (
         <div className={DEFAULT_GALLERY_ROW}>
           {Array.from({ length: media }, (_, i) => (
-            <div key={i} className={`${DEFAULT_GALLERY_THUMB} bg-ods-border`} />
+            <UnifiedSkeleton key={i} className={DEFAULT_GALLERY_THUMB} />
           ))}
         </div>
       )}
       <div className={DEFAULT_FOOTER}>
-        <div className="h-10 w-40 rounded bg-ods-border" />
+        {/* The action button's own height (44px, 48px from md). */}
+        <UnifiedSkeleton className="h-11 w-40 rounded md:h-12" />
       </div>
     </div>
   );
@@ -218,7 +221,7 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   /** Detail URL resolved by the caller. */
   href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
-   *  `computeIsNewTab` so the inner `<a>` matches the runtime
+   *  `computeIsNewTab` so the inner `<Link>` matches the runtime
    *  nav decision (cross-platform / embed → new tab). Defaults to
    *  same-tab for non-chat callsites. */
   target?: '_blank';
@@ -362,14 +365,7 @@ function ProgramEditorialCard({
 
   if (!feature) {
     return (
-      <ContentCardFrame
-        as="a"
-        href={href}
-        target={target}
-        rel={rel}
-        aria-label={`Open ${title}`}
-        className={cn(EDITORIAL_ROW_GRID, className)}
-      >
+      <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
           {playable && cover && <CardHoverPlay size="md" />}
@@ -384,14 +380,7 @@ function ProgramEditorialCard({
   }
 
   return (
-    <ContentCardFrame
-      as="a"
-      href={href}
-      target={target}
-      rel={rel}
-      aria-label={`Open ${title}`}
-      className={cn('flex flex-col', className)}
-    >
+    <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn('flex flex-col', className)}>
       <span
         className={cn(EDITORIAL_FEATURE_COVER, 'transition-colors duration-300')}
         style={{ backgroundColor: edgeColor }}
@@ -540,7 +529,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       (s): s is string => typeof s === 'string' && s.length > 0,
     );
     return (
-      <a href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
             <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
@@ -571,7 +560,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         <span className="flex h-5 shrink-0 items-center self-start text-ods-text-secondary">
           <ExternalLink className="h-3.5 w-3.5" />
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -645,13 +634,13 @@ export function ProgramCard<T extends BaseProgramItem>({
           <span style={{ color: accentColor }}>{dateLabel}</span>
           {renderMeta ? (
             <>
-              <span className="hidden text-ods-text-secondary md:inline">•</span>
+              <span className="hidden text-ods-text-secondary lg:inline">•</span>
               {renderMeta(item)}
             </>
           ) : (
             defaultRenderMeta() && (
               <>
-                <span className="hidden text-ods-text-secondary md:inline">•</span>
+                <span className="hidden text-ods-text-secondary lg:inline">•</span>
                 <div className="flex items-center gap-2">{defaultRenderMeta()}</div>
               </>
             )
@@ -691,14 +680,7 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   if (wholeCardClickable) {
     return (
-      <ContentCardFrame
-        as="a"
-        href={href}
-        target={target}
-        rel={rel}
-        className={cardFrameClass}
-        aria-label={`Open ${item.title}`}
-      >
+      <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cardFrameClass}>
         {cardHeader}
         {images.length > 0 && <MediaGallery images={images} title={item.title} />}
         <div className={DEFAULT_FOOTER}>
@@ -716,9 +698,9 @@ export function ProgramCard<T extends BaseProgramItem>({
 
   return (
     <ContentCardFrame as="div" className={cardFrameClass}>
-      <a href={href} target={target} rel={rel} className="block" aria-label={`Open ${item.title}`}>
+      <Link href={href} target={target} rel={rel} className="block">
         {cardHeader}
-      </a>
+      </Link>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
       <div className={DEFAULT_FOOTER}>
         <Button

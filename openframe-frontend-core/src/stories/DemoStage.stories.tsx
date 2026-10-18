@@ -100,6 +100,7 @@ function Stage() {
         onTabChange={() => go(0)}
         progressTransitionMs={1700}
         stretchTabs
+        tabAlign="start"
       />
       <div className="grid items-end gap-7 lg:grid-cols-[1fr_640px_236px]">
         <FeatureList variant="numbered" items={STEPS} activeIndex={activeStep} className="self-center" />
@@ -108,11 +109,7 @@ function Stage() {
           className="h-[540px]"
           footer={<div className="px-5 py-3.5 text-ods-text-primary text-h6">{feedAt(step).length} found</div>}
         >
-          <IncidentFeed
-            items={feedAt(step)}
-            statusLabels={STATUS_LABELS}
-            emptyLabel="All quiet. Mingo is reading your logs."
-          />
+          <IncidentFeed items={feedAt(step)} statusLabels={STATUS_LABELS} emptyLabel="Mingo is analyzing your logs" />
         </AppWindowFrame>
         <PhoneFrame dateLabel="Thursday, October 1" timeLabel="5:09" className="h-[540px]">
           {step >= 5 && (
@@ -181,16 +178,19 @@ export const RequestCards: Story = {
           <ConversationCard
             requester={{
               avatar: <span className="block h-9 w-9 rounded-full bg-ods-border" />,
+              time: '2:47 PM',
               name: ask.who,
               meta: ask.where,
             }}
             request={ask.quote}
             responder={{
               avatar: <AgentMark agent="fae" className="h-7 w-7 rounded-full" />,
+              time: '2:47 PM',
               name: 'Fae',
               meta: 'this computer',
             }}
             outcome={ask.done}
+            agent="fae"
             footerLabel="Your part"
             footerValue={ask.part}
             footerTone={ask.part === 'One tap' ? 'attention' : 'default'}

@@ -13,10 +13,12 @@
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { getProxiedImageUrl } from '../../../utils/image-proxy';
-import { FigmaIcon } from '../../icons/figma-icon';
-import { ImageIcon } from '../../icons/image-icon';
+import { ImageClassicIcon } from '../../icons-v2-generated/audio-and-visual/image-classic-icon';
+import { FigmaClassicIcon } from '../../icons-v2-generated/brand-logos/figma-classic-icon';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
@@ -47,54 +49,52 @@ export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className="block aspect-square h-12 w-12 shrink-0 self-start rounded-md border border-ods-border bg-ods-bg p-1.5" />
+        <UnifiedSkeleton
+          as="span"
+          className="block aspect-square h-12 w-12 shrink-0 self-start rounded-md border border-ods-border p-1.5"
+        />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={`${COMPACT_CARD_TITLE_ROW} flex-nowrap gap-2`}>
-            <span className="h-3.5 w-1/2 rounded bg-ods-bg" />
-            <span className="h-4 w-12 shrink-0 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-1/2 rounded" />
+            <UnifiedSkeleton as="span" className="h-4 w-12 shrink-0 rounded" />
           </span>
           <span className={`${COMPACT_CARD_META_ROW_BOX} flex-nowrap gap-2`}>
-            <span className="h-3 w-2/5 flex-1 rounded bg-ods-bg/60" />
-            <span className="h-3 w-10 shrink-0 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-2/5 flex-1 rounded" />
+            <UnifiedSkeleton as="span" className="h-3 w-10 shrink-0 rounded" />
             {/* assignee-stack placeholder — mirrors the xs AvatarStack
                 slot so row width doesn't shift when assignees load */}
-            <span className="h-6 w-14 shrink-0 rounded-full bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-6 w-14 shrink-0 rounded-full" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-5/6 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-5/6 rounded" />
           </span>
         </span>
       </span>
     );
   }
   return (
-    <div
-      className={cn(
-        CONTENT_CARD_SKELETON_FRAME_CLASS,
-        'flex h-full animate-pulse flex-col gap-4 p-[var(--spacing-system-lf)]',
-      )}
-    >
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex h-full flex-col gap-4 p-[var(--spacing-system-lf)]')}>
       <div className="flex items-center gap-4">
-        <div className="h-16 w-16 flex-shrink-0 rounded-lg bg-ods-border" />
+        <UnifiedSkeleton className="h-16 w-16 flex-shrink-0 rounded-lg" />
         <div className="flex-1 space-y-2">
-          <div className="h-5 w-3/4 rounded bg-ods-border" />
-          <div className="h-3 w-1/2 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-5 w-3/4 rounded" />
+          <UnifiedSkeleton className="h-3 w-1/2 rounded" />
         </div>
-        <div className="h-6 w-16 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-6 w-16 rounded" />
       </div>
       <div className="space-y-2">
-        <div className="h-3 w-full rounded bg-ods-border" />
-        <div className="h-3 w-5/6 rounded bg-ods-border" />
-        <div className="h-3 w-4/5 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-3 w-full rounded" />
+        <UnifiedSkeleton className="h-3 w-5/6 rounded" />
+        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
       </div>
       <div className="flex-1" />
       <div className="flex items-center justify-between">
-        <div className="h-12 w-32 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-12 w-32 rounded" />
         <div className="flex items-center gap-2">
           {/* assignee-stack placeholder — matches the xs AvatarStack in
               the loaded card's action row */}
-          <div className="h-6 w-14 rounded-full bg-ods-border" />
-          <div className="h-8 w-20 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-6 w-14 rounded-full" />
+          <UnifiedSkeleton className="h-8 w-20 rounded" />
         </div>
       </div>
     </div>
@@ -230,7 +230,7 @@ export function RoadmapCard({
             ) : null}
             {hasFigma ? (
               <span className="hidden shrink-0 items-center sm:flex" title="Has Figma prototype">
-                <FigmaIcon className="h-3 w-3" />
+                <FigmaClassicIcon className="h-3 w-3" />
               </span>
             ) : null}
             {hasScreenshots ? (
@@ -238,7 +238,7 @@ export function RoadmapCard({
                 className="hidden shrink-0 items-center gap-0.5 text-h6 sm:flex"
                 title={`${item.screenshots.length} screenshot${item.screenshots.length === 1 ? '' : 's'}`}
               >
-                <ImageIcon className="h-3 w-3" />
+                <ImageClassicIcon className="h-3 w-3" />
                 <span>{item.screenshots.length}</span>
               </span>
             ) : null}
@@ -260,9 +260,9 @@ export function RoadmapCard({
       );
     }
     return (
-      <a href={compactHref} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link href={compactHref} target={target} rel={rel} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
 
@@ -360,7 +360,7 @@ export function RoadmapCard({
               variant="outline"
               size="small-legacy"
               onClick={() => setShowScreenshots(true)}
-              leftIcon={<ImageIcon className="h-5 w-5" />}
+              leftIcon={<ImageClassicIcon className="h-5 w-5" />}
             />
           )}
           {(() => {
@@ -371,7 +371,7 @@ export function RoadmapCard({
                 size="small-legacy"
                 openInNewTab
                 href={figmaSafe}
-                leftIcon={<FigmaIcon className="h-5 w-5" />}
+                leftIcon={<FigmaClassicIcon className="h-5 w-5" />}
               />
             ) : null;
           })()}

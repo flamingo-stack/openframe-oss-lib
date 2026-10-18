@@ -1,10 +1,17 @@
 'use client';
 
 import { cn } from '../../utils/cn';
-import { GridViewIcon, TableViewIcon } from '../icons';
+import { GridViewIcon } from '../icons-v2-generated/interface/grid-view-icon';
+import { TableViewIcon } from '../icons-v2-generated/interface/table-view-icon';
 import { ToggleGroup, ToggleGroupItem } from '../ui';
 
-type ViewMode = 'grid' | 'table';
+const VIEW_MODES = ['grid', 'table'] as const;
+type ViewMode = (typeof VIEW_MODES)[number];
+
+/** The toggle reports a plain string (empty when the active option is clicked again). */
+function isViewMode(value: string): value is ViewMode {
+  return (VIEW_MODES as readonly string[]).includes(value);
+}
 
 interface ViewToggleProps {
   /**
@@ -62,9 +69,9 @@ export function ViewToggle({
     <ToggleGroup
       type="single"
       value={value}
-      onValueChange={(newValue: ViewMode) => {
+      onValueChange={(newValue: string) => {
         // Only update if we have a valid value (user clicked a different option)
-        if (newValue && newValue !== value) {
+        if (isViewMode(newValue) && newValue !== value) {
           onValueChange(newValue);
         }
       }}

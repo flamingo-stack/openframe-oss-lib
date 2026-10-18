@@ -197,7 +197,6 @@ export function OnboardingGuideDetailView({
             videoSummary={undefined}
             videoBites={undefined}
             title={guide.title}
-            srtContent={guide.srt_content}
             captionsUrl={captionsUrl}
             highlightCaptionsUrl={highlightCaptionsUrl}
             MarkdownRenderer={MarkdownRenderer}

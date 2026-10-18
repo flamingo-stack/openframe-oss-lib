@@ -90,8 +90,19 @@ const buttonVariants = cva(
         true: 'px-0',
         false: '',
       },
+      // Two buttons drawn as ONE surface with a seam between them (a main action
+      // and a chevron that opens its alternatives: `DropdownButton` with an
+      // `action`). `start` is the leading half, `end` the trailing one: each
+      // gives up the corners and the border on its inner edge.
+      attach: {
+        none: '',
+        start: 'rounded-r-none',
+        end: 'rounded-l-none border-l-0',
+      },
     },
     compoundVariants: [
+      // The trailing half as an icon button is the design's 40px chevron cell, at every breakpoint.
+      { attach: 'end', size: 'icon', class: 'w-10 px-0 md:w-10' },
       { size: 'small', class: '[&_svg]:h-4 [&_svg]:w-4' },
       // Comes after the size classes, so cn()'s tailwind-merge resolves the
       // ods-typography group in favour of text-h4.
@@ -103,6 +114,7 @@ const buttonVariants = cva(
       font: 'bold',
       fullWidth: false,
       noPaddingX: false,
+      attach: 'none',
     },
   },
 );
@@ -267,6 +279,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     font,
     fullWidth,
     noPaddingX,
+    attach,
     asChild,
     href,
     openInNewTab,
@@ -339,6 +352,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           download={download}
           prefetch={false}
           className={cn(shellClasses, isDisabled && 'pointer-events-none')}
+          // The click still reaches the caller (a download is what analytics counts).
+          onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
           aria-label={props['aria-label']}
         >
           {splitContent}
@@ -387,7 +402,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     );
   }
 
-  const classes = cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX }), className);
+  const classes = cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX, attach }), className);
 
   // asChild: consumer fully controls the rendered element; we just stamp our classes.
   if (asChild) {
@@ -423,6 +438,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
         download={download}
         prefetch={false}
         className={cn(classes, isDisabled && 'pointer-events-none')}
+        onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
         aria-label={props['aria-label']}
       >
         {content}

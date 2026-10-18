@@ -1,16 +1,47 @@
 'use client';
 
-import type { MouseEvent, ReactNode } from 'react';
+import { createContext, type MouseEvent, type ReactNode, useContext } from 'react';
 import Image from '../../embed-shims/next-image';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { tagVariants, type TagProps } from '../ui/tag';
 
 // =============================================================================
 // Types
 // =============================================================================
+
+/**
+ * ONE action in place of the "⋯" menu, for a host that shows the card outside a
+ * conversation: an editor's list of attached records swaps the menu for
+ * "detach". It is a context because the host renders the card through the
+ * entity-card dispatch, which decides the menu per record type.
+ */
+export interface MingoInfoCardAction {
+  icon: ReactNode;
+  /** The button's accessible name, e.g. "Detach". */
+  label: string;
+  onClick: () => void;
+}
+
+const MingoInfoCardActionContext = createContext<MingoInfoCardAction | null>(null);
+
+export function MingoInfoCardActionProvider({
+  action,
+  children,
+}: {
+  action: MingoInfoCardAction;
+  children: ReactNode;
+}) {
+  return <MingoInfoCardActionContext.Provider value={action}>{children}</MingoInfoCardActionContext.Provider>;
+}
+
+/** The trailing cell's footprint and press feedback, shared by the "⋯" trigger and a host's action. */
+const TRAILING_BUTTON_CLASS =
+  'flex w-[56px] shrink-0 items-center justify-center self-stretch text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent active:bg-ods-bg-active active:text-ods-text-primary md:w-[68px]';
 
 /** A coloured status pill rendered to the right of the title/description. */
 export interface MingoInfoCardStatus {
@@ -128,16 +159,16 @@ export function MingoInfoCardSkeleton({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        'flex w-full animate-pulse items-center gap-[var(--spacing-system-s)] overflow-hidden rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
+        'flex w-full items-center gap-[var(--spacing-system-s)] overflow-hidden rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
         className,
       )}
     >
-      <span className="block size-10 shrink-0 rounded-md border border-ods-border bg-ods-bg" />
+      <UnifiedSkeleton as="span" className="block size-10 shrink-0 rounded-md border border-ods-border" />
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
-        <span className="block h-4 w-1/2 rounded bg-ods-bg" />
-        <span className="block h-3 w-3/4 rounded bg-ods-bg/60" />
+        <UnifiedSkeleton as="span" className="block h-4 w-1/2 rounded" />
+        <UnifiedSkeleton as="span" className="block h-3 w-3/4 rounded" />
       </span>
-      <span className="block h-5 w-16 shrink-0 rounded bg-ods-bg/60" />
+      <UnifiedSkeleton as="span" className="block h-5 w-16 shrink-0 rounded" />
     </span>
   );
 }
@@ -156,7 +187,8 @@ export function MingoInfoCard({
   className,
 }: MingoInfoCardProps) {
   const hasMedia = !!imageSrc || !!icon;
-  const hasMenu = !!menuGroups && menuGroups.length > 0;
+  const action = useContext(MingoInfoCardActionContext);
+  const hasMenu = !action && !!menuGroups && menuGroups.length > 0;
   const isAnchor = !!anchorProps;
   const isInteractive = isAnchor || !!onClick;
 
@@ -181,7 +213,7 @@ export function MingoInfoCard({
 
   const contentClass = cn(
     'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-s)] overflow-hidden p-[var(--spacing-system-s)] text-left',
-    hasMenu && 'border-r border-ods-border',
+    (hasMenu || action) && 'border-r border-ods-border',
     isInteractive &&
       'cursor-pointer transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent active:bg-ods-bg-active',
   );
@@ -194,9 +226,9 @@ export function MingoInfoCard({
       )}
     >
       {isAnchor ? (
-        <a {...anchorProps} className={cn(contentClass, 'no-underline')}>
+        <Link {...anchorProps} className={cn(contentClass, 'no-underline')}>
           {content}
-        </a>
+        </Link>
       ) : onClick ? (
         <button type="button" onClick={onClick} className={contentClass}>
           {content}
@@ -205,6 +237,11 @@ export function MingoInfoCard({
         <span className={contentClass}>{content}</span>
       )}
 
+      {action && (
+        <button type="button" aria-label={action.label} onClick={action.onClick} className={TRAILING_BUTTON_CLASS}>
+          {action.icon}
+        </button>
+      )}
       {hasMenu && (
         <ActionsMenuDropdown
           groups={menuGroups as ActionsMenuGroup[]}
@@ -216,7 +253,7 @@ export function MingoInfoCard({
               aria-label={menuAriaLabel}
               // Press feedback mirrors `Button` (transparent variant):
               // `hover:bg-ods-bg-hover` → `active:bg-ods-bg-active`.
-              className="flex w-[56px] shrink-0 items-center justify-center self-stretch text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent active:bg-ods-bg-active active:text-ods-text-primary md:w-[68px]"
+              className={TRAILING_BUTTON_CLASS}
             >
               <Ellipsis01Icon size={24} />
             </button>

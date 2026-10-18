@@ -5,7 +5,6 @@ export * from './chat';
 export * from './docs';
 export * from './embeds';
 export * from './features';
-export * from './icons';
 export * from './navigation';
 export * from './platform';
 export * from './ui';
@@ -19,7 +18,6 @@ export * from './comment-card';
 export * from './comment-composer';
 export * from './comment-thread';
 export * from './content-loading-container';
-export * from './dynamic-skeleton';
 export * from './empty-state';
 export * from './list-empty-state';
 export * from './faq-accordion';
@@ -36,7 +34,6 @@ export * from './filter-chip';
 export * from './unified-filter-logic';
 export * from './unified-pagination';
 export * from './hero-image-uploader';
-export * from './icons-block';
 export * from './image-cropper';
 export * from './media-carousel';
 // Explicit re-export disambiguates the star-export collision with the
@@ -51,6 +48,7 @@ export * from './pagination';
 export * from './persistent-filter-controls';
 export * from './persistent-pagination';
 export * from './pricing-display';
+export * from './agent-identity';
 export * from './agent-mark';
 export * from './results-count';
 export * from './selection-source-badge';
@@ -58,7 +56,6 @@ export * from './social-icon-row';
 export * from './user-display';
 export * from './vendor-display-button';
 export * from './vendor-icon';
-export * from './vendor-page-skeleton';
 export * from './vendor-tag';
 export * from './why-it-matters';
 export * from './yes-no-display';
@@ -122,3 +119,6 @@ export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-d
 // Note: These are re-exported from ./ui already, no need to duplicate
 
 export { EntityIcon, type EntityIconValue } from './icon-display';
+// An icon stated as DATA (its name, and a mark's own colours) and loaded when it is drawn: what a table keyed by a
+// string (a platform, a provider, a job) holds in place of imported icon components.
+export { NamedIcon, PlatformMark, type IconRef } from './chat/utils/icon-loading';

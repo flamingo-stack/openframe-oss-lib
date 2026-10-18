@@ -7,6 +7,7 @@
  * the same readiness and meta). The card writes no click logic beyond its `href` anchor.
  */
 
+import Link from '../../../embed-shims/next-link';
 import type { DesignDoc } from '../../../types/design-doc';
 import { cn } from '../../../utils/cn';
 import { formatDateShort } from '../../../utils/date-formatters';
@@ -61,8 +62,6 @@ export function DesignDocCardSkeleton() {
         CONTENT_CARD_SKELETON_FRAME_CLASS,
         'flex h-full flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]',
       )}
-      role="status"
-      aria-label="Loading design doc"
     >
       <div className="flex w-full items-center gap-[16px]">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -129,9 +128,9 @@ export function DesignDocCard({ doc, href, target, rel, className }: DesignDocCa
     className,
   );
   return link ? (
-    <a href={link} target={target} rel={rel} className={outer}>
+    <Link href={link} target={target} rel={rel} className={outer}>
       {body}
-    </a>
+    </Link>
   ) : (
     <div className={outer}>{body}</div>
   );

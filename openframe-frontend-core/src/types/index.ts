@@ -6,6 +6,7 @@ export * from './announcement';
 // Doc-source viewer types — DocNode / DocContent / DocSourceDal /
 // DocRenderHandlers. Consumed by knowledge-base, data-room, and future
 // doc-source viewers.
+export * from './data-sync';
 export * from './doc-source';
 export type { Category, CategoryCardProps, RealCategoryCardProps } from './categories';
 export * from './category';
@@ -55,6 +56,7 @@ export * from './waitlist';
 // Business logic types
 export * from './faq';
 export * from './trust-center';
+export * from './downloads';
 export * from './content-ref';
 export * from './report';
 export * from './stack';

@@ -8,10 +8,12 @@ import { findDocNodeByPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { CategorySidebarSkeleton } from '../loading/page-layout-skeleton';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { PersistentSidebar, PersistentMobileDropdown } from '../persistent-filter-controls';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
+import { DataSyncLine } from '../ui/data-attribution';
 import { useDocNavigation } from './doc-navigation-context';
 import { useDocsResolveLink } from './use-docs-resolve-link';
 import { useDocumentTree } from './use-document-tree';
@@ -118,6 +120,11 @@ export interface DocViewerProps {
   /** Whether to render the doc-search bar (bound to chat). */
   showAIChat?: boolean;
 
+  /** This source's documents are mirrored from another system and carry a `sync` (the knowledge base, from GitHub):
+   *  the page then states it in the first row under its title, holding the row with a skeleton while a document
+   *  loads. Default false: a source nothing syncs (the data room) never draws the row. */
+  synced?: boolean;
+
   /** Folder-index filename (default `'README.md'`). */
   folderIndexFile?: string;
 
@@ -152,6 +159,7 @@ function DocViewerContent({
   baseRoute,
   emptyStateText,
   showAIChat = false,
+  synced = false,
   folderIndexFile,
   backButton,
 }: DocViewerProps) {
@@ -270,6 +278,8 @@ function DocViewerContent({
     <div style={{ ...bgStyle, ...containerBgStyle }}>
       <PageLayout title={title} subtitle={subtitle} titleSize="h1" titleWrap backButton={backCfg ?? undefined}>
         <div className="flex w-full flex-col gap-10">
+          {/* Where the document is mirrored from: the first row under the title, as on every synced page. */}
+          {synced && <DataSyncLine sync={content?.sync} loading={isLoadingContent && !content} />}
           {showAIChat && (
             <DocSearchBar
               placeholder={`Search ${sidebarLabel?.toLowerCase() || 'documents'}...`}
@@ -368,7 +378,7 @@ function DocViewerContent({
                   {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
                     <div className="hidden content-lg:block">
                       <div className="sticky top-24">
-                        <div className="mb-5 h-[14px] w-28 animate-pulse rounded bg-ods-border" />
+                        <UnifiedSkeleton className="mb-5 h-[14px] w-28 rounded" />
                         <div className="space-y-0">
                           {[130, 170, 190, 220, 110, 200, 80, 100, 120, 140, 90].map((w, i) => (
                             <div
@@ -377,7 +387,7 @@ function DocViewerContent({
                                 i === 0 ? 'border-ods-accent' : 'border-transparent'
                               }`}
                             >
-                              <div className="h-[13px] animate-pulse rounded bg-ods-border" style={{ width: w }} />
+                              <UnifiedSkeleton className="h-[13px] rounded" width={w} />
                             </div>
                           ))}
                         </div>

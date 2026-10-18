@@ -1,5 +1,6 @@
 package com.openframe.api.dto.knowledgebase;
 
+import com.openframe.api.dto.assignment.AssignmentTargetInput;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,4 +17,6 @@ public class KnowledgeBaseFilterInput {
     private String parentId;
     private KnowledgeBaseItemType type;
     private List<String> tagIds;
+    private KnowledgeBaseScope scope;
+    private AssignmentTargetInput assignedTo;
 }

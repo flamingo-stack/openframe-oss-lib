@@ -1,14 +1,11 @@
 'use client';
 
-import { Boxes, Database, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { Boxes, Database, DollarSign, Hand, Plug, ShieldCheck, Sparkles } from 'lucide-react';
+import { createElement, type ReactNode } from 'react';
 import { cn } from '../utils/cn';
-import {
-  OPENFRAME_CLASSIFICATIONS,
-  isOpenFrameClassification,
-  type OpenFrameClassification,
-} from '../utils/vendor-classification';
-import { OpenSourceIcon, CoinsIcon } from './icons-stub';
-import { OpenFrameLogo } from './openframe-logo';
+import { formatClassification } from '../utils/format';
+import { type VendorClassificationIconConfig, vendorClassificationCopy } from '../utils/vendor-classification';
+import { resolveIcon } from './chat/utils/icon-library';
 
 export interface VendorTagProps {
   type:
@@ -37,14 +34,69 @@ export interface VendorTagProps {
   accentColor?: string;
 }
 
-/** An OpenFrame classification: the OpenFrame mark and its one word ("Selected", "Connect"). */
-function openFrameTag(classification: OpenFrameClassification, text?: string) {
+const TONE_CLASS: Readonly<Record<VendorClassificationIconConfig['tone'], string>> = {
+  accent: 'text-ods-text-on-accent',
+  neutral: 'text-ods-text-secondary',
+  warning: 'text-ods-warning',
+};
+
+/**
+ * A classification's icon, from its config (`VENDOR_CLASSIFICATION_COPY[value].icon`): the
+ * icon is resolved by NAME through the shared resolver, never imported here. A license icon
+ * sits on a small tile (the accent tile for an `accent` tone); an OpenFrame mark and a
+ * lifecycle icon are drawn bare in their tone. A value with no icon draws nothing.
+ */
+export function VendorClassificationIcon({
+  classification,
+  accentColor,
+  className,
+}: {
+  classification: string;
+  /** The accent tile's colour, for a host that tints its hover accent (a vendor card). */
+  accentColor?: string;
+  className?: string;
+}) {
+  const copy = vendorClassificationCopy(classification);
+  if (!copy?.icon) return null;
+  // The resolver returns one component per name, loaded on demand (drawn through `createElement`, as `NamedIcon` does).
+  const icon = resolveIcon(copy.icon.name);
+  if (copy.group !== 'license') {
+    const bareClass = copy.icon.tone === 'accent' ? 'text-ods-accent' : TONE_CLASS[copy.icon.tone];
+    return createElement(icon, {
+      size: copy.group === 'openframe' ? 16 : 12,
+      className: cn('shrink-0', bareClass, className),
+    });
+  }
+  const accent = copy.icon.tone === 'accent';
+  return (
+    <div
+      className={cn(
+        'flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm',
+        accent ? 'bg-ods-accent' : 'bg-ods-border',
+        className,
+      )}
+      style={accent && accentColor ? { backgroundColor: accentColor } : undefined}
+    >
+      {createElement(icon, { size: 10, className: TONE_CLASS[copy.icon.tone] })}
+    </div>
+  );
+}
+
+/**
+ * A classification tag, derived from the value the server sends and its config: the label
+ * (an OpenFrame value's one word), the configured icon, and the warning text colour for a
+ * lifecycle value. Any other value is its title-cased label with no icon.
+ */
+function classificationTag(
+  value: string,
+  text?: string,
+  accentColor?: string,
+): { text: string; icon: ReactNode; textColor?: string } {
+  const copy = vendorClassificationCopy(value);
   return {
-    text: text || OPENFRAME_CLASSIFICATIONS[classification].word,
-    textColor: undefined,
-    icon: (
-      <OpenFrameLogo lowerPathColor="currentColor" upperPathColor="currentColor" className="h-4 w-4 text-ods-accent" />
-    ),
+    text: text || (copy?.group === 'openframe' ? copy.word : undefined) || copy?.label || formatClassification(value),
+    textColor: copy?.group === 'lifecycle' ? 'text-ods-warning' : undefined,
+    icon: <VendorClassificationIcon classification={value} accentColor={accentColor} />,
   };
 }
 
@@ -56,7 +108,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
   );
 
   // Get display text and styling based on type
-  const getTagContent = () => {
+  const getTagContent = (): { text: string; icon: ReactNode; textColor?: string } => {
     switch (type) {
       case 'placeholder':
         return {
@@ -89,26 +141,9 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           ),
         };
       case 'open-source':
-        return {
-          text: text || 'Open Source',
-          icon: (
-            <div
-              className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent"
-              style={accentColor ? { backgroundColor: accentColor } : undefined}
-            >
-              <OpenSourceIcon width={10} height={10} className="text-ods-text-on-accent" />
-            </div>
-          ),
-        };
+        return classificationTag('open_source', text, accentColor);
       case 'commercial':
-        return {
-          text: text || 'Commercial Vendor',
-          icon: (
-            <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
-            </div>
-          ),
-        };
+        return classificationTag('commercial', text);
       // platform-capability tags — same neutral icon-box chrome as 'commercial'
       case 'api':
         return {
@@ -169,7 +204,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
           text: text || 'Paid',
           icon: (
             <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-              <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
+              <DollarSign width={10} height={10} className="text-ods-text-secondary" />
             </div>
           ),
         };
@@ -191,46 +226,12 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
             </div>
           ),
         };
-      case 'classification': {
-        // Handle specific classification types based on the text value
-        const classificationType = text?.toLowerCase();
-
-        if (classificationType === 'open_source') {
-          return {
-            text: 'Open Source',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent">
-                <OpenSourceIcon width={10} height={10} className="text-ods-text-on-accent" />
-              </div>
-            ),
-          };
-        } else if (classificationType === 'commercial') {
-          return {
-            text: 'Commercial Vendor',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-                <CoinsIcon width={10} height={10} className="text-ods-text-secondary" />
-              </div>
-            ),
-          };
-        } else if (isOpenFrameClassification(classificationType)) {
-          return openFrameTag(classificationType);
-        } else {
-          // Fallback for unknown classification types
-          return {
-            text: text || 'Classification',
-            icon: (
-              <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-accent">
-                <span className="text-[8px] font-bold text-ods-text-on-accent">C</span>
-              </div>
-            ),
-          };
-        }
-      }
+      case 'classification':
+        return classificationTag((text ?? '').toLowerCase(), undefined, accentColor);
       case 'openframe_selected':
       case 'openframe_connect':
       case 'openframe_shipped':
-        return openFrameTag(type, text);
+        return classificationTag(type, text);
       default:
         return {
           text: text || type,

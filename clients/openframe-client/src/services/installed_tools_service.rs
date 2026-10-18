@@ -1,4 +1,4 @@
-use crate::models::{InstalledTool, ToolRecordState};
+use crate::models::{FirstRunState, InstalledTool, ToolRecordState};
 use crate::platform::directories::DirectoryManager;
 use anyhow::{Context, Result};
 use std::fs;
@@ -46,6 +46,22 @@ impl InstalledToolsService {
         let mut tools = self.get_all().await?;
         if let Some(existing) = tools.iter_mut().find(|t| t.tool_agent_id == tool_agent_id) {
             existing.state = state;
+            self.persist(&tools).await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub async fn set_first_run(
+        &self,
+        tool_agent_id: &str,
+        first_run: FirstRunState,
+    ) -> Result<bool> {
+        let _guard = self.writer.lock().await;
+        let mut tools = self.get_all().await?;
+        if let Some(existing) = tools.iter_mut().find(|t| t.tool_agent_id == tool_agent_id) {
+            existing.first_run = first_run;
             self.persist(&tools).await?;
             Ok(true)
         } else {

@@ -15,4 +15,7 @@ pub struct InitialConfiguration {
     pub local_ca_cert_path: String,
     #[serde(default)]
     pub tags: Vec<DeviceTag>,
+    /// Install-time remote access mode still waiting for the backend to acknowledge it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_access_mode: Option<String>,
 }

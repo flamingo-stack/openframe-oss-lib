@@ -2,6 +2,14 @@ import type { EntityPlatformAssoc } from './entity-platform';
 // Announcement system TypeScript types
 import type { LegacyPlatform, PlatformFilter } from './platform';
 
+/**
+ * Where an announcement bar is drawn: `web` is any browser (a website, a web app, a sign-in
+ * page), `desktop` and `mobile` are the desktop and phone apps. Not a platform: platforms are
+ * the brands an announcement belongs to (`announcement_platforms`).
+ */
+export const ANNOUNCEMENT_SURFACES = ['web', 'desktop', 'mobile'] as const;
+export type AnnouncementSurface = (typeof ANNOUNCEMENT_SURFACES)[number];
+
 // Database Models
 export interface Announcement {
   id: string;
@@ -20,6 +28,8 @@ export interface Announcement {
   short_title?: string | null;
   /** Path patterns the bar is NOT shown on (regular expressions matched against the whole path): the page shows the news itself. */
   excluded_paths?: string[] | null;
+  /** The surfaces the bar is shown on. Null or empty: every surface. */
+  surfaces?: AnnouncementSurface[] | null;
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
@@ -69,6 +79,8 @@ export interface CreateAnnouncementData {
   short_title?: string | null;
   /** Paths the bar is not shown on (exact match). */
   excluded_paths?: string[];
+  /** The surfaces the bar is shown on. Empty: every surface. */
+  surfaces?: AnnouncementSurface[];
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
@@ -96,6 +108,8 @@ export interface UpdateAnnouncementData {
   short_title?: string | null;
   /** Paths the bar is not shown on (exact match). */
   excluded_paths?: string[];
+  /** The surfaces the bar is shown on. Empty: every surface. */
+  surfaces?: AnnouncementSurface[];
   // CTA (Call-To-Action) fields
   cta_enabled?: boolean;
   cta_text?: string;
@@ -136,6 +150,9 @@ export interface AnnouncementResponse {
  * defaults and the admin form both reference. Announcement colors are
  * admin-chosen data (not ODS-token surfaces) by design.
  */
+/** The icon of an announcement that names none: the bar, the admin form and its preview all read it. */
+export const ANNOUNCEMENT_DEFAULT_ICON = 'openframe-logo';
+
 export const ANNOUNCEMENT_CTA_DEFAULTS = {
   background: '#1A1A1A',
   text: '#FAFAFA',
@@ -167,6 +184,8 @@ export interface AnnouncementFormData {
   short_title?: string;
   /** Paths the bar is not shown on, as the form holds them. */
   excluded_paths?: string[];
+  /** The ticked surfaces. Never empty in a form: stored empty means every surface. */
+  surfaces?: AnnouncementSurface[];
 }
 
 // API Query Parameters
@@ -259,6 +278,12 @@ export interface AnnouncementBarProps {
    * disappear by deactivating the announcement. Default true.
    */
   dismissible?: boolean;
+  /**
+   * The surface this bar is drawn on, matched against the announcement's
+   * `surfaces`: an announcement that lists others stays collapsed here. Only
+   * the host knows it (a browser, or which app shell). Default `'web'`.
+   */
+  surface?: AnnouncementSurface;
   className?: string;
 }
 

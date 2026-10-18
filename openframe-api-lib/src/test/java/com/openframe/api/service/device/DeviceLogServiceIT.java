@@ -1,6 +1,7 @@
 package com.openframe.api.service.device;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.api.config.DeviceLogProperties;
 import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.device.DeviceLogEntry;
@@ -12,6 +13,7 @@ import com.openframe.api.service.tenant.TenantDomainService;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.loki.client.LokiClient;
 import com.openframe.data.loki.model.LokiDirection;
+import com.openframe.data.repository.organization.OrganizationRepository;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -68,7 +70,7 @@ class DeviceLogServiceIT {
     private static final long TIED_NANOS = BASE_NANOS + 300 * STEP_NANOS + 50;
     private static final Instant FROM = BASE.minus(Duration.ofMinutes(1));
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = new JsonMapper();
 
     private static LokiClient lokiClient;
     private static DeviceLogService service;
@@ -279,7 +281,8 @@ class DeviceLogServiceIT {
                 invocation.<Collection<String>>getArgument(0).stream().map(DeviceLogServiceIT::machine).toList());
         TenantDomainService tenantDomainService = mock(TenantDomainService.class);
         when(tenantDomainService.getTenantDomain()).thenReturn(TENANT_DOMAIN);
-        return new DeviceLogService(lokiClient, deviceService, tenantDomainService, new DeviceLogProperties());
+        return new DeviceLogService(lokiClient, deviceService, tenantDomainService, new DeviceLogProperties(),
+                mock(OrganizationRepository.class));
     }
 
     private static void awaitLines(String machineId, int expected) throws InterruptedException {

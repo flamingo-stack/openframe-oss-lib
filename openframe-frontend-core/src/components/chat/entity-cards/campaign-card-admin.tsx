@@ -3,7 +3,7 @@
 /**
  * Campaign Card Admin (chat compact variant).
  *
- * PURE PRESENTATION. Receives a pre-composed `<a>` prop bundle and
+ * PURE PRESENTATION. Receives a pre-composed `<Link>` prop bundle and
  * renders a 3-row compact card. The hub still owns the full-size admin
  * card (with delete + manage buttons) — only the compact chat variant
  * lives here in lib.
@@ -11,7 +11,9 @@
 
 import { Megaphone } from 'lucide-react';
 import type React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateShort } from '../../../utils/date-formatters';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import {
   COMPACT_CARD_ICON_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -80,9 +82,9 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {innerChildren}
-      </a>
+      </Link>
     );
   }
   return (
@@ -95,16 +97,16 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
 export function CampaignCardAdminSkeleton({ className }: { className?: string }) {
   return (
     <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+      <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
       <span className={COMPACT_CARD_TEXT_COL}>
         <span className={COMPACT_CARD_TITLE_ROW}>
-          <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
+          <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
         </span>
         <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className="h-3 w-1/2 rounded bg-ods-bg/70" />
+          <UnifiedSkeleton as="span" className="h-3 w-1/2 rounded" />
         </span>
         <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+          <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
         </span>
       </span>
     </span>

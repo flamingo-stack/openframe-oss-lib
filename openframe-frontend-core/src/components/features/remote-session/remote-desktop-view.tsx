@@ -4,23 +4,29 @@ import type { ReactNode } from 'react';
 import {
   ChatOffIcon,
   ChatTextIcon,
+  Chevron02DownIcon,
   Collapse02Icon,
   Expand02Icon,
   MonitorIcon,
   Settings01Icon,
 } from '../../icons-v2-generated';
 import { PageLayout } from '../../layout/page-layout';
+import { LoadingRegion } from '../../loading/loading-region';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-menu';
 import { Button } from '../../ui/button/button';
-import { Skeleton } from '../../ui/skeleton';
 import { TruncateText } from '../../ui/truncate-text';
 import { RemoteDesktopFullscreenToolbar } from './remote-desktop-fullscreen-toolbar';
 
 /** The page chrome both the view and its skeleton render in. */
 const PAGE_CLASS = 'h-full overflow-hidden px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]';
 
+/** The header card: the device row, and under it the display row when there is one to pick. */
 const CONTROLS_BAR_CLASS =
-  'flex flex-shrink-0 items-center justify-between gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-mf)] py-[var(--spacing-system-xs)]';
+  'flex flex-shrink-0 flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
+
+const CONTROLS_ROW_CLASS =
+  'flex items-center justify-between gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] py-[var(--spacing-system-xs)]';
 
 export interface RemoteDesktopViewProps {
   /** First line of the device header. */
@@ -36,9 +42,13 @@ export interface RemoteDesktopViewProps {
   fullscreen?: boolean;
   onEnterFullscreen: () => void;
   onExitFullscreen: () => void;
-  /** The display switcher's menu; the switcher is hidden while this is empty (a single display). */
+  /**
+   * The display switcher's menu, one entry per separate display. The switcher is
+   * the full-width row under the device row (Figma 2155:109503), and it is left
+   * out while this is empty: one display, or an agent that reports none.
+   */
   displayMenuGroups?: ActionsMenuGroup[];
-  /** The switcher's label, e.g. "Display All" or "Display 2". */
+  /** The switcher's label, e.g. "Display 2", or "Display" before the agent has named one. */
   currentDisplayLabel: string;
   actionsMenuGroups: ActionsMenuGroup[];
   onOpenSettings: () => void;
@@ -86,61 +96,73 @@ export function RemoteDesktopView({
 }: RemoteDesktopViewProps) {
   const controlsBar = (
     <div className={CONTROLS_BAR_CLASS}>
-      <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
-        <div className="flex-shrink-0 rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)]">
-          <MonitorIcon className="h-4 w-4 text-ods-text-primary" />
+      <div className={CONTROLS_ROW_CLASS}>
+        <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
+          <div className="flex-shrink-0 rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)]">
+            <MonitorIcon className="h-4 w-4 text-ods-text-primary" />
+          </div>
+          <div className="flex min-w-0 flex-col">
+            <TruncateText>{deviceName}</TruncateText>
+            <TruncateText
+              variant="h6"
+              tone="secondary"
+            >{`Desktop • ${organizationName || 'Unknown Customer'}`}</TruncateText>
+          </div>
         </div>
-        <div className="flex min-w-0 flex-col">
-          <TruncateText>{deviceName}</TruncateText>
-          <TruncateText
-            variant="h6"
-            tone="secondary"
-          >{`Desktop • ${organizationName || 'Unknown Customer'}`}</TruncateText>
-        </div>
-      </div>
-      <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
-        {displayMenuGroups.length > 0 && (
-          <ActionsMenuDropdown
-            groups={displayMenuGroups}
-            customTrigger={
-              <Button variant="outline" leftIcon={<MonitorIcon className="h-4 w-4 md:h-6 md:w-6" />}>
-                {/* A narrow page keeps the icon and drops the words: the bar never pushes the device's name out. */}
-                <span className="sr-only content-md:not-sr-only">{currentDisplayLabel}</span>
-              </Button>
-            }
-          />
-        )}
-        {onToggleChat && (
+        <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
+          {onToggleChat && (
+            <Button
+              variant="outline"
+              onClick={onToggleChat}
+              leftIcon={
+                chatOpen ? (
+                  <ChatOffIcon className="h-4 w-4 md:h-6 md:w-6" />
+                ) : (
+                  <ChatTextIcon className="h-4 w-4 md:h-6 md:w-6" />
+                )
+              }
+            >
+              {/* A narrow page keeps the icon and drops the words: the bar never pushes the device's name out. */}
+              <span className="sr-only content-md:not-sr-only">{chatOpen ? 'Close Chat' : 'Open Chat'}</span>
+            </Button>
+          )}
+          <ActionsMenuDropdown groups={actionsMenuGroups} triggerAriaLabel="Actions" />
           <Button
             variant="outline"
-            onClick={onToggleChat}
-            leftIcon={
-              chatOpen ? (
-                <ChatOffIcon className="h-4 w-4 md:h-6 md:w-6" />
-              ) : (
-                <ChatTextIcon className="h-4 w-4 md:h-6 md:w-6" />
-              )
-            }
-          >
-            <span className="sr-only content-md:not-sr-only">{chatOpen ? 'Close Chat' : 'Open Chat'}</span>
-          </Button>
-        )}
-        <ActionsMenuDropdown groups={actionsMenuGroups} triggerAriaLabel="Actions" />
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="Settings"
-          onClick={onOpenSettings}
-          leftIcon={<Settings01Icon />}
-        />
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          onClick={fullscreen ? onExitFullscreen : onEnterFullscreen}
-          leftIcon={fullscreen ? <Collapse02Icon /> : <Expand02Icon />}
-        />
+            size="icon"
+            aria-label="Settings"
+            onClick={onOpenSettings}
+            leftIcon={<Settings01Icon />}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            onClick={fullscreen ? onExitFullscreen : onEnterFullscreen}
+            leftIcon={fullscreen ? <Collapse02Icon /> : <Expand02Icon />}
+          />
+        </div>
       </div>
+      {/* The monitor selector is a row of its own under the device row, the full
+          width of the card (Figma 2155:109503): the label never competes with the
+          device's name for the header's width. Hidden with one display or none. */}
+      {displayMenuGroups.length > 0 && (
+        <ActionsMenuDropdown
+          groups={displayMenuGroups}
+          align="start"
+          customTrigger={
+            <button
+              type="button"
+              aria-label="Switch display"
+              className="flex w-full items-center gap-[var(--spacing-system-xs)] border-t border-ods-border p-[var(--spacing-system-sf)] text-left text-ods-text-primary outline-none transition-colors hover:bg-ods-bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus"
+            >
+              <MonitorIcon className="h-6 w-6 shrink-0" />
+              <span className="min-w-0 flex-1 truncate text-h4">{currentDisplayLabel}</span>
+              <Chevron02DownIcon className="h-6 w-6 shrink-0" />
+            </button>
+          }
+        />
+      )}
     </div>
   );
 
@@ -185,25 +207,36 @@ export function RemoteDesktopView({
 }
 
 /** The page while the device is still loading: the header bar as placeholders over an empty screen. */
-export function RemoteDesktopViewSkeleton({ onBack }: Pick<RemoteDesktopViewProps, 'onBack'>) {
+export function RemoteDesktopViewSkeleton({
+  onBack,
+  region = true,
+}: Pick<RemoteDesktopViewProps, 'onBack'> & {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}) {
   return (
     <PageLayout className={PAGE_CLASS} backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}>
-      <div className={CONTROLS_BAR_CLASS}>
-        <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
-          <Skeleton className="h-9 w-9 flex-shrink-0 rounded-md" />
-          <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-            <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-4 w-36" />
+      {/* `contents`: the page's own children stay its layout items; the region adds the one announcement. */}
+      <LoadingRegion label="Loading the remote session" announce={region} className="contents">
+        <div className={CONTROLS_BAR_CLASS}>
+          <div className={CONTROLS_ROW_CLASS}>
+            <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
+              <UnifiedSkeleton className="h-9 w-9 flex-shrink-0 rounded-md" />
+              <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+                <UnifiedSkeleton className="h-5 w-48" />
+                <UnifiedSkeleton className="h-4 w-36" />
+              </div>
+            </div>
+            <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
+              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
+              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
+              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
+            </div>
           </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
-          <Skeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-          <Skeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-          <Skeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-        </div>
-      </div>
 
-      <div className="min-h-0 min-w-0 flex-1 rounded-lg bg-black" />
+        <div className="min-h-0 min-w-0 flex-1 rounded-lg bg-black" />
+      </LoadingRegion>
     </PageLayout>
   );
 }

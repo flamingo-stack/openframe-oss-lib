@@ -22,6 +22,8 @@
 'use client';
 import { forwardRef, type ComponentType, type ImgHTMLAttributes, type Ref } from 'react';
 
+import { fetchPriorityProp } from '../utils/fetch-priority';
+
 type ImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder'> & {
   src?: string | { src: string };
   alt?: string;
@@ -35,6 +37,13 @@ type ImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder
   placeholder?: 'blur' | 'empty' | `data:image/${string}`;
   blurDataURL?: string;
   unoptimized?: boolean;
+  /**
+   * Draw the picture about this many pixels wide: the host's registered resizer
+   * (`registerImageResizer`) answers the URL, and the picture is drawn as it
+   * comes, with no second optimizer pass. For a slot whose width the caller
+   * measured (a wall column); a host with no resizer draws `src` as usual.
+   */
+  optimizedWidth?: number;
   onLoadingComplete?: (img: HTMLImageElement) => void;
   loader?: unknown;
 };
@@ -58,13 +67,44 @@ export function registerImage<P>(component: ComponentType<P>): void {
   impl = component as RegisteredImage;
 }
 
-const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim(props, ref) {
-  // Real impl path — registered by the host. Hand off untouched so
-  // every Next-specific prop (priority, placeholder, sizes, loader…)
-  // reaches the real component intact.
+/** A host's way to ask for a picture at a smaller width: the same picture, about `widthPx` wide, uncropped. */
+type ImageResizer = (src: string, widthPx: number) => string;
+
+let resizer: ImageResizer | null = null;
+
+/**
+ * Register how this host serves a picture at a given width (its image
+ * transform or optimizer). Code that only needs a few pixels of a picture (a
+ * colour sample) asks through {@link resizedImageUrl} and never downloads the
+ * original. Without a registration the original URL is used.
+ */
+export function registerImageResizer(fn: ImageResizer): void {
+  resizer = fn;
+}
+
+/** The URL of `src` about `widthPx` wide, as the host serves it; `src` itself when the host registered no way. */
+export function resizedImageUrl(src: string, widthPx: number): string {
+  return resizer ? resizer(src, widthPx) : src;
+}
+
+const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ optimizedWidth, ...given }, ref) {
+  // A picture asked for at a width is the host resizer's URL, drawn as it comes.
+  const props: ImageProps =
+    optimizedWidth && resizer && typeof given.src === 'string'
+      ? { ...given, src: resizer(given.src, optimizedWidth), unoptimized: true }
+      : given;
+  // `priority` means "this is the picture the page is waiting for", so its
+  // request is ranked high on EVERY host. Stated here, once: since Next 16
+  // `priority` only preloads and no longer ranks the request, and the plain
+  // <img> below dropped the prop altogether, so an embedder's hero went out at
+  // the default priority. A caller that names its own `fetchPriority` keeps it.
+  const fetchPriority = props.fetchPriority ?? (props.priority ? 'high' : undefined);
+
+  // Real impl path — registered by the host. Every Next-specific prop
+  // (priority, placeholder, sizes, loader…) reaches the real component intact.
   if (impl) {
     const Real = impl;
-    return <Real ref={ref} {...props} />;
+    return <Real ref={ref} {...props} fetchPriority={fetchPriority} />;
   }
 
   // Fallback path — plain <img>. Drops Next-only props and reduces
@@ -83,6 +123,7 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim(pr
     unoptimized: _unoptimized,
     onLoadingComplete,
     loader: _loader,
+    fetchPriority: _fetchPriority,
     style,
     ...rest
   } = props;
@@ -115,6 +156,8 @@ const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim(pr
       style={finalStyle}
       onLoad={onLoadingComplete ? e => onLoadingComplete(e.currentTarget) : undefined}
       {...rest}
+      // The attribute's spelling depends on the host's React major (`fetchPriorityProp`).
+      {...(fetchPriority ? fetchPriorityProp(fetchPriority) : {})}
     />
   );
 });

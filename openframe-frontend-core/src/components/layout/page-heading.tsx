@@ -68,6 +68,41 @@ export function PageHeading({
   );
 }
 
+/**
+ * THE way a heading is drawn on more than one line: each line on its own line,
+ * with a space before every break. The space is what keeps the heading's TEXT
+ * (what search engines, screen readers and link previews read) in words:
+ * "own. Approved", never "own.Approved". It sits at the end of a line, where it
+ * draws nothing. An empty line is a blank line.
+ *
+ * Every multi-line title goes through this; never write a bare `<br />` or one
+ * block `<span>` per line in a heading. The lines are its children, so anything
+ * that walks a title's children (the accent marks) reaches every line.
+ */
+export interface HeadingLinesProps {
+  /** The title's lines, top to bottom: one child per line. */
+  children: ReactNode;
+}
+
+export function HeadingLines({ children }: HeadingLinesProps) {
+  return (
+    <>
+      {Children.toArray(children).map((line, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: a title's lines never reorder
+        <Fragment key={index}>
+          {index > 0 ? (
+            <>
+              {' '}
+              <br />
+            </>
+          ) : null}
+          {line}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 /** A sentence mark inside a title: `.`, `:`, `?` or `!` that ends a sentence (followed by a space or the end). */
 const SENTENCE_MARK = /([.:?!]+)(?=\s|$)/g;
 const ONLY_MARKS = /^\s*[.:?!]+\s*$/;
@@ -116,17 +151,22 @@ function accentMarks(node: ReactNode, accentClassName: string): ReactNode {
     if (ONLY_MARKS.test(node)) return node;
     const parts = node.split(SENTENCE_MARK);
     if (parts.length === 1) return node;
-    return parts.map((part, index) =>
-      // `split` with one capture group alternates text, mark, text, mark...
-      index % 2 === 1 ? (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
-        <span key={index} className={accentClassName}>
-          {part}
-        </span>
-      ) : (
-        // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
-        <Fragment key={index}>{part}</Fragment>
-      ),
+    // One node for one string, so a list of children keeps its length (each of `HeadingLines`' lines stays one line).
+    return (
+      <>
+        {parts.map((part, index) =>
+          // `split` with one capture group alternates text, mark, text, mark...
+          index % 2 === 1 ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+            <span key={index} className={accentClassName}>
+              {part}
+            </span>
+          ) : (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one string never reorder
+            <Fragment key={index}>{part}</Fragment>
+          ),
+        )}
+      </>
     );
   }
   if (Array.isArray(node)) {
@@ -154,7 +194,15 @@ const SECTION_HEADING_LAYOUT = {
 } as const;
 
 export interface SectionHeadingProps {
-  /** The small label above the heading (Azeret Mono, uppercase, accent colour). */
+  /**
+   * The small label above the heading (Azeret Mono, uppercase, accent colour).
+   * On a page heading (`level="page"`) it is part of the `<h1>`: a hero's
+   * eyebrow names what the page is about ("Endpoint management software") above
+   * its positioning line, so the page's heading, and its accessible name, say
+   * both. The element takes no box of its own, so the eyebrow and the title keep
+   * their two places in the stack. On a section heading it stays a label beside
+   * the `<h2>`, whose accessible name is its title alone.
+   */
   eyebrow?: ReactNode;
   /** The heading text; a node when part of it is highlighted. Every sentence mark in it is drawn in the accent colour. */
   title: ReactNode;
@@ -166,6 +214,12 @@ export interface SectionHeadingProps {
   action?: ReactNode;
   /** `page` = the page's `<h1>` (a hero); `section` = an `<h2>`. Default `section`. */
   level?: 'page' | 'section';
+  /**
+   * Draw the heading's text without a heading element. For a loading state that
+   * shows a heading's words before the content that carries the real heading
+   * arrives: the page then never holds the same `<h1>` twice.
+   */
+  presentational?: boolean;
   /**
    * The brand whose accent the eyebrow and the sentence marks take, for a section
    * that shows ANOTHER product. Omitted: the platform the page runs on.
@@ -190,21 +244,45 @@ export function SectionHeading({
   intro,
   action,
   level = 'section',
+  presentational = false,
   platform,
   tone = 'accent',
   className,
 }: SectionHeadingProps) {
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
-  const Tag = level === 'page' ? 'h1' : 'h2';
+  const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
+  const eyebrowNode = eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null;
+  const headingText = (
+    <>
+      {accentSentenceMarks(title, platform, tone)}
+      {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
+    </>
+  );
   const stack = (
     <div className={layout.stack}>
-      {eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null}
-      <Tag className={layout.heading}>
-        {accentSentenceMarks(title, platform, tone)}
-        {punctuation ? <span className={accentClassName}>{punctuation}</span> : null}
-      </Tag>
-      {intro ? <div className={layout.intro}>{intro}</div> : null}
+      {eyebrowNode && level === 'page' ? (
+        // `contents`: the element names the heading and draws no box, so the stack lays its two children out as before.
+        <Tag className="contents">
+          {eyebrowNode}
+          {/* A space between the eyebrow and the title, so the heading's text reads "Eyebrow Title", not "EyebrowTitle". */}{' '}
+          <span className={`block ${layout.heading}`} data-section-heading>
+            {headingText}
+          </span>
+        </Tag>
+      ) : (
+        <>
+          {eyebrowNode}
+          <Tag className={layout.heading} data-section-heading>
+            {headingText}
+          </Tag>
+        </>
+      )}
+      {intro ? (
+        <div className={layout.intro} data-section-intro>
+          {intro}
+        </div>
+      ) : null}
     </div>
   );
   if (!action) return className ? <div className={className}>{stack}</div> : stack;

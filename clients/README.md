@@ -99,4 +99,6 @@ What the commands do:
 
 Files: data and configuration in `/Library/Application Support/OpenFrame/` or `C:\ProgramData\OpenFrame\`; logs in `/Library/Logs/OpenFrame/` or `C:\ProgramData\OpenFrame\logs\`; the macOS service definition at `/Library/LaunchDaemons/com.openframe.client.plist`.
 
-Updates are delivered by the OpenFrame platform. Re-running `install` on an enrolled device deregisters it and returns it to the waiting state; run `auth` again afterwards. The device keeps its identity, so re-authenticating re-registers the same device.
+On Windows the agent is listed in Settings → Apps as "OpenFrame Client"; its Uninstall button asks for administrator approval and runs `openframe-client uninstall`.
+
+Updates are delivered by the OpenFrame platform. Running `install` again on an installed device reinstalls it: the service, the integrated tools and the local data are removed and installed again, and the device keeps its identity. With tenant parameters it re-registers right away; without them it waits for `auth`.

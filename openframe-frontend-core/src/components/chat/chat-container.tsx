@@ -1,10 +1,10 @@
 import { type FC, type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated';
+import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { PlusCircleIcon } from '../plus-circle-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { Skeleton } from '../ui/skeleton';
 import { SquareAvatar as Avatar } from '../ui/square-avatar';
 import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
 import { MspOrganizationCard } from './msp-organization-card';
@@ -111,12 +111,12 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
               <div className="flex items-center gap-3">
                 {/* 64px round avatar placeholder — matches the `w-16 h-16`
                     rounded-full avatar / userIcon block below. */}
-                <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
+                <UnifiedSkeleton className="h-16 w-16 shrink-0 rounded-full" />
                 <div className="flex flex-col gap-1">
                   {/* Name line — sized to the `text-h3` name. */}
-                  <Skeleton className="h-6 w-40" />
+                  <UnifiedSkeleton className="h-6 w-40" />
                   {/* Server line — sized to the `text-h4` secondary row. */}
-                  <Skeleton className="h-4 w-28" />
+                  <UnifiedSkeleton className="h-4 w-28" />
                 </div>
               </div>
             ) : (
@@ -154,7 +154,7 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                   onClick={onNewChat}
                   variant="transparent"
                   size="small-legacy"
-                  leftIcon={<PlusCircleIcon className="h-5 w-5" whiteOverlay />}
+                  leftIcon={<PlusCircleIcon className="h-5 w-5" />}
                   className="text-ods-text-primary hover:bg-ods-bg-hover"
                 >
                   New Chat

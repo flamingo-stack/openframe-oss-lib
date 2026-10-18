@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 @Document(collection = "openframe_client_configuration")
 @Data
 @Builder
@@ -26,6 +27,8 @@ public class OpenFrameClientConfiguration implements TenantScoped {
     private Long documentVersion;
     private String version;
     private List<DownloadConfiguration> downloadConfiguration;
+    // the switches every client of the tenant runs with; absent on documents written before the flags existed
+    private Map<String, ClientFeatureFlag> featureFlags;
     @CreatedDate
     private LocalDateTime createdAt;
     @LastModifiedDate

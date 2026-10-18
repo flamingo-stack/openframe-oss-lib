@@ -1,6 +1,7 @@
 package com.openframe.data.service;
 
 import com.openframe.data.document.clientconfiguration.DownloadConfiguration;
+import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
 import com.openframe.data.document.clientconfiguration.PublishState;
 import com.openframe.data.repository.clientconfiguration.OpenFrameClientConfigurationRepository;
@@ -10,7 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+
+import static java.util.Objects.requireNonNullElse;
 import java.util.Optional;
 
 @Slf4j
@@ -45,6 +49,25 @@ public class OpenFrameClientConfigurationService {
         PublishState nextState = PublishState.published();
         config.setPublishState(nextState);
         save(config);
+    }
+
+    public boolean haveFeatureFlagsMoved(Map<String, ClientFeatureFlag> newFlags) {
+        Map<String, ClientFeatureFlag> oldFlags = currentFeatureFlags();
+        return !oldFlags.equals(newFlags);
+    }
+
+    @RetryOnOptimisticLockingFailure
+    public void updateFeatureFlags(Map<String, ClientFeatureFlag> newFlags) {
+        OpenFrameClientConfiguration config = get();
+        Map<String, ClientFeatureFlag> oldFlags = requireNonNullElse(config.getFeatureFlags(), Map.of());
+        config.setFeatureFlags(newFlags);
+        save(config);
+        log.info("Updated client feature flags {} -> {}", oldFlags, newFlags);
+    }
+
+    private Map<String, ClientFeatureFlag> currentFeatureFlags() {
+        OpenFrameClientConfiguration config = get();
+        return requireNonNullElse(config.getFeatureFlags(), Map.of());
     }
 
     @RetryOnOptimisticLockingFailure

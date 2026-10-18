@@ -14,23 +14,14 @@ import { useCollapsible } from '../chat/hooks/use-collapsible';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { APPROVAL_LEVEL_META, APPROVAL_LEVELS } from './approval-level';
 
-const approvalLevelLabels: Record<ApprovalLevel, string> = {
-  ALLOW: 'Allow',
-  ASK_USER: 'Ask User',
-  ASK_TECHNICIAN: 'Ask Technician',
-  DENY: 'Restrict',
-};
-
-const approvalLevelOptions = (Object.keys(approvalLevelLabels) as ApprovalLevel[]).map(value => ({
-  value,
-  label: approvalLevelLabels[value],
-}));
+const approvalLevelOptions = APPROVAL_LEVELS.map(value => ({ value, label: APPROVAL_LEVEL_META[value].label }));
 
 const POLICY_LEVEL_WIDTH = 'w-[180px]';
 const CATEGORY_LEVEL_WIDTH = 'w-[256px]';
 
-const getApprovalLevelLabel = (level: ApprovalLevel): string => approvalLevelLabels[level] ?? level;
+const getApprovalLevelLabel = (level: ApprovalLevel): string => APPROVAL_LEVEL_META[level]?.label ?? level;
 
 const ApprovalLevelDropdown: FC<{
   value: ApprovalLevel | undefined;

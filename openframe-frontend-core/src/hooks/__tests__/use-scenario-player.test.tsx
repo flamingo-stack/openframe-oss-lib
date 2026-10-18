@@ -1,4 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
+import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useScenarioPlayer } from '../use-scenario-player';
 
@@ -73,7 +74,7 @@ describe('useScenarioPlayer', () => {
     act(() => {
       result.current.go(1);
     });
-    expect(result.current).toMatchObject({ scenario: 1, step: 0, paused: false });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0, held: false });
     beats(8);
     expect(result.current).toMatchObject({ scenario: 1, step: 8 });
 
@@ -81,7 +82,7 @@ describe('useScenarioPlayer', () => {
     act(() => {
       vi.advanceTimersByTime(4200);
     });
-    expect(result.current).toMatchObject({ scenario: 0, step: 0, paused: false });
+    expect(result.current).toMatchObject({ scenario: 0, step: 0, held: false });
   });
 
   it('jumps to a step and keeps playing from there', () => {
@@ -132,7 +133,7 @@ describe('useScenarioPlayer', () => {
     expect(result.current).toMatchObject({ scenario: 1, step: 0 });
   });
 
-  it('does not advance while paused or disabled', () => {
+  it('does not advance while the visitor holds it, or while disabled', () => {
     stubReducedMotion(false);
     const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
       initialProps: { enabled: false },
@@ -143,21 +144,41 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(0);
 
     rerender({ enabled: true });
+    // A press on the stage holds it until it is released, wherever that happens.
     act(() => {
-      result.current.setPaused(true);
+      result.current.holdProps.onPointerDown({} as React.PointerEvent<HTMLElement>);
     });
+    expect(result.current.held).toBe(true);
     act(() => {
       vi.advanceTimersByTime(10_000);
     });
     expect(result.current.step).toBe(0);
 
     act(() => {
-      result.current.setPaused(false);
+      window.dispatchEvent(new Event('pointerup'));
     });
     act(() => {
       vi.advanceTimersByTime(1700);
     });
     expect(result.current.step).toBe(1);
+  });
+
+  it('plays on from a chosen tab even when the release of the press that chose it is never reported', () => {
+    stubReducedMotion(false);
+    const { result } = renderHook(() => useScenarioPlayer(OPTIONS));
+    act(() => {
+      result.current.holdProps.onPointerDown({
+        currentTarget: document.body,
+      } as unknown as React.PointerEvent<HTMLElement>);
+    });
+    expect(result.current.held).toBe(true);
+    // No pointerup, no mouseup, no move: only the choice itself.
+    act(() => {
+      result.current.go(1);
+    });
+    expect(result.current).toMatchObject({ scenario: 1, step: 0, held: false });
+    beats(3);
+    expect(result.current).toMatchObject({ scenario: 1, step: 3 });
   });
 
   it('picks up where it was every time it comes back on screen', () => {
@@ -188,7 +209,7 @@ describe('useScenarioPlayer', () => {
     expect(result.current.step).toBe(7);
   });
 
-  it('takes its first step within a third of a second of becoming playable, then keeps the beat', () => {
+  it('takes its first step within a third of a second, keeps the beat, and resumes a step where it stopped', () => {
     stubReducedMotion(false);
     const { result, rerender } = renderHook(({ enabled }) => useScenarioPlayer({ ...OPTIONS, enabled }), {
       initialProps: { enabled: false },
@@ -208,11 +229,23 @@ describe('useScenarioPlayer', () => {
     });
     expect(result.current.step).toBe(2);
 
-    // Coming back on screen is the same: it moves at once.
+    // 700 ms into the next step it leaves the screen, for a long time.
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
     rerender({ enabled: false });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(result.current.step).toBe(2);
+    // Back: it resumes the step with the 1000 ms that were left, neither a whole new step nor a skipped one.
     rerender({ enabled: true });
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(900);
+    });
+    expect(result.current.step).toBe(2);
+    act(() => {
+      vi.advanceTimersByTime(200);
     });
     expect(result.current.step).toBe(3);
   });

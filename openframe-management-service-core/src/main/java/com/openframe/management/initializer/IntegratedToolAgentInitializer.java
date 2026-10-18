@@ -1,6 +1,6 @@
 package com.openframe.management.initializer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.document.toolagent.IntegratedToolAgentConfiguration;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
 import com.openframe.data.service.IntegratedToolAgentService;

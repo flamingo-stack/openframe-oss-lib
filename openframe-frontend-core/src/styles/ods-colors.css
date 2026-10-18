@@ -52,13 +52,16 @@
    */
   color-scheme: dark;
 
+  /* The `-secondary` tints of success, warning, cyan and pink are the surface a
+   * badge sets the family's own colour on. Each is dark enough for that text to
+   * clear 4.5:1 at badge size (measured: 4.6:1); the Figma values were 3.0 to 4.2. */
   /* Attention – Success */
   --ods-attention-green-success: #5ea62e;
   --ods-attention-green-success-hover: #549c24;
   --ods-attention-green-success-action: #4a921a;
-  --ods-attention-green-success-secondary: #2e461f;
-  --ods-attention-green-success-secondary-hover: #385029;
-  --ods-attention-green-success-secondary-action: #425a33;
+  --ods-attention-green-success-secondary: #203116;
+  --ods-attention-green-success-secondary-hover: #2a3b20;
+  --ods-attention-green-success-secondary-action: #34452a;
 
   /* Attention – Error */
   --ods-attention-red-error: #f36666;
@@ -72,33 +75,33 @@
   --ods-attention-yellow-warning: #e1b32f;
   --ods-attention-yellow-warning-hover: #d7a925;
   --ods-attention-yellow-warning-action: #cd9f1b;
-  --ods-attention-yellow-warning-secondary: #5a4d25;
-  --ods-attention-yellow-warning-secondary-hover: #64572f;
-  --ods-attention-yellow-warning-secondary-action: #6e6139;
+  --ods-attention-yellow-warning-secondary: #544822;
+  --ods-attention-yellow-warning-secondary-hover: #5e522c;
+  --ods-attention-yellow-warning-secondary-action: #685c36;
 
   /* Flamingo Cyan */
   --ods-flamingo-cyan-base: #5efaf0;
   --ods-flamingo-cyan-hover: #54f0e6;
   --ods-flamingo-cyan-action: #4ae6dc;
-  --ods-flamingo-cyan-secondary: #058c83;
-  --ods-flamingo-cyan-secondary-hover: #008279;
-  --ods-flamingo-cyan-secondary-action: #00786f;
+  --ods-flamingo-cyan-secondary: #047169;
+  --ods-flamingo-cyan-secondary-hover: #00675f;
+  --ods-flamingo-cyan-secondary-action: #005d55;
 
   /* Flamingo Pink */
   --ods-flamingo-pink-base: #f357bb;
   --ods-flamingo-pink-hover: #e94db1;
   --ods-flamingo-pink-action: #df43a7;
-  --ods-flamingo-pink-secondary: #792b5d;
-  --ods-flamingo-pink-secondary-hover: #6f2153;
-  --ods-flamingo-pink-secondary-action: #651749;
+  --ods-flamingo-pink-secondary: #4a1a39;
+  --ods-flamingo-pink-secondary-hover: #40102f;
+  --ods-flamingo-pink-secondary-action: #360625;
 
   /* Open Yellow */
   --ods-open-yellow-base: #ffc008;
   --ods-open-yellow-hover: #f5b600;
   --ods-open-yellow-action: #ebac00;
-  --ods-open-yellow-secondary: #7f6004;
-  --ods-open-yellow-secondary-hover: #755600;
-  --ods-open-yellow-secondary-action: #6b4c00;
+  --ods-open-yellow-secondary: #695003;
+  --ods-open-yellow-secondary-hover: #5f4600;
+  --ods-open-yellow-secondary-action: #553c00;
 
   /* System Greys */
   --ods-system-greys-background: #161616;
@@ -262,6 +265,9 @@
   --social-instagram-purple: #8134af;
   --social-youtube: #ff0000;
   --social-twitter: #1da1f2;
+  --social-hubspot: #ff7a59;
+  --social-reddit: #ff4500;
+  --social-g2: #ff492c;
 }
 
 /* ===================================================================== */
@@ -279,8 +285,8 @@
      was byte-identical to --color-bg-card, so every `bg-ods-skeleton` pulse
      sitting on a card was invisible — it only appeared while the row's hover
      tint lightened the ground beneath it (people-hub score table, 2026-08).
-     `soft-grey` is what `ui/Skeleton` (bg-ods-border) already pulses with, so
-     the two skeleton primitives now read as one, in both themes. */
+     `soft-grey` is the border's grey too, so a skeleton reads the same on
+     every surface, in both themes. */
   --color-bg-skeleton: var(--ods-system-greys-soft-grey);
   --color-bg-surface: var(--ods-system-greys-soft-grey);
   --color-bg-surface-hover: var(--ods-system-greys-soft-grey-hover);
@@ -471,22 +477,6 @@
   --ods-accent: var(--ods-open-yellow-base);
 }
 
-[data-app-type='flamingo-teaser'] {
-  --color-accent-primary: var(--ods-flamingo-pink-base);
-  --color-accent-hover: var(--ods-flamingo-pink-hover);
-  --color-accent-active: var(--ods-flamingo-pink-action);
-  --color-accent-secondary: var(--ods-flamingo-pink-secondary);
-  --color-accent-secondary-hover: var(--ods-flamingo-pink-secondary-hover);
-  --color-accent-secondary-active: var(--ods-flamingo-pink-secondary-action);
-  --color-accent-focus: var(--ods-flamingo-pink-base);
-  --color-focus-ring: var(--ods-flamingo-pink-base);
-  --color-focus-visible: var(--ods-flamingo-pink-base);
-  --color-link: var(--ods-flamingo-pink-base);
-  --color-link-hover: var(--ods-flamingo-pink-hover);
-  --ods-current: var(--ods-flamingo-pink-base);
-  --ods-accent: var(--ods-flamingo-pink-base);
-}
-
 [data-app-type='flamingo'] {
   --color-accent-primary: var(--ods-flamingo-pink-base);
   --color-accent-hover: var(--ods-flamingo-pink-hover);
@@ -608,6 +598,22 @@
   --color-link-hover: var(--ods-flamingo-cyan-hover);
   --ods-current: var(--ods-flamingo-cyan-base);
   --ods-accent: var(--ods-flamingo-cyan-base);
+}
+
+[data-app-type='coding-hub'] {
+  --color-accent-primary: var(--ods-system-greys-white);
+  --color-accent-hover: var(--ods-system-greys-white-hover);
+  --color-accent-active: var(--ods-system-greys-white-action);
+  --color-accent-secondary: var(--ods-system-greys-black);
+  --color-accent-secondary-hover: var(--ods-system-greys-black-hover);
+  --color-accent-secondary-active: var(--ods-system-greys-black-action);
+  --color-accent-focus: var(--ods-system-greys-white);
+  --color-focus-ring: var(--ods-system-greys-white);
+  --color-focus-visible: var(--ods-system-greys-white);
+  --color-link: var(--ods-system-greys-white);
+  --color-link-hover: var(--ods-system-greys-white-hover);
+  --ods-current: var(--ods-system-greys-white);
+  --ods-accent: var(--ods-system-greys-white);
 }
 
 [data-app-type='company-hub'] {

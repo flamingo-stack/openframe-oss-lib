@@ -20,9 +20,11 @@
 
 import { Eye } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import type { BlogPostSummary } from '../../../types/blog';
 import { cn } from '../../../utils/cn';
 import { formatDateWithTimezone } from '../../../utils/format';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { StatusBadge } from '../../ui/status-badge';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -75,32 +77,32 @@ export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm'
   if (size === 'sm') {
     return (
       <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
+        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
         <span className={COMPACT_CARD_TEXT_COL}>
           <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-2/5 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
           </span>
           <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
       </span>
     );
   }
   return (
-    <article className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'group flex h-full animate-pulse flex-col')}>
-      <div className="aspect-[1200/630] bg-ods-border" />
+    <article className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'group flex h-full flex-col')}>
+      <UnifiedSkeleton className="aspect-[1200/630]" />
       <div className="flex flex-grow flex-col space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-border" />
-        <div className="h-5 w-1/2 rounded bg-ods-border" />
-        <div className="h-3 w-full rounded bg-ods-border" />
-        <div className="h-3 w-4/5 rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
+        <UnifiedSkeleton className="h-5 w-1/2 rounded" />
+        <UnifiedSkeleton className="h-3 w-full rounded" />
+        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
         <div className="mt-auto flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-ods-border" />
-          <div className="h-3 w-24 rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-8 w-8 rounded-full" />
+          <UnifiedSkeleton className="h-3 w-24 rounded" />
         </div>
       </div>
     </article>
@@ -138,13 +140,7 @@ export function BlogCard({
     const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     const firstCategory = post.categories?.find(c => c && c.name)?.name;
     return (
-      <a
-        href={href}
-        target={target}
-        rel={rel}
-        className={cn(COMPACT_CARD_OUTER, className)}
-        aria-label={`Read article: ${post.title}`}
-      >
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {displayImage ? (
             <Image
@@ -176,7 +172,7 @@ export function BlogCard({
             <span className={COMPACT_CARD_SUMMARY}>{post.summary || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -209,13 +205,7 @@ export function BlogCard({
   const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
   return (
     <article className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col', className)} role="article">
-      <a
-        href={href}
-        target={target}
-        rel={rel}
-        className="flex h-full flex-col focus:outline-none"
-        aria-label={`Read article: ${post.title}`}
-      >
+      <Link href={href} target={target} rel={rel} className="flex h-full flex-col focus:outline-none">
         <div className="relative aspect-[1200/630] w-full overflow-hidden bg-ods-bg">
           {displayImage ? (
             <Image
@@ -276,7 +266,7 @@ export function BlogCard({
             </div>
           </div>
         </div>
-      </a>
+      </Link>
     </article>
   );
 }

@@ -23,7 +23,7 @@
 import { useRouter } from '../../embed-shims/next-navigation';
 import type { Faq } from '../../types/faq';
 import { PageShell, PageLayout } from '../ui';
-import { FaqSection } from './faq-section';
+import { FaqSection, type FaqSectionProps } from './faq-section';
 import type { FaqSchemaOptions } from './json-ld';
 
 export interface FaqDocumentPageProps {
@@ -49,11 +49,16 @@ export interface FaqDocumentPageProps {
   jsonLd?: FaqSchemaOptions;
   /** Base URL `FaqSection` appends `/api/faqs` to (reverse-proxy embedders). */
   apiBaseUrl?: string;
+  /** What the page is about (forwarded to `FaqSection`): its FAQs and its ask card are the ones written for the topic. */
+  topic?: string;
   /** Optional entity scoping forwarded to `FaqSection`. */
   entityType?: string;
   entityId?: number | string;
   /** Minimum FAQ count before the section renders (forwarded to `FaqSection`). */
   minResults?: number;
+  /** The "ask the assistant" card beside the questions (forwarded to `FaqSection`): `false` switches it off, an
+   *  object states its topic, wording and the chat it opens. */
+  ask?: FaqSectionProps['ask'];
 }
 
 export function FaqDocumentPage({
@@ -67,6 +72,8 @@ export function FaqDocumentPage({
   entityType,
   entityId,
   minResults,
+  topic,
+  ask,
   shell = true,
 }: FaqDocumentPageProps) {
   const router = useRouter();
@@ -93,6 +100,8 @@ export function FaqDocumentPage({
         entityType={entityType}
         entityId={entityId}
         minResults={minResults}
+        topic={topic}
+        ask={ask}
       />
     </PageLayout>
   );

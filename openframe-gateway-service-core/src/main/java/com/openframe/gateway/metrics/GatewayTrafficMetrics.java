@@ -14,6 +14,7 @@ public class GatewayTrafficMetrics {
 
     private static final String LOG_PREFIX = "sessionId={} path={} sub={} | ";
     private static final String CLOSED_COUNTER = "openframe.tenant.gateway.websocket.sessions.closed";
+    private static final String CLIENT_UPGRADE_REQUIRED_COUNTER = "openframe.tenant.gateway.client.upgrade.required";
 
     @Getter
     private final AtomicInteger activeWebSocketConnections = new AtomicInteger(0);
@@ -36,6 +37,10 @@ public class GatewayTrafficMetrics {
         registry.counter("openframe.tenant.gateway.websocket.upgrade.rejected",
                 "tool", tool,
                 "reason", reason).increment();
+    }
+
+    public void recordClientUpgradeRequired(String kind) {
+        registry.counter(CLIENT_UPGRADE_REQUIRED_COUNTER, "kind", kind).increment();
     }
 
     public void webSocketOpened(String sessionId, String path, String sub) {

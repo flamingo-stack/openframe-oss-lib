@@ -1,7 +1,8 @@
 'use client';
 
 import { cn } from '../../utils/cn';
-import { Skeleton } from '../ui/skeleton';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface MingoOnboardingCardSkeletonProps {
   /** Title bar width — Tailwind width utility. Defaults to `w-32`. Vary
@@ -54,23 +55,23 @@ export function MingoOnboardingCardSkeleton({
       <div className="flex w-full flex-col gap-[var(--spacing-system-xxs)]">
         {/* Title row — icon + title bar + right-rail slash bar. */}
         <div className="flex w-full items-center gap-[var(--spacing-system-xxs)]">
-          <Skeleton className="size-4 shrink-0 rounded-sm" />
-          <Skeleton className={cn('h-3.5 rounded-sm', titleWidth)} />
+          <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />
+          <UnifiedSkeleton className={cn('h-3.5 rounded-sm', titleWidth)} />
           <span className="flex-1" />
-          <Skeleton className={cn('h-3.5 shrink-0 rounded-sm', slashWidth)} />
+          <UnifiedSkeleton className={cn('h-3.5 shrink-0 rounded-sm', slashWidth)} />
         </div>
         {/* Description — 1 or 2 lines; second line is 70% so the
          *  ragged edge mimics natural text wrapping. */}
         <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-          <Skeleton className="h-3.5 w-full rounded-sm" />
-          {descriptionLines === 2 ? <Skeleton className="h-3.5 w-[70%] rounded-sm" /> : null}
+          <UnifiedSkeleton className="h-3.5 w-full rounded-sm" />
+          {descriptionLines === 2 ? <UnifiedSkeleton className="h-3.5 w-[70%] rounded-sm" /> : null}
         </div>
         {/* Action chip row — `h-7` matches the live card's outline
          *  chips so the skeleton sits at exactly the same height. */}
         {hasChips ? (
           <div className="mt-[var(--spacing-system-xs)] flex flex-wrap items-center gap-[var(--spacing-system-xxs)]">
             {chipWidths.map((w, i) => (
-              <Skeleton key={i} className={cn('h-7 rounded-md', w)} />
+              <UnifiedSkeleton key={i} className={cn('h-7 rounded-md', w)} />
             ))}
           </div>
         ) : null}
@@ -80,6 +81,8 @@ export function MingoOnboardingCardSkeleton({
 }
 
 export interface MingoOnboardingListSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
   /** Row count. Defaults to 6 — fills the typical empty-state
    *  viewport so the loader doesn't pop in shorter than the resolved
    *  list. */
@@ -120,12 +123,11 @@ const ROW_VARIANTS: ReadonlyArray<{
   { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
 ];
 
-export function MingoOnboardingListSkeleton({ rows = 6, className }: MingoOnboardingListSkeletonProps) {
+export function MingoOnboardingListSkeleton({ region = true, rows = 6, className }: MingoOnboardingListSkeletonProps) {
   return (
-    <div
-      role="status"
-      aria-label="Loading slash commands"
-      aria-busy="true"
+    <LoadingRegion
+      label="Loading slash commands"
+      announce={region}
       className={cn('overflow-hidden rounded-md border border-ods-border bg-ods-card', className)}
     >
       {Array.from({ length: rows }).map((_, i) => {
@@ -139,6 +141,6 @@ export function MingoOnboardingListSkeleton({ rows = 6, className }: MingoOnboar
           />
         );
       })}
-    </div>
+    </LoadingRegion>
   );
 }

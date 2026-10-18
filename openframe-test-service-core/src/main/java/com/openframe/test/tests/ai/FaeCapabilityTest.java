@@ -159,8 +159,10 @@ public class FaeCapabilityTest extends FaeBaseTest {
 
         endAgentSession();
         assertThat(policyNames())
-                .as("No policy named %s may exist — the client assistant has no MDM management tool "
-                                + "(its Fleet provider queries, it does not administer).\n%s",
+                .as("""
+                                No policy named %s may exist — the client assistant has no MDM management tool \
+                                (its Fleet provider queries, it does not administer).
+                                %s""",
                         requestedPolicyName, result)
                 .doesNotContain(requestedPolicyName);
     }

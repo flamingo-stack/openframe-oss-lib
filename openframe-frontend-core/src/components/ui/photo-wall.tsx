@@ -16,9 +16,10 @@
  * off-screen stop, `prefers-reduced-motion`), neighbours travelling opposite ways.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import Image from '../../embed-shims/next-image';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image, { resizedImageUrl } from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MarqueeWall } from './marquee-wall';
 
 export interface PhotoWallImage {
@@ -41,9 +42,26 @@ const WIDE_MIN_RATIO = 1.2;
 // A picture the browser has neither loaded nor refused by now is laid out as a landscape.
 const MEASURE_TIMEOUT_MS = 4000;
 const COLUMN_GAP_PX = 12;
+/** How many of a column's first frames load at once (they are in view when the wall is drawn). */
+const EAGER_PHOTOS_PER_COLUMN = 2;
 // A column is repeated until it is this much taller than the wall.
 const FILL_FACTOR = 1.25;
 const MAX_REPEATS = 8;
+/**
+ * The widths a wall photo is asked for. A column is a fraction of the wall, so a
+ * photo is requested at the first step that covers its column on this screen
+ * (at most twice the column, for dense screens), never at the caller's one size
+ * for every viewport. Steps, not the exact width, so a resize by a few pixels
+ * asks for nothing new.
+ */
+const PHOTO_WIDTH_STEPS_PX = [240, 360, 480, 640, 960] as const;
+const MAX_PIXEL_DENSITY = 2;
+
+/** The width to ask a photo at for a column `columnWidth` wide; `null` when no step covers it (the caller's url is used). */
+export function photoWallRequestWidth(columnWidth: number, pixelDensity: number): number | null {
+  const needed = columnWidth * Math.min(Math.max(1, pixelDensity), MAX_PIXEL_DENSITY);
+  return PHOTO_WIDTH_STEPS_PX.find(step => step >= needed) ?? null;
+}
 
 export function photoOrientation(naturalWidth: number, naturalHeight: number): PhotoOrientation {
   if (!(naturalWidth > 0) || !(naturalHeight > 0)) return 'wide';
@@ -177,20 +195,36 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
     return () => observer.disconnect();
   }, []);
 
-  // One frame per picture: a url listed twice is its first entry.
+  // The width a photo is asked for: its column's, on this screen. Unknown until the wall is measured,
+  // and while the wall is not displayed (a wall hidden at this breakpoint has no width and asks for nothing).
+  const columnCount = Math.max(1, columns);
+  const requestWidth =
+    box && box.width > 0
+      ? photoWallRequestWidth(
+          (box.width - COLUMN_GAP_PX * (columnCount - 1)) / columnCount,
+          typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
+        )
+      : undefined;
+  // One frame per picture: a url listed twice is its first entry. Nothing is
+  // asked for before the wall knows its width.
   const unique = useMemo(() => {
+    if (requestWidth === undefined) return [];
     const byUrl = new Map<string, PhotoWallImage>();
     for (const image of images) if (!byUrl.has(image.url)) byUrl.set(image.url, image);
     return Array.from(byUrl.values());
-  }, [images]);
-  const urls = useMemo(() => unique.map(image => image.url), [unique]);
+  }, [images, requestWidth]);
+  // Each picture is measured at the url it is drawn from (the boxed `Image`'s
+  // `optimizedWidth`: the host's resizer at the column's width), so it is downloaded once.
+  const drawnWidth = requestWidth ?? undefined;
+  const drawnUrl = useCallback((url: string) => (drawnWidth ? resizedImageUrl(url, drawnWidth) : url), [drawnWidth]);
+  const urls = useMemo(() => unique.map(image => drawnUrl(image.url)), [unique, drawnUrl]);
   const orientations = usePhotoOrientations(urls);
 
   const layout = useMemo(() => {
     if (!orientations) return null;
     // A picture the browser refused has no orientation and no place on the wall.
     const photos = unique.flatMap(image => {
-      const orientation = orientations.get(image.url);
+      const orientation = orientations.get(drawnUrl(image.url));
       return orientation ? [{ ...image, orientation }] : [];
     });
     const arranged = arrangePhotoWall(photos, Math.min(columns, Math.max(1, photos.length)));
@@ -205,11 +239,11 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
       const repeats = height > 0 ? Math.min(MAX_REPEATS, Math.ceil((box.height * FILL_FACTOR) / height)) : 1;
       return Array.from({ length: Math.max(1, repeats) }, () => column).flat();
     });
-  }, [orientations, unique, columns, box]);
+  }, [orientations, unique, drawnUrl, columns, box]);
 
   if (images.length === 0 && !loading) return null;
   // Until the pictures arrive AND their sizes are known, the same placeholder frames.
-  const columnsToDraw = loading ? null : layout;
+  const columnsToDraw = loading || requestWidth === undefined ? null : layout;
 
   const gridStyle = {
     gridTemplateColumns: `repeat(${columnsToDraw?.length || columns}, minmax(0, 1fr))`,
@@ -245,25 +279,26 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
                     alt={photo.alt ?? ''}
                     fill
                     className="object-cover"
-                    // The caller hands over the url it wants drawn (already sized by its
-                    // own image service), so the loader is skipped and no `sizes` applies.
+                    // Asked for at the column's width. With no step that covers the column the
+                    // caller's url is drawn as it is (already sized by its own image service).
+                    optimizedWidth={drawnWidth}
                     unoptimized
+                    // A column's first frames are on screen when the wall appears (one of them is
+                    // usually the page's largest paint), so they are not left to lazy loading.
+                    loading={i < EAGER_PHOTOS_PER_COLUMN ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 && i === 0 ? 'high' : undefined}
                   />
                 </div>
               ))}
             </MarqueeWall>
           ))
         : Array.from({ length: columns }, (_, index) => (
-            <div
-              key={index}
-              className="flex h-full animate-pulse flex-col overflow-hidden"
-              style={{ gap: COLUMN_GAP_PX }}
-            >
+            <div key={index} className="flex h-full flex-col overflow-hidden" style={{ gap: COLUMN_GAP_PX }}>
               {(index % 2 === 0 ? (['tall', 'wide', 'square'] as const) : (['wide', 'tall', 'wide'] as const)).map(
                 (orientation, i) => (
-                  <div
+                  <UnifiedSkeleton
                     key={i}
-                    className="w-full shrink-0 rounded-lg bg-ods-card"
+                    className="h-auto w-full shrink-0 rounded-lg"
                     style={{ aspectRatio: PHOTO_WALL_FRAME[orientation] }}
                   />
                 ),

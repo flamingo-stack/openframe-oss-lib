@@ -4,6 +4,7 @@ import { cloneElement, memo, type ReactElement, type ReactNode, type MouseEvent 
 import Link from '../../embed-shims/next-link';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
 
@@ -119,7 +120,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
       </span>
 
       {hasUnread && showLabel && (
-        <span className="ml-[var(--spacing-system-xs)] flex size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2">
+        <span className="ml-[var(--spacing-system-xs)] flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)]">
           <span className="text-ods-text-on-accent text-h5">{unreadCount > 99 ? '99+' : unreadCount}</span>
         </span>
       )}
@@ -164,9 +165,9 @@ export function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolea
   return (
     <div className="flex h-14 w-full items-center justify-start p-[var(--spacing-system-m)]" aria-hidden="true">
       <div className="relative flex flex-shrink-0 items-center justify-center">
-        <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-6 w-6 rounded" />
       </div>
-      {showLabel && <div className="ml-[var(--spacing-system-xs)] h-4 flex-1 animate-pulse rounded bg-ods-border" />}
+      {showLabel && <UnifiedSkeleton className="ml-[var(--spacing-system-xs)] h-4 flex-1 rounded" />}
     </div>
   );
 }

@@ -2,7 +2,9 @@
 
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import Link from '../../embed-shims/next-link';
 import { LinkedinIcon } from '../icons-v2-generated/brand-logos/linkedin-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { LinkedInContainer } from './embed-container';
 
 /**
@@ -42,7 +44,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
             <LinkedinIcon className="h-5 w-5 shrink-0" />
             <span>LinkedIn post</span>
           </div>
-          <a
+          <Link
             href={url}
             target="_blank"
             rel="noopener noreferrer"
@@ -50,7 +52,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
           >
             <LinkedinIcon className="h-4 w-4" />
             <span>View on LinkedIn</span>
-          </a>
+          </Link>
         </div>
       </LinkedInContainer>
     );
@@ -60,17 +62,17 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
     <LinkedInContainer>
       <div className="relative w-full" style={{ height }}>
         {!loaded && (
-          <div className="absolute inset-0 animate-pulse p-6">
+          <div className="absolute inset-0 p-6">
             <div className="mb-4 flex items-center space-x-3">
-              <div className="h-12 w-12 rounded-full bg-ods-border" />
+              <UnifiedSkeleton className="h-12 w-12 rounded-full" />
               <div>
-                <div className="mb-2 h-4 w-32 rounded bg-ods-border" />
-                <div className="h-3 w-24 rounded bg-ods-border" />
+                <UnifiedSkeleton className="mb-2 h-4 w-32 rounded" />
+                <UnifiedSkeleton className="h-3 w-24 rounded" />
               </div>
             </div>
             <div className="space-y-2">
-              <div className="h-4 w-full rounded bg-ods-border" />
-              <div className="h-4 w-3/4 rounded bg-ods-border" />
+              <UnifiedSkeleton className="h-4 w-full rounded" />
+              <UnifiedSkeleton className="h-4 w-3/4 rounded" />
             </div>
           </div>
         )}
@@ -85,7 +87,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
         />
       </div>
       <div className="border-t border-ods-border bg-ods-bg-surface px-4 py-3">
-        <a
+        <Link
           href={url}
           target="_blank"
           rel="noopener noreferrer"
@@ -93,7 +95,7 @@ export function LinkedInEmbedClient({ url, height = 600 }: LinkedInEmbedProps) {
         >
           <ExternalLink className="h-4 w-4" />
           <span>View on LinkedIn</span>
-        </a>
+        </Link>
       </div>
     </LinkedInContainer>
   );

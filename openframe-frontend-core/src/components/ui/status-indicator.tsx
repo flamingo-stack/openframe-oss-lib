@@ -1,5 +1,7 @@
 'use client';
 
+import Link from '../../embed-shims/next-link';
+
 interface StatusIndicatorProps {
   status: 'success' | 'pending' | 'error' | 'missing';
   label: string;
@@ -34,9 +36,9 @@ export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
 
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:underline">
+      <Link href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:underline">
         {content}
-      </a>
+      </Link>
     );
   }
 

@@ -3,7 +3,7 @@
 /**
  * Data-room / OpenFrame-docs inline chat card.
  *
- * PURE PRESENTATION. The card receives a pre-composed `<a>` prop bundle
+ * PURE PRESENTATION. The card receives a pre-composed `<Link>` prop bundle
  * (`anchorProps`) plus a pre-resolved badge label — both decisions
  * (URL composition + cross-app routing) are made in the consumer's
  * runtime layer, not inside this card.
@@ -15,6 +15,8 @@
 
 import { ExternalLink } from 'lucide-react';
 import type React from 'react';
+import Link from '../../../embed-shims/next-link';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { StatusBadge } from '../../ui/status-badge';
 import type { DataRoomDocCardItem } from '../types/entities/data-room-doc';
 import {
@@ -50,8 +52,8 @@ export interface DataRoomDocCardProps {
    *  card. The hub-side dispatcher already passes
    *  `getSourceLabel(sourceRepo)` with a non-null fallback. */
   badgeText: string;
-  /** Pre-composed `<a>` prop bundle. When provided, the outer renders
-   *  as `<a {...anchorProps}>`; otherwise the card is non-interactive. */
+  /** Pre-composed `<Link>` prop bundle. When provided, the outer renders
+   *  as `<Link {...anchorProps}>`; otherwise the card is non-interactive. */
   anchorProps?: DataRoomDocCardAnchorProps;
 }
 
@@ -92,9 +94,9 @@ export function DataRoomDocCard({ item, className, badgeText, anchorProps }: Dat
     );
   }
   return (
-    <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   );
 }
 
@@ -103,17 +105,17 @@ export function DataRoomDocCardSkeleton({ className }: { className?: string }) {
     <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
       <span className={COMPACT_CARD_TEXT_COL}>
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="h-3.5 w-2/3 rounded bg-ods-bg" />
-          <span className="h-4 w-16 rounded-full bg-ods-bg/60" />
+          <UnifiedSkeleton as="span" className="h-3.5 w-2/3 rounded" />
+          <UnifiedSkeleton as="span" className="h-4 w-16 rounded-full" />
         </span>
-        <span className="h-4 w-1/2 rounded bg-ods-bg/60" />
+        <UnifiedSkeleton as="span" className="h-4 w-1/2 rounded" />
         <span className="flex min-w-0 flex-col gap-0">
-          <span className="h-5 w-5/6 rounded bg-ods-bg/60" />
-          <span className="h-5 w-3/4 rounded bg-ods-bg/60" />
+          <UnifiedSkeleton as="span" className="h-5 w-5/6 rounded" />
+          <UnifiedSkeleton as="span" className="h-5 w-3/4 rounded" />
         </span>
       </span>
       <span className="flex h-5 shrink-0 items-center self-start">
-        <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
+        <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
       </span>
     </span>
   );

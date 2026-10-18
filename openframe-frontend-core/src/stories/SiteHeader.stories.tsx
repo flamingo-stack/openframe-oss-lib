@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
-
-import { OpenFrameLogo, OpenFrameText } from '../components/icons';
 import { Menu01Icon } from '../components/icons-v2-generated/interface/menu-01-icon';
+import { OpenframeLogoIcon } from '../components/icons-v2-generated/logos/openframe-logo-icon';
+import { OpenframeTextIcon } from '../components/icons-v2-generated/logos/openframe-text-icon';
 import { HeaderButton } from '../components/navigation/header-button';
 import { SiteHeader, type SiteHeaderProps } from '../components/navigation/site-header';
 import { SocialIconRow } from '../components/social-icon-row';
@@ -12,12 +12,12 @@ import { adminNav, simpleNav, siteNav } from './site-nav-fixtures';
 
 const logo = (
   <span className="flex items-center gap-2">
-    <OpenFrameLogo
+    <OpenframeLogoIcon
+      secondaryColor="var(--color-accent-primary)"
       className="h-6 w-6 shrink-0"
-      upperPathColor="var(--color-text-primary)"
-      lowerPathColor="var(--color-accent-primary)"
+      color="var(--color-text-primary)"
     />
-    <OpenFrameText textColor="var(--color-text-primary)" className="h-4" />
+    <OpenframeTextIcon color="var(--color-text-primary)" className="h-4 w-[87px]" />
   </span>
 );
 

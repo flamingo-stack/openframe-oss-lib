@@ -2,6 +2,7 @@
 
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
+import { AgentMark } from '../agent-mark';
 import {
   AlertCircleIcon,
   Arrow02LeftIcon,
@@ -18,7 +19,7 @@ import {
   UserIcon,
   UsersIcon,
 } from '../icons-v2-generated';
-import { MingoIcon } from '../icons/mingo-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
@@ -209,7 +210,7 @@ export function MingoChatRail({
     );
   } else if (isLoadingHistory) {
     list = Array.from({ length: 6 }, (_, i) => (
-      <div key={i} className="h-10 shrink-0 animate-pulse rounded-md bg-ods-skeleton" aria-hidden />
+      <UnifiedSkeleton key={i} aria-hidden className="h-10 shrink-0 rounded-md" />
     ));
   } else if (dialogs.length === 0 && !draftTitle) {
     list = hasSearch ? (
@@ -256,13 +257,7 @@ export function MingoChatRail({
       aria-label="Mingo chats"
       logo={
         <div className="flex flex-1 items-center justify-between">
-          <MingoIcon
-            color="currentColor"
-            eyesColor="var(--ods-flamingo-cyan-base)"
-            cornerColor="var(--ods-flamingo-cyan-base)"
-            className="size-6 text-ods-text-primary"
-            aria-hidden
-          />
+          <AgentMark agent="mingo" className="size-6 text-ods-text-primary" />
           {onExpand && (
             <Button
               variant="transparent"

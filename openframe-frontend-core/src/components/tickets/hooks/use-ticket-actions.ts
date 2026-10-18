@@ -33,6 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { randomId } from '../../../utils/random-id';
 import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown';
 import { useOptionalTicketLive } from '../ticket-live-provider';
 import {
@@ -360,7 +361,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       const submitToken: object = {};
       formInFlightRef.current = submitToken;
       setIsSubmittingForm(true);
-      const placeholderId = `temp-${cryptoRandomId()}`;
+      const placeholderId = `temp-${randomId()}`;
       const placeholder: OptimisticTicket = {
         id: placeholderId,
         external_id: 'Pending sync…',
@@ -711,15 +712,6 @@ export function mapTicketActionError(err: unknown): MappedTicketActionError {
     supportSystemDown: false,
     removeRowFromCache: false,
   };
-}
-
-/** Small id generator that doesn't require pulling in nanoid as a new
- *  dep. Sufficient for client-only optimistic ids. */
-function cryptoRandomId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 /** True iff any ['tickets', …] cache slot contains a ticket whose

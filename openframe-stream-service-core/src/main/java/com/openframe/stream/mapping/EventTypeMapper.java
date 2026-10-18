@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 public class EventTypeMapper {
@@ -30,10 +31,27 @@ public class EventTypeMapper {
         return unifiedType;
     }
 
+    public static UnifiedEventType mapToUnifiedType(IntegratedToolType toolType, String sourceEventType, Integer messageId) {
+        return Optional.ofNullable(messageId)
+                .map(id -> messageKey(toolType, sourceEventType, id))
+                .map(mappings::get)
+                .orElseGet(() -> mapToUnifiedType(toolType, sourceEventType));
+    }
+
     private static void registerMapping(IntegratedToolType toolName, String sourceEventType, UnifiedEventType unifiedType) {
         String key = toolName.getDbName() + ":" + sourceEventType;
         mappings.put(key, unifiedType);
         log.info("Registered mapping: {}:{} -> {}", toolName.getDbName(), sourceEventType, unifiedType);
+    }
+
+    private static void registerMapping(IntegratedToolType toolName, String sourceEventType, int messageId, UnifiedEventType unifiedType) {
+        String key = messageKey(toolName, sourceEventType, messageId);
+        mappings.put(key, unifiedType);
+        log.info("Registered mapping: {}:{}#{} -> {}", toolName.getDbName(), sourceEventType, messageId, unifiedType);
+    }
+
+    private static String messageKey(IntegratedToolType toolType, String sourceEventType, int messageId) {
+        return toolType.getDbName() + ":" + sourceEventType + "#" + messageId;
     }
 
     private static void initializeDefaultMappings() {
@@ -72,6 +90,10 @@ public class EventTypeMapper {
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_AMT_ACTIVATE, UnifiedEventType.DEVICE_OOB_ACTIVATION_REQUESTED);
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_DIAGNOSTIC, UnifiedEventType.DEVICE_DIAGNOSTIC);
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_AGENT_LOG, UnifiedEventType.FILE_OPERATION);
+        registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_AGENT_LOG,
+                SourceEventTypes.MeshCentral.AGENT_LOG_CLIPBOARD_GET, UnifiedEventType.REMOTE_CLIPBOARD_COPIED);
+        registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_AGENT_LOG,
+                SourceEventTypes.MeshCentral.AGENT_LOG_CLIPBOARD_SET, UnifiedEventType.REMOTE_CLIPBOARD_PASTED);
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_BATCH_UPLOAD, UnifiedEventType.FILE_BATCH_UPLOAD);
         registerMapping(IntegratedToolType.MESHCENTRAL, SourceEventTypes.MeshCentral.NODE_SESSION_COMPRESSION, UnifiedEventType.REMOTE_SESSION_STATS_UPDATED);
 

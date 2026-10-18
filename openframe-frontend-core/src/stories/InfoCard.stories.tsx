@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { InfoCard } from '../components';
-import { FlamingoLogo } from '../components/icons';
+import { FlamingoMarkIcon } from '../components/icons-v2-generated/logos/flamingo-mark-icon';
 import { ShieldCheckIcon } from '../components/icons-v2-generated/security';
 
 const meta = {
@@ -91,7 +91,7 @@ export const WithCopyableValues: Story = {
       footer: {
         icon: <ShieldCheckIcon size={24} className="text-ods-success" />,
         text: 'Signed by Flamingo',
-        logo: <FlamingoLogo width={24} height={24} />,
+        logo: <FlamingoMarkIcon color="var(--ods-flamingo-pink-base)" size={24} />,
         link: { href: 'https://github.com/flamingo-ai/fleetdm' },
       },
     },
@@ -138,7 +138,7 @@ export const WithFooter: Story = {
       footer: {
         icon: <ShieldCheckIcon size={24} className="text-ods-success" />,
         text: 'Signed by Flamingo',
-        logo: <FlamingoLogo width={24} height={24} />,
+        logo: <FlamingoMarkIcon color="var(--ods-flamingo-pink-base)" size={24} />,
         link: { href: 'https://github.com/flamingo-ai/fleetdm' },
       },
     },
@@ -161,7 +161,7 @@ export const WithFooterWithoutLink: Story = {
       footer: {
         icon: <ShieldCheckIcon size={24} className="text-ods-success" />,
         text: 'Signed by Flamingo',
-        logo: <FlamingoLogo width={24} height={24} />,
+        logo: <FlamingoMarkIcon color="var(--ods-flamingo-pink-base)" size={24} />,
       },
     },
   },

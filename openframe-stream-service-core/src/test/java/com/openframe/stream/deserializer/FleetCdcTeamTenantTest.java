@@ -1,7 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.stream.service.ClusterTenantIdResolver;
 import com.openframe.stream.service.FleetMdmCacheService;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.when;
  */
 class FleetCdcTeamTenantTest {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
 
     private ObjectNode after() {
         return mapper.createObjectNode();

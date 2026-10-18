@@ -1,14 +1,16 @@
 import { useMemo } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AnnouncementBar } from '@flamingo-stack/openframe-frontend-core/components'
+import { AnnouncementBar, useLegalDocuments } from '@flamingo-stack/openframe-frontend-core/components'
 import {
   SiteHeader,
   TicketAlertsButton,
   type SiteNav,
 } from '@flamingo-stack/openframe-frontend-core/components/navigation'
 import { AskAi } from './ask-ai'
+import { useAssistantIdentity } from '../providers/assistant-identity'
 import { WalkthroughVideo } from './walkthrough-video'
 import { DOCS_BASE_ROUTE } from '../config/content'
+import { EP } from '../config/endpoints'
 
 const NAV = [
   // No "Home" item — the header wordmark links home.
@@ -20,7 +22,7 @@ const NAV = [
   { to: '/authors', label: 'Authors' },
   { to: '/faqs', label: 'FAQ' },
   { to: '/trust-center', label: 'Trust' },
-  { to: '/legal/privacy', label: 'Legal' },
+  { to: '/download', label: 'Download' },
   { to: '/contact', label: 'Contact' },
   { to: '/schedule-a-call', label: 'Schedule' },
   { to: '/tickets', label: 'Tickets' },
@@ -29,23 +31,36 @@ const NAV = [
 
 // The site navigation model: plain data, the same shape every hub platform
 // hands the shared `SiteHeader`. Each entry is a plain link (no panels), and
-// `match` marks the current section.
-const SITE_NAV: SiteNav = {
-  menus: NAV.map((n) => ({
-    id: n.to,
-    label: n.label,
-    href: n.to,
-    match: [n.to],
-  })),
-  footerColumns: [],
-  primaryCta: 'none',
-  legal: { company: 'OpenFrame', notes: [], links: [] },
-  brand: { name: 'OpenFrame', tagline: '', social: [] },
+// `match` marks the current section. The legal documents follow, one link
+// each, from the hub's list: the host names none of them.
+function siteNav(legal: ReadonlyArray<{ docType: string; title: string }>): SiteNav {
+  const links = [...NAV, ...legal.map((doc) => ({ to: `/legal/${doc.docType}`, label: doc.title }))]
+  return {
+    menus: links.map((n) => ({
+      id: n.to,
+      label: n.label,
+      href: n.to,
+      match: [n.to],
+    })),
+    footerColumns: [],
+    primaryCta: 'none',
+    legal: { company: 'OpenFrame', notes: [], links: [] },
+    brand: { name: 'OpenFrame', tagline: '', social: [] },
+  }
 }
 
 export function AppShell() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
+  // The launcher shows the SERVER's identity (name and glyph), the same one the
+  // FAQ's ask card uses; with none configured, the lib's own defaults.
+  const assistant = useAssistantIdentity()
+  const { documents: legalDocuments } = useLegalDocuments({ apiEndpoint: EP.legalDocuments })
+  const nav = useMemo(() => siteNav(legalDocuments), [legalDocuments])
+  const mingo = useMemo(
+    () => ({ label: assistant.name ?? undefined, icon: assistant.icon }),
+    [assistant.name, assistant.icon],
+  )
 
   // The SHARED lib header, the same `SiteHeader` every hub platform mounts,
   // proving it embeds cleanly too. Its links soft-navigate because
@@ -78,13 +93,13 @@ export function AppShell() {
           server-side and pass `initialAnnouncement`. */}
       <AnnouncementBar />
       <SiteHeader
-        nav={SITE_NAV}
+        nav={nav}
         pathname={pathname}
         logo={<span className="font-semibold text-ods-text-primary">OpenFrame</span>}
         logoHref="/"
         // Mingo launcher in the header: THE chat entry (dispatches
         // `ask-ai:open`; the always-mounted panel in <AskAi /> listens).
-        mingo={{}}
+        mingo={mingo}
         sideActions={sideActions}
       />
       {/* No container constraint here — each route's lib component manages its

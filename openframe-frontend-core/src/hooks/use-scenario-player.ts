@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAutoplay } from './ui/use-autoplay';
+import { useCallback, useState } from 'react';
+import { type AutoplayHoldProps, useAutoplay } from './ui/use-autoplay';
+import { useResumableTimeout } from './ui/use-resumable-timeout';
 
 /**
  * How soon the first step follows the moment the demo becomes playable (it
- * scrolled into view, the tab came back, play was pressed). A demo that sits
+ * scrolled into view, the tab came back, the visitor let go of it). A demo that sits
  * still for a whole step after it appears reads as broken; one that moves
  * within a third of a second reads as responding to you.
  */
@@ -32,6 +33,14 @@ export interface UseScenarioPlayerOptions {
    * never gets to play (it is never scrolled into view) still reads complete.
    */
   startAtEnd?: boolean;
+  /**
+   * Whether step 0 of every scenario is an EMPTY stage, to be left at once
+   * (default true: a stage that sits empty for a whole step after a tap reads
+   * as not responding). False when step 0 already shows something to read:
+   * every step then lasts a whole `stepMs`, however the scenario was started
+   * (a page load, the rotation and a chosen tab all pace it the same).
+   */
+  emptyFirstStep?: boolean;
 }
 
 export interface UseScenarioPlayerResult {
@@ -39,9 +48,16 @@ export interface UseScenarioPlayerResult {
   scenario: number;
   /** Current step, 0..lastStep. */
   step: number;
-  /** The visitor stopped it with the pause control. */
-  paused: boolean;
-  setPaused: (paused: boolean) => void;
+  /**
+   * False until it has been playable once (it has not been on screen yet).
+   * A progress line reads 0 until then, so it starts from empty when the
+   * visitor first reaches it, never part-way through a step nobody saw begin.
+   */
+  started: boolean;
+  /** The visitor is holding it still (pressing on it, or the keyboard is inside it). */
+  held: boolean;
+  /** Spread on the stage's outer element: how a visitor stops it (`useAutoplay`). */
+  holdProps: AutoplayHoldProps;
   /** Jump to a step in the current scenario (a visitor's tap, a stepper button). */
   setStep: (step: number) => void;
   /** Switch scenario and restart it from step 0. */
@@ -60,14 +76,16 @@ export interface UseScenarioPlayerResult {
  * line and the stage itself agree by construction.
  *
  * WHEN IT MOVES is `useAutoplay`'s rule: on screen (`enabled`), tab visible,
- * not paused, motion allowed. Under reduced motion it parks on the last step
+ * not held by the visitor, motion allowed. Under reduced motion it parks on the last step
  * of the current scenario, and every scenario can still be read by choosing it.
  *
- * The moment it becomes playable its first step follows within `START_MS`,
- * not a whole step later; from there every step takes `stepMs`.
+ * A step is `stepMs` of time spent playing: an interruption pauses it and it
+ * resumes with what was left (`useResumableTimeout`, the one clock every timed
+ * thing here runs on). At the top of a scenario whose first step is the empty
+ * stage, that step is left within `START_MS`.
  *
- * A visitor's own choice (`go`, `setStep`) moves the clock there and un-pauses
- * it; the rotation carries on from that point.
+ * A visitor's own choice (`go`, `setStep`) moves the clock there and lets go of
+ * any hold; the rotation carries on from that point.
  */
 export function useScenarioPlayer({
   scenarioCount,
@@ -77,9 +95,10 @@ export function useScenarioPlayer({
   enabled = true,
   initialScenario = 0,
   startAtEnd = false,
+  emptyFirstStep = true,
 }: UseScenarioPlayerOptions): UseScenarioPlayerResult {
   const auto = useAutoplay(enabled);
-  const { reducedMotion, paused, setPaused } = auto;
+  const { reducedMotion, held, holdProps, release } = auto;
 
   const [scenario, setScenario] = useState(initialScenario);
   const [rawStep, setRawStep] = useState(startAtEnd ? Number.MAX_SAFE_INTEGER : 0);
@@ -89,49 +108,50 @@ export function useScenarioPlayer({
   const step = reducedMotion ? lastStep : Math.min(rawStep, lastStep);
 
   const playing = auto.playing && scenarioCount > 0;
+  // Latched the first time it may play (state derived during render).
+  const [started, setStarted] = useState(false);
+  if (playing && !started) setStarted(true);
 
-  // True from the moment it becomes playable until its first tick has been scheduled.
-  const starting = useRef(false);
-  const wasPlaying = useRef(false);
-  useEffect(() => {
-    if (playing && !wasPlaying.current) starting.current = true;
-    wasPlaying.current = playing;
-    if (!playing) return undefined;
-    const atEnd = rawStep >= lastStep;
-    // The first step after it becomes playable comes quickly. A finished
-    // scenario still holds its full time: it is there to be read.
-    const quickStart = starting.current && !atEnd;
-    starting.current = false;
-    const timer = setTimeout(
-      () => {
-        if (atEnd) {
-          setScenario(current => (current + 1) % scenarioCount);
-          setRawStep(0);
-        } else {
-          setRawStep(current => Math.min(current, lastStep) + 1);
-        }
-      },
-      atEnd ? holdMs : quickStart ? Math.min(START_MS, stepMs) : stepMs,
-    );
-    return () => clearTimeout(timer);
-  }, [playing, rawStep, lastStep, stepMs, holdMs, scenario, scenarioCount]);
+  // ONE clock for everything that waits and moves on (`useResumableTimeout`,
+  // the carousel's too): a step is `stepMs` of time spent PLAYING. Interrupted
+  // (off screen, held, another tab), it comes back with what was left of the
+  // step, never a whole new one and never a skipped one.
+  const atEnd = rawStep >= lastStep;
+  // Step 0 of a scenario whose first step is the empty stage is left at once:
+  // a stage that sits empty for a whole step after a tap reads as not
+  // responding. A finished scenario holds its full time: it is there to be read.
+  const leavesAtOnce = emptyFirstStep && rawStep === 0 && !atEnd;
+  useResumableTimeout({
+    running: playing,
+    durationMs: atEnd ? holdMs : leavesAtOnce ? Math.min(START_MS, stepMs) : stepMs,
+    resetKey: `${scenario}:${Math.min(rawStep, lastStep)}`,
+    onElapsed: () => {
+      if (atEnd) {
+        setScenario(current => (current + 1) % scenarioCount);
+        setRawStep(0);
+      } else {
+        setRawStep(current => Math.min(current, lastStep) + 1);
+      }
+    },
+  });
 
+  // A visitor's choice is an instruction to play from there: it lets go of any hold.
   const setStep = useCallback(
     (next: number) => {
       setRawStep(Math.max(0, Math.min(lastStep, next)));
-      setPaused(false);
+      release();
     },
-    [lastStep, setPaused],
+    [lastStep, release],
   );
 
   const go = useCallback(
     (next: number) => {
       setScenario(next);
       setRawStep(0);
-      setPaused(false);
+      release();
     },
-    [setPaused],
+    [release],
   );
 
-  return { scenario, step, paused, setPaused, setStep, go, reducedMotion };
+  return { scenario, step, started: started || reducedMotion, held, holdProps, setStep, go, reducedMotion };
 }

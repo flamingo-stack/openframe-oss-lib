@@ -152,9 +152,9 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
 
   if (href && target === '_blank') {
     return (
-      <a href={href} id={id} className={baseClass} target="_blank" rel="noopener noreferrer">
+      <Link href={href} id={id} className={baseClass} target="_blank" rel="noopener noreferrer">
         {inner}
-      </a>
+      </Link>
     );
   }
 

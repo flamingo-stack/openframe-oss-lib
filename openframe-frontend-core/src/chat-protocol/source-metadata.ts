@@ -1,8 +1,8 @@
 /**
  * Source-metadata payload → `{ sources, refs }`.
  *
- * ONE decoder for two arrival paths: the live `GUIDE`/`SOURCES` NATS chunk and
- * the persisted row of the same name in dialog history. That is the whole point
+ * ONE decoder for two arrival paths: the live `ATTACHMENTS` NATS chunk and the
+ * persisted row of the same name in dialog history. That is the whole point
  * of putting it here rather than in either consumer — a reloaded thread has to
  * render identically to the live turn, and two parsers is exactly how that stops
  * being true.
@@ -311,6 +311,29 @@ export function sourceMetadataEvent(payload: unknown): SourcesEvent | null {
     ...(decodedSources.length > 0 ? { sources: decodedSources } : {}),
     ...(refs.length > 0 ? { refs } : {}),
   };
+}
+
+/** `null` fields dropped, at any depth. */
+function withoutNulls(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutNulls);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, field]) => field !== null)
+      .map(([key, field]) => [key, withoutNulls(field)]),
+  );
+}
+
+/**
+ * Decode one typed `ATTACHMENTS` record — the live chunk or the persisted
+ * `AttachmentsData` row, which carry `sources` / `videos` / `cards` directly.
+ *
+ * GraphQL answers an unset field with `null` where the live chunk omits it, so
+ * nulls are read as absent: a reloaded source must not gain a
+ * `targetPlatform: null` ("no destination") the live one never carried.
+ */
+export function attachmentsEvent(record: unknown): SourcesEvent | null {
+  return sourceMetadataEvent(withoutNulls(record));
 }
 
 /** What one assistant answer carries: its citations and its expandable refs. */

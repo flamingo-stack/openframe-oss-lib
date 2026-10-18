@@ -44,9 +44,13 @@ vi.mock('use-stick-to-bottom', () => ({
 vi.mock('../chat-message-enhanced', async () => {
   const { forwardRef } = await import('react');
   return {
-    ChatMessageEnhanced: forwardRef<HTMLDivElement, { content: string }>(({ content }, ref) => (
-      <div ref={ref}>{content}</div>
-    )),
+    ChatMessageEnhanced: forwardRef<HTMLDivElement, { content: string; selfAuthorType?: string }>(
+      ({ content, selfAuthorType }, ref) => (
+        <div ref={ref} data-self-author-type={selfAuthorType}>
+          {content}
+        </div>
+      ),
+    ),
   };
 });
 
@@ -106,6 +110,14 @@ const msg = (id: string, role: Message['role']): Message => ({
   role,
   content: `body of ${id}`,
   timestamp: new Date(),
+});
+
+describe('ChatMessageList thread owner', () => {
+  it("hands every row the author type whose turns are the viewer's own", () => {
+    render(<ChatMessageList messages={[msg('m1', 'user'), msg('m2', 'assistant')]} selfAuthorType="user" />);
+    expect(screen.getByText('body of m1').getAttribute('data-self-author-type')).toBe('user');
+    expect(screen.getByText('body of m2').getAttribute('data-self-author-type')).toBe('user');
+  });
 });
 
 describe('ChatMessageList force-scroll decisions', () => {

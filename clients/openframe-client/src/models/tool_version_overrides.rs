@@ -2,7 +2,7 @@
 pub fn lookup(tool_key: &str) -> Option<&'static str> {
     match tool_key {
         #[cfg(feature = "openframe-chat-version")]
-        "openframe-chat" => Some(env!("OPENFRAME_CHAT_VERSION")),
+        crate::models::CHAT_TOOL_AGENT_ID => Some(env!("OPENFRAME_CHAT_VERSION")),
 
         #[cfg(feature = "meshcentral-agent-version")]
         "meshcentral-server" => Some(env!("MESHCENTRAL_AGENT_VERSION")),

@@ -1,6 +1,7 @@
 package com.openframe.kafka.producer.retry;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class KafkaRecoveryHandlerImpl implements KafkaRecoveryHandler {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
 
     @Override
     public void enqueue(Throwable ex, String topic, String key, Object payload) {

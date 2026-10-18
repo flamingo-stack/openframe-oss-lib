@@ -59,6 +59,32 @@
   src: url('./fonts/dm-sans-latin-700-normal.woff2') format('woff2');
 }
 
+/* Metric-matched fallbacks: what is drawn until the two files above arrive
+   (`font-display: swap`). A system font scaled to the web font's advance width
+   and line box, so the text keeps its line breaks and height when the swap
+   happens and nothing below it moves (layout shift). The figures are measured
+   from the files in ./fonts: Azeret Mono's advance is 0.65em against 0.60em
+   for the system monospaces, DM Sans averages 6% wider than Arial. The
+   overrides are the web font's own ascent and descent divided by the scale. */
+@font-face {
+  font-family: 'Azeret Mono Fallback';
+  src:
+    local('Menlo'), local('Monaco'), local('Courier New'), local('Liberation Mono'), local('DejaVu Sans Mono'),
+    local('Roboto Mono'), local('Droid Sans Mono');
+  size-adjust: 108.33%;
+  ascent-override: 86.5%;
+  descent-override: 21.2%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'DM Sans Fallback';
+  src: local('Arial'), local('Helvetica'), local('Liberation Sans'), local('Roboto');
+  size-adjust: 106%;
+  ascent-override: 93.6%;
+  descent-override: 29.2%;
+  line-gap-override: 0%;
+}
+
 :root {
   --font-azeret-mono: 'Azeret Mono';
   --font-dm-sans: 'DM Sans';

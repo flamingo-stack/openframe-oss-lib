@@ -24,10 +24,13 @@
  *     icon registry, chip-styles, click-utils, etc.) re-resolved against
  *     the equivalent lib modules.
  *
- * Public surface — `<EmbeddableChat />` taking the same prop bundle the hub
+ * Surface — `<EmbeddableChat />` taking the same prop bundle the hub
  * shell passes (minus `requireAuth`, which the hub's wrapper handles), plus
  * an optional `extras` opt-in for the chat-card dispatch helpers that need
  * host-supplied builders (program configs, product-release prop builder).
+ *
+ * Hosts mount it through the chat barrel, which loads this module on its own,
+ * after the page's code.
  */
 
 import * as DialogPrimitive from '@radix-ui/react-dialog';
@@ -39,12 +42,13 @@ import { MessageSquare } from 'lucide-react';
 import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { chatProgressLabel } from '../../chat-protocol/progress';
 import { useRequiredChatRuntime } from '../../contexts/chat-runtime-context';
+import Link from '../../embed-shims/next-link';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
+import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
-import { MingoIcon } from '../icons';
 import {
   Arrow02RightIcon,
   Arrow02LeftIcon,
@@ -55,7 +59,7 @@ import {
 } from '../icons-v2-generated';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ActionsMenuDropdown } from '../ui/actions-menu';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
@@ -66,6 +70,7 @@ import { ChatArchivePage } from './chat-archive-page';
 import { ChatAttachmentChipStrip } from './chat-attachment-bar';
 import { ChatComposer, type ChatComposerLock } from './chat-composer';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
+import { CHAT_BLOCK_MIN_WIDTH, MINGO_V2_RAIL_WIDTH } from './chat-dimensions';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
@@ -86,6 +91,7 @@ import { useEmptyStateConfig } from './hooks/use-empty-state-config';
 import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
 import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
+import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader } from './mingo-chat-header';
 import { ChatDialogModals } from './mingo-chat-modals';
@@ -97,7 +103,7 @@ import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
-import { CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
+import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
 import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
 import type { MessageSegment, Message } from './types/message.types';
@@ -106,6 +112,7 @@ import type {
   UnifiedChatState,
   UnifiedSendMessageOptions,
 } from './types/unified-chat-state.types';
+import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, chatListensForAskAiOpens } from './utils/ask-ai-events';
 import { formatChatAttachmentMarkdownForBubble } from './utils/chat-attachment-markdown';
 import { resolveHrefForRuntime } from './utils/chat-nav-resolution';
 import { chatChipClass } from './utils/chip-styles';
@@ -128,11 +135,6 @@ import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row
  * self-contained — the host wires nothing.
  */
 const HISTORY_RAIL_WIDTH = 320;
-/** The v2 chat list (`MingoChatRail`, Figma `chat-sidebar`): the narrowest the v2 chat draws. */
-export const MINGO_V2_RAIL_WIDTH = 296;
-const CHAT_BLOCK_MIN_WIDTH = 400;
-/** Mingo v2: the list and the chat side by side at their narrowest. */
-export const MINGO_V2_SPLIT_WIDTH = MINGO_V2_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 const SPLIT_MIN_WIDTH = HISTORY_RAIL_WIDTH + CHAT_BLOCK_MIN_WIDTH;
 
 // Desktop drawer is this fraction of the viewport width (clamped to the
@@ -480,6 +482,40 @@ export interface EmbeddableChatProps {
     items: ChatContextItem[];
     onRemove?: (item: ChatContextItem) => void;
   };
+  /**
+   * Host content pinned between the thread and the composer: the thread
+   * scrolls above it, the composer stays below, and it keeps its place while
+   * the thread grows (e.g. a guided tour the host attaches to one
+   * conversation, deciding by `mingoState.activeDialogId`). Rendered wherever
+   * the composer is - a conversation or the new-chat surface - and never on
+   * the chat list. Sized by its content: a tall block is the host's to cap or
+   * scroll. `null`/unset leaves the layout as it was.
+   */
+  aboveComposer?: React.ReactNode;
+  /**
+   * v2: what the list's "What to ask Mingo?" opens. Default: a new chat, the
+   * same as "Start New Chat"; a host with its own suggestions surface (a
+   * guided tour in a conversation of its own) points it there instead.
+   */
+  onWhatToAsk?: () => void;
+  /**
+   * v2: the "What to ask?" exchange the list's entry shows (when no
+   * `onWhatToAsk` takes it over): added at the end of the open conversation,
+   * or a new chat opens with it. Local - never sent, never stored. Picking a
+   * chip sends its prompt in that chat, like a quick action.
+   *
+   * A function is called on each click and the exchange appears, whole, once
+   * its promise settles (prompts built from live data, e.g. the workspace's
+   * devices); clicks while one is pending are ignored. It should not reject:
+   * a rejection is logged and shows nothing.
+   */
+  whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
+  /**
+   * v2: items in the chat's ⋯ menu after its own, past a separator - actions
+   * that are not about the chat (e.g. the host's onboarding reset). Shown in
+   * every chat that is not archived, a new one included.
+   */
+  chatMenuExtraItems?: ActionsMenuItem[];
 }
 
 // =============================================================================
@@ -833,14 +869,14 @@ function SourceChip({
     const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
     const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
     return wrapChip(
-      <a
+      <Link
         href={resolvedHref}
         {...newTabAnchorAttrs(isNewTab)}
         onClick={buildClickHandler(resolvedHref, null, cta.targetPlatform ?? null, isNewTab)}
         className={chipClass}
       >
         {chipBody(src.name)}
-      </a>,
+      </Link>,
     );
   }
 
@@ -849,7 +885,7 @@ function SourceChip({
     const resolvedHref = resolveHrefForRuntime(cta.href, runtime);
     const isNewTab = decideTab(resolvedHref, cta.targetPlatform ?? null);
     return wrapChip(
-      <a
+      <Link
         href={resolvedHref}
         {...newTabAnchorAttrs(isNewTab)}
         onClick={buildClickHandler(resolvedHref, src.path, cta.targetPlatform ?? null, isNewTab)}
@@ -857,7 +893,7 @@ function SourceChip({
         title={displayName}
       >
         {chipBody(displayName)}
-      </a>,
+      </Link>,
     );
   }
 
@@ -1044,6 +1080,10 @@ function EmbeddableChatInner({
   guidePendingPrompt,
   onGuidePromptConsumed,
   contextMemory,
+  aboveComposer,
+  onWhatToAsk,
+  whatToAsk: whatToAskContent,
+  chatMenuExtraItems,
   handleRef,
 }: EmbeddableChatProps & { handleRef?: React.Ref<EmbeddableChatHandle> }) {
   // `shell` 'none' / 'inline' means the consumer hosts us inside their own panel
@@ -1606,8 +1646,14 @@ function EmbeddableChatInner({
   // saved scroll position over the freshly-loaded destination page.
   // Source chips already route through `handleNavigationClose`; inline
   // cards now match. New-tab clicks never invoke `closeChat`.
+  // `sendPrompt` goes through a ref: what it sends with is declared further
+  // down (`sendPromptRef.current` is set next to `handleSend`).
+  const sendPromptRef = useRef<(text: string) => void>(() => {});
   const chatPanelHandle = useMemo<ChatPanelHandle>(
-    () => ({ closeChat: handleNavigationClose }),
+    () => ({
+      closeChat: handleNavigationClose,
+      sendPrompt: (text: string) => sendPromptRef.current(text),
+    }),
     [handleNavigationClose],
   );
 
@@ -1639,14 +1685,14 @@ function EmbeddableChatInner({
   // bubbles — and re-mounting their inline cards — on every realtime chunk).
   // The Mingo avatar comes from the resolved agent CONFIG icon when one is
   // available (same server-driven path as every other identity glyph, via
-  // `<EntityIcon>`) — falling back to the built-in `MingoIcon` when no config is
+  // `<EntityIcon>`) — falling back to the Mingo agent's identity mark when no config is
   // in play (host mode with no `activeAgentSlug`).
   const mingoAssistantIcon = useMemo(
     () =>
       effectiveAssistantIcon ? (
         <EntityIcon icon={effectiveAssistantIcon} size={24} />
       ) : (
-        <MingoIcon className="h-6 w-6" cornerColor="var(--ods-flamingo-cyan-base)" />
+        <AgentMark agent="mingo" className="h-6 w-6" />
       ),
     [effectiveAssistantIcon],
   );
@@ -1692,18 +1738,37 @@ function EmbeddableChatInner({
 
   // Map the host's rows → the lib's Message type. The mapping itself lives in
   // `mapHostMessage`, which is where its pass-through list is pinned by tests.
-  const messages: Message[] = useMemo(() => {
+  const hostMessages: Message[] = useMemo(() => {
     const options = { userName: guideUserName, userAvatar: guideUserAvatar, timestampCache };
     const mapped = rawMessages.map(m => mapHostMessage(m, options));
     pruneTimestampCache(timestampCache, new Set(rawMessages.map(m => m.id)));
     return mapped;
   }, [rawMessages, guideUserName, guideUserAvatar, timestampCache]);
 
+  // "What to ask?" exchanges (`whatToAsk`) are the panel's own, shown in the
+  // thread beside the host's messages; a new chat holding one reads as a
+  // conversation until it is sent or left.
+  const whatToAsk = useWhatToAsk({
+    dialogId: activeDialogId,
+    content: typeof whatToAskContent === 'function' ? undefined : whatToAskContent,
+    user: {
+      name: headerUserName ?? 'You',
+      avatar: identityUser?.avatarUrl?.trim() || userAvatarUrl?.trim() || null,
+      authorType: AUTHOR_TYPE.ADMIN,
+    },
+    assistant: { name: 'Mingo', assistantType: 'mingo' },
+  });
+  const noteWhatToAskSend = whatToAsk.noteSend;
+  const messages = whatToAsk.withExchanges(hostMessages);
+  // A new chat whose only messages are those exchanges: no dialog yet.
+  const isWhatToAskDraft = activeDialogId == null && hostMessages.length === 0 && messages.length > 0;
+
   const handleSend = useCallback(
     (text: string) => {
       // Locked: the disabled editor cannot submit, but a queued Enter or a
       // stale ref call still lands here — refused at the seam, not by luck.
       if (composerLock) return;
+      noteWhatToAskSend();
       // Append chat-attachment markdown lines to the user's bubble.
       let augmentedText = text;
       if (readyAttachments.length > 0) {
@@ -1731,7 +1796,7 @@ function EmbeddableChatInner({
         setContextItems([]);
       }
     },
-    [composerLock, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
+    [composerLock, noteWhatToAskSend, sendMessage, readyAttachments, viewUrlPrefix, clearAttachments, contextItems],
   );
 
   /**
@@ -1852,8 +1917,8 @@ function EmbeddableChatInner({
       setIsOpen(true);
       setTimeout(() => askAbout(detail.ref as ChatRef), 0);
     };
-    window.addEventListener('ask-ai:open-with-ref', handler);
-    return () => window.removeEventListener('ask-ai:open-with-ref', handler);
+    window.addEventListener(ASK_AI_OPEN_WITH_REF_EVENT, handler);
+    return () => window.removeEventListener(ASK_AI_OPEN_WITH_REF_EVENT, handler);
   }, [source, askAbout, setIsOpen]);
 
   // Listen for plain "open chat" events (no row context). Fired by the
@@ -1899,9 +1964,12 @@ function EmbeddableChatInner({
       const prompt = typeof detail.prompt === 'string' ? detail.prompt.trim() : '';
       if (prompt) setTimeout(() => sendAskPrompt(prompt), 0);
     };
-    window.addEventListener('ask-ai:open', handler);
-    return () => window.removeEventListener('ask-ai:open', handler);
+    window.addEventListener(ASK_AI_OPEN_EVENT, handler);
+    return () => window.removeEventListener(ASK_AI_OPEN_EVENT, handler);
   }, [source, setIsOpen, sendAskPrompt]);
+  // Declared after both open listeners, so it runs once they are attached: an
+  // open sent while this chat's code was still loading reaches it now.
+  useEffect(() => chatListensForAskAiOpens(), []);
 
   const hasMessages = messages.length > 0;
   // First dialog page in flight and nothing cached yet — we don't yet know if
@@ -2191,7 +2259,14 @@ function EmbeddableChatInner({
       ? freshConversationTitle
       : 'Current Chats';
   const headerBackAriaLabel = hasConversation ? (isViewingArchived ? 'Back to archive' : 'Back') : 'Back to Mingo';
-  const headerOnBack = hasConversation ? handleBack : () => handleActiveModeChange('mingo');
+  const clearWhatToAskDraft = whatToAsk.clearDraft;
+  const headerOnBack = hasConversation
+    ? () => {
+        // Leaving a new chat that only holds "What to ask?" exchanges drops them.
+        if (activeDialogId == null) clearWhatToAskDraft();
+        handleBack();
+      }
+    : () => handleActiveModeChange('mingo');
   const headerOnRestore =
     isViewingArchived && unarchiveDialog && activeDialog ? () => setRestoreTarget(activeDialog) : undefined;
   const headerOnRename =
@@ -2225,8 +2300,77 @@ function EmbeddableChatInner({
   // dedicated reset (not `handleBack`, which would reopen the archive when the
   // open conversation is archived) so it always lands on a fresh chat.
   const handleNewChat = useCallback(() => {
+    clearWhatToAskDraft();
     resetToNewChat();
-  }, [resetToNewChat]);
+  }, [clearWhatToAskDraft, resetToNewChat]);
+
+  // The open chat cannot take a message now: the composer is locked, a turn is
+  // running, or it waits on an approval / escalation nobody has answered.
+  const activeDialogStatus = activeDialog && dialogStatusOf ? dialogStatusOf(activeDialog) : undefined;
+  const isChatBlocked =
+    !!composerLock ||
+    chatLoading ||
+    activeDialogStatus === 'working' ||
+    activeDialogStatus === 'approval' ||
+    (pendingApprovals?.length ?? 0) > 0 ||
+    awaitsDecision(hostMessages);
+
+  // "What to ask Mingo?" with `whatToAsk`: the exchange goes at the end of the
+  // open conversation when it can go on right now. Otherwise (none open, an
+  // archived one, one still loading or blocked as above) a new chat opens with
+  // it: adding prompts under a pending approval or a running turn would mix
+  // two conversations. A new chat with nothing sent yet gets another exchange.
+  // `newChat`: asked from a screen with no chat open (the archive list), where
+  // the conversation open before it is not the one the user is looking at.
+  const showWhatToAsk = (content: WhatToAskContent, newChat = false) => {
+    if (!newChat && activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
+      whatToAsk.ask('current', content);
+      return;
+    }
+    const isUnsentNewChat = activeDialogId == null && hostMessages.length === 0 && !isViewingArchived;
+    if (!isUnsentNewChat) {
+      whatToAsk.clearDraft();
+      resetToNewChat();
+    }
+    setComposeOpen(true);
+    whatToAsk.ask('draft', content);
+  };
+
+  // A "What to ask?" chip: its prompt goes out on its own, like a quick action
+  // (whatever is staged in the composer stays staged), into the chat the chip
+  // sits in - not while that chat is blocked. From a new chat that send
+  // creates the dialog the exchange moves to.
+  useEffect(() => {
+    sendPromptRef.current = text => {
+      if (isChatBlocked) return;
+      noteWhatToAskSend();
+      void sendMessage(text).catch((err: unknown) => {
+        console.error('[EmbeddableChat] sendPrompt failed:', err);
+      });
+    };
+  });
+  // An async `whatToAsk` settles renders later: by then the panel may be in
+  // another state, so it is shown through the latest `showWhatToAsk`.
+  const showWhatToAskRef = useRef(showWhatToAsk);
+  useEffect(() => {
+    showWhatToAskRef.current = showWhatToAsk;
+  });
+  const whatToAskPendingRef = useRef(false);
+  const requestWhatToAsk = (newChat: boolean) => {
+    if (!whatToAskContent) return;
+    if (typeof whatToAskContent !== 'function') {
+      showWhatToAsk(whatToAskContent, newChat);
+      return;
+    }
+    if (whatToAskPendingRef.current) return;
+    whatToAskPendingRef.current = true;
+    whatToAskContent()
+      .then(content => showWhatToAskRef.current(content, newChat))
+      .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
+      .finally(() => {
+        whatToAskPendingRef.current = false;
+      });
+  };
 
   // "Ask Mingo" from an archived chat: the conversation is read-only (the
   // backend refuses writes), so the question starts a new chat instead. It is
@@ -2386,15 +2530,24 @@ function EmbeddableChatInner({
     };
   const mingoRailProps = {
     dialogs,
-    activeDialogId: activeDialogId ?? undefined,
+    // The archive takes the chat column: the open chat stays selected (closing
+    // the archive returns to it) but is not what the list marks as on screen.
+    activeDialogId: archiveOpen ? undefined : (activeDialogId ?? undefined),
     // Beside a new chat (wide only: narrow, the list is its own screen).
-    draftTitle: wideMingo && !hasConversation && !archiveOpen ? freshConversationTitle : undefined,
+    // A new chat holding only "What to ask?" exchanges is still that new chat.
+    draftTitle:
+      wideMingo && (!hasConversation || isWhatToAskDraft) && !archiveOpen ? freshConversationTitle : undefined,
     onSelectDialog: (id: string) => leaveArchiveThen(() => handleSelectDialog(id))(),
     onNewChat: leaveArchiveThen(handleNewChat),
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
-    // The suggestions a new chat opens on.
-    onWhatToAsk: leaveArchiveThen(handleNewChat),
+    // The suggestions a new chat opens on, unless the host has a surface of its own.
+    // From the archive list no chat is on screen, even though the one open
+    // before it is still the active dialog: that click opens a new chat.
+    onWhatToAsk: () => {
+      const fromArchive = archiveOpen;
+      leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? () => requestWhatToAsk(fromArchive) : handleNewChat))();
+    },
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,
@@ -2419,15 +2572,18 @@ function EmbeddableChatInner({
     isV2 && !stackedListView ? (
       <div className="col-start-2 row-start-1 min-w-0">
         <MingoChatHeader
-          title={headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
-          subtitle={headerPersonName}
-          avatar={headerAvatar}
+          // Over the archive the header is the archive's: the chat still open
+          // underneath is not on screen, so neither its name nor its actions are.
+          title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
+          subtitle={archiveOpen ? undefined : headerPersonName}
+          avatar={archiveOpen ? undefined : headerAvatar}
           // Wide: shows / hides the list beside the chat. Narrow: back to the
           // list, the only one of the two that fits.
           onToggleList={wideMingo ? toggleRailCollapsed : headerShowBack ? headerOnBack : () => setComposeOpen(false)}
           listOpen={splitActive}
-          menuItems={headerShowBack && !isViewingArchived ? splitHeaderMenuItems : []}
-          onRestore={isViewingArchived ? headerOnRestore : undefined}
+          menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? splitHeaderMenuItems : []}
+          extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
+          onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
           // Only while the list and the chat both fit: narrow, the toggle is
           // already the way back to the list.
           onCollapse={
@@ -2983,6 +3139,15 @@ function EmbeddableChatInner({
                           </div>
                         </div>
 
+                        {/* Host block pinned above the composer (`aboveComposer`):
+                            the thread's own bottom padding separates them, the
+                            composer's horizontal inset is repeated so the two line up. */}
+                        {aboveComposer != null && aboveComposer !== false && (
+                          <div className="shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
+                            {aboveComposer}
+                          </div>
+                        )}
+
                         <ChatAttachmentChipStrip
                           attachments={stagedAttachments}
                           onRemove={removeAttachment}
@@ -3124,7 +3289,7 @@ function EmbeddableChatInner({
           <div className="absolute bottom-4 right-4 md:bottom-6 md:right-6">
             <Button
               onClick={handleOpen}
-              leftIcon={<MingoIcon className="h-5 w-5" color="currentColor" />}
+              leftIcon={<AgentMark agent="mingo" className="h-5 w-5" />}
               tabIndex={isOpen ? -1 : 0}
               className={`pointer-events-auto !w-auto shadow-lg ${isOpen ? '!pointer-events-none' : ''}`}
             >

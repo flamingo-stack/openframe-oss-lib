@@ -45,7 +45,6 @@ export * from './modal';
 export * from './modal-v2';
 export * from './modal-guarded-close';
 export * from './admin-form-drawer';
-export * from './playback-toggle';
 export * from './admin-form-modal';
 export * from './separator';
 export * from './sheet';
@@ -65,6 +64,7 @@ export * from './alert';
 export * from './badge';
 export * from './ai-generated-badge';
 export * from './fade-preview';
+export * from './layout-hold';
 export * from './progress';
 export * from './release-changelog-section';
 export * from './stacked-rows-panel';
@@ -73,10 +73,10 @@ export * from './status-badge';
 export * from './palette-badge';
 export * from './department-badge';
 export * from './store-badges';
+export * from './mobile-app-qr';
 export * from './status-indicator';
 export * from './toaster';
 // TODO: Add other UI components as they are moved to ui-kit
-export * from './skeleton';
 export * from './hover-dropdown';
 // Chat components
 export * from '../chat';
@@ -107,6 +107,7 @@ export * from './device-card';
 export * from './device-card-compact';
 export * from './entity-image';
 export * from './data-attribution';
+export * from './download-button';
 export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
@@ -202,6 +203,7 @@ export * from './tag-key-value-filter';
 
 // Markdown Editor (MDEditor-based)
 export * from './markdown-editor';
+export * from './markdown-link-command';
 
 // File Upload
 export * from './file-upload';
@@ -236,6 +238,13 @@ export { LazyMount, type LazyMountProps } from './lazy-mount';
 export * from './app-window-frame';
 export * from './product-screen-frame';
 export * from './phone-frame';
+export * from './notification-stack';
+export * from './numbered-step';
+export * from './strip-card';
+export * from './benefit-list';
+export * from './leader-row';
+export * from './device-wallpaper';
+export * from './analyzing-state';
 export * from './incident-feed';
 export * from './status-line';
 export * from './snap-carousel';
