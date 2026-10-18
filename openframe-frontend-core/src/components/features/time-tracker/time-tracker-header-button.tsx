@@ -11,6 +11,7 @@ import {
 } from '../../navigation/app-layout-context';
 import { HeaderButton } from '../../navigation/header-button';
 import { OVERLAY_BACKDROP_CLASS } from '../../ui/drawer';
+import { usePortalContainer } from '../../ui/portal-container';
 import { useOptionalTimeTracker } from './time-tracker-context';
 import { TimeTrackerPanel } from './time-tracker-panel';
 import { useTrackerClock } from './use-tracker-clock';
@@ -39,6 +40,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
     accumulatedMs: ctx?.accumulatedMs,
   });
   const layoutContainer = useAppLayoutDrawerContainer();
+  const portalContainer = usePortalContainer();
   const coordination = useAppLayoutDrawerCoordination();
 
   const isOpen = ctx?.isOpen ?? false;
@@ -129,7 +131,7 @@ export function TimeTrackerHeaderButton({ className, disabled }: TimeTrackerHead
           )}
         />
       </PopoverPrimitive.Portal>
-      <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Portal container={portalContainer ?? undefined}>
         <PopoverPrimitive.Content
           align="end"
           sideOffset={8}

@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
+import { DATA_SYNC_SOURCES, type DataSync, type DataSyncSource } from '../../types/data-sync';
 import { formatDate } from '../../utils/format';
+import { ClickupIcon } from '../icons-v2-generated/brand-logos/clickup-icon';
+import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
+import { HubspotIcon } from '../icons-v2-generated/brand-logos/hubspot-icon';
 import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 
 export interface DataAttributionProps {
@@ -60,4 +64,44 @@ export function DataAttributionSkeleton() {
       <TextSkeleton.Body className="w-52" />
     </div>
   );
+}
+
+/** The mark each sync source is drawn with (the app's standard brand marks); its name is `DATA_SYNC_SOURCES`'. */
+const DATA_SYNC_ICONS: Record<DataSyncSource, typeof ClickupIcon> = {
+  clickup: ClickupIcon,
+  hubspot: HubspotIcon,
+  github: GithubClassicIcon,
+};
+
+/**
+ * THE sync line of a shared page whose records an API reads from a mirror (the roadmap and the delivery board:
+ * ClickUp; the ticket center: HubSpot; the docs and the legal documents: GitHub). The page draws whatever `sync`
+ * its endpoint answers, so a host that states none shows no line. `loading` draws the line's skeleton, so the page
+ * does not move when it fills in. It sits on its own row, at the end; `inline` leaves it in the caller's row.
+ */
+export function DataSyncLine({
+  sync,
+  loading = false,
+  inline = false,
+  action,
+}: {
+  sync?: DataSync | null;
+  loading?: boolean;
+  inline?: boolean;
+  action?: ReactNode;
+}) {
+  if (!loading && !(sync && sync.source in DATA_SYNC_ICONS)) return null;
+  const Icon = sync ? DATA_SYNC_ICONS[sync.source] : null;
+  const line =
+    loading || !sync || !Icon ? (
+      <DataAttributionSkeleton />
+    ) : (
+      <DataAttribution
+        icon={<Icon size={16} />}
+        source={DATA_SYNC_SOURCES[sync.source]}
+        lastUpdated={sync.syncedAt}
+        action={action}
+      />
+    );
+  return inline ? line : <div className="flex w-full justify-end">{line}</div>;
 }

@@ -7,6 +7,7 @@ import { cn } from '../../utils/cn';
 import { CheckIcon, PlusIcon, SearchIcon, TrashIcon } from '../icons-v2-generated';
 import { Button } from './button';
 import { Input } from './input';
+import { usePortalContainer } from './portal-container';
 
 export interface TagSelectOption {
   id: string;
@@ -61,6 +62,7 @@ export function TagSelectDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const keyboardPadding = useKeyboardCollisionPadding();
+  const portalContainer = usePortalContainer();
 
   // Clear the query on close, while rendering rather than from an effect: the
   // popover closes and reopens without unmounting, so an effect left the
@@ -110,7 +112,7 @@ export function TagSelectDropdown({
           {triggerLabel}
         </Button>
       </PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Portal container={portalContainer ?? undefined}>
         <PopoverPrimitive.Content
           align={align}
           sideOffset={6}

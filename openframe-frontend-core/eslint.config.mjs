@@ -188,6 +188,9 @@ export default defineConfig([
       // is under test is its display mode — `contents` versus a positioned box —
       // which no `screen` query can reach, so the test walks up from the control.
       'src/components/ui/__tests__/field-wrapper-error-slot.test.tsx',
+      // Where a menu opened inside ModalV2 hangs: in the role-less `z-[1300]` layer,
+      // not under <body>. The test walks up from the dialog to reach that layer.
+      'src/components/ui/__tests__/modal-portal-host.test.tsx',
       // The store badges paint through <linearGradient>/<clipPath> elements addressed
       // by id, and the contract is that those ids are unique PER INSTANCE — two badge
       // rows on one page must not resolve each other's <defs>. A <defs> child has no
@@ -395,6 +398,16 @@ export default defineConfig([
     name: 'openframe-frontend-core/link-primitives',
     files: ['src/embed-shims/next-link.tsx', 'src/components/chat/nav-link-anchor-via-runtime.tsx'],
     rules: { 'flamingo/no-raw-anchor': 'off' },
+  },
+
+  {
+    // Popups portal into the active portal container, so a modal or panel that
+    // owns its overlays keeps them above itself: ./eslint-config/popup-portal.js.
+    name: 'openframe-frontend-core/popup-portal-container',
+    files: ['src/**/*.{jsx,tsx}'],
+    ignores: ['**/*.{test,spec}.{jsx,tsx}', '**/__tests__/**', '**/*.stories.{jsx,tsx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/popup-portal-container': 'error' },
   },
 
   ...prettierCompat,
