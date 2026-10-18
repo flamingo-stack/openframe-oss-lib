@@ -33,6 +33,7 @@ import {
   type TrustCenterSubprocessor,
   type TrustFrameworkMonitoringEntry,
 } from '../../types/trust-center';
+import { cn } from '../../utils/cn';
 import { getFlagFromCountryName } from '../../utils/country-phone-utils';
 import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
@@ -591,33 +592,28 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Rows each panel's skeleton draws: what the panel lists, per panel. Each is a short CURATED list (the frameworks the
- * company is audited against, the documents it publishes, the subprocessors it names, the AI practices it states),
- * so the skeleton draws the list's own length and the panel does not move when it lands. A single fold for every
- * panel moved the documents, subprocessors and AI panels by 160 to 420px. Update a count with the list it stands for.
+ * Rows a panel's skeleton draws, on a phone (below `content-md`) and from `content-md`: the rows of a panel one screen
+ * holds below its section's heading (a row of a typical description is about 100px on a phone and 80px wide). The
+ * panels list what the host's data lists, so the skeleton draws the layout's fold, never one record set's length; a
+ * host whose lists are curated passes their lengths (`TrustCenterSkeleton`'s `panelRows`).
  */
-const TRUST_PANEL_FOLD = {
-  compliance: 3,
-  documents: 1,
-  subprocessors: 6,
-  ai: 5,
-} as const;
+const TRUST_PANEL_FOLD = { phone: 4, wide: 5 } as const;
 /**
- * The lines each row's description takes while loading (`text-h6` lines, measured against the loaded rows), per row
- * of the panel's fold: the descriptions wrap to more lines on a phone than from `content-md` up, and the AI practices
- * differ in length. A row past the list takes the list's last value.
+ * The lines a typical row description takes (`text-h6` lines): a sentence wraps to a few lines in a phone's narrow
+ * cell and fits one line from `content-md` up. A longer description growing past it is a settle below the row.
  */
-const TRUST_SKELETON_LABEL = {
-  oneLine: { phone: [1], wide: [1] },
-  compliance: { phone: [5, 4, 4], wide: [1] },
-  ai: { phone: [7, 4, 10, 6, 9], wide: [2, 2, 3, 2, 3] },
-} as const;
+const TRUST_ROW_DESCRIPTION_LINES = { phone: 4, wide: 1 } as const;
 
-/** One row's line count from a per-row list. */
-function rowLines(lines: readonly number[], index: number): number {
-  return lines[Math.min(index, lines.length - 1)];
+/** The panels whose rows the skeleton draws (the Controls, Contact and FAQ sections draw their own). */
+export type TrustCenterPanelId = 'compliance' | 'documents' | 'subprocessors' | 'ai';
+
+/** Rows a panel's skeleton draws: one count, or one per breakpoint. */
+export type TrustPanelRows = number | { phone: number; wide: number };
+
+function panelFold(rows: TrustPanelRows | undefined): { phone: number; wide: number } {
+  if (rows === undefined) return TRUST_PANEL_FOLD;
+  return typeof rows === 'number' ? { phone: rows, wide: rows } : rows;
 }
-type TrustSkeletonLabel = (typeof TRUST_SKELETON_LABEL)[keyof typeof TRUST_SKELETON_LABEL];
 
 /**
  * Rows of the REAL `StackedRowsPanel` (its own row heights and borders) whose
@@ -625,14 +621,21 @@ type TrustSkeletonLabel = (typeof TRUST_SKELETON_LABEL)[keyof typeof TRUST_SKELE
  * a label, and the right-hand badge or button in the page's `ACTION_COLUMN`.
  */
 function skeletonRows(shape: {
-  count: number;
+  rows: TrustPanelRows | undefined;
   mark: 'logo' | 'glyph';
   action: 'badge' | 'button' | 'none';
-  label?: TrustSkeletonLabel;
 }): PanelRow[] {
-  const label = shape.label ?? TRUST_SKELETON_LABEL.oneLine;
-  return Array.from({ length: shape.count }, (_, index) => ({
+  const fold = panelFold(shape.rows);
+  return Array.from({ length: Math.max(fold.phone, fold.wide) }, (_, index) => ({
     id: `skeleton-${index}`,
+    // A row past a breakpoint's fold is not drawn there; the last row drawn on a phone drops its divider like the
+    // panel's last row (`last:` cannot see a hidden sibling).
+    className: cn(
+      index >= fold.phone && 'hidden content-md:flex',
+      index >= fold.wide && 'content-md:hidden',
+      fold.phone < fold.wide && index === fold.phone - 1 && 'content-max-md:border-b-0',
+      fold.wide < fold.phone && index === fold.wide - 1 && 'content-md:border-b-0',
+    ),
     columns: [
       {
         // The loaded rows' own cell (leading mark, `text-h4` value over a wrapping `text-h6` label): the panel lays
@@ -649,13 +652,13 @@ function skeletonRows(shape: {
             <TextLineSkeleton
               type="inherit"
               as="span"
-              lines={rowLines(label.phone, index)}
+              lines={TRUST_ROW_DESCRIPTION_LINES.phone}
               className="w-full content-md:hidden"
             />
             <TextLineSkeleton
               type="inherit"
               as="span"
-              lines={rowLines(label.wide, index)}
+              lines={TRUST_ROW_DESCRIPTION_LINES.wide}
               className="hidden w-full content-md:block"
             />
           </>
@@ -725,6 +728,11 @@ export interface TrustCenterSkeletonProps {
    * Absent: the FAQ is not drawn in the sections column (the page draws it last, after the host's content).
    */
   faq?: ReactNode;
+  /**
+   * Rows each panel's skeleton draws, for a host whose lists are curated (it knows their lengths). Absent: the
+   * layout's fold, the rows one screen holds.
+   */
+  panelRows?: Partial<Record<TrustCenterPanelId, TrustPanelRows>>;
 }
 
 /**
@@ -737,35 +745,20 @@ export function TrustCenterSkeleton({
   attribution = true,
   download,
   faq,
+  panelRows,
 }: TrustCenterSkeletonProps = {}) {
   const content: Record<TrustCenterSectionId, ReactNode> = {
     compliance: (
-      <StackedRowsPanel
-        rows={skeletonRows({
-          count: TRUST_PANEL_FOLD.compliance,
-          mark: 'logo',
-          action: 'badge',
-          label: TRUST_SKELETON_LABEL.compliance,
-        })}
-      />
+      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.compliance, mark: 'logo', action: 'badge' })} />
     ),
     controls: <ControlsSectionSkeleton />,
     documents: (
-      <StackedRowsPanel rows={skeletonRows({ count: TRUST_PANEL_FOLD.documents, mark: 'glyph', action: 'button' })} />
+      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.documents, mark: 'glyph', action: 'button' })} />
     ),
     subprocessors: (
-      <StackedRowsPanel rows={skeletonRows({ count: TRUST_PANEL_FOLD.subprocessors, mark: 'glyph', action: 'none' })} />
+      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.subprocessors, mark: 'glyph', action: 'none' })} />
     ),
-    ai: (
-      <StackedRowsPanel
-        rows={skeletonRows({
-          count: TRUST_PANEL_FOLD.ai,
-          mark: 'glyph',
-          action: 'none',
-          label: TRUST_SKELETON_LABEL.ai,
-        })}
-      />
-    ),
+    ai: <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.ai, mark: 'glyph', action: 'none' })} />,
     contact: <ContactSection onContact={() => undefined} />,
     faq,
   };

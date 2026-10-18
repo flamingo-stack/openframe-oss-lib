@@ -100,7 +100,7 @@ export function InfoCardRowSkeleton({
   return (
     <div className={cn(FRAME_CLASS, className)} aria-hidden>
       <div className={cn(CELL, LEAD_CELL_CLASS)}>
-        {leadIcon && <UnifiedSkeleton className="size-10 shrink-0 rounded-sm" />}
+        {leadIcon && <UnifiedSkeleton className={LEAD_ICON_CLASS} />}
         <div className={LEAD_TEXT_CLASS}>
           <TextLineSkeleton type="h3" className="w-1/2" />
           <TextLineSkeleton type="h6" className="w-1/3" />

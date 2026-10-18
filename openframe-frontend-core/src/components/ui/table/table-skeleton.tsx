@@ -2,6 +2,7 @@
 
 import { cn } from '../../../utils/cn';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { CHECKBOX_BOX_CLASS } from '../checkbox';
 import type { TableCardSkeletonProps } from './types';
 import { getHideClasses, TABLE_ACTIONS_COLUMN_KEY, TABLE_CHEVRON_COLUMN_KEY } from './utils';
 
@@ -57,7 +58,7 @@ export function TableCardSkeleton({
           >
             {selectable && (
               <div className="flex w-10 shrink-0 items-center justify-center">
-                <UnifiedSkeleton className="size-4 rounded-[2px]" />
+                <UnifiedSkeleton className={CHECKBOX_BOX_CLASS} />
               </div>
             )}
             {columns.map(column => {

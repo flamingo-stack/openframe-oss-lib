@@ -70,6 +70,7 @@ import {
   TRUST_SECTION_LEADS,
   TRUST_STATUS_ROW_CLASS,
   TrustCenterSkeleton,
+  type TrustCenterSkeletonProps,
   TrustSection,
 } from './trust-center-sections';
 
@@ -108,6 +109,11 @@ export interface TrustCenterPageProps {
   faqSkeletonUncategorized?: boolean;
   /** The FAQ's loading-state first fold, questions per group (the FAQ's `skeletonShape`). */
   faqSkeletonShape?: number[];
+  /**
+   * Rows each panel's loading state draws, for a host whose lists are curated (`TrustCenterSkeleton`'s
+   * `panelRows`). Absent: the layout's fold.
+   */
+  panelSkeletonRows?: TrustCenterSkeletonProps['panelRows'];
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -166,6 +172,7 @@ export function TrustCenterPage({
   faqSkeletonSections,
   faqSkeletonUncategorized,
   faqSkeletonShape,
+  panelSkeletonRows,
 }: TrustCenterPageProps) {
   // In a page's loading state the projection is read (the host passes none): the page draws its skeleton.
   const scoped = useLoadingScope();
@@ -288,6 +295,7 @@ export function TrustCenterPage({
         attribution={attribution}
         download={download}
         faq={beforeFaq ? undefined : faqSkeleton}
+        panelRows={panelSkeletonRows}
       />
     );
   } else if (error && !data) {

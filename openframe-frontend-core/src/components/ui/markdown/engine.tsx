@@ -194,6 +194,13 @@ export interface MarkdownEngineProps {
 export const MARKDOWN_SKELETON_LINES = 3;
 /** Paragraphs under each heading of a loading body, and their lines. */
 const SKELETON_SECTION_PARAGRAPHS = [3, 2] as const;
+/**
+ * Lines a typical body's opening line set takes, on a phone (below `content-md`) and from `content-md`: a document's
+ * `# ` title wraps on a phone, and the opening paragraph every post and legal document starts with runs a few lines.
+ * Typical lengths, never one record's: a longer record growing past them is a settle below its own lines.
+ */
+const SKELETON_TITLE_LINES = { phone: 2, wide: 1 } as const;
+const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
 /** The renderer's own frame: read by the engine and by its skeleton. */
 const RENDERER_CLASS = 'simple-markdown-renderer';
 const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
@@ -434,10 +441,27 @@ function ParagraphBar({ lines, className }: { lines: number; className: string }
   );
 }
 
+/** Lines of a text run per breakpoint: on a phone, and from `content-md`. */
+interface SkeletonLinesByBreakpoint {
+  phone: number;
+  wide: number;
+}
+
+/** A text run of the lines it takes on a phone and from `content-md` (the content area's own steps). */
+function LinesByBreakpoint({ lines, as = 'div' }: { lines: SkeletonLinesByBreakpoint; as?: 'div' | 'span' }) {
+  return (
+    <>
+      <TextLineSkeleton type="inherit" as={as} lines={lines.phone} className="w-full content-md:hidden" />
+      <TextLineSkeleton type="inherit" as={as} lines={lines.wide} className="hidden w-full content-md:flex" />
+    </>
+  );
+}
+
 /**
- * A markdown body while it is read: the renderer's own frame and type. With `sections`, each section is a REAL
- * `<h2>` (the renderer's heading classes) holding a bar, then its paragraphs; without, one paragraph of `lines`
- * lines. Every bar takes the line height of the element it stands for, at the body's text size.
+ * A markdown body while it is read: the renderer's own frame and type. With `sections`, the body's opening paragraph
+ * (a typical length per breakpoint), then each section a REAL `<h2>` (the renderer's heading classes) holding a bar,
+ * then its paragraphs; without, one paragraph of `lines` lines. Every bar takes the line height of the element it
+ * stands for, at the body's text size.
  */
 export function MarkdownEngineSkeleton({
   sections,
@@ -463,9 +487,14 @@ export function MarkdownEngineSkeleton({
         <div className={ARTICLE_CLASS}>
           {title && (
             <h2 className={cn(MARKDOWN_H1_CLASS, textSizes.h1)}>
-              <TextLineSkeleton type="inherit" as="span" className="w-2/3" />
+              <LinesByBreakpoint lines={SKELETON_TITLE_LINES} as="span" />
             </h2>
           )}
+          {sections ? (
+            <div className={paragraphClass}>
+              <LinesByBreakpoint lines={SKELETON_LEAD_LINES} />
+            </div>
+          ) : null}
           {sections ? (
             Array.from({ length: sections }, (_, section) => (
               <div key={section}>

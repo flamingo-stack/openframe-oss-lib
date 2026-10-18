@@ -183,6 +183,13 @@ const PREVIEW_CHANGELOG_SECTIONS = [
   { title: 'Improvements', Icon: TrendingUp },
 ] as const;
 const CHANGELOG_ICON_CLASS = 'h-6 w-6';
+/**
+ * The delivery tables' collapsed preview (px): about the first rows of a table and the start of the next. The loaded
+ * tables and their loading state both sit in a `FadePreview` this high, so the section is one height in both.
+ */
+const DELIVERY_PREVIEW_HEIGHT = 300;
+/** The completed / in-progress table gap inside the preview (the section's own `space-y` stops at the wrapper). */
+const DELIVERY_TABLES_STACK_CLASS = 'space-y-4';
 
 /** Single-release route — the hub's public API shape, mirroring `<ProductReleasesView>`. */
 const DEFAULT_ENDPOINT = '/api/releases';
@@ -559,12 +566,22 @@ export function ReleaseDetailPage({
               {(() => {
                 const deliveryCount = deliveryData ? deliveryData.completed.length + deliveryData.inProgress.length : 0;
                 return deliveryLoading ? (
-                  <DeliverySection data={deliveryData} isLoading={deliveryLoading} />
+                  // The loaded preview's frame, its height written into the markup (`fixedHeight`), so the tables'
+                  // loading state takes the collapsed preview's place, toggle row included. Inert: nothing to open yet.
+                  <div inert>
+                    <FadePreview fixedHeight collapsedHeight={DELIVERY_PREVIEW_HEIGHT}>
+                      <div className={DELIVERY_TABLES_STACK_CLASS}>
+                        <DeliverySection data={deliveryData} isLoading={deliveryLoading} />
+                      </div>
+                    </FadePreview>
+                  </div>
                 ) : (
-                  <FadePreview hiddenCount={deliveryCount - 1} collapsedHeight={300} resetKey={deliveryCount}>
-                    {/* space-y-4 restores the completed/in-progress table gap the
-                      parent's space-y used to provide before the fade wrapper. */}
-                    <div className="space-y-4">
+                  <FadePreview
+                    hiddenCount={deliveryCount - 1}
+                    collapsedHeight={DELIVERY_PREVIEW_HEIGHT}
+                    resetKey={deliveryCount}
+                  >
+                    <div className={DELIVERY_TABLES_STACK_CLASS}>
                       <DeliverySection data={deliveryData} isLoading={false} />
                     </div>
                   </FadePreview>

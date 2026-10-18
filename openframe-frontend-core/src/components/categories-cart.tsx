@@ -25,12 +25,12 @@ const ARROW_ICON_CLASS = 'h-5 w-5 text-ods-text-primary transition-colors md:h-6
 /** As many icon boxes as the widest strip shows (the strip clips the rest). */
 const ICON_STRIP_FOLD = 20;
 
-/** The strip's fades at both ends. */
+/** The strip's fades at both ends, into the card's own surface. */
 function StripFades() {
   return (
     <>
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-[#212121] to-transparent md:w-6" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-[#212121] to-transparent md:w-6" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-ods-card to-transparent md:w-6" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-4 bg-gradient-to-l from-ods-card to-transparent md:w-6" />
     </>
   );
 }

@@ -95,6 +95,9 @@ const CASE_STUDY_MENU_SKELETON_FRAME =
   'flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
 const CASE_STUDY_MENU_MEDIA = 'relative block aspect-video w-full shrink-0 overflow-hidden rounded-md';
 const CASE_STUDY_MENU_MSP_ROW = 'flex items-center gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6';
+/** The MSP's icon in the menu card's MSP row (20px), read by the card and its skeleton. */
+const MSP_ICON_PX = 20;
+const MSP_ICON_CLASS = 'size-5 shrink-0 rounded';
 /** The content-type chip a portrait case study shows (a static label). */
 const CASE_STUDY_TYPE_LABEL = 'Case Study';
 
@@ -205,7 +208,7 @@ export function CaseStudyCardSkeleton({
       <div className={cn(CASE_STUDY_MENU_SKELETON_FRAME, className)} aria-hidden>
         <UnifiedSkeleton className={CASE_STUDY_MENU_MEDIA} />
         <div className={CASE_STUDY_MENU_MSP_ROW}>
-          <UnifiedSkeleton className="size-5 shrink-0 rounded" />
+          <UnifiedSkeleton className={MSP_ICON_CLASS} />
           <TextLineSkeleton type="h6" className="w-28" />
         </div>
         <TextLineSkeleton type="h6" lines={2} className="w-full" />
@@ -215,9 +218,7 @@ export function CaseStudyCardSkeleton({
     );
   }
   if (size === 'sm') {
-    return (
-      <CompactCardSkeleton rows={[{ width: 'w-1/2' }, { width: 'w-11/12' }]} className={className} />
-    );
+    return <CompactCardSkeleton rows={[{ width: 'w-1/2' }, { width: 'w-11/12' }]} className={className} />;
   }
   return (
     <div className={cn('block h-full', className)} aria-hidden>
@@ -369,8 +370,8 @@ export function CaseStudyCard({
             {study.msp.icon_url && (
               <EntityIcon
                 icon={{ url: study.msp.icon_url }}
-                size={20}
-                className="size-5 shrink-0 rounded object-contain"
+                size={MSP_ICON_PX}
+                className={cn(MSP_ICON_CLASS, 'object-contain')}
               />
             )}
             <span className="min-w-0 truncate">{study.msp.name}</span>

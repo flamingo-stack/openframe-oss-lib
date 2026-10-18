@@ -2,11 +2,13 @@
 
 import type { ReactNode } from 'react';
 import { DATA_SYNC_SOURCES, type DataSync, type DataSyncSource } from '../../types/data-sync';
+import { cn } from '../../utils/cn';
 import { formatDate } from '../../utils/format';
 import { ClickupIcon } from '../icons-v2-generated/brand-logos/clickup-icon';
 import { GithubClassicIcon } from '../icons-v2-generated/brand-logos/github-classic-icon';
 import { HubspotIcon } from '../icons-v2-generated/brand-logos/hubspot-icon';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TOOL_MARK_CLASS } from '../platform/tool-badge-mark';
 import { useLoadingScope } from './loading-scope';
 
 export interface DataAttributionProps {
@@ -66,7 +68,7 @@ export function DataAttributionSkeleton({ icon, action }: Pick<DataAttributionPr
   return (
     <div className={LINE_CLASS} aria-hidden="true">
       <div className={ITEM_CLASS}>
-        {icon ?? <UnifiedSkeleton className="size-4 rounded" />}
+        {icon ?? <UnifiedSkeleton className={cn(TOOL_MARK_CLASS, 'rounded')} />}
         <span>
           Data synced from <TextLineSkeleton type="inherit" as="span" className={`${WORD_BAR_CLASS} w-20`} />
         </span>

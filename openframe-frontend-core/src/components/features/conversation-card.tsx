@@ -15,11 +15,21 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatarSkeleton } from '../ui/square-avatar';
 import { Tag } from '../ui/tag';
 
+/**
+ * The lines the outcome takes at least, on a narrow card (below `content-md`) and from `content-md`: a typical
+ * outcome is a sentence or two, which takes four lines in a phone's card and three in a wide one. The outcome is
+ * never cut: a longer one grows its card (the cards of a row stretch to the tallest). Static classes (a class built at
+ * runtime emits no CSS); the skeleton draws the same counts.
+ */
+const OUTCOME_LINES = { phone: 4, wide: 3 } as const;
+const OUTCOME_LINES_CLASS = 'min-h-[4lh] content-md:min-h-[3lh]';
+
 /** The card's frame, its parts' blocks and its footer row: ONE string each, read by the card and its skeleton. */
 const CARD_FRAME_CLASS =
   'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
 const ANSWER_BLOCK_CLASS = 'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]';
-const CONTEXT_BLOCK_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]';
+const CONTEXT_BLOCK_CLASS =
+  'flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]';
 const FOOTER_ROW_CLASS = 'mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]';
 /** The speakers' avatar size the skeleton draws when the card draws it in a loading scope. */
 export const CONVERSATION_CARD_AVATAR_PX = 32;
@@ -142,7 +152,7 @@ export function ConversationCard({
           {selection.pressed ? <CheckIcon /> : <PlusIcon />}
         </Button>
       )}
-      {/* Every part keeps a fixed number of lines, so cards in a row or a carousel line up part by part. */}
+      {/* Every part keeps at least its number of lines, so cards in a row or a carousel line up part by part. */}
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
         <p
           id={requestId}
@@ -171,9 +181,7 @@ export function ConversationCard({
         className={ANSWER_BLOCK_CLASS}
       >
         <div className="flex items-start gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h4">
-          <span className="line-clamp-3 min-h-[3lh] min-w-0 flex-1" title={outcome}>
-            {outcome}
-          </span>
+          <span className={cn(OUTCOME_LINES_CLASS, 'min-w-0 flex-1')}>{outcome}</span>
           {outcomeAside}
           <span className="flex h-[1lh] shrink-0 items-center">
             <CheckCircleIcon size={16} className="text-ods-success" aria-hidden />
@@ -206,7 +214,7 @@ function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: Reac
 /**
  * The card while it loads: the SAME frame, then each part at the number of
  * lines the loaded card keeps for it (the request's two, the context's three,
- * the outcome's three), so a loaded card takes the skeleton's place without
+ * the outcome's `OUTCOME_LINES`), so a loaded card takes the skeleton's place without
  * moving the page. Pass the parts the loaded card will have.
  */
 export function ConversationCardSkeleton({
@@ -245,7 +253,8 @@ export function ConversationCardSkeleton({
       )}
       <div className={ANSWER_BLOCK_CLASS}>
         <TurnSkeleton avatarPx={avatarPx}>
-          <TextLineSkeleton lines={3} type="h4" />
+          <TextLineSkeleton lines={OUTCOME_LINES.phone} type="h4" className="content-md:hidden" />
+          <TextLineSkeleton lines={OUTCOME_LINES.wide} type="h4" className="hidden content-md:flex" />
         </TurnSkeleton>
       </div>
       {footer && (

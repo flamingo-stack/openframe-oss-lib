@@ -37,9 +37,6 @@ const BADGE_CLASS = TAG_BADGE_CLASS;
  */
 /** The row's layout, read by the row and by its skeleton. */
 const TAG_ROW_CLASS = 'flex w-full flex-wrap items-center gap-2';
-/** A row capped by `max` holds one line: it never wraps, and its tags shrink to an ellipsis. */
-const CAPPED_ROW_CLASS = 'flex-nowrap';
-const CAPPED_BADGE_CLASS = 'block min-w-0 truncate';
 /** How many tags a row usually shows: what its loading state draws. */
 export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
 
@@ -84,7 +81,8 @@ export function EntityTagBadgesSkeleton({
 }
 
 export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBadgesProps) {
-  // A capped row draws its cap and its "+N" badge while it loads, so both states hold the same line.
+  // A capped row draws its cap and its "+N" badge while it loads, in the row's own wrapping layout: the skeleton
+  // takes the lines a typical capped row takes, and a loaded tag is never cut to fit it.
   if (useLoadingScope()) {
     return max == null ? (
       <EntityTagBadgesSkeleton className={className} />
@@ -96,47 +94,30 @@ export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBad
   if (items.length === 0) return null;
 
   // Only null/undefined means "no cap"; max={0} shows none, negatives clamp to 0.
-  const capped = max != null;
-  const visibleLimit = capped ? Math.max(0, max) : items.length;
+  const visibleLimit = max == null ? items.length : Math.max(0, max);
   const shown = items.slice(0, visibleLimit);
   const overflow = items.length - shown.length;
-  // A capped row is ONE line at every width (what its skeleton draws): a tag that does not fit is cut with an
-  // ellipsis, and the "+N" badge always shows whole.
-  const badgeClass = cn(BADGE_CLASS, capped && CAPPED_BADGE_CLASS);
 
   return (
-    <div className={cn(TAG_ROW_CLASS, capped && CAPPED_ROW_CLASS, className)}>
+    <div className={cn(TAG_ROW_CLASS, className)}>
       {shown.map(tag => {
         const key = tag.tag_id ?? tag.id ?? tag.slug ?? tag.name;
         const label = (tag.name || '').toUpperCase();
         if (basePath && tag.slug) {
           return (
-            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className={cn('inline-flex', capped && 'min-w-0')}>
+            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className="inline-flex">
               <StatusBadge
                 text={label}
                 variant="card"
-                title={capped ? label : undefined}
-                className={cn(badgeClass, 'cursor-pointer transition-colors hover:border-ods-accent')}
+                className={cn(BADGE_CLASS, 'cursor-pointer transition-colors hover:border-ods-accent')}
               />
             </Link>
           );
         }
-        return (
-          <StatusBadge
-            key={key}
-            text={label}
-            variant="card"
-            title={capped ? label : undefined}
-            className={badgeClass}
-          />
-        );
+        return <StatusBadge key={key} text={label} variant="card" className={BADGE_CLASS} />;
       })}
       {overflow > 0 && (
-        <StatusBadge
-          text={`+${overflow}`}
-          variant="card"
-          className={cn(BADGE_CLASS, 'shrink-0 text-ods-text-secondary')}
-        />
+        <StatusBadge text={`+${overflow}`} variant="card" className={cn(BADGE_CLASS, 'text-ods-text-secondary')} />
       )}
     </div>
   );

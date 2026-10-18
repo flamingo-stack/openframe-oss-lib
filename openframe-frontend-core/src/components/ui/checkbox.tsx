@@ -23,13 +23,17 @@ export interface CheckboxProps extends Omit<CheckboxPrimitiveProps, 'onCheckedCh
   onCheckedChange?: (checked: boolean) => void;
 }
 
+/** The checkbox's box (its size and corners): read by the checkbox and by every skeleton that stands for one. */
+export const CHECKBOX_BOX_CLASS = 'h-4 w-4 shrink-0 rounded-sm';
+
 const Checkbox = forwardRef<ElementRef<typeof CheckboxPrimitive.Root>, CheckboxProps>(
   ({ className, onCheckedChange, ...props }, ref) => (
     <CheckboxPrimitive.Root
       ref={ref}
       onCheckedChange={booleanCheckedChange(onCheckedChange)}
       className={cn(
-        'peer h-4 w-4 shrink-0 rounded-sm border border-ods-border bg-ods-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-ods-accent data-[state=checked]:bg-ods-accent',
+        CHECKBOX_BOX_CLASS,
+        'peer border border-ods-border bg-ods-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-ods-accent data-[state=checked]:bg-ods-accent',
         className,
       )}
       {...props}

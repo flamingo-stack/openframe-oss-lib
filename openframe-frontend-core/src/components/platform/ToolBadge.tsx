@@ -14,6 +14,7 @@ import { NavLinkAnchorViaRuntime } from '../chat/nav-link-anchor-via-runtime';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
 import { useLoadingScope } from '../ui/loading-scope';
+import { TOOL_MARK_CLASS } from './tool-badge-mark';
 
 export type { ToolType } from '../../types/tool.types';
 
@@ -50,7 +51,6 @@ export interface ToolBadgeProps {
 // The house tag (Figma `tag`): 32px, on the card surface, the caption face.
 const CHIP_CLASS =
   'inline-flex h-8 items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5';
-const CHIP_MARK_CLASS = 'flex h-4 w-4 shrink-0 items-center justify-center';
 const INLINE_CLASS = 'flex items-center gap-1 text-ods-text-secondary';
 /**
  * A tool's name while it loads, in characters of its own face (the chip's caption face is monospaced, so `ch` is one
@@ -70,14 +70,14 @@ export function ToolBadgeSkeleton({ variant = 'inline', icon = true, className }
   if (variant === 'chip') {
     return (
       <span className={cn(CHIP_CLASS, className)} aria-hidden>
-        {icon && <UnifiedSkeleton as="span" className={cn(CHIP_MARK_CLASS, 'rounded-sm')} />}
+        {icon && <UnifiedSkeleton as="span" className={cn(TOOL_MARK_CLASS, 'rounded-sm')} />}
         <TextLineSkeleton type="h5" width={CHIP_NAME_TYPICAL_CH} />
       </span>
     );
   }
   return (
     <div className={cn(INLINE_CLASS, className)} aria-hidden>
-      {icon && <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />}
+      {icon && <UnifiedSkeleton className={cn(TOOL_MARK_CLASS, 'rounded-sm')} />}
       <TextLineSkeleton type="h4" className="w-20" />
     </div>
   );
@@ -129,7 +129,7 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
         {mark && (
           <span
             className={cn(
-              CHIP_MARK_CLASS,
+              TOOL_MARK_CLASS,
               '[&_img]:h-full [&_img]:w-full [&_img]:rounded-sm [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full',
             )}
           >
