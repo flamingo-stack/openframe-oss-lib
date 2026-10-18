@@ -457,6 +457,96 @@ function ModalFooter({ onCancel, primary }: { onCancel?: () => void; primary: Re
   );
 }
 
+/**
+ * The card's wrappers at a step: ONE derivation for the loaded card and its skeleton.
+ *
+ * The card states ONE height and everything inside derives from it (see
+ * `MEETING_SCHEDULER_H`). details-first's tallest stage is the form, so it gets
+ * its own fixed pair rather than a floor: a floor was tried before and let the
+ * tall stage push the wrapper.
+ *
+ * details-first's form stage grows with the link's questions (see
+ * MEETING_SCHEDULER_DETAILS_FIRST_H); every other stage keeps the stated box.
+ * `cn` is tailwind-merge-backed and last-wins, so the host `className` comes
+ * last: a host's own `h-*` stays reachable.
+ */
+function schedulerCardClasses(flow: SchedulerFlow, step: Step, className?: string) {
+  const detailsFirst = flow === 'details-first';
+  const formOnly = detailsFirst && step === 'details';
+  const boxed = !formOnly;
+  return {
+    formOnly,
+    cardClass: cn(
+      CARD_CLASS,
+      boxed ? SCHEDULER_FLOW_PRESETS[flow].height : 'content-md:h-auto',
+      detailsFirst && 'flex flex-col',
+      formOnly && 'bg-ods-bg',
+      className,
+    ),
+    /** details-first states a height on phones too (see MEETING_SCHEDULER_DETAILS_FIRST_H), so
+     *  the wrappers that let content shrink into a stated height run at every width there. */
+    innerClass: cn(CARD_INNER_CLASS, detailsFirst && boxed && 'min-h-0 flex-1'),
+    actionPanelClass: cn(ACTION_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto'),
+    stepPanelClass: cn(STEP_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto'),
+  };
+}
+
+/**
+ * The scheduler while its availability loads: the SAME card, wrappers and
+ * panels as the loaded scheduler at that step, with the context panel and the
+ * action panel drawn as their skeletons. The scheduler draws it on a cold
+ * load; a page that streams draws it while the scheduler is not mounted yet
+ * (a step of `undefined` is the flow's first).
+ */
+export function MeetingSchedulerSkeleton({
+  flow = DEFAULT_SCHEDULER_FLOW,
+  step,
+  className,
+  onBack,
+  fieldRows,
+  consent = false,
+  monthOffset = 0,
+}: {
+  flow?: SchedulerFlow;
+  step?: Step;
+  className?: string;
+  onBack?: () => void;
+  /** The details form's rows (details-first), so the form skeleton has the form's shape. */
+  fieldRows?: BookingFieldRow[];
+  /** Whether the host adds its consent row under the form. */
+  consent?: boolean;
+  monthOffset?: number;
+}) {
+  const preset = SCHEDULER_FLOW_PRESETS[flow];
+  const { formOnly, cardClass, innerClass, actionPanelClass, stepPanelClass } = schedulerCardClasses(
+    flow,
+    step ?? preset.initialStep,
+    className,
+  );
+  return (
+    <div className={cardClass}>
+      <LoadingRegion label="Loading available times" className={innerClass}>
+        {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />}
+        <div className={actionPanelClass}>
+          {/* Both terms matter. Without `flow` this stays a calendar where
+              the form belongs; without the step term, paging a month AFTER
+              Continue (which happens at `step === 'slot'`) would swap the
+              calendar out for a form skeleton and back. */}
+          {formOnly ? (
+            // The SAME wrapper the loaded form gets, so the skeleton never
+            // states its own inset.
+            <div className={stepPanelClass}>
+              <BookingFormSkeleton fieldRows={fieldRows} consent={consent} footerNote={preset.footerNote} />
+            </div>
+          ) : (
+            <SlotPickerSkeleton monthOffset={monthOffset} />
+          )}
+        </div>
+      </LoadingRegion>
+    </div>
+  );
+}
+
 export function HubSpotMeetingScheduler({
   meetingId,
   apiBaseUrl = '',
@@ -776,33 +866,8 @@ export function HubSpotMeetingScheduler({
    *  exit under a details-first visitor. */
   const backEdge = detailsFirst ? (step === 'slot' ? backToDetails : onBack) : step === 'details' ? backToSlot : onBack;
 
-  /**
-   * The card states ONE height and everything inside derives from it (see
-   * `MEETING_SCHEDULER_H`). details-first's tallest stage is the form, so it
-   * gets its own fixed pair rather than a floor — a floor was tried here before
-   * and let the tall stage push the wrapper.
-   *
-   * Placed BEFORE the host `className`: `cn` is tailwind-merge-backed and
-   * last-wins, so appending it after would make a host's own `h-*` unreachable,
-   * which is the override the height-inside-CARD_CLASS arrangement allows today.
-   */
-  // details-first's form stage grows with the link's questions (see
-  // MEETING_SCHEDULER_DETAILS_FIRST_H); every other stage keeps the stated box.
-  // `formOnly` is exactly that stage (`detailsFirst && step === 'details'`), so
-  // slot-first, the calendar, the confirmation and the skeleton of either stay boxed.
-  const boxed = !formOnly;
-  const cardClass = cn(
-    CARD_CLASS,
-    boxed ? preset.height : 'content-md:h-auto',
-    detailsFirst && 'flex flex-col',
-    formOnly && 'bg-ods-bg',
-    className,
-  );
-  /** details-first states a height on phones too (see MEETING_SCHEDULER_DETAILS_FIRST_H), so
-   *  the wrappers that let content shrink into a stated height run at every width there. */
-  const innerClass = cn(CARD_INNER_CLASS, detailsFirst && boxed && 'min-h-0 flex-1');
-  const actionPanelClass = cn(ACTION_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto');
-  const stepPanelClass = cn(STEP_PANEL_CLASS, detailsFirst && boxed && 'min-h-0 overflow-y-auto');
+  // The card states ONE height and everything inside derives from it (`schedulerCardClasses`).
+  const { cardClass, innerClass, actionPanelClass, stepPanelClass } = schedulerCardClasses(flow, step, className);
 
   /** One card SHAPE for every degraded return below. */
   const degraded = (message: string) => (
@@ -835,30 +900,15 @@ export function HubSpotMeetingScheduler({
     // (`ContextPanelSkeleton` beside the real slot-area layout), so nothing
     // shifts when it swaps.
     return (
-      <div className={cardClass}>
-        <LoadingRegion label="Loading available times" className={innerClass}>
-          {!formOnly && <ContextPanelSkeleton onBack={backEdge} className={CONTEXT_PANEL_CLASS} />}
-          <div className={actionPanelClass}>
-            {/* Both terms matter. Without `flow` this stays a calendar where
-                the form belongs; without the step term, paging a month AFTER
-                Continue (which happens at `step === 'slot'`) would swap the
-                calendar out for a form skeleton and back. */}
-            {formOnly ? (
-              // The SAME wrapper the loaded form gets, so the skeleton never
-              // states its own inset.
-              <div className={stepPanelClass}>
-                <BookingFormSkeleton
-                  fieldRows={detailsFormProps?.fieldRows}
-                  consent={Boolean(detailsFormProps?.consent)}
-                  footerNote={preset.footerNote}
-                />
-              </div>
-            ) : (
-              <SlotPickerSkeleton monthOffset={monthOffset} />
-            )}
-          </div>
-        </LoadingRegion>
-      </div>
+      <MeetingSchedulerSkeleton
+        flow={flow}
+        step={step}
+        className={className}
+        onBack={backEdge}
+        fieldRows={detailsFormProps?.fieldRows}
+        consent={Boolean(detailsFormProps?.consent)}
+        monthOffset={monthOffset}
+      />
     );
   }
 
