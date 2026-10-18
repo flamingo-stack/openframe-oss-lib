@@ -9,6 +9,7 @@ import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
+import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -40,11 +41,6 @@ import static com.openframe.stream.handler.software.FleetRowFields.str;
 @Slf4j
 public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
-    private static final String TABLE_HOST_SOFTWARE = "host_software";
-    private static final String TABLE_SOFTWARE_CVE = "software_cve";
-    private static final String TABLE_HOST_OPERATING_SYSTEM = "host_operating_system";
-    private static final String TABLE_OS_VULNERABILITY = "operating_system_vulnerabilities";
-
     private final FleetHostResolver fleetHostResolver;
     private final FleetSoftwareCveRepository fleetSoftwareCveRepository;
     private final FleetSoftwareRepository fleetSoftwareRepository;
@@ -68,18 +64,16 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
     @Override
     public void handle(DeserializedDebeziumMessage message, IntegratedToolEnrichedData extraParams) {
         DebeziumMessage.Payload<JsonNode> payload = message.getPayload();
-        if (payload == null || payload.getSource() == null) {
+        MessageType type = message.getMessageType();
+        if (payload == null || type == null) {
             return;
         }
-        String table = payload.getSource().getTable();
-        if (TABLE_HOST_SOFTWARE.equals(table)) {
-            handleHostSoftware(payload);
-        } else if (TABLE_HOST_OPERATING_SYSTEM.equals(table)) {
-            handleHostOperatingSystem(payload);
-        } else if (TABLE_OS_VULNERABILITY.equals(table)) {
-            handleOsVulnerability(payload);
-        } else if (TABLE_SOFTWARE_CVE.equals(table)) {
-            handleSoftwareCve(payload);
+        switch (type) {
+            case FLEET_MDM_HOST_SOFTWARE_EVENT -> handleHostSoftware(payload);
+            case FLEET_MDM_HOST_OPERATING_SYSTEM_EVENT -> handleHostOperatingSystem(payload);
+            case FLEET_MDM_OS_VULNERABILITY_EVENT -> handleOsVulnerability(payload);
+            case FLEET_MDM_SOFTWARE_CVE_EVENT -> handleSoftwareCve(payload);
+            default -> { }
         }
     }
 

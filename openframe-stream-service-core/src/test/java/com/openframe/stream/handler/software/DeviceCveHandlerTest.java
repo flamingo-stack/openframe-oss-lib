@@ -4,6 +4,7 @@ import com.openframe.data.document.rmm.software.DeviceCve;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
+import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
@@ -51,18 +52,14 @@ class DeviceCveHandlerTest {
 
     @InjectMocks private DeviceCveHandler handler;
 
-    private DeserializedDebeziumMessage msg(String table, String op, JsonNode before, JsonNode after) {
+    private DeserializedDebeziumMessage msg(MessageType type, String op, JsonNode before, JsonNode after) {
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
-        if (table != null) {
-            DebeziumMessage.Payload.Source source = new DebeziumMessage.Payload.Source();
-            source.setTable(table);
-            payload.setSource(source);
-        }
         payload.setOperation(op);
         payload.setBefore(before);
         payload.setAfter(after);
         DeserializedDebeziumMessage m = new DeserializedDebeziumMessage();
         m.setPayload(payload);
+        m.setMessageType(type);
         return m;
     }
 
@@ -76,21 +73,22 @@ class DeviceCveHandlerTest {
     }
 
     @Test
-    void handle_unknownTable_isNoOp() {
-        handler.handle(msg("some_other_table", "c", null, row().put("x", 1)), null);
+    void handle_unrelatedMessageType_isNoOp() {
+        // A type that does not contribute to device_cve routes to the default no-op branch.
+        handler.handle(msg(MessageType.FLEET_MDM_SOFTWARE_TITLE_EVENT, "c", null, row().put("x", 1)), null);
         verifyNoInteractions(fleetHostResolver, fleetSoftwareRepository, fleetSoftwareCveRepository,
                 deviceSoftwareRepository, deviceCveRepository, tenantSoftwareCveAggregator);
     }
 
     @Test
-    void handle_nullSource_isNoOp() {
+    void handle_nullMessageType_isNoOp() {
         handler.handle(msg(null, "c", null, row().put("host_id", 1)), null);
         verifyNoInteractions(fleetHostResolver, deviceCveRepository, tenantSoftwareCveAggregator);
     }
 
     @Test
     void hostSoftware_missingIds_isNoOp() {
-        handler.handle(msg("host_software", "c", null, row().put("host_id", 100)), null);  // no software_id
+        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, row().put("host_id", 100)), null);
         verifyNoInteractions(fleetHostResolver, deviceCveRepository, tenantSoftwareCveAggregator);
     }
 
@@ -99,7 +97,7 @@ class DeviceCveHandlerTest {
         ObjectNode after = row().put("host_id", 100).put("software_id", 200);
         when(fleetHostResolver.resolve("100")).thenReturn(null);
 
-        handler.handle(msg("host_software", "c", null, after), null);
+        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, after), null);
 
         verifyNoInteractions(fleetSoftwareRepository, fleetSoftwareCveRepository);
         verifyNothingWritten();
@@ -117,7 +115,7 @@ class DeviceCveHandlerTest {
         when(deviceCveRepository.findByTenantIdAndMachineIdAndCveIdAndSoftwareId(any(), any(), any(), any()))
                 .thenReturn(Optional.empty());
 
-        handler.handle(msg("host_software", "c", null, after), null);
+        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, after), null);
 
         verify(deviceCveRepository, times(2)).save(any(DeviceCve.class));
         verify(tenantSoftwareCveAggregator).recompute("t1", 42L);
@@ -131,7 +129,7 @@ class DeviceCveHandlerTest {
                 FleetSoftware.builder().softwareTitleId(42L).version("1.0").build()));
         when(fleetSoftwareCveRepository.findBySoftwareId(200L)).thenReturn(List.of());
 
-        handler.handle(msg("host_software", "c", null, after), null);
+        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, after), null);
 
         verifyNothingWritten();
     }
@@ -143,7 +141,7 @@ class DeviceCveHandlerTest {
         when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.of(
                 FleetSoftware.builder().softwareTitleId(42L).build()));
 
-        handler.handle(msg("host_software", "d", before, null), null);
+        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "d", before, null), null);
 
         verify(deviceCveRepository).deleteByTenantIdAndMachineIdAndSoftwareId("t1", "m1", 200L);
         verify(tenantSoftwareCveAggregator).recompute("t1", 42L);
@@ -162,7 +160,7 @@ class DeviceCveHandlerTest {
         when(deviceCveRepository.findByTenantIdAndMachineIdAndCveIdAndSoftwareId(any(), any(), any(), any()))
                 .thenReturn(Optional.empty());
 
-        handler.handle(msg("software_cve", "c", null, after), null);
+        handler.handle(msg(MessageType.FLEET_MDM_SOFTWARE_CVE_EVENT, "c", null, after), null);
 
         verify(fleetSoftwareCveRepository).save(any(FleetSoftwareCve.class));   // catalog upsert
         verify(deviceCveRepository, times(2)).save(any(DeviceCve.class));
@@ -177,7 +175,7 @@ class DeviceCveHandlerTest {
         when(deviceSoftwareRepository.findBySoftwareId(200L)).thenReturn(List.of(
                 DeviceSoftware.builder().tenantId("t1").machineId("m1").hostId(100L).build()));
 
-        handler.handle(msg("software_cve", "d", before, null), null);
+        handler.handle(msg(MessageType.FLEET_MDM_SOFTWARE_CVE_EVENT, "d", before, null), null);
 
         verify(fleetSoftwareCveRepository).deleteBySoftwareIdAndCve(200L, "CVE-9");
         verify(deviceCveRepository).deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId("t1", "m1", "CVE-9", 200L);
