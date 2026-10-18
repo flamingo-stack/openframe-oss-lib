@@ -20,6 +20,7 @@ import java.util.List;
 
 import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
 import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 
 
@@ -66,8 +67,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 try {
                     ssoOidcUserService.autoProvisionForTenantLogin(authentication);
                 } catch (Exception e) {
-                    authErrorResponder.send(response, request, "sso-login-auto-provision", e,
-                            "SSO login failed. Please try again.");
+                    authErrorResponder.send(response, request, "sso-login-auto-provision", e, SSO_LOGIN_FAILED);
                     return;
                 }
                 super.onAuthenticationSuccess(request, response, authentication);
