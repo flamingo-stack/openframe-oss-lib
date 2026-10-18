@@ -32,10 +32,13 @@ import { buildProductReleaseCardProps } from '../../chat/entity-cards/product-re
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link';
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution';
 import { executeNavigationImperative } from '../../chat/utils/execute-navigation';
+import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
 import { LoadingRegion } from '../../loading/loading-region';
+import { PaginationSkeleton } from '../../pagination';
 import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
 import { ProductReleaseCardSkeleton } from './product-release-card-skeleton';
 
@@ -158,10 +161,15 @@ export function ProductReleasesView({
   const listParams = new URLSearchParams({ limit: String(itemsPerPage), offset: String(offset) });
   if (search) listParams.set(searchParamKey, search);
   if (status && status !== 'all') listParams.set(statusParamKey, status);
-  const { data, isLoading, error, reload } = useSelfFetch<ProductReleaseListResponse>(
-    `${endpoint}?${listParams.toString()}`,
+  // In a page's loading state the list is read: nothing is fetched and the view is its skeleton.
+  const inScope = useLoadingScope();
+  const { data, isLoading: fetching, error, reload } = useSelfFetch<ProductReleaseListResponse>(
+    inScope ? null : `${endpoint}?${listParams.toString()}`,
     { initialData },
   );
+  const isLoading = inScope || fetching;
+  // The page's sync row (`PageDataSyncRow`) states what this list's endpoint answered.
+  usePageDataSync(data?.sync, isLoading && !data);
 
   const releases = data?.data ?? [];
   const totalCount = data?.count ?? 0;
@@ -234,7 +242,7 @@ export function ProductReleasesView({
             {/* Pagination — always present at the bottom for consistent spacing. */}
             <div className="mt-6 flex justify-center content-md:mt-8">
               {isLoading ? (
-                <div className="m-3 h-12 w-64" />
+                <PaginationSkeleton />
               ) : releases.length > 0 && totalPages > 1 ? (
                 <PersistentPaginationWrapper
                   isLoading={false}

@@ -12,13 +12,22 @@ export {
   EntityAuthorCard,
   EntityMetadataValueCell,
   EntityMetadataAuthorCell,
+  EntityAuthorCardSkeleton,
+  EntityMetadataValueCellSkeleton,
+  EntityMetadataAuthorCellSkeleton,
+  type EntityAuthorCardSkeletonProps,
   EMPTY_AUTHOR_PLACEHOLDER,
   type EntityAuthorCardProps,
 } from './entity-author-card';
 export { BlogImagePlaceholder } from './blog-image-placeholder';
-export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPerson } from './entity-portrait-card';
+export {
+  EntityPortraitCard,
+  EntityPortraitCardSkeleton,
+  type EntityPortraitCardProps,
+  type EntityPortraitPerson,
+} from './entity-portrait-card';
 export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
-export { AdminContentCard } from './admin-content-card';
+export { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
 export {
   CONTENT_CARD_FRAME_CLASS,
   CONTENT_CARD_SKELETON_FRAME_CLASS,
@@ -28,7 +37,6 @@ export {
 export {
   AdminContentCardGrid,
   AdminContentCardGridSkeleton,
-  AdminContentCardSkeleton,
   ADMIN_CONTENT_CARD_GRID_CLASS,
   type AdminContentCardGridProps,
   type AdminContentCardGridSkeletonProps,
@@ -44,7 +52,12 @@ export type { AiPromptCardData, AiPromptCardProps } from './ai-prompt-card';
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card';
-export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
+export {
+  ChatTicketItem,
+  ChatTicketItemSkeleton,
+  type ChatTicketItemData,
+  type ChatTicketItemProps,
+} from './chat-ticket-item';
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
   ProductReleaseCard,

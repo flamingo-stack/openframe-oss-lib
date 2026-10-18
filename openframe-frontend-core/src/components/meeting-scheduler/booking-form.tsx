@@ -1,7 +1,7 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, Ref } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import type { Control, Path, UseFormRegister } from 'react-hook-form';
@@ -30,7 +30,7 @@ import {
 import { cn } from '../../utils/cn';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import {
   Button,
   FieldWrapper,
@@ -135,10 +135,6 @@ const SPAN_CLASS = {
   4: 'content-md:col-span-4',
 } as const;
 
-/** One field's skeleton: label + control footprint — the CSS twin of `FieldWrapper`'s
- *  label row over `Input`'s `h-11 content-md:h-12` (the other skeleton heights below are
- *  the same kind of twin: the textarea, the consent row, the `Button`). */
-const FIELD_SKELETON_CLASS = 'h-[4.75rem] w-full';
 
 /** The submit copy every standalone `BookingForm` gets; the slot-first preset reads the same constant. */
 export const DEFAULT_SUBMIT_LABEL = 'Confirm Booking';
@@ -975,42 +971,76 @@ export function BookingForm({
  */
 export function BookingFormSkeleton({
   fieldRows,
+  optionalFields,
+  fieldCopy,
   consent,
   footerNote,
+  submitLabel = DEFAULT_SUBMIT_LABEL,
 }: {
   fieldRows?: BookingFieldRow[];
-  /** Whether the host adds its consent row (drawn only then). A HubSpot
-   *  `legalConsent` block is unknown until availability lands — the one
-   *  footprint this skeleton cannot budget for. */
-  consent?: boolean;
+  /** The optional questions the form asks (`BookingForm`'s `optionalFields`): a row slot naming another optional
+   *  question is left out, as the loaded form leaves it out. */
+  optionalFields?: readonly string[];
+  /** The host's per-field copy (`BookingForm`'s `fieldCopy`): a built-in field's label is drawn with it. */
+  fieldCopy?: Record<string, BookingFieldCopy>;
+  /** The host's consent row (`BookingForm`'s `consent`), drawn for real: it is the host's own words. `true` (no
+   *  copy known) draws the row with its label as a bar. A HubSpot `legalConsent` block is unknown until
+   *  availability lands, the one footprint this skeleton cannot budget for. */
+  consent?: BookingFormConsent | boolean;
+  /** The footer's note (the host's words), drawn for real. */
   footerNote?: string;
+  /** The submit button's label (`BookingForm`'s `submitLabel`): the button is drawn for real at its own size. */
+  submitLabel?: string;
 }) {
+  const consentId = useId();
+  // The real submit button (static copy), inert with the rest of the form.
+  const submitButton = (
+    <Button type="button" tabIndex={-1} className={footerNote ? SUBMIT_WIDE_CLASS : undefined}>
+      {submitLabel}
+    </Button>
+  );
   return (
-    <div className={cn('flex-1', FORM_STACK)}>
+    // Inert: the fields are the form's own controls, drawn so each is its loaded size; none takes focus.
+    <div className={cn('flex-1', FORM_STACK)} aria-hidden inert>
       {/* The host's rows (or the built-in layout) through the SAME grid, column
           rule and normalisation as the loaded form — see `normalizeFieldRows`. */}
-      {skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS).map(row => (
+      {skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS, optionalFields).map(row => (
         <div key={row.map(s => s.name).join('|')} className={ROW_GRID}>
           {row.map((slot, slotIndex) => (
-            <UnifiedSkeleton
+            <FieldSkeleton
               key={slot.name}
-              className={cn(FIELD_SKELETON_CLASS, slotColumnClass(row, slot, slotIndex))}
+              name={slot.name}
+              fieldCopy={fieldCopy}
+              className={slotColumnClass(row, slot, slotIndex)}
             />
           ))}
         </div>
       ))}
       {/* Without rows there is no telling how many questions the link declares: one long answer stands for them. */}
-      {!fieldRows && <UnifiedSkeleton className="h-[7.75rem] w-full" />}
-      {consent && <UnifiedSkeleton className="h-[4.25rem] w-full" />}
+      {!fieldRows && (
+        // An empty label keeps the field's own frame (`FieldWrapper` draws no label for it); the bar stands for it.
+        <FieldWrapper label="">
+          <TextLineSkeleton type="h6" className="mb-1 w-40" />
+          <Textarea tabIndex={-1} />
+        </FieldWrapper>
+      )}
+      {consent && (
+        <CheckboxBlock
+          id={consentId}
+          checked={false}
+          onCheckedChange={() => {}}
+          required
+          label={consent === true ? <TextLineSkeleton type="inherit" as="span" className="w-64 max-w-full" /> : consent.label}
+          description={consent === true ? undefined : consent.description}
+        />
+      )}
       {footerNote ? (
         <div className={FOOTER_ROW_CLASS}>
-          <UnifiedSkeleton className="h-5 min-w-40 flex-1" />
-          <UnifiedSkeleton className={cn('h-12 w-full', SUBMIT_WIDE_CLASS)} />
+          <p className="text-ods-text-secondary text-h6">{footerNote}</p>
+          {submitButton}
         </div>
       ) : (
-        <div className={FOOTER_BARE_CLASS}>
-          <UnifiedSkeleton className="h-12 w-40" />
-        </div>
+        <div className={FOOTER_BARE_CLASS}>{submitButton}</div>
       )}
     </div>
   );
@@ -1048,8 +1078,36 @@ function normalizeFieldRows(fieldRows: BookingFieldRow[], resolves: (name: strin
   return { rows, unplacedBuiltIns, named };
 }
 
-/** The skeleton's rows: the normalised host rows, then the built-ins none of them named. */
-function skeletonRows(fieldRows: BookingFieldRow[]): BookingFieldRow[] {
-  const { rows, unplacedBuiltIns } = normalizeFieldRows(fieldRows);
+/** The skeleton's rows: the normalised host rows, then the built-ins none of them named. With `optionalFields`, a
+ *  slot that is neither a built-in nor one of the named questions is left out, as `bookingFormAsks` leaves it out. */
+function skeletonRows(fieldRows: BookingFieldRow[], optionalFields?: readonly string[]): BookingFieldRow[] {
+  const asks = (name: string) =>
+    !optionalFields || BUILT_IN_BOOKING_FIELDS.some(f => f.name === name) || optionalFields.includes(name);
+  const { rows, unplacedBuiltIns } = normalizeFieldRows(fieldRows, asks);
   return [...rows, ...unplacedBuiltIns.map(f => [{ name: f.name }])];
+}
+
+/**
+ * One field while the link is read: the loaded field's own `FieldWrapper` over the loaded control (an `Input`, so
+ * the slot is its loaded height at every width). A built-in field's label is its own words (or the host's copy); a
+ * declared question's label is read, so it is a bar of the label's line.
+ */
+function FieldSkeleton({
+  name,
+  fieldCopy,
+  className,
+}: {
+  name: string;
+  fieldCopy?: Record<string, BookingFieldCopy>;
+  className?: string;
+}) {
+  const builtIn = BUILT_IN_BOOKING_FIELDS.find(f => f.name === name);
+  const label = builtIn ? (fieldCopy?.[name]?.label ?? builtIn.label) : undefined;
+  return (
+    // An empty label keeps the field's own frame; the read label is the bar under it.
+    <FieldWrapper label={label ?? ''} required={builtIn?.required} className={className}>
+      {!builtIn && <TextLineSkeleton type="h6" className="mb-1 w-32" />}
+      <Input tabIndex={-1} />
+    </FieldWrapper>
+  );
 }

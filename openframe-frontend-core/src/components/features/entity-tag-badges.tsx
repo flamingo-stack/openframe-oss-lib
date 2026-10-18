@@ -1,6 +1,10 @@
+'use client';
+
 import Link from 'next/link';
 import type { TagAssoc } from '../../types/blog';
-import { StatusBadge } from '../ui/status-badge';
+import { cn } from '../../utils/cn';
+import { useLoadingScope } from '../ui/loading-scope';
+import { StatusBadge, StatusBadgeSkeleton } from '../ui/status-badge';
 
 interface EntityTagBadgesProps {
   /** Flat `<entity>_tags[]` association array (from entity_tags hydration). */
@@ -31,7 +35,46 @@ const BADGE_CLASS = TAG_BADGE_CLASS;
  * `EntityTagList` delegates here so there is exactly one tag-display design.
  * Renders nothing when there are no tags.
  */
+/** The row's layout, read by the row and by its skeleton. */
+const TAG_ROW_CLASS = 'flex w-full flex-wrap items-center gap-2';
+/** How many tags a row usually shows: what its loading state draws. */
+export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
+
+/**
+ * A tag row while its tags are read: `count` badge boxes of the tag badge's size (the row's fold from tablet width
+ * up), and `phoneCount` below that width when a phone's row shows fewer (or more) before it wraps. Hosts pass their
+ * row's layout fold (`<THING>_TAG_ROW_FOLD`); the default is `ENTITY_TAG_BADGES_SKELETON_COUNT`.
+ */
+export function EntityTagBadgesSkeleton({
+  count = ENTITY_TAG_BADGES_SKELETON_COUNT,
+  phoneCount = count,
+  className,
+}: {
+  count?: number;
+  phoneCount?: number;
+  className?: string;
+}) {
+  return (
+    <div aria-hidden className={cn(TAG_ROW_CLASS, className)}>
+      {Array.from({ length: Math.max(count, phoneCount) }, (_, i) => (
+        <StatusBadgeSkeleton
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton badges never reorder
+          key={i}
+          variant="card"
+          className={cn(
+            // The loaded badge's 1px border (its colours are the skeleton's).
+            'border',
+            i >= phoneCount && 'hidden content-md:inline-flex',
+            i >= count && 'content-md:hidden',
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBadgesProps) {
+  if (useLoadingScope()) return <EntityTagBadgesSkeleton className={className} />;
   const items = (tags || []).filter((t): t is TagAssoc => !!t && !!t.name);
   if (items.length === 0) return null;
 
@@ -41,7 +84,7 @@ export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBad
   const overflow = items.length - shown.length;
 
   return (
-    <div className={`flex w-full flex-wrap items-center gap-2 ${className || ''}`}>
+    <div className={cn(TAG_ROW_CLASS, className)}>
       {shown.map(tag => {
         const key = tag.tag_id ?? tag.id ?? tag.slug ?? tag.name;
         const label = (tag.name || '').toUpperCase();

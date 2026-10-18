@@ -13,7 +13,7 @@ export type {
 } from './remote-session-block';
 export { RemoteSessionChatPanel } from './remote-session-chat-panel';
 export type { RemoteSessionChatPanelProps } from './remote-session-chat-panel';
-export { RemoteDesktopChatMessageRow } from './remote-desktop-chat-message-row';
+export { RemoteDesktopChatMessageRow, RemoteDesktopChatMessageRowSkeleton } from './remote-desktop-chat-message-row';
 export type { RemoteDesktopChatMessageRowProps } from './remote-desktop-chat-message-row';
 export { REMOTE_DESKTOP_CHAT_END_USER_NAME, RemoteDesktopChatPanel } from './remote-desktop-chat-panel';
 export type { RemoteDesktopChatPanelProps, RemoteDesktopChatTechnician } from './remote-desktop-chat-panel';

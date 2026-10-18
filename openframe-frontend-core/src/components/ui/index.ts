@@ -65,6 +65,9 @@ export * from './badge';
 export * from './ai-generated-badge';
 export * from './fade-preview';
 export * from './layout-hold';
+export * from './skeleton-surface';
+export * from './input-styles';
+export * from './loading-scope';
 export * from './progress';
 export * from './release-changelog-section';
 export * from './stacked-rows-panel';
@@ -181,7 +184,7 @@ export type {
 } from './query-report-table';
 
 // Pagination components
-export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
+export { CursorPagination, CursorPaginationSimple, CursorPaginationSkeleton } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 
 // DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.

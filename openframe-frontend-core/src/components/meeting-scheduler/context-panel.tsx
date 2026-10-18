@@ -4,8 +4,11 @@ import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar, AvatarStack, Button } from '../ui';
+import { AutocompleteSkeleton } from '../ui/autocomplete';
+import { useLoadingScope } from '../ui/loading-scope';
+import { SquareAvatarSkeleton } from '../ui/square-avatar';
 import { TimezoneSelect } from '../ui/timezone-select';
 
 /**
@@ -103,6 +106,15 @@ const BACK_BUTTON_CLASS = 'py-0';
  *  section headers. */
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
 
+/** One host's row and its text column, read by the panel and by its skeleton. */
+const HOST_ROW_CLASS = 'flex items-center gap-[var(--spacing-system-xs)]';
+const HOST_TEXT_CLASS = 'flex min-w-0 flex-col';
+/** The static duration line beside the host. */
+const DURATION_LINE_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
+/** The "Duration" field and its chips row. */
+const DURATION_FIELD_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
+const DURATION_CHIPS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-xs)]';
+
 /**
  * Same-footprint skeleton — swaps with the loaded panel with zero shift.
  * STATIC labels ("Duration", "Timezone") render REAL; only data-driven
@@ -112,10 +124,19 @@ export function ContextPanelSkeleton({
   className,
   onBack,
   backLabel = 'Back',
+  title = true,
+  description = true,
+  durations = 0,
 }: {
   className?: string;
   onBack?: () => void;
   backLabel?: string;
+  /** The loaded panel has the meeting's title line (a bar of it). Default true: a scheduling link has a title. */
+  title?: boolean;
+  /** The loaded panel has the meeting's description line (a bar of it). Default true. */
+  description?: boolean;
+  /** How many duration chips the loaded panel offers (more than 1 draws the "Duration" row). Default 0. */
+  durations?: number;
 }) {
   return (
     <div className={cn(PANEL_STACK, className)}>
@@ -127,19 +148,31 @@ export function ContextPanelSkeleton({
       <div className={STRIP_BODY}>
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
-            <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] content-lg:flex-none">
-              <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded-full" />
-              <div className="flex flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-                <UnifiedSkeleton className="h-5 w-32" />
-                <UnifiedSkeleton className="h-4 w-24" />
+            <div className={HOST_ROW_CLASS}>
+              <SquareAvatarSkeleton variant="round" size="sm" />
+              <div className={HOST_TEXT_CLASS}>
+                <TextLineSkeleton type="h4" className="w-32" />
+                <TextLineSkeleton type="h6" className="w-24" />
               </div>
             </div>
-            <UnifiedSkeleton className="h-4 w-20 shrink-0" />
+            <TextLineSkeleton type="h6" className="w-20 shrink-0" />
           </div>
+          {title && <TextLineSkeleton type="h3" className="w-3/5" />}
+          {description && <TextLineSkeleton type="h6" className="w-4/5" />}
+          {durations > 1 && (
+            <div className={DURATION_FIELD_CLASS}>
+              <p className={FIELD_LABEL_CLASS}>Duration</p>
+              <div className={DURATION_CHIPS_CLASS}>
+                {Array.from({ length: durations }, (_, i) => (
+                  <InteractiveSkeleton.Button key={i} size="small-legacy" className="w-16" />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className={STRIP_ASIDE}>
           <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          <UnifiedSkeleton className="h-12 w-full" />
+          <AutocompleteSkeleton />
         </div>
       </div>
     </div>
@@ -162,6 +195,20 @@ export function SchedulerContextPanel({
   showTimezone = true,
   className,
 }: SchedulerContextPanelProps) {
+  // While the meeting is read the panel is its skeleton (the hosts, title and durations are read data).
+  if (useLoadingScope()) {
+    return (
+      <ContextPanelSkeleton
+        onBack={onBack}
+        backLabel={backLabel}
+        title={title !== undefined}
+        description={description !== undefined && description !== null}
+        durations={locked ? 0 : durationsMs.length}
+        className={className}
+      />
+    );
+  }
+
   return (
     <div className={cn(PANEL_STACK, className)}>
       {/* The card's ONE back edge, at every step — the caller decides where it
@@ -178,7 +225,7 @@ export function SchedulerContextPanel({
             {hosts.length > 0 && hosts.length <= 3 && (
               <div className="flex flex-col gap-[var(--spacing-system-s)]">
                 {hosts.map(host => (
-                  <div key={host.name} className="flex items-center gap-[var(--spacing-system-xs)]">
+                  <div key={host.name} className={HOST_ROW_CLASS}>
                     <SquareAvatar
                       variant="round"
                       size="sm"
@@ -186,7 +233,7 @@ export function SchedulerContextPanel({
                       alt={host.name}
                       fallback={host.name}
                     />
-                    <div className="flex min-w-0 flex-col">
+                    <div className={HOST_TEXT_CLASS}>
                       <p className="truncate text-ods-text-primary text-h4">{host.name}</p>
                       {host.title && <p className="truncate text-ods-text-secondary text-h6">{host.title}</p>}
                     </div>
@@ -205,7 +252,7 @@ export function SchedulerContextPanel({
               ? // Post-selection, or a link that offers one length: a static line,
                 // which is what sits beside the host on the header-strip layouts.
                 selectedDurationMs != null && (
-                  <p className="shrink-0 text-ods-text-secondary text-h6">
+                  <p className={DURATION_LINE_CLASS}>
                     {formatDurationCompact(selectedDurationMs / 1000)} call
                   </p>
                 )
@@ -218,9 +265,9 @@ export function SchedulerContextPanel({
           {/* Several lengths on offer: chips, which need a full row of their
               own at every width — so they stay OUT of the identity row. */}
           {!locked && durationsMs.length > 1 && (
-            <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+            <div className={DURATION_FIELD_CLASS}>
               <p className={FIELD_LABEL_CLASS}>Duration</p>
-              <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">
+              <div className={DURATION_CHIPS_CLASS}>
                 {durationsMs.map(ms => (
                   <Button
                     key={ms}
@@ -255,7 +302,7 @@ export function SchedulerContextPanel({
                 }}
               />
             ) : (
-              <UnifiedSkeleton className="h-12 w-full" />
+              <AutocompleteSkeleton />
             )}
           </div>
         )}

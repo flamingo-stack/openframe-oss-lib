@@ -53,18 +53,19 @@ import { cn } from '../../utils/cn';
 import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../faq/faq-section';
-import { CommandBox } from '../features/command-box';
+import { CommandBox, CommandBoxSkeleton } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { LoadError } from '../ui/error-state';
+import { useLoadingScope } from '../ui/loading-scope';
 import { MobileAppQr } from '../ui/mobile-app-qr';
-import { StoreBadgeLinks } from '../ui/store-badges';
+import { AppStoreBadge, GooglePlayBadge, StoreBadgeLinks } from '../ui/store-badges';
 
 export interface DownloadAppsPageProps {
   /** GET endpoint for the public projection. Default `DOWNLOADS_API_PATH`. */
@@ -114,6 +115,13 @@ const CARD_CLASS =
 const CARD_HEADER_CLASS = 'flex items-center gap-[var(--spacing-system-sf)]';
 const BUTTONS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-sf)]';
 const COMMANDS_CLASS = 'flex flex-col gap-[var(--spacing-system-mf)]';
+const SCAN_CARD_CLASS = 'content-md:flex-row content-md:items-center content-md:justify-between';
+const QR_CLASS = 'h-[144px] w-[144px] shrink-0';
+/** `StoreBadgeLinks`' row and badge size, which the loading store card draws with the same artwork. */
+const STORE_BADGES_CLASS = 'flex flex-wrap items-center gap-[var(--spacing-system-lf)]';
+const STORE_BADGE_CLASS = 'h-12 w-auto';
+const MOBILE_STORE_CARD_LINE = 'Get alerts and respond to tickets on the go.';
+const MOBILE_SCAN_TITLE = 'Scan with your phone';
 
 const OS_ICONS: Partial<Record<DesktopOs, ComponentType<{ className?: string }>>> = {
   mac: AppleLogoIcon,
@@ -246,18 +254,61 @@ function WebCard({ web }: { web: DownloadAppsWebOption }) {
   );
 }
 
-/** A section's cards while the server's answer loads: the same grid and card frame, a button's box in each. */
-function CardsSkeleton({ label }: { label: string }) {
+/**
+ * The desktop cards while the server's answer loads: one card per system the page knows (`DESKTOP_OSES`, in the
+ * loaded grid's own rule), each with its real logo and name, the requirement line as a bar, the installer button's
+ * own skeleton and one install command's box (a system the deployment does not offer drops out when it lands).
+ */
+function SystemCardsSkeleton() {
   return (
-    <LoadingRegion label={label} className={CARDS_GRID_CLASS}>
-      {[0, 1].map(card => (
-        <div key={card} className={CARD_CLASS}>
-          <UnifiedSkeleton className="h-6 w-32 rounded" />
-          <UnifiedSkeleton className="h-12 w-56 rounded-md" />
-          <UnifiedSkeleton className="h-14 w-full rounded-md" />
+    <div className={cardsGridClass(DESKTOP_OSES.length)}>
+      {DESKTOP_OSES.map(os => {
+        const Icon = OS_ICONS[os];
+        return (
+          <div key={os} className={CARD_CLASS}>
+            <div className={CARD_HEADER_CLASS}>
+              {Icon && <Icon className="h-6 w-6 shrink-0 text-ods-text-secondary" />}
+              <h3 className="m-0 text-ods-text-primary text-h3">{DESKTOP_OS_LABELS[os]}</h3>
+              <TextLineSkeleton type="h6" className="ml-auto w-32" />
+            </div>
+            <div className={BUTTONS_CLASS}>
+              <InteractiveSkeleton.Button size="default" className="w-56" />
+            </div>
+            <div className={COMMANDS_CLASS}>
+              <CommandBoxSkeleton lines={1} showCopy />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The mobile cards while the server's answer loads: the store card (its line and both store badges, static artwork,
+ * real; the device name as a bar) and the scan card (its heading real, the address line and the code as skeletons).
+ */
+function MobileCardsSkeleton() {
+  return (
+    <div className={cardsGridClass(2)}>
+      <div className={CARD_CLASS}>
+        <div className={CARD_HEADER_CLASS}>
+          <TextLineSkeleton type="h3" className="w-48" />
         </div>
-      ))}
-    </LoadingRegion>
+        <p className="m-0 text-ods-text-secondary text-h4">{MOBILE_STORE_CARD_LINE}</p>
+        <div className={STORE_BADGES_CLASS} inert aria-hidden>
+          <AppStoreBadge className={STORE_BADGE_CLASS} />
+          <GooglePlayBadge className={STORE_BADGE_CLASS} />
+        </div>
+      </div>
+      <div className={cn(CARD_CLASS, SCAN_CARD_CLASS)}>
+        <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+          <CardHeader title={MOBILE_SCAN_TITLE} />
+          <TextLineSkeleton type="h4" lines={2} className="w-full" />
+        </div>
+        <UnifiedSkeleton className={QR_CLASS} />
+      </div>
+    </div>
   );
 }
 
@@ -292,6 +343,8 @@ export function DownloadAppsPage({
   faq,
 }: DownloadAppsPageProps) {
   const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData });
+  // In a page's loading state the answer is read: the page draws its sections' skeletons, never nothing.
+  const scoped = useLoadingScope();
   // The page adapts to the server's answer: a section exists only for what it names.
   const systems = showDesktop && data ? rowsBySystem(data.desktop) : [];
   const mobile = data?.mobile ?? null;
@@ -300,20 +353,21 @@ export function DownloadAppsPage({
   const offersDesktop = showDesktop && (!data || systems.length > 0);
 
   let body: ReactNode;
-  if (error && !data) {
+  if (error && !data && !scoped) {
     body = <LoadError message="Could not load the downloads" onRetry={reload} />;
-  } else if (!data) {
-    body = isLoading ? (
-      <>
+  } else if (!data || scoped) {
+    body = isLoading || scoped ? (
+      // ONE region announces the page's loading; the sections inside it are silent.
+      <LoadingRegion label="Loading the downloads" className={SECTIONS_CLASS}>
         {showDesktop && (
           <Section id="download-desktop" title="Desktop app">
-            <CardsSkeleton label="Loading the installers" />
+            <SystemCardsSkeleton />
           </Section>
         )}
         <Section id="download-mobile" title="Mobile app">
-          <CardsSkeleton label="Loading the mobile app" />
+          <MobileCardsSkeleton />
         </Section>
-      </>
+      </LoadingRegion>
     ) : null;
   } else {
     body = (
@@ -333,7 +387,7 @@ export function DownloadAppsPage({
             <div className={cardsGridClass(mobile.install ? 2 : 1)}>
               <div className={CARD_CLASS}>
                 <CardHeader title={storeCardTitle(mobile)} />
-                <p className="m-0 text-ods-text-secondary text-h4">Get alerts and respond to tickets on the go.</p>
+                <p className="m-0 text-ods-text-secondary text-h4">{MOBILE_STORE_CARD_LINE}</p>
                 <StoreBadgeLinks
                   appStoreUrl={mobile.appStoreUrl}
                   googlePlayUrl={mobile.googlePlayUrl}
@@ -341,16 +395,14 @@ export function DownloadAppsPage({
                 />
               </div>
               {mobile.install && (
-                <div
-                  className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}
-                >
+                <div className={cn(CARD_CLASS, SCAN_CARD_CLASS)}>
                   <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-                    <CardHeader title="Scan with your phone" />
+                    <CardHeader title={MOBILE_SCAN_TITLE} />
                     <p className="m-0 text-ods-text-secondary text-h4">
                       Point your camera at the code, or open {formatUrlForDisplay(mobile.install.url)} on your phone.
                     </p>
                   </div>
-                  <MobileAppQr install={mobile.install} className="h-[144px] w-[144px] shrink-0" />
+                  <MobileAppQr install={mobile.install} className={QR_CLASS} />
                 </div>
               )}
             </div>

@@ -7,16 +7,12 @@ import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import type { ChatApprovalStatus } from '../../chat/types';
 import { Button } from '../../ui/button';
-import { NotificationTile } from './notification-tile';
+import { LOCKSCREEN_APPROVAL_BUTTON_CLASS, NotificationTile } from './notification-tile';
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
 import type { Notification } from './types';
 
-/**
- * The two buttons on a lock-screen notification: compact and their own width.
- * Stretched to fill the tile they dwarfed the notification wherever the tile
- * is wide (a phone-width page shows it at the full content width).
- */
-const LOCKSCREEN_BUTTON = 'h-9 min-w-24';
+/** The two buttons on a lock-screen notification (shared with the tile's skeleton). */
+const LOCKSCREEN_BUTTON = LOCKSCREEN_APPROVAL_BUTTON_CLASS;
 
 export interface ApprovalRequestNotificationTileProps {
   notification: Notification;

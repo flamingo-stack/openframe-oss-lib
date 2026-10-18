@@ -5,6 +5,8 @@ import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -40,6 +42,12 @@ export const SQUARE_AVATAR_SIZE_CLASS = {
   xl: 'h-16 w-16',
 } as const;
 
+/** The avatar's corner at each variant, read by the avatar and by its skeleton. */
+const SQUARE_AVATAR_VARIANT_CLASS = {
+  square: 'rounded-md',
+  round: 'rounded-full',
+} as const;
+
 const SquareAvatar = memo(
   forwardRef<HTMLDivElement, SquareAvatarProps>(
     (
@@ -58,7 +66,13 @@ const SquareAvatar = memo(
       },
       ref,
     ) => {
-      const resolvedSrc = useAuthedImageSrc(src);
+      // In a loading scope the avatar is its skeleton, and its image is not fetched.
+      const held = useLoadingScope();
+      const authedSrc = useAuthedImageSrc(held ? undefined : src);
+      if (held) {
+        return <SquareAvatarSkeleton size={size} sizePx={sizePx} variant={variant} className={className} />;
+      }
+      const resolvedSrc = authedSrc;
       const sizeClasses = SQUARE_AVATAR_SIZE_CLASS;
 
       const sizePxBySize = {
@@ -69,10 +83,7 @@ const SquareAvatar = memo(
         xl: 64,
       };
 
-      const variantClasses = {
-        square: 'rounded-md',
-        round: 'rounded-full',
-      };
+      const variantClasses = SQUARE_AVATAR_VARIANT_CLASS;
 
       return (
         <div
@@ -140,3 +151,24 @@ const SquareAvatar = memo(
 SquareAvatar.displayName = 'SquareAvatar';
 
 export { SquareAvatar };
+
+/** A SquareAvatar while its person is read: a box of the avatar's own size and corner. */
+export function SquareAvatarSkeleton({
+  size = 'md',
+  sizePx,
+  variant = 'square',
+  className,
+}: Pick<SquareAvatarProps, 'size' | 'sizePx' | 'variant' | 'className'>) {
+  return (
+    <UnifiedSkeleton
+      className={cn(
+        'shrink-0',
+        sizePx === undefined && SQUARE_AVATAR_SIZE_CLASS[size],
+        SQUARE_AVATAR_VARIANT_CLASS[variant],
+        className,
+      )}
+      width={sizePx}
+      height={sizePx}
+    />
+  );
+}

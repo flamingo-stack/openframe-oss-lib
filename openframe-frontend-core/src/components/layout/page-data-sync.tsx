@@ -19,15 +19,27 @@ interface PageDataSyncState {
 
 interface PageDataSyncContextValue {
   state: PageDataSyncState;
-  report: (state: PageDataSyncState) => void;
+  report: (state: PageDataSyncState | ((prev: PageDataSyncState) => PageDataSyncState)) => void;
 }
 
 const PageDataSyncContext = createContext<PageDataSyncContextValue | null>(null);
 
 const EMPTY: PageDataSyncState = { sync: null, loading: false };
+/**
+ * Before the list below has reported (its first paint, the server's HTML), the row is loading: a page that has the
+ * row has a list that states its sync, so its line's skeleton holds the row instead of the row appearing later.
+ */
+const NOT_REPORTED: PageDataSyncState = { sync: null, loading: true };
 
 export function PageDataSyncProvider({ children }: { children: ReactNode }) {
-  const [state, report] = useState<PageDataSyncState>(EMPTY);
+  const [state, report] = useState<PageDataSyncState>(NOT_REPORTED);
+  // The children's effects run before this one: a list that states its sync has reported by now. When none has, the
+  // page states no sync and the row's skeleton goes (a page whose list never reports must not hold it forever).
+  useEffect(() => {
+    // After the commit (a task, not inside the effect): every list mounted with the page has reported by then.
+    const timer = setTimeout(() => report(prev => (prev === NOT_REPORTED ? EMPTY : prev)), 0);
+    return () => clearTimeout(timer);
+  }, []);
   const value = useMemo(() => ({ state, report }), [state]);
   return <PageDataSyncContext.Provider value={value}>{children}</PageDataSyncContext.Provider>;
 }

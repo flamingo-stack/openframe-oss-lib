@@ -16,6 +16,8 @@ import {
 } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 export interface TabItem {
@@ -150,6 +152,21 @@ interface IndicatorRect {
 }
 
 const HIDDEN_INDICATOR: IndicatorRect = { left: 0, width: 0 };
+
+/** The strip's layout, read by the strip and by its skeleton, so the skeleton is the strip's size. */
+const STRIP_FRAME_CLASS = 'relative w-full';
+const STRIP_ROW_CLASS = 'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden';
+const ADMIN_TAB_GAP_CLASS = 'gap-[var(--spacing-system-xxs)]';
+const TAB_CLASS =
+  'group relative flex shrink-0 items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]';
+const TAB_AVATAR_GAP_CLASS = 'gap-[var(--spacing-system-xsf)]';
+const TAB_STRETCH_CLASS = 'flex-1';
+const tabAlignClass = (tabAlign: 'center' | 'start') =>
+  tabAlign === 'start' ? 'justify-start text-left' : 'justify-center';
+/** A tab with a second line: the label and its sublabel, beside each other from md, stacked below. */
+const TAB_SUBLABEL_WRAP_CLASS =
+  'flex min-w-0 flex-col items-start text-left content-md:flex-row content-md:items-baseline content-md:gap-[var(--spacing-system-xsf)]';
+const STRIP_BORDER_CLASS = 'pointer-events-none absolute bottom-0 left-0 right-0 h-px';
 
 const StatusDot = ({ indicator, className }: { indicator: NonNullable<TabItem['indicator']>; className?: string }) => (
   <div
@@ -423,15 +440,12 @@ const TabBar = memo(function TabBarImpl({
   }
 
   return (
-    <div className={cn('relative w-full', className)}>
+    <div className={cn(STRIP_FRAME_CLASS, className)}>
       {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows.
           `relative` makes this the offsetParent the underline is measured against. */}
       <div
         ref={scrollRef}
-        className={cn(
-          'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden',
-          isAdmin && 'gap-[var(--spacing-system-xxs)]',
-        )}
+        className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}
       >
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
@@ -444,8 +458,9 @@ const TabBar = memo(function TabBarImpl({
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
               className={cn(
-                'group relative flex shrink-0 cursor-pointer items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
-                tabAlign === 'start' ? 'justify-start text-left' : 'justify-center',
+                TAB_CLASS,
+                'cursor-pointer',
+                tabAlignClass(tabAlign),
                 // Named rather than `transition-all`: the only thing that moves
                 // here is colour.
                 'border-none bg-transparent outline-none transition-colors duration-200',
@@ -454,8 +469,8 @@ const TabBar = memo(function TabBarImpl({
                 // can tab through it with nothing to show where you are. Inset,
                 // so it stays within the button and never overlaps a neighbour.
                 'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-                stretchTabs && 'flex-1',
-                tab.avatar && 'gap-[var(--spacing-system-xsf)]',
+                stretchTabs && TAB_STRETCH_CLASS,
+                tab.avatar && TAB_AVATAR_GAP_CLASS,
                 // `default`: the open tab is marked by the underline alone, no surface
                 // of its own. `admin`: the open and the hovered tab carry an accent
                 // fade. ODS colour vars hold hex values, so Tailwind alpha modifiers
@@ -492,7 +507,7 @@ const TabBar = memo(function TabBarImpl({
               ) : null}
 
               {tab.sublabel ? (
-                <span className="flex min-w-0 flex-col items-start text-left content-md:flex-row content-md:items-baseline content-md:gap-[var(--spacing-system-xsf)]">
+                <span className={TAB_SUBLABEL_WRAP_CLASS}>
                   <span
                     className={cn(
                       'whitespace-nowrap transition-colors text-h4',
@@ -571,10 +586,69 @@ const TabBar = memo(function TabBarImpl({
       )}
 
       {/* Bottom border — a gradient-capable 1px line that fades to transparent on any edge that has an active fade shadow. */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px" style={borderStyle} />
+      <div className={STRIP_BORDER_CLASS} style={borderStyle} />
     </div>
   );
 });
+
+export interface TabNavigationSkeletonProps {
+  /** How many tabs the strip draws. */
+  count: number;
+  /** Each tab leads with an avatar: a 24px circle before its label. */
+  avatar?: boolean;
+  /** Each tab carries a quieter second line (`TabItem.sublabel`): beside the label from md, under it below. */
+  sublabel?: boolean;
+  stretchTabs?: boolean;
+  tabAlign?: 'center' | 'start';
+  variant?: TabNavigationVariant;
+  className?: string;
+}
+
+/**
+ * The strip while its tabs are read: the same strip, tab padding and gaps, each label a bar at the label's type
+ * step, and the strip's bottom border drawn for real. `TabNavigation` draws it in a loading scope.
+ */
+export function TabNavigationSkeleton({
+  count,
+  avatar = false,
+  sublabel = false,
+  stretchTabs = false,
+  tabAlign = 'center',
+  variant,
+  className,
+}: TabNavigationSkeletonProps) {
+  const providedVariant = useContext(TabNavigationVariantContext);
+  const isAdmin = (variant ?? providedVariant) === 'admin';
+  return (
+    <div className={cn(STRIP_FRAME_CLASS, className)} aria-hidden>
+      <div className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}>
+        {Array.from({ length: count }, (_, i) => (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tabs never reorder
+            key={i}
+            className={cn(
+              TAB_CLASS,
+              tabAlignClass(tabAlign),
+              stretchTabs && TAB_STRETCH_CLASS,
+              avatar && TAB_AVATAR_GAP_CLASS,
+            )}
+          >
+            {avatar && <UnifiedSkeleton variant="circular" className="size-6 shrink-0" />}
+            {sublabel ? (
+              <span className={TAB_SUBLABEL_WRAP_CLASS}>
+                <TextLineSkeleton as="span" type="h4" className="w-20" />
+                <TextLineSkeleton as="span" type="h6" className="w-28" />
+              </span>
+            ) : (
+              <TextLineSkeleton type="h4" className="w-20" />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className={cn(STRIP_BORDER_CLASS, 'bg-ods-border')} />
+    </div>
+  );
+}
 
 export function TabNavigation({
   activeTab: controlledActiveTab,
@@ -751,9 +825,22 @@ export function TabNavigation({
   //    body can mark itself while it waits.
   const deferredActiveTab = useDeferredValue(activeTab);
   const isStale = activeTab !== deferredActiveTab;
+  // In a loading scope the strip is its skeleton; the body below draws its own loading state.
+  const loading = useLoadingScope();
 
   return (
     <>
+      {loading ? (
+        <TabNavigationSkeleton
+          count={tabs.length}
+          avatar={tabs.some(tab => tab.avatar)}
+          sublabel={tabs.some(tab => tab.sublabel)}
+          stretchTabs={stretchTabs}
+          tabAlign={tabAlign}
+          variant={variant}
+          className={className}
+        />
+      ) : (
       <TabBar
         tabs={tabs}
         activeTab={activeTab}
@@ -767,6 +854,7 @@ export function TabNavigation({
         progressTransitionMs={progressTransitionMs}
         variant={variant}
       />
+      )}
 
       {/* Render children with active tab if provided */}
       {children && children(deferredActiveTab, { isStale })}

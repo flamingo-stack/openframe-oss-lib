@@ -614,9 +614,18 @@ function cardEntry<Row>(definition: {
  *  which host-supplied `ProgramConfig` they render with. A group whose config
  *  the host didn't supply renders nothing (the skeleton still reserves its
  *  height, so a rail that never resolves collapses instead of flickering). */
+/** Gallery thumbnails an event card's skeleton draws: the gallery row's first fold (the row scrolls past it). */
+const EVENT_CARD_SKELETON_MEDIA = 4;
+
 function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRegistryEntry {
   return cardEntry({
-    skeleton: size => <ProgramCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    // An event's list API serves its gallery (the loaded card draws its photo row), the other programs' none.
+    skeleton: size => (
+      <ProgramCardSkeleton
+        size={size === 'sm' ? 'sm' : 'default'}
+        media={configKey === 'event' ? EVENT_CARD_SKELETON_MEDIA : 0}
+      />
+    ),
     decode: decodeProgramRow,
     render: (item, ctx) => {
       const config = ctx.extras?.programConfigs?.[configKey];
@@ -761,7 +770,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
    *  step-numbered 'default' variant is for the guide detail page's "More in
    *  section" rail, not this full-width row. */
   onboarding_guide: cardEntry({
-    skeleton: size => <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />,
+    skeleton: size => <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} published={false} />,
     decode: decodeOnboardingGuideRow,
     render: (guide, ctx) => (
       <OnboardingGuideCard

@@ -13,6 +13,7 @@ import {
 import { contentFetch } from '../../utils/embed-content-fetch';
 import { navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
+import { useLoadingScope } from '../ui/loading-scope';
 import { useDocNavigation } from './doc-navigation-context';
 
 function scrollToContent() {
@@ -226,6 +227,9 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
   const [error, setError] = useState<string | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const lastFetchedPath = useRef<string | null>(null);
+  // In a loading scope nothing is fetched: the viewer reports itself loading, so it draws its own skeleton.
+  const held = useLoadingScope();
+  const heldRef = useRef(held);
 
   const normalizedBaseRoute = baseRoute.replace(/\/$/, '');
 
@@ -484,6 +488,7 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     // useEffect issues the correct fetch after structure arrives — the
     // speculative result silently no-ops (the content state update gets
     // overwritten by the targeted fetch).
+    if (heldRef.current) return;
     const latest = latestRef.current;
     const speculativeContentPath = latest.cleanInitialPath || latest.folderIndexFile;
     lastFetchedPath.current = speculativeContentPath;

@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 /**
  * StackedRowsPanel — a single bordered card that stacks rows inside it.
@@ -67,7 +69,22 @@ export interface StackedRowsPanelProps {
   /** Optional uppercase caption rendered above the card. */
   title?: string;
   className?: string;
+  /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty). */
+  skeleton?: StackedRowsPanelSkeletonShape;
 }
+
+/** How many rows a loading panel draws, and how many value/label columns each carries. */
+export interface StackedRowsPanelSkeletonShape {
+  /** Rows drawn. Default {@link STACKED_ROWS_SKELETON_COUNT}. */
+  rows?: number;
+  /** Columns per row; one is a full-width title/caption row. Default 1. */
+  columns?: number;
+  /** Each cell carries a label under its value. Default `true`. */
+  labels?: boolean;
+}
+
+/** Rows a loading panel draws when its caller names no count. */
+export const STACKED_ROWS_SKELETON_COUNT = 3;
 
 const ALIGN_CLASS: Record<PanelColumnAlign, string> = {
   left: 'justify-start items-start',
@@ -93,6 +110,13 @@ const HIDE_CLASS: Record<PanelHideAt, string> = {
 // the joined-row pattern used across the detail layouts (56px mobile, 80px tablet+).
 const ROW_CLASS =
   'flex items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] min-h-14 content-md:min-h-20 border-b border-ods-border last:border-b-0';
+// A single-column row is a full-width title/subtitle row, padded symmetrically.
+const FULL_WIDTH_ROW_CLASS =
+  'flex items-center gap-[var(--spacing-system-m)] border-b border-ods-border p-[var(--spacing-system-m)] last:border-b-0';
+const CARD_CLASS = 'flex flex-col overflow-clip rounded-md border border-ods-border bg-ods-card';
+const TITLED_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
+const TITLE_CLASS = 'uppercase text-ods-text-secondary text-h5';
+const DEFAULT_WIDTH_CLASS = 'flex-[1_0_0] min-w-0';
 
 function CellValue({ column }: { column: PanelColumn }) {
   const valueNode = (
@@ -131,7 +155,7 @@ function CellValue({ column }: { column: PanelColumn }) {
 }
 
 function PanelCell({ column }: { column: PanelColumn }) {
-  const widthClass = column.width ?? 'flex-[1_0_0] min-w-0';
+  const widthClass = column.width ?? DEFAULT_WIDTH_CLASS;
   const hideClass = column.hideAt ? HIDE_CLASS[column.hideAt] : 'flex';
 
   if (column.content !== undefined) {
@@ -171,10 +195,7 @@ function PanelRowView({ row }: { row: PanelRow }) {
   // A single-column row is a full-width title/subtitle row: pad symmetrically
   // (ODS `m`) instead of using a fixed column-row height.
   const rowClass = isFullWidth
-    ? cn(
-        'flex items-center gap-[var(--spacing-system-m)] border-b border-ods-border p-[var(--spacing-system-m)] last:border-b-0',
-        row.className,
-      )
+    ? cn(FULL_WIDTH_ROW_CLASS, row.className)
     : cn(ROW_CLASS, row.className);
 
   return (
@@ -186,9 +207,13 @@ function PanelRowView({ row }: { row: PanelRow }) {
   );
 }
 
-export function StackedRowsPanel({ rows, title, className }: StackedRowsPanelProps) {
+export function StackedRowsPanel({ rows, title, className, skeleton }: StackedRowsPanelProps) {
+  // In a page's loading state with no rows yet (they are read) the panel is its skeleton; rows it is given there
+  // are the page's own copy and draw as they are.
+  const inScope = useLoadingScope();
+  if (inScope && rows.length === 0) return <StackedRowsPanelSkeleton {...skeleton} title={title} className={className} />;
   const card = (
-    <div className="flex flex-col overflow-clip rounded-md border border-ods-border bg-ods-card">
+    <div className={CARD_CLASS}>
       {rows.map(row => (
         <PanelRowView key={row.id} row={row} />
       ))}
@@ -200,8 +225,42 @@ export function StackedRowsPanel({ rows, title, className }: StackedRowsPanelPro
   }
 
   return (
-    <div className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', className)}>
-      <p className="uppercase text-ods-text-secondary text-h5">{title}</p>
+    <div className={cn(TITLED_CLASS, className)}>
+      <p className={TITLE_CLASS}>{title}</p>
+      {card}
+    </div>
+  );
+}
+
+/**
+ * A StackedRowsPanel while its rows are read: the same card and row heights, each cell's value a `text-h4` bar
+ * over its label's `text-h6` bar. The title above the card is the page's own and draws as it is.
+ */
+export function StackedRowsPanelSkeleton({
+  rows = STACKED_ROWS_SKELETON_COUNT,
+  columns = 1,
+  labels = true,
+  title,
+  className,
+}: StackedRowsPanelSkeletonShape & Pick<StackedRowsPanelProps, 'title' | 'className'>) {
+  const card = (
+    <div className={CARD_CLASS} aria-hidden>
+      {Array.from({ length: rows }, (_, row) => (
+        <div key={row} className={columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS}>
+          {Array.from({ length: columns }, (_cell, column) => (
+            <div key={column} className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
+              <TextLineSkeleton type="h4" className="w-1/2" />
+              {labels && <TextLineSkeleton type="h6" className="w-3/4" />}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+  if (!title) return <div className={className}>{card}</div>;
+  return (
+    <div className={cn(TITLED_CLASS, className)}>
+      <p className={TITLE_CLASS}>{title}</p>
       {card}
     </div>
   );

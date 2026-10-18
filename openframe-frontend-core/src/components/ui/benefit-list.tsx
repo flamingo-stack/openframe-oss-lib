@@ -5,12 +5,24 @@ import { FileOffIcon } from '../icons-v2-generated/documents/file-off-icon';
 import { CreditCardXmarkIcon } from '../icons-v2-generated/finance/credit-card-xmark-icon';
 import { FlaskVialIcon } from '../icons-v2-generated/school/flask-vial-icon';
 import { XmarkAltIcon } from '../icons-v2-generated/signs-and-symbols/xmark-alt-icon';
+import { TextHold } from './layout-hold';
 
 export interface BenefitItem {
   /** Drawn at 16px in the quiet colour. */
   icon?: ReactNode;
   label: string;
+  /**
+   * The words carry read data that is not here yet ("Trusted by {count} MSPs" before the count): the mark is drawn
+   * as it is and the words as a bar exactly their width (pass the copy with its slot unfilled: the page's own words,
+   * never shown, only measured).
+   */
+  loading?: boolean;
 }
+
+/** A benefit's layout, read by the benefit and by its loading form. */
+const BENEFIT_ITEM_CLASS = 'flex items-center gap-[var(--spacing-system-xs)]';
+const BENEFIT_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary [&_svg]:size-4';
+const BENEFIT_LABEL_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 
 /** The mark of each of the trial's terms, wherever a term is listed. */
 export const TRIAL_TERM_ICONS = {
@@ -80,16 +92,20 @@ export function BenefitList({
       )}
     >
       {all.map(item => (
-        <li key={item.label} className="flex items-center gap-[var(--spacing-system-xs)]">
+        <li key={item.label} className={BENEFIT_ITEM_CLASS}>
           {item.icon && (
-            <span
-              className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary [&_svg]:size-4"
-              aria-hidden
-            >
+            <span className={BENEFIT_ICON_CLASS} aria-hidden>
               {item.icon}
             </span>
           )}
-          <span className="whitespace-nowrap text-ods-text-primary text-h4">{item.label}</span>
+          {item.loading ? (
+            // A bar exactly as wide as the copy (the page's own words, its slot unfilled), so the row keeps its box.
+            <span className={BENEFIT_LABEL_CLASS}>
+              <TextHold>{item.label}</TextHold>
+            </span>
+          ) : (
+            <span className={BENEFIT_LABEL_CLASS}>{item.label}</span>
+          )}
         </li>
       ))}
     </ul>

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { cn } from '../utils/cn';
 import { faqItemAnchor } from '../utils/faq-anchor';
 import { Chevron02DownIcon } from './icons-v2-generated/arrows/chevron-02-down-icon';
+import { TextLineSkeleton } from './loading/unified-skeleton';
+import { useLoadingScope } from './ui/loading-scope';
 
 export interface FaqItem {
   id: number | string;
@@ -16,8 +18,24 @@ interface FaqAccordionProps {
   defaultOpenIds?: (number | string)[];
 }
 
+/** The accordion's layout, read by the accordion and by its skeleton, so the skeleton is the accordion's size. */
+const ACCORDION_FRAME_CLASS = 'divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent';
+const ROW_HEADER_CLASS = 'flex w-full items-center gap-6 px-6 py-4 text-left content-md:gap-10';
+const QUESTION_CLASS = 'min-w-0 flex-1 break-words';
+const CHEVRON_CLASS = 'shrink-0 text-ods-text-primary';
+/**
+ * Rows the accordion's skeleton draws when not told how many: one screen of closed rows, from the row's layout. A
+ * closed row is `py-4` around one `text-h3` line from `content-md` (57px with its divider: 13 under a 900px desktop
+ * viewport once the block's heading sits above them) and about one and a half lines on a phone (about 62px: 12 under
+ * an 844px one). 12 fills the first screen at both widths without drawing a second.
+ */
+export const FAQ_ACCORDION_SKELETON_ROWS = 12;
+
 export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) {
   const [openSet, setOpenSet] = useState<Set<string | number>>(new Set(defaultOpenIds));
+  // In a loading scope the items are the empty record: the accordion is its skeleton.
+  const loading = useLoadingScope();
+  if (loading) return <FaqAccordionSkeleton count={items.length || undefined} />;
 
   const toggle = (id: string | number) => {
     setOpenSet(prev => {
@@ -29,7 +47,7 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
   };
 
   return (
-    <div className="divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
+    <div className={ACCORDION_FRAME_CLASS}>
       {items.map(item => {
         const isOpen = openSet.has(item.id);
 
@@ -56,16 +74,16 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
                 }
               }}
               aria-expanded={isOpen}
-              className="flex w-full cursor-pointer items-center gap-6 px-6 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus content-md:gap-10"
+              className={cn(
+                ROW_HEADER_CLASS,
+                'cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
+              )}
             >
-              <h3 className="min-w-0 flex-1 break-words">{item.question}</h3>
+              <h3 className={QUESTION_CLASS}>{item.question}</h3>
               <Chevron02DownIcon
                 aria-hidden="true"
                 size={24}
-                className={cn(
-                  'shrink-0 text-ods-text-primary transition-transform duration-300',
-                  isOpen && 'rotate-180',
-                )}
+                className={cn(CHEVRON_CLASS, 'transition-transform duration-300', isOpen && 'rotate-180')}
               />
             </div>
             {/* Content wrapper. Collapses with the grid 1fr->0fr transition the
@@ -90,6 +108,40 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The accordion while its questions are read: the bordered list of `count` closed rows, each question a bar (two
+ * lines on a phone, one from `content-md`) inside the row's own `h3`, the chevron real.
+ */
+export function FaqAccordionSkeleton({
+  count = FAQ_ACCORDION_SKELETON_ROWS,
+  className,
+}: {
+  count?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn(ACCORDION_FRAME_CLASS, className)} aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+        <div key={i} className={ROW_HEADER_CLASS}>
+          <h3 className={QUESTION_CLASS}>
+            {/* On a phone about every other question wraps to a second line; from `content-md` each is one line. */}
+            {i % 2 === 0 ? (
+              <>
+                <TextLineSkeleton type="inherit" as="span" lines={2} className="w-5/6 content-md:hidden" />
+                <TextLineSkeleton type="inherit" as="span" className="hidden w-5/6 content-md:block" />
+              </>
+            ) : (
+              <TextLineSkeleton type="inherit" as="span" className="w-5/6" />
+            )}
+          </h3>
+          <Chevron02DownIcon aria-hidden="true" size={24} className={CHEVRON_CLASS} />
+        </div>
+      ))}
     </div>
   );
 }

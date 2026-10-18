@@ -33,7 +33,10 @@ import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
-import { buildBaseComponents } from './base-components';
+import { cn } from '../../../utils/cn';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../loading-scope';
+import { buildBaseComponents, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,
@@ -178,7 +181,23 @@ export interface MarkdownEngineProps {
    * streaming can never permanently diverge from the settled output.
    */
   streaming?: boolean;
+  /**
+   * The shape drawn while the content is read (a page's loading state, where `content` is empty): this many
+   * sections, each a heading and its paragraphs. Unset, one paragraph of `skeletonLines` lines.
+   */
+  skeletonSections?: number;
+  /** Lines of the one paragraph a loading body draws when it names no sections. Default 3. */
+  skeletonLines?: number;
 }
+
+/** Lines a loading body draws when its caller names no shape. */
+export const MARKDOWN_SKELETON_LINES = 3;
+/** Paragraphs under each heading of a loading body, and their lines. */
+const SKELETON_SECTION_PARAGRAPHS = [3, 2] as const;
+/** The renderer's own frame: read by the engine and by its skeleton. */
+const RENDERER_CLASS = 'simple-markdown-renderer';
+const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
+const ARTICLE_CLASS = 'prose prose-lg max-w-none';
 
 /**
  * One memoized completed block of a streaming message. Parent-level memos
@@ -363,15 +382,15 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   );
 
   return (
-    <div className={`simple-markdown-renderer ${className}`}>
+    <div className={`${RENDERER_CLASS} ${className}`}>
       {/* Mermaid's <style> is rendered by MermaidDiagram itself — one tag
           per mounted diagram instead of one per engine instance (i.e. per
           chat segment), where the overwhelming majority render no diagram. */}
       {/* `overflow-wrap: anywhere` is inherited from `.simple-markdown-renderer`
           in app-globals.css — do NOT re-add `break-words` here, it would
           override the cascade with the weaker `break-word` for this subtree. */}
-      <div className="content-wrapper max-w-none">
-        <article className="prose prose-lg max-w-none">
+      <div className={CONTENT_WRAPPER_CLASS}>
+        <article className={ARTICLE_CLASS}>
           <HeadingIdMapContext.Provider value={headingIds}>{body}</HeadingIdMapContext.Provider>
         </article>
       </div>
@@ -389,4 +408,70 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
  * cards stay mounted. The streaming path additionally memoizes completed
  * atomic blocks so the in-flight message re-parses only its live tail.
  */
-export const MarkdownEngine = memo(MarkdownEngineImpl);
+export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEngineProps) {
+  // In a page's loading state with no content yet (it is read) the body is its skeleton; content it is given
+  // there is the page's own and renders as it is.
+  const inScope = useLoadingScope();
+  if (inScope && !props.content) {
+    return (
+      <MarkdownEngineSkeleton
+        sections={props.skeletonSections}
+        lines={props.skeletonLines}
+        textSize={props.textSize}
+        className={props.className}
+      />
+    );
+  }
+  return <MarkdownEngineImpl {...props} />;
+});
+
+/** A paragraph of `lines` lines at the body's own paragraph type, as one bar of its line height. */
+function ParagraphBar({ lines, className }: { lines: number; className: string }) {
+  return (
+    <div className={className}>
+      <TextLineSkeleton type="inherit" lines={lines} className="w-full" />
+    </div>
+  );
+}
+
+/**
+ * A markdown body while it is read: the renderer's own frame and type. With `sections`, each section is a REAL
+ * `<h2>` (the renderer's heading classes) holding a bar, then its paragraphs; without, one paragraph of `lines`
+ * lines. Every bar takes the line height of the element it stands for, at the body's text size.
+ */
+export function MarkdownEngineSkeleton({
+  sections,
+  lines = MARKDOWN_SKELETON_LINES,
+  textSize,
+  className = '',
+}: {
+  sections?: number;
+  lines?: number;
+  textSize?: TextSizeConfig;
+  className?: string;
+}) {
+  const textSizes = resolveTextSizeConfig(textSize);
+  const paragraphClass = cn(MARKDOWN_PARAGRAPH_CLASS, textSizes.p);
+  return (
+    // `w-full`: bars have no width of their own, so in a shrink-to-fit parent (a flex item) the skeleton would be
+    // 0px wide where the loaded text fills its line.
+    <div className={`${RENDERER_CLASS} w-full ${className}`} aria-hidden>
+      <div className={CONTENT_WRAPPER_CLASS}>
+        <div className={ARTICLE_CLASS}>
+          {sections
+            ? Array.from({ length: sections }, (_, section) => (
+                <div key={section}>
+                  <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
+                    <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
+                  </h2>
+                  {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
+                    <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
+                  ))}
+                </div>
+              ))
+            : <ParagraphBar lines={lines} className={paragraphClass} />}
+        </div>
+      </div>
+    </div>
+  );
+}

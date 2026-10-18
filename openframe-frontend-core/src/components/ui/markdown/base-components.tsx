@@ -16,6 +16,7 @@ import { cn } from '../../../utils/cn';
 import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
 import { renderedLinkRel } from '../../../utils/markdown-link';
 import { getHashTargetElement, navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import { useLoadingScope } from '../loading-scope';
 import { extractText, resolveFallbackHeadingId, useAssignedHeadingIds, useHeadingId } from './heading-ids';
 import { MermaidDiagram } from './mermaid-diagram';
 import type { TextSizeElement } from './text-size';
@@ -64,8 +65,19 @@ export interface StandardLeafRenderers {
  * the engine's cap: 400x400 intrinsic, `w-auto h-auto max-h-[400px]` drives
  * the actual rendered box; click-to-expand surfaces provide full resolution.
  */
+/**
+ * The page title, a section heading and a paragraph of rendered markdown (before the text size): read by the
+ * renderer and by every skeleton that stands in for a markdown body.
+ */
+export const MARKDOWN_H1_CLASS = 'mb-4 mt-8 font-sans font-bold text-ods-text-primary first:mt-0';
+export const MARKDOWN_H2_CLASS = 'mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary';
+export const MARKDOWN_PARAGRAPH_CLASS = 'mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0';
+
 const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, alt }) => {
-  const resolvedSrc = useAuthedImageSrc(src);
+  // In a loading scope the image is a box (the image shim draws it), and nothing is fetched.
+  const inScope = useLoadingScope();
+  const authedSrc = useAuthedImageSrc(inScope ? undefined : src);
+  const resolvedSrc = inScope ? src : authedSrc;
   if (!resolvedSrc) return null;
   return (
     <Image
@@ -235,11 +247,8 @@ export function buildBaseComponents({
     ...buildStandardLeafRenderers({ textSizes }),
 
     // --- headings ---
-    h1: makeHeading('h1', cn('mb-4 mt-8 font-sans font-bold text-ods-text-primary first:mt-0', textSizes.h1)),
-    h2: makeHeading(
-      'h2',
-      cn('mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary', textSizes.h2),
-    ),
+    h1: makeHeading('h1', cn(MARKDOWN_H1_CLASS, textSizes.h1)),
+    h2: makeHeading('h2', cn(MARKDOWN_H2_CLASS, textSizes.h2)),
     h3: makeHeading('h3', cn('mb-3 mt-6 font-sans font-semibold text-ods-text-primary', textSizes.h3)),
     h4: makeHeading('h4', cn('mb-2 mt-4 font-sans font-semibold text-ods-text-primary', textSizes.h4)),
     h5: makeHeading('h5', cn('mb-2 mt-3 font-sans font-semibold text-ods-text-primary', textSizes.h5)),
@@ -247,7 +256,7 @@ export function buildBaseComponents({
 
     // --- paragraph ---
     p: ({ children }: MdRenderProps<'p'>) => (
-      <p className={cn('mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0', textSizes.p)}>{children}</p>
+      <p className={cn(MARKDOWN_PARAGRAPH_CLASS, textSizes.p)}>{children}</p>
     ),
 
     // --- links ---

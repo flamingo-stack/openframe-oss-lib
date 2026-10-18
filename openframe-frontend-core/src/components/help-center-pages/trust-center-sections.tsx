@@ -33,6 +33,7 @@ import {
   type TrustCenterSubprocessor,
   type TrustFrameworkMonitoringEntry,
 } from '../../types/trust-center';
+import { cn } from '../../utils/cn';
 import { getFlagFromCountryName } from '../../utils/country-phone-utils';
 import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
@@ -47,17 +48,20 @@ import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
 import { LoadingRegion } from '../loading/loading-region';
-import { TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { Button } from '../ui/button/button';
 import { ComplianceLogo } from '../ui/compliance-badge';
+import { DataAttributionSkeleton } from '../ui/data-attribution';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
 import { ScrollShadow } from '../ui/scroll-fade';
 import { SearchInput } from '../ui/search-input';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
-import { StatusBadge } from '../ui/status-badge';
-import { TabNavigation, type TabItem } from '../ui/tab-navigation';
+import { StatusBadge, StatusBadgeSkeleton } from '../ui/status-badge';
+import { StatusIndicatorSkeleton } from '../ui/status-indicator';
+import { TabNavigation, TabNavigationSkeleton, type TabItem } from '../ui/tab-navigation';
 
 /** Monitoring `icon` vocabulary (owned by `TRUST_FRAMEWORK_MONITORING`) → icon component, ONE lookup. */
 const FRAMEWORK_ICONS: Record<TrustFrameworkMonitoringEntry['icon'], typeof ShieldCheckIcon> = {
@@ -232,6 +236,16 @@ function countLabel(n: number, noun: string): string {
  */
 const CONTROLS_LIST_HEIGHT = 'h-[calc(5*3.5rem+7px)] content-md:h-[calc(5*5rem+7px)]';
 
+/** The controls section's stack, loaded and loading. */
+const CONTROLS_SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-m)]';
+/** The controls toolbar (summary line + search), loaded and loading. */
+const CONTROLS_TOOLBAR_CLASS =
+  'flex flex-col gap-[var(--spacing-system-s)] content-md:flex-row content-md:items-center content-md:justify-between';
+const CONTROLS_SEARCH_CLASS = 'w-full content-md:w-80';
+const CONTROLS_SEARCH_PLACEHOLDER = 'Search controls';
+/** Category tabs the Controls skeleton draws (the categories are read). */
+const CONTROLS_SKELETON_TABS = 4;
+
 /** Skeleton rows shown in the list box while the server's answer is on its way: exactly the box's visible rows. */
 const CONTROLS_SKELETON_ROWS = 5;
 
@@ -295,9 +309,11 @@ export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: Tr
   const activeDomain = current?.domain ?? domain;
   const activeTab = activeDomain ? controlsTabId(activeDomain) : '';
 
-  let summary: string;
+  let summary: ReactNode;
   if (answer.error && !current) summary = 'Controls are unavailable';
-  else if (!current) summary = typedQuery ? `Searching for “${typedQuery}”…` : 'Loading…';
+  else if (!current && typedQuery) summary = `Searching for “${typedQuery}”…`;
+  // A category's first read: the summary's line as the skeleton's own bar (`ControlsSectionSkeleton`).
+  else if (!current) summary = <ControlsSummarySkeleton />;
   else if (query)
     summary = `${current.controls.length} in ${current.domain} match “${query}” · ${countLabel(total, 'control')} in total`;
   else summary = `${countLabel(current.controls.length, 'passing control')} in ${current.domain}`;
@@ -325,7 +341,7 @@ export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: Tr
   }
 
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-m)]">
+    <div className={CONTROLS_SECTION_CLASS}>
       <TabNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -333,13 +349,13 @@ export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: Tr
           setDomain(categories.find(category => controlsTabId(category.domain) === tabId)?.domain ?? null)
         }
       />
-      <div className="flex flex-col gap-[var(--spacing-system-s)] content-md:flex-row content-md:items-center content-md:justify-between">
+      <div className={CONTROLS_TOOLBAR_CLASS}>
         <p className={BODY_TEXT} aria-live="polite">
           {summary}
         </p>
-        <div className="w-full content-md:w-80">
+        <div className={CONTROLS_SEARCH_CLASS}>
           <SearchInput
-            placeholder="Search controls"
+            placeholder={CONTROLS_SEARCH_PLACEHOLDER}
             value={typed}
             onChange={setTyped}
             debounceMs={0}
@@ -567,73 +583,108 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
 // Skeleton
 // ---------------------------------------------------------------------------
 
-/** A section's heading and lead, exactly as `TrustSection` renders them (real text: it does not load). */
-function SkeletonSection({ id, children }: { id: TrustCenterSectionId; children: ReactNode }) {
-  const label = TRUST_CENTER_SECTIONS.find(section => section.id === id)?.label ?? id;
-  const lead = TRUST_SECTION_LEADS[id];
-  return (
-    <section aria-hidden="true" className="flex flex-col gap-[var(--spacing-system-m)]">
-      <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-        <h2 className={SECTION_HEADING_CLASS}>{label}</h2>
-        {lead ? <p className={BODY_TEXT}>{lead}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
+/**
+ * Rows each panel's skeleton draws: what one screen of that section shows under its heading (about 120px, so 724px
+ * of a 390x844 phone and 780px of a 1440x900 desktop), from each panel's measured row height (phone / desktop):
+ * compliance 107 / 81 (its description wraps to four phone lines), documents 56 / 81, subprocessors 58 / 77, AI and
+ * data use 157 / 105 (seven phone lines, two wide). The panels show every row, so a section with fewer settles once;
+ * the counts come from the layout, never the data.
+ */
+const TRUST_PANEL_FOLD = {
+  compliance: { phone: 6, wide: 9 },
+  documents: { phone: 12, wide: 9 },
+  subprocessors: { phone: 12, wide: 10 },
+  ai: { phone: 4, wide: 7 },
+} as const;
+type TrustPanelFold = (typeof TRUST_PANEL_FOLD)[keyof typeof TRUST_PANEL_FOLD];
+/**
+ * The height of each section's row description while loading (`text-h6` lines, measured against the loaded rows):
+ * the Vanta descriptions wrap to more lines on a phone than from `content-md` up.
+ */
+const TRUST_SKELETON_LABEL = {
+  oneLine: { phone: 1, wide: 1 },
+  compliance: { phone: 4, wide: 1 },
+  ai: { phone: 7, wide: 2 },
+} as const;
+type TrustSkeletonLabel = (typeof TRUST_SKELETON_LABEL)[keyof typeof TRUST_SKELETON_LABEL];
+
 
 /**
  * Rows of the REAL `StackedRowsPanel` (its own row heights and borders) whose
  * cells hold bars: a mark (a 40px compliance logo or a 24px glyph), a value over
  * a label, and the right-hand badge or button in the page's `ACTION_COLUMN`.
  */
-function skeletonRows(count: number, shape: { mark: 'logo' | 'glyph'; action: 'badge' | 'button' }): PanelRow[] {
-  return Array.from({ length: count }, (_, index) => ({
+function skeletonRows(
+  fold: TrustPanelFold,
+  shape: { mark: 'logo' | 'glyph'; action: 'badge' | 'button' | 'none'; label?: TrustSkeletonLabel },
+): PanelRow[] {
+  const label = shape.label ?? TRUST_SKELETON_LABEL.oneLine;
+  return Array.from({ length: Math.max(fold.phone, fold.wide) }, (_, index) => ({
     id: `skeleton-${index}`,
+    // A row past one width's fold is left out at that width (the panel's row is `flex`).
+    className: cn(index >= fold.phone && 'hidden content-md:flex', index >= fold.wide && 'content-md:hidden'),
     columns: [
       {
+        // The loaded rows' own cell (leading mark, `text-h4` value over a wrapping `text-h6` label): the panel lays
+        // the bars out exactly as it lays out the text.
         key: 'item',
-        content: (
-          <div className="flex w-full items-center gap-[var(--spacing-system-s)]">
-            <UnifiedSkeleton
-              className={shape.mark === 'logo' ? 'size-10 shrink-0 rounded-full' : 'size-6 shrink-0 rounded'}
-            />
-            <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-              <UnifiedSkeleton variant="text" className="h-5 w-1/3 content-md:h-6" />
-              <TextSkeleton.Body className="w-1/2" />
-            </div>
-          </div>
+        leadingIcon: (
+          <UnifiedSkeleton
+            className={shape.mark === 'logo' ? 'size-10 shrink-0 rounded-full' : 'size-6 shrink-0 rounded'}
+          />
         ),
+        value: <TextLineSkeleton type="inherit" as="span" className="w-1/3" />,
+        label: (
+          <>
+            <TextLineSkeleton type="inherit" as="span" lines={label.phone} className="w-full content-md:hidden" />
+            <TextLineSkeleton type="inherit" as="span" lines={label.wide} className="hidden w-full content-md:block" />
+          </>
+        ),
+        wrap: true,
       },
-      {
-        key: 'action',
-        width: ACTION_COLUMN,
-        align: 'right',
-        content:
-          shape.action === 'badge' ? (
-            <UnifiedSkeleton className="h-4 w-28 rounded" />
-          ) : (
-            <UnifiedSkeleton className="h-6 w-16 rounded content-md:h-8" />
-          ),
-      },
+      ...(shape.action === 'none'
+        ? []
+        : [
+            {
+              key: 'action',
+              width: ACTION_COLUMN,
+              align: 'right' as const,
+              content:
+                shape.action === 'badge' ? (
+                  <StatusBadgeSkeleton />
+                ) : (
+                  // The rows' action is a `size="small"` Button: its own size classes.
+                  <InteractiveSkeleton.Button size="small" className="w-16" />
+                ),
+            },
+          ]),
     ],
   }));
 }
 
-/** The Controls section while loading: its tab strip, its summary and search, and the list box's own skeleton. */
+/** The controls summary line while its counts are read. */
+function ControlsSummarySkeleton() {
+  return <TextLineSkeleton as="span" type="h6" className="w-48" />;
+}
+
+/** The Controls section while loading: its tab strip, its summary and the real search, and the list box's skeleton. */
 function ControlsSectionSkeleton() {
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-m)]">
-      <div className="flex items-center gap-[var(--spacing-system-xxs)] overflow-hidden">
-        {[0, 1, 2, 3].map(index => (
-          <div key={index} className="shrink-0 p-[var(--spacing-system-m)]">
-            <UnifiedSkeleton variant="text" className="h-5 w-36 content-md:h-6" />
-          </div>
-        ))}
-      </div>
-      <div className="flex flex-col gap-[var(--spacing-system-s)] content-md:flex-row content-md:items-center content-md:justify-between">
-        <TextSkeleton.Body className="w-48" />
-        <UnifiedSkeleton className="h-11 w-full rounded-[6px] content-md:h-12 content-md:w-80" />
+    <div className={CONTROLS_SECTION_CLASS}>
+      <TabNavigationSkeleton count={CONTROLS_SKELETON_TABS} />
+      <div className={CONTROLS_TOOLBAR_CLASS}>
+        <p className={BODY_TEXT}>
+          <ControlsSummarySkeleton />
+        </p>
+        <div className={CONTROLS_SEARCH_CLASS}>
+          <SearchInput
+            placeholder={CONTROLS_SEARCH_PLACEHOLDER}
+            value=""
+            onChange={() => undefined}
+            debounceMs={0}
+            showDropdown={false}
+          />
+        </div>
       </div>
       <div className={CONTROLS_LIST_HEIGHT}>
         <ControlsListSkeleton />
@@ -642,67 +693,66 @@ function ControlsSectionSkeleton() {
   );
 }
 
-/** The section rail while loading: `StickySectionNav`'s line and its 40px items. */
-function SectionRailSkeleton() {
-  return (
-    <div className="sticky" style={{ top: STICKY_HEADER_OFFSET_PX }}>
-      <div className="relative">
-        <div
-          className="absolute -left-0.5 top-0 w-px bg-ods-border"
-          style={{ height: TRUST_CENTER_SECTIONS.length * 40 }}
-        />
-        {TRUST_CENTER_SECTIONS.map(section => (
-          <div key={section.id} className="flex h-10 items-center px-3 py-2">
-            <TextSkeleton.Body className="w-24" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+export interface TrustCenterSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  /** The status row's sync line (`TrustCenterPage`'s `attribution`). Default true. */
+  attribution?: boolean;
+  /** The status row's PDF link (static: drawn as given). */
+  download?: ReactNode;
+  /**
+   * The FAQ section's content while loading (the page's `FaqSection` in a scope, which draws its own skeleton).
+   * Absent: the FAQ is not drawn in the sections column (the page draws it last, after the host's content).
+   */
+  faq?: ReactNode;
 }
 
 /**
- * The page BODY while the trust center loads: built on the loaded body's own
- * layout classes and the real section headings and panels, so nothing moves when
- * the content replaces it. The status row, then Compliance, Controls and
- * Documents (what fills the first screens), beside the section rail.
+ * The page BODY while the trust center loads: the loaded body's own layout classes, the status row (status and sync
+ * line as skeletons, the PDF link real), then EVERY section in the page's order with its real heading and lead and
+ * its content as a skeleton (the Contact section is static: drawn for real), beside the real section rail.
  */
-export function TrustCenterSkeleton({
-  region = true,
-}: {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-} = {}) {
+export function TrustCenterSkeleton({ region = true, attribution = true, download, faq }: TrustCenterSkeletonProps = {}) {
+  const content: Record<TrustCenterSectionId, ReactNode> = {
+    compliance: <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.compliance, {
+          mark: 'logo',
+          action: 'badge',
+          label: TRUST_SKELETON_LABEL.compliance,
+        })} />,
+    controls: <ControlsSectionSkeleton />,
+    documents: <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.documents, { mark: 'glyph', action: 'button' })} />,
+    subprocessors: (
+      <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.subprocessors, { mark: 'glyph', action: 'none' })} />
+    ),
+    ai: <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.ai, { mark: 'glyph', action: 'none', label: TRUST_SKELETON_LABEL.ai })} />,
+    contact: <ContactSection onContact={() => undefined} />,
+    faq,
+  };
+  const sections = TRUST_CENTER_SECTIONS.filter(section => section.id !== 'faq' || faq !== undefined);
   return (
     <>
-      <div className={TRUST_STATUS_ROW_CLASS} aria-hidden="true">
-        <div className="flex items-center gap-1.5">
-          <UnifiedSkeleton className="size-3 rounded-full" />
-          <TextSkeleton.Body className="w-44" />
-        </div>
-        {/* `DataAttribution`'s own layout: two lines below `sm`, one row above it. */}
-        <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xsf)] content-sm:flex-row content-sm:items-center content-sm:gap-[var(--spacing-system-sf)]">
-          <div className="flex items-center gap-[var(--spacing-system-xsf)]">
-            <UnifiedSkeleton className="size-4 rounded" />
-            <TextSkeleton.Body className="w-36" />
-          </div>
-          <TextSkeleton.Body className="w-44" />
-        </div>
+      {/* Inert: the real controls drawn here (the PDF link, the search, Contact's button, the rail) are not usable
+          while the page loads. */}
+      <div className={TRUST_STATUS_ROW_CLASS} aria-hidden="true" inert>
+        <StatusIndicatorSkeleton />
+        {attribution ? <DataAttributionSkeleton action={download} /> : null}
       </div>
       <LoadingRegion label="Loading the trust center" announce={region} className={TRUST_BODY_GRID_CLASS}>
-        <div className={TRUST_SECTIONS_COLUMN_CLASS}>
-          <SkeletonSection id="compliance">
-            <StackedRowsPanel rows={skeletonRows(3, { mark: 'logo', action: 'badge' })} />
-          </SkeletonSection>
-          <SkeletonSection id="controls">
-            <ControlsSectionSkeleton />
-          </SkeletonSection>
-          <SkeletonSection id="documents">
-            <StackedRowsPanel rows={skeletonRows(2, { mark: 'glyph', action: 'button' })} />
-          </SkeletonSection>
+        <div className={TRUST_SECTIONS_COLUMN_CLASS} aria-hidden="true" inert>
+          {sections.map(section => (
+            <TrustSection key={section.id} id={section.id} title={section.label} lead={TRUST_SECTION_LEADS[section.id]}>
+              {content[section.id]}
+            </TrustSection>
+          ))}
         </div>
-        <aside className="hidden content-lg:block" aria-hidden="true">
-          <SectionRailSkeleton />
+        <aside className="hidden content-lg:block" aria-hidden="true" inert>
+          <div className="sticky" style={{ top: STICKY_HEADER_OFFSET_PX }}>
+            <StickySectionNav
+              sections={TRUST_CENTER_SECTIONS.map(section => ({ id: section.id, label: section.label }))}
+              activeSection={TRUST_CENTER_SECTIONS[0].id}
+              onSectionClick={() => undefined}
+            />
+          </div>
         </aside>
       </LoadingRegion>
     </>

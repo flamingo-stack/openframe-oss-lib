@@ -20,8 +20,11 @@
  * code goes through the barrel (`@flamingo-stack/.../embed-shims`).
  */
 'use client';
-import { forwardRef, type ComponentType, type ImgHTMLAttributes, type Ref } from 'react';
+import { forwardRef, type ComponentType, type CSSProperties, type ImgHTMLAttributes, type Ref } from 'react';
 
+import { UnifiedSkeleton } from '../components/loading/unified-skeleton';
+import { useLoadingScope } from '../components/ui/loading-scope';
+import { cn } from '../utils/cn';
 import { fetchPriorityProp } from '../utils/fetch-priority';
 
 type ImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, 'src' | 'placeholder'> & {
@@ -87,7 +90,39 @@ export function resizedImageUrl(src: string, widthPx: number): string {
   return resizer ? resizer(src, widthPx) : src;
 }
 
+/** A size class on the picture's own classes: its width or height comes from CSS, not from its attributes. */
+const SIZED_BY_CLASS = /(?:^|\s)(?:[a-z0-9-]+:)*(?:w|h|size|inset)-(?!auto(?:\s|$))/;
+
+/**
+ * The picture in a loading scope: a box where the picture would be, and nothing fetched. It keeps the picture's
+ * own classes (its size, radius, position) and its proportions (the `width` / `height` it states), so the box is
+ * the size the picture is drawn at.
+ */
+function HeldImage({ className, style, width, height, fill }: ImageProps) {
+  const w = Number(width);
+  const h = Number(height);
+  const ratio = w > 0 && h > 0 ? `${w} / ${h}` : undefined;
+  const boxStyle = fill
+    ? { position: 'absolute' as const, inset: 0, width: '100%', height: '100%', ...style }
+    : { aspectRatio: ratio, width: SIZED_BY_CLASS.test(className ?? '') || !(w > 0) ? undefined : w, ...style };
+  const { width: boxWidth, height: boxHeight, ...rest } = boxStyle as CSSProperties;
+  return (
+    <UnifiedSkeleton
+      as="span"
+      variant="rectangular"
+      width={boxWidth}
+      height={boxHeight}
+      // The picture's own classes last, so its size and radius win over the skeleton's defaults.
+      className={cn('inline-block h-auto w-auto max-w-full', className)}
+      style={{ ...rest, objectFit: undefined, objectPosition: undefined }}
+    />
+  );
+}
+
 const Image = forwardRef<HTMLImageElement, ImageProps>(function NextImageShim({ optimizedWidth, ...given }, ref) {
+  // In a loading scope the picture is a box of its own size, and it is not fetched.
+  const held = useLoadingScope();
+  if (held) return <HeldImage {...given} />;
   // A picture asked for at a width is the host resizer's URL, drawn as it comes.
   const props: ImageProps =
     optimizedWidth && resizer && typeof given.src === 'string'

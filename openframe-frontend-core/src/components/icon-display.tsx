@@ -5,6 +5,8 @@ import Image from '../embed-shims/next-image';
 import { cn } from '../utils/cn';
 import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
+import { useLoadingScope } from './ui/loading-scope';
 
 /** Unified icon value used across the app (announcement bar, chat quick actions,
  *  AI-agent identity). Exactly one of `name`/`url` is typically set. */
@@ -40,6 +42,13 @@ export function EntityIcon({
   // An agent named by its slug is drawn from its identity (`AgentIdentityProvider`):
   // its uploaded picture, or the glyph the identity names with the identity's props.
   const identity = useAgentIdentityIcon(icon?.url ? null : icon?.name);
+  const held = useLoadingScope();
+  // In a loading scope the icon is data still being read: a box of its size.
+  if (held) {
+    return (
+      <UnifiedSkeleton as="span" width={size} height={size} className={cn('inline-block shrink-0 rounded-md', className)} />
+    );
+  }
   if (!icon?.url && identity?.url) {
     // An agent's picture: a square file, cropped to a circle like every picture of an agent.
     return (

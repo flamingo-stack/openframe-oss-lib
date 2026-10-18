@@ -4,6 +4,7 @@ import type React from 'react';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Badge } from '../ui/badge';
 import { SectionSelector } from './section-selector';
 
@@ -491,8 +492,10 @@ function UnifiedUI({ state, handlers, config, iframeRef }: UnifiedUIProps) {
 
         {/* Loading Skeleton */}
         {showSkeleton && (
-          <div className="absolute inset-0 z-10 flex h-full w-full animate-pulse items-center justify-center rounded-lg bg-ods-skeleton">
-            <div className="text-center">
+          // A static frame: the skeleton surface pulses behind the words, which stay outside it (still).
+          <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-lg">
+            <UnifiedSkeleton variant="rectangular" className="absolute inset-0 h-full" />
+            <div className="relative text-center">
               <div className="text-ods-text-primary text-h2">
                 Warming up <span className="text-ods-open-yellow">Fae</span> and{' '}
                 <span className="text-ods-open-yellow">Mingo</span>

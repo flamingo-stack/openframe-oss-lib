@@ -4,7 +4,9 @@ import { Monitor } from 'lucide-react';
 import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
+import { OrganizationCardSkeleton } from '../loading/organization-card-skeleton';
 import { EntityImage } from './entity-image';
+import { useLoadingScope } from './loading-scope';
 
 export interface Organization {
   id: string;
@@ -22,6 +24,18 @@ export interface Organization {
    *  fields declared above. */
   [key: string]: unknown;
 }
+
+/** The card's corner radius, read by the card and by `OrganizationCardSkeleton`. */
+export const ORGANIZATION_CARD_RADIUS_CLASS = 'rounded-[6px]';
+/** The card's layout, read by the card and by `OrganizationCardSkeleton`, so the skeleton is the card's size. */
+export const ORGANIZATION_CARD_LAYOUT_CLASS = 'relative flex w-full flex-col gap-3 overflow-clip p-4';
+export const ORGANIZATION_CARD_SURFACE_CLASS = 'border border-ods-border bg-ods-card';
+export const ORGANIZATION_CARD_HEADER_CLASS = 'flex w-full items-start gap-3';
+export const ORGANIZATION_CARD_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col justify-center py-2';
+export const ORGANIZATION_CARD_DESCRIPTION_CLASS = 'h-12 w-full overflow-hidden';
+export const ORGANIZATION_CARD_FOOTER_CLASS = 'flex w-full min-w-0 items-center justify-between gap-2';
+export const ORGANIZATION_CARD_STATS_CLASS = 'flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4';
+export const ORGANIZATION_CARD_STAT_CLASS = 'flex flex-shrink-0 items-center gap-1';
 
 export interface OrganizationCardProps {
   organization: Organization;
@@ -56,6 +70,16 @@ export function OrganizationCard({
   customFooter,
   deviceCount,
 }: OrganizationCardProps) {
+  // In a page's loading state the organization is read: the card is its skeleton.
+  if (useLoadingScope()) {
+    return (
+      <OrganizationCardSkeleton
+        className={className}
+        showDescription={Boolean(organization.description)}
+        showFooter={Boolean(customFooter || footerStats)}
+      />
+    );
+  }
   const handleActionClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -65,7 +89,9 @@ export function OrganizationCard({
   const card = (
     <div
       className={cn(
-        'relative flex w-full flex-col gap-3 overflow-clip rounded-[6px] border border-ods-border bg-ods-card p-4',
+        ORGANIZATION_CARD_LAYOUT_CLASS,
+        ORGANIZATION_CARD_SURFACE_CLASS,
+        ORGANIZATION_CARD_RADIUS_CLASS,
         'transition-colors',
         href && 'cursor-pointer hover:border-ods-border-hover hover:bg-ods-card-hover',
         className,
@@ -97,10 +123,10 @@ export function OrganizationCard({
       )}
 
       {/* Header */}
-      <div className="flex w-full items-start gap-3">
+      <div className={ORGANIZATION_CARD_HEADER_CLASS}>
         <EntityImage src={fetchedImageUrl || organization.imageUrl} alt={organization.name} />
 
-        <div className="flex min-w-0 flex-1 flex-col justify-center py-2">
+        <div className={ORGANIZATION_CARD_TEXT_CLASS}>
           <h3 className="truncate text-ods-text-primary transition-colors text-h3" title={organization.name}>
             {organization.name}
           </h3>
@@ -115,7 +141,7 @@ export function OrganizationCard({
 
       {/* Description */}
       {organization.description && (
-        <div className="h-12 w-full overflow-hidden">
+        <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS}>
           <p className="line-clamp-2 text-ods-text-primary text-h4" title={organization.description}>
             {organization.description}
           </p>
@@ -126,10 +152,10 @@ export function OrganizationCard({
       {customFooter ? (
         customFooter
       ) : footerStats && footerStats.length > 0 ? (
-        <div className="flex w-full min-w-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4">
+        <div className={ORGANIZATION_CARD_FOOTER_CLASS}>
+          <div className={ORGANIZATION_CARD_STATS_CLASS}>
             {footerStats.map((stat, index) => (
-              <div key={index} className="flex flex-shrink-0 items-center gap-1">
+              <div key={index} className={ORGANIZATION_CARD_STAT_CLASS}>
                 {stat.icon}
                 <span className="text-ods-text-primary text-h6">
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}

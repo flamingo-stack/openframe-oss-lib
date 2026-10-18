@@ -2,7 +2,8 @@
 
 import { useSearchParams, usePathname } from '../embed-shims/next-navigation';
 import { withQuery } from '../utils/search-params';
-import { Pagination } from './pagination';
+import { Pagination, PaginationSkeleton } from './pagination';
+import { useLoadingScope } from './ui/loading-scope';
 
 interface UnifiedPaginationProps {
   currentPage: number;
@@ -32,6 +33,7 @@ export function UnifiedPagination({
 }: UnifiedPaginationProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
+  const loading = useLoadingScope();
 
   /**
    * The address of a page of this list: the current URL with `page` set. Page 1
@@ -69,6 +71,19 @@ export function UnifiedPagination({
       });
     }, 0);
   };
+
+  // While the list is read its page count is not known (0 in a loading state): the pager is its skeleton, never
+  // left out, so the content above it keeps its place.
+  if (loading) {
+    return (
+      <div className={className}>
+        <PaginationSkeleton
+          totalPages={totalPages > 1 ? totalPages : undefined}
+          currentPage={totalPages > 1 ? currentPage : undefined}
+        />
+      </div>
+    );
+  }
 
   // Don't render pagination if there's only one page (optionally holding the
   // row's height so the content above it does not shift).

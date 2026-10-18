@@ -4,8 +4,11 @@ import { ChevronDown } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
+import { cn } from '../../utils/cn';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Badge } from './badge';
 import { FadePreview } from './fade-preview';
+import { useLoadingScope } from './loading-scope';
 import { RichMarkdownRenderer } from './markdown';
 
 interface ReleaseChangelogSectionProps {
@@ -39,11 +42,33 @@ interface ReleaseChangelogSectionProps {
    *  (YouTube, OG cards, etc.) work out of the box. Hosts that already
    *  wrap with a Supabase-aware preset can keep passing their own. */
   MarkdownRenderer?: React.ComponentType<{ content: string }>;
+  /** Mark the loaded section `data-loading-optional`: a block its page's loading state does not draw. */
+  loadingOptional?: boolean;
 }
 
 // Collapsed height for the preview-first mode. ~120px shows the first
 // entry's title + the start of its description before the mask kicks in.
 const PREVIEW_COLLAPSED_HEIGHT = 120;
+
+/** The section's layout, read by the section and by its skeleton, so the skeleton is the section's size. */
+const SECTION_CLASS = 'space-y-4';
+const COLLAPSIBLE_TITLE_ROW_CLASS = 'flex w-full cursor-pointer items-center justify-between';
+const TITLE_BASE_CLASS = 'flex items-center gap-2 text-h2';
+const titleClass = (isBreaking: boolean) =>
+  `${TITLE_BASE_CLASS} ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`;
+const COUNT_BADGE_CLASS = 'ml-2';
+const CHEVRON_CLASS = 'h-4 w-4 shrink-0 text-ods-text-secondary transition-transform duration-200';
+const ENTRY_LIST_CLASS = 'space-y-6';
+const ENTRY_CLASS = 'ml-0 border-l-2 border-ods-border pl-4';
+const ENTRY_TITLE_CLASS =
+  'mb-2 text-ods-text-primary text-h3 [&_p+p]:!mt-2 [&_p]:!my-0 [&_p]:!text-[length:var(--font-size-h3-body)] [&_p]:!font-bold [&_p]:!leading-[var(--font-line-space-h3-body)]';
+const ENTRY_DESCRIPTION_CLASS =
+  'text-ods-text-primary text-h4 [&_p]:!text-[length:var(--font-size-h4-body)] [&_p]:!font-medium [&_p]:!leading-[var(--font-line-space-h4-body)]';
+/** FadePreview's toggle row: a `size="compact"` link Button (h-6, at every width) under a `mf` gap. */
+const COMPACT_BUTTON_HEIGHT_CLASS = 'h-6';
+const PREVIEW_TOGGLE_SKELETON_CLASS = cn('mt-[var(--spacing-system-mf)] w-28', COMPACT_BUTTON_HEIGHT_CLASS);
+/** Entries a skeleton draws when it is not told how many (the first fold of a section). */
+const CHANGELOG_SKELETON_ENTRIES = 1;
 
 export function ReleaseChangelogSection({
   title,
@@ -55,8 +80,23 @@ export function ReleaseChangelogSection({
   previewFirst = false,
   icon,
   MarkdownRenderer = RichMarkdownRenderer,
+  loadingOptional = false,
 }: ReleaseChangelogSectionProps) {
   const [collapsed, setCollapsed] = useState(collapsible ? defaultCollapsed : false);
+  const loading = useLoadingScope();
+
+  if (loading)
+    return (
+      <ReleaseChangelogSectionSkeleton
+        title={title}
+        isBreaking={isBreaking}
+        hideTitle={hideTitle}
+        collapsible={collapsible}
+        defaultCollapsed={defaultCollapsed}
+        previewFirst={previewFirst}
+        icon={icon}
+      />
+    );
 
   if (!entries || entries.length === 0) return null;
 
@@ -65,34 +105,30 @@ export function ReleaseChangelogSection({
   const showEntries = !collapsible || !collapsed;
 
   return (
-    <div className="space-y-4">
+    <div className={SECTION_CLASS} data-loading-optional={loadingOptional || undefined}>
       {!hideTitle &&
         (collapsible ? (
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
-            className="flex w-full cursor-pointer items-center justify-between"
+            className={COLLAPSIBLE_TITLE_ROW_CLASS}
           >
-            <h2
-              className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}
-            >
+            <h2 className={titleClass(isBreaking)}>
               {icon}
               {title}
-              <Badge variant="secondary" className="ml-2">
+              <Badge variant="secondary" className={COUNT_BADGE_CLASS}>
                 {entries.length}
               </Badge>
             </h2>
             <ChevronDown
-              className={`h-4 w-4 shrink-0 text-ods-text-secondary transition-transform duration-200 ${
-                !collapsed ? 'rotate-180' : ''
-              }`}
+              className={`${CHEVRON_CLASS} ${!collapsed ? 'rotate-180' : ''}`}
             />
           </button>
         ) : (
-          <h2 className={`flex items-center gap-2 text-h2 ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`}>
+          <h2 className={titleClass(isBreaking)}>
             {icon}
             {title}
-            <Badge variant="secondary" className="ml-2">
+            <Badge variant="secondary" className={COUNT_BADGE_CLASS}>
               {entries.length}
             </Badge>
           </h2>
@@ -129,9 +165,9 @@ function ChangelogEntryList({
   MarkdownRenderer: React.ComponentType<{ content: string }>;
 }) {
   return (
-    <ul className="space-y-6">
+    <ul className={ENTRY_LIST_CLASS}>
       {entries.map((entry, index) => (
-        <li key={index} className="ml-0 border-l-2 border-ods-border pl-4">
+        <li key={index} className={ENTRY_CLASS}>
           {/* Entry title — run through the SAME markdown renderer as the
               description so inline markdown (links like `[label](url)`,
               emphasis) renders instead of showing as raw text, then pinned
@@ -140,7 +176,7 @@ function ChangelogEntryList({
               so plain-text titles look exactly as before. `[&_p]:!my-0`
               strips the renderer's paragraph margins; `mb-2` keeps the gap to
               the description. */}
-          <div className="mb-2 text-ods-text-primary text-h3 [&_p+p]:!mt-2 [&_p]:!my-0 [&_p]:!text-[length:var(--font-size-h3-body)] [&_p]:!font-bold [&_p]:!leading-[var(--font-line-space-h3-body)]">
+          <div className={ENTRY_TITLE_CLASS}>
             <MarkdownRenderer content={entry.title} />
           </div>
           {entry.description && (
@@ -151,10 +187,96 @@ function ChangelogEntryList({
                inflate the changelog body to 20px. The `[&_p]:!` overrides
                pin every descendant `<p>` back to the h4 responsive tokens
                so the breakpoints stay aligned with the rest of the page. */
-            <div className="text-ods-text-primary text-h4 [&_p]:!text-[length:var(--font-size-h4-body)] [&_p]:!font-medium [&_p]:!leading-[var(--font-line-space-h4-body)]">
+            <div className={ENTRY_DESCRIPTION_CLASS}>
               <MarkdownRenderer content={entry.description} />
             </div>
           )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export interface ReleaseChangelogSectionSkeletonProps {
+  /** The section's heading (static copy: drawn for real). */
+  title: string;
+  /** Entries drawn when not `previewFirst` (the first fold). Default 1. */
+  count?: number;
+  isBreaking?: boolean;
+  hideTitle?: boolean;
+  collapsible?: boolean;
+  defaultCollapsed?: boolean;
+  /** The preview-first mode: the first entry clamped to the preview height, then the toggle row. */
+  previewFirst?: boolean;
+  icon?: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * A changelog section while it is read: the real icon and heading, the count badge as a chip, the first entry (title
+ * line and description lines) as bars, clamped to the preview height with FadePreview's toggle row in preview mode.
+ */
+export function ReleaseChangelogSectionSkeleton({
+  title,
+  count = CHANGELOG_SKELETON_ENTRIES,
+  isBreaking = false,
+  hideTitle = false,
+  collapsible = false,
+  defaultCollapsed = true,
+  previewFirst = false,
+  icon,
+  className,
+}: ReleaseChangelogSectionSkeletonProps) {
+  const heading = (
+    <h2 className={titleClass(isBreaking)}>
+      {icon}
+      {title}
+      {/* Badge: text-xs (16px line) + py-0.5 + a 1px border, px-2.5 around one or two digits. */}
+      <InteractiveSkeleton.Chip className={cn(COUNT_BADGE_CLASS, 'h-[22px] w-7')} />
+    </h2>
+  );
+  const inPreviewMode = previewFirst && !collapsible;
+  const showEntries = !collapsible || !defaultCollapsed;
+  const list = <ChangelogEntryListSkeleton count={inPreviewMode ? 1 : count} />;
+  return (
+    <div className={cn(SECTION_CLASS, className)} aria-hidden>
+      {!hideTitle &&
+        (collapsible ? (
+          <div className={COLLAPSIBLE_TITLE_ROW_CLASS}>
+            {heading}
+            <ChevronDown className={cn(CHEVRON_CLASS, !defaultCollapsed && 'rotate-180')} />
+          </div>
+        ) : (
+          heading
+        ))}
+      {showEntries &&
+        (inPreviewMode ? (
+          <div className="relative">
+            <div className="overflow-hidden" style={{ maxHeight: PREVIEW_COLLAPSED_HEIGHT }}>
+              {list}
+            </div>
+            <UnifiedSkeleton className={PREVIEW_TOGGLE_SKELETON_CLASS} />
+          </div>
+        ) : (
+          list
+        ))}
+    </div>
+  );
+}
+
+function ChangelogEntryListSkeleton({ count }: { count: number }) {
+  return (
+    <ul className={ENTRY_LIST_CLASS}>
+      {Array.from({ length: count }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton entries never reorder
+        <li key={index} className={ENTRY_CLASS}>
+          <div className={ENTRY_TITLE_CLASS}>
+            <TextLineSkeleton type="h3" className="w-2/3" />
+          </div>
+          <div className={ENTRY_DESCRIPTION_CLASS}>
+            {/* Five lines: in preview mode the entry runs past the 120px clamp, as a real first entry does. */}
+            <TextLineSkeleton type="inherit" lines={5} className="w-full" />
+          </div>
         </li>
       ))}
     </ul>

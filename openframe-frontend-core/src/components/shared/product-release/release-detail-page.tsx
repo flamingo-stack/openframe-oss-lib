@@ -14,9 +14,13 @@ import type { ChangelogEntry } from '../../../types/product-release';
 import type { VideoTeaser } from '../../../types/video-processing';
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { contentFetch } from '../../../utils/embed-content-fetch';
-import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
+import {
+  EntityMetadataAuthorCell,
+  EntityMetadataAuthorCellSkeleton,
+  EntityMetadataValueCellSkeleton,
+} from '../../chat/entity-cards/entity-author-card';
 import type { CaptionSrtFields } from '../../features/captions-url';
-import { EntityTagBadges } from '../../features/entity-tag-badges';
+import { EntityTagBadges, EntityTagBadgesSkeleton } from '../../features/entity-tag-badges';
 import { useCaptions } from '../../features/use-captions';
 import { Video } from '../../features/video';
 import {
@@ -27,12 +31,13 @@ import {
 import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Card, CardContent } from '../../ui/card';
 import { FadePreview } from '../../ui/fade-preview';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { RichMarkdownRenderer } from '../../ui/markdown';
-import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
-import { DetailPageSkeleton } from '../detail-page-skeleton';
-import { MediaGalleryStrip } from '../media-gallery-strip';
+import { ReleaseChangelogSection, ReleaseChangelogSectionSkeleton } from '../../ui/release-changelog-section';
+import { MediaGalleryStrip, MediaGalleryStripSkeleton } from '../media-gallery-strip';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
@@ -147,6 +152,38 @@ export interface ReleaseDetailPageProps {
 // override via the `MarkdownRenderer` prop.
 const DefaultMarkdownRenderer = RichMarkdownRenderer;
 
+/** The page's layout, read by the page and by its skeleton, so the skeleton is the page's size. */
+const CONTENT_STACK_CLASS = 'space-y-6 content-md:space-y-8';
+/**
+ * The release's tag row while it is read, from the row's layout: badges of a typical tag's width (`w-20` text, about
+ * 114px with the badge's padding and the gap), so a phone's 358px row holds three and two rows are six, and a wide
+ * page's row holds eleven. A release with more tags wraps further when it lands (a note, not a defect).
+ */
+/**
+ * A release title's typical lines at the page's `text-h1` (a name, a version and a short headline, about 45
+ * characters): three on a phone's 358px, two from `content-md`, one from `content-lg`.
+ */
+const RELEASE_TITLE_SKELETON_LINES = { phone: 3, md: 2, lg: 1 } as const;
+const RELEASE_TAG_ROW_FOLD = { phone: 6, wide: 11 } as const;
+const RELEASE_TAG_SKELETON_WIDTH_CLASS = '[&>*]:w-20';
+const METADATA_GRID_CLASS =
+  'grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4';
+/** A metadata cell's edge (divider + card fill); the cell's own frame is the shared value cell's. */
+const METADATA_CELL_EDGE_CLASS = 'border-b border-ods-border bg-ods-card content-md:border-b-0 content-md:border-r';
+const METADATA_CELL_CLASS = `flex flex-col gap-3 ${METADATA_CELL_EDGE_CLASS} p-4`;
+const SUMMARY_CLASS = 'text-ods-text-primary text-h4';
+/** The metadata grid's value labels (static copy). */
+const RELEASE_TYPE_LABEL = 'Release Type';
+const RELEASE_STATUS_LABEL = 'Release Status';
+const RELEASE_DATE_LABEL = 'Release Date';
+/** The three preview-first changelog sections, in page order (static copy and icons). */
+const PREVIEW_CHANGELOG_SECTIONS = [
+  { title: 'Features Added', Icon: Sparkles },
+  { title: 'Bugs Fixed', Icon: Wrench },
+  { title: 'Improvements', Icon: TrendingUp },
+] as const;
+const CHANGELOG_ICON_CLASS = 'h-6 w-6';
+
 /** Single-release route — the hub's public API shape, mirroring `<ProductReleasesView>`. */
 const DEFAULT_ENDPOINT = '/api/releases';
 
@@ -200,6 +237,8 @@ export function ReleaseDetailPage({
   const [deliveryData, setDeliveryData] = useState<DeliveryResponse | null>(null);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
   const [deliveryLoading, setDeliveryLoading] = useState(false);
+  // In a loading scope the page is its skeleton and the linked tasks are not fetched.
+  const scoped = useLoadingScope();
 
   useEffect(() => {
     // `release` is a fresh object identity whenever the release read resolves
@@ -209,7 +248,7 @@ export function ReleaseDetailPage({
     let cancelled = false;
 
     async function fetchLinkedTasks() {
-      if (!release) return;
+      if (!release || scoped) return;
 
       try {
         // Fetch roadmap tasks if linked
@@ -261,19 +300,18 @@ export function ReleaseDetailPage({
     return () => {
       cancelled = true;
     };
-  }, [release, RoadmapSection, DeliverySection, roadmapApiEndpoint, deliveryApiEndpoint]);
+  }, [release, scoped, RoadmapSection, DeliverySection, roadmapApiEndpoint, deliveryApiEndpoint]);
 
   // `isLoading` is false whenever `initialData` seeded the read, so a
   // pre-fetched (SSR / admin-preview) release never flashes the skeleton.
-  if (isLoading && !release) {
-    // `bare` + `PageShell` so the loading state matches the loaded page's full
-    // width / padding / min-height (the wrapper supplies the page chrome).
+  // In a loading scope the host's record is empty: the scope alone decides.
+  if (scoped || (isLoading && !release)) {
     return renderShell(
-      // Match the loaded page's top offset (TitleBlock's
-      // `pt-[var(--spacing-system-l)]`) so content doesn't jump on load.
-      <div className="pt-[var(--spacing-system-l)]">
-        <DetailPageSkeleton bare metadataColumns={4} showImageGallery={true} />
-      </div>,
+      <ReleaseLoadingLayout
+        backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
+      >
+        {relatedContent}
+      </ReleaseLoadingLayout>,
     );
   }
 
@@ -332,33 +370,33 @@ export function ReleaseDetailPage({
       titleWrap
       backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
     >
-      <div className="space-y-6 content-md:space-y-8">
+      <div className={CONTENT_STACK_CLASS}>
         {/* Tags — flat product_release_tags[] from entity_tags */}
         <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
 
         {/* Metadata Grid */}
-        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4">
+        <div className={METADATA_GRID_CLASS}>
           {/* Release Type */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
+          <div className={METADATA_CELL_CLASS}>
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{releaseType.toLocaleUpperCase()}</p>
-              <p className="text-ods-text-secondary text-h6">Release Type</p>
+              <p className="text-ods-text-secondary text-h6">{RELEASE_TYPE_LABEL}</p>
             </div>
           </div>
 
           {/* Release Status */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
+          <div className={METADATA_CELL_CLASS}>
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{releaseStatus.toLocaleUpperCase()}</p>
-              <p className="text-ods-text-secondary text-h6">Release Status</p>
+              <p className="text-ods-text-secondary text-h6">{RELEASE_STATUS_LABEL}</p>
             </div>
           </div>
 
           {/* Release Date */}
-          <div className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 content-md:border-b-0 content-md:border-r">
+          <div className={METADATA_CELL_CLASS}>
             <div className="flex flex-col gap-0">
               <p className="text-ods-text-primary text-h4">{formatReleaseDate(releaseDate)}</p>
-              <p className="text-ods-text-secondary text-h6">Release Date</p>
+              <p className="text-ods-text-secondary text-h6">{RELEASE_DATE_LABEL}</p>
             </div>
           </div>
 
@@ -378,12 +416,15 @@ export function ReleaseDetailPage({
 
         {/* Summary */}
         {releaseSummary && (
-          <div className="text-ods-text-primary text-h4">
+          <div className={SUMMARY_CLASS}>
             <p>{releaseSummary}</p>
           </div>
         )}
 
         {/* Video Display Section - Injectable or fallback */}
+        {/* A release's video is optional: the loading state leaves it out, so the gate leaves it out too. */}
+        {/* A block of the page's own stack spacing (its videos keep their gaps), hidden when the slot draws nothing. */}
+        <div data-loading-optional className={`${CONTENT_STACK_CLASS} empty:hidden`}>
         {VideoDisplaySection ? (
           <VideoDisplaySection
             mainVideoUrl={mainVideoUrl}
@@ -418,17 +459,19 @@ export function ReleaseDetailPage({
             )}
           </>
         )}
+        </div>
 
         {/* Content */}
+        {/* Record-dependent blocks the loading state does not draw carry `data-loading-optional`. */}
         {releaseContent && (
-          <div className="text-ods-text-primary text-h4">
+          <div className="text-ods-text-primary text-h4" data-loading-optional>
             <MarkdownRenderer content={releaseContent} />
           </div>
         )}
 
         {/* Breaking Changes Warning */}
         {hasBreakingChanges && (
-          <Card className="border-ods-error bg-ods-error/10">
+          <Card className="border-ods-error bg-ods-error/10" data-loading-optional>
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-6 w-6 text-ods-error" />
@@ -451,6 +494,7 @@ export function ReleaseDetailPage({
           entries={breakingChanges || []}
           isBreaking
           hideTitle
+          loadingOptional
           icon={<AlertTriangle className="h-6 w-6" />}
           MarkdownRenderer={MarkdownRenderer}
         />
@@ -484,7 +528,7 @@ export function ReleaseDetailPage({
 
         {/* Related Roadmap Items */}
         {RoadmapSection && (roadmapLoading || roadmapTasks.length > 0) && (
-          <div className="w-full space-y-4">
+          <div className="w-full space-y-4" data-loading-optional>
             <p className="tracking-[-0.28px] text-ods-text-secondary text-h5">Related Roadmap Items</p>
             <RoadmapSection
               items={roadmapTasks}
@@ -503,7 +547,7 @@ export function ReleaseDetailPage({
         {DeliverySection &&
           (deliveryLoading ||
             (deliveryData && (deliveryData.completed.length > 0 || deliveryData.inProgress.length > 0))) && (
-            <div className="w-full space-y-4">
+            <div className="w-full space-y-4" data-loading-optional>
               <p className="tracking-[-0.28px] text-ods-text-secondary text-h5">Related Enhancements and Bug-fixes</p>
               {(() => {
                 const deliveryCount = deliveryData ? deliveryData.completed.length + deliveryData.inProgress.length : 0;
@@ -524,7 +568,7 @@ export function ReleaseDetailPage({
 
         {/* Related Links */}
         {(githubReleases?.length || knowledgeBaseLinks?.length || migrationGuideUrl || documentationUrl) && (
-          <div className="w-full space-y-1">
+          <div className="w-full space-y-1" data-loading-optional>
             <p className="tracking-[-0.28px] text-ods-text-secondary text-h5">Related Links</p>
             <Card className="border-ods-border bg-ods-card p-6">
               <div className="space-y-4">
@@ -631,5 +675,64 @@ export function ReleaseDetailPage({
        */}
       <Fragment key="related-content">{relatedContent}</Fragment>
     </PageLayout>,
+  );
+}
+
+interface ReleaseLoadingLayoutProps {
+  /** The page's back button (static copy: drawn for real). */
+  backButton?: { label?: string; onClick: () => void };
+  /** The host's slot below the article (byline, related content), drawn as is. */
+  children?: ReactNode;
+}
+
+/**
+ * The release page while its release is read: the title and version as bars in the page's own title block (the back
+ * button real), the tag row, the four-cell metadata grid with its real labels, the media strip, the summary lines, the
+ * the three changelog sections with their real headings, and the host's slot below. Rendered
+ * inside the caller's shell (`ReleaseDetailPage` draws it in a scope, in its own `PageShell`): each part is its own
+ * component's skeleton.
+ */
+function ReleaseLoadingLayout({ backButton, children }: ReleaseLoadingLayoutProps) {
+  return (
+    <PageLayout
+      loading
+      subtitleRow="always"
+      titleSize="h1"
+      titleWrap
+      titleSkeletonLines={RELEASE_TITLE_SKELETON_LINES}
+      backButton={backButton}
+    >
+      <div className={CONTENT_STACK_CLASS} aria-hidden>
+        <EntityTagBadgesSkeleton
+          count={RELEASE_TAG_ROW_FOLD.wide}
+          phoneCount={RELEASE_TAG_ROW_FOLD.phone}
+          className={RELEASE_TAG_SKELETON_WIDTH_CLASS}
+        />
+        <div className={METADATA_GRID_CLASS}>
+          <EntityMetadataValueCellSkeleton label={RELEASE_TYPE_LABEL} className={METADATA_CELL_EDGE_CLASS} />
+          <EntityMetadataValueCellSkeleton label={RELEASE_STATUS_LABEL} className={METADATA_CELL_EDGE_CLASS} />
+          <EntityMetadataValueCellSkeleton label={RELEASE_DATE_LABEL} className={METADATA_CELL_EDGE_CLASS} />
+          <EntityMetadataAuthorCellSkeleton />
+        </div>
+        <MediaGalleryStripSkeleton />
+        {/* A summary of about 350 characters: seven lines on a phone, three on a wide screen. */}
+        <div className={SUMMARY_CLASS}>
+          <p>
+            <TextLineSkeleton type="inherit" as="span" lines={7} className="w-full content-md:hidden" />
+            <TextLineSkeleton type="inherit" as="span" lines={3} className="hidden w-full content-md:block" />
+          </p>
+        </div>
+        {/* A release's video is optional: the loading layout leaves its slot out. */}
+        {PREVIEW_CHANGELOG_SECTIONS.map(({ title, Icon }) => (
+          <ReleaseChangelogSectionSkeleton
+            key={title}
+            title={title}
+            icon={<Icon className={CHANGELOG_ICON_CLASS} />}
+            previewFirst
+          />
+        ))}
+      </div>
+      <Fragment key="related-content">{children}</Fragment>
+    </PageLayout>
   );
 }

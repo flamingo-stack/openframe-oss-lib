@@ -2,22 +2,33 @@
 
 import { OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { FilterPillRowSkeleton } from '../ui/filter-pill-row';
+
+/** The catalog's layout, read by the loaded view and by this skeleton, so the skeleton is the view's size. */
+export const CATALOG_VIEW_CLASS = 'flex w-full flex-col gap-10';
+export const CATALOG_CONTROLS_CLASS = 'space-y-4';
+export const CATALOG_SECTIONS_CLASS = 'space-y-10';
+export const CATALOG_SECTION_CLASS = 'space-y-4';
+export const CATALOG_SECTION_HEADING_CLASS = 'flex items-center gap-2 text-ods-text-primary text-h3';
+export const CATALOG_SECTION_COUNT_CLASS =
+  'inline-flex items-center justify-center rounded-full bg-ods-text-secondary/20 px-2 py-0.5 text-ods-text-secondary text-h6';
+export const CATALOG_LIST_CLASS = 'flex flex-col gap-4';
 
 /**
- * Loading skeleton for `/onboarding-guides` — CHROME-LESS, exactly like the
- * loaded `<OnboardingGuidesCatalogView>`. The HOST page owns the
- * `<DevSectionPage sectionKey="onboarding">` shell (hero + back button);
- * this component renders only what replaces the view: the search/pill
- * placeholder block and the section card lists.
- *
- * HISTORY: this used to mount its own `<DevSectionPage>` — nested inside the
- * page's shell that double-rendered the hero + back button during loading
- * (the view was made chrome-less in the page restructure; the skeleton was
- * missed). Keep BOTH chrome-less.
- *
- * Wrapper mirrors the loaded view's `w-full flex flex-col gap-10`; per-card
- * height matches the loaded catalog card so resolve shifts are zero.
+ * Catalog cards one screen shows under the search and the section pills (a 1440x900 desktop and a 390x844 phone
+ * both fit three of the `catalog` card's height before the fold). The section count is the data's: the skeleton
+ * draws ONE section of this fold, and every loaded section is a `data-loading-item`.
+ */
+export const ONBOARDING_CATALOG_CARD_FOLD = 3;
+/** Section pills one row shows before it wraps (the "All" pill and the first sections). */
+const ONBOARDING_CATALOG_PILL_FOLD = 4;
+
+/**
+ * Loading skeleton for `/onboarding-guides`: CHROME-LESS, exactly like the loaded `<OnboardingGuidesCatalogView>`.
+ * The HOST page owns the shell (hero + back button); this renders only what replaces the view: the search input,
+ * the section pill row (its label real) and one section of `ONBOARDING_CATALOG_CARD_FOLD` cards, in the view's own
+ * classes.
  */
 export function OnboardingGuidesCatalogSkeleton({
   region = true,
@@ -26,35 +37,28 @@ export function OnboardingGuidesCatalogSkeleton({
   region?: boolean;
 } = {}) {
   return (
-    <LoadingRegion label="Loading onboarding guides" announce={region} className="flex w-full flex-col gap-10">
-      {/* Search input placeholder — matches `<SearchInput>` h-12 — plus the
-          section pill row (~74 px incl. padding), same as the loaded
-          preControls block. */}
-      <div className="space-y-4">
-        <UnifiedSkeleton className="h-12 w-full rounded-md" />
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4">
-          <UnifiedSkeleton className="h-4 w-14 rounded" />
-          {[0, 1, 2, 3].map(i => (
-            <UnifiedSkeleton key={i} className="h-10 w-24 rounded-md" />
-          ))}
-        </div>
+    <LoadingRegion label="Loading onboarding guides" announce={region} className={CATALOG_VIEW_CLASS}>
+      <div className={CATALOG_CONTROLS_CLASS}>
+        <InteractiveSkeleton.Input />
+        <FilterPillRowSkeleton label="Section" pills={ONBOARDING_CATALOG_PILL_FOLD} />
       </div>
-      <div className="space-y-10">
-        {[4, 3, 3].map((cardCount, sectionIdx) => (
-          <section key={sectionIdx} className="space-y-4">
-            <div className="flex items-center gap-2 tracking-[-0.36px] text-ods-text-primary text-h3">
-              <UnifiedSkeleton className="h-6 w-40 rounded" />
-              <UnifiedSkeleton className="h-5 w-8 rounded-full" />
-            </div>
-            <ul className="flex flex-col gap-4">
-              {Array.from({ length: cardCount }).map((_, cardIdx) => (
-                <li key={cardIdx}>
-                  <OnboardingGuideCardSkeleton size="catalog" />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
+      <div className={CATALOG_SECTIONS_CLASS}>
+        <section className={CATALOG_SECTION_CLASS} data-loading-item>
+          <h2 className={CATALOG_SECTION_HEADING_CLASS}>
+            <TextLineSkeleton type="inherit" as="span" className="w-40" />
+            <span className={CATALOG_SECTION_COUNT_CLASS}>
+              <TextLineSkeleton type="inherit" as="span" className="w-3" />
+            </span>
+          </h2>
+          <ul className={CATALOG_LIST_CLASS}>
+            {Array.from({ length: ONBOARDING_CATALOG_CARD_FOLD }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+              <li key={i}>
+                <OnboardingGuideCardSkeleton size="catalog" />
+              </li>
+            ))}
+          </ul>
+        </section>
       </div>
     </LoadingRegion>
   );

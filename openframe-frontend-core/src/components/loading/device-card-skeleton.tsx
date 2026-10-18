@@ -1,6 +1,6 @@
 import { cn } from '../../utils/cn';
 import { LoadingRegion } from './loading-region';
-import { UnifiedSkeleton } from './unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from './unified-skeleton';
 
 export interface DeviceCardSkeletonProps {
   /**
@@ -44,9 +44,9 @@ export function DeviceCardSkeleton({ className, moreButton = true, detailsButton
           {/* OS icon (16px) + name, one `text-h4` line */}
           <div className="flex items-center gap-1 text-h4">
             <UnifiedSkeleton className="size-4 shrink-0 rounded" />
-            <UnifiedSkeleton className="h-[1lh] w-3/4 rounded" />
+            <TextLineSkeleton type="inherit" className="w-3/4" />
           </div>
-          <UnifiedSkeleton className="h-[1lh] w-1/2 rounded text-h6" />
+          <TextLineSkeleton type="h6" className="w-1/2" />
         </div>
         {moreButton && (
           <div className="flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-3">
@@ -60,7 +60,7 @@ export function DeviceCardSkeleton({ className, moreButton = true, detailsButton
       <div className="flex w-full items-center gap-2">
         <UnifiedSkeleton className="h-8 w-20 shrink-0 rounded-md" />
         <div className="min-w-0 flex-1 text-h6">
-          <UnifiedSkeleton className="h-[1lh] w-40 max-w-full rounded" />
+          <TextLineSkeleton type="inherit" className="w-40 max-w-full" />
         </div>
       </div>
     </div>

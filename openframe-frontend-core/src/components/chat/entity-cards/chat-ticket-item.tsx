@@ -4,8 +4,9 @@ import { ChevronRight } from 'lucide-react';
 import { type ButtonHTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../../utils/cn';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
-import { Tag } from '../../ui/tag';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { Tag, TagSkeleton } from '../../ui/tag';
 import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag';
 
 export interface ChatTicketItemData {
@@ -58,31 +59,35 @@ export interface ChatTicketItemProps extends Omit<ButtonHTMLAttributes<HTMLButto
 
 const UNREAD_NOTICE = 'You have a new unread message';
 
+// The row's boxes, read by the row AND its skeleton, so the two are one size.
+const TICKET_ROW = cn('flex h-20 w-full items-center gap-4 px-4', 'border-b border-ods-border bg-ods-card');
+const TICKET_ROW_TEXT = 'flex min-w-0 flex-1 flex-col justify-center';
+const TICKET_ROW_CHEVRON = 'flex size-12 shrink-0 items-center justify-center rounded-md border';
+
+/**
+ * A ticket row while it is read: the title as a `text-h3` line and the reference line as a `text-h6` line, the status
+ * tag's box, and the chevron box with its icon (static) drawn for real.
+ */
+export function ChatTicketItemSkeleton({ className }: { className?: string }) {
+  return (
+    <div aria-hidden className={cn(TICKET_ROW, className)}>
+      <div className={TICKET_ROW_TEXT}>
+        <TextLineSkeleton type="h3" className="w-1/2" />
+        <TextLineSkeleton type="h6" className="w-1/3" />
+      </div>
+      {/* The status is a `TicketStatusTag`, a default-size `Tag`: its own skeleton. */}
+      <TagSkeleton className="w-20" />
+      <div className={cn(TICKET_ROW_CHEVRON, 'border-ods-border bg-ods-card')}>
+        <ChevronRight className="size-6 text-ods-text-secondary" />
+      </div>
+    </div>
+  );
+}
+
 const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
   ({ className, ticket, onClick, isLoading = false, ...props }, ref) => {
-    if (isLoading) {
-      return (
-        <div
-          aria-hidden
-          className={cn(
-            'flex h-20 w-full items-center gap-4 px-4',
-            'border-b border-ods-border bg-ods-card',
-            className,
-          )}
-        >
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-            {/* title line */}
-            <UnifiedSkeleton className="h-5 w-1/2" />
-            {/* subtitle line */}
-            <UnifiedSkeleton className="h-4 w-1/3" />
-          </div>
-          {/* status tag */}
-          <UnifiedSkeleton className="h-8 w-20 shrink-0 rounded-r-md" />
-          {/* chevron box */}
-          <UnifiedSkeleton className="size-12 shrink-0 rounded-md" />
-        </div>
-      );
-    }
+    const scoped = useLoadingScope();
+    if (isLoading || scoped) return <ChatTicketItemSkeleton className={className} />;
 
     if (!ticket) return null;
 
@@ -103,8 +108,7 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
         type="button"
         onClick={() => onClick?.(ticket.id)}
         className={cn(
-          'flex h-20 w-full items-center gap-4 px-4',
-          'border-b border-ods-border bg-ods-card',
+          TICKET_ROW,
           'cursor-pointer transition-colors duration-150',
           'hover:bg-ods-bg-hover',
           // `focus-visible:` covers keyboard nav AND the post-click state
@@ -117,7 +121,7 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
         )}
         {...props}
       >
-        <div className="flex min-w-0 flex-1 flex-col justify-center text-left">
+        <div className={cn(TICKET_ROW_TEXT, 'text-left')}>
           <p
             className={cn('truncate text-h3', isResolved ? 'text-ods-text-secondary' : 'text-ods-text-primary')}
             title={ticket.title}
@@ -153,7 +157,7 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
         <div
           data-testid="chat-ticket-item-chevron"
           className={cn(
-            'flex size-12 shrink-0 items-center justify-center rounded-md border',
+            TICKET_ROW_CHEVRON,
             ticket.unread ? 'border-ods-open-yellow bg-ods-open-yellow' : 'border-ods-border bg-ods-card',
           )}
         >

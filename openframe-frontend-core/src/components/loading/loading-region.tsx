@@ -1,4 +1,7 @@
+'use client';
+
 import type { ElementType, HTMLAttributes, ReactNode } from 'react';
+import { useLoadingScope } from '../ui/loading-scope';
 
 /**
  * THE container of a loading state: the one thing a screen reader hears while it loads.
@@ -34,12 +37,15 @@ export interface LoadingRegionProps extends HTMLAttributes<HTMLElement> {
 export function LoadingRegion({
   label = 'Loading',
   as: Tag = 'div',
-  announce = true,
+  announce: announceGiven = true,
   status = true,
   className,
   children,
   ...props
 }: LoadingRegionProps) {
+  // Inside a loading scope the page's region has already said it: nothing in it announces again.
+  const inScope = useLoadingScope();
+  const announce = announceGiven && !inScope;
   // One tree for both states: `children` keeps its slot whether or not the status is drawn, so an
   // `announce` that flips at runtime does not remount the content (and drop its state and focus).
   return (

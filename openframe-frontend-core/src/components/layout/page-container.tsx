@@ -2,7 +2,9 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
+import { useLoadingScope } from '../ui/loading-scope';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
 import { accentSentenceMarks } from './page-heading';
@@ -136,8 +138,9 @@ function isAdvancedProps(props: PageContainerProps): props is AdvancedPageContai
  * </PageContainer>
  */
 export function PageContainer(props: PageContainerProps) {
+  const inScope = useLoadingScope();
   if (isAdvancedProps(props)) {
-    return renderAdvancedPageContainer(props);
+    return renderAdvancedPageContainer(props, inScope);
   } else {
     return renderLegacyPageContainer(props);
   }
@@ -175,6 +178,20 @@ function renderLegacyPageContainer({
   );
 }
 
+/** The header's title and subtitle lines, read by the header and by their skeletons. */
+const PAGE_CONTAINER_TITLE_CLASS = 'text-ods-text-primary text-h2';
+const PAGE_CONTAINER_SUBTITLE_CLASS = 'text-ods-text-secondary text-h6';
+
+/** A page title that is read, while it is: one bar of the title's line, at its type step. */
+export function PageContainerTitleSkeleton({ className }: { className?: string }) {
+  return <TextLineSkeleton type="h2" className={cn('w-64 max-w-full', className)} />;
+}
+
+/** A page subtitle that is read, while it is: one bar of the subtitle's line. */
+export function PageContainerSubtitleSkeleton({ className }: { className?: string }) {
+  return <TextLineSkeleton type="h6" className={cn('w-80 max-w-full', className)} />;
+}
+
 // Advanced implementation (from UI component)
 function renderAdvancedPageContainer({
   children,
@@ -192,7 +209,22 @@ function renderAdvancedPageContainer({
   className,
   contentClassName,
   showHeader = true,
-}: AdvancedPageContainerProps) {
+}: AdvancedPageContainerProps,
+  inScope = false,
+) {
+  // A title or subtitle that is READ arrives as '' in a page's loading state (an absent one is undefined): it is
+  // drawn as a bar of its line, so the header keeps its rows. A given one is the page's own words, drawn as is.
+  const titleNode = title ? (
+    <PageTitle className={PAGE_CONTAINER_TITLE_CLASS}>{accentSentenceMarks(title)}</PageTitle>
+  ) : inScope && title === '' ? (
+    <PageContainerTitleSkeleton />
+  ) : null;
+  const subtitleNode = subtitle ? (
+    <div className={PAGE_CONTAINER_SUBTITLE_CLASS}>{subtitle}</div>
+  ) : inScope && subtitle === '' ? (
+    <PageContainerSubtitleSkeleton />
+  ) : null;
+
   // Determine PageActions variant based on page variant
   const getActionsVariant = () => {
     if (actionsVariant) return actionsVariant;
@@ -245,10 +277,10 @@ function renderAdvancedPageContainer({
             )}
 
             {/* Title */}
-            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
+            {titleNode}
 
             {/* Subtitle */}
-            {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
+            {subtitleNode}
           </div>
 
           {/* Header Actions */}
@@ -275,8 +307,8 @@ function renderAdvancedPageContainer({
               />
             )}
 
-            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
-            {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
+            {titleNode}
+            {subtitleNode}
           </div>
 
           {/* Header Actions */}
@@ -303,7 +335,7 @@ function renderAdvancedPageContainer({
               />
             )}
 
-            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
+            {titleNode}
           </div>
 
           {/* Header Actions */}
@@ -320,10 +352,10 @@ function renderAdvancedPageContainer({
     // Default content header
     return (
       <div className="flex items-center justify-between gap-4 content-md:flex-col content-md:items-start content-md:justify-start content-lg:flex-row content-lg:items-center content-lg:justify-between">
-        {(title || subtitle) && (
+        {(titleNode || subtitleNode) && (
           <div className="flex min-w-0 flex-1 flex-col gap-1">
-            {title && <PageTitle className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</PageTitle>}
-            {subtitle && <div className="text-ods-text-secondary text-h6">{subtitle}</div>}
+            {titleNode}
+            {subtitleNode}
           </div>
         )}
 

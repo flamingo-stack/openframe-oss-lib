@@ -29,7 +29,10 @@ import { contentFetch } from '../../../utils/embed-content-fetch';
 import { RoadmapCard } from '../../chat/entity-cards/roadmap-card';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 import { EmptyState } from '../../empty-state';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { RoadmapGridSkeleton } from './roadmap-grid-skeleton';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
@@ -167,6 +170,30 @@ function RoadmapGridSingle({
   );
 }
 
+/** The quarter list and a quarter's head, read by the grid and by its skeleton. */
+const QUARTER_LIST_CLASS = 'flex flex-col gap-10';
+const QUARTER_HEAD_CLASS = 'flex items-center gap-3';
+
+/**
+ * The quarter-grouped grid while its items are read: one quarter, its heading and item count as bars, then the
+ * grid's card skeletons.
+ */
+export function RoadmapGridQuarterSkeleton({ showLeftMargin = true }: { showLeftMargin?: boolean }) {
+  return (
+    <div className={QUARTER_LIST_CLASS} aria-hidden>
+      <div className="flex flex-col">
+        <div className={QUARTER_HEAD_CLASS}>
+          <TextLineSkeleton type="h2" className="w-40" />
+          <TextLineSkeleton type="h6" className="w-16" />
+        </div>
+        <div className="pt-4">
+          <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RoadmapGrid({
   items,
   onItemUpdate,
@@ -180,6 +207,7 @@ export function RoadmapGrid({
 }: RoadmapGridProps) {
   // ── Voting (shared across all quarters) ──
   const { getVote, toggleVote } = useRoadmapVoting(votingOptions);
+  const inScope = useLoadingScope();
   const [votingTasks, setVotingTasks] = useState<Set<string>>(new Set());
 
   const handleVote = async (taskId: string, voteType: 'up' | 'down') => {
@@ -267,6 +295,16 @@ export function RoadmapGrid({
     );
   }, [hasActiveFilters, sortedQuartersKey, isInitialized, quartersToKeepClosed]);
 
+  // While the page is read the items are not known (none in a loading state): the grid is its skeleton, never the
+  // empty state.
+  if (inScope) {
+    return groupByQuarter ? (
+      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} />
+    ) : (
+      <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} />
+    );
+  }
+
   if (items.length === 0) {
     return (
       <EmptyState
@@ -296,7 +334,7 @@ export function RoadmapGrid({
       type="multiple"
       value={expandedQuarters}
       onValueChange={setExpandedQuarters}
-      className="flex flex-col gap-10"
+      className={QUARTER_LIST_CLASS}
     >
       {sortedQuarters.map(quarter => {
         const itemCount = itemsByQuarter[quarter]?.length || 0;
@@ -309,7 +347,7 @@ export function RoadmapGrid({
             className="border-0"
           >
             <AccordionTrigger className="w-full p-0 hover:no-underline [&>svg]:ml-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:shrink-0 [&>svg]:text-ods-text-secondary">
-              <div className="flex items-center gap-3">
+              <div className={QUARTER_HEAD_CLASS}>
                 <h3
                   className={cn(
                     'text-ods-text-primary transition-opacity text-h2',

@@ -6,6 +6,8 @@ import { useCopyToClipboard } from '../../hooks';
 import { cn } from '../../utils/cn';
 import { CheckIcon } from '../icons-v2-generated';
 import { Copy01Icon } from '../icons-v2-generated/documents';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 import { ProgressBar } from './progress-bar';
 
 export interface InfoCardFooterData {
@@ -46,21 +48,49 @@ export interface InfoCardData {
 interface InfoCardProps {
   data: InfoCardData;
   className?: string;
+  /** The shape drawn while the data is read (a page's loading state, where `data.items` is empty). */
+  skeleton?: InfoCardSkeletonShape;
 }
 
-export function InfoCard({ data, className = '' }: InfoCardProps) {
+/** What a loading InfoCard draws: its rows, and whether it carries a head, a progress bar and a footer. */
+export interface InfoCardSkeletonShape {
+  /** Value rows drawn. Default {@link INFO_CARD_SKELETON_ROWS}. */
+  rows?: number;
+  /** A title line. Default `true`. */
+  title?: boolean;
+  /** A subtitle line. */
+  subtitle?: boolean;
+  progress?: boolean;
+  footer?: boolean;
+}
+
+/** Rows a loading card draws when its caller names no count. */
+export const INFO_CARD_SKELETON_ROWS = 3;
+
+/** The card's frame and groups, read by the card and by its skeleton. */
+const FRAME_CLASS = 'flex w-full flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
+const CONTENT_CLASS = 'flex w-full flex-col items-start gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]';
+const HEAD_CLASS = 'flex w-full flex-col items-start self-stretch';
+const HEAD_LINE_CLASS = 'flex items-center gap-[var(--spacing-system-xsf)] self-stretch';
+const ROWS_CLASS = 'flex w-full flex-col items-start gap-[var(--spacing-system-xs)] self-stretch';
+const VALUE_ROW_CLASS = 'flex h-6 w-full items-center gap-[var(--spacing-system-xs)] self-stretch';
+const DIVIDER_CLASS = 'h-px flex-1 bg-ods-divider';
+const FOOTER_CLASS = 'mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]';
+
+export function InfoCard({ data, className = '', skeleton }: InfoCardProps) {
+  // In a page's loading state with no rows yet (they are read) the card is its skeleton.
+  const inScope = useLoadingScope();
+  if (inScope && data.items.length === 0) return <InfoCardSkeleton {...skeleton} className={className} />;
   return (
-    <div
-      className={cn('flex w-full flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card', className)}
-    >
+    <div className={cn(FRAME_CLASS, className)}>
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
           `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
           "Info-card" design. With no title/subtitle, the body is the only group. */}
-      <div className="flex w-full flex-col items-start gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]">
+      <div className={CONTENT_CLASS}>
         {(data.title || data.subtitle) && (
-          <div className="flex w-full flex-col items-start self-stretch">
+          <div className={HEAD_CLASS}>
             {data.title && (
-              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
+              <div className={HEAD_LINE_CLASS}>
                 <span className="min-w-0 truncate text-ods-text-primary text-h4" title={data.title}>
                   {data.title}
                 </span>
@@ -68,7 +98,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
               </div>
             )}
             {data.subtitle && (
-              <div className="flex items-center gap-[var(--spacing-system-xsf)] self-stretch">
+              <div className={HEAD_LINE_CLASS}>
                 <span className="min-w-0 truncate text-ods-text-secondary text-h4" title={data.subtitle}>
                   {data.subtitle}
                 </span>
@@ -81,7 +111,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
         )}
 
         {(data.items.length > 0 || data.progress) && (
-          <div className="flex w-full flex-col items-start gap-[var(--spacing-system-xs)] self-stretch">
+          <div className={ROWS_CLASS}>
             {/* Info items */}
             {data.items.map((item, index) => {
               const values = Array.isArray(item.value) ? item.value : [item.value];
@@ -124,7 +154,7 @@ export function InfoCard({ data, className = '' }: InfoCardProps) {
 
 function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
   return (
-    <div className="mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]">
+    <div className={FOOTER_CLASS}>
       <div className="flex w-full items-center justify-between gap-1">
         <div className="flex items-center gap-1">
           {footer.icon}
@@ -159,9 +189,9 @@ function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLab
   const { copy, copied } = useCopyToClipboard();
 
   return (
-    <div className="flex h-6 w-full items-center gap-[var(--spacing-system-xs)] self-stretch">
+    <div className={VALUE_ROW_CLASS}>
       <span className="whitespace-nowrap text-ods-text-primary text-h4">{showLabel ? label : ''}</span>
-      <div className="h-px flex-1 bg-ods-divider" />
+      <div className={DIVIDER_CLASS} />
       <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
         <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
           {value}
@@ -181,6 +211,51 @@ function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLab
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * An InfoCard while its data is read: the same frame and groups, the title and subtitle `text-h4` bars, each row
+ * its label and value bars either side of the row's divider, the progress bar and the footer line boxes of their
+ * own height.
+ */
+export function InfoCardSkeleton({
+  rows = INFO_CARD_SKELETON_ROWS,
+  title = true,
+  subtitle = false,
+  progress = false,
+  footer = false,
+  className = '',
+}: InfoCardSkeletonShape & { className?: string }) {
+  return (
+    <div className={cn(FRAME_CLASS, className)} aria-hidden>
+      <div className={CONTENT_CLASS}>
+        {(title || subtitle) && (
+          <div className={HEAD_CLASS}>
+            {title && <TextLineSkeleton type="h4" className="w-1/2" />}
+            {subtitle && <TextLineSkeleton type="h4" className="w-1/3" />}
+          </div>
+        )}
+        {(rows > 0 || progress) && (
+          <div className={ROWS_CLASS}>
+            {Array.from({ length: rows }, (_, index) => (
+              <div key={index} className={VALUE_ROW_CLASS}>
+                <TextLineSkeleton type="h4" className="w-20" />
+                <div className={DIVIDER_CLASS} />
+                <TextLineSkeleton type="h4" className="w-24" />
+              </div>
+            ))}
+            {/* The bar is 8px tall below `md`, 24px from it (`ProgressBar`). */}
+            {progress && <UnifiedSkeleton className="h-2 w-full rounded content-md:h-6" />}
+          </div>
+        )}
+      </div>
+      {footer && (
+        <div className={FOOTER_CLASS}>
+          <TextLineSkeleton type="h4" className="w-1/2" />
+        </div>
+      )}
     </div>
   );
 }

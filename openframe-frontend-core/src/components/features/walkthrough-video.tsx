@@ -82,6 +82,7 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { CardHitLayer } from './card-hit-layer';
 import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
@@ -234,6 +235,7 @@ function WalkthroughVideo({
   className,
 }: WalkthroughVideoProps): React.ReactElement | null {
   const inline = placement === 'inline';
+  const inScope = useLoadingScope();
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
   // id-match dismissal key: a new video (new id) re-shows the card. No id
@@ -936,6 +938,9 @@ function WalkthroughVideo({
     cardModeRef.current = cardMode;
   });
 
+  // While the page is read the video is not known: inline, the block is its skeleton (the same box); floating, the
+  // card is an overlay that takes no space, so nothing is drawn.
+  if (inScope) return inline ? <InlineWalkthroughVideoSkeleton className={className} /> : null;
   if (!video || (!video.mainVideoUrl && !video.youtubeUrl)) return null;
 
   // The collapsed card is suppressed by the appear-delay mount gate and by

@@ -3,7 +3,8 @@
 import { ChevronDown, ChevronUp, FileText, Folder, FolderOpen } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { DEFAULT_FOLDER_INDEX_FILE as CANONICAL_FOLDER_INDEX_FILE } from '../../utils/doc-tree-nav';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface NavigationNode {
   id: string;
@@ -39,6 +40,65 @@ interface MultiLevelNavigationProps {
 // constant under the same local name preserves call-site syntax without
 // drifting from the SSOT.
 const DEFAULT_FOLDER_INDEX_FILE = CANONICAL_FOLDER_INDEX_FILE;
+
+/** The tree's list, item and row frame, read by the tree and by its skeleton, so the skeleton is its size. */
+const NAV_LIST_CLASS = 'space-y-2';
+const NAV_ITEM_CLASS = 'space-y-1';
+const NAV_ROW_FRAME_CLASS = 'relative w-full rounded-lg border transition-all duration-150';
+const NAV_ROW_CONTENT_CLASS = 'flex w-full items-center rounded-lg px-2 text-h6';
+/** How many rows each skeleton draws (the desktop tree, the mobile dropdown). */
+export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 4;
+export const MOBILE_NAVIGATION_SKELETON_ROWS = 3;
+const NAV_SKELETON_LABEL_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3'] as const;
+
+function NavigationTreeSkeleton({
+  rows,
+  rowHeightClass,
+  className,
+}: {
+  rows: number;
+  rowHeightClass: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn(NAV_LIST_CLASS, className)} aria-hidden>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className={NAV_ITEM_CLASS}>
+          <div className="px-2">
+            <div className={cn(NAV_ROW_FRAME_CLASS, 'border-ods-border bg-ods-card')}>
+              <div className={cn(NAV_ROW_CONTENT_CLASS, rowHeightClass)}>
+                <MediaSkeleton.Icon size="sm" className="mr-2 flex-shrink-0" />
+                <TextLineSkeleton type="h6" className={NAV_SKELETON_LABEL_WIDTHS[i % NAV_SKELETON_LABEL_WIDTHS.length]} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The documentation tree while it is read: its rows' frames, each with an icon box and a bar of its name. */
+export function MultiLevelNavigationSkeleton({
+  rows = MULTI_LEVEL_NAVIGATION_SKELETON_ROWS,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return <NavigationTreeSkeleton rows={rows} rowHeightClass="h-12" className={className} />;
+}
+
+/** The mobile documentation dropdown while it is read: the same rows at the dropdown's height. */
+export function MobileNavigationDropdownSkeleton({
+  rows = MOBILE_NAVIGATION_SKELETON_ROWS,
+  className,
+}: {
+  rows?: number;
+  className?: string;
+}) {
+  return <NavigationTreeSkeleton rows={rows} rowHeightClass="h-11" className={className} />;
+}
 
 /**
  * Compute the visual "selected" state for a navigation node.
@@ -90,18 +150,10 @@ export function MultiLevelNavigation({
   className,
   folderIndexFile = DEFAULT_FOLDER_INDEX_FILE,
 }: MultiLevelNavigationProps) {
-  if (isLoading) {
-    return (
-      <div className={cn('space-y-2', className)}>
-        {[1, 2, 3, 4].map(i => (
-          <UnifiedSkeleton key={i} className="h-12 rounded-lg p-3" />
-        ))}
-      </div>
-    );
-  }
+  if (useLoadingScope() || isLoading) return <MultiLevelNavigationSkeleton className={className} />;
 
   return (
-    <div className={cn('space-y-2', className)} role="list" aria-label="Navigation list">
+    <div className={cn(NAV_LIST_CLASS, className)} role="list" aria-label="Navigation list">
       {nodes.map(node => (
         <NavigationItem
           key={node.id}
@@ -145,11 +197,11 @@ function NavigationItem({
   const hasChildren = children.length > 0;
 
   return (
-    <div className="space-y-1" role="listitem">
+    <div className={NAV_ITEM_CLASS} role="listitem">
       <div className={cn('px-2', level > 0 && 'ml-4')}>
         <div
           className={cn(
-            'relative w-full rounded-lg border transition-all duration-150',
+            NAV_ROW_FRAME_CLASS,
             isSelected ? 'border-ods-border bg-ods-border' : 'border-ods-border bg-ods-card',
           )}
         >
@@ -238,18 +290,10 @@ export function MobileNavigationDropdown({
   className,
   folderIndexFile = DEFAULT_FOLDER_INDEX_FILE,
 }: MultiLevelNavigationProps) {
-  if (isLoading) {
-    return (
-      <div className={cn('space-y-2', className)}>
-        {[1, 2, 3].map(i => (
-          <UnifiedSkeleton key={i} className="h-10 rounded-lg p-3" />
-        ))}
-      </div>
-    );
-  }
+  if (useLoadingScope() || isLoading) return <MobileNavigationDropdownSkeleton className={className} />;
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn(NAV_LIST_CLASS, className)}>
       {nodes.map(node => (
         <MobileNavigationItem
           key={node.id}
@@ -286,7 +330,7 @@ function MobileNavigationItem({
       <div className={cn('px-2', level > 0 && 'ml-3')}>
         <div
           className={cn(
-            'relative w-full rounded-lg border transition-all duration-150',
+            NAV_ROW_FRAME_CLASS,
             isSelected ? 'border-ods-border bg-ods-border' : 'border-ods-border bg-ods-card',
           )}
         >

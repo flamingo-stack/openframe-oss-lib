@@ -22,10 +22,10 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { VideoTeaser } from '../../types/video-processing';
 import { resolveContentHref } from '../../utils/content-href';
 import { buildOgPlaceholderUrl } from '../../utils/og-placeholder';
-import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card';
-import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
+import { EntityAuthorCard, EntityAuthorCardSkeleton } from '../chat/entity-cards/entity-author-card';
+import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
-import { EntityTagBadges } from '../features/entity-tag-badges';
+import { EntityTagBadges, EntityTagBadgesSkeleton } from '../features/entity-tag-badges';
 import { EntityVideoSection } from '../features/entity-video-section';
 import { useCaptions } from '../features/use-captions';
 import { useVideoWarmup } from '../features/use-video-warmup';
@@ -37,9 +37,10 @@ import { VideoBitesStrip } from '../features/video-bites-strip';
 // the detail block visibly narrower than the rail.
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { ArticleAuthorByline } from '../shared/article-author-byline';
-import { DetailPageSkeleton } from '../shared/detail-page-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { ArticleAuthorByline, ArticleAuthorBylineSkeleton } from '../shared/article-author-byline';
 import { LoadError } from '../ui/error-state';
+import { useLoadingScope } from '../ui/loading-scope';
 import { RichMarkdownRenderer } from '../ui/markdown';
 
 export interface OnboardingGuideDetailViewProps {
@@ -84,6 +85,67 @@ export interface OnboardingGuideDetailViewProps {
   shell?: boolean;
 }
 
+/** The view's layout, read by the view and by its skeleton, so the skeleton is the view's size. */
+const RELATED_BLOCK_CLASS = 'space-y-4 border-t border-ods-border pt-8';
+const RELATED_HEADING_CLASS = 'tracking-[-0.36px] text-ods-text-primary text-h3';
+const RELATED_LIST_CLASS = 'flex flex-col gap-3';
+const BODY_CLASS = 'space-y-4';
+/** The metadata grid's extra cell label (static copy). */
+const SECTION_CELL_LABEL = 'Section';
+/** Related guides and body paragraphs the skeleton draws (a guide's first fold). */
+export const ONBOARDING_GUIDE_RELATED_SKELETON_COUNT = 3;
+const ONBOARDING_GUIDE_BODY_SKELETON_PARAGRAPHS = 3;
+
+export interface OnboardingGuideDetailViewSkeletonProps {
+  /** The real back button (static copy). */
+  backButton?: { label?: string; onClick: () => void };
+  /** Related guide cards drawn. Default `ONBOARDING_GUIDE_RELATED_SKELETON_COUNT`; 0 draws no related block. */
+  relatedCount?: number;
+  /** The host's slot below the guide, drawn as is. */
+  children?: ReactNode;
+}
+
+/**
+ * The guide page while its guide is read: the title as a bar in the page's own title block (the back button real),
+ * the tag row, the metadata grid (real "Section" / "Published" labels), body paragraphs, the author byline, and the
+ * related block ("More in" real, the section a bar, guide card skeletons). Rendered inside the caller's shell.
+ */
+export function OnboardingGuideDetailViewSkeleton({
+  backButton,
+  relatedCount = ONBOARDING_GUIDE_RELATED_SKELETON_COUNT,
+  children,
+}: OnboardingGuideDetailViewSkeletonProps) {
+  return (
+    <PageLayout loading titleSize="h1" titleWrap backButton={backButton}>
+      <EntityTagBadgesSkeleton />
+      <EntityAuthorCardSkeleton extraCellLabels={[SECTION_CELL_LABEL]} />
+      <div className={BODY_CLASS} aria-hidden>
+        {Array.from({ length: ONBOARDING_GUIDE_BODY_SKELETON_PARAGRAPHS }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton paragraphs never reorder
+          <TextLineSkeleton key={i} type="h4" lines={3} className="w-full" />
+        ))}
+      </div>
+      <ArticleAuthorBylineSkeleton />
+      {relatedCount > 0 && (
+        <div className={RELATED_BLOCK_CLASS} aria-hidden>
+          <h2 className={RELATED_HEADING_CLASS}>
+            More in <TextLineSkeleton type="inherit" as="span" className="inline-block w-32 align-middle" />
+          </h2>
+          <ul className={RELATED_LIST_CLASS}>
+            {Array.from({ length: relatedCount }, (_, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+              <li key={i}>
+                <OnboardingGuideCardSkeleton />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <Fragment key="related-content">{children}</Fragment>
+    </PageLayout>
+  );
+}
+
 export function OnboardingGuideDetailView({
   authorHref,
   authorBio,
@@ -111,7 +173,11 @@ export function OnboardingGuideDetailView({
 
   // Controlled (hub SSR `initialData`) OR self-fetch by slug (config-only embed).
   const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null;
-  const { data: guide, isLoading, error, reload } = useSelfFetch<OnboardingGuide>(url, { initialData });
+  // In a page's loading state the guide is read (the host passes an empty record): nothing is fetched.
+  const scoped = useLoadingScope();
+  const { data: guide, isLoading, error, reload } = useSelfFetch<OnboardingGuide>(scoped ? null : url, {
+    initialData,
+  });
 
   // Hooks must run unconditionally — feed them optional-chained values so they
   // no-op while the guide is still loading.
@@ -120,21 +186,15 @@ export function OnboardingGuideDetailView({
     supabaseStorageOrigin: runtime?.endpoints.supabaseStorageOrigin,
   });
 
-  if (error || (!guide && !isLoading)) {
-    return renderShell(<LoadError message="Guide not found." onRetry={reload} />);
-  }
-  if (!guide) {
-    // Skeleton (not a bare "Loading…") for parity with every other shared view —
-    // catalog, roadmap, releases all render a skeleton on first load, so the detail
-    // page shouldn't flash text then content. `bare` + `PageShell` so the loading
-    // state matches the loaded page's full width / padding / min-height.
+  const backCfg = { label: backLabel, onClick: () => router.push(resolvedBackHref) };
+  const loading = scoped || (!guide && isLoading);
+  if (loading) {
     return renderShell(
-      // Match the loaded page's top offset (TitleBlock's
-      // `pt-[var(--spacing-system-l)]`) so content doesn't jump on load.
-      <div className="pt-[var(--spacing-system-l)]">
-        <DetailPageSkeleton bare showImageGallery={false} />
-      </div>,
+      <OnboardingGuideDetailViewSkeleton backButton={backCfg}>{relatedContent}</OnboardingGuideDetailViewSkeleton>,
     );
+  }
+  if (error || !guide) {
+    return renderShell(<LoadError message="Guide not found." onRetry={reload} />);
   }
 
   // Track URLs via the ONE captions configurer (`useCaptions`); same-origin
@@ -165,7 +225,7 @@ export function OnboardingGuideDetailView({
       title={guide.title}
       titleSize="h1"
       titleWrap
-      backButton={{ label: backLabel, onClick: () => router.push(resolvedBackHref) }}
+      backButton={backCfg}
     >
       {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}
       <EntityTagBadges tags={guide.onboarding_guide_tags} />
@@ -178,7 +238,7 @@ export function OnboardingGuideDetailView({
         extraCells={[
           {
             value: `${guide.section} · Step ${guide.step_order}`,
-            label: 'Section',
+            label: SECTION_CELL_LABEL,
             uppercase: false,
           },
         ]}
@@ -206,7 +266,7 @@ export function OnboardingGuideDetailView({
 
       {/* Markdown body */}
       {guide.content && (
-        <div className="space-y-4">
+        <div className={BODY_CLASS}>
           <MarkdownRenderer content={guide.content} />
         </div>
       )}
@@ -234,9 +294,9 @@ export function OnboardingGuideDetailView({
 
       {/* Related — same-section, ordered by step. */}
       {related.length > 0 && (
-        <div className="space-y-4 border-t border-ods-border pt-8">
-          <h2 className="tracking-[-0.36px] text-ods-text-primary text-h3">More in {guide.section}</h2>
-          <ul className="flex flex-col gap-3">
+        <div className={RELATED_BLOCK_CLASS}>
+          <h2 className={RELATED_HEADING_CLASS}>More in {guide.section}</h2>
+          <ul className={RELATED_LIST_CLASS}>
             {related.map(r => (
               <li key={r.id}>{renderRelatedCardFn(r)}</li>
             ))}

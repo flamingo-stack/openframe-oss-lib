@@ -7,7 +7,8 @@ import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
 import { TruncateText } from '../ui/truncate-text';
 
@@ -168,28 +169,16 @@ function Example({
   );
 }
 
-/**
- * A text placeholder in its line's own box (`text-h…` on the line, the bar inline in it), so a
- * placeholder line is the loaded line's height.
- */
-const LINE_SKELETON_CLASS = 'inline-block h-[0.7em] rounded align-middle';
-
 /** The example's two turns, in the loaded example's own box. */
 function ExampleSkeleton({ className }: { className?: string }) {
   const turn = (first: boolean) => (
     <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
       <UnifiedSkeleton className="size-6 shrink-0 rounded-full" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="text-h6">
-          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-28')} />
-        </div>
+        <TextLineSkeleton type="h6" className="w-28" />
         <div className="min-h-[2lh] text-h4">
-          <div className="text-h4">
-            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
-          </div>
-          <div className="text-h4">
-            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-2/3')} />
-          </div>
+          <TextLineSkeleton type="h4" className="w-full" />
+          <TextLineSkeleton type="h4" className="w-2/3" />
         </div>
       </div>
     </div>
@@ -213,13 +202,9 @@ function JobHeadSkeleton() {
     <>
       <UnifiedSkeleton className="size-9 shrink-0 rounded-lg" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="text-h4">
-          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-32')} />
-        </div>
+        <TextLineSkeleton type="h4" className="w-32" />
         <div className="mt-0.5">
-          <div className="text-h6">
-            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-40')} />
-          </div>
+          <TextLineSkeleton type="h6" className="w-40" />
         </div>
       </div>
     </>
@@ -257,12 +242,8 @@ export function CapabilityExplorerSkeleton({
               <JobHeadSkeleton />
             </div>
             <div className="min-h-[3lh] text-h6">
-              <div className="text-h6">
-                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
-              </div>
-              <div className="text-h6">
-                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-5/6')} />
-              </div>
+              <TextLineSkeleton type="h6" className="w-full" />
+              <TextLineSkeleton type="h6" className="w-5/6" />
             </div>
             <UnifiedSkeleton className="h-[300px] shrink-0 rounded-lg" />
             <ExampleSkeleton className="shrink-0" />
@@ -294,25 +275,17 @@ export function CapabilityExplorerSkeleton({
           <div className={cn('grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,380px)] gap-8', PANEL_TOP_HEIGHT_CLASS)}>
             <div className="flex min-w-0 flex-col overflow-hidden">
               <div className="mb-2">
-                <div className="text-h2">
-                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-64')} />
-                </div>
+                <TextLineSkeleton type="h2" className="w-64" />
               </div>
               <div className="min-h-[3lh] text-h4">
-                <div className="text-h4">
-                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
-                </div>
-                <div className="text-h4">
-                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-4/5')} />
-                </div>
+                <TextLineSkeleton type="h4" className="w-full" />
+                <TextLineSkeleton type="h4" className="w-4/5" />
               </div>
               <div className="mt-auto grid grid-cols-1 gap-2">
                 {[0, 1, 2].map(i => (
                   <div key={i} className="flex min-w-0 items-center gap-2.5">
                     <UnifiedSkeleton className="size-4 shrink-0 rounded-full" />
-                    <div className="text-h6">
-                      <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, i === 1 ? 'w-56' : 'w-48')} />
-                    </div>
+                    <TextLineSkeleton type="h6" className={i === 1 ? 'w-56' : 'w-48'} />
                   </div>
                 ))}
               </div>
@@ -326,9 +299,7 @@ export function CapabilityExplorerSkeleton({
               PANEL_FOOTER_HEIGHT_CLASS,
             )}
           >
-            <div className="text-h5">
-              <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-16')} />
-            </div>
+            <TextLineSkeleton type="h5" className="w-16" />
             <UnifiedSkeleton className="h-7 w-36 rounded-md" />
           </div>
         </div>
@@ -365,7 +336,11 @@ export function CapabilityExplorer({
 }: CapabilityExplorerProps) {
   const wide = useContentLgUp();
   const listRef = useRef<HTMLDivElement>(null);
+  const inScope = useLoadingScope();
 
+  // While the page is read its jobs are not known (none in a loading state): the explorer is its skeleton, never
+  // left out. The page's loading region announces it, so this one does not.
+  if (inScope) return <CapabilityExplorerSkeleton region={false} className={className} />;
   if (items.length === 0) return null;
   // Unknown until measured: one box, so neither layout's ids are in the page twice.
   if (wide === undefined) return <CapabilityExplorerSkeleton className={className} />;

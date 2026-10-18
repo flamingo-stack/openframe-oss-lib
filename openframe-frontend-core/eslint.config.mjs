@@ -198,6 +198,12 @@ export default defineConfig([
       // every `[id]` in the container and asserts the set size, which is the only
       // formulation of that claim.
       'src/components/ui/__tests__/store-badges.test.tsx',
+      // A loading state is aria-hidden skeleton shapes: what is under test is that
+      // the shapes are there (the skeleton surface) and that one surface never
+      // pulses inside another, which `screen` cannot reach.
+      'src/components/ui/__tests__/loading-scope.test.tsx',
+      'src/__tests__/one-pulse.test.tsx',
+      'src/__tests__/skeleton-nesting.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

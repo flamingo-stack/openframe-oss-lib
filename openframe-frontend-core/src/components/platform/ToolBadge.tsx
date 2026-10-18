@@ -11,7 +11,9 @@ import type { ToolType } from '../../types/tool.types';
 import { cn } from '../../utils/cn';
 import { getToolLabel } from '../../utils/tool-utils';
 import { NavLinkAnchorViaRuntime } from '../chat/nav-link-anchor-via-runtime';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export type { ToolType } from '../../types/tool.types';
 
@@ -44,6 +46,38 @@ export interface ToolBadgeProps {
   iconClassName?: string;
 }
 
+/** The badge's layout, read by the badge and by its skeleton, so the skeleton is the badge's size. */
+// The house tag (Figma `tag`): 32px, on the card surface, the caption face.
+const CHIP_CLASS =
+  'inline-flex h-8 items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5';
+const CHIP_MARK_CLASS = 'flex h-4 w-4 shrink-0 items-center justify-center';
+const INLINE_CLASS = 'flex items-center gap-1 text-ods-text-secondary';
+
+export interface ToolBadgeSkeletonProps {
+  variant?: 'inline' | 'chip';
+  /** Whether the badge leads with its mark (default true). */
+  icon?: boolean;
+  className?: string;
+}
+
+/** A badge while its tool is read: the chip's own frame (or the inline row), a mark box and a bar for the name. */
+export function ToolBadgeSkeleton({ variant = 'inline', icon = true, className }: ToolBadgeSkeletonProps) {
+  if (variant === 'chip') {
+    return (
+      <span className={cn(CHIP_CLASS, className)} aria-hidden>
+        {icon && <UnifiedSkeleton as="span" className={cn(CHIP_MARK_CLASS, 'rounded-sm')} />}
+        <TextLineSkeleton type="h5" className="w-16" />
+      </span>
+    );
+  }
+  return (
+    <div className={cn(INLINE_CLASS, className)} aria-hidden>
+      {icon && <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />}
+      <TextLineSkeleton type="h4" className="w-20" />
+    </div>
+  );
+}
+
 /**
  * One tool, named: a mark and a label. Pass a `toolType` for a tool the
  * registry knows, or `label` + `icon` for one it does not (a connector or a
@@ -59,8 +93,11 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
   className,
   iconClassName,
 }) => {
+  const loading = useLoadingScope();
   const text = label ?? (toolType ? getToolLabel(toolType) : '');
   const mark = icon ?? (toolType ? <ToolIcon toolType={toolType} className={iconClassName} size={16} /> : null);
+
+  if (loading) return <ToolBadgeSkeleton variant={variant} icon={!!mark} className={className} />;
 
   // One rule for both variants: with an `href` the badge is a link.
   const linked = (node: React.ReactElement, linkClassName: string) =>
@@ -85,14 +122,13 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
     return linked(
       <span
         className={cn(
-          // The house tag (Figma `tag`): 32px, on the card surface, the caption face.
-          'inline-flex h-8 items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5',
+          CHIP_CLASS,
           href && 'transition-colors hover:border-ods-border-hover',
           className,
         )}
       >
         {mark && (
-          <span className="flex h-4 w-4 shrink-0 items-center justify-center [&_img]:h-full [&_img]:w-full [&_img]:rounded-sm [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full">
+          <span className={cn(CHIP_MARK_CLASS, '[&_img]:h-full [&_img]:w-full [&_img]:rounded-sm [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full')}>
             {mark}
           </span>
         )}
@@ -103,7 +139,7 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
   }
 
   return linked(
-    <div className={cn('flex items-center gap-1 text-ods-text-secondary', className)}>
+    <div className={cn(INLINE_CLASS, className)}>
       {mark}
       <span className="text-ods-text-primary text-h4">{text}</span>
     </div>,

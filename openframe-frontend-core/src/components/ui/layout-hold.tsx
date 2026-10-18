@@ -3,24 +3,21 @@ import { cn } from '../../utils/cn';
 import { SKELETON_SURFACE_CLASS } from './skeleton-surface';
 
 /**
- * Holding a layout while its content is read, the two ways that are right at
- * EVERY width. A placeholder of a guessed size (a `w-40` bar, a `h-[120px]`
+ * Holding text while its layout is read, the way that is right at EVERY width. A placeholder of a guessed size (a `w-40` bar, a `h-[120px]`
  * box) is only right at the widths it was tuned at: text wraps where the words
  * make it wrap, so the placeholder has to be made of the words, or of the real
  * layout, to wrap where the content will.
  *
- * - `TextHold`: an inline stand-in exactly as wide as the words it is given
+ * - `TextHold`: an inline bar exactly as wide as the words it is given (the page's own words, never invented)
  *   (same font, same letter spacing, because it IS those words, not shown).
  *   `bar` draws one skeleton bar per line the words take, each as wide as
  *   its line, in plain CSS (no measuring, so it is in the server's HTML);
  *   `blank` only keeps their space.
- * - `LayoutHold`: a block as tall as the real layout rendered inside it, kept
- *   invisible and inert: the layout's own height, at any width.
  *
- * Neither is shown or read out; both are removed for assistive technology.
+ * It is not shown or read out; it is removed for assistive technology.
  */
 export interface TextHoldProps {
-  /** The words whose width is held (the content's own, or a stand-in of its length). */
+  /** The words whose width is held: the page's own static words, never invented ones. */
   children: ReactNode;
   /** `bar`: one skeleton bar per line the words take. `blank`: the space only. */
   variant?: 'bar' | 'blank';
@@ -57,19 +54,5 @@ export function TextHold({ children, variant = 'bar', className }: TextHoldProps
     >
       {children}
     </span>
-  );
-}
-
-export interface LayoutHoldProps {
-  /** The real layout, rendered with the data at hand. */
-  children: ReactNode;
-  className?: string;
-}
-
-export function LayoutHold({ children, className }: LayoutHoldProps) {
-  return (
-    <div aria-hidden inert className={cn('invisible', className)}>
-      {children}
-    </div>
   );
 }

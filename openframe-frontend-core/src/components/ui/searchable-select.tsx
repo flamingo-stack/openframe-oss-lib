@@ -6,9 +6,20 @@ import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collisi
 import { cn } from '../../utils/cn';
 import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
 import { usePortalContainer } from './portal-container';
+
+/** An option's frame (a list row, or a tile in the grid), read by the options and by their loading state. */
+const SELECT_ROW_CLASS =
+  'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left';
+const SELECT_TILE_CLASS =
+  'flex min-w-0 flex-col items-center justify-center gap-[var(--spacing-system-xxs)] border-b border-r border-ods-border p-[var(--spacing-system-xs)]';
+/** Options the loading state draws: the `max-h-80` (320px) list holds eight 40px rows, or about twelve tiles. */
+const SELECT_ROWS_FOLD = 8;
+const SELECT_TILES_FOLD = 12;
 
 export interface SearchableSelectOption {
   value: string;
@@ -87,7 +98,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
     placeholder = 'Select...',
     searchPlaceholder = 'Search...',
     emptyText = 'No results found',
-    loadingText = 'Loading…',
+    loadingText = 'Loading options',
     isLoading = false,
     disabled = false,
     trigger,
@@ -232,7 +243,16 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
             role="listbox"
           >
             {isLoading ? (
-              <div className={statusClass}>{loadingText}</div>
+              // The options while they are read: the list's own rows (or tiles), a label bar each; `loadingText` is
+              // what a screen reader hears.
+              <LoadingRegion label={loadingText} className="contents">
+                {Array.from({ length: isGrid ? SELECT_TILES_FOLD : SELECT_ROWS_FOLD }, (_, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+                  <div key={i} className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
+                    <TextLineSkeleton type={isGrid ? 'h6' : 'h4'} className={isGrid ? 'w-full' : 'w-2/3'} />
+                  </div>
+                ))}
+              </LoadingRegion>
             ) : filtered.length === 0 ? (
               <div className={statusClass}>{emptyText}</div>
             ) : (
@@ -247,9 +267,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
                     onClick={() => handleSelect(opt.value)}
                     className={cn(
                       'transition-colors hover:bg-ods-bg-hover',
-                      isGrid
-                        ? 'flex min-w-0 flex-col items-center justify-center gap-[var(--spacing-system-xxs)] border-b border-r border-ods-border p-[var(--spacing-system-xs)]'
-                        : 'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
+                      isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS,
                       isSelected && 'bg-ods-bg-hover',
                     )}
                   >

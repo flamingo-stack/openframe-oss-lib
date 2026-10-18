@@ -12,10 +12,11 @@ import { serializeJsonLd } from '../../utils/common';
 import { faqSectionSlug, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
-import { FaqAccordion, type FaqItem } from '../faq-accordion';
+import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, FaqAccordionSkeleton, type FaqItem } from '../faq-accordion';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
 
@@ -87,9 +88,91 @@ export interface FaqSectionProps {
    * (`onOpen`). An `aside` takes the card's place.
    */
   ask?: false | FaqAskOptions;
+  /**
+   * How many named categories the block's loading state draws (each a category section with its heading and rows,
+   * then the questions with no category): the number its host usually shows. Default 0 (one flat list).
+   */
+  skeletonSections?: number;
+  /** The loading state draws the group of questions with no category after the named ones. Default true. */
+  skeletonUncategorized?: boolean;
+  /**
+   * The loading state's first fold, group by group: how many questions each group draws, in order (the named
+   * categories first, then the uncategorized group when `skeletonUncategorized` is not false). Wins over
+   * `skeletonSections` / `minResults` for the skeleton. Absent: `minResults` spread over `skeletonSections` groups.
+   */
+  skeletonShape?: number[];
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
+
+/** The block's layout, read by the block and by its skeleton, so the skeleton is the block's size. */
+const SECTION_DEFAULT_CLASS = 'space-y-10';
+const COLUMN_STACK_CLASS = 'space-y-8';
+const QUESTIONS_STACK_CLASS = 'space-y-10';
+const ASIDE_GRID_CLASS =
+  'grid gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16';
+const ASIDE_QUESTIONS_CELL_CLASS = 'content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1';
+const ASIDE_CELL_CLASS = 'content-lg:col-start-1 content-lg:row-start-2';
+const TOPIC_STACK_CLASS = 'space-y-1';
+const TOPIC_CLASS = 'text-ods-text-muted text-h6';
+const CATEGORY_NAV_CLASS = 'flex flex-wrap gap-2';
+const CATEGORY_PILL_CLASS = 'rounded-full border px-4 py-2 transition-colors text-h6';
+const CATEGORY_SECTION_CLASS = 'scroll-mt-24 space-y-4';
+/** Questions the block's skeleton draws when the host states no count (`minResults`): one screen of the accordion's rows. */
+export const FAQ_SECTION_SKELETON_QUESTIONS = FAQ_ACCORDION_SKELETON_ROWS;
+
+/**
+ * The block's arrangement, for the loaded list and its skeleton alike: without an aside the category nav above the
+ * questions; with one, heading and nav in a left column, questions on the right, the aside under the left column.
+ */
+function FaqLayout({
+  heading,
+  nav,
+  questions,
+  aside,
+}: {
+  heading?: React.ReactNode;
+  nav?: React.ReactNode;
+  questions: React.ReactNode;
+  aside?: React.ReactNode;
+}) {
+  if (!aside) {
+    return (
+      <div className={COLUMN_STACK_CLASS}>
+        {nav}
+        {questions}
+      </div>
+    );
+  }
+  // One instance of each block, placed by the grid: questions second in the
+  // document (and on a narrow area), in the right column from `lg`.
+  return (
+    <div className={ASIDE_GRID_CLASS}>
+      <div className={COLUMN_STACK_CLASS}>
+        {heading}
+        {nav}
+      </div>
+      <div className={ASIDE_QUESTIONS_CELL_CLASS}>{questions}</div>
+      <div className={ASIDE_CELL_CLASS}>{aside}</div>
+    </div>
+  );
+}
+
+/** The heading above the questions: the host's node (or the default `<h2>`), with the topic's bare name under it. */
+function faqHeadingNode(heading: React.ReactNode | null | undefined, showTopic: boolean, topic?: string) {
+  // `undefined` → default <h2> title; `null` → the host page owns the <h1>, so no title renders here.
+  const titleNode = heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading;
+  if (!(showTopic && topic)) return titleNode;
+  // The host's heading may arrive from a server component, still streaming: React cannot check such a
+  // node when it sits in a list of siblings and warns about a missing key. So it is the ONLY child of its
+  // own wrapper, and the two siblings here are this component's own elements.
+  return (
+    <div className={TOPIC_STACK_CLASS}>
+      <div>{titleNode}</div>
+      <p className={TOPIC_CLASS}>{topic}</p>
+    </div>
+  );
+}
 
 /** The id of a page's own FAQ block: what a page's "FAQ" link or section nav points at. */
 export const PAGE_FAQ_SECTION_ID = 'faq';
@@ -348,7 +431,7 @@ function GroupedFaqList({
   }, []);
 
   const categoryNav = navGroups.length > 1 && (
-    <nav aria-label="FAQ categories" className="flex flex-wrap gap-2">
+    <nav aria-label="FAQ categories" className={CATEGORY_NAV_CLASS}>
       {navGroups.map(group => {
         const isActive = group.slug === activeSlug;
         return (
@@ -358,7 +441,7 @@ function GroupedFaqList({
             aria-current={isActive ? 'true' : undefined}
             onClick={e => handleJump(e, group.slug as string)}
             className={cn(
-              'rounded-full border px-4 py-2 transition-colors text-h6',
+              CATEGORY_PILL_CLASS,
               isActive
                 ? 'border-ods-text-primary bg-ods-card text-ods-text-primary'
                 : 'border-ods-border bg-ods-card text-ods-text-secondary hover:border-ods-text-secondary hover:text-ods-text-primary',
@@ -371,11 +454,12 @@ function GroupedFaqList({
     </nav>
   );
   const questions = (
-    <div className="space-y-10">
+    <div className={QUESTIONS_STACK_CLASS}>
       {groups.map(group => {
         const key = groupKey(group);
         return (
-          <section key={key} id={group.slug ?? undefined} className="scroll-mt-24 space-y-4">
+          // A category is a record's group: how many there are is the data's (`data-loading-item`, like a list row).
+          <section key={key} id={group.slug ?? undefined} className={CATEGORY_SECTION_CLASS} data-loading-item>
             {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
             <FaqAccordion
               // Re-key on item-hash changes so the remount picks up the new
@@ -391,48 +475,7 @@ function GroupedFaqList({
     </div>
   );
 
-  if (!aside) {
-    return (
-      <div className="space-y-8">
-        {categoryNav}
-        {questions}
-      </div>
-    );
-  }
-
-  // One instance of each block, placed by the grid: questions second in the
-  // document (and on a narrow area), in the right column from `lg`.
-  return (
-    <div className="grid gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16">
-      <div className="space-y-8">
-        {heading}
-        {categoryNav}
-      </div>
-      <div className="content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1">{questions}</div>
-      <div className="content-lg:col-start-1 content-lg:row-start-2">{aside}</div>
-    </div>
-  );
-}
-
-function FaqSkeleton({
-  region = true,
-}: {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-} = {}) {
-  return (
-    <LoadingRegion label="Loading questions" announce={region} className="space-y-8">
-      <UnifiedSkeleton className="h-12 w-2/3 rounded content-md:h-14" />
-      <div className="w-full divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent">
-        {Array.from({ length: 8 }).map((_, idx) => (
-          <div key={idx} className="flex items-center justify-between gap-6 px-6 py-4 content-md:gap-10">
-            <UnifiedSkeleton className="h-6 w-5/6 rounded" />
-            <UnifiedSkeleton className="size-6 rounded" />
-          </div>
-        ))}
-      </div>
-    </LoadingRegion>
-  );
+  return <FaqLayout heading={heading} nav={categoryNav} questions={questions} aside={aside} />;
 }
 
 interface FaqsResponse {
@@ -473,8 +516,12 @@ export function FaqSection({
   apiBaseUrl = '',
   aside: asideProp,
   ask,
+  skeletonSections,
+  skeletonUncategorized,
+  skeletonShape,
 }: FaqSectionProps) {
   const assistant = useAssistantRuntime();
+  const inScope = useLoadingScope();
   // The host's own block wins; else the card, where a chat is there to open and the FAQ has a topic
   // (an empty topic is no topic, as the questions request reads it).
   const askTopic = ask === false ? undefined : ask?.topic || topic || entityType;
@@ -488,7 +535,8 @@ export function FaqSection({
     () => (initialFaqs ? { faqs: initialFaqs } : undefined),
     [initialFaqs],
   );
-  const { data, dataUrl, isLoading, error } = useSelfFetch<FaqsResponse>(url, { initialData });
+  // A loading scope fetches nothing.
+  const { data, dataUrl, isLoading, error } = useSelfFetch<FaqsResponse>(inScope ? null : url, { initialData });
 
   // Only the answer for THIS url: while another topic's questions load, the
   // previous topic's are not this page's. Memoised because the `??` fallback
@@ -499,40 +547,37 @@ export function FaqSection({
   // Grouped before the early returns so the hook order stays stable.
   const groups = useMemo(() => (faqs.length > 0 ? groupFaqsBySection(faqs) : []), [faqs]);
 
-  // `undefined` → default <h2> title; `null` → the host page owns the <h1>, so
-  // no title renders here. `heading === null` also makes the category headings
-  // <h2> (directly under the page <h1>); otherwise they nest as <h3>.
-  const titleNode = heading === undefined ? <h2 className={SECTION_HEADING_CLASS}>{DEFAULT_HEADING_TEXT}</h2> : heading;
-  const headingNode =
-    showTopic && topic ? (
-      // The host's heading may arrive from a server component, still streaming: React cannot check such a
-      // node when it sits in a list of siblings and warns about a missing key. So it is the ONLY child of its
-      // own wrapper, and the two siblings here are this component's own elements.
-      <div className="space-y-1">
-        <div>{titleNode}</div>
-        <p className="text-ods-text-muted text-h6">{topic}</p>
-      </div>
-    ) : (
-      titleNode
-    );
+  // `heading === null` also makes the category headings <h2> (directly under the page <h1>); otherwise they nest
+  // as <h3>.
+  const headingNode = faqHeadingNode(heading, showTopic, topic);
 
   // Degrade silently — never show an error banner or an empty section shell
   // where FAQs would be (host pages and the standalone surface both rely on it).
   if (error) return null;
-  if (!isLoading && faqs.length === 0) return null;
-  if (isLoading && faqs.length === 0) {
+  // In a loading scope, or while its own request is unanswered, the block is its skeleton.
+  if (inScope || (isLoading && faqs.length === 0)) {
     return (
-      <div className={className}>
-        <FaqSkeleton />
-      </div>
+      <FaqSectionSkeleton
+        heading={heading}
+        topic={topic}
+        showTopic={showTopic}
+        aside={aside}
+        count={minResults}
+        sections={skeletonSections}
+        uncategorized={skeletonUncategorized}
+        shape={skeletonShape}
+        className={className}
+        id={id}
+      />
     );
   }
+  if (faqs.length === 0) return null;
 
   const schema = emitJsonLd ? buildFaqJsonLdFromFaqs(faqs, jsonLd) : null;
 
   return (
     <>
-      <section id={id} data-faq-topic={topic} className={className ?? 'space-y-10'}>
+      <section id={id} data-faq-topic={topic} className={className ?? SECTION_DEFAULT_CLASS}>
         {!aside && headingNode}
         <GroupedFaqList
           groups={groups}
@@ -550,5 +595,86 @@ export function FaqSection({
         />
       )}
     </>
+  );
+}
+
+export interface FaqSectionSkeletonProps
+  extends Pick<FaqSectionProps, 'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'> {
+  /** Questions drawn (the instance's `minResults`). Default `FAQ_SECTION_SKELETON_QUESTIONS`. */
+  count?: number;
+  /** Named categories drawn (each its section, a heading bar and its rows), then the uncategorized rows. Default 0. */
+  sections?: number;
+  /** Draw the uncategorized group after the named ones. Default true (always drawn when `sections` is 0). */
+  uncategorized?: boolean;
+  /** Questions per group, in order (named first, then the uncategorized one when drawn): wins over `count`/`sections`. */
+  shape?: number[];
+}
+
+/**
+ * The FAQ block while its questions are read: the heading (the host's node, or "Frequently Asked Questions") and the
+ * topic line real, the aside (the ask card, which draws its own loading state) in its place, `sections` category
+ * sections (nav pills, a heading bar, rows) when the host groups its FAQs, then the uncategorized rows: `count`
+ * question rows in all, as bars.
+ */
+export function FaqSectionSkeleton({
+  heading,
+  topic,
+  showTopic = false,
+  aside,
+  count = FAQ_SECTION_SKELETON_QUESTIONS,
+  sections = 0,
+  uncategorized = true,
+  shape,
+  className,
+  id,
+}: FaqSectionSkeletonProps) {
+  const headingNode = faqHeadingNode(heading, showTopic, topic);
+  const CategoryHeading = heading === null ? 'h2' : 'h3';
+  // A stated shape names every group's rows; otherwise the count is spread over the groups, each at least one.
+  const shapeGroups = shape?.filter(rows => rows > 0);
+  const named = shapeGroups?.length
+    ? Math.max(0, shapeGroups.length - (uncategorized ? 1 : 0))
+    : Math.max(0, sections);
+  const groups = shapeGroups?.length ? shapeGroups.length : named + (uncategorized || named === 0 ? 1 : 0);
+  const rowsOf = (group: number) =>
+    shapeGroups?.length
+      ? shapeGroups[group]
+      : Math.max(1, Math.floor((count * (group + 1)) / groups) - Math.floor((count * group) / groups));
+  const nav =
+    named > 1 ? (
+      <div className={CATEGORY_NAV_CLASS} aria-hidden>
+        {Array.from({ length: named }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton pills never reorder
+          <span key={i} className={cn(CATEGORY_PILL_CLASS, 'border-ods-border bg-ods-card')}>
+            <TextLineSkeleton type="inherit" as="span" className="w-24" />
+          </span>
+        ))}
+      </div>
+    ) : undefined;
+  const questions = (
+    <div className={QUESTIONS_STACK_CLASS}>
+      {Array.from({ length: groups }, (_, group) => {
+        const isNamed = group < named;
+        return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton groups never reorder
+          <section key={group} className={CATEGORY_SECTION_CLASS} data-loading-item>
+            {isNamed && (
+              <CategoryHeading className={SECTION_HEADING_CLASS}>
+                <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
+              </CategoryHeading>
+            )}
+            <FaqAccordionSkeleton count={rowsOf(group)} />
+          </section>
+        );
+      })}
+    </div>
+  );
+  return (
+    <LoadingRegion label="Loading questions">
+      <section id={id} data-faq-topic={topic} className={className ?? SECTION_DEFAULT_CLASS}>
+        {!aside && headingNode}
+        <FaqLayout heading={aside ? headingNode : undefined} nav={nav} questions={questions} aside={aside} />
+      </section>
+    </LoadingRegion>
   );
 }

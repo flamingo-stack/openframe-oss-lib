@@ -63,7 +63,9 @@ import {
   BookingForm,
   BookingFormSkeleton,
   DEFAULT_SUBMIT_LABEL,
+  type BookingFieldCopy,
   type BookingFieldRow,
+  type BookingFormConsent,
   type BookingFormProps,
 } from './booking-form';
 import { Confirmation } from './confirmation';
@@ -504,8 +506,11 @@ export function MeetingSchedulerSkeleton({
   className,
   onBack,
   fieldRows,
+  optionalFields,
+  fieldCopy,
   consent = false,
   monthOffset = 0,
+  contextPanel,
 }: {
   flow?: SchedulerFlow;
   step?: Step;
@@ -513,9 +518,20 @@ export function MeetingSchedulerSkeleton({
   onBack?: () => void;
   /** The details form's rows (details-first), so the form skeleton has the form's shape. */
   fieldRows?: BookingFieldRow[];
-  /** Whether the host adds its consent row under the form. */
-  consent?: boolean;
+  /** The optional questions the details form asks (`BookingForm`'s `optionalFields`). */
+  optionalFields?: readonly string[];
+  /** The host's per-field copy (`BookingForm`'s `fieldCopy`). */
+  fieldCopy?: Record<string, BookingFieldCopy>;
+  /** The host's consent row under the form (`BookingForm`'s `consent`, drawn for real); `true` when its copy is not
+   *  known here. */
+  consent?: BookingFormConsent | boolean;
   monthOffset?: number;
+  /**
+   * The rows the loaded context panel will have (`ContextPanelSkeleton`'s): whether the scheduler is given a
+   * title and a description, and how many durations the link offers. Defaults: title and description on, no
+   * duration chips.
+   */
+  contextPanel?: { title?: boolean; description?: boolean; durations?: number };
 }) {
   const preset = SCHEDULER_FLOW_PRESETS[flow];
   const { formOnly, cardClass, innerClass, actionPanelClass, stepPanelClass } = schedulerCardClasses(
@@ -526,7 +542,7 @@ export function MeetingSchedulerSkeleton({
   return (
     <div className={cardClass}>
       <LoadingRegion label="Loading available times" className={innerClass}>
-        {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} />}
+        {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} {...contextPanel} />}
         <div className={actionPanelClass}>
           {/* Both terms matter. Without `flow` this stays a calendar where
               the form belongs; without the step term, paging a month AFTER
@@ -536,7 +552,14 @@ export function MeetingSchedulerSkeleton({
             // The SAME wrapper the loaded form gets, so the skeleton never
             // states its own inset.
             <div className={stepPanelClass}>
-              <BookingFormSkeleton fieldRows={fieldRows} consent={consent} footerNote={preset.footerNote} />
+              <BookingFormSkeleton
+                fieldRows={fieldRows}
+                optionalFields={optionalFields}
+                fieldCopy={fieldCopy}
+                consent={consent}
+                footerNote={preset.footerNote}
+                submitLabel={preset.submitLabel}
+              />
             </div>
           ) : (
             <SlotPickerSkeleton monthOffset={monthOffset} />
@@ -906,8 +929,12 @@ export function HubSpotMeetingScheduler({
         className={className}
         onBack={backEdge}
         fieldRows={detailsFormProps?.fieldRows}
-        consent={Boolean(detailsFormProps?.consent)}
+        optionalFields={detailsFormProps?.optionalFields}
+        fieldCopy={detailsFormProps?.fieldCopy}
+        consent={detailsFormProps?.consent}
         monthOffset={monthOffset}
+        // The panel's title and description rows are the scheduler's own props; the durations are read.
+        contextPanel={{ title: Boolean(title), description: Boolean(description), durations: 0 }}
       />
     );
   }
@@ -1271,6 +1298,8 @@ export {
 export {
   MeetingSchedulerDirectory,
   MeetingSchedulerDirectoryRowSkeleton,
+  MeetingSchedulerDirectorySkeleton,
+  MEETING_DIRECTORY_PAGE_SIZE,
   type MeetingSchedulerDirectoryProps,
 } from './directory';
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };

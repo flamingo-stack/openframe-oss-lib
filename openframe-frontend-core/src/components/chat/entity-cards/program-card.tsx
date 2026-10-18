@@ -38,10 +38,11 @@ import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { CardHoverPlay } from '../../features/video-center-badge';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
-import { SquareAvatar } from '../../ui/square-avatar';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
 import { Tag } from '../../ui/tag';
 import {
   programItemToStripProfile,
@@ -55,15 +56,14 @@ import {
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS, ContentCardFrame } from './content-card-frame';
-import { EntityPortraitCard } from './entity-portrait-card';
+import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -102,14 +102,24 @@ const DEFAULT_GALLERY_ROW = 'flex gap-[var(--spacing-system-mf)]';
 const DEFAULT_GALLERY_THUMB =
   'relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg md:h-40 md:w-40 xl:h-[200px] xl:w-[200px]';
 const DEFAULT_FOOTER = 'flex justify-end border-t border-ods-border pt-[var(--spacing-system-lf)]';
+/** The hosts' avatars (32px each): beside the text from md, their own row under it on a phone. */
+const DEFAULT_HOSTS_ROW = 'flex flex-wrap gap-2 md:justify-end';
 
 export function ProgramCardSkeleton({
   size = 'default',
   eyebrow = true,
   media = 0,
   tags = false,
+  hosts = 1,
+  typeLabel,
+  className,
 }: {
+  /** `default` size: how many host avatars the card shows (a row of its own on a phone). 0 = none. */
+  hosts?: number;
   size?: CardSize;
+  /** `portrait` size: the content-type chip (the config's static label), when the card shows one. */
+  typeLabel?: string;
+  className?: string;
   eyebrow?: boolean;
   /** `default` size: how many gallery thumbnails the card shows (`MediaGallery`'s row). 0 = no gallery. */
   media?: number;
@@ -118,34 +128,35 @@ export function ProgramCardSkeleton({
 }) {
   // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
   // that row's line height.
+  if (size === 'portrait') return <EntityPortraitCardSkeleton typeLabel={typeLabel} className={className} />;
   if (size === 'row') {
     return (
-      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID)}>
+      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, className)}>
         <UnifiedSkeleton as="span" className={EDITORIAL_ROW_THUMB} />
         <span className={EDITORIAL_ROW_TEXT}>
-          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h3" />
+          <TextLineSkeleton as="span" type="h3" lines={2} className="w-full" />
           <span className={EDITORIAL_META_ROW}>
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
+            <TextLineSkeleton as="span" type="inherit" className="w-40" />
           </span>
-          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h6" />
+          <TextLineSkeleton as="span" type="h6" lines={2} className="w-full" />
         </span>
       </span>
     );
   }
   if (size === 'feature') {
     return (
-      <span className={cn(EDITORIAL_FRAME, 'flex flex-col')}>
+      <span className={cn(EDITORIAL_FRAME, 'flex flex-col', className)}>
         <UnifiedSkeleton as="span" className={cn(EDITORIAL_FEATURE_COVER, 'rounded-none')} />
         <span className={EDITORIAL_FEATURE_BODY}>
-          {eyebrow && <UnifiedSkeleton as="span" className="block h-[1lh] w-28 rounded text-h5" />}
-          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h3" />
+          {eyebrow && <TextLineSkeleton as="span" type="h5" className="w-28" />}
+          <TextLineSkeleton as="span" type="h3" lines={2} className="w-full" />
           <span className={EDITORIAL_META_ROW}>
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
+            <TextLineSkeleton as="span" type="inherit" className="w-40" />
           </span>
-          <UnifiedSkeleton as="span" className="block h-[3lh] w-full rounded text-h4" />
+          <TextLineSkeleton as="span" type="h4" lines={3} className="w-full" />
           <span className={EDITORIAL_PERSON_ROW}>
             <UnifiedSkeleton as="span" className="block h-8 w-8 shrink-0 rounded-full" />
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded text-h6" />
+            <TextLineSkeleton as="span" type="h6" className="w-40" />
           </span>
         </span>
       </span>
@@ -153,39 +164,23 @@ export function ProgramCardSkeleton({
   }
   if (size === 'sm') {
     return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={COMPACT_CARD_TITLE_ROW}>
-            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
-          </span>
-        </span>
-        <span className="flex h-5 shrink-0 items-center self-start">
-          <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
-        </span>
-      </span>
+      <CompactCardSkeleton trailingIcon className={className} />
     );
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY)}>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY, className)}>
       <div className={DEFAULT_HEADER}>
         <UnifiedSkeleton className={DEFAULT_COVER_FRAME} />
         <div className={DEFAULT_TEXT}>
           <div className={DEFAULT_TITLE}>
-            <UnifiedSkeleton as="span" className="block h-[2lh] w-3/4 rounded" />
+            <TextLineSkeleton as="span" type="inherit" lines={2} className="w-3/4" />
           </div>
           <div className={DEFAULT_META_ROW}>
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-32 rounded" />
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
+            <TextLineSkeleton as="span" type="inherit" className="w-32" />
+            <TextLineSkeleton as="span" type="inherit" className="w-40" />
           </div>
           <div className={DEFAULT_DESCRIPTION}>
-            <UnifiedSkeleton as="span" className="block h-[3lh] w-full rounded" />
+            <TextLineSkeleton as="span" type="inherit" lines={3} className="w-full" />
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
@@ -194,6 +189,13 @@ export function ProgramCardSkeleton({
             </div>
           )}
         </div>
+        {hosts > 0 && (
+          <div className={DEFAULT_HOSTS_ROW}>
+            {Array.from({ length: hosts }, (_, i) => (
+              <SquareAvatarSkeleton key={i} variant="round" size="sm" />
+            ))}
+          </div>
+        )}
       </div>
       {media > 0 && (
         <div className={DEFAULT_GALLERY_ROW}>
@@ -453,6 +455,19 @@ export function ProgramCard<T extends BaseProgramItem>({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' || size === 'row' ? 'square' : 'wide',
   });
+  if (useLoadingScope()) {
+    return (
+      <ProgramCardSkeleton
+        size={size}
+        eyebrow={!!eyebrow}
+        media={media.filter(m => isImageMedia(m)).length}
+        tags={tags.length > 0}
+        hosts={getHosts(item.hosts).length}
+        typeLabel={size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
+        className={className}
+      />
+    );
+  }
   const coverImage = item.cover_url;
   const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);
@@ -659,7 +674,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       </div>
 
       {hosts.length > 0 && (
-        <div className="flex flex-wrap gap-2 md:justify-end">
+        <div className={DEFAULT_HOSTS_ROW}>
           {hosts.map((host, index) => (
             <SquareAvatar
               variant="round"

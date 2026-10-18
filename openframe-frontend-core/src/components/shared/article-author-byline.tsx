@@ -21,7 +21,8 @@
  *     platform awareness; pass copy or leave it absent to render nothing.
  *
  * Render order: avatar → name + job title + date → bio (when present).
- * Returns null when `author` is empty (no card rendered).
+ * Returns null when `author` is empty (no card rendered); in a loading scope it is
+ * `ArticleAuthorBylineSkeleton`.
  */
 
 import { Calendar, User } from 'lucide-react';
@@ -31,6 +32,8 @@ import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { formatBioText, formatDateWithTimezone } from '../../utils/format';
 import { getProxiedImageUrl } from '../../utils/image-proxy';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface ArticleAuthorBylineProps {
   /** Author display name. Required — block is hidden when null/empty. */
@@ -64,6 +67,19 @@ export interface ArticleAuthorBylineProps {
   className?: string;
 }
 
+/** The card's layout, read by the card and by its skeleton, so the skeleton is the card's size. */
+const BYLINE_FRAME_CLASS = cn(
+  'rounded-lg border border-ods-border bg-ods-card p-6',
+  'flex flex-col items-start gap-4 content-md:flex-row',
+);
+const AVATAR_SIZE_CLASS = { md: 'w-14 h-14', lg: 'w-16 h-16' } as const;
+const AVATAR_BORDER_CLASS = 'rounded-full border-2 border-ods-border';
+const BODY_CLASS = 'min-w-0 flex-1';
+const NAME_ROW_CLASS = 'flex flex-wrap items-baseline gap-x-3 gap-y-1';
+const NAME_CLASS = 'text-ods-text-primary text-h5';
+const JOB_TITLE_CLASS = 'text-body-sm mt-0.5 font-body text-ods-text-secondary';
+const BIO_CLASS = 'text-body-md mt-2 font-body leading-relaxed text-ods-text-secondary';
+
 function formatDate(value: string | Date): string {
   // A published date is a content date: UTC-pinned through the one renderer, so
   // the server and every client agree on the day (React #418).
@@ -86,6 +102,8 @@ export function ArticleAuthorByline({
   // the byline works in bare embeds (raw avatar URL) and proxies whenever the
   // host mounted a runtime with `imageProxyUrlPrefix` (the hub always does).
   const runtime = useChatRuntime();
+  const loading = useLoadingScope();
+  if (loading) return <ArticleAuthorBylineSkeleton size={size} className={className} />;
   if (!author) return null;
 
   const proxiedAvatar = avatar
@@ -101,7 +119,7 @@ export function ArticleAuthorByline({
   // Class-driven sizing (md = 56px, lg = 64px). The numeric pair feeds only
   // the Image element's intrinsic width/height attributes (required by the
   // Next image shim) — layout comes from the classes.
-  const avatarSizeClass = size === 'lg' ? 'w-16 h-16' : 'w-14 h-14';
+  const avatarSizeClass = AVATAR_SIZE_CLASS[size];
   const avatarIconClass = size === 'lg' ? 'w-8 h-8' : 'w-7 h-7';
   const avatarDim = size === 'lg' ? 64 : 56;
   const formattedBio = formatBioText(bio ?? null);
@@ -109,11 +127,7 @@ export function ArticleAuthorByline({
 
   return (
     <div
-      className={cn(
-        'rounded-lg border border-ods-border bg-ods-card p-6',
-        'flex flex-col items-start gap-4 content-md:flex-row',
-        className,
-      )}
+      className={cn(BYLINE_FRAME_CLASS, className)}
     >
       {/* Avatar */}
       <div className="flex-shrink-0">
@@ -123,12 +137,13 @@ export function ArticleAuthorByline({
             alt={author}
             width={avatarDim}
             height={avatarDim}
-            className={cn('rounded-full border-2 border-ods-border object-cover', avatarSizeClass)}
+            className={cn(AVATAR_BORDER_CLASS, 'object-cover', avatarSizeClass)}
           />
         ) : (
           <div
             className={cn(
-              'flex items-center justify-center rounded-full border-2 border-ods-border bg-ods-bg',
+              'flex items-center justify-center bg-ods-bg',
+              AVATAR_BORDER_CLASS,
               avatarSizeClass,
             )}
           >
@@ -138,9 +153,9 @@ export function ArticleAuthorByline({
       </div>
 
       {/* Name + meta + bio */}
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h3 className="text-ods-text-primary text-h5">
+      <div className={BODY_CLASS}>
+        <div className={NAME_ROW_CLASS}>
+          <h3 className={NAME_CLASS}>
             {href ? (
               <Link href={href} className="transition-colors hover:text-ods-accent">
                 {author}
@@ -156,12 +171,45 @@ export function ArticleAuthorByline({
             </span>
           )}
         </div>
-        {jobTitle && <p className="text-body-sm mt-0.5 font-body text-ods-text-secondary">{jobTitle}</p>}
+        {jobTitle && <p className={JOB_TITLE_CLASS}>{jobTitle}</p>}
         {formattedBio ? (
-          <p className="text-body-md mt-2 font-body leading-relaxed text-ods-text-secondary">{formattedBio}</p>
+          <p className={BIO_CLASS}>{formattedBio}</p>
         ) : fallbackBio ? (
           <p className="text-body-md mt-2 font-body italic text-ods-text-secondary">{fallbackBio}</p>
         ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The byline while its author is read: the card frame, the avatar circle at its size, and bars for the name (h5),
+ * the job title and three bio lines, each inside the loaded text's own element so it takes that line's height.
+ */
+export function ArticleAuthorBylineSkeleton({
+  size = 'md',
+  className,
+}: {
+  size?: 'md' | 'lg';
+  className?: string;
+}) {
+  return (
+    <div className={cn(BYLINE_FRAME_CLASS, className)} aria-hidden>
+      <div className="flex-shrink-0">
+        <UnifiedSkeleton variant="circular" className={AVATAR_SIZE_CLASS[size]} />
+      </div>
+      <div className={cn(BODY_CLASS, 'w-full')}>
+        <div className={NAME_ROW_CLASS}>
+          <h3 className={NAME_CLASS}>
+            <TextLineSkeleton type="inherit" as="span" className="w-40" />
+          </h3>
+        </div>
+        <p className={JOB_TITLE_CLASS}>
+          <TextLineSkeleton type="inherit" as="span" className="w-32" />
+        </p>
+        <p className={BIO_CLASS}>
+          <TextLineSkeleton type="inherit" as="span" lines={3} className="w-full" />
+        </p>
       </div>
     </div>
   );

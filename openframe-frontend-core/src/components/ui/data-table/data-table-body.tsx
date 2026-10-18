@@ -4,6 +4,7 @@ import { useSyncExternalStore, type ReactNode } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
 import { LoadingRegion } from '../../loading/loading-region';
+import { useLoadingScope } from '../loading-scope';
 import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
@@ -97,7 +98,7 @@ const getNoRows = () => 0;
  * in the consumer to get the full benefit.
  */
 export function DataTableBody<T = unknown>({
-  loading,
+  loading: loadingProp,
   emptyMessage,
   emptyState,
   skeletonRows = 10,
@@ -112,6 +113,9 @@ export function DataTableBody<T = unknown>({
   renderSubRow,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>();
+  // In a page's loading state the body is loading: its rows are the row skeletons.
+  const inScope = useLoadingScope();
+  const loading = inScope || loadingProp;
   const rows = table.getRowModel().rows;
   const hasRows = rows.length > 0;
 
@@ -128,7 +132,12 @@ export function DataTableBody<T = unknown>({
 
   if (loading && !hasRows) {
     return (
-      <LoadingRegion label="Loading results" announce={loadingRegion} className={cn(ROW_STACK_CLASSES, className)}>
+      <LoadingRegion
+        label="Loading results"
+        // The page's loading region announces a loading state once.
+        announce={loadingRegion && !inScope}
+        className={cn(ROW_STACK_CLASSES, className)}
+      >
         <DataTableSkeleton
           rows={skeletonRows}
           className={skeletonRowClassName}

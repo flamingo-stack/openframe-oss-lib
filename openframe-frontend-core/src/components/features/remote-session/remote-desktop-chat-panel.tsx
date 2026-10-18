@@ -3,8 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '../../../utils/cn';
 import { ChatInput } from '../../chat/chat-input';
-import { RemoteDesktopChatMessageRow } from './remote-desktop-chat-message-row';
+import { LoadingRegion } from '../../loading/loading-region';
+import { RemoteDesktopChatMessageRow, RemoteDesktopChatMessageRowSkeleton } from './remote-desktop-chat-message-row';
 import type { RemoteSessionChatMessage } from './types';
+
+/**
+ * Message rows the panel's loading state draws: the panel spans the view's height (about 750px on a 900px screen,
+ * less the input), and a one-line message is about 60px with its gap.
+ */
+const CHAT_PANEL_FOLD = 10;
 
 /** Who is typing on the technician's side of the chat: shown on the technician's rows. */
 export interface RemoteDesktopChatTechnician {
@@ -67,10 +74,16 @@ export function RemoteDesktopChatPanel({
     >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex min-h-full flex-col justify-end gap-[var(--spacing-system-xsf)]">
-          {rows.length === 0 ? (
-            <p className="text-center text-ods-text-muted text-h6">
-              {loading ? 'Loading the chat...' : 'No messages yet - say hello to the user.'}
-            </p>
+          {rows.length === 0 && loading ? (
+            // The chat while it is read: a screen of the panel's own message rows.
+            <LoadingRegion label="Loading the chat" className="flex flex-col gap-[var(--spacing-system-xsf)]">
+              {Array.from({ length: CHAT_PANEL_FOLD }, (_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+                <RemoteDesktopChatMessageRowSkeleton key={i} />
+              ))}
+            </LoadingRegion>
+          ) : rows.length === 0 ? (
+            <p className="text-center text-ods-text-muted text-h6">No messages yet - say hello to the user.</p>
           ) : (
             rows.map(message => (
               <RemoteDesktopChatMessageRow

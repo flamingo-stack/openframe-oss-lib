@@ -19,8 +19,15 @@ import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collisi
 import { cn } from '../../utils/cn';
 import { SearchIcon } from '../icons-v2-generated';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { HiddenTagsPopup } from './hidden-tags-popup';
 import { Tag } from './tag';
+
+/** A result row's frame, read by the rows and by their loading state. */
+const SEARCH_RESULT_ROW_CLASS = 'flex min-h-10 items-center border-b border-ods-border px-3 last:border-b-0';
+/** Rows the results' loading state draws: the dropdown's 320px scroller holds eight 40px rows. */
+const SEARCH_RESULTS_FOLD = 8;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -394,7 +401,8 @@ export function SearchInput({
         role="option"
         aria-selected={isHighlighted}
         className={cn(
-          'flex min-h-10 cursor-pointer items-center border-b border-ods-border px-3 transition-colors last:border-b-0',
+          SEARCH_RESULT_ROW_CLASS,
+          'cursor-pointer transition-colors',
           isHighlighted && 'bg-ods-bg-hover',
           !isHighlighted && 'hover:bg-ods-bg-hover',
         )}
@@ -409,7 +417,17 @@ export function SearchInput({
   // ---- Dropdown content ----
   const renderDropdownContent = () => {
     if (isLoading) {
-      return <div className="px-4 py-3 text-ods-text-secondary text-h6">Loading...</div>;
+      // The results while they are read: the dropdown's own rows, a title bar each.
+      return (
+        <LoadingRegion label="Loading results">
+          {Array.from({ length: SEARCH_RESULTS_FOLD }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+            <div key={i} className={SEARCH_RESULT_ROW_CLASS} aria-hidden>
+              <TextLineSkeleton type="h6" className="w-2/3" />
+            </div>
+          ))}
+        </LoadingRegion>
+      );
     }
 
     if (flatResults.length === 0) {

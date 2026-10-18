@@ -19,9 +19,15 @@ const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
+/**
+ * Rows a table's skeleton draws when its host states no count: one screen of rows under a page's header (a 68px row
+ * card and its 8px gap; about ten fit under the header of a 1440x900 screen, nine of a phone's 66px rows).
+ */
+export const TABLE_SKELETON_ROWS = 10;
+
 export function TableCardSkeleton({
   columns,
-  rows = 10,
+  rows = TABLE_SKELETON_ROWS,
   compact = false,
   hasActions = false,
   hasChevron = false,
@@ -55,7 +61,7 @@ export function TableCardSkeleton({
                 <UnifiedSkeleton className="mb-1 h-5 w-3/4 rounded" />
                 {/* second line simulates multi-line content on the primary column */}
                 {index % 2 === 0 && column.key === primaryKey && (
-                  <UnifiedSkeleton className="h-4 w-1/2 rounded opacity-60" />
+                  <UnifiedSkeleton className="h-4 w-1/2 rounded" />
                 )}
               </div>
             ))}
@@ -93,7 +99,7 @@ export function TableCardSkeleton({
                 compact mobile skeleton 78px against a real row's 58. */}
             <div className={cn('flex min-w-0 flex-1 flex-col justify-center', compact ? 'py-0' : 'py-3')}>
               <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
-              <UnifiedSkeleton className="h-3 w-1/2 rounded opacity-60" />
+              <UnifiedSkeleton className="h-3 w-1/2 rounded" />
             </div>
             {hasActions && <UnifiedSkeleton className="h-12 w-12 shrink-0 rounded" />}
             {hasChevron && <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded" />}

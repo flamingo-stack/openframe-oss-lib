@@ -4,13 +4,15 @@ import { type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
 import { isOwnClick } from '../../utils/own-click';
 import { useAgentTint } from '../agent-identity';
-import { ChatTurn } from '../chat/chat-turn';
+import { ChatTurn, TURN_BODY_CLASS, TURN_ROW_CLASS } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { BUTTON_ICON_SM_SIZE, Button } from '../ui/button/button';
+import { useLoadingScope } from '../ui/loading-scope';
+import { SquareAvatarSkeleton } from '../ui/square-avatar';
 import { Tag } from '../ui/tag';
 
 /** The card's frame, its parts' blocks and its footer row: ONE string each, read by the card and its skeleton. */
@@ -19,6 +21,8 @@ const CARD_FRAME_CLASS =
 const ANSWER_BLOCK_CLASS = 'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]';
 const CONTEXT_BLOCK_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]';
 const FOOTER_ROW_CLASS = 'mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]';
+/** The speakers' avatar size the skeleton draws when the card draws it in a loading scope. */
+export const CONVERSATION_CARD_AVATAR_PX = 32;
 
 export interface ConversationCardSpeaker {
   /** Rendered as given (an avatar, an agent mark). */
@@ -87,6 +91,18 @@ export function ConversationCard({
 }: ConversationCardProps) {
   const tint = useAgentTint(agent);
   const requestId = useId();
+  // While the page is read the conversation is not known: the card is its skeleton, with the parts it will have.
+  if (useLoadingScope()) {
+    return (
+      <ConversationCardSkeleton
+        avatarPx={CONVERSATION_CARD_AVATAR_PX}
+        context={!!context}
+        footer={!!footerLabel}
+        footerLabel={footerLabel}
+        className={className}
+      />
+    );
+  }
   return (
     <div
       className={cn(
@@ -177,9 +193,9 @@ export function ConversationCard({
 /** A speaker's turn while loading: the avatar box, the name line, then the turn's own lines. */
 function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 items-start gap-[var(--spacing-system-sf)]">
-      <UnifiedSkeleton className="shrink-0 rounded-md" width={avatarPx} height={avatarPx} />
-      <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]">
+    <div className={TURN_ROW_CLASS}>
+      <SquareAvatarSkeleton sizePx={avatarPx} />
+      <div className={TURN_BODY_CLASS}>
         <TextLineSkeleton lines={1} type="h4" className="w-1/2" />
         {children}
       </div>
@@ -194,16 +210,22 @@ function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: Reac
  * moving the page. Pass the parts the loaded card will have.
  */
 export function ConversationCardSkeleton({
-  avatarPx,
+  avatarPx = CONVERSATION_CARD_AVATAR_PX,
   context = false,
   footer = false,
+  footerLabel,
   label = 'Loading a conversation',
+  announce = true,
   className,
 }: {
-  /** What a screen reader hears while it loads (several cards in a row each say it). */
+  /** What a screen reader hears while it loads. */
   label?: string;
+  /** `false` inside another loading region (a row of cards): only the outermost region announces. */
+  announce?: boolean;
   /** The speakers' avatar size, as the host draws it. */
-  avatarPx: number;
+  avatarPx?: number;
+  /** The footer's question when the page states it ("Your part"): drawn for real. */
+  footerLabel?: string;
   /** The loaded card has a context part ("Today"). */
   context?: boolean;
   /** The loaded card has a footer. */
@@ -211,7 +233,7 @@ export function ConversationCardSkeleton({
   className?: string;
 }) {
   return (
-    <LoadingRegion label={label} className={cn(CARD_FRAME_CLASS, className)}>
+    <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
       <TurnSkeleton avatarPx={avatarPx}>
         <TextLineSkeleton lines={2} type="h3" />
       </TurnSkeleton>
@@ -227,8 +249,8 @@ export function ConversationCardSkeleton({
         </TurnSkeleton>
       </div>
       {footer && (
-        <div className={FOOTER_ROW_CLASS}>
-          <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
+        <div className={cn(FOOTER_ROW_CLASS, 'text-ods-text-secondary text-h6')}>
+          {footerLabel ? <span>{footerLabel}</span> : <TextLineSkeleton lines={1} type="h6" className="w-1/4" />}
           <Tag as="span" label={'\u00a0'} variant="badge" className="invisible" />
         </div>
       )}

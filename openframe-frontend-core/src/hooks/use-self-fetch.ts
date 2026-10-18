@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useLoadingScope } from '../components/ui/loading-scope';
 import { contentFetch } from '../utils/embed-content-fetch';
 
 export interface UseSelfFetchResult<T> {
@@ -45,14 +46,18 @@ export interface UseSelfFetchResult<T> {
  * url string (the url IS the cache key).
  */
 export function useSelfFetch<T>(
-  url: string | null,
+  givenUrl: string | null,
   options?: { initialData?: T; revalidateOnVisibleAfterMs?: number },
 ): UseSelfFetchResult<T> {
+  // In a loading scope nothing is fetched: the view draws itself with the data it was given (its loading state
+  // when it was given none).
+  const held = useLoadingScope();
+  const url = held ? null : givenUrl;
   const initialData = options?.initialData;
   const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs;
   const [data, setData] = useState<T | null>(initialData ?? null);
-  const [dataUrl, setDataUrl] = useState<string | null>(initialData !== undefined ? url : null);
-  const [isLoading, setIsLoading] = useState(initialData === undefined && url !== null);
+  const [dataUrl, setDataUrl] = useState<string | null>(initialData !== undefined ? givenUrl : null);
+  const [isLoading, setIsLoading] = useState(initialData === undefined && givenUrl !== null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   // When the held data was obtained: seeded at mount for SSR-hydrated data,
@@ -67,7 +72,7 @@ export function useSelfFetch<T>(
   // rendered data isn't re-fetched on mount). A VALUE compare (not a one-shot flag) so the
   // SSR-hydration skip survives React 18 StrictMode's mount→unmount→remount in dev;
   // `reload()` nulls it to force a re-fetch of the same url.
-  const dataUrlRef = useRef<string | null>(initialData !== undefined ? url : null);
+  const dataUrlRef = useRef<string | null>(initialData !== undefined ? givenUrl : null);
 
   // Both resets below are prop-driven, so they use React's "adjust state while
   // rendering" pattern rather than an effect. From an effect each one commits a

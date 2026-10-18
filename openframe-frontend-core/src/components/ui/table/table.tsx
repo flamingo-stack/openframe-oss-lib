@@ -5,12 +5,13 @@ import { cn } from '../../../utils/cn';
 import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
-import { CursorPagination } from '../cursor-pagination';
+import { CursorPagination, CursorPaginationSkeleton } from '../cursor-pagination';
 import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
+import { useLoadingScope } from '../loading-scope';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
-import { COMPACT_ROW_MIN_HEIGHT, TableCardSkeleton } from './table-skeleton';
+import { COMPACT_ROW_MIN_HEIGHT, TABLE_SKELETON_ROWS, TableCardSkeleton } from './table-skeleton';
 import type { RowAction, TableColumn, TableProps, TableRowData } from './types';
 import { useTableMotion } from './use-table-motion';
 
@@ -100,9 +101,9 @@ export function Table<T = TableRowData>({
   data,
   columns,
   rowKey,
-  loading = false,
+  loading: loadingProp = false,
   emptyMessage,
-  skeletonRows = 10,
+  skeletonRows = TABLE_SKELETON_ROWS,
   minRows,
   emptyState,
   keepHeightWhenEmpty,
@@ -135,6 +136,8 @@ export function Table<T = TableRowData>({
   animateRowReorder,
   actionsColumnWidth,
 }: TableProps<T>) {
+  // In a page's loading state the table is loading: its header real, its rows the row skeletons.
+  const loading = useLoadingScope() || loadingProp;
   // Opt-in row-reorder animation: framer-motion is loaded lazily (its own chunk)
   // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
   const tableMotion = useTableMotion(Boolean(animateRowReorder));
@@ -366,6 +369,20 @@ export function Table<T = TableRowData>({
           itemName={cursorPagination.itemName}
           loading={loading}
           onNext={cursorPagination.onNext}
+          onPrevious={cursorPagination.onPrevious}
+          onReset={cursorPagination.onReset}
+          showInfo={cursorPagination.showInfo ?? true}
+          compact={cursorPagination.compact}
+          resetButtonLabel={cursorPagination.resetButtonLabel}
+          resetButtonIcon={cursorPagination.resetButtonIcon}
+          className={cn('mt-2 border-t border-ods-border pt-3', paginationClassName)}
+        />
+      )}
+
+      {/* While the first page is read: the pager's skeleton in its place (its buttons real and inert). */}
+      {!infiniteScroll && cursorPagination && loading && data.length === 0 && (
+        <CursorPaginationSkeleton
+          hasPreviousPage={cursorPagination.hasPreviousPage}
           onPrevious={cursorPagination.onPrevious}
           onReset={cursorPagination.onReset}
           showInfo={cursorPagination.showInfo ?? true}

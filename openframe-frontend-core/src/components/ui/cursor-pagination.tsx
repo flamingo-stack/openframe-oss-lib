@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, RotateCcw, Home } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 
 export interface CursorPaginationProps {
@@ -26,6 +27,8 @@ export interface CursorPaginationProps {
   compact?: boolean;
   resetButtonLabel?: string;
   resetButtonIcon?: 'home' | 'rotate';
+  /** @internal The skeleton's state: the count line a bar, the buttons drawn but inert. */
+  skeleton?: boolean;
 }
 
 export function CursorPagination({
@@ -46,6 +49,7 @@ export function CursorPagination({
   compact = false,
   resetButtonLabel = 'First',
   resetButtonIcon = 'home',
+  skeleton = false,
 }: CursorPaginationProps) {
   const handleNext = () => {
     if (hasNextPage && endCursor && onNext) {
@@ -84,10 +88,18 @@ export function CursorPagination({
   return (
     <div className={cn('flex items-center justify-between gap-4', compact ? 'py-2' : 'py-3', className)}>
       {/* Info text */}
-      {showInfo && <div className="text-ods-text-secondary text-h6">{displayText || <span>&nbsp;</span>}</div>}
+      {showInfo && (
+        <div className="text-ods-text-secondary text-h6">
+          {skeleton ? (
+            <TextLineSkeleton type="inherit" as="span" className="w-40" />
+          ) : (
+            displayText || <span>&nbsp;</span>
+          )}
+        </div>
+      )}
 
-      {/* Navigation buttons */}
-      <div className="flex items-center gap-2">
+      {/* Navigation buttons (in the skeleton: the real buttons, their labels the pager's own words, inert) */}
+      <div className="flex items-center gap-2" inert={skeleton || undefined} aria-hidden={skeleton || undefined}>
         {onReset ? (
           <Button
             variant="outline"
@@ -131,6 +143,19 @@ export function CursorPagination({
       </div>
     </div>
   );
+}
+
+/**
+ * The pager while its page is read: the same row, the count line as a bar, and the pager's own buttons (their labels
+ * are the pager's words) drawn inert. Takes the pager's configuration; its cursors and counts are not known yet.
+ */
+export function CursorPaginationSkeleton(
+  props: Pick<
+    CursorPaginationProps,
+    'hasPreviousPage' | 'onPrevious' | 'onReset' | 'className' | 'showInfo' | 'compact' | 'resetButtonLabel' | 'resetButtonIcon'
+  >,
+) {
+  return <CursorPagination {...props} hasNextPage={false} skeleton />;
 }
 
 export function CursorPaginationSimple({

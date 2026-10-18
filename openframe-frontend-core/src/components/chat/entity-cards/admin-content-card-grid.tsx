@@ -3,61 +3,14 @@
 import type { ComponentType, ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { LoadingRegion } from '../../loading/loading-region';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { AdminContentCardSkeleton } from './admin-content-card';
 
 /** THE admin card grid: columns and gap shared by the live grid and its skeleton. */
 export const ADMIN_CONTENT_CARD_GRID_CLASS =
   'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--spacing-system-lf)]';
 
-/**
- * One `AdminContentCard reserveRows`-shaped placeholder. It mirrors that card box
- * for box (3:2 cover, then a `gap-3 p-5` column: two-line title, subtitle line,
- * two-line summary, 28px badges row, meta line, bordered actions row), each text
- * row sized in its own typography's line height, so a skeleton, a real card and a
- * reserved slot are the same height at every breakpoint. `p-5` has no ODS token
- * (20px); it is the card's own padding and must match it exactly.
- */
-export function AdminContentCardSkeleton({
-  className,
-  actions = true,
-  subtitleRow = true,
-}: {
-  className?: string;
-  /** Matches the card's `subtitleRow`: off for a card type that has no subtitle line. */
-  subtitleRow?: boolean;
-  /** The bordered actions row. Off for a card rendered without `actions` (a read-only rail card). */
-  actions?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'flex h-full flex-col overflow-hidden rounded-2xl border border-ods-border bg-transparent',
-        className,
-      )}
-    >
-      <UnifiedSkeleton className="aspect-[3/2] w-full shrink-0" />
-      <div className="flex flex-1 flex-col gap-[var(--spacing-system-sf)] p-5">
-        <UnifiedSkeleton className="h-[2lh] w-full rounded text-h3" />
-        {subtitleRow && <UnifiedSkeleton className="h-[1lh] w-1/2 rounded text-h6" />}
-        <UnifiedSkeleton className="h-[2lh] w-full rounded text-h6" />
-        <div className="flex h-7 items-center gap-[var(--spacing-system-xsf)]">
-          <UnifiedSkeleton className="h-5 w-20 rounded-full" />
-          <UnifiedSkeleton className="h-5 w-24 rounded-full" />
-        </div>
-        <UnifiedSkeleton className="h-[1lh] w-32 rounded text-h6" />
-        {actions && (
-          <div className="mt-auto flex items-center justify-between border-t border-ods-border pt-[var(--spacing-system-sf)]">
-            <UnifiedSkeleton className="h-10 w-24 rounded" />
-            <div className="flex gap-[var(--spacing-system-xsf)]">
-              <UnifiedSkeleton className="h-10 w-20 rounded" />
-              <UnifiedSkeleton className="h-10 w-20 rounded" />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+/** The card's own skeleton, kept on this module's exports for its callers. */
+export { AdminContentCardSkeleton };
 
 export interface AdminContentCardGridSkeletonProps {
   /** How many placeholder cards: one page. */

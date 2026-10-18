@@ -1,8 +1,15 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
+import { cn } from '../utils/cn';
 import { getProxiedImageUrl } from '../utils/image-proxy-stub';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
+
+/** The default button's frame, without its surface and hover (a skeleton draws the same box). */
+export const VENDOR_DISPLAY_BUTTON_FRAME_CLASS =
+  'flex max-w-full items-center gap-2 overflow-hidden rounded-lg border border-ods-border px-3 py-2';
+/** The default button's logo box. */
+export const VENDOR_DISPLAY_BUTTON_LOGO_CLASS = 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg';
 
 interface VendorDisplayButtonProps {
   vendor: VendorWithMedia;
@@ -61,10 +68,10 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   return (
     <button
       onClick={handleClick}
-      className="flex max-w-full items-center gap-2 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-3 py-2 transition-colors hover:border-ods-accent"
+      className={cn(VENDOR_DISPLAY_BUTTON_FRAME_CLASS, 'bg-ods-card transition-colors hover:border-ods-accent')}
     >
       {logoUrl ? (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-card">
+        <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-card')}>
           <Image
             src={getProxiedImageUrl(logoUrl) || logoUrl}
             alt={`${vendor.title} logo`}
@@ -74,7 +81,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
           />
         </div>
       ) : (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-border">
+        <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-border')}>
           <span className="text-ods-text-primary text-h6">{vendor.title.charAt(0)}</span>
         </div>
       )}

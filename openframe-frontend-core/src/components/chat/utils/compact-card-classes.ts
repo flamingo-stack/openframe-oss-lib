@@ -50,8 +50,20 @@ export const COMPACT_CARD_TITLE_ROW = 'flex items-center min-w-0 h-5';
 /** Subtitle / summary row container — fixed 16px (h-4). */
 export const COMPACT_CARD_META_ROW_BOX = 'flex items-center min-w-0 h-4';
 
+/** The title's type: bold 14px on a 20px line (the skeleton's title bar takes the same line). */
+export const COMPACT_CARD_TITLE_TYPE = 'text-sm font-semibold leading-5';
+
 /** Title text — bold 14px on a 20px line. */
-export const COMPACT_CARD_TITLE = 'truncate text-sm font-semibold leading-5 text-ods-text-primary';
+export const COMPACT_CARD_TITLE = `truncate ${COMPACT_CARD_TITLE_TYPE} text-ods-text-primary`;
+
+/** Title row that wraps (the title followed by its badges), for cards with no fixed title row. */
+export const COMPACT_CARD_TITLE_WRAP_ROW = 'flex min-w-0 flex-wrap items-center gap-1.5';
+
+/** Two-line preview under the title (data-room docs, generic entities, tickets). */
+export const COMPACT_CARD_PREVIEW = 'line-clamp-2 whitespace-pre-wrap break-words text-ods-text-secondary text-h6';
+
+/** The trailing external-link icon's slot, top-aligned with the title. */
+export const COMPACT_CARD_TRAILING_ICON = 'flex h-5 shrink-0 items-center self-start text-ods-text-secondary';
 
 /** Subtitle text — 11px on a 16px line. */
 export const COMPACT_CARD_SUBTITLE = 'truncate text-h6 text-ods-text-secondary';

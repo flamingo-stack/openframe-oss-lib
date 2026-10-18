@@ -1,6 +1,8 @@
 // CLIENT subpath barrel — `@flamingo-stack/openframe-frontend-core/components/related-content`
 export {
   RelatedContentSection,
+  RelatedContentSectionSkeleton,
+  type RelatedContentSectionSkeletonProps,
   GROUP_PAGE_SIZE,
   type RelatedContentSectionProps,
   type CardLinkProvider,

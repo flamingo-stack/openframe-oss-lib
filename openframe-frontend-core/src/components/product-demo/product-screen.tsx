@@ -1,10 +1,11 @@
 'use client';
 
-import { lazy, type LazyExoticComponent, Suspense } from 'react';
+import { lazy, type LazyExoticComponent, type ReactNode, Suspense } from 'react';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ProductScreenFrame, type ProductScreenFrameProps } from '../ui/product-screen-frame';
 import { PRODUCT_SCREEN_LOADERS } from './registry';
 import { PRODUCT_SCREEN_KEYS, PRODUCT_SCREEN_LABELS, type ProductScreenKey } from './screen-keys';
+import { PRODUCT_SCREEN_SKELETONS } from './screen-skeletons';
 import type { ProductScreenComponent } from './types';
 
 /** One lazy component per screen, made once: a screen's code is fetched the first time it renders. */
@@ -52,26 +53,16 @@ export interface ProductScreenProps extends Omit<ProductScreenFrameProps, 'child
   height?: number | string;
 }
 
-/** The box a product screen occupies while it loads. */
-export function ProductScreenSkeleton({
+/** A screen's frame: its label, height and layout width, shared by the screen and by its skeleton. */
+function ProductScreenShell({
+  screen,
   compact = false,
+  label,
   height,
-  className,
-}: Pick<ProductScreenProps, 'compact' | 'height' | 'className'>) {
-  return (
-    <UnifiedSkeleton
-      className={className}
-      height={height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT)}
-    />
-  );
-}
-
-/**
- * One product screen of the registry, in its frame. The screen's code is
- * downloaded when this mounts; until then the frame holds its box.
- */
-export function ProductScreen({ screen, compact = false, label, height, designWidth, ...frame }: ProductScreenProps) {
-  const Screen = LAZY_SCREENS[screen];
+  designWidth,
+  children,
+  ...frame
+}: ProductScreenProps & { children: ReactNode }) {
   const frameHeight = height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT);
   const minWidth = compact ? undefined : MIN_LAYOUT_WIDTH[screen];
   const compactWidth = compact ? COMPACT_LAYOUT_WIDTH[screen] : undefined;
@@ -88,9 +79,54 @@ export function ProductScreen({ screen, compact = false, label, height, designWi
       label={label ?? PRODUCT_SCREEN_LABELS[screen]}
       height={frameHeight}
     >
-      <Suspense fallback={<UnifiedSkeleton className="h-full w-full" />}>
+      {children}
+    </ProductScreenFrame>
+  );
+}
+
+/** What a screen draws while its code loads: its own skeleton (`PRODUCT_SCREEN_SKELETONS`), else the frame's box. */
+function ScreenLoading({ screen, compact }: { screen: ProductScreenKey; compact: boolean }) {
+  const Skeleton = PRODUCT_SCREEN_SKELETONS[screen];
+  return Skeleton ? <Skeleton compact={compact} /> : <UnifiedSkeleton className="h-full w-full" />;
+}
+
+/**
+ * A product screen while it loads. Given a `screen`, the screen's own frame (its layout width, scale and height)
+ * around that screen's skeleton, so it is the loaded picture's box; without one, the box the frame occupies.
+ */
+export function ProductScreenSkeleton({
+  screen,
+  compact = false,
+  height,
+  className,
+  ...frame
+}: Partial<Pick<ProductScreenProps, 'screen'>> & Omit<ProductScreenProps, 'screen'>) {
+  if (screen) {
+    return (
+      <ProductScreenShell screen={screen} compact={compact} height={height} className={className} {...frame}>
+        <ScreenLoading screen={screen} compact={compact} />
+      </ProductScreenShell>
+    );
+  }
+  return (
+    <UnifiedSkeleton
+      className={className}
+      height={height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT)}
+    />
+  );
+}
+
+/**
+ * One product screen of the registry, in its frame. The screen's code is
+ * downloaded when this mounts; until then the frame draws the screen's skeleton.
+ */
+export function ProductScreen({ screen, compact = false, ...frame }: ProductScreenProps) {
+  const Screen = LAZY_SCREENS[screen];
+  return (
+    <ProductScreenShell screen={screen} compact={compact} {...frame}>
+      <Suspense fallback={<ScreenLoading screen={screen} compact={compact} />}>
         <Screen compact={compact} />
       </Suspense>
-    </ProductScreenFrame>
+    </ProductScreenShell>
   );
 }

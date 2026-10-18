@@ -2,19 +2,11 @@
 
 // Page layout skeletons
 export {
-  AnnouncementBarSkeleton,
-  HeroSkeleton,
   SearchContainerSkeleton,
   CategorySidebarSkeleton,
   BreadcrumbSkeleton,
   BreadcrumbLinkSkeleton,
   ResultsHeaderSkeleton,
-  TwoColumnLayoutSkeleton,
-  ArticleLayoutSkeleton,
-  VendorDetailLayoutSkeleton,
-  StatsSectionSkeleton,
-  SlackCommunitySkeleton,
-  BlogCardGridSkeleton,
   VendorGridSkeleton,
 } from './page-layout-skeleton';
 
@@ -30,13 +22,9 @@ export { ContentLoadingContainer, useContentLoading } from '../content-loading-c
 // Profile system loading skeleton
 export { ProfileLoadingSkeleton } from '../profile/ProfileLoadingSkeleton';
 
-export { MspProfileFormSkeleton } from './msp-profile-form-skeleton';
-
 export { SettingsFormSkeleton, type SettingsFormSkeletonProps } from './settings-form-skeleton';
 
 export { CategoryCardSkeleton } from './category-card-skeleton';
-
-export { CategoryVendorSelectorSkeleton } from './category-vendor-selector-skeleton';
 
 export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 
