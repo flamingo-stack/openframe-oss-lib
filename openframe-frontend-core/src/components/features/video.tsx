@@ -211,9 +211,9 @@ export function Video(props: VideoProps): React.ReactElement | null {
   const loading = useLoadingScope();
   const url = props.url;
   const layout = props.layout ?? 'native';
-  // In a loading scope the video is its skeleton (url or none: the url may be what is still read), and no player
-  // is mounted.
-  if (loading) return <VideoSkeleton layout={layout} className={props.className} />;
+  // ONE switch: in a loading scope with no url yet (it is read) the video is its skeleton and no player is mounted;
+  // a url it is given there is the page's own and plays as it is.
+  if (loading && !url) return <VideoSkeleton layout={layout} className={props.className} />;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);

@@ -3,13 +3,15 @@
 import { type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { useContentLgUp } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
+import { AgentAvatarSkeleton } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
+import { SquareAvatarSkeleton } from '../ui/square-avatar';
 import { TruncateText } from '../ui/truncate-text';
 
 /** One job the product does, as the explorer shows it. Every field is the host's data. */
@@ -93,9 +95,20 @@ const PANEL_TOP_HEIGHT_CLASS = 'h-[256px]';
 const PANEL_SCREEN_HEIGHT_CLASS = 'h-[420px]';
 const PANEL_FOOTER_HEIGHT_CLASS = 'h-[52px]';
 const CARD_HEIGHT_CLASS = 'h-[700px]';
+/** A job's icon tile's box (in the list, a card's head and their skeletons). */
+const JOB_ICON_TILE_BOX = 'size-9 shrink-0 rounded-lg';
+const JOB_ICON_TILE_CLASS = cn(
+  JOB_ICON_TILE_BOX,
+  'flex items-center justify-center border border-ods-border bg-ods-bg',
+);
+/** The mark beside each turn of an example (the host's avatar is drawn at this size). */
+const EXAMPLE_MARK_PX = 24;
 
 /** The element id of a job's tab (never the job's own id: that is the host's anchor). */
 export const capabilityTabId = (id: string): string => `${id}-tab`;
+
+/** A highlight's check mark: `MediaSkeleton.Icon size="sm"` (16px) while loading. */
+const HIGHLIGHT_ICON_PX = 16;
 
 function Highlights({ items, className }: { items: readonly string[]; className?: string }) {
   if (items.length === 0) return null;
@@ -103,7 +116,7 @@ function Highlights({ items, className }: { items: readonly string[]; className?
     <ul className={cn('grid grid-cols-1 gap-2', className)}>
       {items.slice(0, 3).map(text => (
         <li key={text} className="flex min-w-0 items-center gap-2.5">
-          <CheckIcon size={16} className="shrink-0 text-ods-flamingo-cyan" />
+          <CheckIcon size={HIGHLIGHT_ICON_PX} className="shrink-0 text-ods-flamingo-cyan" />
           <TruncateText variant="h6" triggerClassName="flex-1">
             {text}
           </TruncateText>
@@ -134,7 +147,14 @@ function Example({
   );
   // The mark is the host's own avatar: its shape says who it is (a person who uses a computer, one who runs it, an agent), so it is never clipped here.
   const mark = (node: ReactNode) =>
-    node ? <span className="flex size-6 shrink-0 items-center justify-center">{node}</span> : null;
+    node ? (
+      <span
+        className="flex shrink-0 items-center justify-center"
+        style={{ width: EXAMPLE_MARK_PX, height: EXAMPLE_MARK_PX }}
+      >
+        {node}
+      </span>
+    ) : null;
   const requester = example.requester;
   const responder = example.responder;
   return (
@@ -171,9 +191,14 @@ function Example({
 
 /** The example's two turns, in the loaded example's own box. */
 function ExampleSkeleton({ className }: { className?: string }) {
+  // Who asks is a person (the host's avatar), who answers the agent.
   const turn = (first: boolean) => (
     <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
-      <UnifiedSkeleton className="size-6 shrink-0 rounded-full" />
+      {first ? (
+        <SquareAvatarSkeleton variant="round" sizePx={EXAMPLE_MARK_PX} className="shrink-0" />
+      ) : (
+        <AgentAvatarSkeleton size={EXAMPLE_MARK_PX} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <TextLineSkeleton type="h6" className="w-28" />
         <div className="min-h-[2lh] text-h4">
@@ -200,7 +225,7 @@ function ExampleSkeleton({ className }: { className?: string }) {
 function JobHeadSkeleton() {
   return (
     <>
-      <UnifiedSkeleton className="size-9 shrink-0 rounded-lg" />
+      <UnifiedSkeleton className={JOB_ICON_TILE_BOX} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TextLineSkeleton type="h4" className="w-32" />
         <div className="mt-0.5">
@@ -284,7 +309,7 @@ export function CapabilityExplorerSkeleton({
               <div className="mt-auto grid grid-cols-1 gap-2">
                 {[0, 1, 2].map(i => (
                   <div key={i} className="flex min-w-0 items-center gap-2.5">
-                    <UnifiedSkeleton className="size-4 shrink-0 rounded-full" />
+                    <MediaSkeleton.Icon size="sm" className="shrink-0" />
                     <TextLineSkeleton type="h6" className={i === 1 ? 'w-56' : 'w-48'} />
                   </div>
                 ))}
@@ -292,16 +317,8 @@ export function CapabilityExplorerSkeleton({
             </div>
             <ExampleSkeleton />
           </div>
+          {/* The footer is the job's own (not every job has one) and the panel is one height: not drawn. */}
           <UnifiedSkeleton className={cn('shrink-0 rounded-xl', PANEL_SCREEN_HEIGHT_CLASS)} />
-          <div
-            className={cn(
-              'flex min-w-0 shrink-0 items-center gap-[var(--spacing-system-sf)]',
-              PANEL_FOOTER_HEIGHT_CLASS,
-            )}
-          >
-            <TextLineSkeleton type="h5" className="w-16" />
-            <UnifiedSkeleton className="h-7 w-36 rounded-md" />
-          </div>
         </div>
       </div>
     </LoadingRegion>
@@ -365,7 +382,7 @@ export function CapabilityExplorer({
           >
             <div className="flex min-w-0 items-center gap-3">
               {item.iconName && (
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-flamingo-cyan">
+                <span className={cn(JOB_ICON_TILE_CLASS, 'text-ods-flamingo-cyan')}>
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
                 </span>
               )}
@@ -398,7 +415,11 @@ export function CapabilityExplorer({
                 className="shrink-0"
               />
             )}
-            {item.footer && <div className="mt-auto min-w-0 shrink-0 overflow-hidden">{item.footer}</div>}
+            {item.footer && (
+              <div data-loading-optional className="mt-auto min-w-0 shrink-0 overflow-hidden">
+                {item.footer}
+              </div>
+            )}
           </article>
         )}
       />
@@ -465,10 +486,7 @@ export function CapabilityExplorer({
             >
               {item.iconName && (
                 <span
-                  className={cn(
-                    'flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg',
-                    selected ? 'text-ods-flamingo-cyan' : 'text-ods-text-secondary',
-                  )}
+                  className={cn(JOB_ICON_TILE_CLASS, selected ? 'text-ods-flamingo-cyan' : 'text-ods-text-secondary')}
                 >
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
                 </span>
@@ -535,7 +553,10 @@ export function CapabilityExplorer({
           {renderScreen(active, { compact: false })}
         </div>
         {active.footer && (
-          <div className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}>
+          <div
+            data-loading-optional
+            className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}
+          >
             {active.footer}
           </div>
         )}

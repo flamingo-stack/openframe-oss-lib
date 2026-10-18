@@ -38,12 +38,12 @@ import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
 import { CardHoverPlay } from '../../features/video-center-badge';
-import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
-import { Tag } from '../../ui/tag';
+import { Tag, TagSkeleton } from '../../ui/tag';
 import {
   programItemToStripProfile,
   type BaseProgramItem,
@@ -104,6 +104,22 @@ const DEFAULT_GALLERY_THUMB =
 const DEFAULT_FOOTER = 'flex justify-end border-t border-ods-border pt-[var(--spacing-system-lf)]';
 /** The hosts' avatars (32px each): beside the text from md, their own row under it on a phone. */
 const DEFAULT_HOSTS_ROW = 'flex flex-wrap gap-2 md:justify-end';
+/** The tags a card's skeleton draws when it shows a tag row (a row of read tags: a typical one). */
+const DEFAULT_TAGS_FOLD = 2;
+/** The person's avatar in the editorial feature card, read by the card and its skeleton. */
+const EDITORIAL_PERSON_AVATAR = { variant: 'round', size: 'sm' } as const;
+
+/** The default card's action: the config's own words ("View podcast"). */
+const programActionLabel = (singular: string): string => `View ${singular.toLowerCase()}`;
+
+/** The default card's action button (copy), read by the card and by its skeleton. */
+function ProgramActionButton({ label, href, newTab }: { label: string; href?: string; newTab?: boolean }) {
+  return (
+    <Button variant="outline" href={href} openInNewTab={newTab} rightIcon={<ArrowRight className="h-5 w-5" />}>
+      {label}
+    </Button>
+  );
+}
 
 export function ProgramCardSkeleton({
   size = 'default',
@@ -112,8 +128,11 @@ export function ProgramCardSkeleton({
   tags = false,
   hosts = 1,
   typeLabel,
+  actionLabel,
   className,
 }: {
+  /** `default` size: the action's words (copy: `View <type>`), drawn for real; else a button of its size. */
+  actionLabel?: string;
   /** `default` size: how many host avatars the card shows (a row of its own on a phone). 0 = none. */
   hosts?: number;
   size?: CardSize;
@@ -155,7 +174,7 @@ export function ProgramCardSkeleton({
           </span>
           <TextLineSkeleton as="span" type="h4" lines={3} className="w-full" />
           <span className={EDITORIAL_PERSON_ROW}>
-            <UnifiedSkeleton as="span" className="block h-8 w-8 shrink-0 rounded-full" />
+            <SquareAvatarSkeleton {...EDITORIAL_PERSON_AVATAR} className="shrink-0" />
             <TextLineSkeleton as="span" type="h6" className="w-40" />
           </span>
         </span>
@@ -163,9 +182,7 @@ export function ProgramCardSkeleton({
     );
   }
   if (size === 'sm') {
-    return (
-      <CompactCardSkeleton trailingIcon className={className} />
-    );
+    return <CompactCardSkeleton trailingIcon className={className} />;
   }
   return (
     <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY, className)}>
@@ -184,8 +201,9 @@ export function ProgramCardSkeleton({
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
-              <UnifiedSkeleton as="span" className="block h-8 w-24 rounded" />
-              <UnifiedSkeleton as="span" className="block h-8 w-24 rounded" />
+              {Array.from({ length: DEFAULT_TAGS_FOLD }, (_, i) => (
+                <TagSkeleton key={i} />
+              ))}
             </div>
           )}
         </div>
@@ -205,8 +223,14 @@ export function ProgramCardSkeleton({
         </div>
       )}
       <div className={DEFAULT_FOOTER}>
-        {/* The action button's own height (44px, 48px from md). */}
-        <UnifiedSkeleton className="h-11 w-40 rounded md:h-12" />
+        {actionLabel ? (
+          // The action's words are copy: the real button, not a control while it loads.
+          <span inert aria-hidden className="flex">
+            <ProgramActionButton label={actionLabel} />
+          </span>
+        ) : (
+          <InteractiveSkeleton.Button size="default" className="w-40" />
+        )}
       </div>
     </div>
   );
@@ -409,11 +433,10 @@ function ProgramEditorialCard({
           {profile && (
             <>
               <SquareAvatar
-                variant="round"
+                {...EDITORIAL_PERSON_AVATAR}
                 src={profile.avatarUrl || undefined}
                 alt={profile.name}
                 fallback={profile.name.charAt(0).toUpperCase()}
-                size="sm"
               />
               <span className="truncate text-h6">
                 <span className="text-ods-text-primary">{profile.name}</span>
@@ -464,6 +487,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         tags={tags.length > 0}
         hosts={getHosts(item.hosts).length}
         typeLabel={size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
+        actionLabel={programActionLabel(config.labels.singular)}
         className={className}
       />
     );
@@ -691,7 +715,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   );
 
   const cardFrameClass = cn(DEFAULT_BODY, className);
-  const actionLabel = `View ${config.labels.singular.toLowerCase()}`;
+  const actionLabel = programActionLabel(config.labels.singular);
 
   if (wholeCardClickable) {
     return (
@@ -718,14 +742,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       </Link>
       {images.length > 0 && <MediaGallery images={images} title={item.title} />}
       <div className={DEFAULT_FOOTER}>
-        <Button
-          variant="outline"
-          href={href}
-          openInNewTab={target === '_blank'}
-          rightIcon={<ArrowRight className="h-5 w-5" />}
-        >
-          {actionLabel}
-        </Button>
+        <ProgramActionButton label={actionLabel} href={href} newTab={target === '_blank'} />
       </div>
     </ContentCardFrame>
   );

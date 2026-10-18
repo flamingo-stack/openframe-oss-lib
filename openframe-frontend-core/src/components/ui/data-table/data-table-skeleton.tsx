@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { useDataTableContext } from './data-table';
 import { getHideClasses } from './utils';
 
@@ -94,10 +94,10 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
                     getHideClasses(meta?.hideAt),
                   )}
                 >
-                  <UnifiedSkeleton className="mb-[var(--spacing-system-xxs)] h-5 w-3/4 rounded-sm" />
-                  {index % 2 === 0 && column.id === firstColumnId && (
-                    <UnifiedSkeleton className="h-4 w-1/2 rounded-sm opacity-60" />
-                  )}
+                  {/* A cell's text (the row's primary face), and on the first column every other row a second,
+                      secondary line (a description or an id under it). */}
+                  <TextLineSkeleton type="h4" className="w-3/4" />
+                  {index % 2 === 0 && column.id === firstColumnId && <TextLineSkeleton type="h6" className="w-1/2" />}
                 </div>
               );
             })}
@@ -111,8 +111,8 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
             )}
           >
             <div className="flex min-w-0 flex-1 flex-col justify-center py-[var(--spacing-system-sf)]">
-              <UnifiedSkeleton className="mb-[var(--spacing-system-xsf)] h-4 w-3/4 rounded-sm" />
-              <UnifiedSkeleton className="h-3 w-1/2 rounded-sm opacity-60" />
+              <TextLineSkeleton type="h4" className="w-3/4" />
+              <TextLineSkeleton type="h6" className="w-1/2" />
             </div>
           </div>
         </div>

@@ -39,8 +39,11 @@ const sizeClasses = {
 const PLATFORM_BADGE_FRAME_CLASS = 'inline-flex items-center rounded-full border';
 
 export function PlatformBadge({ platform, size = 'sm', showLabel = true, className }: PlatformBadgeProps) {
-  // While the record is read its platform is not known: the badge is drawn as its skeleton.
-  if (useLoadingScope()) return <PlatformBadgeSkeleton size={size} showLabel={showLabel} className={className} />;
+  // ONE switch: while the record is read its platform is not known and the badge is its skeleton; a platform it is
+  // given in a loading scope is the page's own and is drawn as it is.
+  if (useLoadingScope() && !platform) {
+    return <PlatformBadgeSkeleton size={size} showLabel={showLabel} className={className} />;
+  }
   if (!platform) {
     return null;
   }
@@ -88,7 +91,12 @@ export function PlatformBadgeSkeleton({
   return (
     <UnifiedSkeleton
       as="span"
-      className={cn('inline-block rounded-full align-middle text-h6', box.height, showLabel ? box.width : box.iconOnly, className)}
+      className={cn(
+        'inline-block rounded-full align-middle text-h6',
+        box.height,
+        showLabel ? box.width : box.iconOnly,
+        className,
+      )}
     />
   );
 }

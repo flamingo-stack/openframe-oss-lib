@@ -282,6 +282,7 @@ export function Table<T = TableRowData>({
             rows={skeletonRows}
             compact={compact}
             hasActions={(rowActions?.length ?? 0) > 0}
+            actionCount={rowActions?.length}
             hasChevron={Boolean(rowHref)}
           />
         ) : data.length === 0 ? (
@@ -338,6 +339,7 @@ export function Table<T = TableRowData>({
                 columns={columns}
                 rows={infiniteScroll.skeletonRows ?? 3}
                 hasActions={(rowActions?.length ?? 0) > 0}
+                actionCount={rowActions?.length}
                 hasChevron={Boolean(rowHref)}
               />
             )}

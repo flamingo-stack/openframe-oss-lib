@@ -33,7 +33,6 @@ import {
   type TrustCenterSubprocessor,
   type TrustFrameworkMonitoringEntry,
 } from '../../types/trust-center';
-import { cn } from '../../utils/cn';
 import { getFlagFromCountryName } from '../../utils/country-phone-utils';
 import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
@@ -253,7 +252,11 @@ function controlsTabId(domain: string): string {
   return `domain-${domain.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 }
 
-function ControlsListSkeleton() {
+/**
+ * The list box while a category or a search is read. It announces itself (`LoadingRegion`) so a tab switch or a search
+ * is heard as loading; `region={false}` inside the page's own loading region, which already announced.
+ */
+function ControlsListSkeleton({ region = true }: { region?: boolean } = {}) {
   const rows: PanelRow[] = Array.from({ length: CONTROLS_SKELETON_ROWS }, (_, index) => ({
     id: `skeleton-${index}`,
     className: CONTROL_ROW_CLASS,
@@ -269,7 +272,11 @@ function ControlsListSkeleton() {
       },
     ],
   }));
-  return <StackedRowsPanel rows={rows} />;
+  return (
+    <LoadingRegion label="Loading the controls" announce={region}>
+      <StackedRowsPanel rows={rows} />
+    </LoadingRegion>
+  );
 }
 
 /**
@@ -584,19 +591,12 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Rows each panel's skeleton draws: what one screen of that section shows under its heading (about 120px, so 724px
- * of a 390x844 phone and 780px of a 1440x900 desktop), from each panel's measured row height (phone / desktop):
- * compliance 107 / 81 (its description wraps to four phone lines), documents 56 / 81, subprocessors 58 / 77, AI and
- * data use 157 / 105 (seven phone lines, two wide). The panels show every row, so a section with fewer settles once;
- * the counts come from the layout, never the data.
+ * Rows each panel's skeleton draws: ONE short fold for every panel, what a Trust Center panel typically holds (two to
+ * six frameworks, documents, subprocessors and AI practices; three is the common case). Drawing a screen of rows per
+ * panel made each panel collapse by 1,000px or more when the rows landed; a panel holding a different count settles
+ * once by a few rows. The count comes from what a trust center lists, never from today's data.
  */
-const TRUST_PANEL_FOLD = {
-  compliance: { phone: 6, wide: 9 },
-  documents: { phone: 12, wide: 9 },
-  subprocessors: { phone: 12, wide: 10 },
-  ai: { phone: 4, wide: 7 },
-} as const;
-type TrustPanelFold = (typeof TRUST_PANEL_FOLD)[keyof typeof TRUST_PANEL_FOLD];
+const TRUST_PANEL_FOLD = 3;
 /**
  * The height of each section's row description while loading (`text-h6` lines, measured against the loaded rows):
  * the Vanta descriptions wrap to more lines on a phone than from `content-md` up.
@@ -608,21 +608,19 @@ const TRUST_SKELETON_LABEL = {
 } as const;
 type TrustSkeletonLabel = (typeof TRUST_SKELETON_LABEL)[keyof typeof TRUST_SKELETON_LABEL];
 
-
 /**
  * Rows of the REAL `StackedRowsPanel` (its own row heights and borders) whose
  * cells hold bars: a mark (a 40px compliance logo or a 24px glyph), a value over
  * a label, and the right-hand badge or button in the page's `ACTION_COLUMN`.
  */
-function skeletonRows(
-  fold: TrustPanelFold,
-  shape: { mark: 'logo' | 'glyph'; action: 'badge' | 'button' | 'none'; label?: TrustSkeletonLabel },
-): PanelRow[] {
+function skeletonRows(shape: {
+  mark: 'logo' | 'glyph';
+  action: 'badge' | 'button' | 'none';
+  label?: TrustSkeletonLabel;
+}): PanelRow[] {
   const label = shape.label ?? TRUST_SKELETON_LABEL.oneLine;
-  return Array.from({ length: Math.max(fold.phone, fold.wide) }, (_, index) => ({
+  return Array.from({ length: TRUST_PANEL_FOLD }, (_, index) => ({
     id: `skeleton-${index}`,
-    // A row past one width's fold is left out at that width (the panel's row is `flex`).
-    className: cn(index >= fold.phone && 'hidden content-md:flex', index >= fold.wide && 'content-md:hidden'),
     columns: [
       {
         // The loaded rows' own cell (leading mark, `text-h4` value over a wrapping `text-h6` label): the panel lays
@@ -687,7 +685,7 @@ function ControlsSectionSkeleton() {
         </div>
       </div>
       <div className={CONTROLS_LIST_HEIGHT}>
-        <ControlsListSkeleton />
+        <ControlsListSkeleton region={false} />
       </div>
     </div>
   );
@@ -712,19 +710,26 @@ export interface TrustCenterSkeletonProps {
  * line as skeletons, the PDF link real), then EVERY section in the page's order with its real heading and lead and
  * its content as a skeleton (the Contact section is static: drawn for real), beside the real section rail.
  */
-export function TrustCenterSkeleton({ region = true, attribution = true, download, faq }: TrustCenterSkeletonProps = {}) {
+export function TrustCenterSkeleton({
+  region = true,
+  attribution = true,
+  download,
+  faq,
+}: TrustCenterSkeletonProps = {}) {
   const content: Record<TrustCenterSectionId, ReactNode> = {
-    compliance: <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.compliance, {
+    compliance: (
+      <StackedRowsPanel
+        rows={skeletonRows({
           mark: 'logo',
           action: 'badge',
           label: TRUST_SKELETON_LABEL.compliance,
-        })} />,
-    controls: <ControlsSectionSkeleton />,
-    documents: <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.documents, { mark: 'glyph', action: 'button' })} />,
-    subprocessors: (
-      <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.subprocessors, { mark: 'glyph', action: 'none' })} />
+        })}
+      />
     ),
-    ai: <StackedRowsPanel rows={skeletonRows(TRUST_PANEL_FOLD.ai, { mark: 'glyph', action: 'none', label: TRUST_SKELETON_LABEL.ai })} />,
+    controls: <ControlsSectionSkeleton />,
+    documents: <StackedRowsPanel rows={skeletonRows({ mark: 'glyph', action: 'button' })} />,
+    subprocessors: <StackedRowsPanel rows={skeletonRows({ mark: 'glyph', action: 'none' })} />,
+    ai: <StackedRowsPanel rows={skeletonRows({ mark: 'glyph', action: 'none', label: TRUST_SKELETON_LABEL.ai })} />,
     contact: <ContactSection onContact={() => undefined} />,
     faq,
   };

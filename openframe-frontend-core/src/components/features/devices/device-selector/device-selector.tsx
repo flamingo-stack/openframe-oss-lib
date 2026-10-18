@@ -764,6 +764,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
           {!singleSelect && (
             <TabNavigation
               tabs={assignTabs}
+              staticLabels
               activeTab={activeSubTab}
               onTabChange={handleTabChange}
               className="overflow-clip rounded-t-[6px]"

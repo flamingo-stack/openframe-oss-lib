@@ -52,6 +52,11 @@ const CHIP_CLASS =
   'inline-flex h-8 items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5';
 const CHIP_MARK_CLASS = 'flex h-4 w-4 shrink-0 items-center justify-center';
 const INLINE_CLASS = 'flex items-center gap-1 text-ods-text-secondary';
+/**
+ * A tool's name while it loads, in characters of its own face (the chip's caption face is monospaced, so `ch` is one
+ * character): a typical tool name ("MeshCentral", "Tactical RMM") is 11 to 13.
+ */
+const CHIP_NAME_TYPICAL_CH = '11ch';
 
 export interface ToolBadgeSkeletonProps {
   variant?: 'inline' | 'chip';
@@ -66,7 +71,7 @@ export function ToolBadgeSkeleton({ variant = 'inline', icon = true, className }
     return (
       <span className={cn(CHIP_CLASS, className)} aria-hidden>
         {icon && <UnifiedSkeleton as="span" className={cn(CHIP_MARK_CLASS, 'rounded-sm')} />}
-        <TextLineSkeleton type="h5" className="w-16" />
+        <TextLineSkeleton type="h5" width={CHIP_NAME_TYPICAL_CH} />
       </span>
     );
   }
@@ -120,15 +125,14 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
 
   if (variant === 'chip') {
     return linked(
-      <span
-        className={cn(
-          CHIP_CLASS,
-          href && 'transition-colors hover:border-ods-border-hover',
-          className,
-        )}
-      >
+      <span className={cn(CHIP_CLASS, href && 'transition-colors hover:border-ods-border-hover', className)}>
         {mark && (
-          <span className={cn(CHIP_MARK_CLASS, '[&_img]:h-full [&_img]:w-full [&_img]:rounded-sm [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full')}>
+          <span
+            className={cn(
+              CHIP_MARK_CLASS,
+              '[&_img]:h-full [&_img]:w-full [&_img]:rounded-sm [&_img]:object-contain [&_svg]:h-full [&_svg]:w-full',
+            )}
+          >
             {mark}
           </span>
         )}

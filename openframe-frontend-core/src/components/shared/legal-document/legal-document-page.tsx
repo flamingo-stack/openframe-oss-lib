@@ -23,13 +23,10 @@ import { useRouter } from '../../../embed-shims/next-navigation';
 import { cn } from '../../../utils/cn';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
 import { LoadingRegion } from '../../loading/loading-region';
-import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { PageShell, PageLayout } from '../../ui';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { RichMarkdownRenderer } from '../../ui/markdown';
-import { MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from '../../ui/markdown/base-components';
-import { TEXT_SIZE_PRESETS } from '../../ui/markdown/text-size';
+import { RichMarkdownRenderer, RichMarkdownRendererSkeleton } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
 import { useLegalDocuments } from './use-legal-documents';
 
@@ -103,42 +100,22 @@ export function legalDocumentStampLabel(
   return parts.length > 0 ? parts.join(' \u00b7 ') : null;
 }
 
-/** Sections a legal document's skeleton draws: its first fold (a long document is drawn no further). */
-export const LEGAL_DOCUMENT_SKELETON_SECTIONS = 8;
-/** Paragraph blocks under each skeleton section. */
-const LEGAL_DOCUMENT_SKELETON_PARAGRAPHS = 2;
-/** The rendered markdown's own classes (the renderer's default preset): the document title (its H1, demoted to an
- *  `h2` on this page), each section heading and each paragraph. */
-const LEGAL_TITLE_CLASS = cn(MARKDOWN_H1_CLASS, TEXT_SIZE_PRESETS.default.h1);
-const LEGAL_SECTION_HEADING_CLASS = cn(MARKDOWN_H2_CLASS, TEXT_SIZE_PRESETS.default.h2);
-const LEGAL_PARAGRAPH_CLASS = cn(MARKDOWN_PARAGRAPH_CLASS, TEXT_SIZE_PRESETS.default.p);
+/**
+ * Sections a legal document's skeleton draws: its first fold. One section at the rendered `article` type is about
+ * 290px (a 32px heading with its rule and margins, then a three-line and a two-line paragraph at 20px / 1.6) from
+ * desktop and about 260px on a phone, so three fill the screen under the page title at 1440 and at 390; a long
+ * document is drawn no further.
+ */
+export const LEGAL_DOCUMENT_SKELETON_SECTIONS = 3;
 
 /**
- * A legal document's body while it is read: the document's title row, then `sections` real `<h2>` elements of the
- * rendered document's own classes, each holding a bar, with two paragraph blocks of three lines under each.
+ * A legal document's body while it is read: the rich renderer's own skeleton (`RichMarkdownRendererSkeleton`, the
+ * `article` type the page renders with), opening with the document's own title row, then its first fold of sections.
  */
 export function LegalDocumentSkeleton({ sections = LEGAL_DOCUMENT_SKELETON_SECTIONS }: { sections?: number }) {
   return (
     <LoadingRegion label="Loading the document" className="w-full">
-      <div aria-hidden>
-        <h2 className={LEGAL_TITLE_CLASS}>
-          <TextLineSkeleton type="inherit" as="span" className="w-2/3" />
-        </h2>
-        {Array.from({ length: sections }, (_section, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton sections never reorder
-          <div key={i}>
-            <h2 className={LEGAL_SECTION_HEADING_CLASS}>
-              <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
-            </h2>
-            {Array.from({ length: LEGAL_DOCUMENT_SKELETON_PARAGRAPHS }, (_paragraph, p) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton paragraphs never reorder
-              <div key={p} className={LEGAL_PARAGRAPH_CLASS}>
-                <TextLineSkeleton type="h4" lines={3} className="w-full" />
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      <RichMarkdownRendererSkeleton title sections={sections} />
     </LoadingRegion>
   );
 }

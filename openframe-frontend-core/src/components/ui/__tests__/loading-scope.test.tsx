@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { CategoriesCart } from '../../categories-cart';
 import { ChatTurn } from '../../chat/chat-turn';
 import { EntityAuthorCard } from '../../chat/entity-cards/entity-author-card';
+import { PlatformBadge } from '../../features/platform-badge';
 import { PushButtonSelector } from '../../features/push-button-selector';
 import { Video } from '../../features/video';
 import { VideoBitesStrip } from '../../features/video-bites-strip';
@@ -61,7 +62,13 @@ describe('a component in a scope draws its own skeleton', () => {
       />,
       ['Section', 'Published'],
     ],
-    ['ChatTurn', <ChatTurn key="a" name={READ} time={READ}>{READ}</ChatTurn>, []],
+    [
+      'ChatTurn',
+      <ChatTurn key="a" name={READ} time={READ}>
+        {READ}
+      </ChatTurn>,
+      [],
+    ],
     ['LeaderRow', <LeaderRow key="a" label="Seats" value="" />, ['Seats']],
     ['ToolBadge', <ToolBadge key="a" label={READ} variant="chip" />, []],
     ['MetricValue', <MetricValue key="a" value={READ} label="Generation time" />, ['Generation time']],
@@ -70,11 +77,7 @@ describe('a component in a scope draws its own skeleton', () => {
     ['VendorIcon', <VendorIcon key="a" vendor={{ title: READ }} />, []],
     ['StatusBadge', <StatusBadge key="a" text={READ} />, []],
     ['AvatarStack', <AvatarStack key="a" people={[{ name: READ }]} />, []],
-    [
-      'CategoriesCart',
-      <CategoriesCart key="a" category={{ name: READ, slug: 'x', description: READ } as never} />,
-      [],
-    ],
+    ['CategoriesCart', <CategoriesCart key="a" category={{ name: READ, slug: 'x', description: READ } as never} />, []],
     [
       'PushButtonSelector',
       <PushButtonSelector
@@ -111,6 +114,21 @@ describe('a component in a scope draws its own skeleton', () => {
     expect(container.querySelector(SURFACE)).not.toBeNull();
     expect(container.textContent ?? '').not.toContain(READ);
     for (const words of staticCopy) expect(container.textContent).toContain(words);
+  });
+
+  it('a tab strip whose labels are static copy draws them for real (inert); read labels stay bars', () => {
+    const { container } = inScope(<TabNavigation tabs={[{ id: 'a', label: 'Overview' }]} activeTab="a" staticLabels />);
+    expect(container.textContent).toContain('Overview');
+    expect(container.querySelector('[inert]')).not.toBeNull();
+  });
+
+  it("a part given its data in a scope draws it (the page's own), and its skeleton only when the data is read", () => {
+    const { container } = inScope(
+      <PlatformBadge platform={{ id: '1', name: 'openframe', display_name: 'OpenFrame' }} />,
+    );
+    expect(container.textContent).toContain('OpenFrame');
+    const view = inScope(<PlatformBadge platform={null} />);
+    expect(view.container.querySelector(SURFACE)).not.toBeNull();
   });
 
   it('a benefit whose words are read draws its icon and a bar exactly the copy wide (the words unseen)', () => {

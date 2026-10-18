@@ -134,6 +134,11 @@ interface TabNavigationProps {
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions;
   defaultTab?: string; // Fallback when no valid tab in URL or initial value
+  /**
+   * The tab labels are static copy (config, never read data): in a loading scope the real strip is drawn (inert)
+   * instead of its skeleton bars. Default `false`: labels built from read data stay skeletons.
+   */
+  staticLabels?: boolean;
 
   /**
    * Render prop for the tab BODY. Receives the tab to render and, additively,
@@ -155,7 +160,8 @@ const HIDDEN_INDICATOR: IndicatorRect = { left: 0, width: 0 };
 
 /** The strip's layout, read by the strip and by its skeleton, so the skeleton is the strip's size. */
 const STRIP_FRAME_CLASS = 'relative w-full';
-const STRIP_ROW_CLASS = 'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden';
+const STRIP_ROW_CLASS =
+  'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden';
 const ADMIN_TAB_GAP_CLASS = 'gap-[var(--spacing-system-xxs)]';
 const TAB_CLASS =
   'group relative flex shrink-0 items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]';
@@ -443,10 +449,7 @@ const TabBar = memo(function TabBarImpl({
     <div className={cn(STRIP_FRAME_CLASS, className)}>
       {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows.
           `relative` makes this the offsetParent the underline is measured against. */}
-      <div
-        ref={scrollRef}
-        className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}
-      >
+      <div ref={scrollRef} className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}>
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
 
@@ -664,6 +667,7 @@ export function TabNavigation({
   variant: variantProp,
   urlSync = false,
   defaultTab,
+  staticLabels = false,
   children,
 }: TabNavigationProps) {
   const providedVariant = useContext(TabNavigationVariantContext);
@@ -825,35 +829,52 @@ export function TabNavigation({
   //    body can mark itself while it waits.
   const deferredActiveTab = useDeferredValue(activeTab);
   const isStale = activeTab !== deferredActiveTab;
-  // In a loading scope the strip is its skeleton; the body below draws its own loading state.
+  // In a loading scope the body below draws its own loading state. The strip draws its skeleton, unless the caller
+  // says its labels are static copy (`staticLabels`): then the real strip is drawn, inert.
   const loading = useLoadingScope();
 
   return (
     <>
-      {loading ? (
+      {loading && staticLabels ? (
+        <div className="contents" aria-hidden="true" inert>
+          <TabBar
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={() => undefined}
+            className={className}
+            shadowClassName={shadowClassName}
+            showLeftGradient={showLeftGradient}
+            showRightGradient={showRightGradient}
+            stretchTabs={stretchTabs}
+            tabAlign={tabAlign}
+            progressTransitionMs={progressTransitionMs}
+            variant={variant}
+          />
+        </div>
+      ) : loading ? (
         <TabNavigationSkeleton
           count={tabs.length}
-          avatar={tabs.some(tab => tab.avatar)}
-          sublabel={tabs.some(tab => tab.sublabel)}
+          avatar={tabs.some(tab => Boolean(tab.avatar))}
+          sublabel={tabs.some(tab => Boolean(tab.sublabel))}
           stretchTabs={stretchTabs}
           tabAlign={tabAlign}
           variant={variant}
           className={className}
         />
       ) : (
-      <TabBar
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        className={className}
-        shadowClassName={shadowClassName}
-        showLeftGradient={showLeftGradient}
-        showRightGradient={showRightGradient}
-        stretchTabs={stretchTabs}
-        tabAlign={tabAlign}
-        progressTransitionMs={progressTransitionMs}
-        variant={variant}
-      />
+        <TabBar
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          className={className}
+          shadowClassName={shadowClassName}
+          showLeftGradient={showLeftGradient}
+          showRightGradient={showRightGradient}
+          stretchTabs={stretchTabs}
+          tabAlign={tabAlign}
+          progressTransitionMs={progressTransitionMs}
+          variant={variant}
+        />
       )}
 
       {/* Render children with active tab if provided */}

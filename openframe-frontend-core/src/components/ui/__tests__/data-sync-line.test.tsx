@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { PageDataSyncProvider, PageDataSyncRow } from '../../layout/page-data-sync';
 import { DataSyncLine } from '../data-attribution';
 
 describe('DataSyncLine', () => {
@@ -27,6 +28,21 @@ describe('DataSyncLine', () => {
 
   it('draws no line while loading when the host states no sync', () => {
     render(<DataSyncLine loading stated={false} />);
+    expect(screen.queryByText(/Data synced from/)).not.toBeInTheDocument();
+  });
+
+  it("a page whose records are mirrored holds its row's skeleton before the list reports; one that is not draws none", () => {
+    const { rerender } = render(
+      <PageDataSyncProvider>
+        <PageDataSyncRow />
+      </PageDataSyncProvider>,
+    );
+    expect(screen.getByText(/Data synced from/)).toBeInTheDocument();
+    rerender(
+      <PageDataSyncProvider key="authored" stated={false}>
+        <PageDataSyncRow />
+      </PageDataSyncProvider>,
+    );
     expect(screen.queryByText(/Data synced from/)).not.toBeInTheDocument();
   });
 });

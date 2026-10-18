@@ -240,7 +240,9 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
               // bottom/right rule, so the grid needs no gap.
               isGrid ? 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))]' : 'py-[var(--spacing-system-xs)]',
             )}
-            role="listbox"
+            // A listbox owns options only: while they are read the box holds the loading region (a status and
+            // hidden rows), with no listbox role around it.
+            role={isLoading ? undefined : 'listbox'}
           >
             {isLoading ? (
               // The options while they are read: the list's own rows (or tiles), a label bar each; `loadingText` is

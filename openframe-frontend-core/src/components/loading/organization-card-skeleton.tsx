@@ -1,18 +1,19 @@
 import { cn } from '../../utils/cn';
 import { EntityImageSkeleton } from '../ui/entity-image';
-import {
-  ORGANIZATION_CARD_DESCRIPTION_CLASS,
-  ORGANIZATION_CARD_FOOTER_CLASS,
-  ORGANIZATION_CARD_HEADER_CLASS,
-  ORGANIZATION_CARD_LAYOUT_CLASS,
-  ORGANIZATION_CARD_RADIUS_CLASS,
-  ORGANIZATION_CARD_STAT_CLASS,
-  ORGANIZATION_CARD_STATS_CLASS,
-  ORGANIZATION_CARD_SURFACE_CLASS,
-  ORGANIZATION_CARD_TEXT_CLASS,
-} from '../ui/organization-card';
 import { LoadingRegion } from './loading-region';
 import { MediaSkeleton, TextLineSkeleton } from './unified-skeleton';
+
+/** The card's corner radius, read by `OrganizationCard` and by its skeleton here. */
+export const ORGANIZATION_CARD_RADIUS_CLASS = 'rounded-[6px]';
+/** The card's layout, read by `OrganizationCard` and by its skeleton here, so the skeleton is the card's size. */
+export const ORGANIZATION_CARD_LAYOUT_CLASS = 'relative flex w-full flex-col gap-3 overflow-clip p-4';
+export const ORGANIZATION_CARD_SURFACE_CLASS = 'border border-ods-border bg-ods-card';
+export const ORGANIZATION_CARD_HEADER_CLASS = 'flex w-full items-start gap-3';
+export const ORGANIZATION_CARD_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col justify-center py-2';
+export const ORGANIZATION_CARD_DESCRIPTION_CLASS = 'h-12 w-full overflow-hidden';
+export const ORGANIZATION_CARD_FOOTER_CLASS = 'flex w-full min-w-0 items-center justify-between gap-2';
+export const ORGANIZATION_CARD_STATS_CLASS = 'flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4';
+export const ORGANIZATION_CARD_STAT_CLASS = 'flex flex-shrink-0 items-center gap-1';
 
 export interface OrganizationCardSkeletonProps {
   /**
@@ -85,7 +86,6 @@ export function OrganizationCardSkeleton({
     </div>
   );
 }
-
 
 /**
  * OrganizationCardSkeletonGrid - Grid of organization card skeletons

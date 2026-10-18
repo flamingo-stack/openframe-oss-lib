@@ -15,6 +15,8 @@ import { useLoadingScope } from './ui/loading-scope';
 export const COMMENT_THREAD_SKELETON_COUNT = 3;
 // The thread's and the block's boxes, read by them AND their skeletons.
 const COMMENT_THREAD_LIST = 'flex flex-col gap-[var(--spacing-system-sf)]';
+/** A root's actions at the end of its footer (Reply, then the surface's own), loaded and loading. */
+const COMMENT_THREAD_ACTIONS = 'ml-auto flex flex-wrap gap-[var(--spacing-system-xsf)]';
 const COMMENTS_BLOCK = 'space-y-[var(--spacing-system-sf)]';
 const COMMENTS_BLOCK_HEADER = 'px-0 text-ods-text-secondary hover:text-ods-text-primary';
 const commentsBlockChevron = (open: boolean) => `h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`;
@@ -69,7 +71,7 @@ export function CommentThread({
   onViewProduct,
 }: CommentThreadProps) {
   if (useLoadingScope()) {
-    return <CommentThreadSkeleton count={COMMENT_THREAD_SKELETON_COUNT} leadWith={leadWith} />;
+    return <CommentThreadSkeleton count={COMMENT_THREAD_SKELETON_COUNT} leadWith={leadWith} reply={Boolean(onReply)} />;
   }
   if (comments.length === 0) {
     return emptyLabel ? <p className="text-ods-text-secondary text-h6">{emptyLabel}</p> : null;
@@ -91,6 +93,15 @@ export function CommentThread({
         />
       ))}
     </div>
+  );
+}
+
+/** A root's Reply button: static copy, drawn for real in the loaded thread and (inert) in its skeleton. */
+function ReplyButton({ onClick, disabled }: { onClick?: () => void; disabled?: boolean }) {
+  return (
+    <Button type="button" variant="outline" size="small-legacy" onClick={onClick} disabled={disabled}>
+      Reply
+    </Button>
   );
 }
 
@@ -117,18 +128,8 @@ function CommentThreadRow({
         </span>
       ) : null}
       {onReply || actions ? (
-        <span className="ml-auto flex flex-wrap gap-[var(--spacing-system-xsf)]">
-          {onReply ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="small-legacy"
-              onClick={() => setReplyOpen(open => !open)}
-              disabled={pending}
-            >
-              Reply
-            </Button>
-          ) : null}
+        <span className={COMMENT_THREAD_ACTIONS}>
+          {onReply ? <ReplyButton onClick={() => setReplyOpen(open => !open)} disabled={pending} /> : null}
           {actions}
         </span>
       ) : null}
@@ -176,21 +177,33 @@ function CommentThreadRow({
   );
 }
 
-/** A thread while it is read: `count` comment rows, each `CommentCardSkeleton` in the thread's own list. */
+/**
+ * A thread while it is read: `count` comment rows, each `CommentCardSkeleton` in the thread's own list, with the
+ * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
+ * so they are not drawn).
+ */
 export function CommentThreadSkeleton({
   count = COMMENT_THREAD_SKELETON_COUNT,
   leadWith = 'commenter',
   showTitle = true,
+  reply = false,
 }: {
   count?: number;
   leadWith?: 'vendor' | 'commenter';
   /** The rows carry a title line (titled reviews); a design-doc thread's comments have none. */
   showTitle?: boolean;
+  /** The thread takes replies (`CommentThread`'s `onReply`): each root's footer carries its Reply button. */
+  reply?: boolean;
 }) {
+  const footer = reply ? (
+    <span className={COMMENT_THREAD_ACTIONS}>
+      <ReplyButton />
+    </span>
+  ) : undefined;
   return (
-    <div className={COMMENT_THREAD_LIST} aria-hidden>
+    <div className={COMMENT_THREAD_LIST} aria-hidden="true" inert>
       {Array.from({ length: count }, (_, i) => (
-        <CommentCardSkeleton key={i} leadWith={leadWith} showTitle={showTitle} showDelete={false} />
+        <CommentCardSkeleton key={i} leadWith={leadWith} showTitle={showTitle} showDelete={false} footer={footer} />
       ))}
     </div>
   );

@@ -36,7 +36,7 @@ import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { useLoadingScope } from '../loading-scope';
-import { buildBaseComponents, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
+import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,
@@ -443,11 +443,14 @@ export function MarkdownEngineSkeleton({
   sections,
   lines = MARKDOWN_SKELETON_LINES,
   textSize,
+  title = false,
   className = '',
 }: {
   sections?: number;
   lines?: number;
   textSize?: TextSizeConfig;
+  /** The body opens with its own `# ` title (a legal document's, demoted to an `h2`): its H1 row is drawn first. */
+  title?: boolean;
   className?: string;
 }) {
   const textSizes = resolveTextSizeConfig(textSize);
@@ -458,18 +461,25 @@ export function MarkdownEngineSkeleton({
     <div className={`${RENDERER_CLASS} w-full ${className}`} aria-hidden>
       <div className={CONTENT_WRAPPER_CLASS}>
         <div className={ARTICLE_CLASS}>
-          {sections
-            ? Array.from({ length: sections }, (_, section) => (
-                <div key={section}>
-                  <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
-                    <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
-                  </h2>
-                  {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
-                    <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
-                  ))}
-                </div>
-              ))
-            : <ParagraphBar lines={lines} className={paragraphClass} />}
+          {title && (
+            <h2 className={cn(MARKDOWN_H1_CLASS, textSizes.h1)}>
+              <TextLineSkeleton type="inherit" as="span" className="w-2/3" />
+            </h2>
+          )}
+          {sections ? (
+            Array.from({ length: sections }, (_, section) => (
+              <div key={section}>
+                <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
+                  <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
+                </h2>
+                {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
+                  <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
+                ))}
+              </div>
+            ))
+          ) : (
+            <ParagraphBar lines={lines} className={paragraphClass} />
+          )}
         </div>
       </div>
     </div>

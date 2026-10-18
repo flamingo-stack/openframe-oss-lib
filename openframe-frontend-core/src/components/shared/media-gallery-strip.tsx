@@ -47,7 +47,10 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
-  if (useLoadingScope()) return <MediaGalleryStripSkeleton className={className} />;
+  // ONE switch: in a loading scope with no items yet (they are read) the strip is its skeleton; items it is given
+  // there are the page's own and are drawn as they are. A record's media is optional: a page whose loading layout
+  // leaves the strip out wraps the loaded one in `data-loading-optional`.
+  if (useLoadingScope() && !items?.length) return <MediaGalleryStripSkeleton className={className} />;
 
   if (!items || items.length === 0) return null;
 

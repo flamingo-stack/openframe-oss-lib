@@ -677,7 +677,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
       >
         <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
           <ScrollAreaPrimitive.Viewport className="max-h-[240px] min-h-0 w-full [&>div]:!block">
-            <div role="listbox">
+            {/* A listbox owns options only: while they are read the box is the loading region's (a status and
+                hidden rows), with no listbox role around it. */}
+            <div role={loading ? undefined : 'listbox'}>
               {loading ? (
                 // The options while they are read: the list's own rows, a label bar each (`loadingText` is what a
                 // screen reader hears).

@@ -30,7 +30,7 @@ import {
 import { cn } from '../../utils/cn';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { HUBSPOT_DO_NOT_COLLECT_FORM_PROPS } from '../../utils/hubspot-collected-forms';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import {
   Button,
   FieldWrapper,
@@ -51,6 +51,7 @@ import {
   ToggleGroupItem,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
+import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
 
 /**
  * One field in a host-supplied row. `name` is a built-in (`email`, `firstName`,
@@ -134,7 +135,6 @@ const SPAN_CLASS = {
   3: 'content-md:col-span-3',
   4: 'content-md:col-span-4',
 } as const;
-
 
 /** The submit copy every standalone `BookingForm` gets; the slot-first preset reads the same constant. */
 export const DEFAULT_SUBMIT_LABEL = 'Confirm Booking';
@@ -396,6 +396,9 @@ function drawnAsChips(field: { type: string; options?: string[] }, display: Book
  * it `fieldLabelId`), a refused question paints the lib's error border on its
  * chips, and hover is a quiet background so it never reads as the chosen one.
  */
+/** The chips' row: read by `chipsControl` and by `FieldSkeleton`, so a chips question loads at its own height. */
+const CHIP_ROW_CLASS = 'flex flex-wrap justify-start gap-[var(--spacing-system-xsf)]';
+
 const chipsControl = ({ field, id, registerName, error, control }: ControlArgs): ReactNode => (
   <Controller
     control={control}
@@ -411,19 +414,17 @@ const chipsControl = ({ field, id, registerName, error, control }: ControlArgs):
           if (value) rhf.onChange(value);
         }}
         // The form focuses a question that failed validation through its ref: the group passes that to its first chip.
-        ref={(group: HTMLDivElement | null) => rhf.ref(group && { focus: () => group.querySelector('button')?.focus() })}
+        ref={(group: HTMLDivElement | null) =>
+          rhf.ref(group && { focus: () => group.querySelector('button')?.focus() })
+        }
         onBlur={rhf.onBlur}
         aria-labelledby={fieldLabelId(id)}
         aria-required={field.required || undefined}
         aria-invalid={Boolean(error)}
-        className="flex flex-wrap justify-start gap-[var(--spacing-system-xsf)]"
+        className={CHIP_ROW_CLASS}
       >
         {(field.options ?? []).map(opt => (
-          <ToggleGroupItem
-            key={opt}
-            value={opt}
-            className={cn(error && 'data-[state=off]:border-ods-error')}
-          >
+          <ToggleGroupItem key={opt} value={opt} className={cn(error && 'data-[state=off]:border-ods-error')}>
             {formFieldOptionLabel(field, opt)}
           </ToggleGroupItem>
         ))}
@@ -558,8 +559,7 @@ export function BookingForm({
   // silently and never a reason to hide the form.
   // `optionalFields` narrows the optional ones to the questions this form asks.
   const supportedFields = useMemo(
-    () =>
-      normalizeFormFields(formFields).filter(field => bookingFormAsks(field, optionalFields)),
+    () => normalizeFormFields(formFields).filter(field => bookingFormAsks(field, optionalFields)),
     [formFields, optionalFields],
   );
   // The DEFERRED schema in both flows: it is the wider of the two, and a strict
@@ -1030,7 +1030,9 @@ export function BookingFormSkeleton({
           checked={false}
           onCheckedChange={() => {}}
           required
-          label={consent === true ? <TextLineSkeleton type="inherit" as="span" className="w-64 max-w-full" /> : consent.label}
+          label={
+            consent === true ? <TextLineSkeleton type="inherit" as="span" className="w-64 max-w-full" /> : consent.label
+          }
           description={consent === true ? undefined : consent.description}
         />
       )}
@@ -1088,9 +1090,10 @@ function skeletonRows(fieldRows: BookingFieldRow[], optionalFields?: readonly st
 }
 
 /**
- * One field while the link is read: the loaded field's own `FieldWrapper` over the loaded control (an `Input`, so
- * the slot is its loaded height at every width). A built-in field's label is its own words (or the host's copy); a
- * declared question's label is read, so it is a bar of the label's line.
+ * One field while the link is read: the loaded field's own `FieldWrapper` over the loaded control. A built-in field's
+ * label is its own words (or the host's copy); a declared question's label is the host's copy when it gives one
+ * (static, drawn for real), else a bar of the label's line, since the link supplies it. A question the host draws
+ * as chips (`display: 'chips'`) is one row of chips at the chips' own height; any other is an `Input`.
  */
 function FieldSkeleton({
   name,
@@ -1102,12 +1105,19 @@ function FieldSkeleton({
   className?: string;
 }) {
   const builtIn = BUILT_IN_BOOKING_FIELDS.find(f => f.name === name);
-  const label = builtIn ? (fieldCopy?.[name]?.label ?? builtIn.label) : undefined;
+  const copy = fieldCopy?.[name];
+  const label = builtIn ? (copy?.label ?? builtIn.label) : copy?.label;
   return (
-    // An empty label keeps the field's own frame; the read label is the bar under it.
+    // An empty label keeps the field's own frame; a read label is the bar under it.
     <FieldWrapper label={label ?? ''} required={builtIn?.required} className={className}>
-      {!builtIn && <TextLineSkeleton type="h6" className="mb-1 w-32" />}
-      <Input tabIndex={-1} />
+      {label === undefined && <TextLineSkeleton type="h6" className="mb-1 w-32" />}
+      {!builtIn && copy?.display === 'chips' ? (
+        <div className={CHIP_ROW_CLASS}>
+          <UnifiedSkeleton variant="default" className={cn(TOGGLE_SIZE_CLASS.default, 'w-24 rounded-md')} />
+        </div>
+      ) : (
+        <Input tabIndex={-1} />
+      )}
     </FieldWrapper>
   );
 }

@@ -193,7 +193,6 @@ function TicketCenterAuthed({
   );
 }
 
-
 /**
  * The list's header, loaded and loading: "Your Current Tickets" (static), the sync line (when the page does not
  * state it above) and the refresh button.
@@ -246,7 +245,7 @@ function TicketCenterSkeleton({
   return (
     <LoadingRegion label="Loading tickets" announce={region} className={TICKET_CENTER_CLASS}>
       <div inert aria-hidden>
-        <TicketOpenForm onSubmit={async () => false} isSubmitting={false} supportSystemDown={false} />
+        <TicketOpenForm onSubmit={() => Promise.resolve(false)} isSubmitting={false} supportSystemDown={false} />
       </div>
       <div className={TICKET_LIST_BLOCK_CLASS}>
         <TicketListHeader sync={null} syncLoading />

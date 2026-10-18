@@ -32,7 +32,7 @@ import { EmptyState } from '../../empty-state';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { RoadmapGridSkeleton } from './roadmap-grid-skeleton';
+import { RoadmapGridSkeleton, roadmapGridClass } from './roadmap-grid-skeleton';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
@@ -144,13 +144,7 @@ function RoadmapGridSingle({
   votingTasks: Set<string>;
 }) {
   return (
-    // LITERAL class strings: an interpolated `content-md:grid-cols-${n}` is invisible
-    // to Tailwind's scanner and is never generated.
-    <div
-      className={`grid grid-cols-1 gap-6 ${columns === 2 ? 'content-md:grid-cols-2' : ''} ${
-        showLeftMargin ? 'content-md:ml-[120px]' : ''
-      }`}
-    >
+    <div className={roadmapGridClass(columns, showLeftMargin)}>
       {items.map(item => (
         // DOM id + sticky-header scroll offset live ON RoadmapCard's own
         // outer element (no wrapper div). Anchor mirrors
@@ -173,12 +167,21 @@ function RoadmapGridSingle({
 /** The quarter list and a quarter's head, read by the grid and by its skeleton. */
 const QUARTER_LIST_CLASS = 'flex flex-col gap-10';
 const QUARTER_HEAD_CLASS = 'flex items-center gap-3';
+/** The quarter's content padding: the grid's `AccordionContent` takes `pt-4`, and pads its children `pb-4` itself. */
+const QUARTER_CONTENT_CLASS = 'pt-4';
+const QUARTER_CONTENT_INNER_CLASS = 'pb-4';
 
 /**
  * The quarter-grouped grid while its items are read: one quarter, its heading and item count as bars, then the
  * grid's card skeletons.
  */
-export function RoadmapGridQuarterSkeleton({ showLeftMargin = true }: { showLeftMargin?: boolean }) {
+export function RoadmapGridQuarterSkeleton({
+  showLeftMargin = true,
+  columns = 2,
+}: {
+  showLeftMargin?: boolean;
+  columns?: 1 | 2;
+}) {
   return (
     <div className={QUARTER_LIST_CLASS} aria-hidden>
       <div className="flex flex-col">
@@ -186,8 +189,11 @@ export function RoadmapGridQuarterSkeleton({ showLeftMargin = true }: { showLeft
           <TextLineSkeleton type="h2" className="w-40" />
           <TextLineSkeleton type="h6" className="w-16" />
         </div>
-        <div className="pt-4">
-          <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} />
+        {/* The quarter's content box: the `AccordionContent` padding (`pt-4` here, the content's own `pb-4` inside). */}
+        <div className={QUARTER_CONTENT_CLASS}>
+          <div className={QUARTER_CONTENT_INNER_CLASS}>
+            <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} columns={columns} />
+          </div>
         </div>
       </div>
     </div>
@@ -299,9 +305,9 @@ export function RoadmapGrid({
   // empty state.
   if (inScope) {
     return groupByQuarter ? (
-      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} />
+      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} />
     ) : (
-      <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} />
+      <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} columns={columns} />
     );
   }
 

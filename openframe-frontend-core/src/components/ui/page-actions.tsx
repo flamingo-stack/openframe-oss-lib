@@ -3,7 +3,7 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
@@ -223,15 +223,6 @@ export interface PageActionsProps {
 
 const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]';
 
-/** Matches `Button` size="icon" / size="default" exactly, so a placeholder and the
- *  button that replaces it occupy the same box at both breakpoints. `rounded-md`
- *  is the same token `Button` itself uses — a raw `6px` would agree today and
- *  drift the moment a platform overrides `--radius`. */
-const SKELETON_HEIGHT = 'h-11 md:h-12';
-const SKELETON_ICON_WIDTH = 'w-11 md:w-12';
-const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]';
-const SKELETON_RADIUS = 'rounded-md';
-
 /**
  * Placeholders for actions whose SHAPE isn't known yet — the page is still
  * loading the record that decides which actions exist (e.g. an archived entity
@@ -273,24 +264,33 @@ function ActionSkeletons({
         // stretches only labelled buttons (`fullWidth: !!action.label`), so an
         // icon action keeps its square box there too.
         const isIconOnly = action ? !action.label || !!action.iconOnlyOnDesktop : emptyFallback === 'icon';
-        return (
-          <UnifiedSkeleton
-            // Static placeholder list — index IS the identity here.
-            key={`action-skeleton-${idx}`}
-            className={cn(
-              SKELETON_HEIGHT,
-              SKELETON_RADIUS,
-              isIconOnly ? SKELETON_ICON_WIDTH : fullWidth ? 'flex-1' : SKELETON_LABEL_WIDTH,
-            )}
-          />
-        );
+        // Static placeholder list — index IS the identity here.
+        const key = `action-skeleton-${idx}`;
+        // The square button's own size (`Button size="icon"`).
+        if (isIconOnly) return <InteractiveSkeleton.Button key={key} size="icon" />;
+        // A labelled action is the button it will render (its label is the caller's copy), drawn invisible under one
+        // bar, so the placeholder is that button's box at every breakpoint. Not a control while it loads.
+        if (action) {
+          return (
+            <span key={key} inert aria-hidden className={cn('relative inline-flex', fullWidth && 'flex-1')}>
+              <span className={cn('invisible inline-flex', fullWidth && 'flex-1')}>
+                {renderRawActionButton(action, { fullWidth })}
+              </span>
+              <UnifiedSkeleton className="absolute inset-0 h-full" />
+            </span>
+          );
+        }
+        // An unknown set that settles into a labelled button: the default button's size.
+        return <InteractiveSkeleton.Button key={key} size="default" className={fullWidth ? 'flex-1' : undefined} />;
       })}
     </>
   );
 }
 
 /** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
-const MOBILE_TRIGGER_SKELETON_CLASS = cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS);
+function MobileTriggerSkeleton() {
+  return <InteractiveSkeleton.Button size="icon" />;
+}
 
 export function PageActions({
   variant = 'icon-buttons',
@@ -370,7 +370,7 @@ function IconButtonsVariant({
       {/* Mobile: single icon button OR all actions merged into one "..." menu */}
       <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
-          <UnifiedSkeleton className={MOBILE_TRIGGER_SKELETON_CLASS} />
+          <MobileTriggerSkeleton />
         ) : useSingleActionMobile && singleAction ? (
           renderActionButton(singleAction, { iconOnly: true })
         ) : hasMobileMenuItems ? (
@@ -424,11 +424,7 @@ function PrimaryButtonsVariant({
       </div>
 
       <div className={cn('hidden items-center md:content-max-md:flex', ACTIONS_GAP, className)}>
-        {loading ? (
-          <UnifiedSkeleton className={MOBILE_TRIGGER_SKELETON_CLASS} />
-        ) : (
-          <CompactPrimaryActions actions={desktopActions} />
-        )}
+        {loading ? <MobileTriggerSkeleton /> : <CompactPrimaryActions actions={desktopActions} />}
       </div>
 
       <MobileBottomActions actions={sortedActions} loading={loading} />
@@ -479,7 +475,7 @@ function MenuPrimaryVariant({
 
       <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
-          <UnifiedSkeleton className={MOBILE_TRIGGER_SKELETON_CLASS} />
+          <MobileTriggerSkeleton />
         ) : hasMobileMenuItems || selector ? (
           // The selector rides into the menu as its header row: on mobile the
           // title row has no room for it, and hiding it entirely (what

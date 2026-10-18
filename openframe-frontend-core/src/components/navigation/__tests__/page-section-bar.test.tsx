@@ -52,7 +52,7 @@ describe('PageSectionBar', () => {
   it('drops a tab when its section empties itself after mount', async () => {
     const { rerender } = render(<Page secondHasContent />);
     expect(screen.getByText('Left out')).toBeInTheDocument();
-    await act(async () => rerender(<Page secondHasContent={false} />));
+    act(() => rerender(<Page secondHasContent={false} />));
     await waitFor(() => expect(screen.queryByText('Left out')).not.toBeInTheDocument());
   });
 });

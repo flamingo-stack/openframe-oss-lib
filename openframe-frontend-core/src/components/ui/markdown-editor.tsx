@@ -3,13 +3,46 @@
 import type { ICommand } from '@uiw/react-md-editor';
 import { Loader2, Upload } from 'lucide-react';
 import type React from 'react';
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { Suspense, createContext, useRef, useCallback, useContext, useState, useEffect } from 'react';
 import dynamic from '../../embed-shims/next-dynamic';
 import { cn } from '../../utils/cn';
 import { IMAGE_FILE_ACCEPT, fileMediaType } from '../../utils/media-type';
+import { LoadingRegion } from '../loading/loading-region';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useMarkdownLinkCommand } from './markdown-link-command';
 
-const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false });
+/** The editor's default height in pixels (`MarkdownEditorProps.height`). */
+const MARKDOWN_EDITOR_DEFAULT_HEIGHT = 600;
+
+/**
+ * The editor while its code loads: one box at the editor's own height (the frame the editor draws at `height`), so
+ * the form around it does not move when the editor arrives.
+ */
+export function MarkdownEditorSkeleton({
+  height = MARKDOWN_EDITOR_DEFAULT_HEIGHT,
+  className,
+}: {
+  height?: number;
+  className?: string;
+}) {
+  return (
+    <LoadingRegion label="Loading the editor" className={className}>
+      <UnifiedSkeleton className="w-full rounded-md" height={height} />
+    </LoadingRegion>
+  );
+}
+
+/** The height the editor being loaded is drawn at, for its loading state (a lazy loader's fallback takes no props). */
+const MarkdownEditorHeightContext = createContext(MARKDOWN_EDITOR_DEFAULT_HEIGHT);
+
+function MarkdownEditorPending() {
+  return <MarkdownEditorSkeleton height={useContext(MarkdownEditorHeightContext)} />;
+}
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), {
+  ssr: false,
+  loading: () => <MarkdownEditorPending />,
+});
 
 const MARKDOWN_EDITOR_STYLE_ID = 'ods-markdown-editor-styles';
 
@@ -125,7 +158,7 @@ export function MarkdownEditor({
   onChange,
   placeholder = '',
   disabled = false,
-  height = 600,
+  height = MARKDOWN_EDITOR_DEFAULT_HEIGHT,
   minHeight = 100,
   className,
   onUploadFile,
@@ -341,53 +374,51 @@ export function MarkdownEditor({
         />
       )}
 
-      {!MDEditor && (
-        <div className="flex h-64 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </div>
-      )}
-      {MDEditor && (
-        <MDEditor
-          value={value}
-          onChange={handleChange}
-          preview="live"
-          hideToolbar={false}
-          visibleDragbar={true}
-          height={height}
-          minHeight={minHeight}
-          commands={toolbarCommands}
-          extraCommands={extraCommands}
-          style={
-            {
-              '--md-editor-text-color': 'var(--color-text-primary)',
-              '--md-editor-bg-color': 'var(--color-bg-card)',
-              '--md-editor-border-color': 'var(--color-border)',
-            } as React.CSSProperties
-          }
-          components={
-            renderPreview
-              ? {
-                  preview: source => {
-                    return <CustomPreview source={source} />;
-                  },
-                }
-              : undefined
-          }
-          textareaProps={{
-            placeholder,
-            disabled,
-            style: {
-              fontFamily: 'var(--font-family-body)',
-              fontSize: '18px',
-              fontWeight: 500,
-              lineHeight: '24px',
-              color: 'var(--color-text-primary)',
-              backgroundColor: disabled ? 'var(--color-bg)' : 'var(--color-bg-card)',
-            },
-          }}
-          data-color-mode="dark"
-        />
-      )}
+      {/* `next/dynamic` draws the loader's `loading`; a host on `React.lazy` reaches this boundary. Both are the skeleton. */}
+      <MarkdownEditorHeightContext.Provider value={height}>
+        <Suspense fallback={<MarkdownEditorSkeleton height={height} />}>
+          <MDEditor
+            value={value}
+            onChange={handleChange}
+            preview="live"
+            hideToolbar={false}
+            visibleDragbar={true}
+            height={height}
+            minHeight={minHeight}
+            commands={toolbarCommands}
+            extraCommands={extraCommands}
+            style={
+              {
+                '--md-editor-text-color': 'var(--color-text-primary)',
+                '--md-editor-bg-color': 'var(--color-bg-card)',
+                '--md-editor-border-color': 'var(--color-border)',
+              } as React.CSSProperties
+            }
+            components={
+              renderPreview
+                ? {
+                    preview: source => {
+                      return <CustomPreview source={source} />;
+                    },
+                  }
+                : undefined
+            }
+            textareaProps={{
+              placeholder,
+              disabled,
+              style: {
+                fontFamily: 'var(--font-family-body)',
+                fontSize: '18px',
+                fontWeight: 500,
+                lineHeight: '24px',
+                color: 'var(--color-text-primary)',
+                backgroundColor: disabled ? 'var(--color-bg)' : 'var(--color-bg-card)',
+              },
+            }}
+            data-color-mode="dark"
+          />
+        </Suspense>
+      </MarkdownEditorHeightContext.Provider>
 
       {uploadProgress && <p className="mt-1 text-ods-text-secondary text-h6">{uploadProgress}</p>}
 

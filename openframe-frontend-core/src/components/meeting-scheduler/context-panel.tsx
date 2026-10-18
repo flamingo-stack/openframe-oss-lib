@@ -114,6 +114,8 @@ const DURATION_LINE_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
 /** The "Duration" field and its chips row. */
 const DURATION_FIELD_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
 const DURATION_CHIPS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-xs)]';
+/** After a slot is chosen the timezone field is drawn only on the 280px sidebar (from `lg`). */
+const TIMEZONE_WIDE_ONLY_CLASS = 'content-max-lg:hidden';
 
 /**
  * Same-footprint skeleton — swaps with the loaded panel with zero shift.
@@ -127,6 +129,7 @@ export function ContextPanelSkeleton({
   title = true,
   description = true,
   durations = 0,
+  timezone = 'shown',
 }: {
   className?: string;
   onBack?: () => void;
@@ -135,8 +138,16 @@ export function ContextPanelSkeleton({
   title?: boolean;
   /** The loaded panel has the meeting's description line (a bar of it). Default true. */
   description?: boolean;
-  /** How many duration chips the loaded panel offers (more than 1 draws the "Duration" row). Default 0. */
+  /**
+   * How many duration chips the loaded panel offers: more than 1 draws the "Duration" row, otherwise the static
+   * duration line beside the host (every link states its length, as chips or as that line). Default 0.
+   */
   durations?: number;
+  /**
+   * The timezone field, as the loaded panel draws it: `shown`, `wide` (only from `lg`, after a slot is chosen) or
+   * `hidden` (the confirmation). Default `shown`.
+   */
+  timezone?: 'shown' | 'wide' | 'hidden';
 }) {
   return (
     <div className={cn(PANEL_STACK, className)}>
@@ -155,7 +166,7 @@ export function ContextPanelSkeleton({
                 <TextLineSkeleton type="h6" className="w-24" />
               </div>
             </div>
-            <TextLineSkeleton type="h6" className="w-20 shrink-0" />
+            {durations <= 1 && <TextLineSkeleton type="h6" className="w-20 shrink-0" />}
           </div>
           {title && <TextLineSkeleton type="h3" className="w-3/5" />}
           {description && <TextLineSkeleton type="h6" className="w-4/5" />}
@@ -170,10 +181,12 @@ export function ContextPanelSkeleton({
             </div>
           )}
         </div>
-        <div className={STRIP_ASIDE}>
-          <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          <AutocompleteSkeleton />
-        </div>
+        {timezone !== 'hidden' && (
+          <div className={cn(STRIP_ASIDE, timezone === 'wide' && TIMEZONE_WIDE_ONLY_CLASS)}>
+            <p className={FIELD_LABEL_CLASS}>Timezone</p>
+            <AutocompleteSkeleton />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -204,6 +217,7 @@ export function SchedulerContextPanel({
         title={title !== undefined}
         description={description !== undefined && description !== null}
         durations={locked ? 0 : durationsMs.length}
+        timezone={showTimezone ? (locked ? 'wide' : 'shown') : 'hidden'}
         className={className}
       />
     );
@@ -252,9 +266,7 @@ export function SchedulerContextPanel({
               ? // Post-selection, or a link that offers one length: a static line,
                 // which is what sits beside the host on the header-strip layouts.
                 selectedDurationMs != null && (
-                  <p className={DURATION_LINE_CLASS}>
-                    {formatDurationCompact(selectedDurationMs / 1000)} call
-                  </p>
+                  <p className={DURATION_LINE_CLASS}>{formatDurationCompact(selectedDurationMs / 1000)} call</p>
                 )
               : null}
           </div>
@@ -291,7 +303,7 @@ export function SchedulerContextPanel({
           // summary line states the zone one row below — so the fact survives,
           // only the control steps aside. The 280px sidebar has the room, so
           // there it stays.
-          <div className={cn(STRIP_ASIDE, locked && 'content-max-lg:hidden')}>
+          <div className={cn(STRIP_ASIDE, locked && TIMEZONE_WIDE_ONLY_CLASS)}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
             {timezone ? (
               <TimezoneSelect

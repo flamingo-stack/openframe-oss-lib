@@ -103,7 +103,9 @@ export function ArticleAuthorByline({
   // host mounted a runtime with `imageProxyUrlPrefix` (the hub always does).
   const runtime = useChatRuntime();
   const loading = useLoadingScope();
-  if (loading) return <ArticleAuthorBylineSkeleton size={size} className={className} />;
+  // ONE switch: in a loading scope with no author yet (it is read) the byline is its skeleton; an author it is given
+  // there is the page's own and is drawn as it is.
+  if (loading && !author) return <ArticleAuthorBylineSkeleton size={size} className={className} />;
   if (!author) return null;
 
   const proxiedAvatar = avatar
@@ -126,9 +128,7 @@ export function ArticleAuthorByline({
   const dateLabel = publishedAt ? formatDate(publishedAt) : '';
 
   return (
-    <div
-      className={cn(BYLINE_FRAME_CLASS, className)}
-    >
+    <div className={cn(BYLINE_FRAME_CLASS, className)}>
       {/* Avatar */}
       <div className="flex-shrink-0">
         {avatar ? (
@@ -140,13 +140,7 @@ export function ArticleAuthorByline({
             className={cn(AVATAR_BORDER_CLASS, 'object-cover', avatarSizeClass)}
           />
         ) : (
-          <div
-            className={cn(
-              'flex items-center justify-center bg-ods-bg',
-              AVATAR_BORDER_CLASS,
-              avatarSizeClass,
-            )}
-          >
+          <div className={cn('flex items-center justify-center bg-ods-bg', AVATAR_BORDER_CLASS, avatarSizeClass)}>
             <User className={cn('text-ods-text-secondary', avatarIconClass)} />
           </div>
         )}
@@ -186,13 +180,7 @@ export function ArticleAuthorByline({
  * The byline while its author is read: the card frame, the avatar circle at its size, and bars for the name (h5),
  * the job title and three bio lines, each inside the loaded text's own element so it takes that line's height.
  */
-export function ArticleAuthorBylineSkeleton({
-  size = 'md',
-  className,
-}: {
-  size?: 'md' | 'lg';
-  className?: string;
-}) {
+export function ArticleAuthorBylineSkeleton({ size = 'md', className }: { size?: 'md' | 'lg'; className?: string }) {
   return (
     <div className={cn(BYLINE_FRAME_CLASS, className)} aria-hidden>
       <div className="flex-shrink-0">

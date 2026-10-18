@@ -578,7 +578,9 @@ export function SearchInput({
         >
           <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
             <ScrollAreaPrimitive.Viewport className="max-h-[320px] min-h-0 w-full">
-              <div role="listbox">{renderDropdownContent()}</div>
+              {/* A listbox owns options only: while the results are read the box is the loading region's (a status
+                  and hidden rows), with no listbox role around it. */}
+              <div role={isLoading ? undefined : 'listbox'}>{renderDropdownContent()}</div>
             </ScrollAreaPrimitive.Viewport>
             <ScrollAreaPrimitive.Scrollbar className="hidden" orientation="vertical">
               <ScrollAreaPrimitive.Thumb />

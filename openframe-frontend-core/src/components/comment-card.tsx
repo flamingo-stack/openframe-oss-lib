@@ -76,6 +76,8 @@ const COMMENT_CARD_LEAD = 'flex min-w-0 flex-1 items-center gap-2';
 const COMMENT_CARD_ACTIONS = 'flex justify-start gap-2 min-[420px]:justify-end';
 const COMMENT_CARD_TIME = 'flex-shrink-0 whitespace-nowrap text-ods-text-secondary text-h6';
 const COMMENT_CARD_CONTENT = 'w-full max-w-full space-y-2 overflow-hidden';
+/** The card's footer row (a thread's reply count, badges and Reply), loaded and loading. */
+const COMMENT_CARD_FOOTER = 'flex flex-wrap items-center gap-2 pt-2';
 const commentTitleRow = (compact: boolean) => (compact ? 'flex h-[20px] items-center' : 'flex h-[24px] items-center');
 const commentBodyRow = (compact: boolean) => (compact ? 'flex h-[60px] items-center' : 'flex h-[72px] items-center');
 /** The commenter header's avatar (UserSummary `compact`, `avatarSize`). */
@@ -131,10 +133,7 @@ export function CommentCard({
 
   return (
     <>
-      <div
-        className={COMMENT_CARD_FRAME}
-        style={{ maxWidth: '100%', wordBreak: 'break-word' }}
-      >
+      <div className={COMMENT_CARD_FRAME} style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
         {/* Comment Header */}
         <div className={COMMENT_CARD_HEADER}>
           {/* Row 1: Info + Timestamp */}
@@ -145,9 +144,7 @@ export function CommentCard({
                 <VendorDisplayButton vendor={comment.vendor} onClick={onViewProduct || (() => {})} />
 
                 {/* Timestamp */}
-                <span className={COMMENT_CARD_TIME}>
-                  {formatActivityTime(comment.createdAt)}
-                </span>
+                <span className={COMMENT_CARD_TIME}>{formatActivityTime(comment.createdAt)}</span>
               </>
             ) : comment.user ? (
               <UserSummary
@@ -207,10 +204,7 @@ export function CommentCard({
         </div>
 
         {/* Comment Content */}
-        <div
-          className={COMMENT_CARD_CONTENT}
-          style={{ maxWidth: '100%', wordBreak: 'break-word' }}
-        >
+        <div className={COMMENT_CARD_CONTENT} style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
           {comment.title && (
             <div className={commentTitleRow(compact)}>
               <h4
@@ -257,7 +251,7 @@ export function CommentCard({
               </p>
             </div>
           )}
-          {footer ? <div className="flex flex-wrap items-center gap-2 pt-2">{footer}</div> : null}
+          {footer ? <div className={COMMENT_CARD_FOOTER}>{footer}</div> : null}
         </div>
       </div>
       {children}
@@ -275,6 +269,7 @@ export function CommentCardSkeleton({
   showTitle = true,
   showDelete = false,
   compact = false,
+  footer,
   className,
 }: {
   leadWith?: 'vendor' | 'commenter';
@@ -282,6 +277,8 @@ export function CommentCardSkeleton({
   /** Draw the delete button's box (the viewer may delete the comment). */
   showDelete?: boolean;
   compact?: boolean;
+  /** The card's footer row as the loaded card draws it (its static controls, such as a thread's Reply). */
+  footer?: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -323,6 +320,7 @@ export function CommentCardSkeleton({
         <div className={commentBodyRow(compact)}>
           <TextLineSkeleton type="h4" lines={3} className="w-full" />
         </div>
+        {footer ? <div className={COMMENT_CARD_FOOTER}>{footer}</div> : null}
       </div>
     </div>
   );

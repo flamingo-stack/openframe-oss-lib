@@ -1,8 +1,9 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton } from '../../loading/unified-skeleton';
 import type { TableCardSkeletonProps } from './types';
+import { getHideClasses } from './utils';
 
 // INNER row heights: the bordered row card adds 1px top + bottom, so the
 // outer block totals the designed 68px / 80px.
@@ -30,6 +31,7 @@ export function TableCardSkeleton({
   rows = TABLE_SKELETON_ROWS,
   compact = false,
   hasActions = false,
+  actionCount = 1,
   hasChevron = false,
   className,
   rowClassName,
@@ -57,27 +59,36 @@ export function TableCardSkeleton({
             )}
           >
             {columns.map(column => (
-              <div key={column.key} className={cn('flex shrink-0 flex-col justify-center', column.width || 'flex-1')}>
-                <UnifiedSkeleton className="mb-1 h-5 w-3/4 rounded" />
-                {/* second line simulates multi-line content on the primary column */}
-                {index % 2 === 0 && column.key === primaryKey && (
-                  <UnifiedSkeleton className="h-4 w-1/2 rounded" />
+              <div
+                key={column.key}
+                className={cn(
+                  'flex shrink-0 flex-col justify-center',
+                  column.width || 'flex-1',
+                  getHideClasses(column.hideAt),
                 )}
+              >
+                {/* A cell's text (`TableCell`: the primary face), and on the primary column every other row a
+                    second, secondary line (a description or an id under it). */}
+                <TextLineSkeleton type="h4" className="w-3/4" />
+                {index % 2 === 0 && column.key === primaryKey && <TextLineSkeleton type="h6" className="w-1/2" />}
               </div>
             ))}
 
-            {/* Actions skeleton */}
+            {/* The actions column: one outline button per row action, the real buttons' size. */}
             {hasActions && (
-              <div className={cn('flex shrink-0 items-center gap-2', !hasChevron && 'ml-auto')}>
-                <UnifiedSkeleton className="h-12 w-12 rounded" />
-                <UnifiedSkeleton className="h-12 w-24 rounded" />
+              <div
+                className={cn('flex min-w-[100px] shrink-0 items-center justify-end gap-2', !hasChevron && 'ml-auto')}
+              >
+                {Array.from({ length: actionCount }, (_action, i) => (
+                  <InteractiveSkeleton.Button key={i} size="default" />
+                ))}
               </div>
             )}
 
-            {/* Chevron skeleton */}
+            {/* The chevron column: the row link's icon button. */}
             {hasChevron && (
               <div className={cn('flex w-12 shrink-0 items-center justify-end', !hasActions && 'ml-auto')}>
-                <UnifiedSkeleton className="h-8 w-8 rounded" />
+                <InteractiveSkeleton.Button size="icon" />
               </div>
             )}
           </div>
@@ -98,11 +109,11 @@ export function TableCardSkeleton({
                 sized by its own `py-2` + floor, so adding `py-3` here made the
                 compact mobile skeleton 78px against a real row's 58. */}
             <div className={cn('flex min-w-0 flex-1 flex-col justify-center', compact ? 'py-0' : 'py-3')}>
-              <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
-              <UnifiedSkeleton className="h-3 w-1/2 rounded" />
+              <TextLineSkeleton type="h4" className="w-3/4" />
+              <TextLineSkeleton type="h6" className="w-1/2" />
             </div>
-            {hasActions && <UnifiedSkeleton className="h-12 w-12 shrink-0 rounded" />}
-            {hasChevron && <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded" />}
+            {hasActions && <InteractiveSkeleton.Button size="icon" className="shrink-0" />}
+            {hasChevron && <InteractiveSkeleton.Button size="icon" className="shrink-0" />}
           </div>
         </div>
       ))}

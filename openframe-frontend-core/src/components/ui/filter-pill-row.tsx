@@ -41,8 +41,8 @@ export interface FilterPillRowProps {
 /** The row's shell, label and count line, read by the row and by its skeleton, so the skeleton is the row's box. */
 const FILTER_ROW_CLASS = 'flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4';
 const FILTER_COUNT_CLASS = 'ml-auto shrink-0 text-ods-text-secondary text-h6';
-/** A pill's box while loading: the `small-legacy` button's height. */
-const FILTER_PILL_SKELETON_CLASS = 'h-10 w-24 content-md:h-10 content-md:w-24';
+/** The pill's button size, read by the pill and by its skeleton (`InteractiveSkeleton.Button size`). */
+const FILTER_PILL_SIZE = 'small-legacy';
 
 function FilterPillRowFrame({ label, children, inert }: { label: string; children: ReactNode; inert?: boolean }) {
   return (
@@ -61,7 +61,7 @@ function FilterPill({ label, selected, onClick }: { label: string; selected: boo
     <Button
       type="button"
       variant={selected ? 'accent' : 'outline'}
-      size="small-legacy"
+      size={FILTER_PILL_SIZE}
       onClick={onClick}
       tabIndex={onClick ? undefined : -1}
       className="text-h3"
@@ -128,7 +128,7 @@ export function FilterPillRowSkeleton({
     <FilterPillRowFrame label={label} inert>
       {options
         ? options.map(option => <FilterPill key={option} label={option} selected={false} />)
-        : Array.from({ length: pills }, (_, i) => <InteractiveSkeleton.Button key={i} className={FILTER_PILL_SKELETON_CLASS} />)}
+        : Array.from({ length: pills }, (_, i) => <InteractiveSkeleton.Button key={i} size={FILTER_PILL_SIZE} />)}
       {count && (
         <div className={FILTER_COUNT_CLASS}>
           <TextLineSkeleton type="h6" className="w-40" />

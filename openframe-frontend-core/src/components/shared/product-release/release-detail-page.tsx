@@ -37,7 +37,7 @@ import { FadePreview } from '../../ui/fade-preview';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { ReleaseChangelogSection, ReleaseChangelogSectionSkeleton } from '../../ui/release-changelog-section';
-import { MediaGalleryStrip, MediaGalleryStripSkeleton } from '../media-gallery-strip';
+import { MediaGalleryStrip } from '../media-gallery-strip';
 
 // Types for injectable components
 export interface MarkdownRendererProps {
@@ -411,8 +411,13 @@ export function ReleaseDetailPage({
           />
         </div>
 
-        {/* Image gallery — shared strip + lightbox (images) / inline clips. */}
-        <MediaGalleryStrip items={releaseMedia ?? []} />
+        {/* Image gallery — shared strip + lightbox (images) / inline clips. A release's media is optional: the loading
+            layout leaves the strip out, so the gate leaves it out too. */}
+        {releaseMedia && releaseMedia.length > 0 && (
+          <div data-loading-optional="">
+            <MediaGalleryStrip items={releaseMedia} />
+          </div>
+        )}
 
         {/* Summary */}
         {releaseSummary && (
@@ -425,40 +430,42 @@ export function ReleaseDetailPage({
         {/* A release's video is optional: the loading state leaves it out, so the gate leaves it out too. */}
         {/* A block of the page's own stack spacing (its videos keep their gaps), hidden when the slot draws nothing. */}
         <div data-loading-optional className={`${CONTENT_STACK_CLASS} empty:hidden`}>
-        {VideoDisplaySection ? (
-          <VideoDisplaySection
-            mainVideoUrl={mainVideoUrl}
-            youtubeUrl={youtubeUrl}
-            highlightVideoUrl={highlightVideoUrl}
-            highlightVideoThumbnail={highlightVideoThumbnail}
-            title={releaseTitle}
-            videoBites={videoBites}
-            bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
-            filterPublishedBites={true}
-            bitesProfile={toStripProfile(author)}
-            bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
-            captionsUrl={captionsUrl}
-            highlightCaptionsUrl={highlightCaptionsUrl}
-          />
-        ) : (
-          <>
-            {/*
+          {VideoDisplaySection ? (
+            <VideoDisplaySection
+              mainVideoUrl={mainVideoUrl}
+              youtubeUrl={youtubeUrl}
+              highlightVideoUrl={highlightVideoUrl}
+              highlightVideoThumbnail={highlightVideoThumbnail}
+              title={releaseTitle}
+              videoBites={videoBites}
+              bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
+              filterPublishedBites={true}
+              bitesProfile={toStripProfile(author)}
+              bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
+              captionsUrl={captionsUrl}
+              highlightCaptionsUrl={highlightCaptionsUrl}
+            />
+          ) : (
+            <>
+              {/*
               Fallback when no `VideoDisplaySection` is injected. `<Video>` is the
               SSoT for every video surface — single source of truth across YouTube,
               HLS, and MP4 paths.
             */}
-            {youtubeUrl && <Video kind="youtube" url={youtubeUrl} title={`${releaseTitle} - Video`} layout="native" />}
-            {!youtubeUrl && mainVideoUrl && <Video url={mainVideoUrl} captionsUrl={captionsUrl} layout="centered" />}
-            {highlightVideoUrl && (
-              <Video
-                url={highlightVideoUrl}
-                poster={highlightVideoThumbnail}
-                captionsUrl={highlightCaptionsUrl}
-                layout="centered"
-              />
-            )}
-          </>
-        )}
+              {youtubeUrl && (
+                <Video kind="youtube" url={youtubeUrl} title={`${releaseTitle} - Video`} layout="native" />
+              )}
+              {!youtubeUrl && mainVideoUrl && <Video url={mainVideoUrl} captionsUrl={captionsUrl} layout="centered" />}
+              {highlightVideoUrl && (
+                <Video
+                  url={highlightVideoUrl}
+                  poster={highlightVideoThumbnail}
+                  captionsUrl={highlightCaptionsUrl}
+                  layout="centered"
+                />
+              )}
+            </>
+          )}
         </div>
 
         {/* Content */}
@@ -687,7 +694,7 @@ interface ReleaseLoadingLayoutProps {
 
 /**
  * The release page while its release is read: the title and version as bars in the page's own title block (the back
- * button real), the tag row, the four-cell metadata grid with its real labels, the media strip, the summary lines, the
+ * button real), the tag row, the four-cell metadata grid with its real labels, the summary lines, the
  * the three changelog sections with their real headings, and the host's slot below. Rendered
  * inside the caller's shell (`ReleaseDetailPage` draws it in a scope, in its own `PageShell`): each part is its own
  * component's skeleton.
@@ -714,7 +721,7 @@ function ReleaseLoadingLayout({ backButton, children }: ReleaseLoadingLayoutProp
           <EntityMetadataValueCellSkeleton label={RELEASE_DATE_LABEL} className={METADATA_CELL_EDGE_CLASS} />
           <EntityMetadataAuthorCellSkeleton />
         </div>
-        <MediaGalleryStripSkeleton />
+        {/* A release's media is optional (`data-loading-optional` on the loaded strip): its strip is left out. */}
         {/* A summary of about 350 characters: seven lines on a phone, three on a wide screen. */}
         <div className={SUMMARY_CLASS}>
           <p>

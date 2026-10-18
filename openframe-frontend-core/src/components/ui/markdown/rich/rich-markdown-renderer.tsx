@@ -214,6 +214,15 @@ export const RichMarkdownRenderer = memo(RichMarkdownRendererImpl);
  * A RichMarkdownRenderer while its content is read: the engine's skeleton at the `article` type, `sections`
  * sections of a real `<h2>` holding a bar and its paragraphs (the renderer's own heading and paragraph classes).
  */
-export function RichMarkdownRendererSkeleton({ sections, className }: { sections?: number; className?: string }) {
-  return <MarkdownEngineSkeleton sections={sections} textSize="article" className={className} />;
+export function RichMarkdownRendererSkeleton({
+  sections,
+  title,
+  className,
+}: {
+  sections?: number;
+  /** The body opens with its own `# ` title (`MarkdownEngineSkeleton`'s `title`). */
+  title?: boolean;
+  className?: string;
+}) {
+  return <MarkdownEngineSkeleton sections={sections} title={title} textSize="article" className={className} />;
 }

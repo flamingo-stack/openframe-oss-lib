@@ -115,7 +115,7 @@ export function DevSectionView({ sectionKey, preControls, children, showHeading 
   // The list reports where its records are mirrored from; the line states it at the end of the section's heading row
   // (under the page's title when this view shows no heading of its own).
   return (
-    <PageDataSyncProvider>
+    <PageDataSyncProvider stated={section.mirrored}>
       <div className="flex w-full flex-col gap-10">
         {showHeading ? (
           <SectionHeading title={section.hero.title} punctuation=":" action={<PageDataSyncRow inline />} />

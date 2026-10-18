@@ -50,8 +50,8 @@ const STATUS_FILTER_LABEL_TEXT_CLASS = 'text-ods-text-secondary text-h5';
 /** The option buttons' type, read by the row and by its skeleton. */
 const STATUS_FILTER_BUTTON_CLASS = 'text-h3';
 const STATUS_FILTER_COUNT_CLASS = 'ml-auto shrink-0 text-ods-text-secondary text-h6';
-/** The option buttons' box: the `small-legacy` button's height. */
-const STATUS_FILTER_PILL_SKELETON_CLASS = 'h-10 w-20 content-md:h-10 content-md:w-20';
+/** The option buttons' size, read by the row and by its skeleton (`InteractiveSkeleton.Button size`). */
+const STATUS_FILTER_BUTTON_SIZE = 'small-legacy';
 /** How many option buttons the skeleton draws when the options are read with the page. */
 export const STATUS_FILTER_SKELETON_PILLS = 3;
 
@@ -99,7 +99,7 @@ export function StatusFilterComponent({
         <Button
           type="button"
           variant={selectedStatus === 'all' ? 'accent' : 'outline'}
-          size="small-legacy"
+          size={STATUS_FILTER_BUTTON_SIZE}
           onClick={() => onStatusChange('all')}
           disabled={disabledValues.includes('all')}
           className={STATUS_FILTER_BUTTON_CLASS}
@@ -114,7 +114,7 @@ export function StatusFilterComponent({
           key={option.value}
           type="button"
           variant={selectedStatus === option.value ? 'accent' : 'outline'}
-          size="small-legacy"
+          size={STATUS_FILTER_BUTTON_SIZE}
           onClick={() => onStatusChange(option.value)}
           disabled={disabledValues.includes(option.value)}
           className={STATUS_FILTER_BUTTON_CLASS}
@@ -157,22 +157,35 @@ export function StatusFilterComponentSkeleton({
         <span className={STATUS_FILTER_LABEL_TEXT_CLASS}>{label}</span>
       </div>
       {showAll && (
-        <Button type="button" variant="outline" size="small-legacy" className={STATUS_FILTER_BUTTON_CLASS} tabIndex={-1}>
+        <Button
+          type="button"
+          variant="outline"
+          size={STATUS_FILTER_BUTTON_SIZE}
+          className={STATUS_FILTER_BUTTON_CLASS}
+          tabIndex={-1}
+        >
           All
         </Button>
       )}
       {options
         ? options.map(option => (
-            <Button key={option} type="button" variant="outline" size="small-legacy" className={STATUS_FILTER_BUTTON_CLASS} tabIndex={-1}>
+            <Button
+              key={option}
+              type="button"
+              variant="outline"
+              size={STATUS_FILTER_BUTTON_SIZE}
+              className={STATUS_FILTER_BUTTON_CLASS}
+              tabIndex={-1}
+            >
               {option}
             </Button>
           ))
         : Array.from({ length: pills }, (_, index) => (
-            <InteractiveSkeleton.Button key={index} className={STATUS_FILTER_PILL_SKELETON_CLASS} />
+            <InteractiveSkeleton.Button key={index} size={STATUS_FILTER_BUTTON_SIZE} />
           ))}
       {showCount && (
         <div className={STATUS_FILTER_COUNT_CLASS}>
-          <TextLineSkeleton type="inherit" as="span" className="inline-block align-top w-6" /> items
+          <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" /> items
         </div>
       )}
     </div>
