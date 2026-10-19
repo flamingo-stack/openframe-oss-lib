@@ -117,8 +117,8 @@ public class ProxySessionCleanupWebSocketClient implements WebSocketClient {
                             closeIfLeaked(proxySession, sessionId, target, debugPath, signal, CLEANUP_GRACE)
                                     .onErrorResume(ex -> Mono.empty())
                                     .subscribe(null,
-                                            ex -> log.error(LOG_PREFIX + "failed to close: {}",
-                                                    sessionId, target, ex.getMessage()));
+                                            ex -> log.error(LOG_PREFIX + "failed to close",
+                                                    sessionId, target, ex));
                         });
             }
         };
