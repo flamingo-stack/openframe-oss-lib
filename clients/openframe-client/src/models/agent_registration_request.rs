@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use super::DeviceTag;
+use super::{CodeSignature, DeviceTag};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +14,7 @@ pub struct AgentRegistrationRequest {
     pub os_type: String,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<DeviceTag>,
+    pub code_signature: CodeSignature,
 }
 
 #[cfg(test)]

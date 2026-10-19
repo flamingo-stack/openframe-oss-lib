@@ -8,6 +8,7 @@ fn request(user_id: &str) -> AgentRegistrationRequest {
         user_id: user_id.to_string(),
         os_type: "WINDOWS".to_string(),
         tags: Vec::new(),
+        code_signature: CodeSignature::valid("F7LDSU8JPJ".to_string()),
     }
 }
 
@@ -21,4 +22,11 @@ fn serializes_user_id_as_camel_case_when_present() {
 fn omits_user_id_when_empty() {
     let json = serde_json::to_value(request("")).unwrap();
     assert!(json.get("userId").is_none());
+}
+
+#[test]
+fn serializes_code_signature_as_nested_object() {
+    let json = serde_json::to_value(request("user-42")).unwrap();
+    assert_eq!(json["codeSignature"]["status"], "VALID");
+    assert_eq!(json["codeSignature"]["signer"], "F7LDSU8JPJ");
 }

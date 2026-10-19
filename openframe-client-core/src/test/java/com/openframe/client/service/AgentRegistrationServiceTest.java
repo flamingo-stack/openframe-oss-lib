@@ -7,6 +7,8 @@ import com.openframe.client.exception.AgentRegistrationSecretValidationException
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.*;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
+import com.openframe.client.exception.UntrustedAgentSignatureException;
+import com.openframe.client.service.validator.AgentCodeSignatureValidator;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.core.exception.ErrorCode;
@@ -57,6 +59,9 @@ class AgentRegistrationServiceTest {
     private AgentRegistrationSecretValidator agentRegistrationSecretValidator;
 
     @Mock
+    private AgentCodeSignatureValidator agentCodeSignatureValidator;
+
+    @Mock
     private ClientSecretValidator clientSecretValidator;
 
     @Mock
@@ -103,6 +108,7 @@ class AgentRegistrationServiceTest {
                 machineRepository,
                 organizationIdResolver,
                 agentRegistrationSecretValidator,
+                agentCodeSignatureValidator,
                 clientSecretValidator,
                 agentSecretGenerator,
                 passwordEncoder,
@@ -327,6 +333,37 @@ class AgentRegistrationServiceTest {
         verify(machineRepository, never()).findByMachineId(any());
         verify(machineRepository, never()).save(any());
         verify(oauthClientRepository, never()).save(any());
+    }
+
+    @Test
+    void registerAgent_WithUntrustedSignature_CreatesNothing() {
+        doThrow(new UntrustedAgentSignatureException("Agent is not signed by a trusted signer"))
+                .when(agentCodeSignatureValidator).validate(request);
+
+        assertThrows(
+                UntrustedAgentSignatureException.class,
+                () -> agentRegistrationService.register(INITIAL_KEY, request)
+        );
+
+        verify(agentRegistrationSecretValidator).validate(INITIAL_KEY);
+        verify(machineIdGenerator, never()).generate();
+        verify(oauthClientRepository, never()).save(any());
+        verify(machineRepository, never()).save(any());
+    }
+
+    @Test
+    void reinstall_WithUntrustedSignature_DoesNotTouchMachine() {
+        doThrow(new UntrustedAgentSignatureException("Agent is not signed by a trusted signer"))
+                .when(agentCodeSignatureValidator).validate(request);
+
+        assertThrows(
+                UntrustedAgentSignatureException.class,
+                () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
+        );
+
+        verify(oauthClientRepository, never()).findByMachineId(any());
+        verify(machineRepository, never()).save(any());
+        verify(toolConnectionService, never()).disconnectAll(any());
     }
 
     private AgentRegistrationRequest createTestRequest() {
