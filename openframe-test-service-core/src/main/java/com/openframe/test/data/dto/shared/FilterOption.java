@@ -6,10 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * One faceted filter option ({@code value} / {@code label} / {@code count}) as returned by the
- * {@code *Filters} queries ({@code ScriptFilterOption} in the schema).
- */
+// One faceted filter option (value / label / count) as returned by the
+// *Filters queries (ScriptFilterOption in the schema).
 @Data
 @Builder
 @NoArgsConstructor
