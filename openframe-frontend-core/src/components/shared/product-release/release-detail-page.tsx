@@ -155,17 +155,17 @@ const DefaultMarkdownRenderer = RichMarkdownRenderer;
 /** The page's layout, read by the page and by its skeleton, so the skeleton is the page's size. */
 const CONTENT_STACK_CLASS = 'space-y-6 content-md:space-y-8';
 /**
- * The release's tag row while it is read, from the row's layout: badges of a typical tag's width (`w-20` text, about
- * 114px with the badge's padding and the gap), so a phone's 358px row holds three and two rows are six, and a wide
- * page's row holds eleven. A release with more tags wraps further when it lands (a note, not a defect).
+ * A release title's typical lines at the page's `text-h1` (a name, a version and a headline, about 60 characters):
+ * five on a phone's 342px, three from `content-md`, two from `content-lg`.
  */
+const RELEASE_TITLE_SKELETON_LINES = { phone: 5, md: 3, lg: 2 } as const;
 /**
- * A release title's typical lines at the page's `text-h1` (a name, a version and a short headline, about 45
- * characters): three on a phone's 358px, two from `content-md`, one from `content-lg`.
+ * The release's tag row while it is read: ONE line of badges of a typical tag's width (`w-20`, 88px with the gap) at the
+ * narrowest width of each step: three on a phone's 342px, seven from `content-md` (720px). A release has at least that
+ * line's worth or fewer on it (fewer leave the line as tall); more wrap when they land.
  */
-const RELEASE_TITLE_SKELETON_LINES = { phone: 3, md: 2, lg: 1 } as const;
-const RELEASE_TAG_ROW_FOLD = { phone: 6, wide: 11 } as const;
-const RELEASE_TAG_SKELETON_WIDTH_CLASS = '[&>*]:w-20';
+const RELEASE_TAG_ROW_FOLD = { phone: 3, wide: 7 } as const;
+const RELEASE_TAG_SKELETON_WIDTH_CLASS = 'w-20';
 const METADATA_GRID_CLASS =
   'grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4';
 /** A metadata cell's edge (divider + card fill); the cell's own frame is the shared value cell's. */
@@ -730,7 +730,7 @@ function ReleaseLoadingLayout({ backButton, children }: ReleaseLoadingLayoutProp
         <EntityTagBadgesSkeleton
           count={RELEASE_TAG_ROW_FOLD.wide}
           phoneCount={RELEASE_TAG_ROW_FOLD.phone}
-          className={RELEASE_TAG_SKELETON_WIDTH_CLASS}
+          itemClassName={RELEASE_TAG_SKELETON_WIDTH_CLASS}
         />
         <div className={METADATA_GRID_CLASS}>
           <EntityMetadataValueCellSkeleton label={RELEASE_TYPE_LABEL} className={METADATA_CELL_EDGE_CLASS} />

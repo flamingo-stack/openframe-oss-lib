@@ -63,8 +63,11 @@ export interface EntityAuthorCardProps {
    * Use for entity-specific labels (e.g. onboarding-guide section/step,
    * webinar host, customer-interview customer). The grid auto-sizes via
    * `grid-cols-N`.
+   *
+   * `optional`: a cell only some records carry (a date a record may leave empty). It is not drawn in a loading scope
+   * (list the cells every record has there) and its loaded cell is marked `data-loading-optional`.
    */
-  extraCells?: Array<{ value: React.ReactNode; label: string; uppercase?: boolean }>;
+  extraCells?: Array<{ value: React.ReactNode; label: string; uppercase?: boolean; optional?: boolean }>;
   /** When true, render the author cell even when `author?.full_name` is
    *  missing — using the `EMPTY_AUTHOR_PLACEHOLDER` shape above. Used by
    *  catalog grids that must keep a fixed shape so skeleton alignment
@@ -108,15 +111,18 @@ export function EntityMetadataValueCell({
   label,
   className,
   uppercase = true,
+  optional = false,
 }: {
   value: React.ReactNode;
   label: string;
   className?: string;
   uppercase?: boolean;
+  /** A cell only some records carry: marked `data-loading-optional` (its loading state does not draw it). */
+  optional?: boolean;
 }) {
   if (useLoadingScope()) return <EntityMetadataValueCellSkeleton label={label} className={className} />;
   return (
-    <div className={cn(VALUE_CELL_CLASS, className)}>
+    <div className={cn(VALUE_CELL_CLASS, className)} data-loading-optional={optional || undefined}>
       <div className={CELL_STACK_CLASS}>
         {typeof value === 'string' ? (
           <p className={VALUE_TEXT_CLASS}>{uppercase ? value.toLocaleUpperCase() : value}</p>
@@ -253,7 +259,7 @@ export function EntityAuthorCard({
   if (loading) {
     return (
       <EntityAuthorCardSkeleton
-        extraCellLabels={(extraCells ?? []).map(cell => cell.label)}
+        extraCellLabels={(extraCells ?? []).filter(cell => !cell.optional).map(cell => cell.label)}
         publishedLabel={publishedAt === undefined ? null : publishedLabel}
         className={className}
       />
@@ -283,6 +289,7 @@ export function EntityAuthorCard({
           value={cell.value}
           label={cell.label}
           uppercase={cell.uppercase ?? true}
+          optional={cell.optional}
           className={CELL_DIVIDER_CLASS}
         />
       ))}

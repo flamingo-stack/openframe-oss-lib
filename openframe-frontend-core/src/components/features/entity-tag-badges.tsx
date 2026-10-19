@@ -59,11 +59,14 @@ export function EntityTagBadgesSkeleton({
   phoneCount = count,
   overflow = false,
   className,
+  itemClassName,
 }: {
   count?: number;
   phoneCount?: number;
   overflow?: boolean;
   className?: string;
+  /** Extra classes on each tag's box (a host's typical tag width); the row keeps the row's own classes. */
+  itemClassName?: string;
 }) {
   return (
     <div aria-hidden className={cn(TAG_ROW_CLASS, className)}>
@@ -73,6 +76,7 @@ export function EntityTagBadgesSkeleton({
           key={i}
           className={cn(
             TAG_ITEM_CLASS,
+            itemClassName,
             i >= phoneCount && 'hidden content-md:inline-flex',
             i >= count && 'content-md:hidden',
           )}

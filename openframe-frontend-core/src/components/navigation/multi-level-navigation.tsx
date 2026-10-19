@@ -49,9 +49,13 @@ const NAV_LIST_CLASS = 'space-y-2';
 const NAV_ITEM_CLASS = 'space-y-1';
 const NAV_ROW_FRAME_CLASS = 'relative w-full rounded-lg border transition-all duration-150';
 const NAV_ROW_CONTENT_CLASS = 'flex w-full items-center rounded-lg px-2 text-h6';
-/** How many rows each skeleton draws (the desktop tree, the mobile dropdown). */
-export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 4;
-export const MOBILE_NAVIGATION_SKELETON_ROWS = 3;
+/**
+ * How many rows each skeleton draws (the desktop tree, the mobile dropdown): the one root entry every tree has. How many
+ * entries sit at a tree's root, and which folder is open on the reader's path, are the repository's, so a skeleton that
+ * drew more would lose rows (and move the article under it) when a tree has fewer.
+ */
+export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 1;
+export const MOBILE_NAVIGATION_SKELETON_ROWS = 1;
 const NAV_SKELETON_LABEL_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3'] as const;
 
 function NavigationTreeSkeleton({

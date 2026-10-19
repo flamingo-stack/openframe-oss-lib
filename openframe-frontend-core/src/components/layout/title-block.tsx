@@ -243,40 +243,43 @@ export function TitleBlock({
   // Exactly one title element renders per pass, so one ref covers every branch.
   // The tooltip arms itself only on real clipping — repeating a fully visible
   // title back to the user is noise, and `titleWrap`/loading never clip at all.
-  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(titleLoading ? null : title);
+  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(
+    titleLoading ? null : title,
+  );
   const { ref: subtitleRef, isTruncated: subtitleTruncated } = useIsTruncated<HTMLParagraphElement>(
     subtitleLoading ? null : subtitle,
   );
-  const titleNode = titleLoading && titleWrap && titleSkeletonLines ? (
-    <>
-      <TextLineSkeleton
-        type="inherit"
+  const titleNode =
+    titleLoading && titleWrap && titleSkeletonLines ? (
+      <>
+        <TextLineSkeleton
+          type="inherit"
+          as="span"
+          lines={titleSkeletonLines.phone}
+          className="w-full content-md:hidden"
+        />
+        <TextLineSkeleton
+          type="inherit"
+          as="span"
+          lines={titleSkeletonLines.md}
+          className="hidden w-full content-md:flex content-lg:hidden"
+        />
+        <TextLineSkeleton
+          type="inherit"
+          as="span"
+          lines={titleSkeletonLines.lg}
+          className="hidden w-full content-lg:flex"
+        />
+      </>
+    ) : titleLoading ? (
+      <UnifiedSkeleton
         as="span"
-        lines={titleSkeletonLines.phone}
-        className="w-full content-md:hidden"
+        aria-hidden
+        className={cn(TITLE_TEXT_SKELETON_CLASS, skeletonSize.width, skeletonSize.height)}
       />
-      <TextLineSkeleton
-        type="inherit"
-        as="span"
-        lines={titleSkeletonLines.md}
-        className="hidden w-full content-md:flex content-lg:hidden"
-      />
-      <TextLineSkeleton
-        type="inherit"
-        as="span"
-        lines={titleSkeletonLines.lg}
-        className="hidden w-full content-lg:flex"
-      />
-    </>
-  ) : titleLoading ? (
-    <UnifiedSkeleton
-      as="span"
-      aria-hidden
-      className={cn(TITLE_TEXT_SKELETON_CLASS, skeletonSize.width, skeletonSize.height)}
-    />
-  ) : (
-    title
-  );
+    ) : (
+      title
+    );
 
   return (
     <div
@@ -305,6 +308,9 @@ export function TitleBlock({
         className={cn(
           'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] content-md:max-w-full content-md:flex-none',
           TITLE_BLOCK_MIN_HEIGHT,
+          // A wrapping title's loading lines stand for a title that fills the row (its typical lines are full ones), so the
+          // column takes the row's width: sized to content it would shrink to the bars' minimum.
+          titleLoading && titleWrap && titleSkeletonLines && 'content-md:w-full',
         )}
       >
         {backButton && (
