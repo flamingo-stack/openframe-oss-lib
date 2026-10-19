@@ -83,6 +83,9 @@ const BLOG_CARD_SUMMARY_ROW = 'mb-3 flex min-h-[42px] items-center md:min-h-[45p
 const BLOG_CARD_BYLINE = 'mt-auto flex items-center justify-between gap-2 text-ods-text-secondary text-h6';
 const BLOG_CARD_BYLINE_PERSON = 'flex min-w-0 items-center gap-2';
 const BLOG_CARD_VIEWS = 'flex shrink-0 items-center gap-1';
+/** The byline avatar's box (32px, the photo cropped to it): an author photo of any shape takes exactly this box, and
+ *  the skeleton draws the same box. */
+const BLOG_CARD_AVATAR = 'size-8 shrink-0 rounded-full object-cover';
 /** The content-type chip a portrait blog card shows (a static label). */
 const BLOG_POST_TYPE_LABEL = 'Blog Post';
 
@@ -107,9 +110,7 @@ export function BlogCardSkeleton({
     );
   }
   if (size === 'sm') {
-    return (
-      <CompactCardSkeleton className={className} />
-    );
+    return <CompactCardSkeleton className={className} />;
   }
   return (
     <article className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, BLOG_CARD_FRAME, className)} aria-hidden>
@@ -123,7 +124,7 @@ export function BlogCardSkeleton({
         </div>
         <div className={BLOG_CARD_BYLINE}>
           <div className={BLOG_CARD_BYLINE_PERSON}>
-            <MediaSkeleton.Avatar size="sm" className="shrink-0" />
+            <MediaSkeleton.Avatar size="sm" className={BLOG_CARD_AVATAR} />
             <TextLineSkeleton type="h6" className="w-40" />
           </div>
           <div className={BLOG_CARD_VIEWS}>
@@ -276,7 +277,7 @@ export function BlogCard({
                   alt={post.author_name || ''}
                   width={32}
                   height={32}
-                  className="shrink-0 rounded-full"
+                  className={BLOG_CARD_AVATAR}
                   unoptimized
                 />
               ) : null}

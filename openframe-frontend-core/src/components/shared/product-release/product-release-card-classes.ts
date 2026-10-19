@@ -9,12 +9,11 @@ export const RELEASE_CARD_COVER_BOX_CLASS = 'relative aspect-[1200/630] w-full o
 export const RELEASE_CARD_TEXT_COLUMN_CLASS = 'flex min-w-0 flex-1 flex-col';
 export const RELEASE_CARD_VERSION_ROW_CLASS = 'mb-3 flex items-center gap-3';
 export const RELEASE_CARD_VERSION_CLASS = 'truncate font-semibold text-ods-text-primary text-code';
-export const RELEASE_CARD_TITLE_BOX_CLASS = 'mb-3 flex min-h-[60px] items-start content-md:min-h-[72px]';
-export const RELEASE_CARD_TITLE_CLASS =
-  "line-clamp-2 font-heading text-xl font-semibold leading-tight text-ods-text-primary content-md:text-2xl";
-export const RELEASE_CARD_SUMMARY_BOX_CLASS = 'min-h-[68px] content-md:min-h-[78px]';
-export const RELEASE_CARD_SUMMARY_CLASS =
-  "line-clamp-3 font-body text-sm leading-relaxed text-ods-text-secondary content-md:text-base";
+/** The title's box reserves two lines of the title's own type (`2lh`), the summary's three. */
+export const RELEASE_CARD_TITLE_BOX_CLASS = 'mb-3 flex min-h-[2lh] items-start text-h2';
+export const RELEASE_CARD_TITLE_CLASS = 'line-clamp-2 text-h2 text-ods-text-primary';
+export const RELEASE_CARD_SUMMARY_BOX_CLASS = 'min-h-[3lh] text-h4';
+export const RELEASE_CARD_SUMMARY_CLASS = 'line-clamp-3 text-h4 text-ods-text-secondary';
 export const RELEASE_CARD_CHANGELOG_CLASS =
   'flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-ods-border pt-3 text-ods-text-secondary text-h6';
 export const RELEASE_CARD_GRID_CLASS =

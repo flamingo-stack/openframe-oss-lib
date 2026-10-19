@@ -6,8 +6,8 @@
  * ONE page, not tabs (2026 trust-center practice: buyers skim and Ctrl-F, and a
  * questionnaire needs a deep link per section): hero with the monitoring status
  * (with the page's PDF as a quiet link at its end) and the Request access action, then anchored sections in reading order
- * (`TRUST_CENTER_SECTIONS`: AI & data use → compliance → controls → documents →
- * subprocessors → FAQ → questions) with a sticky section rail on desktop
+ * (`TRUST_CENTER_SECTIONS`: controls → compliance → documents → subprocessors →
+ * AI & data use → contact → FAQ) with a sticky section rail on desktop
  * (`StickySectionNav` + `useScrollSpy`, the vendor-page / DocViewer pattern).
  * Built ONLY from existing lib components (see `trust-center-sections.tsx`); the
  * chrome is the canonical `PageShell` + frozen `PageLayout`.

@@ -44,13 +44,17 @@ export function trustFrameworkBadge(framework: Pick<TrustCenterFramework, 'monit
 
 /**
  * Sections of the page, in reading order — the anchor ids (`#controls`) and the
- * sticky section rail. AI & data use follows Subprocessors: the AI statements
- * read as the continuation of who processes the data (Anthropic among them);
- * Contact comes before the FAQ.
+ * sticky section rail. Controls come first: they are what makes the page
+ * continuously monitored, and their list box is ONE height whatever the
+ * domains hold (it scrolls), so the first screen is the same loading and loaded
+ * and the read lists (frameworks, documents, ...) start below it, where their
+ * length moves nothing a reader is looking at. AI & data use follows
+ * Subprocessors: the AI statements read as the continuation of who processes the
+ * data (Anthropic among them); Contact comes before the FAQ.
  */
 export const TRUST_CENTER_SECTIONS = [
-  { id: 'compliance', label: 'Compliance' },
   { id: 'controls', label: 'Controls' },
+  { id: 'compliance', label: 'Compliance' },
   { id: 'documents', label: 'Documents' },
   { id: 'subprocessors', label: 'Subprocessors' },
   { id: 'ai', label: 'AI & data use' },

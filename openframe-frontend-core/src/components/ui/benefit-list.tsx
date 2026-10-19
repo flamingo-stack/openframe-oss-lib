@@ -12,11 +12,29 @@ export interface BenefitItem {
   icon?: ReactNode;
   label: string;
   /**
-   * The words carry read data that is not here yet ("Trusted by {count} MSPs" before the count): the mark is drawn
-   * as it is and the words as a bar exactly their width (pass the copy with its slot unfilled: the page's own words,
-   * never shown, only measured).
+   * The words carry read data that is not here yet ("Trusted by {count} MSPs" before the count): pass the copy with
+   * its slots unfilled. The mark and the page's own words are drawn real, and each `{slot}` is a bar as wide as
+   * `typical` (a typical value of the data, held unseen: `'000'` for a count).
    */
   loading?: boolean;
+  /** A typical value of a loading item's slots, whose width each slot's bar takes. */
+  typical?: string;
+}
+
+/** A loading benefit's words: the copy real, each `{slot}` a bar as wide as a typical value. */
+function LoadingLabel({ label, typical }: { label: string; typical: string }) {
+  return (
+    <>
+      {label.split(/(\{\w+\})/).map((part, index) =>
+        /^\{\w+\}$/.test(part) ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: the parts of one fixed string never reorder
+          <TextHold key={index}>{typical}</TextHold>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
 }
 
 /** A benefit's layout, read by the benefit and by its loading form. */
@@ -99,9 +117,9 @@ export function BenefitList({
             </span>
           )}
           {item.loading ? (
-            // A bar exactly as wide as the copy (the page's own words, its slot unfilled), so the row keeps its box.
+            // The page's own words, real, and a bar where each read value goes: the row keeps its box.
             <span className={BENEFIT_LABEL_CLASS}>
-              <TextHold>{item.label}</TextHold>
+              <LoadingLabel label={item.label} typical={item.typical ?? '000'} />
             </span>
           ) : (
             <span className={BENEFIT_LABEL_CLASS}>{item.label}</span>

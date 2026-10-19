@@ -65,6 +65,8 @@ export interface FaqDocumentPageProps {
   skeletonUncategorized?: boolean;
   /** The FAQ's loading-state first fold, questions per group (forwarded to `FaqSection`). */
   skeletonShape?: number[];
+  /** The FAQ's loading state draws the category nav's row (forwarded to `FaqSection`): the host's list is categorised. */
+  skeletonNav?: boolean;
 }
 
 export function FaqDocumentPage({
@@ -83,6 +85,7 @@ export function FaqDocumentPage({
   skeletonSections,
   skeletonUncategorized,
   skeletonShape,
+  skeletonNav,
   shell = true,
 }: FaqDocumentPageProps) {
   const router = useRouter();
@@ -114,6 +117,7 @@ export function FaqDocumentPage({
         skeletonSections={skeletonSections}
         skeletonUncategorized={skeletonUncategorized}
         skeletonShape={skeletonShape}
+        skeletonNav={skeletonNav}
       />
     </PageLayout>
   );

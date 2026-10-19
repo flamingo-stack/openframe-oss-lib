@@ -48,9 +48,15 @@ export interface ToolBadgeProps {
 }
 
 /** The badge's layout, read by the badge and by its skeleton, so the skeleton is the badge's size. */
-// The house tag (Figma `tag`): 32px, on the card surface, the caption face.
+// The house tag (Figma `tag`): 32px (`TOOL_CHIP_HEIGHT`), on the card surface, the caption face.
 const CHIP_CLASS =
-  'inline-flex h-8 items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5';
+  'inline-flex items-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] text-ods-text-primary text-h5';
+/**
+ * A chip's height, as a CSS length: the chip and its skeleton take it, and a host that keeps room for N lines of chips
+ * (a card's footer that stays one height) sizes that room from it.
+ */
+export const TOOL_CHIP_HEIGHT = '2rem';
+const CHIP_STYLE = { height: TOOL_CHIP_HEIGHT } as const;
 const INLINE_CLASS = 'flex items-center gap-1 text-ods-text-secondary';
 /**
  * A tool's name while it loads, in characters of its own face (the chip's caption face is monospaced, so `ch` is one
@@ -69,7 +75,7 @@ export interface ToolBadgeSkeletonProps {
 export function ToolBadgeSkeleton({ variant = 'inline', icon = true, className }: ToolBadgeSkeletonProps) {
   if (variant === 'chip') {
     return (
-      <span className={cn(CHIP_CLASS, className)} aria-hidden>
+      <span className={cn(CHIP_CLASS, className)} style={CHIP_STYLE} aria-hidden>
         {icon && <UnifiedSkeleton as="span" className={cn(TOOL_MARK_CLASS, 'rounded-sm')} />}
         <TextLineSkeleton type="h5" width={CHIP_NAME_TYPICAL_CH} />
       </span>
@@ -125,7 +131,10 @@ export const ToolBadge: React.FC<ToolBadgeProps> = ({
 
   if (variant === 'chip') {
     return linked(
-      <span className={cn(CHIP_CLASS, href && 'transition-colors hover:border-ods-border-hover', className)}>
+      <span
+        className={cn(CHIP_CLASS, href && 'transition-colors hover:border-ods-border-hover', className)}
+        style={CHIP_STYLE}
+      >
         {mark && (
           <span
             className={cn(

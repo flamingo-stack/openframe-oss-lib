@@ -24,7 +24,7 @@ function isGalleryImage(mediaType: string): boolean {
 /** The strip's layout, read by the strip and by its skeleton, so the skeleton is the strip's size. */
 const STRIP_CLASS = 'flex w-full gap-6 overflow-x-auto';
 const TILE_SIZE_CLASS = 'shrink-0 w-[240px] h-[200px] rounded-md';
-const TILE_CLASS = `${TILE_SIZE_CLASS} overflow-hidden border border-ods-border bg-black transition-opacity`;
+const TILE_CLASS = `${TILE_SIZE_CLASS} overflow-hidden border border-ods-border bg-ods-bg transition-opacity`;
 /** Tiles a skeleton draws when not told how many (a strip's first fold on a wide screen). */
 export const MEDIA_GALLERY_STRIP_SKELETON_COUNT = 4;
 

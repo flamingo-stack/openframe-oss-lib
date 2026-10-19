@@ -79,6 +79,11 @@ function renderSocialIcon(platform: string) {
   return icon ? createElement(icon, { className: 'h-5 w-5' }) : null;
 }
 
+/** The row's box: what a caller's loading state draws its skeleton buttons in, so they sit where the row's buttons do. */
+export function socialIconRowClass(compact = false): string {
+  return `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'}`;
+}
+
 export function SocialIconRow({
   className = '',
   links = defaultLinks,
@@ -134,7 +139,7 @@ export function SocialIconRow({
     );
   };
 
-  const rowClass = `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'} ${className}`;
+  const rowClass = `${socialIconRowClass(compact)} ${className}`;
 
   // Two-group mode: external links, a thin divider, then internal links — but only
   // when both groups are present (otherwise it's just a flat row, no stray divider).

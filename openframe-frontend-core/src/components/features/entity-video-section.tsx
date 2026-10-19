@@ -89,6 +89,11 @@ export interface EntityVideoSectionProps {
   captionsEntity?: { type: string; id: string | number } | null;
   /** LCP hint — when true, the full-video tab's poster eager-loads. */
   priority?: boolean;
+  /**
+   * The host's records carry both a full video and a highlight reel (an interview is recorded with its reel): in a
+   * loading scope the section draws its player under the real "Full Video" / "Highlights" tabs. Default false.
+   */
+  skeletonTabs?: boolean;
 }
 
 export function EntityVideoSection({
@@ -112,6 +117,7 @@ export function EntityVideoSection({
   highlightCaptionsUrl: highlightCaptionsUrlProp,
   captionsEntity,
   priority = false,
+  skeletonTabs = false,
 }: EntityVideoSectionProps) {
   const captions = useCaptions();
   const loading = useLoadingScope();
@@ -127,7 +133,7 @@ export function EntityVideoSection({
   const highlightCaptionsUrl = highlightCaptionsUrlProp ?? derivedCaptions?.highlightCaptionsUrl;
 
   // In a loading scope the props are empty: the section is its player while the record is read.
-  if (loading) return <EntityVideoSectionSkeleton />;
+  if (loading) return <EntityVideoSectionSkeleton tabs={skeletonTabs} />;
 
   if (!hasVideo && !videoSummary && (!videoBites || videoBites.length === 0)) {
     return null;
@@ -149,16 +155,10 @@ export function EntityVideoSection({
         (fullVideoUrl && hasHighlight ? (
           <Tabs defaultValue="full-video" className="w-full">
             <TabsList className={VIDEO_TAB_LIST_CLASS}>
-              <TabsTrigger
-                value="full-video"
-                className={VIDEO_TAB_TRIGGER_CLASS}
-              >
+              <TabsTrigger value="full-video" className={VIDEO_TAB_TRIGGER_CLASS}>
                 {FULL_VIDEO_TAB_LABEL}
               </TabsTrigger>
-              <TabsTrigger
-                value="highlights"
-                className={VIDEO_TAB_TRIGGER_CLASS}
-              >
+              <TabsTrigger value="highlights" className={VIDEO_TAB_TRIGGER_CLASS}>
                 {HIGHLIGHTS_TAB_LABEL}
               </TabsTrigger>
             </TabsList>

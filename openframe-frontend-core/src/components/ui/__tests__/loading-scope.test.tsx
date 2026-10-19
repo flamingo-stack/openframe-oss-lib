@@ -131,13 +131,16 @@ describe('a component in a scope draws its own skeleton', () => {
     expect(view.container.querySelector(SURFACE)).not.toBeNull();
   });
 
-  it('a benefit whose words are read draws its icon and a bar exactly the copy wide (the words unseen)', () => {
+  it('a benefit whose value is read draws its icon, its words real and a bar a typical value wide where the value goes', () => {
     const { container } = render(
-      <BenefitList items={[{ icon: <svg data-testid="mark" />, label: 'Trusted by {count} MSPs', loading: true }]} />,
+      <BenefitList
+        items={[{ icon: <svg data-testid="mark" />, label: 'Trusted by {count} MSPs', loading: true, typical: '000' }]}
+      />,
     );
     expect(screen.getByTestId('mark')).toBeTruthy();
     const bar = container.querySelector(SURFACE);
     expect(bar?.className).toContain('text-transparent');
-    expect(bar?.textContent).toBe('Trusted by {count} MSPs');
+    expect(bar?.textContent).toBe('000');
+    expect(container.textContent).toBe('Trusted by 000 MSPs');
   });
 });

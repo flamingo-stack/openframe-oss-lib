@@ -82,6 +82,10 @@ export interface CapabilityExplorerProps {
   /** The marks beside the two turns of an example that names nobody of its own. */
   requesterMark?: ReactNode;
   responderMark?: ReactNode;
+  /** The jobs are being read (the host's query runs): the explorer draws its own skeleton. A page's loading scope does too. */
+  loading?: boolean;
+  /** The jobs the skeleton's list draws: one screen of the host's list. */
+  fold?: number;
   className?: string;
 }
 
@@ -349,6 +353,8 @@ export function CapabilityExplorer({
   renderScreen,
   requesterMark,
   responderMark,
+  loading = false,
+  fold,
   className,
 }: CapabilityExplorerProps) {
   const wide = useContentLgUp();
@@ -356,8 +362,8 @@ export function CapabilityExplorer({
   const inScope = useLoadingScope();
 
   // While the page is read its jobs are not known (none in a loading state): the explorer is its skeleton, never
-  // left out. The page's loading region announces it, so this one does not.
-  if (inScope) return <CapabilityExplorerSkeleton region={false} className={className} />;
+  // left out. The page's loading region announces it, so this one does not; a host's own read does.
+  if (inScope || loading) return <CapabilityExplorerSkeleton region={!inScope} count={fold} className={className} />;
   if (items.length === 0) return null;
   // Unknown until measured: one box, so neither layout's ids are in the page twice.
   if (wide === undefined) return <CapabilityExplorerSkeleton className={className} />;

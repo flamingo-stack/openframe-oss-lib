@@ -48,10 +48,8 @@ import { hideOnError } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface CaseStudyCardProps {
-  study: CaseStudyCardData;
-  /** Detail URL resolved by the caller. */
-  href: string;
+/** The card's options, the same loaded or loading. */
+interface CaseStudyCardOptions {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
@@ -74,6 +72,23 @@ export interface CaseStudyCardProps {
   showTypeBadge?: boolean;
   className?: string;
 }
+
+/**
+ * The story and its link, or `loading` while the host reads the story (a client read): the card then draws its own
+ * skeleton (`CaseStudyCardSkeleton`), as it does in a loading scope.
+ */
+export type CaseStudyCardProps = CaseStudyCardOptions &
+  (
+    | {
+        study: CaseStudyCardData;
+        /** Detail URL resolved by the caller. */
+        href: string;
+        loading?: false;
+      }
+    | { loading: true; study?: undefined; href?: undefined }
+  );
+
+type LoadedCaseStudyCardProps = CaseStudyCardOptions & { study: CaseStudyCardData; href: string };
 
 /** The `result` card's boxes: the card and its skeleton share them, so they are one height. */
 const CASE_STUDY_RESULT_STACK = 'flex h-full flex-col gap-5 p-6';
@@ -249,7 +264,16 @@ function caseStudyHighlight(study: CaseStudyCardData): { url: string; posterUrl:
   return bite ? { url: bite.url, posterUrl: bite.thumbnail_url ?? null } : null;
 }
 
-export function CaseStudyCard({
+export function CaseStudyCard(props: CaseStudyCardProps) {
+  const inScope = useLoadingScope();
+  if (inScope || props.loading) {
+    return <CaseStudyCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />;
+  }
+  return <LoadedCaseStudyCard {...props} />;
+}
+
+/** The card for a read story (`CaseStudyCard` decides whether it is read). */
+function LoadedCaseStudyCard({
   study,
   href,
   target: targetProp,
@@ -262,7 +286,7 @@ export function CaseStudyCard({
   mediaMounted,
   onNavigate,
   className,
-}: CaseStudyCardProps) {
+}: LoadedCaseStudyCardProps) {
   const [hovered, setHovered] = useState(false);
   const { target, rel } = useEntityCardLink({
     href,
@@ -276,10 +300,6 @@ export function CaseStudyCard({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const coverImage = study.featured_image || placeholderUrl || null;
-
-  if (useLoadingScope()) {
-    return <CaseStudyCardSkeleton size={size} showTypeBadge={showTypeBadge} className={className} />;
-  }
 
   if (size === 'sm') {
     return (

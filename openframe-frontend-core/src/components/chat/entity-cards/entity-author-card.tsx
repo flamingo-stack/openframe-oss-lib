@@ -94,7 +94,13 @@ const GRID_FRAME_CLASS = 'grid grid-cols-1 w-full overflow-hidden rounded-md bor
 
 /** `md:grid-cols-N` for a grid of `cells` cells, as static classes the build can see. */
 function gridColsClass(cells: number): string {
-  return cells >= 4 ? 'md:grid-cols-4' : cells === 3 ? 'md:grid-cols-3' : cells === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
+  return cells >= 4
+    ? 'md:grid-cols-4'
+    : cells === 3
+      ? 'md:grid-cols-3'
+      : cells === 2
+        ? 'md:grid-cols-2'
+        : 'md:grid-cols-1';
 }
 
 export function EntityMetadataValueCell({
@@ -128,7 +134,10 @@ export function EntityMetadataValueCellSkeleton({ label, className }: { label: s
   return (
     <div className={cn(VALUE_CELL_CLASS, className)}>
       <div className={CELL_STACK_CLASS}>
-        <TextLineSkeleton type="h4" className="w-24" />
+        {/* The value's own paragraph (a read value that wraps to more lines pairs with it line for line). */}
+        <p className={VALUE_TEXT_CLASS}>
+          <TextLineSkeleton as="span" type="inherit" className="w-24" />
+        </p>
         <p className={LABEL_TEXT_CLASS}>{label}</p>
       </div>
     </div>
@@ -278,7 +287,12 @@ export function EntityAuthorCard({
         />
       ))}
       {showDateCell && (
-        <EntityMetadataValueCell value={dateLabel} label={publishedLabel} uppercase={false} className={CELL_DIVIDER_CLASS} />
+        <EntityMetadataValueCell
+          value={dateLabel}
+          label={publishedLabel}
+          uppercase={false}
+          className={CELL_DIVIDER_CLASS}
+        />
       )}
       <EntityMetadataAuthorCell author={effectiveAuthor} roleLabel={roleLabel} authorHref={authorHref} />
     </div>

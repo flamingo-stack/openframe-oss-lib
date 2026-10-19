@@ -6,9 +6,9 @@ import { useCopyToClipboard } from '../../hooks';
 import { cn } from '../../utils/cn';
 import { CheckIcon } from '../icons-v2-generated';
 import { Copy01Icon } from '../icons-v2-generated/documents';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
-import { ProgressBar } from './progress-bar';
+import { ProgressBar, ProgressBarSkeleton } from './progress-bar';
 
 export interface InfoCardFooterData {
   /** Leading icon next to the text, expected at 24x24 (e.g. <ShieldCheckIcon size={24} />) */
@@ -246,8 +246,7 @@ export function InfoCardSkeleton({
                 <TextLineSkeleton type="h4" className="w-24" />
               </div>
             ))}
-            {/* The bar is 8px tall below `md`, 24px from it (`ProgressBar`). */}
-            {progress && <UnifiedSkeleton className="h-2 w-full rounded content-md:h-6" />}
+            {progress && <ProgressBarSkeleton />}
           </div>
         )}
       </div>

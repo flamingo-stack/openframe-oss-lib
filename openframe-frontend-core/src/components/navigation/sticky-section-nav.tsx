@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollShadow } from '../ui/scroll-fade';
 
@@ -22,6 +22,14 @@ const HORIZONTAL_BRAND_CLASS =
   'hidden shrink-0 items-center gap-2.5 border-r border-ods-border pr-6 text-ods-text-primary text-h4 content-lg:flex';
 const HORIZONTAL_ROW_CLASS = 'flex h-full items-center gap-1 [scrollbar-width:none] content-lg:items-stretch';
 const HORIZONTAL_ACTION_CLASS = 'hidden shrink-0 items-center content-lg:flex';
+/**
+ * A section's pill on a narrow area; from the content `lg` step a tab the height of the bar. Its shape, read by the
+ * pill and by its skeleton (the label a bar inside it), so the skeleton is the pill's size at every step.
+ */
+const PILL_CLASS = cn(
+  'flex shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-1.5 text-h6',
+  'content-lg:rounded-none content-lg:border-x-0 content-lg:border-b-2 content-lg:border-t-0 content-lg:py-0',
+);
 const VERTICAL_NAV_CLASS = 'relative bg-ods-bg';
 const VERTICAL_ROW_CLASS = 'relative flex h-10 w-full items-stretch transition-all duration-200';
 const VERTICAL_BUTTON_CLASS = 'relative flex flex-1 cursor-pointer items-center gap-2 px-3 py-2';
@@ -76,14 +84,14 @@ function HorizontalSectionNav({
   }, [activeSection]);
 
   return (
-    <nav ref={navRef} aria-label={label} className={cn(HORIZONTAL_NAV_CLASS, STICKY_SECTION_NAV_HEIGHT_CLASS, className)}>
+    <nav
+      ref={navRef}
+      aria-label={label}
+      className={cn(HORIZONTAL_NAV_CLASS, STICKY_SECTION_NAV_HEIGHT_CLASS, className)}
+    >
       {brand && <div className={HORIZONTAL_BRAND_CLASS}>{brand}</div>}
       {/* The scrolling row and its edge fades are the lib's one pattern (`ScrollShadow`), not a second one. */}
-      <ScrollShadow
-        axis="horizontal"
-        className="min-w-0 flex-1"
-        scrollClassName={HORIZONTAL_ROW_CLASS}
-      >
+      <ScrollShadow axis="horizontal" className="min-w-0 flex-1" scrollClassName={HORIZONTAL_ROW_CLASS}>
         {sections.map(section => {
           const active = activeSection === section.id;
           return (
@@ -97,9 +105,8 @@ function HorizontalSectionNav({
                 onSectionClick(section.id);
               }}
               className={cn(
-                // A pill on a narrow area; from the content `lg` step a tab the height of the bar.
-                'flex shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-1.5 transition-colors text-h6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
-                'content-lg:rounded-none content-lg:border-x-0 content-lg:border-b-2 content-lg:border-t-0 content-lg:py-0',
+                PILL_CLASS,
+                'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
                 active
                   ? 'border-ods-border bg-ods-card text-ods-text-primary content-lg:border-ods-accent content-lg:bg-transparent content-lg:bg-gradient-to-b content-lg:from-transparent content-lg:to-ods-accent/10'
                   : 'border-transparent text-ods-text-secondary hover:text-ods-text-primary content-lg:hover:bg-ods-bg-hover',
@@ -238,7 +245,10 @@ export function StickySectionNavSkeleton({
         {brand && <div className={HORIZONTAL_BRAND_CLASS}>{brand}</div>}
         <div className={cn('min-w-0 flex-1 overflow-hidden', HORIZONTAL_ROW_CLASS, 'content-lg:items-center')}>
           {widths.map((width, i) => (
-            <UnifiedSkeleton key={i} className={cn('h-8 shrink-0 rounded-full', width)} />
+            // The pill's own box (a tab from the content `lg` step), its label a bar.
+            <div key={i} className={cn(PILL_CLASS, 'border-transparent')}>
+              <TextLineSkeleton type="h6" className={width} />
+            </div>
           ))}
         </div>
         {action && <div className={HORIZONTAL_ACTION_CLASS}>{action}</div>}
@@ -249,7 +259,12 @@ export function StickySectionNavSkeleton({
     <div className={cn(VERTICAL_NAV_CLASS, className)} aria-hidden>
       <div
         className="absolute bg-ods-border"
-        style={{ width: '1px', height: `${count * 40}px`, [ribbonPosition === 'left' ? 'left' : 'right']: '-2px', top: '0px' }}
+        style={{
+          width: '1px',
+          height: `${count * 40}px`,
+          [ribbonPosition === 'left' ? 'left' : 'right']: '-2px',
+          top: '0px',
+        }}
       />
       {widths.map((width, i) => (
         <div key={i} className={VERTICAL_ROW_CLASS}>

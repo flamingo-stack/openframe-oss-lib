@@ -4,7 +4,7 @@ import { type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
 import { isOwnClick } from '../../utils/own-click';
 import { useAgentTint } from '../agent-identity';
-import { ChatTurn, TURN_BODY_CLASS, TURN_ROW_CLASS } from '../chat/chat-turn';
+import { ChatTurn, ChatTurnNameSkeleton, TURN_BODY_CLASS, TURN_ROW_CLASS } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
@@ -23,6 +23,19 @@ import { Tag } from '../ui/tag';
  */
 const OUTCOME_LINES = { phone: 4, wide: 3 } as const;
 const OUTCOME_LINES_CLASS = 'min-h-[4lh] content-md:min-h-[3lh]';
+/**
+ * The lines the context ("Today") takes at least, the same way: a typical status quo is a sentence or two, four
+ * lines in a phone's card and three in a wide one, never cut (a longer one grows its card).
+ */
+const CONTEXT_LINES = { phone: 4, wide: 3 } as const;
+const CONTEXT_LINES_CLASS = 'min-h-[4lh] content-md:min-h-[3lh]';
+/** The context's text and the outcome's row and text: ONE string each, read by the card and its skeleton. */
+const CONTEXT_TEXT_CLASS = cn('m-0 text-ods-text-secondary text-h4', CONTEXT_LINES_CLASS);
+const OUTCOME_ROW_CLASS = 'flex items-start gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h4';
+const OUTCOME_TEXT_CLASS = cn('m-0 min-w-0 flex-1', OUTCOME_LINES_CLASS);
+/** The outcome's check, centred on its first line (one line high, by style: it is a mark, not a line of text). */
+const OUTCOME_CHECK_CLASS = 'flex shrink-0 items-center';
+const OUTCOME_CHECK_STYLE = { height: '1lh' } as const;
 
 /** The card's frame, its parts' blocks and its footer row: ONE string each, read by the card and its skeleton. */
 const CARD_FRAME_CLASS =
@@ -107,6 +120,8 @@ export function ConversationCard({
       <ConversationCardSkeleton
         avatarPx={CONVERSATION_CARD_AVATAR_PX}
         context={!!context}
+        requesterMeta={!!requester.meta}
+        responderMeta={!!responder.meta}
         footer={!!footerLabel}
         footerLabel={footerLabel}
         className={className}
@@ -167,9 +182,7 @@ export function ConversationCard({
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
           <span className="text-ods-text-secondary text-h6">{context.label}</span>
-          <p className="m-0 line-clamp-3 min-h-[3lh] text-ods-text-secondary text-h4" title={context.text}>
-            {context.text}
-          </p>
+          <p className={CONTEXT_TEXT_CLASS}>{context.text}</p>
         </div>
       )}
       {/* The answer is a command block: who did it, what was done, and its check. */}
@@ -180,10 +193,10 @@ export function ConversationCard({
         time={responder.time}
         className={ANSWER_BLOCK_CLASS}
       >
-        <div className="flex items-start gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h4">
-          <span className={cn(OUTCOME_LINES_CLASS, 'min-w-0 flex-1')}>{outcome}</span>
+        <div className={OUTCOME_ROW_CLASS}>
+          <p className={OUTCOME_TEXT_CLASS}>{outcome}</p>
           {outcomeAside}
-          <span className="flex h-[1lh] shrink-0 items-center">
+          <span className={OUTCOME_CHECK_CLASS} style={OUTCOME_CHECK_STYLE}>
             <CheckCircleIcon size={16} className="text-ods-success" aria-hidden />
           </span>
         </div>
@@ -198,13 +211,13 @@ export function ConversationCard({
   );
 }
 
-/** A speaker's turn while loading: the avatar box, the name line, then the turn's own lines. */
-function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: ReactNode }) {
+/** A speaker's turn while loading: the avatar box, the turn's name row (its meta and time), then the turn's own lines. */
+function TurnSkeleton({ avatarPx, meta, children }: { avatarPx: number; meta: boolean | string; children: ReactNode }) {
   return (
     <div className={TURN_ROW_CLASS}>
       <SquareAvatarSkeleton sizePx={avatarPx} />
       <div className={TURN_BODY_CLASS}>
-        <TextLineSkeleton lines={1} type="h4" className="w-1/2" />
+        <ChatTurnNameSkeleton meta={meta} time />
         {children}
       </div>
     </div>
@@ -213,13 +226,15 @@ function TurnSkeleton({ avatarPx, children }: { avatarPx: number; children: Reac
 
 /**
  * The card while it loads: the SAME frame, then each part at the number of
- * lines the loaded card keeps for it (the request's two, the context's three,
- * the outcome's `OUTCOME_LINES`), so a loaded card takes the skeleton's place without
+ * lines the loaded card keeps for it (the request's two, the context's
+ * `CONTEXT_LINES`, the outcome's `OUTCOME_LINES`), so a loaded card takes the skeleton's place without
  * moving the page. Pass the parts the loaded card will have.
  */
 export function ConversationCardSkeleton({
   avatarPx = CONVERSATION_CARD_AVATAR_PX,
   context = false,
+  requesterMeta = false,
+  responderMeta = false,
   footer = false,
   footerLabel,
   label = 'Loading a conversation',
@@ -236,25 +251,40 @@ export function ConversationCardSkeleton({
   footerLabel?: string;
   /** The loaded card has a context part ("Today"). */
   context?: boolean;
+  /** The asker's name carries a meta line (their role); a string is static copy, drawn for real. */
+  requesterMeta?: boolean | string;
+  /** The answerer's name carries a meta line ("What changes"); a string is static copy, drawn for real. */
+  responderMeta?: boolean | string;
   /** The loaded card has a footer. */
   footer?: boolean;
   className?: string;
 }) {
   return (
     <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
-      <TurnSkeleton avatarPx={avatarPx}>
+      <TurnSkeleton avatarPx={avatarPx} meta={requesterMeta}>
         <TextLineSkeleton lines={2} type="h3" />
       </TurnSkeleton>
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
           <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
-          <TextLineSkeleton lines={3} type="h4" />
+          <p className={CONTEXT_TEXT_CLASS}>
+            <TextLineSkeleton as="span" lines={CONTEXT_LINES.phone} type="h4" className="content-md:hidden" />
+            <TextLineSkeleton as="span" lines={CONTEXT_LINES.wide} type="h4" className="hidden content-md:flex" />
+          </p>
         </div>
       )}
       <div className={ANSWER_BLOCK_CLASS}>
-        <TurnSkeleton avatarPx={avatarPx}>
-          <TextLineSkeleton lines={OUTCOME_LINES.phone} type="h4" className="content-md:hidden" />
-          <TextLineSkeleton lines={OUTCOME_LINES.wide} type="h4" className="hidden content-md:flex" />
+        <TurnSkeleton avatarPx={avatarPx} meta={responderMeta}>
+          {/* The outcome's row: its text at a typical line count, beside the check's place (the row's width). */}
+          <div className={OUTCOME_ROW_CLASS}>
+            <p className={OUTCOME_TEXT_CLASS}>
+              <TextLineSkeleton as="span" lines={OUTCOME_LINES.phone} type="h4" className="content-md:hidden" />
+              <TextLineSkeleton as="span" lines={OUTCOME_LINES.wide} type="h4" className="hidden content-md:flex" />
+            </p>
+            <span className={cn(OUTCOME_CHECK_CLASS, 'invisible')} style={OUTCOME_CHECK_STYLE}>
+              <CheckCircleIcon size={16} aria-hidden />
+            </span>
+          </div>
         </TurnSkeleton>
       </div>
       {footer && (

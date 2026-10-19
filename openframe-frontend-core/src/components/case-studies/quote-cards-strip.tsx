@@ -6,6 +6,7 @@ import { CardHitLayer } from '../features/card-hit-layer';
 import { CardsStrip } from '../features/cards-strip';
 import { LoadingRegion } from '../loading/loading-region';
 import { Card } from '../ui/card';
+import { useLoadingScope } from '../ui/loading-scope';
 import { PersonCell, PersonCellSkeleton } from '../ui/people-cell';
 
 /** One customer quote chip: the line, who said it, their logo, and the case study it opens. */
@@ -60,16 +61,41 @@ export function QuoteCardTileSkeleton({ className }: { className?: string }) {
 
 export interface QuoteCardsStripProps {
   quotes: readonly QuoteCard[];
+  /** The quotes are being read (the host's query runs): the strip draws its own skeleton. A page's loading scope does too. */
+  loading?: boolean;
+  /** The quote cards the skeleton draws: one screen of the host's strip. */
+  fold?: number;
   className?: string;
+}
+
+/** The quote cards a strip's skeleton draws when its host names none: a chip is about a third of a wide page's row. */
+const QUOTE_STRIP_FOLD = 4;
+
+/** The strip while its quotes are read: the same strip engine, still, with the quote card's own skeleton. */
+function QuoteCardsStripSkeleton({ fold, className }: { fold: number; className?: string }) {
+  return (
+    <CardsStrip
+      className={className}
+      showTitle={false}
+      showChevrons={false}
+      autoScroll={false}
+      items={Array.from({ length: fold }, (_, index) => ({ key: `quote-${index}` }))}
+      itemKey={item => item.key}
+      renderCard={(_item, ctx) => <QuoteCardTileSkeleton key={ctx.cardKey} className="shrink-0" />}
+    />
+  );
 }
 
 /**
  * A scrolling row of customer quote chips on THE strip engine every card rail
  * uses (`CardsStrip`, render-prop mode so each chip keeps its natural width).
  * The whole chip opens the case study the quote comes from; the loop clone
- * keeps the click but stays out of the a11y tree. Renders nothing when empty.
+ * keeps the click but stays out of the a11y tree. While its quotes are read (a page's loading scope with none handed
+ * over, or `loading`) it is its own skeleton; read and empty, it renders nothing.
  */
-export function QuoteCardsStrip({ quotes, className }: QuoteCardsStripProps) {
+export function QuoteCardsStrip({ quotes, loading = false, fold = QUOTE_STRIP_FOLD, className }: QuoteCardsStripProps) {
+  const scoped = useLoadingScope();
+  if ((scoped && quotes.length === 0) || loading) return <QuoteCardsStripSkeleton fold={fold} className={className} />;
   if (quotes.length === 0) return null;
   return (
     <CardsStrip

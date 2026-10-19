@@ -28,7 +28,14 @@ export interface ChatTurnProps {
 export const TURN_ROW_CLASS = 'flex min-w-0 items-start gap-[var(--spacing-system-sf)]';
 export const TURN_BODY_CLASS = 'flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xxs)]';
 const NAME_ROW_CLASS = 'flex min-w-0 items-baseline gap-[var(--spacing-system-xsf)]';
-const NAME_GROUP_CLASS = 'flex min-w-0 flex-1 items-baseline gap-[var(--spacing-system-xsf)]';
+/**
+ * The name and its meta: stacked below `content-md` (a phone's card has no room for both on one line, and a cut
+ * name or meta says nothing), side by side from `content-md`. The skeleton reads the same class, so it stacks where
+ * the turn does.
+ */
+const NAME_GROUP_CLASS =
+  'flex min-w-0 flex-1 flex-col content-md:flex-row content-md:items-baseline content-md:gap-[var(--spacing-system-xsf)]';
+const META_CLASS = 'min-w-0 text-ods-text-secondary text-h6 content-md:truncate';
 const NAME_TYPE = { default: 'h4', quiet: 'h6' } as const;
 const NAME_CLASS = { default: 'text-ods-text-primary text-h4', quiet: 'text-ods-text-secondary text-h6' } as const;
 const TIME_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
@@ -55,6 +62,7 @@ export function ChatTurn({
       <ChatTurnSkeleton
         nameSize={nameSize}
         time={skeleton?.time ?? time !== undefined}
+        meta={skeleton?.meta ?? !!meta}
         lines={skeleton?.lines}
         avatarPx={skeleton?.avatarPx}
         className={className}
@@ -68,7 +76,7 @@ export function ChatTurn({
         <div className={NAME_ROW_CLASS}>
           <span className={NAME_GROUP_CLASS}>
             <span className={cn('min-w-0 truncate', NAME_CLASS[nameSize])}>{name}</span>
-            {meta && <span className="min-w-0 truncate text-ods-text-secondary text-h6">{meta}</span>}
+            {meta && <span className={META_CLASS}>{meta}</span>}
           </span>
           {time && <span className={TIME_CLASS}>{time}</span>}
         </div>
@@ -88,7 +96,34 @@ export interface ChatTurnSkeletonProps {
   lines?: 1 | 2 | 3;
   /** Whether the name row carries a time at its far end. */
   time?: boolean;
+  /** Whether the name carries a meta line; a string is static copy, drawn for real. */
+  meta?: boolean | string;
   className?: string;
+}
+
+/**
+ * The turn's name row while it is read: a bar at the name's type step, the meta (stacked under it below
+ * `content-md`, beside it from there, as the turn draws it) and the time at the far end. Read by the turn's
+ * skeleton and by every card that draws a turn of its own.
+ */
+export function ChatTurnNameSkeleton({
+  nameSize = 'default',
+  meta = false,
+  time = false,
+}: Pick<ChatTurnSkeletonProps, 'nameSize' | 'meta' | 'time'>) {
+  return (
+    <div className={NAME_ROW_CLASS}>
+      <span className={NAME_GROUP_CLASS}>
+        <TextLineSkeleton type={NAME_TYPE[nameSize]} className="w-24" />
+        {typeof meta === 'string' ? (
+          <span className={META_CLASS}>{meta}</span>
+        ) : (
+          meta && <TextLineSkeleton type="h6" className="w-20" />
+        )}
+      </span>
+      {time && <TextLineSkeleton type="h6" className="w-12 shrink-0" />}
+    </div>
+  );
 }
 
 /** A turn while it is read: the picture's box, a bar at the name's type step, and a bar per message line. */
@@ -98,18 +133,14 @@ export function ChatTurnSkeleton({
   nameSize = 'default',
   lines = 1,
   time = false,
+  meta = false,
   className,
 }: ChatTurnSkeletonProps) {
   return (
     <div className={cn(TURN_ROW_CLASS, className)} aria-hidden>
       {avatarPx ? <SquareAvatarSkeleton sizePx={avatarPx} variant={avatarShape} /> : null}
       <div className={TURN_BODY_CLASS}>
-        <div className={NAME_ROW_CLASS}>
-          <span className={NAME_GROUP_CLASS}>
-            <TextLineSkeleton type={NAME_TYPE[nameSize]} className="w-24" />
-          </span>
-          {time && <TextLineSkeleton type="h6" className="w-12 shrink-0" />}
-        </div>
+        <ChatTurnNameSkeleton nameSize={nameSize} meta={meta} time={time} />
         <div>
           {Array.from({ length: lines }, (_, i) => (
             <TextLineSkeleton

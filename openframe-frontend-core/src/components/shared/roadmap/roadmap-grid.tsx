@@ -124,6 +124,10 @@ export interface RoadmapGridProps {
   /** Past quarters within this window of the current quarter stay open by
    *  default; older ones collapse. Default `2`. */
   quartersToKeepClosed?: number;
+  /** The items are being read (the host's query runs): the grid draws its own skeleton. A page's loading scope does too. */
+  isLoading?: boolean;
+  /** The cards the flat grid's skeleton draws: one screen of the host's grid (default the skeleton's own). */
+  fold?: number;
 }
 
 /** Internal flat 2-col grid for ONE set of items. Voting comes from the parent
@@ -210,6 +214,8 @@ export function RoadmapGrid({
   groupByQuarter = false,
   hasActiveFilters = false,
   quartersToKeepClosed = 2,
+  isLoading = false,
+  fold,
 }: RoadmapGridProps) {
   // ── Voting (shared across all quarters) ──
   const { getVote, toggleVote } = useRoadmapVoting(votingOptions);
@@ -301,13 +307,13 @@ export function RoadmapGrid({
     );
   }, [hasActiveFilters, sortedQuartersKey, isInitialized, quartersToKeepClosed]);
 
-  // While the page is read the items are not known (none in a loading state): the grid is its skeleton, never the
-  // empty state.
-  if (inScope) {
+  // While the page is read, or the host's query runs, the items are not known: the grid is its skeleton, never the
+  // empty state. The page's loading region announces a scope's; a host's own read announces itself.
+  if (inScope || isLoading) {
     return groupByQuarter ? (
       <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} />
     ) : (
-      <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} columns={columns} />
+      <RoadmapGridSkeleton region={!inScope} count={fold} showLeftMargin={showLeftMargin} columns={columns} />
     );
   }
 

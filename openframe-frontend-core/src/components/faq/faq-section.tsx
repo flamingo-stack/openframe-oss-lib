@@ -101,6 +101,12 @@ export interface FaqSectionProps {
    * `skeletonSections` / `minResults` for the skeleton. Absent: `minResults` spread over `skeletonSections` groups.
    */
   skeletonShape?: number[];
+  /**
+   * The host's FAQs fall into named categories, so the loaded block draws its category nav (the platform's full,
+   * categorised list): the loading state draws the nav's row too, so what follows it (the ask card) does not move.
+   * Default false (a nav only when `skeletonSections` names two or more categories).
+   */
+  skeletonNav?: boolean;
 }
 
 const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
@@ -111,18 +117,28 @@ const SECTION_DEFAULT_CLASS = 'space-y-10';
 const NAV_ABOVE_QUESTIONS_CLASS = 'pb-8';
 const NAV_BELOW_HEADING_CLASS = 'pt-8';
 const QUESTIONS_STACK_CLASS = 'space-y-10';
+// `grid-cols-1` (a `minmax(0, 1fr)` track): one column never grows to a child's content width (the nav skeleton's
+// one-line pill row is wider than a phone).
 const ASIDE_GRID_CLASS =
-  'grid gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16';
+  'grid grid-cols-1 gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16';
 const ASIDE_QUESTIONS_CELL_CLASS = 'content-lg:col-start-2 content-lg:row-span-2 content-lg:row-start-1';
 const ASIDE_CELL_CLASS = 'content-lg:col-start-1 content-lg:row-start-2';
 const TOPIC_STACK_CLASS = 'space-y-1';
 const TOPIC_CLASS = 'text-ods-text-muted text-h6';
 const CATEGORY_NAV_CLASS = 'flex flex-wrap gap-2';
+/**
+ * The nav's row while the categories are read (`skeletonNav`): which categories there are, and how many, is read data,
+ * so the skeleton draws ONE line of pills, the pills that do not fit cut off at its edge (never wrapped to a second
+ * line). `FAQ_NAV_SKELETON_PILLS` is more than the widest column holds on one line.
+ */
+const CATEGORY_NAV_SKELETON_LINE_CLASS = 'flex min-w-0 flex-nowrap gap-2 overflow-hidden';
+const FAQ_NAV_SKELETON_PILLS = 8;
 const CATEGORY_PILL_CLASS = 'rounded-full border px-4 py-2 transition-colors text-h6';
 const CATEGORY_SECTION_CLASS = 'scroll-mt-24';
 /**
  * A category's heading, with the gap to its questions inside its own box (padding, not the group's spacing): only a
- * named group has one, so it is the group's optional part (`data-loading-optional`) and takes its gap with it.
+ * named group has one, so it is the group's optional part (`data-loading-optional`) and takes its gap with it, unless
+ * the host declared its FAQs categorised (`skeletonNav`): then every group it draws is named, loading and loaded.
  */
 const CATEGORY_HEADING_CLASS = cn(SECTION_HEADING_CLASS, 'pb-4');
 /** Questions the block's skeleton draws when the host states no count (`minResults`): one screen of the accordion's rows. */
@@ -135,21 +151,25 @@ export const FAQ_SECTION_SKELETON_QUESTIONS = FAQ_ACCORDION_SKELETON_ROWS;
 function FaqLayout({
   heading,
   nav,
+  navDeclared = false,
   questions,
   aside,
 }: {
   heading?: React.ReactNode;
   nav?: React.ReactNode;
+  /** The host states its FAQs are categorised (`skeletonNav`): the nav is drawn loading and loaded, never optional. */
+  navDeclared?: boolean;
   questions: React.ReactNode;
   aside?: React.ReactNode;
 }) {
   // The category nav is drawn only when the FAQs fall into two or more categories: a part of the record
-  // (`data-loading-optional`), carrying its own gap.
+  // (`data-loading-optional`), carrying its own gap, unless the host declared it (`navDeclared`).
+  const optional = navDeclared ? undefined : true;
   if (!aside) {
     return (
       <div>
         {nav && (
-          <div className={NAV_ABOVE_QUESTIONS_CLASS} data-loading-optional>
+          <div className={NAV_ABOVE_QUESTIONS_CLASS} data-loading-optional={optional}>
             {nav}
           </div>
         )}
@@ -164,7 +184,7 @@ function FaqLayout({
       <div>
         {heading}
         {nav && (
-          <div className={NAV_BELOW_HEADING_CLASS} data-loading-optional>
+          <div className={NAV_BELOW_HEADING_CLASS} data-loading-optional={optional}>
             {nav}
           </div>
         )}
@@ -293,7 +313,10 @@ function GroupedFaqList({
   categoryHeadingAs,
   heading,
   aside,
+  navDeclared,
 }: {
+  /** The host declared the category nav (`skeletonNav`). */
+  navDeclared?: boolean;
   /** With `aside`, the section heading: it sits in the left column above the category nav. */
   heading?: React.ReactNode;
   aside?: React.ReactNode;
@@ -479,7 +502,10 @@ function GroupedFaqList({
           <section key={key} id={group.slug ?? undefined} className={CATEGORY_SECTION_CLASS} data-loading-item>
             {/* Only a named group has a heading (the uncategorized one has none): a part of the record, not of every group. */}
             {group.section && (
-              <CategoryHeading className={CATEGORY_HEADING_CLASS} data-loading-optional>
+              <CategoryHeading
+                className={CATEGORY_HEADING_CLASS}
+                data-loading-optional={navDeclared ? undefined : true}
+              >
                 {group.section}
               </CategoryHeading>
             )}
@@ -497,7 +523,9 @@ function GroupedFaqList({
     </div>
   );
 
-  return <FaqLayout heading={heading} nav={categoryNav} questions={questions} aside={aside} />;
+  return (
+    <FaqLayout heading={heading} nav={categoryNav} navDeclared={navDeclared} questions={questions} aside={aside} />
+  );
 }
 
 interface FaqsResponse {
@@ -541,6 +569,7 @@ export function FaqSection({
   skeletonSections,
   skeletonUncategorized,
   skeletonShape,
+  skeletonNav = false,
 }: FaqSectionProps) {
   const assistant = useAssistantRuntime();
   const inScope = useLoadingScope();
@@ -588,6 +617,7 @@ export function FaqSection({
         sections={skeletonSections}
         uncategorized={skeletonUncategorized}
         shape={skeletonShape}
+        navRow={skeletonNav}
         className={className}
         id={id}
       />
@@ -606,6 +636,7 @@ export function FaqSection({
           categoryHeadingAs={heading === null ? 'h2' : 'h3'}
           heading={aside ? headingNode : undefined}
           aside={aside}
+          navDeclared={skeletonNav}
         />
       </section>
       {schema && (
@@ -632,6 +663,8 @@ export interface FaqSectionSkeletonProps extends Pick<
   uncategorized?: boolean;
   /** Questions per group, in order (named first, then the uncategorized one when drawn): wins over `count`/`sections`. */
   shape?: number[];
+  /** Draw the category nav's row (one line of pills) whatever `sections` is: the host's FAQs are categorised. */
+  navRow?: boolean;
 }
 
 /**
@@ -649,6 +682,7 @@ export function FaqSectionSkeleton({
   sections = 0,
   uncategorized = true,
   shape,
+  navRow = false,
   className,
   id,
 }: FaqSectionSkeletonProps) {
@@ -662,17 +696,21 @@ export function FaqSectionSkeleton({
     shapeGroups?.length
       ? shapeGroups[group]
       : Math.max(1, Math.floor((count * (group + 1)) / groups) - Math.floor((count * group) / groups));
-  const nav =
-    named > 1 ? (
-      <div className={CATEGORY_NAV_CLASS} aria-hidden>
-        {Array.from({ length: named }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton pills never reorder
-          <span key={i} className={cn(CATEGORY_PILL_CLASS, 'border-ods-border bg-ods-card')}>
-            <TextLineSkeleton type="inherit" as="span" className="w-24" />
-          </span>
-        ))}
-      </div>
-    ) : undefined;
+  const pill = (i: number) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton pills never reorder
+    <span key={i} className={cn(CATEGORY_PILL_CLASS, 'shrink-0 border-ods-border bg-ods-card')}>
+      <TextLineSkeleton type="inherit" as="span" className="w-24" />
+    </span>
+  );
+  const nav = navRow ? (
+    <div className={CATEGORY_NAV_SKELETON_LINE_CLASS} aria-hidden>
+      {Array.from({ length: FAQ_NAV_SKELETON_PILLS }, (_, i) => pill(i))}
+    </div>
+  ) : named > 1 ? (
+    <div className={CATEGORY_NAV_CLASS} aria-hidden>
+      {Array.from({ length: named }, (_, i) => pill(i))}
+    </div>
+  ) : undefined;
   const questions = (
     <div className={QUESTIONS_STACK_CLASS}>
       {Array.from({ length: groups }, (_, group) => {
@@ -681,7 +719,7 @@ export function FaqSectionSkeleton({
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton groups never reorder
           <section key={group} className={CATEGORY_SECTION_CLASS} data-loading-item>
             {isNamed && (
-              <CategoryHeading className={CATEGORY_HEADING_CLASS} data-loading-optional>
+              <CategoryHeading className={CATEGORY_HEADING_CLASS} data-loading-optional={navRow ? undefined : true}>
                 <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
               </CategoryHeading>
             )}
@@ -695,7 +733,13 @@ export function FaqSectionSkeleton({
     <LoadingRegion label="Loading questions">
       <section id={id} data-faq-topic={topic} className={className ?? SECTION_DEFAULT_CLASS}>
         {!aside && headingNode}
-        <FaqLayout heading={aside ? headingNode : undefined} nav={nav} questions={questions} aside={aside} />
+        <FaqLayout
+          heading={aside ? headingNode : undefined}
+          nav={nav}
+          navDeclared={navRow}
+          questions={questions}
+          aside={aside}
+        />
       </section>
     </LoadingRegion>
   );

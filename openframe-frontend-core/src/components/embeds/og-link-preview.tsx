@@ -177,7 +177,8 @@ const COMPACT_FRAME_CLASS = 'flex h-[120px] flex-row overflow-hidden rounded-lg 
 const COMPACT_MEDIA_CLASS = 'h-full w-[200px] flex-shrink-0';
 const COMPACT_BODY_CLASS = 'flex min-w-0 flex-1 flex-col justify-center p-3';
 /** The compact card with no image: one row of a favicon box, the title and description lines, the link mark. */
-const COMPACT_ROW_CLASS = 'flex flex-row items-center gap-3 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-4 py-3';
+const COMPACT_ROW_CLASS =
+  'flex flex-row items-center gap-3 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-4 py-3';
 const COMPACT_ICON_BOX_CLASS = 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface';
 const COMPACT_ROW_TEXT_CLASS = 'min-w-0 flex-1';
 const COMPACT_ROW_LINE_CLASS = 'truncate text-h6';
@@ -244,7 +245,7 @@ export function OGLinkPreviewSkeleton({
               <TextLineSkeleton type="h4" lines={2} className="mb-2 w-full" />
               <TextLineSkeleton type="h4" lines={2} className="mb-2 w-5/6" />
               {/* The source line: the site name and the domain, at the line's own type. */}
-              <div className="flex min-h-[var(--font-line-space-h4-body)] items-center gap-2 text-xs">
+              <div className="flex min-h-[var(--font-line-space-h4-body)] items-center gap-2 text-h6">
                 <TextLineSkeleton type="inherit" as="span" className="w-24" />
                 <TextLineSkeleton type="inherit" as="span" className="w-20" />
               </div>
@@ -263,9 +264,10 @@ export function OGLinkPreviewSkeleton({
  */
 /** The tile's layout, read by the tile and by its skeleton. */
 const TILE_FRAME_CLASS = 'flex min-w-0 flex-col gap-1.5 rounded-lg border border-ods-border bg-ods-card p-3';
-const TILE_SOURCE_ROW_CLASS = 'flex min-w-0 items-center gap-1.5 text-xs';
-const TILE_HEADLINE_CLASS = 'font-sans text-[15px] font-semibold leading-snug';
-const TILE_EXCERPT_CLASS = 'font-sans text-xs leading-normal';
+const TILE_SOURCE_ROW_CLASS = 'flex min-w-0 items-center gap-1.5 text-h6';
+/** The headline's and the excerpt's type (the loaded `TruncateText`s take them as their `variant`). */
+const TILE_HEADLINE_CLASS = 'text-h3';
+const TILE_EXCERPT_CLASS = 'text-h6';
 
 export function OGLinkTileSkeleton() {
   return (
@@ -495,7 +497,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
       >
         <div className={TILE_SOURCE_ROW_CLASS}>
           <Favicon src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} size="w-4 h-4" />
-          <TruncateText as="span" className="font-sans text-xs font-medium">
+          <TruncateText as="span" variant="h6" className="text-current">
             {name}
           </TruncateText>
           {meta != null && (
@@ -503,22 +505,20 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
           )}
         </div>
         {kicker != null && (
-          <div
-            className="overflow-hidden font-sans text-xs font-bold uppercase tracking-wide text-ods-accent"
-            style={lineClamp(1)}
-          >
+          <div className="overflow-hidden text-ods-accent text-h5" style={lineClamp(1)}>
             {kicker}
           </div>
         )}
         <TruncateText
           lines={2}
-          className={cn(TILE_HEADLINE_CLASS, 'transition-colors group-hover:text-ods-accent')}
+          variant="h3"
+          className="transition-colors group-hover:text-ods-accent"
           triggerClassName="-mt-0.5"
         >
           {curatedTitle || domainToTitle(domain)}
         </TruncateText>
         {curatedDescription && (
-          <TruncateText lines={2} tone="secondary" className={TILE_EXCERPT_CLASS}>
+          <TruncateText lines={2} variant="h6" tone="secondary">
             {curatedDescription}
           </TruncateText>
         )}
@@ -629,7 +629,10 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
           className={cn(COMPACT_FRAME_CLASS, 'group transition-colors hover:border-ods-accent')}
         >
           <div
-            className={cn(COMPACT_MEDIA_CLASS, 'relative flex items-center justify-center overflow-hidden rounded-lg transition-colors duration-300')}
+            className={cn(
+              COMPACT_MEDIA_CLASS,
+              'relative flex items-center justify-center overflow-hidden rounded-lg transition-colors duration-300',
+            )}
             style={{ backgroundColor: bgColor }}
           >
             {renderImage()}
@@ -689,7 +692,10 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         className={cn(DEFAULT_FRAME_CLASS, 'group transition-colors hover:border-ods-accent')}
       >
         <div
-          className={cn(DEFAULT_MEDIA_CLASS, 'relative flex items-center justify-center overflow-hidden transition-colors duration-300')}
+          className={cn(
+            DEFAULT_MEDIA_CLASS,
+            'relative flex items-center justify-center overflow-hidden transition-colors duration-300',
+          )}
           style={{ backgroundColor: bgColor }}
         >
           {renderImage()}
@@ -726,12 +732,12 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
               >
                 {description}
               </TruncateText>
-              <div className="flex min-w-0 items-center gap-2 text-xs text-ods-text-secondary">
-                <TruncateText as="span" className="text-xs font-medium text-current">
+              <div className="flex min-w-0 items-center gap-2 text-ods-text-secondary text-h6">
+                <TruncateText as="span" variant="h6" className="text-current">
                   {effectiveData.siteName}
                 </TruncateText>
                 <span>•</span>
-                <TruncateText as="span" className="text-xs text-current">
+                <TruncateText as="span" variant="h6" className="text-current">
                   {ogDomain}
                 </TruncateText>
                 {meta}

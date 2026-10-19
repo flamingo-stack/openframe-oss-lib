@@ -281,20 +281,15 @@ export function ProductReleaseCard({
                 content transition is shift-free. Mirrors the
                 onboarding-guide catalog card. */}
             <div className={RELEASE_CARD_TITLE_BOX_CLASS}>
-              <h3 className={RELEASE_CARD_TITLE_CLASS}>
-                {title}
-              </h3>
+              <h3 className={RELEASE_CARD_TITLE_CLASS}>{title}</h3>
             </div>
             {/* Summary — fixed 3-line height. `line-clamp-3` caps long
                 summaries at 3 lines; `min-h` reserves the same vertical
                 space when content is shorter, so the catalog grid stays
-                row-consistent regardless of per-card content length.
-                Heights derived from text-sm content-md:text-base × leading-relaxed
-                (1.625): 14×1.625×3 ≈ 68 px mobile, 16×1.625×3 ≈ 78 px desktop. */}
+                row-consistent regardless of per-card content length
+                (three lines of the summary's `text-h4`). */}
             <div className={RELEASE_CARD_SUMMARY_BOX_CLASS}>
-              <p className={RELEASE_CARD_SUMMARY_CLASS}>
-                {summary ?? ''}
-              </p>
+              <p className={RELEASE_CARD_SUMMARY_CLASS}>{summary ?? ''}</p>
             </div>
           </div>
         </div>
