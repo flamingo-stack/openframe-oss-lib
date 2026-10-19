@@ -254,7 +254,7 @@ public class RestProxyService {
                                 .trustManager(InsecureTrustManagerFactory.INSTANCE)
                                 .build());
                     } catch (SSLException e) {
-                        log.error("Error configuring SSL context: {}", e.getMessage());
+                        log.error("Error configuring SSL context: {}", e.getMessage(), e);
                     }
                 })
                 .doOnConnected(conn -> {
