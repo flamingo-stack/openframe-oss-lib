@@ -75,7 +75,7 @@ public class KnowledgeBaseTagService {
 
     public List<String> findItemIdsByTags(List<String> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
-            return null;
+            return List.of();
         }
         return tagAssignmentRepository.findByTagIdInAndEntityType(tagIds, ENTITY_TYPE)
                 .stream()
