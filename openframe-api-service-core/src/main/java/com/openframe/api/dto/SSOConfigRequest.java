@@ -20,16 +20,12 @@ public class SSOConfigRequest {
     @NotBlank(message = "Client Secret cannot be empty")
     private String clientSecret;
 
-    /**
-     * If true, users authenticated via this SSO provider may be auto-provisioned in the system.
-     * If false, only pre-existing users are allowed to sign in via this provider.
-     */
+    // If true, users may be auto-provisioned; if false, only pre-existing users may sign in.
     private Boolean autoProvisionUsers;
 
     private String msTenantId;
 
-    /**
-     * Whitelisted email domains for auto-provisioning.
-     */
+    // Whitelisted email domains for auto-provisioning.
     private List<String> allowedDomains;
 } 
+
