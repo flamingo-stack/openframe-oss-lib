@@ -1,7 +1,7 @@
 'use client';
 
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronRight, Circle } from 'lucide-react';
+import { Tick02Icon as Check, ArrowRight01Icon as ChevronRight, CircleIcon as Circle } from '../icons-v2-generated';
 import { type ComponentPropsWithoutRef, type ElementRef, type HTMLAttributes, forwardRef } from 'react';
 
 import { cn } from '../../utils/cn';
@@ -227,3 +227,4 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
 };
+
