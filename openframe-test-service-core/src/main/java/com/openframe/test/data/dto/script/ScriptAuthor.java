@@ -6,10 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * The creating user of a script (the {@code author: User} field), reduced to the
- * fields the scripts table selects.
- */
+// Creating user of a script, reduced to the fields the scripts table selects.
 @Data
 @Builder
 @NoArgsConstructor
