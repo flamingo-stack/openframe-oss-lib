@@ -49,25 +49,12 @@ public class DeviceFilterService {
         this.facetExecutor = facetExecutor;
     }
 
-    /**
-     * Every facet. For callers with no selection set of their own — the external REST API, whose
-     * response DTO always carries all of them.
-     */
+    // Returns every facet; used by callers (e.g. external REST API) with no selection of their own.
     public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters) {
         return getDeviceFilters(filters, DeviceFilterFacet.ALL);
     }
 
-    /**
-     * Only the requested facets; each one skipped is one Pinot round trip not made.
-     *
-     * Unrequested facets come back as empty lists (the mappers map {@code null} to
-     * {@code List.of()}), never {@code null}, so the non-null GraphQL list types hold even if a
-     * field is somehow read without having been selected. {@code filteredCount} is the exception —
-     * it is a scalar and stays {@code null} when unrequested, which is only observable if a caller
-     * asks for it without listing it in {@code requestedFacets}.
-     *
-     * @param requestedFacets facets to compute; {@code null} means all, EMPTY means none.
-     */
+    // Computes only the requested facets, skipping unneeded Pinot round trips; null requestedFacets means all.
     public CompletableFuture<DeviceFilters> getDeviceFilters(DeviceFilterCriteria filters,
                                                              Set<DeviceFilterFacet> requestedFacets) {
         Set<DeviceFilterFacet> facets = requestedFacets != null ? requestedFacets : DeviceFilterFacet.ALL;
@@ -110,12 +97,7 @@ public class DeviceFilterService {
                 );
     }
 
-    /**
-     * Submits one facet query, or short-circuits to {@code null} when the caller didn't ask for it.
-     *
-     * The executor is explicit on purpose — see {@link DeviceFilterExecutorConfig} for why the
-     * {@code supplyAsync} default is wrong for these blocking Pinot calls.
-     */
+    // Submits one facet query on facetExecutor, or short-circuits to null when the caller didn't ask for it.
     private <T> CompletableFuture<T> facetQuery(Set<DeviceFilterFacet> facets,
                                                 DeviceFilterFacet facet,
                                                 Supplier<T> query) {
@@ -125,11 +107,7 @@ public class DeviceFilterService {
         return supplyAsync(query, facetExecutor);
     }
 
-    /**
-     * Builds the tagKeyValues filter list for Pinot queries.
-     * Combines tagKeys and tagValues from DeviceFilterCriteria into "key:value" format.
-     * If only tagValues are provided (no tagKeys), passes them as-is for partial matching.
-     */
+    // Builds the "key:value" tagKeyValues filter list for Pinot queries from DeviceFilterCriteria.
     private List<String> buildTagKeyValuesFilter(DeviceFilterCriteria filters) {
         if (filters == null) {
             return emptyList();
