@@ -1,6 +1,5 @@
 package com.openframe.client.service;
 
-import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.client.event.DeviceCameOnlineEvent;
 import com.openframe.client.event.DeviceFirstConnectedEvent;
 import com.openframe.client.exception.MachineNotFoundException;
@@ -27,17 +26,14 @@ public class MachineStatusService {
     private final MachineRepository machineRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    @RetryOnOptimisticLockingFailure
     public void updateToOnline(String machineId, Instant eventTimestamp) {
         update(machineId, ONLINE, eventTimestamp);
     }
 
-    @RetryOnOptimisticLockingFailure
     public void updateToOffline(String machineId, Instant eventTimestamp) {
         update(machineId, OFFLINE, eventTimestamp);
     }
 
-    @RetryOnOptimisticLockingFailure
     public void processHeartbeat(String machineId, Instant eventTimestamp) {
         update(machineId, ONLINE, eventTimestamp);
     }

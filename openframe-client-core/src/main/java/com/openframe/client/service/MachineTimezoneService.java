@@ -1,6 +1,5 @@
 package com.openframe.client.service;
 
-import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
@@ -24,7 +23,6 @@ public class MachineTimezoneService {
 
     private final MachineRepository machineRepository;
 
-    @RetryOnOptimisticLockingFailure
     public void updateTimezone(String machineId, String timezone) {
         if (isBlank(timezone)) {
             log.warn("Timezone update for machineId={} had a blank timezone, ignoring", machineId);
