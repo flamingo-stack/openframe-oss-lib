@@ -4,7 +4,10 @@ import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -15,6 +18,9 @@ import java.util.List;
 import java.util.Map;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "machines")
 public class Machine implements TenantScoped {
     @Id
@@ -64,3 +70,4 @@ public class Machine implements TenantScoped {
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
     private Long version = 0L;
 }
+
