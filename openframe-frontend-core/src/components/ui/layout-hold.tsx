@@ -56,3 +56,22 @@ export function TextHold({ children, variant = 'bar', className }: TextHoldProps
     </span>
   );
 }
+
+export interface LayoutHoldProps {
+  /** The real layout, rendered with the data at hand. */
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * @deprecated Render the layout itself inside a `LoadingScope`: each part draws its own skeleton. Kept so hosts on an
+ * older release keep compiling; nothing in the lib uses it. A block as tall as the layout rendered inside it, kept
+ * invisible and inert.
+ */
+export function LayoutHold({ children, className }: LayoutHoldProps) {
+  return (
+    <div aria-hidden inert className={cn('invisible', className)}>
+      {children}
+    </div>
+  );
+}

@@ -217,6 +217,11 @@ export interface EntityAuthorCardSkeletonProps {
   extraCellLabels?: string[];
   /** The Published cell's label, or `null` when the card has no Published cell. Defaults to "Published". */
   publishedLabel?: string | null;
+  /**
+   * How many optional cells the loaded card may add (cells only some records carry). They are not drawn, but they
+   * count in the grid's columns, so every drawn cell is as wide as on the loaded card. Default 0.
+   */
+  optionalCells?: number;
   className?: string;
 }
 
@@ -227,9 +232,10 @@ export interface EntityAuthorCardSkeletonProps {
 export function EntityAuthorCardSkeleton({
   extraCellLabels = [],
   publishedLabel = 'Published',
+  optionalCells = 0,
   className,
 }: EntityAuthorCardSkeletonProps) {
-  const totalCells = extraCellLabels.length + (publishedLabel === null ? 0 : 1) + 1;
+  const totalCells = extraCellLabels.length + optionalCells + (publishedLabel === null ? 0 : 1) + 1;
   return (
     <div className={cn(GRID_FRAME_CLASS, gridColsClass(totalCells), className)}>
       {extraCellLabels.map((label, i) => (
@@ -260,6 +266,7 @@ export function EntityAuthorCard({
     return (
       <EntityAuthorCardSkeleton
         extraCellLabels={(extraCells ?? []).filter(cell => !cell.optional).map(cell => cell.label)}
+        optionalCells={(extraCells ?? []).filter(cell => cell.optional).length}
         publishedLabel={publishedAt === undefined ? null : publishedLabel}
         className={className}
       />

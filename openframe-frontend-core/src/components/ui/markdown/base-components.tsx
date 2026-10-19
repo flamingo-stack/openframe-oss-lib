@@ -70,11 +70,13 @@ export interface StandardLeafRenderers {
  * renderer and by every skeleton that stands in for a markdown body.
  */
 export const MARKDOWN_H1_CLASS = 'mb-4 mt-8 font-sans font-bold text-ods-text-primary first:mt-0';
-export const MARKDOWN_H2_CLASS = 'mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary';
+export const MARKDOWN_H2_CLASS =
+  'mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary';
 export const MARKDOWN_PARAGRAPH_CLASS = 'mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0';
 
 const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, alt }) => {
-  // In a loading scope the image is a box (the image shim draws it), and nothing is fetched.
+  // In a loading scope the image is a box and nothing is fetched: the authed fetch is skipped, and the `Image` shim
+  // draws its skeleton box (`HeldImage`) without reading `src`. `src` is passed only so the box is drawn at all.
   const inScope = useLoadingScope();
   const authedSrc = useAuthedImageSrc(inScope ? undefined : src);
   const resolvedSrc = inScope ? src : authedSrc;
@@ -255,9 +257,7 @@ export function buildBaseComponents({
     h6: makeHeading('h6', cn('mb-1 mt-3 font-sans font-semibold text-ods-text-primary', textSizes.h6)),
 
     // --- paragraph ---
-    p: ({ children }: MdRenderProps<'p'>) => (
-      <p className={cn(MARKDOWN_PARAGRAPH_CLASS, textSizes.p)}>{children}</p>
-    ),
+    p: ({ children }: MdRenderProps<'p'>) => <p className={cn(MARKDOWN_PARAGRAPH_CLASS, textSizes.p)}>{children}</p>,
 
     // --- links ---
     a: ({ href, children, className: linkClassName, rel: authoredRel }: MdRenderProps<'a'>) => {

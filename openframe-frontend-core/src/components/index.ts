@@ -93,7 +93,8 @@ export * from './shared/delivery';
 // Legal-document shared component (privacy policy, terms of service)
 export * from './shared/legal-document';
 
-// Detail Page Skeleton
+// Detail Page Skeleton (deprecated: kept for hosts on an older release)
+export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detail-page-skeleton';
 
 // Author byline card (end-of-article author description) — embeddable via
 // embed-shims + optional-runtime avatar proxying; hosts pass their own

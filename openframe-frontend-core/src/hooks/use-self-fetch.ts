@@ -57,6 +57,9 @@ export function useSelfFetch<T>(
   const revalidateOnVisibleAfterMs = options?.revalidateOnVisibleAfterMs;
   const [data, setData] = useState<T | null>(initialData ?? null);
   const [dataUrl, setDataUrl] = useState<string | null>(initialData !== undefined ? givenUrl : null);
+  // From `givenUrl`, not the held `url`, on purpose: a view held in a loading scope with no data IS loading
+  // (callers such as RoadmapView draw their skeleton from `isLoading && !data`). When the scope ends, `url` becomes
+  // `givenUrl` and the fetch below settles it.
   const [isLoading, setIsLoading] = useState(initialData === undefined && givenUrl !== null);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);

@@ -30,6 +30,12 @@ export { ProfileLoadingSkeleton } from '../profile/ProfileLoadingSkeleton';
 
 export { CategoryCardSkeleton } from './category-card-skeleton';
 
+// Deprecated (kept for hosts on an older release; a component draws its own skeleton now)
+export { MspProfileFormSkeleton } from './msp-profile-form-skeleton';
+export { SettingsFormSkeleton, type SettingsFormSkeletonProps } from './settings-form-skeleton';
+export { CategoryVendorSelectorSkeleton } from './category-vendor-selector-skeleton';
+export { BlogCardGridSkeleton, SlackCommunitySkeleton } from './deprecated-layout-skeletons';
+
 export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 
 // Note: OpenmspHeartbeatLoader is a client-only component and should be

@@ -229,7 +229,8 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
   const lastFetchedPath = useRef<string | null>(null);
   // In a loading scope nothing is fetched: the viewer reports itself loading, so it draws its own skeleton.
   const held = useLoadingScope();
-  const heldRef = useRef(held);
+  // The first fetch has started: it starts once, when the hook is first out of a loading scope.
+  const startedRef = useRef(false);
 
   const normalizedBaseRoute = baseRoute.replace(/\/$/, '');
 
@@ -475,10 +476,8 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     latestRef.current = { fetchContent, fetchStructure, cleanInitialPath, folderIndexFile };
   });
 
-  // Mount-only. The `isInitialized` state this used to latch on was read
-  // NOWHERE else: it was a run-once guard that cost a setState in an effect
-  // body (and a second, no-op run of this effect) to say what empty deps say
-  // directly.
+  // Runs once (`startedRef`), when the hook is first outside a loading scope: at mount, or when a scope it
+  // mounted in ends. A ref, not state: nothing renders from it.
   useEffect(() => {
     // Kick off the speculative content fetch IN PARALLEL with the structure
     // fetch — the two endpoints are independent and most landing pages have
@@ -488,7 +487,9 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     // useEffect issues the correct fetch after structure arrives — the
     // speculative result silently no-ops (the content state update gets
     // overwritten by the targeted fetch).
-    if (heldRef.current) return;
+    // Starts once, the first time the hook is out of a loading scope (at mount, or when the scope ends).
+    if (held || startedRef.current) return;
+    startedRef.current = true;
     const latest = latestRef.current;
     const speculativeContentPath = latest.cleanInitialPath || latest.folderIndexFile;
     lastFetchedPath.current = speculativeContentPath;
@@ -497,7 +498,7 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     // independent endpoints stay in parallel.
     void latest.fetchContent(speculativeContentPath);
     void latest.fetchStructure();
-  }, []);
+  }, [held]);
 
   useEffect(() => {
     if (selectedPath === null || selectedPath === undefined) return;

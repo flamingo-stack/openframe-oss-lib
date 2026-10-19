@@ -21,6 +21,7 @@ import { cn } from '../../utils/cn';
 import { NavLinkAnchorViaRuntime } from '../chat/nav-link-anchor-via-runtime';
 import { useScrollSpy } from '../docs/use-scroll-spy';
 import { PageContainer } from '../layout/page-container';
+import { useLoadingScope } from '../ui/loading-scope';
 import { STICKY_SECTION_NAV_HEIGHT_PX, StickySectionNav, type StickyNavSection } from './sticky-section-nav';
 
 /** The bar's own height: what a section's anchor must clear besides the header. */
@@ -50,7 +51,9 @@ function useRenderedSections(sections: StickyNavSection[]): StickyNavSection[] {
   useEffect(() => {
     const measure = () =>
       setEmpty(prev => {
-        const next = new Set(sections.filter(section => !document.getElementById(section.id)?.hasChildNodes()).map(s => s.id));
+        const next = new Set(
+          sections.filter(section => !document.getElementById(section.id)?.hasChildNodes()).map(s => s.id),
+        );
         return next.size === prev.size && [...next].every(id => prev.has(id)) ? prev : next;
       });
     measure();
@@ -81,6 +84,9 @@ export interface PageSectionBarProps {
 
 export function PageSectionBar({ sections: listed, label, brand, action }: PageSectionBarProps) {
   const sections = useRenderedSections(listed);
+  // In a loading scope a page whose sections are not known yet passes none: the bar still stands, and
+  // `StickySectionNav` draws its own skeleton.
+  const inScope = useLoadingScope();
   // What stays stuck over the bar: the site header alone, and nothing while it has slid away.
   const headerBottom = useHeaderHeight(undefined, { stuckOnly: true });
   const { activeSection, handleSectionClick } = useScrollSpy(sections, {
@@ -88,7 +94,7 @@ export function PageSectionBar({ sections: listed, label, brand, action }: PageS
     aboveFirst: 'none',
     headerOffset: headerBottom + SECTION_BAR_HEIGHT_PX + PAGE_ANCHOR_GAP_PX,
   });
-  if (sections.length === 0) return null;
+  if (sections.length === 0 && !inScope) return null;
 
   return (
     <PageContainer
