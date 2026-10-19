@@ -80,3 +80,5 @@ export * from './access-code-cohorts';
 export * from './icons';
 export * from './permissions';
 export * from './tmcg';
+export type { PlatformConfig } from './platform';
+export type { RealCategory } from './categories';

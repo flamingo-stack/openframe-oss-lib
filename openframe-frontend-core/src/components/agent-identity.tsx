@@ -10,8 +10,6 @@ import {
 import { identityTint } from '../utils/identity-tint';
 import { HEX_PATTERN } from '../utils/ods-color-utils';
 
-export { AGENT_IDENTITIES_API_PATH, type AgentIdentityIcon, type AgentIdentityIcons };
-
 /**
  * The colour an agent's GLYPH is drawn in when its identity names none: the
  * theme's text colour, the same wherever the mark sits. An agent's mark is one

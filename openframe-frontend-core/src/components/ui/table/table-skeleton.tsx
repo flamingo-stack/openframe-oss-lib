@@ -1,8 +1,10 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { CHECKBOX_BOX_CLASS } from '../checkbox';
 import type { TableCardSkeletonProps } from './types';
+import { getHideClasses, TABLE_ACTIONS_COLUMN_KEY, TABLE_CHEVRON_COLUMN_KEY } from './utils';
 
 // INNER row heights: the bordered row card adds 1px top + bottom, so the
 // outer block totals the designed 68px / 80px.
@@ -19,12 +21,18 @@ const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
+/**
+ * Rows a table's skeleton draws when its host states no count: one screen of rows under a page's header (a 68px row
+ * card and its 8px gap; about ten fit under the header of a 1440x900 screen, nine of a phone's 66px rows).
+ */
+export const TABLE_SKELETON_ROWS = 10;
+
 export function TableCardSkeleton({
   columns,
-  rows = 10,
+  rows = TABLE_SKELETON_ROWS,
   compact = false,
-  hasActions = false,
-  hasChevron = false,
+  actions,
+  selectable = false,
   className,
   rowClassName,
 }: TableCardSkeletonProps) {
@@ -39,64 +47,50 @@ export function TableCardSkeleton({
           key={index}
           className={cn('relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card', className)}
         >
-          {/* Desktop Skeleton */}
-          {/* Matches the ROW it stands in for: a compact row is content-sized
-              with a floor, a normal row is a fixed height. Using the taller of
-              the two here made every compact table jump on its first paint. */}
+          {/* `TableRow`'s own row: the same frame, gap and height at every breakpoint, each column in its own cell
+              width (the synthetic actions and chevron columns included), so a loaded row takes the skeleton's place. */}
           <div
             className={cn(
-              'hidden items-center gap-4 px-4 content-md:flex',
+              'relative flex items-center gap-4 px-4',
               compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
               rowClassName,
             )}
           >
-            {columns.map(column => (
-              <div key={column.key} className={cn('flex shrink-0 flex-col justify-center', column.width || 'flex-1')}>
-                <UnifiedSkeleton className="mb-1 h-5 w-3/4 rounded" />
-                {/* second line simulates multi-line content on the primary column */}
-                {index % 2 === 0 && column.key === primaryKey && (
-                  <UnifiedSkeleton className="h-4 w-1/2 rounded opacity-60" />
-                )}
-              </div>
-            ))}
-
-            {/* Actions skeleton */}
-            {hasActions && (
-              <div className={cn('flex shrink-0 items-center gap-2', !hasChevron && 'ml-auto')}>
-                <UnifiedSkeleton className="h-12 w-12 rounded" />
-                <UnifiedSkeleton className="h-12 w-24 rounded" />
+            {selectable && (
+              <div className="flex w-10 shrink-0 items-center justify-center">
+                <UnifiedSkeleton className={CHECKBOX_BOX_CLASS} />
               </div>
             )}
-
-            {/* Chevron skeleton */}
-            {hasChevron && (
-              <div className={cn('flex w-12 shrink-0 items-center justify-end', !hasActions && 'ml-auto')}>
-                <UnifiedSkeleton className="h-8 w-8 rounded" />
-              </div>
-            )}
-          </div>
-
-          {/* Mobile Skeleton */}
-          <div
-            className={cn(
-              'flex items-center justify-start gap-3 px-3 content-md:hidden',
-              // Mirror the real row on mobile too: a compact row is
-              // content-sized with a floor, a normal row a fixed height.
-              // Hard-wiring ROW_HEIGHT_MOBILE made every COMPACT table jump
-              // 68px -> 58px per row when the data replaced the skeleton.
-              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_MOBILE),
-              rowClassName,
-            )}
-          >
-            {/* The inner padding is the NON-compact row's; a compact row is
-                sized by its own `py-2` + floor, so adding `py-3` here made the
-                compact mobile skeleton 78px against a real row's 58. */}
-            <div className={cn('flex min-w-0 flex-1 flex-col justify-center', compact ? 'py-0' : 'py-3')}>
-              <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
-              <UnifiedSkeleton className="h-3 w-1/2 rounded opacity-60" />
-            </div>
-            {hasActions && <UnifiedSkeleton className="h-12 w-12 shrink-0 rounded" />}
-            {hasChevron && <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded" />}
+            {columns.map(column => {
+              const cellClass = cn('flex shrink-0', column.width || 'min-w-0 flex-1', getHideClasses(column.hideAt));
+              if (column.key === TABLE_ACTIONS_COLUMN_KEY) {
+                // One button per row action, at the real buttons' size: an icon-only action an icon button. A host
+                // that renders its own actions (`renderRowActions`) gets one icon button in the column's width.
+                return (
+                  <div key={column.key} className={cn(cellClass, 'items-center justify-end gap-2')}>
+                    {(actions ?? [{ iconOnly: true }]).map((action, i) => (
+                      // biome-ignore lint/suspicious/noArrayIndexKey: skeleton buttons never reorder
+                      <InteractiveSkeleton.Button key={i} size={action.iconOnly ? 'icon' : 'default'} />
+                    ))}
+                  </div>
+                );
+              }
+              if (column.key === TABLE_CHEVRON_COLUMN_KEY) {
+                return (
+                  <div key={column.key} className={cn(cellClass, 'items-center justify-end')}>
+                    <InteractiveSkeleton.Button size="icon" />
+                  </div>
+                );
+              }
+              return (
+                <div key={column.key} className={cn(cellClass, 'flex-col justify-center overflow-hidden')}>
+                  {/* A cell's text (`TableCell`: the primary face), and on the primary column every other row a
+                      second, secondary line (a description or an id under it). */}
+                  <TextLineSkeleton type="h4" className="w-3/4" />
+                  {index % 2 === 0 && column.key === primaryKey && <TextLineSkeleton type="h6" className="w-1/2" />}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}

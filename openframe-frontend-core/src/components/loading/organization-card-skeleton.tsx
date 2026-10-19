@@ -1,7 +1,19 @@
 import { cn } from '../../utils/cn';
+import { EntityImageSkeleton } from '../ui/entity-image';
 import { LoadingRegion } from './loading-region';
-import { OrganizationIconSkeleton } from './organization-icon-skeleton';
-import { TextSkeleton, MediaSkeleton } from './unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton } from './unified-skeleton';
+
+/** The card's corner radius, read by `OrganizationCard` and by its skeleton here. */
+export const ORGANIZATION_CARD_RADIUS_CLASS = 'rounded-[6px]';
+/** The card's layout, read by `OrganizationCard` and by its skeleton here, so the skeleton is the card's size. */
+export const ORGANIZATION_CARD_LAYOUT_CLASS = 'relative flex w-full flex-col gap-3 overflow-clip p-4';
+export const ORGANIZATION_CARD_SURFACE_CLASS = 'border border-ods-border bg-ods-card';
+export const ORGANIZATION_CARD_HEADER_CLASS = 'flex w-full items-start gap-3';
+export const ORGANIZATION_CARD_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col justify-center py-2';
+export const ORGANIZATION_CARD_DESCRIPTION_CLASS = 'h-12 w-full overflow-hidden';
+export const ORGANIZATION_CARD_FOOTER_CLASS = 'flex w-full min-w-0 items-center justify-between gap-2';
+export const ORGANIZATION_CARD_STATS_CLASS = 'flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4';
+export const ORGANIZATION_CARD_STAT_CLASS = 'flex flex-shrink-0 items-center gap-1';
 
 export interface OrganizationCardSkeletonProps {
   /**
@@ -23,17 +35,13 @@ export interface OrganizationCardSkeletonProps {
   containerClassName?: string;
 }
 
+/** The two footer stats a loading card draws (a value and its label each). */
+const ORGANIZATION_CARD_SKELETON_STAT_WIDTHS = ['w-16', 'w-20'] as const;
+
 /**
- * OrganizationCardSkeleton - Loading skeleton matching OrganizationCard exact layout
- *
- * Matches VendorCard skeleton structure for 100% visual parity.
- *
- * Structure:
- * - Header: 60x60px org logo + title + subtitle
- * - Description: Fixed 48px height with 2-line clamp
- * - Footer: Stats display area
- *
- * Prevents layout jumps by matching exact dimensions.
+ * OrganizationCard while its organization is read: the card's own layout constants (frame, header, description
+ * box, footer), so it is the card's size by construction. The logo is `EntityImageSkeleton`, the name and its
+ * second line `text-h3` and `text-h6` bars, the description two `text-h4` lines, the footer two stats.
  */
 export function OrganizationCardSkeleton({
   className,
@@ -44,71 +52,37 @@ export function OrganizationCardSkeleton({
   return (
     <div
       className={cn(
-        containerClassName || 'border border-ods-border bg-ods-card',
-        'flex h-full flex-col overflow-hidden rounded-lg',
+        ORGANIZATION_CARD_LAYOUT_CLASS,
+        containerClassName || ORGANIZATION_CARD_SURFACE_CLASS,
+        ORGANIZATION_CARD_RADIUS_CLASS,
         className,
       )}
+      aria-hidden
     >
-      <div className="flex flex-col gap-3 p-4">
-        {/* Header Section - Row layout matching OrganizationCard/VendorCard */}
-        <div className="flex w-full items-start gap-3">
-          {/* Logo Frame - 60px width fixed, matching actual structure */}
-          <OrganizationIconSkeleton
-            size="xl"
-            backgroundStyle="dark"
-            showBackground={true}
-            className="h-[60px] w-[60px]"
-          />
-
-          {/* Text Container - Column layout, matching actual structure */}
-          <div className="flex min-w-0 flex-1 flex-col justify-center space-y-1 py-2">
-            {/* Title - Single line with proper width */}
-            <TextSkeleton.Subheading className="w-3/4" />
-            {/* Subtitle (industry/tier) - Single line, shorter */}
-            <TextSkeleton.Caption className="w-1/2" />
+      <div className={ORGANIZATION_CARD_HEADER_CLASS}>
+        <EntityImageSkeleton />
+        <div className={ORGANIZATION_CARD_TEXT_CLASS}>
+          <TextLineSkeleton type="h3" className="w-3/4" />
+          <TextLineSkeleton type="h6" className="w-1/2" />
+        </div>
+      </div>
+      {showDescription && (
+        <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS}>
+          <TextLineSkeleton type="h4" lines={2} className="w-full" />
+        </div>
+      )}
+      {showFooter && (
+        <div className={ORGANIZATION_CARD_FOOTER_CLASS}>
+          <div className={ORGANIZATION_CARD_STATS_CLASS}>
+            {ORGANIZATION_CARD_SKELETON_STAT_WIDTHS.map(width => (
+              <div key={width} className={ORGANIZATION_CARD_STAT_CLASS}>
+                <MediaSkeleton.Icon size="sm" />
+                <TextLineSkeleton type="h6" className={width} />
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Description Section - Fixed 48px height matching VendorCard */}
-        {showDescription && (
-          <div className="flex h-12 w-full items-center overflow-hidden">
-            <div className="w-full space-y-1">
-              <TextSkeleton.Body className="w-full" />
-              <TextSkeleton.Body className="w-2/3" />
-            </div>
-          </div>
-        )}
-
-        {/* Footer Section - Stats display */}
-        {showFooter && (
-          <div className="flex w-full min-w-0 items-center justify-between gap-2">
-            {/* Stats Container */}
-            <div className="flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4">
-              {/* Stat 1 */}
-              <div className="flex flex-shrink-0 items-center gap-1">
-                <MediaSkeleton.Icon size="sm" className="h-5 w-5" />
-                <TextSkeleton.Caption className="w-8" />
-              </div>
-
-              {/* Stat 2 */}
-              <div className="flex flex-shrink-0 items-center gap-1">
-                <MediaSkeleton.Icon size="sm" className="h-5 w-5" />
-                <TextSkeleton.Caption className="w-10" />
-              </div>
-            </div>
-
-            {/* Tag/Badge Section */}
-            <div className="flex-shrink-0">
-              <div className="flex items-center gap-1.5 rounded border border-ods-border bg-ods-bg px-2.5 py-1.5">
-                <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-sm bg-ods-border">
-                  <MediaSkeleton.Icon size="sm" className="h-2.5 w-2.5" />
-                </div>
-                <TextSkeleton.Caption className="w-16" />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

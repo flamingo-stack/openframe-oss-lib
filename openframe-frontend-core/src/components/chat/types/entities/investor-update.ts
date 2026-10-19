@@ -8,8 +8,8 @@
  * formatter move here.
  */
 
+import type { ContentRef } from '../../../../types/content-ref';
 import { formatDateWithTimezone } from '../../../../utils/format';
-import type { ContentRef } from './content-ref';
 
 export interface MetricEntry {
   current: number;

@@ -22,8 +22,10 @@
 export { useQueryParams } from './use-query-params';
 export type { UseQueryParamsOptions, UseQueryParamsReturn } from './use-query-params';
 
-export { useApiParams, createSearchParams } from './use-api-params';
-export type { ParamSchema, UseApiParamsOptions, UseApiParamsReturn } from './use-api-params';
+export { useApiParams } from './use-api-params';
+export { createSearchParams } from '../../utils/search-params';
+export type { UseApiParamsOptions, UseApiParamsReturn } from './use-api-params';
+export type { ParamSchema } from '../../utils/search-params';
 
 // Introspection
 export { introspector, GraphQLIntrospector } from './introspection';
@@ -48,8 +50,8 @@ export {
   validateSchema,
   getArrayParams,
   getRequiredParams,
-  shouldIncludeInUrl,
 } from './flatten-schema';
+export { shouldIncludeInUrl } from '../../utils/search-params';
 
 export {
   urlParamsToVariables,

@@ -41,34 +41,6 @@ export function slugifyHeadingBase(text: string): string {
 export function slugifyHeadingText(text: string): string {
   return slugifyHeadingBase(stripHeadingEmojis(text));
 }
-
-// ---------------------------------------------------------------------------
-// Heading SCANNER + DEDUPER (the other half of the producer/consumer contract)
-// ---------------------------------------------------------------------------
-/**
- * Sharing the slug chain alone was not enough. The PRODUCER
- * (`utils/markdown-section-extractor`) and the CONSUMER
- * (`components/ui/markdown/heading-ids`) each carried their own copy of
- * "which lines are headings" and "how do duplicates get suffixed", and the
- * copies drifted:
- *   - the extractor toggled its code-block state on a bare
- *     `line.startsWith('```')`, so a `~~~`-fenced (or wider-backtick, or
- *     indented) block containing `## Setup` produced a SECTION from the
- *     extractor and NO id from the renderer — `sectionIdMap` then missed
- *     silently and the deep-link anchor pointed nowhere;
- *   - the extractor anchored ATX at column 0 while the renderer allowed the
- *     CommonMark 0..3-space indent;
- *   - the dedupe counter was hand-copied in both files, each with a comment
- *     saying "the two must agree".
- * Both now call `scanHeadings` + `createHeadingIdDeduper`. Server-safe: no
- * React, no DOM.
- */
-
-// The CommonMark fence machine used to live in THIS file, which meant a
-// streaming renderer imported its fence state from a module named after
-// heading slugs. It now lives in `./markdown-fences`; re-exported here so the
-// public `utils` surface (and every existing import) is unchanged.
-export { createFenceTracker, isBlankLine, type FenceTracker, type FenceLineRole } from './markdown-fences';
 import { createFenceTracker, isBlankLine } from './markdown-fences';
 
 /** A heading the renderer will emit, located in the source. */

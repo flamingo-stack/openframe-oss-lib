@@ -32,14 +32,18 @@ import { buildProductReleaseCardProps } from '../../chat/entity-cards/product-re
 import { useEntityCardLink } from '../../chat/entity-cards/use-entity-card-link';
 import { isModifierClick } from '../../chat/utils/chat-nav-resolution';
 import { executeNavigationImperative } from '../../chat/utils/execute-navigation';
+import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
 import { LoadingRegion } from '../../loading/loading-region';
-import { PersistentPaginationWrapper } from '../../persistent-pagination';
 import { LoadError } from '../../ui/error-state';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { UnifiedPagination } from '../../unified-pagination';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
-import { ProductReleaseCardSkeleton } from './product-release-card-skeleton';
 
 const DEFAULT_ENDPOINT = '/api/releases';
+/** The pager's row inside the list's bottom slot: no margin of its own (the slot spaces it), so the loaded pager is
+ *  the height of its skeleton. */
+const PAGER_ROW_CLASS = 'flex w-full justify-center';
 // Param keys sourced from the shared registry (see RoadmapView) — single source for the
 // chrome's written `?key=` and this view's read.
 const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
@@ -158,10 +162,19 @@ export function ProductReleasesView({
   const listParams = new URLSearchParams({ limit: String(itemsPerPage), offset: String(offset) });
   if (search) listParams.set(searchParamKey, search);
   if (status && status !== 'all') listParams.set(statusParamKey, status);
-  const { data, isLoading, error, reload } = useSelfFetch<ProductReleaseListResponse>(
-    `${endpoint}?${listParams.toString()}`,
-    { initialData },
-  );
+  // In a page's loading state the list is read: nothing is fetched and the view is its skeleton.
+  const inScope = useLoadingScope();
+  const {
+    data,
+    isLoading: fetching,
+    error,
+    reload,
+  } = useSelfFetch<ProductReleaseListResponse>(inScope ? null : `${endpoint}?${listParams.toString()}`, {
+    initialData,
+  });
+  const isLoading = inScope || fetching;
+  // The page's sync row (`PageDataSyncRow`) states what this list's endpoint answered.
+  usePageDataSync(data?.sync, isLoading && !data);
 
   const releases = data?.data ?? [];
   const totalCount = data?.count ?? 0;
@@ -219,33 +232,28 @@ export function ProductReleasesView({
                     key={release?.id ?? `slot-${i}`}
                     style={{ visibility: isLoading || hasData ? 'visible' : 'hidden' }}
                   >
-                    {isLoading ? (
-                      <ProductReleaseCardSkeleton size="lg" />
-                    ) : release ? (
+                    {!isLoading && release ? (
                       <ReleaseRow release={release} basePath={basePath} buildCardProps={buildCardProps} />
                     ) : (
-                      <ProductReleaseCardSkeleton size="lg" />
+                      // Read, or a hidden slot past the page's last release: the card draws its own skeleton.
+                      <ProductReleaseCard loading size="lg" title="" version="" formattedDate="" />
                     )}
                   </div>
                 );
               })}
             </LoadingRegion>
 
-            {/* Pagination — always present at the bottom for consistent spacing. */}
+            {/* Pagination: always present at the bottom, one row height in every state (its skeleton while the list
+                is read, the hidden real control for a single page), so the list above never moves. */}
             <div className="mt-6 flex justify-center content-md:mt-8">
-              {isLoading ? (
-                <div className="m-3 h-12 w-64" />
-              ) : releases.length > 0 && totalPages > 1 ? (
-                <PersistentPaginationWrapper
-                  isLoading={false}
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={goToPage}
-                  variant="blog"
-                />
-              ) : (
-                <div className="m-3 h-12 w-64" style={{ visibility: 'hidden' }} />
-              )}
+              <UnifiedPagination
+                loading={isLoading}
+                currentPage={currentPage}
+                totalPages={releases.length > 0 ? totalPages : 0}
+                onPageChange={goToPage}
+                className={PAGER_ROW_CLASS}
+                reserveSpace
+              />
             </div>
           </>
         )}

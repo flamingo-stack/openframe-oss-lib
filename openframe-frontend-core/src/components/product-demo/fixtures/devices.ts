@@ -72,9 +72,6 @@ export function buildDevicesFixture(cast: DemoCast): DevicesFixture {
   return { devices, deviceFilters, totalCount: devices.length };
 }
 
-/** What the Devices page shows for a search: the query in the field and the rows that answer it. */
-export const DEVICES_SEARCH_QUERY = 'Windows';
-
 /** The fleet narrowed to its Windows devices, the way the list answers that search. */
 export function buildWindowsDevicesFixture(cast: DemoCast): DevicesFixture {
   const fleet = buildDevicesFixture(cast);

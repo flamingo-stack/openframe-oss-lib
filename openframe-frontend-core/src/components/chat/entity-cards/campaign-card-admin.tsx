@@ -13,21 +13,20 @@ import { Megaphone } from 'lucide-react';
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { formatDateShort } from '../../../utils/date-formatters';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import {
   COMPACT_CARD_ICON_SLOT,
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_OUTER_STATIC,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUBTITLE,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 /** Minimal campaign shape needed by the chat-inline compact card. */
 export interface CampaignCardItem {
@@ -52,6 +51,7 @@ export interface CampaignCardAdminProps {
 }
 
 export function CampaignCardAdmin({ campaign, className, anchorProps }: CampaignCardAdminProps) {
+  if (useLoadingScope()) return <CampaignCardAdminSkeleton className={className} />;
   const goalsCount = campaign.goals?.length || 0;
 
   const innerChildren = (
@@ -96,19 +96,6 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
 
 export function CampaignCardAdminSkeleton({ className }: { className?: string }) {
   return (
-    <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-      <span className={COMPACT_CARD_TEXT_COL}>
-        <span className={COMPACT_CARD_TITLE_ROW}>
-          <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <UnifiedSkeleton as="span" className="h-3 w-1/2 rounded" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
-        </span>
-      </span>
-    </span>
+    <CompactCardSkeleton rows={[{ width: 'w-1/2' }, { width: 'w-11/12' }]} className={className} />
   );
 }
