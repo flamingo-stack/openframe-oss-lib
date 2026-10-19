@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronDown, ChevronUp, FileText, Folder, FolderOpen } from 'lucide-react';
+import { ChevronDownIcon, ChevronUpIcon, FileTextIcon, FolderIcon, FolderOpenIcon } from '../icons-v2-generated';
 import { cn } from '../../utils/cn';
 import { DEFAULT_FOLDER_INDEX_FILE as CANONICAL_FOLDER_INDEX_FILE } from '../../utils/doc-tree-nav';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -166,12 +166,12 @@ function NavigationItem({
               <span className="mr-2 flex-shrink-0">
                 {node.type === 'folder' ? (
                   isExpanded ? (
-                    <FolderOpen className="h-4 w-4" />
+                    <FolderOpenIcon className="h-4 w-4" />
                   ) : (
-                    <Folder className="h-4 w-4" />
+                    <FolderIcon className="h-4 w-4" />
                   )
                 ) : (
-                  <FileText className="h-4 w-4" />
+                  <FileTextIcon className="h-4 w-4" />
                 )}
               </span>
               <span className="min-w-0 flex-1 truncate text-left">
@@ -197,7 +197,7 @@ function NavigationItem({
                 }}
                 aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`}
               >
-                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                {isExpanded ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
               </button>
             )}
           </div>
@@ -302,12 +302,12 @@ function MobileNavigationItem({
               <span className="mr-2 flex-shrink-0">
                 {node.type === 'folder' ? (
                   isExpanded ? (
-                    <FolderOpen className="h-4 w-4" />
+                    <FolderOpenIcon className="h-4 w-4" />
                   ) : (
-                    <Folder className="h-4 w-4" />
+                    <FolderIcon className="h-4 w-4" />
                   )
                 ) : (
-                  <FileText className="h-4 w-4" />
+                  <FileTextIcon className="h-4 w-4" />
                 )}
               </span>
               <span className="min-w-0 flex-1 truncate text-left">
@@ -333,7 +333,7 @@ function MobileNavigationItem({
                 }}
                 aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`}
               >
-                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {isExpanded ? <ChevronUpIcon className="h-3.5 w-3.5" /> : <ChevronDownIcon className="h-3.5 w-3.5" />}
               </button>
             )}
           </div>
