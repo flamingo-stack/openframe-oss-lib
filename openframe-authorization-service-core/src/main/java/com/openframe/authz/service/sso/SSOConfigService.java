@@ -21,17 +21,11 @@ public class SSOConfigService {
     private final EncryptionService encryptionService;
     private final List<DefaultProviderConfig> defaultProviderConfigs;
 
-    /**
-     * Get ACTIVE SSO configuration by tenant and provider.
-     */
     public Optional<SSOPerTenantConfig> getSSOConfig(String tenantId, String provider) {
         return ssoPerTenantConfigRepository.findFirstByTenantIdAndProviderAndEnabledTrue(tenantId, provider);
     }
 
-    /**
-     * Get effective ACTIVE SSO configuration for a tenant and provider.
-     * Falls back to global properties-based SSO config if tenant-specific config is absent.
-     */
+    // Falls back to global properties-based SSO config if tenant-specific config is absent.
     public Optional<SSOConfig> getEffectiveSSOConfig(String tenantId, String provider) {
         Optional<SSOPerTenantConfig> perTenant = getSSOConfig(tenantId, provider);
         if (perTenant.isPresent()) {
@@ -58,17 +52,10 @@ public class SSOConfigService {
         return Optional.of(cfg);
     }
 
-    /**
-     * Get ACTIVE SSO configurations for a tenant (independent of provider).
-     * Active = enabled + non-empty clientId/clientSecret.
-     */
     public List<SSOPerTenantConfig> getActiveForTenant(String tenantId) {
         return ssoPerTenantConfigRepository.findByTenantIdAndEnabledTrue(tenantId);
     }
 
-    /**
-     * Get effective providers for tenant: union of active per-tenant providers and available defaults from properties.
-     */
     public List<String> getEffectiveProvidersForTenant(String tenantId) {
         Set<String> result = new LinkedHashSet<>();
         getActiveForTenant(tenantId).forEach(cfg -> result.add(cfg.getProvider().toLowerCase(Locale.ROOT)));
@@ -80,10 +67,6 @@ public class SSOConfigService {
         return List.copyOf(result);
     }
 
-    /**
-     * Providers the tenant configured with its own app — active per-tenant configs only, no
-     * defaults and no built-in login toggle.
-     */
     public List<String> getCustomProvidersForTenant(String tenantId) {
         return getActiveForTenant(tenantId).stream()
                 .map(cfg -> cfg.getProvider().toLowerCase(Locale.ROOT))
@@ -92,11 +75,8 @@ public class SSOConfigService {
                 .toList();
     }
 
-    /**
-     * Whether the built-in OpenFrame (password) login is enabled for the tenant. Controlled by a
-     * pseudo-provider document ({@link SSOConfig#OPENFRAME_PROVIDER}) in {@code sso_configs};
-     * absence means enabled — the toggle only ever opts a tenant out.
-     */
+    // Controlled by a pseudo-provider document (SSOConfig.OPENFRAME_PROVIDER) in sso_configs;
+    // absence means enabled — the toggle only ever opts a tenant out.
     public boolean isOpenframeLoginEnabled(String tenantId) {
         return ssoPerTenantConfigRepository
                 .findFirstByTenantIdAndProvider(tenantId, SSOConfig.OPENFRAME_PROVIDER)
@@ -112,9 +92,6 @@ public class SSOConfigService {
     }
 
 
-    /**
-     * Find enabled, auto-provisioning SSO config by email domain (lowercased).
-     */
     public Optional<SSOPerTenantConfig> findAutoProvisionByDomain(String domain) {
         if (!StringUtils.hasText(domain)) {
             return Optional.empty();
@@ -125,9 +102,6 @@ public class SSOConfigService {
                 .findFirst();
     }
 
-    /**
-     * Get decrypted client secret for SSO configuration
-     */
     public String getDecryptedClientSecret(SSOConfig config) {
         if (config.getClientSecret() == null) {
             return null;
