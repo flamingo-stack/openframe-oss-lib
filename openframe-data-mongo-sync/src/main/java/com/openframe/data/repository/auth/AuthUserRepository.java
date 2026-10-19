@@ -11,24 +11,15 @@ import java.util.Optional;
 @Repository
 public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
 
-    /**
-     * Find single ACTIVE user by email
-     */
     Optional<AuthUser> findByEmailAndStatus(String email, UserStatus status);
 
     /** All accounts for an email in a given status, across tenants — used to detect duplicates. */
     List<AuthUser> findAllByEmailAndStatus(String email, UserStatus status);
 
-    /**
-     * Find single ACTIVE user by email within a specific tenant
-     */
     Optional<AuthUser> findByEmailAndTenantIdAndStatus(String email, String tenantId, UserStatus status);
 
     boolean existsByEmailAndTenantId(String email, String tenantId);
 
-    /**
-     * Find single user by email within a specific tenant regardless of status
-     */
     Optional<AuthUser> findByEmailAndTenantId(String email, String tenantId);
     void deleteByTenantId(String tenantId);
 
