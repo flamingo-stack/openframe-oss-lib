@@ -51,6 +51,7 @@ import {
   ToggleGroupItem,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
+import { useLoadingScope } from '../ui/loading-scope';
 import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
 
 /**
@@ -437,7 +438,10 @@ const chipsControl = ({ field, id, registerName, error, control }: ControlArgs):
 const builtInId = (name: string) => `ms-${name.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`)}`;
 
 export interface BookingFormProps {
-  availability: MeetingAvailability;
+  /** The link's availability; null while it is read (the form is then its skeleton). */
+  availability: MeetingAvailability | null;
+  /** The link is still being read: the form draws its own skeleton (`BookingFormSkeleton`), as in a loading scope. */
+  loading?: boolean;
   meetingId: string;
   /** Absent in `deferSlot` mode — the slot is chosen AFTER these answers. */
   startTimeMs?: number;
@@ -527,8 +531,28 @@ export interface BookingFormProps {
  * external embedders). Honeypot + elapsed-ms are merged into the POST at
  * submit; the parent calls `resetSignals()` after a SLOT_TAKEN refetch so a
  * legitimate retry isn't flagged too-fast.
+ *
+ * While the link is read (`loading`, a loading scope, or no availability yet) the form is its own skeleton.
  */
-export function BookingForm({
+export function BookingForm(props: BookingFormProps) {
+  const inScope = useLoadingScope();
+  const { availability } = props;
+  if (inScope || props.loading || !availability) {
+    return (
+      <BookingFormSkeleton
+        fieldRows={props.fieldRows}
+        optionalFields={props.optionalFields}
+        fieldCopy={props.fieldCopy}
+        consent={props.consent}
+        footerNote={props.footerNote}
+        submitLabel={props.submitLabel}
+      />
+    );
+  }
+  return <BookingFormBody {...props} availability={availability} />;
+}
+
+function BookingFormBody({
   availability,
   meetingId,
   startTimeMs,
@@ -552,7 +576,7 @@ export function BookingForm({
   honeypotInputProps,
   getSignals,
   rescue = null,
-}: BookingFormProps) {
+}: BookingFormProps & { availability: MeetingAvailability }) {
   const { formFields, legalConsent } = availability;
   // Every declared question resolved to a control (`resolveFormFieldControl`) —
   // an unfamiliar HubSpot type is drawn as its nearest control, never dropped

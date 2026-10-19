@@ -33,6 +33,9 @@ function markFontSize(mark: string): number {
   return 7;
 }
 
+/** A compliance logo's box (the official mark's frame and the drawn badge alike): read by its skeletons too. */
+export const COMPLIANCE_LOGO_SIZE_CLASS = 'size-10';
+
 /**
  * A compliance standard's badge, for a standard the icon set has no official
  * mark for: the standard's mark ("CMMC", "FedRAMP") in a plain ring, drawn in
@@ -45,7 +48,7 @@ export function ComplianceBadge({ standard, className }: { standard: ComplianceS
     <svg
       viewBox="0 0 40 40"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn('size-10 shrink-0', className)}
+      className={cn(COMPLIANCE_LOGO_SIZE_CLASS, 'shrink-0', className)}
       role="img"
       aria-label={`${standard.body} ${standard.mark}`}
     >
@@ -96,7 +99,7 @@ export function ComplianceLogo({
     <span
       role="img"
       aria-label={`${standard.body} ${standard.mark}`}
-      className={cn('flex size-10 shrink-0 items-center justify-center', className)}
+      className={cn('flex shrink-0 items-center justify-center', COMPLIANCE_LOGO_SIZE_CLASS, className)}
     >
       {/* Fills the box, so a caller's size class sizes the mark too (not only its frame). */}
       <Official size={40} className="size-full" aria-hidden="true" />

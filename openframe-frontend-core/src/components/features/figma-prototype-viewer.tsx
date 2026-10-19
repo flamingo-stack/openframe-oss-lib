@@ -492,15 +492,9 @@ function UnifiedUI({ state, handlers, config, iframeRef }: UnifiedUIProps) {
 
         {/* Loading Skeleton */}
         {showSkeleton && (
-          // A static frame: the skeleton surface pulses behind the words, which stay outside it (still).
-          <div className="absolute inset-0 z-10 flex h-full w-full items-center justify-center overflow-hidden rounded-lg">
+          // The prototype's frame as one skeleton surface: no words of its own.
+          <div className="absolute inset-0 z-10 h-full w-full overflow-hidden rounded-lg">
             <UnifiedSkeleton variant="rectangular" className="absolute inset-0 h-full" />
-            <div className="relative text-center">
-              <div className="text-ods-text-primary text-h2">
-                Warming up <span className="text-ods-open-yellow">Fae</span> and{' '}
-                <span className="text-ods-open-yellow">Mingo</span>
-              </div>
-            </div>
           </div>
         )}
       </div>

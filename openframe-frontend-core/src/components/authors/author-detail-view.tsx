@@ -92,7 +92,7 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
               {proxiedAvatar ? (
                 <Image src={proxiedAvatar} alt={author.fullName} fill className="object-cover" unoptimized />
               ) : (
-                <div className="flex h-full w-full items-center justify-center font-heading text-3xl text-ods-text-secondary">
+                <div className="flex h-full w-full items-center justify-center text-ods-text-secondary text-h2">
                   {author.fullName.charAt(0).toUpperCase()}
                 </div>
               )}

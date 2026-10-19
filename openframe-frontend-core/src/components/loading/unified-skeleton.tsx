@@ -224,20 +224,24 @@ export const TextSkeleton = {
 /**
  * Interactive element skeletons
  */
+/** The width a button skeleton stands for its label with (a short label). */
+const BUTTON_SKELETON_LABEL_WIDTH_CLASS = 'w-24';
+
 export const InteractiveSkeleton = {
   /**
-   * A button while its label is read (or a whole button row in a skeleton). With `size`, the box is that Button
-   * size's own classes (`BUTTON_SIZE_CLASS`, the same map `buttonVariants` reads: height and padding per
-   * breakpoint) and a width standing for the label (`className` overrides it); icon sizes carry their own width.
-   * Without `size`, the historic 40/48px box.
+   * A button while its label is read (or a whole button row in a skeleton): the box is that Button size's own
+   * classes (`BUTTON_SIZE_CLASS`, the same map `buttonVariants` reads: height and padding per breakpoint; the
+   * `default` size when none is given, as `Button`'s own default) and a width standing for the label (`className`
+   * overrides it); icon sizes carry their own width.
    */
-  Button: ({ className, size, ...props }: Omit<UnifiedSkeletonProps, 'variant'> & { size?: ButtonSizeKey }) => (
+  Button: ({
+    className,
+    size = 'default',
+    ...props
+  }: Omit<UnifiedSkeletonProps, 'variant'> & { size?: ButtonSizeKey }) => (
     <UnifiedSkeleton
       variant="default"
-      className={cn(
-        size ? cn(BUTTON_SIZE_CLASS[size], !size.startsWith('icon') && 'w-24') : 'h-10 w-32 content-md:h-12 content-md:w-40',
-        className,
-      )}
+      className={cn(BUTTON_SIZE_CLASS[size], !size.startsWith('icon') && BUTTON_SKELETON_LABEL_WIDTH_CLASS, className)}
       {...props}
     />
   ),
@@ -246,7 +250,11 @@ export const InteractiveSkeleton = {
    * Input field skeleton
    */
   Input: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton variant="default" className={cn('w-full', INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS, className)} {...props} />
+    <UnifiedSkeleton
+      variant="default"
+      className={cn('w-full', INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS, className)}
+      {...props}
+    />
   ),
 
   /**

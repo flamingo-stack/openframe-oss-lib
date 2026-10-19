@@ -21,6 +21,9 @@ interface EntityTagBadgesProps {
   skeletonCount?: number;
   /** In a loading state with no `max`: how many tag boxes a phone's row draws (default `skeletonCount`). */
   skeletonPhoneCount?: number;
+  /** In a loading state: a host's typical tag label width (a sizing class) where its tags run longer or shorter than
+   *  the default, so its skeleton row wraps where its typical row wraps. */
+  skeletonItemClassName?: string;
   /** Extra classes on the wrapper row. */
   className?: string;
 }
@@ -50,10 +53,11 @@ const TAG_ITEM_CLASS = 'inline-flex';
 export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
 
 /**
- * A tag's label while it is read: a typical label's width, ten characters of the badge's monospaced type (measured
- * across records, a tag is about ten characters, e.g. "COMPLIANCE"), so the row wraps where a typical row wraps.
+ * A tag's label while it is read: a typical label's width, eight characters of the badge's monospaced type (loaded
+ * badges measure 41 to 132px, typically about 90px: "AI AGENTS", "AI IN IT"), so the row wraps where a typical row
+ * wraps: a capped row's three tags and its "+N" fit one line of a phone (342px), as a typical capped row does.
  */
-const TAG_SKELETON_WIDTH_CLASS = 'w-[10ch]';
+const TAG_SKELETON_WIDTH_CLASS = 'w-[8ch]';
 /** The "+N" badge's skeleton: the width of a two-digit count. */
 const OVERFLOW_BADGE_SKELETON_CLASS = 'w-5';
 
@@ -74,7 +78,8 @@ export function EntityTagBadgesSkeleton({
   phoneCount?: number;
   overflow?: boolean;
   className?: string;
-  /** Extra classes on each tag's box (a host's typical tag width); the row keeps the row's own classes. */
+  /** A host's typical tag label width (a sizing class on each badge, in place of the default); the row keeps the
+   *  row's own classes. */
   itemClassName?: string;
 }) {
   return (
@@ -85,18 +90,14 @@ export function EntityTagBadgesSkeleton({
           key={i}
           className={cn(
             TAG_ITEM_CLASS,
-            itemClassName,
             i >= phoneCount && 'hidden content-md:inline-flex',
             i >= count && 'content-md:hidden',
           )}
           data-loading-item
         >
           {/* The loaded badge's 1px border (its colours are the skeleton's). */}
-          {/* A host's typical tag width (`itemClassName`) is the box's: the badge fills it. */}
-          <StatusBadgeSkeleton
-            variant="card"
-            className={cn('border', itemClassName ? 'box-border w-full' : TAG_SKELETON_WIDTH_CLASS)}
-          />
+          {/* The label's typical width: the host's (`itemClassName`), else the default. */}
+          <StatusBadgeSkeleton variant="card" className={cn('border', itemClassName ?? TAG_SKELETON_WIDTH_CLASS)} />
         </span>
       ))}
       {/* The "+N" badge counts the tags left out: read data, so it is one of the list's items. */}
@@ -115,15 +116,21 @@ export function EntityTagBadges({
   max,
   skeletonCount,
   skeletonPhoneCount,
+  skeletonItemClassName,
   className,
 }: EntityTagBadgesProps) {
   // A capped row draws its cap and its "+N" badge while it loads, in the row's own wrapping layout: the skeleton
   // takes the lines a typical capped row takes, and a loaded tag is never cut to fit it.
   if (useLoadingScope()) {
     return max == null ? (
-      <EntityTagBadgesSkeleton count={skeletonCount} phoneCount={skeletonPhoneCount} className={className} />
+      <EntityTagBadgesSkeleton
+        count={skeletonCount}
+        phoneCount={skeletonPhoneCount}
+        itemClassName={skeletonItemClassName}
+        className={className}
+      />
     ) : (
-      <EntityTagBadgesSkeleton count={max} overflow className={className} />
+      <EntityTagBadgesSkeleton count={max} overflow itemClassName={skeletonItemClassName} className={className} />
     );
   }
   const items = (tags || []).filter((t): t is TagAssoc => !!t && !!t.name);

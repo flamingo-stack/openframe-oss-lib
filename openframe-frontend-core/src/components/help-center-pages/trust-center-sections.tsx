@@ -14,7 +14,7 @@
  * server answers as one flat, grouped, counted list.
  */
 
-import { createElement, useState, type ReactNode } from 'react';
+import { createElement, useState, type CSSProperties, type ReactNode } from 'react';
 import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
@@ -49,7 +49,7 @@ import { ListEmptyState } from '../list-empty-state';
 import { LoadingRegion } from '../loading/loading-region';
 import { InteractiveSkeleton, TextLineSkeleton, TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
-import { ComplianceLogo } from '../ui/compliance-badge';
+import { COMPLIANCE_LOGO_SIZE_CLASS, ComplianceLogo } from '../ui/compliance-badge';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -220,7 +220,7 @@ export function ComplianceSection({
  * so the list box shows exactly 5 of them and scrolls for
  * the rest.
  */
-const CONTROL_ROW_CLASS = 'h-14 content-md:h-20 overflow-hidden';
+const CONTROL_ROW_CLASS = 'h-[var(--control-row-h)] overflow-hidden';
 
 /** ONE row renderer for the controls list: fixed-height rows, one line each for name and description. */
 function controlRows(controls: TrustCenterControl[]): PanelRow[] {
@@ -243,14 +243,17 @@ function countLabel(n: number, noun: string): string {
 }
 
 /**
- * The list box: exactly 5 control rows (`CONTROL_ROW_CLASS`: 3.5rem, 5rem from
- * md) plus their 1px separators and the panel's border. Controls, loading,
- * empty and error all fill this same box, so nothing below it moves.
+ * The list box: exactly `CONTROLS_SKELETON_ROWS` control rows (`CONTROL_ROW_CLASS`) plus their 1px separators and the
+ * panel's 1px border, computed from the section's row height and row count (`CONTROLS_SECTION_CLASS` and
+ * `controlsSectionStyle`). Controls, loading, empty and error all fill this same box, so nothing below it moves.
  */
-const CONTROLS_LIST_HEIGHT = 'h-[calc(5*3.5rem+7px)] content-md:h-[calc(5*5rem+7px)]';
+const CONTROLS_LIST_HEIGHT = 'h-[calc(var(--controls-rows)*(var(--control-row-h)+1px)+2px)]';
 
 /** The controls section's stack, loaded and loading. */
-const CONTROLS_SECTION_CLASS = 'flex flex-col gap-[var(--spacing-system-m)]';
+/** It states a control row's height (3.5rem, 5rem from md: one line of name, one of description), which the rows and
+ *  the list box read. */
+const CONTROLS_SECTION_CLASS =
+  'flex flex-col gap-[var(--spacing-system-m)] [--control-row-h:3.5rem] content-md:[--control-row-h:5rem]';
 /** The controls toolbar (summary line + search), loaded and loading. */
 const CONTROLS_TOOLBAR_CLASS =
   'flex flex-col gap-[var(--spacing-system-s)] content-md:flex-row content-md:items-center content-md:justify-between';
@@ -261,6 +264,8 @@ const CONTROLS_SKELETON_TABS = 4;
 
 /** Skeleton rows shown in the list box while the server's answer is on its way: exactly the box's visible rows. */
 const CONTROLS_SKELETON_ROWS = 5;
+/** The section's row count, which the list box's height reads. */
+const controlsSectionStyle = { '--controls-rows': CONTROLS_SKELETON_ROWS } as CSSProperties;
 
 function controlsTabId(domain: string): string {
   return `domain-${domain.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
@@ -368,7 +373,7 @@ function ControlsSectionLoaded({ endpoint, seed }: { endpoint: string; seed: Tru
   }
 
   return (
-    <div className={CONTROLS_SECTION_CLASS}>
+    <div className={CONTROLS_SECTION_CLASS} style={controlsSectionStyle}>
       <TabNavigation
         tabs={tabs}
         activeTab={activeTab}
@@ -514,6 +519,9 @@ export function DocumentRequestModal({
 // Subprocessors
 // ---------------------------------------------------------------------------
 
+/** A row's glyph mark (a subprocessor's icon, a document's glyph): read by the rows and their skeleton. */
+const TRUST_GLYPH_SIZE_CLASS = 'size-6';
+
 /**
  * A subprocessor's mark, best source first: its own site's icon (the hub looks
  * it up from the website Vanta holds), else the brand logo our icon set has for
@@ -521,14 +529,15 @@ export function DocumentRequestModal({
  * icon that fails to load falls back to.
  */
 function subprocessorMark({ name, logoUrl }: TrustCenterSubprocessor): ReactNode {
-  if (logoUrl) return <EntityImage src={logoUrl} alt={name} fallbackText={name} sizeClassName="size-6" />;
+  if (logoUrl)
+    return <EntityImage src={logoUrl} alt={name} fallbackText={name} sizeClassName={TRUST_GLYPH_SIZE_CLASS} />;
   const logo = brandLogoForName(name);
   return logo ? (
     <span role="img" aria-label={name} className="flex">
-      {createElement(logo, { className: 'size-6' })}
+      {createElement(logo, { className: TRUST_GLYPH_SIZE_CLASS })}
     </span>
   ) : (
-    <EntityImage alt={name} fallbackText={name} sizeClassName="size-6" />
+    <EntityImage alt={name} fallbackText={name} sizeClassName={TRUST_GLYPH_SIZE_CLASS} />
   );
 }
 
@@ -682,7 +691,11 @@ function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?:
         key: 'item',
         leadingIcon: (
           <UnifiedSkeleton
-            className={shape.mark === 'logo' ? 'size-10 shrink-0 rounded-full' : 'size-6 shrink-0 rounded'}
+            className={
+              shape.mark === 'logo'
+                ? cn(COMPLIANCE_LOGO_SIZE_CLASS, 'shrink-0 rounded-full')
+                : cn(TRUST_GLYPH_SIZE_CLASS, 'shrink-0 rounded')
+            }
           />
         ),
         value: <TextLineSkeleton type="inherit" as="span" className="w-1/3" />,
@@ -728,7 +741,7 @@ function ControlsSummarySkeleton() {
 /** The Controls section while loading: its tab strip, its summary and the real search, and the list box's skeleton. */
 function ControlsSectionSkeleton() {
   return (
-    <div className={CONTROLS_SECTION_CLASS}>
+    <div className={CONTROLS_SECTION_CLASS} style={controlsSectionStyle}>
       <TabNavigationSkeleton count={CONTROLS_SKELETON_TABS} />
       <div className={CONTROLS_TOOLBAR_CLASS}>
         <p className={BODY_TEXT}>

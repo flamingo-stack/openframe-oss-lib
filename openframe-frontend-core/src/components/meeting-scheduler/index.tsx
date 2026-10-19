@@ -59,19 +59,12 @@ import { formatDurationCompact, formatDateWithTimezone } from '../../utils/forma
 import { BackButton } from '../layout/back-button';
 import { LoadingRegion } from '../loading/loading-region';
 import { Alert, AlertDescription, Button } from '../ui';
-import {
-  BookingForm,
-  BookingFormSkeleton,
-  DEFAULT_SUBMIT_LABEL,
-  type BookingFieldCopy,
-  type BookingFieldRow,
-  type BookingFormConsent,
-  type BookingFormProps,
-} from './booking-form';
+import { useLoadingScope } from '../ui/loading-scope';
+import { BookingForm, DEFAULT_SUBMIT_LABEL, type BookingFieldRow, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
-import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
+import { SchedulerContextPanel } from './context-panel';
 import { SchedulerModalHeader } from './modal-header';
-import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
+import { SlotPicker, dayKeyInZone } from './slot-picker';
 
 /**
  * Visitor-facing copy per booking-error code. Everything except SLOT_TAKEN
@@ -434,6 +427,7 @@ const MODAL_STACK_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
 const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
 const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
 const NOOP = () => undefined;
+const NOOP_SUBMIT = () => Promise.resolve();
 
 /** The modal's form draws the name pair first and the email under it, as its design does. */
 const MODAL_FIELD_ROWS: BookingFieldRow[] = [[{ name: 'firstName' }, { name: 'lastName' }], [{ name: 'email' }]];
@@ -493,83 +487,6 @@ function schedulerCardClasses(flow: SchedulerFlow, step: Step, className?: strin
   };
 }
 
-/**
- * The scheduler while its availability loads: the SAME card, wrappers and
- * panels as the loaded scheduler at that step, with the context panel and the
- * action panel drawn as their skeletons. The scheduler draws it on a cold
- * load; a page that streams draws it while the scheduler is not mounted yet
- * (a step of `undefined` is the flow's first).
- */
-export function MeetingSchedulerSkeleton({
-  flow = DEFAULT_SCHEDULER_FLOW,
-  step,
-  className,
-  onBack,
-  fieldRows,
-  optionalFields,
-  fieldCopy,
-  consent = false,
-  monthOffset = 0,
-  contextPanel,
-}: {
-  flow?: SchedulerFlow;
-  step?: Step;
-  className?: string;
-  onBack?: () => void;
-  /** The details form's rows (details-first), so the form skeleton has the form's shape. */
-  fieldRows?: BookingFieldRow[];
-  /** The optional questions the details form asks (`BookingForm`'s `optionalFields`). */
-  optionalFields?: readonly string[];
-  /** The host's per-field copy (`BookingForm`'s `fieldCopy`). */
-  fieldCopy?: Record<string, BookingFieldCopy>;
-  /** The host's consent row under the form (`BookingForm`'s `consent`, drawn for real); `true` when its copy is not
-   *  known here. */
-  consent?: BookingFormConsent | boolean;
-  monthOffset?: number;
-  /**
-   * The rows the loaded context panel will have (`ContextPanelSkeleton`'s): whether the scheduler is given a
-   * title and a description, and how many durations the link offers. Defaults: title and description on, no
-   * duration chips.
-   */
-  contextPanel?: { title?: boolean; description?: boolean; durations?: number };
-}) {
-  const preset = SCHEDULER_FLOW_PRESETS[flow];
-  const { formOnly, cardClass, innerClass, actionPanelClass, stepPanelClass } = schedulerCardClasses(
-    flow,
-    step ?? preset.initialStep,
-    className,
-  );
-  return (
-    <div className={cardClass}>
-      <LoadingRegion label="Loading available times" className={innerClass}>
-        {!formOnly && <ContextPanelSkeleton onBack={onBack} className={CONTEXT_PANEL_CLASS} {...contextPanel} />}
-        <div className={actionPanelClass}>
-          {/* Both terms matter. Without `flow` this stays a calendar where
-              the form belongs; without the step term, paging a month AFTER
-              Continue (which happens at `step === 'slot'`) would swap the
-              calendar out for a form skeleton and back. */}
-          {formOnly ? (
-            // The SAME wrapper the loaded form gets, so the skeleton never
-            // states its own inset.
-            <div className={stepPanelClass}>
-              <BookingFormSkeleton
-                fieldRows={fieldRows}
-                optionalFields={optionalFields}
-                fieldCopy={fieldCopy}
-                consent={consent}
-                footerNote={preset.footerNote}
-                submitLabel={preset.submitLabel}
-              />
-            </div>
-          ) : (
-            <SlotPickerSkeleton monthOffset={monthOffset} />
-          )}
-        </div>
-      </LoadingRegion>
-    </div>
-  );
-}
-
 export function HubSpotMeetingScheduler({
   meetingId,
   apiBaseUrl = '',
@@ -600,6 +517,10 @@ export function HubSpotMeetingScheduler({
     book,
     isSubmitting,
   } = useMeetingBooking({ meetingId, apiBaseUrl, initialAvailability });
+  // A cold start: in a loading scope, or no month in the cache yet. Every part draws its own skeleton in the SAME
+  // tree as the loaded card (`loading`), so nothing remounts or shifts when the month lands.
+  const inScope = useLoadingScope();
+  const coldStart = inScope || (isLoadingAvailability && !availability);
 
   const detailsFirst = flow === 'details-first';
   // The modal arrangement is slot-first's only: details-first keeps the card.
@@ -636,8 +557,7 @@ export function HubSpotMeetingScheduler({
   // cold load is still the current step; a failed load or a link the form cannot
   // reproduce is the degraded box.
   const stage: SchedulerStage =
-    !(isLoadingAvailability && !availability) &&
-    (Boolean(availabilityError) || !availability || !isNativelyBookable(availability))
+    !coldStart && (Boolean(availabilityError) || !availability || !isNativelyBookable(availability))
       ? 'unavailable'
       : step;
   // Reported from an effect, not beside each `setStep`: the stage moves in several
@@ -650,8 +570,10 @@ export function HubSpotMeetingScheduler({
     onStageChangeRef.current = onStageChange;
   });
   useEffect(() => {
+    // A loading scope reports nothing: nothing in it writes.
+    if (inScope) return;
     onStageChangeRef.current?.(stage);
-  }, [stage]);
+  }, [stage, inScope]);
   // State, not a ref: the link-swap reset below writes it DURING RENDER, and
   // this file's own rule forbids writing a ref there. "Frozen" means written
   // once at Continue, not `useRef`.
@@ -898,7 +820,7 @@ export function HubSpotMeetingScheduler({
   );
   const degradedCard = degraded("We couldn't load available call times. Please try again shortly.");
 
-  if (modal && isLoadingAvailability && !availability) {
+  if (modal && coldStart) {
     return (
       <div className={cn(MODAL_STACK_CLASS, className)}>
         <LoadingRegion label="Loading available times" className={MODAL_CARD_CLASS}>
@@ -935,34 +857,13 @@ export function HubSpotMeetingScheduler({
     );
   }
 
-  if (isLoadingAvailability && !availability) {
-    // COLD start only — a month already in the query cache renders straight
-    // into the loaded card. Composed inside the SAME wrappers as that card
-    // (`ContextPanelSkeleton` beside the real slot-area layout), so nothing
-    // shifts when it swaps.
-    return (
-      <MeetingSchedulerSkeleton
-        flow={flow}
-        step={step}
-        className={className}
-        onBack={backEdge}
-        fieldRows={detailsFormProps?.fieldRows}
-        optionalFields={detailsFormProps?.optionalFields}
-        fieldCopy={detailsFormProps?.fieldCopy}
-        consent={detailsFormProps?.consent}
-        monthOffset={monthOffset}
-        // The panel's title and description rows are the scheduler's own props; the durations are read.
-        contextPanel={{ title: Boolean(title), description: Boolean(description), durations: 0 }}
-      />
-    );
-  }
-
-  if (availabilityError || !availability) return degradedCard;
-
-  if (!isNativelyBookable(availability)) {
-    // Fail closed — never render a half-working native form on a link with
-    // questions or consent we can't faithfully reproduce.
-    return degraded('This meeting type is booked directly on HubSpot.');
+  if (!coldStart) {
+    if (availabilityError || !availability) return degradedCard;
+    if (!isNativelyBookable(availability)) {
+      // Fail closed — never render a half-working native form on a link with
+      // questions or consent we can't faithfully reproduce.
+      return degraded('This meeting type is booked directly on HubSpot.');
+    }
   }
 
   // ---- the card ------------------------------------------------------------
@@ -1105,9 +1006,11 @@ export function HubSpotMeetingScheduler({
 
   return (
     <div className={cardClass}>
-      <div className={innerClass}>
+      {/* One tree loading and loaded: the region announces only on a cold start. */}
+      <LoadingRegion label="Loading available times" announce={coldStart} className={innerClass}>
         {!formOnly && (
           <SchedulerContextPanel
+            loading={coldStart}
             hosts={shownHosts}
             title={title}
             description={description}
@@ -1153,7 +1056,43 @@ export function HubSpotMeetingScheduler({
             MEETING_SCHEDULER_H. `min-h-0` is what lets it: a flex item's
             default `min-height:auto` refuses to shrink below its content. */}
         <div className={actionPanelClass}>
-          {step === 'confirmed' && confirmation && timezone ? (
+          {coldStart ? (
+            // The month is not here yet: the step's own part draws its skeleton in the loaded wrapper. Both terms
+            // matter: without `formOnly` this would be a calendar where the form belongs; paging a month AFTER
+            // Continue (at `step === 'slot'`) keeps the calendar.
+            formOnly ? (
+              <div className={stepPanelClass}>
+                <DetailsForm
+                  loading
+                  {...detailsFormProps}
+                  availability={availability}
+                  meetingId={meetingId}
+                  timezone={timezone}
+                  deferSlot={detailsFirst}
+                  submitLabel={preset.submitLabel}
+                  footerNote={preset.footerNote}
+                  isSubmitting={false}
+                  onSubmit={NOOP_SUBMIT}
+                  honeypotInputProps={honeypotInputProps}
+                  getSignals={getSignals}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-[var(--spacing-system-m)] content-md:min-h-0 content-md:flex-1">
+                <SlotPicker
+                  loading
+                  slots={slots}
+                  timezone={timezone}
+                  monthOffset={monthOffset}
+                  onMonthOffsetChange={NOOP}
+                  selectedSlot={null}
+                  onSelectSlot={NOOP}
+                  selectedDay={null}
+                  onSelectDay={NOOP}
+                />
+              </div>
+            )
+          ) : step === 'confirmed' && confirmation && timezone ? (
             <div className={stepPanelClass}>
               <Confirmation confirmation={confirmation} timezone={timezone} />
             </div>
@@ -1292,7 +1231,7 @@ export function HubSpotMeetingScheduler({
             </div>
           )}
         </div>
-      </div>
+      </LoadingRegion>
     </div>
   );
 }

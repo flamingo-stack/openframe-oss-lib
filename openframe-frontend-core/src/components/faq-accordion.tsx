@@ -33,10 +33,9 @@ const CHEVRON_CLASS = 'shrink-0 text-ods-text-primary';
 export const FAQ_ACCORDION_SKELETON_ROWS = 12;
 /**
  * Whether a skeleton row's question takes two lines on a phone (one from `content-md`, where a question fits a line).
- * On a phone about every other question wraps to a second line, and a list opens with its broadest questions, the
- * longest: the first two rows wrap, then every other row.
+ * Typically about every other question wraps on a phone: the skeleton alternates, starting with a wrapping row.
  */
-const wrapsOnPhone = (index: number) => index < 2 || index % 2 === 1;
+const wrapsOnPhone = (index: number) => index % 2 === 0;
 
 export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) {
   const [openSet, setOpenSet] = useState<Set<string | number>>(new Set(defaultOpenIds));

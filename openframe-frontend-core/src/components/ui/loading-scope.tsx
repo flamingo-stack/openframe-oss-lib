@@ -18,20 +18,30 @@ const LoadingScopeContext = createContext(false);
 
 /** Draws its children as their own loading state. Inert and hidden from assistive technology: the page's loading
  *  region announces it once. `bare` draws no element of its own (the scope only): for a component's own `loading`
- *  mode, whose markup must not change and whose container already says it is loading. */
+ *  mode, whose markup must not change and whose container already says it is loading. `active` (default true) turns
+ *  the scope on and off without changing the tree, so a component that finishes loading is not remounted; a false
+ *  never cancels an outer scope. */
 export function LoadingScope({
   children,
   className,
   bare = false,
+  active,
 }: {
   children: ReactNode;
   className?: string;
   bare?: boolean;
+  active?: boolean;
 }) {
-  if (bare) return <LoadingScopeContext.Provider value={true}>{children}</LoadingScopeContext.Provider>;
+  const outer = useContext(LoadingScopeContext);
+  const on = outer || (active ?? true);
+  if (bare) return <LoadingScopeContext.Provider value={on}>{children}</LoadingScopeContext.Provider>;
   return (
-    <LoadingScopeContext.Provider value={true}>
-      <div aria-hidden inert className={cn('pointer-events-none select-none', className)}>
+    <LoadingScopeContext.Provider value={on}>
+      <div
+        aria-hidden={on || undefined}
+        inert={on || undefined}
+        className={cn(on && 'pointer-events-none select-none', className)}
+      >
         {children}
       </div>
     </LoadingScopeContext.Provider>

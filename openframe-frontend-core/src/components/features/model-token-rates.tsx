@@ -24,6 +24,7 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { useLoadingScope } from '../ui/loading-scope';
 import { Slider } from '../ui/slider';
 import { TabSelector } from '../ui/tab-selector';
 import { PushButtonSelector } from './push-button-selector';
@@ -192,6 +193,7 @@ const TABLE_SKELETON_ROWS = 8;
  * about the subscription, not about the rates.
  */
 export function ModelTokenRates({ rates = [], status = 'ready', autoTopUpEnabled, className }: ModelTokenRatesProps) {
+  const loading = useLoadingScope() || status === 'loading';
   return (
     <div
       className={cn(
@@ -200,7 +202,7 @@ export function ModelTokenRates({ rates = [], status = 'ready', autoTopUpEnabled
       )}
     >
       {autoTopUpEnabled != null && <AutoTopUpLine enabled={autoTopUpEnabled} />}
-      {status === 'loading' ? (
+      {loading ? (
         <ModelTokenRatesSkeleton />
       ) : status === 'error' ? (
         <ModelTokenRatesUnavailable className="flex-1" />
@@ -508,8 +510,8 @@ export function ModelTokenExchange({
   className,
 }: ModelTokenExchangeProps) {
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
-  const loading = status === 'loading';
-  const failed = status === 'error' || (status === 'ready' && !rate);
+  const loading = useLoadingScope() || status === 'loading';
+  const failed = !loading && (status === 'error' || (status === 'ready' && !rate));
   const sliderId = useId();
   // The amount bought: what the visitor set, else what the host opens on. The slider reaches every preset.
   const [chosen, setChosen] = useState<number | null>(null);

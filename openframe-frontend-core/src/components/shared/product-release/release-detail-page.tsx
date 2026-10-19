@@ -152,10 +152,10 @@ const DefaultMarkdownRenderer = RichMarkdownRenderer;
 /** The page's layout, read by the page and by its parts' skeletons, so the loading state is the page's size. */
 const CONTENT_STACK_CLASS = 'space-y-6 content-md:space-y-8';
 /**
- * A release title's typical lines at the page's `text-h1` (a name, a version and a headline, about 60 characters):
- * five on a phone's 342px, three from `content-md`, two from `content-lg`.
+ * A release title's typical lines at the page's `text-h1` (a name, a version and a headline): the median of sampled
+ * releases is seven on a phone's 342px, four from `content-md` (820px), two from `content-lg`.
  */
-const RELEASE_TITLE_SKELETON_LINES = { phone: 5, md: 3, lg: 2 } as const;
+const RELEASE_TITLE_SKELETON_LINES = { phone: 7, md: 4, lg: 2 } as const;
 const METADATA_GRID_CLASS =
   'grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4';
 /** A metadata cell's edge (divider + card fill); the cell's own frame is the shared value cell's. */
@@ -167,6 +167,12 @@ const SUMMARY_CLASS = 'text-ods-text-primary text-h4';
  * same while it is read: the badges and the "+N" never move the page under them.
  */
 const RELEASE_TAG_ROW_FOLD = 3;
+/**
+ * A release tag's typical label width while it is read: a release is tagged with product areas, longer than most tags
+ * (sampled badges measure 64 to 155px, typically about 105px: ten characters of the badge's type), so on a phone its
+ * three tags fill the first line and the "+N" wraps to a second, as a typical release's row does.
+ */
+const RELEASE_TAG_SKELETON_WIDTH_CLASS = 'w-[10ch]';
 /** The metadata grid's value labels (static copy). */
 const RELEASE_TYPE_LABEL = 'Release Type';
 const RELEASE_STATUS_LABEL = 'Release Status';
@@ -399,7 +405,11 @@ export function ReleaseDetailPage({
     >
       <div className={CONTENT_STACK_CLASS}>
         {/* Tags — flat product_release_tags[] from entity_tags */}
-        <EntityTagBadges tags={view.product_release_tags as TagAssoc[] | undefined} max={RELEASE_TAG_ROW_FOLD} />
+        <EntityTagBadges
+          tags={view.product_release_tags as TagAssoc[] | undefined}
+          max={RELEASE_TAG_ROW_FOLD}
+          skeletonItemClassName={RELEASE_TAG_SKELETON_WIDTH_CLASS}
+        />
 
         {/* Metadata Grid */}
         <div className={METADATA_GRID_CLASS}>

@@ -84,6 +84,12 @@ export function socialIconRowClass(compact = false): string {
   return `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'}`;
 }
 
+/** One button's size and stretch in the row (compact: the quiet 32px icon; else the full-width 44/48px one): read by
+ *  the row and by a caller's skeleton buttons. */
+export function socialIconButtonProps(compact = false): { size: 'icon-sm' | 'icon'; className?: string } {
+  return compact ? { size: 'icon-sm' } : { size: 'icon', className: 'flex-1' };
+}
+
 export function SocialIconRow({
   className = '',
   links = defaultLinks,
@@ -114,8 +120,7 @@ export function SocialIconRow({
         key={index}
         type="button"
         variant={resolvedVariant}
-        size={compact ? 'icon-sm' : 'icon'}
-        className={compact ? undefined : 'flex-1'}
+        {...socialIconButtonProps(compact)}
         aria-label={ariaLabel}
         onClick={link.onClick}
       >
@@ -128,8 +133,7 @@ export function SocialIconRow({
       <Button
         key={index}
         variant={resolvedVariant}
-        size={compact ? 'icon-sm' : 'icon'}
-        className={compact ? undefined : 'flex-1'}
+        {...socialIconButtonProps(compact)}
         href={link.href}
         openInNewTab
         aria-label={ariaLabel}

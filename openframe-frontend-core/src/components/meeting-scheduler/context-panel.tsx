@@ -59,6 +59,8 @@ export interface SchedulerContextPanelProps {
    *  right up to the confirmation — where there is nothing left to re-read. */
   showTimezone?: boolean;
   className?: string;
+  /** The meeting is still being read: the panel draws its own skeleton, as in a loading scope. */
+  loading?: boolean;
 }
 
 /** Panel stack — one rhythm shared by the loaded panel and its skeleton
@@ -192,6 +194,12 @@ export function ContextPanelSkeleton({
   );
 }
 
+/**
+ * How many lengths the panel's skeleton offers while the link is read and its lengths are not known yet: a scheduling
+ * link typically offers more than one (a short and a long call), so the skeleton draws the "Duration" row of chips.
+ */
+const CONTEXT_PANEL_TYPICAL_DURATIONS = 2;
+
 export function SchedulerContextPanel({
   hosts,
   title,
@@ -207,16 +215,17 @@ export function SchedulerContextPanel({
   disabled = false,
   showTimezone = true,
   className,
+  loading = false,
 }: SchedulerContextPanelProps) {
   // While the meeting is read the panel is its skeleton (the hosts, title and durations are read data).
-  if (useLoadingScope()) {
+  if (useLoadingScope() || loading) {
     return (
       <ContextPanelSkeleton
         onBack={onBack}
         backLabel={backLabel}
         title={title !== undefined}
         description={description !== undefined && description !== null}
-        durations={locked ? 0 : durationsMs.length}
+        durations={locked ? 0 : durationsMs.length || CONTEXT_PANEL_TYPICAL_DURATIONS}
         timezone={showTimezone ? (locked ? 'wide' : 'shown') : 'hidden'}
         className={className}
       />

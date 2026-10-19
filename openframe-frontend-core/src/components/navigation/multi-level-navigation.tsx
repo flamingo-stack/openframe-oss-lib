@@ -49,12 +49,24 @@ const NAV_LIST_CLASS = 'space-y-2';
 const NAV_ITEM_CLASS = 'space-y-1';
 const NAV_ROW_FRAME_CLASS = 'relative w-full rounded-lg border transition-all duration-150';
 const NAV_ROW_CONTENT_CLASS = 'flex w-full items-center rounded-lg px-2 text-h6';
+/** Each entry's side padding, around its row frame. */
+const NAV_ROW_PAD_CLASS = 'px-2';
+/**
+ * A row's height (the desktop tree's, the dropdown's), with the folder toggle's square box at the row's end and the
+ * room the name leaves for it: read by the loaded rows and by their skeleton.
+ */
+const NAV_ROW_HEIGHT = {
+  desktop: { row: 'h-12', toggle: 'h-12 w-12', toggleRoom: 'pr-12' },
+  mobile: { row: 'h-11', toggle: 'h-11 w-11', toggleRoom: 'pr-11' },
+} as const;
 /**
  * How many rows each skeleton draws (the desktop tree, the mobile dropdown): a layout fold, the rows one screen holds.
  * A row is 48px (44px in the dropdown) with its border and the list's gap, about 54px (50px): a first screen of 900px
- * (844px on a phone) holds 17. The tree opens on the reader's path, so the skeleton draws that shape: the first root
- * entry open, the rest of the fold its entries (indented as the tree indents them). A tree whose open folder holds
- * fewer entries ends past the first screen anyway, and the tree's other root entries are list growth below it.
+ * (844px on a phone) holds 17. The tree opens on the reader's repository, so the skeleton draws that shape: one root
+ * entry open, the rest of the fold its entries (indented as the tree indents them). It is drawn open FIRST: the root
+ * order is the source's path sort, and which repositories sort before the reader's needs the read, so a page in a
+ * later repository differs by one collapsed root row above the open one. A repository holding fewer entries ends
+ * past the first screen anyway, and the tree's other root entries are list growth below it.
  */
 export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 17;
 export const MOBILE_NAVIGATION_SKELETON_ROWS = 17;
@@ -74,7 +86,7 @@ function NavigationRowSkeleton({
   indentClass?: string;
 }) {
   return (
-    <div className={cn('px-2', indentClass)}>
+    <div className={cn(NAV_ROW_PAD_CLASS, indentClass)}>
       <div className={cn(NAV_ROW_FRAME_CLASS, 'border-ods-border bg-ods-card')}>
         <div className={cn(NAV_ROW_CONTENT_CLASS, rowHeightClass)}>
           <MediaSkeleton.Icon size="sm" className="mr-2 flex-shrink-0" />
@@ -126,7 +138,7 @@ export function MultiLevelNavigationSkeleton({
   return (
     <NavigationTreeSkeleton
       rows={rows}
-      rowHeightClass="h-12"
+      rowHeightClass={NAV_ROW_HEIGHT.desktop.row}
       indentClass={NAV_INDENT_CLASS.desktop}
       className={className}
     />
@@ -144,7 +156,7 @@ export function MobileNavigationDropdownSkeleton({
   return (
     <NavigationTreeSkeleton
       rows={rows}
-      rowHeightClass="h-11"
+      rowHeightClass={NAV_ROW_HEIGHT.mobile.row}
       indentClass={NAV_INDENT_CLASS.mobile}
       className={className}
     />
@@ -249,7 +261,7 @@ function NavigationItem({
 
   return (
     <div className={NAV_ITEM_CLASS} role="listitem" data-loading-item>
-      <div className={cn('px-2', level > 0 && NAV_INDENT_CLASS.desktop)}>
+      <div className={cn(NAV_ROW_PAD_CLASS, level > 0 && NAV_INDENT_CLASS.desktop)}>
         <div
           className={cn(
             NAV_ROW_FRAME_CLASS,
@@ -259,9 +271,11 @@ function NavigationItem({
           <div className="relative flex items-center">
             <button
               className={cn(
-                'flex h-12 w-full items-center rounded-lg px-2 text-ods-text-primary transition-all duration-150 text-h6',
+                NAV_ROW_CONTENT_CLASS,
+                NAV_ROW_HEIGHT.desktop.row,
+                'text-ods-text-primary transition-all duration-150',
                 !isSelected && 'hover:bg-ods-bg-hover',
-                hasChildren && 'pr-12',
+                hasChildren && NAV_ROW_HEIGHT.desktop.toggleRoom,
               )}
               onClick={() => onNodeClick(node)}
               aria-label={`${isSelected ? 'Selected' : 'Select'} ${node.name}`}
@@ -289,7 +303,10 @@ function NavigationItem({
 
             {hasChildren && (
               <button
-                className="absolute right-0 top-0 flex h-12 w-12 items-center justify-center text-ods-text-secondary transition-colors duration-150 hover:text-ods-text-primary"
+                className={cn(
+                  'absolute right-0 top-0 flex items-center justify-center text-ods-text-secondary transition-colors duration-150 hover:text-ods-text-primary',
+                  NAV_ROW_HEIGHT.desktop.toggle,
+                )}
                 onClick={e => {
                   e.stopPropagation();
                   if (onToggleExpand) {
@@ -378,7 +395,7 @@ function MobileNavigationItem({
 
   return (
     <div className={NAV_ITEM_CLASS} data-loading-item>
-      <div className={cn('px-2', level > 0 && NAV_INDENT_CLASS.mobile)}>
+      <div className={cn(NAV_ROW_PAD_CLASS, level > 0 && NAV_INDENT_CLASS.mobile)}>
         <div
           className={cn(
             NAV_ROW_FRAME_CLASS,
@@ -388,9 +405,11 @@ function MobileNavigationItem({
           <div className="relative flex items-center">
             <button
               className={cn(
-                'flex h-11 w-full items-center rounded-lg px-2 text-ods-text-primary transition-all duration-150 text-h6',
+                NAV_ROW_CONTENT_CLASS,
+                NAV_ROW_HEIGHT.mobile.row,
+                'text-ods-text-primary transition-all duration-150',
                 !isSelected && 'hover:bg-ods-bg-hover',
-                hasChildren && 'pr-11',
+                hasChildren && NAV_ROW_HEIGHT.mobile.toggleRoom,
               )}
               onClick={() => onNodeClick(node)}
             >
@@ -417,7 +436,10 @@ function MobileNavigationItem({
 
             {hasChildren && (
               <button
-                className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center text-ods-text-secondary transition-colors duration-150 hover:text-ods-text-primary"
+                className={cn(
+                  'absolute right-0 top-0 flex items-center justify-center text-ods-text-secondary transition-colors duration-150 hover:text-ods-text-primary',
+                  NAV_ROW_HEIGHT.mobile.toggle,
+                )}
                 onClick={e => {
                   e.stopPropagation();
                   if (onToggleExpand) {

@@ -126,7 +126,9 @@ export function OnboardingGuideCardSkeleton({
   className?: string;
 }) {
   if (size === 'portrait') {
-    return <EntityPortraitCardSkeleton typeLabel={showTypeBadge ? GUIDE_TYPE_LABEL : undefined} className={className} />;
+    return (
+      <EntityPortraitCardSkeleton typeLabel={showTypeBadge ? GUIDE_TYPE_LABEL : undefined} className={className} />
+    );
   }
   if (size === 'catalog') {
     return (
@@ -138,10 +140,10 @@ export function OnboardingGuideCardSkeleton({
             </div>
             <div className={CATALOG_TEXT}>
               <div className={CATALOG_TITLE_ROW}>
-                {/* Two lines where the title wraps (a phone), one from md, where the column holds it and the row's
-                    own min height is the card's: a two-line bar there overshot the 72px row by 8px. */}
-                <TextLineSkeleton type="h2" lines={2} className="w-3/4 md:hidden" />
-                <TextLineSkeleton type="h2" className="hidden w-3/4 md:flex" />
+                {/* The loaded title's clamp, two `text-h2` lines, wherever a typical title wraps (a phone, a tablet's
+                    column); one line from lg, where the text column holds a typical title. */}
+                <TextLineSkeleton type="h2" lines={2} className="w-3/4 lg:hidden" />
+                <TextLineSkeleton type="h2" className="hidden w-3/4 lg:flex" />
               </div>
               <div className={CATALOG_SUMMARY_ROW}>
                 <TextLineSkeleton type="h6" lines={2} className="w-full" />
@@ -157,13 +159,13 @@ export function OnboardingGuideCardSkeleton({
     );
   }
   if (size === 'sm') {
-    return (
-      <CompactCardSkeleton trailingIcon className={className} />
-    );
+    return <CompactCardSkeleton trailingIcon className={className} />;
   }
   const t = HORIZONTAL_SIZE_TOKENS.default;
   return (
-    <span className={cn(`flex items-start gap-3 rounded-md border border-ods-border bg-ods-card ${t.padding}`, className)}>
+    <span
+      className={cn(`flex items-start gap-3 rounded-md border border-ods-border bg-ods-card ${t.padding}`, className)}
+    >
       <span className={`inline-flex shrink-0 items-center justify-center rounded-full bg-ods-bg ${t.step}`} />
       <span className="flex min-w-0 flex-1 flex-col gap-2">
         <UnifiedSkeleton as="span" className="block h-4 w-2/3 rounded" />
