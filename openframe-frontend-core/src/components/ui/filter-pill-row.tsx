@@ -12,7 +12,7 @@
  * injected slot.
  */
 
-import { Filter } from 'lucide-react';
+import { Filter } from '../icons-v2';
 import type { ReactNode } from 'react';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
@@ -86,3 +86,4 @@ export function FilterPillRowSkeleton({ label, pills = 5 }: { label: string; pil
     </FilterPillRow>
   );
 }
+
