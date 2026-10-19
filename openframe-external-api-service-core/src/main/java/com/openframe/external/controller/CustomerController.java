@@ -158,12 +158,9 @@ public class CustomerController {
 
         log.info("Updating customer: {} - userId: {}, apiKeyId: {}", id, caller.userId(), caller.apiKeyId());
 
-        try {
-            var updated = organizationCommandService.updateOrganization(id, customerMapper.toUpdateRequest(request));
-            return customerMapper.toResponse(updated);
-        } catch (IllegalArgumentException e) {
-            throw new CustomerNotFoundException(id);
-        }
+        requireCustomer(id);
+        var updated = organizationCommandService.updateOrganization(id, customerMapper.toUpdateRequest(request));
+        return customerMapper.toResponse(updated);
     }
 
     @Operation(summary = "Check if customer can be archived",
@@ -205,3 +202,4 @@ public class CustomerController {
                 .orElseThrow(() -> new CustomerNotFoundException(id));
     }
 }
+
