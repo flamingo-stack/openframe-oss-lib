@@ -19,9 +19,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
     }
 )
 public class ManagementConfiguration {
-    /**
-     * Password encoder for secure password hashing
-     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
