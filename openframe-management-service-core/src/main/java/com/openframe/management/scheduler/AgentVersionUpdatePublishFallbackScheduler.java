@@ -28,14 +28,14 @@ public class AgentVersionUpdatePublishFallbackScheduler {
     private final IntegratedToolAgentService integratedToolAgentService;
     private final ToolAgentUpdateUpdatePublisher toolAgentUpdateUpdatePublisher;
 
-    @Value("${openframe.agent-version-update-publish-fallback.max-attempts:5}")
+    @Value("${openframe.agent-version-update-publish-fallback.max-attempts}")
     private int maxPublishAttempts;
 
-    @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval:30000}")
+    @Scheduled(fixedDelayString = "${openframe.agent-version-update-publish-fallback.interval}")
     @SchedulerLock(
             name = "agentVersionUpdatePublishFallback",
-            lockAtMostFor = "${openframe.agent-version-update-publish-fallback.lock-at-most-for:5m}",
-            lockAtLeastFor = "${openframe.agent-version-update-publish-fallback.lock-at-least-for:10s}"
+            lockAtMostFor = "${openframe.agent-version-update-publish-fallback.lock-at-most-for}",
+            lockAtLeastFor = "${openframe.agent-version-update-publish-fallback.lock-at-least-for}"
     )
     public void publishUnpublishedEntities() {
         try {
