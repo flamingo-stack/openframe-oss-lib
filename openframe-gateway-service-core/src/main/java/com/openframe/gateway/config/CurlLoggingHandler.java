@@ -1,6 +1,7 @@
 package com.openframe.gateway.config;
 
 import java.net.URI;
+import java.util.Set;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelDuplexHandler;
@@ -18,6 +19,10 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
     private final StringBuilder curl = new StringBuilder();
     private boolean isRequest = false;
     private static final AttributeKey<URI> TARGET_URI = AttributeKey.valueOf("target_uri");
+    private static final Set<String> SENSITIVE_HEADERS = Set.of(
+        "authorization", "cookie", "set-cookie", "x-api-key", "api-key", "proxy-authorization"
+    );
+    private static final String REDACTED = "***REDACTED***";
 
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
@@ -50,10 +55,13 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
             // Add headers, excluding the Host header since it's handled by WebClient
             request.headers().forEach(header -> {
                 if (!"Host".equalsIgnoreCase(header.getKey())) {
+                    String headerValue = SENSITIVE_HEADERS.contains(header.getKey().toLowerCase())
+                        ? REDACTED
+                        : header.getValue();
                     curl.append("  -H '")
                         .append(header.getKey())
                         .append(": ")
-                        .append(header.getValue())
+                        .append(headerValue)
                         .append("' \\\n");
                 }
             });
@@ -62,10 +70,7 @@ public class CurlLoggingHandler extends ChannelDuplexHandler {
         if (isRequest && msg instanceof HttpContent content) {
             ByteBuf buffer = content.content();
             if (buffer.isReadable()) {
-                String body = buffer.toString(io.netty.util.CharsetUtil.UTF_8);
-                if (!StringUtil.isNullOrEmpty(body)) {
-                    curl.append("  --data-raw '").append(body).append("'");
-                }
+                curl.append("  --data-raw '").append(REDACTED).append("'");
             }
 
             if (msg instanceof LastHttpContent) {
