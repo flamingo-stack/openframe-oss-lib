@@ -36,7 +36,7 @@ public class KnowledgeBaseTempAttachmentService {
     private static final String KB_ATTACHMENTS_PREFIX = "kb-attachments";
     private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
-    @Value("${openframe.kb.presigned-url-expiration-minutes:15}")
+    @Value("${openframe.kb.presigned-url-expiration-minutes}")
     private int presignedUrlExpirationMinutes;
 
     private final TempAttachmentRepository tempAttachmentRepository;
