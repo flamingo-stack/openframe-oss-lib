@@ -48,7 +48,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DeliveryRolloutServiceTest {
 
-    private static final String ROLLOUT_ID = "CLIENT_UPDATE:openframe-client";
+    private static final String ROLLOUT_ID = "t-1:CLIENT_UPDATE:openframe-client";
     private static final String TARGET_ID = "openframe-client";
     private static final int SEQUENCE = 7;
     private static final int BATCH_SIZE = 2;

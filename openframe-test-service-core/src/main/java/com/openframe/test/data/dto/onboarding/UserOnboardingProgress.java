@@ -21,4 +21,5 @@ public class UserOnboardingProgress {
     private Instant completedAt;
     private Boolean skipped;
     private Instant skippedAt;
+    private String tourDialogId;
 }
