@@ -168,6 +168,7 @@ function renderSkeletonForType(
   type: string,
   size: CardSize,
   adminCampaignCard?: AdminCampaignCardSlot,
+  extras?: ChatCardDispatchExtras,
 ): React.ReactNode {
   if (type === 'marketing_campaign') {
     return adminCampaignCard ? (
@@ -177,7 +178,7 @@ function renderSkeletonForType(
     );
   }
   const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
-  return entry ? entry.skeleton(size) : <GenericEntityCardSkeleton />;
+  return entry ? entry.skeleton(size, extras) : <GenericEntityCardSkeleton />;
 }
 
 /**
@@ -322,6 +323,8 @@ const GROUP_CLASS = 'space-y-4';
 const GROUP_LIST_CLASS = 'space-y-4';
 const GROUP_HEADING_CLASS = 'font-semibold text-ods-text-secondary text-h5';
 // A column with a gap, not space-y: the region's screen-reader status (absolutely positioned) must not take a margin.
+// The rail is a page section (a `<section>`, loaded and loading). Its groups and each group's cards are read lists
+// (`data-loading-item`): how many there are is the data's, and the skeleton draws one fold of each group.
 const RAIL_CLASS = 'flex flex-col gap-8';
 /** Cards per group a skeleton draws when the host states no count. */
 const RAIL_SKELETON_CARDS = 3;
@@ -423,11 +426,13 @@ function ContentGroup({
   // sides). The pager stays in place while an unfetched page loads.
   if (isLoading) {
     const skeletons = pageRefs.map(r => (
-      <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
+      <div key={r.id} data-loading-item>
+        {renderSkeletonForType(type, cardSize, adminCampaignCard, extras)}
+      </div>
     ));
     return (
       // The rail announces for every group (`announce={false}`): one rail, one "loading".
-      <LoadingRegion announce={false} className={GROUP_CLASS}>
+      <LoadingRegion announce={false} className={GROUP_CLASS} data-loading-item>
         {heading}
         {isListLayout ? (
           <div className={GROUP_LIST_CLASS}>{skeletons}</div>
@@ -470,7 +475,7 @@ function ContentGroup({
       const href = resolved.href ?? '';
       const targetPlatform = resolved.targetPlatform ?? contentRef.targetPlatform ?? null;
       return (
-        <div key={itemId}>
+        <div key={itemId} data-loading-item>
           <LinkProvider href={href || null} targetPlatform={targetPlatform}>
             {linkProps => (
               <CardForType
@@ -498,7 +503,7 @@ function ContentGroup({
     // (no pager) still vanishes with its heading.
     if (groupPagination) {
       return (
-        <div className={GROUP_CLASS}>
+        <div className={GROUP_CLASS} data-loading-item>
           {heading}
           {groupPagination}
         </div>
@@ -508,9 +513,13 @@ function ContentGroup({
   }
 
   return (
-    <div className={GROUP_CLASS}>
+    <div className={GROUP_CLASS} data-loading-item>
       {heading}
-      {isListLayout ? <div className={GROUP_LIST_CLASS}>{cards}</div> : <div className={gridClassFor(columns)}>{cards}</div>}
+      {isListLayout ? (
+        <div className={GROUP_LIST_CLASS}>{cards}</div>
+      ) : (
+        <div className={gridClassFor(columns)}>{cards}</div>
+      )}
       {groupPagination}
     </div>
   );
@@ -735,12 +744,15 @@ export function RelatedContentSection({
       return (
         <RelatedContentSectionSkeleton
           title={title}
-          types={(includeTypes?.length ? includeTypes : [entityType ?? 'blog_post_existing']).filter(t => !exclude.has(t))}
+          // The groups a rail may hold, when the host states them; otherwise (an author's rail) which groups there are
+          // is read data: the skeleton draws one group whose type is not known.
+          types={(includeTypes ?? []).filter(t => !exclude.has(t))}
           entityType={entityType}
           minResults={minResults}
           sameTypeMinResults={sameTypeMinResults}
           columns={columns}
           adminCampaignCard={adminCampaignCard}
+          extras={extras}
         />
       );
     }
@@ -775,12 +787,13 @@ export function RelatedContentSection({
         sameTypeMinResults={sameTypeMinResults}
         columns={columns}
         adminCampaignCard={adminCampaignCard}
+        extras={extras}
       />
     );
   }
 
   return (
-    <LoadingRegion label="Loading related content" announce={loadingTypes.size > 0} className={RAIL_CLASS}>
+    <LoadingRegion as="section" label="Loading related content" announce={loadingTypes.size > 0} className={RAIL_CLASS}>
       <h2 className={RAIL_TITLE_CLASS}>{accentSentenceMarks(title)}</h2>
       {orderedTypes.map(type => (
         <ContentGroup
@@ -801,9 +814,15 @@ export function RelatedContentSection({
   );
 }
 
-export interface RelatedContentSectionSkeletonProps
-  extends Pick<RelatedContentSectionProps, 'title' | 'entityType' | 'minResults' | 'sameTypeMinResults' | 'columns' | 'adminCampaignCard'> {
-  /** The rail's content types (its `includeTypes`, or the types of the refs it holds). Ordered like the loaded rail. */
+export interface RelatedContentSectionSkeletonProps extends Pick<
+  RelatedContentSectionProps,
+  'title' | 'entityType' | 'minResults' | 'sameTypeMinResults' | 'columns' | 'adminCampaignCard' | 'extras'
+> {
+  /**
+   * The rail's content types (its `includeTypes`, or the types of the refs it holds). Ordered like the loaded rail.
+   * Empty: the types are read data (an author's rail): one group of an unknown type, its heading a bar and its cards
+   * the generic card's skeleton.
+   */
   types: string[];
 }
 
@@ -820,14 +839,32 @@ export function RelatedContentSectionSkeleton({
   sameTypeMinResults,
   columns = 2,
   adminCampaignCard,
+  extras,
 }: RelatedContentSectionSkeletonProps) {
   const canonicalEntityType = entityType ? canonicalContentRefType(entityType) : null;
+  const unknownGroup =
+    types.length === 0 ? (
+      <div className={GROUP_CLASS} aria-hidden data-loading-item>
+        <h3 className={GROUP_HEADING_CLASS}>
+          <TextLineSkeleton type="inherit" as="span" className="w-24" />
+        </h3>
+        <div className={gridClassFor(columns)}>
+          {Array.from({ length: Math.max(...GRID_COLUMNS_BY_STEP[columns]) * RAIL_GRID_FOLD_ROWS }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+            <div key={i} className={gridFoldClass(i, columns)} data-loading-item>
+              <GenericEntityCardSkeleton />
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : null;
   return (
-    <LoadingRegion label="Loading related content" className={RAIL_CLASS}>
+    <LoadingRegion as="section" label="Loading related content" className={RAIL_CLASS}>
       <h2 className={RAIL_TITLE_CLASS}>
         {/* A title read with the record (passed empty while it is read) is a bar of its line. */}
         {title ? accentSentenceMarks(title) : <TextLineSkeleton type="inherit" as="span" className="w-1/2" />}
       </h2>
+      {unknownGroup}
       {orderRailTypes(new Set(types), entityType).map(type => {
         const config = resolveGroupConfig(type);
         const sameType = canonicalEntityType !== null && canonicalContentRefType(type) === canonicalEntityType;
@@ -840,12 +877,12 @@ export function RelatedContentSectionSkeleton({
         );
         const cards = Array.from({ length: count }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-          <div key={i} className={isList ? undefined : gridFoldClass(i, columns)}>
-            {renderSkeletonForType(type, config.gridSize, adminCampaignCard)}
+          <div key={i} className={isList ? undefined : gridFoldClass(i, columns)} data-loading-item>
+            {renderSkeletonForType(type, config.gridSize, adminCampaignCard, extras)}
           </div>
         ));
         return (
-          <div key={type} className={GROUP_CLASS} aria-hidden>
+          <div key={type} className={GROUP_CLASS} aria-hidden data-loading-item>
             <GroupHeading type={type} />
             {isList ? (
               <div className={GROUP_LIST_CLASS}>{cards}</div>

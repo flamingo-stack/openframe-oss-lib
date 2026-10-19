@@ -112,7 +112,8 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
       {bioText && <p className={BIO_CLASS}>{bioText}</p>}
 
       {author.knowsAbout.length > 0 && (
-        <div className={TOPICS_CLASS}>
+        // Optional per author (not drawn while loading): marked so for the loading-state check.
+        <div className={TOPICS_CLASS} data-loading-optional>
           {author.knowsAbout.map(topic => (
             <StatusBadge key={topic} text={topic} variant="button" colorScheme="cyan" singleLine />
           ))}
@@ -155,7 +156,12 @@ export function AuthorDetailViewSkeleton({ children, className }: { children?: R
           optional per author, so it is not drawn while loading. */}
       <p className={BIO_CLASS} aria-hidden>
         <TextLineSkeleton type="inherit" as="span" lines={5} className="w-full content-md:hidden" />
-        <TextLineSkeleton type="inherit" as="span" lines={3} className="hidden w-full content-md:flex content-lg:hidden" />
+        <TextLineSkeleton
+          type="inherit"
+          as="span"
+          lines={3}
+          className="hidden w-full content-md:flex content-lg:hidden"
+        />
         <TextLineSkeleton type="inherit" as="span" lines={2} className="hidden w-full content-lg:flex" />
       </p>
       {children}

@@ -415,11 +415,8 @@ export function CapabilityExplorer({
                 className="shrink-0"
               />
             )}
-            {item.footer && (
-              <div data-loading-optional className="mt-auto min-w-0 shrink-0 overflow-hidden">
-                {item.footer}
-              </div>
-            )}
+            {/* Inside the card's fixed height: the footer moves nothing, so it is not optional to the loading state. */}
+            {item.footer && <div className="mt-auto min-w-0 shrink-0 overflow-hidden">{item.footer}</div>}
           </article>
         )}
       />
@@ -552,11 +549,9 @@ export function CapabilityExplorer({
         <div className={cn('shrink-0 overflow-hidden rounded-xl border border-ods-border', PANEL_SCREEN_HEIGHT_CLASS)}>
           {renderScreen(active, { compact: false })}
         </div>
+        {/* Inside the panel's fixed height: the footer moves nothing, so it is not optional to the loading state. */}
         {active.footer && (
-          <div
-            data-loading-optional
-            className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}
-          >
+          <div className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}>
             {active.footer}
           </div>
         )}

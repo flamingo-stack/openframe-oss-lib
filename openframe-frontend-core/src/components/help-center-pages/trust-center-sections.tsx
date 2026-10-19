@@ -157,7 +157,7 @@ export function AiSection({ practices }: { practices: TrustCenterAiPractice[] })
       },
     ],
   }));
-  return <StackedRowsPanel rows={rows} />;
+  return <StackedRowsPanel rows={rows} listItems />;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFrame
       ],
     };
   });
-  return <StackedRowsPanel rows={rows} />;
+  return <StackedRowsPanel rows={rows} listItems />;
 }
 
 // ---------------------------------------------------------------------------
@@ -433,7 +433,7 @@ export function DocumentsSection({
       ],
     };
   });
-  return <StackedRowsPanel rows={rows} />;
+  return <StackedRowsPanel rows={rows} listItems />;
 }
 
 /**
@@ -542,7 +542,7 @@ export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCe
         : []),
     ],
   }));
-  return <StackedRowsPanel rows={rows} />;
+  return <StackedRowsPanel rows={rows} listItems />;
 }
 
 // ---------------------------------------------------------------------------
@@ -749,16 +749,22 @@ export function TrustCenterSkeleton({
 }: TrustCenterSkeletonProps = {}) {
   const content: Record<TrustCenterSectionId, ReactNode> = {
     compliance: (
-      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.compliance, mark: 'logo', action: 'badge' })} />
+      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.compliance, mark: 'logo', action: 'badge' })} listItems />
     ),
     controls: <ControlsSectionSkeleton />,
     documents: (
-      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.documents, mark: 'glyph', action: 'button' })} />
+      <StackedRowsPanel
+        rows={skeletonRows({ rows: panelRows?.documents, mark: 'glyph', action: 'button' })}
+        listItems
+      />
     ),
     subprocessors: (
-      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.subprocessors, mark: 'glyph', action: 'none' })} />
+      <StackedRowsPanel
+        rows={skeletonRows({ rows: panelRows?.subprocessors, mark: 'glyph', action: 'none' })}
+        listItems
+      />
     ),
-    ai: <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.ai, mark: 'glyph', action: 'none' })} />,
+    ai: <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.ai, mark: 'glyph', action: 'none' })} listItems />,
     contact: <ContactSection onContact={() => undefined} />,
     faq,
   };

@@ -41,7 +41,10 @@ interface MultiLevelNavigationProps {
 // drifting from the SSOT.
 const DEFAULT_FOLDER_INDEX_FILE = CANONICAL_FOLDER_INDEX_FILE;
 
-/** The tree's list, item and row frame, read by the tree and by its skeleton, so the skeleton is its size. */
+/**
+ * The tree's list, item and row frame, read by the tree and by its skeleton, so the skeleton is its size. The tree's
+ * entries are a read list (`data-loading-item`; an open folder holds its children's items).
+ */
 const NAV_LIST_CLASS = 'space-y-2';
 const NAV_ITEM_CLASS = 'space-y-1';
 const NAV_ROW_FRAME_CLASS = 'relative w-full rounded-lg border transition-all duration-150';
@@ -63,12 +66,15 @@ function NavigationTreeSkeleton({
   return (
     <div className={cn(NAV_LIST_CLASS, className)} aria-hidden>
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className={NAV_ITEM_CLASS}>
+        <div key={i} className={NAV_ITEM_CLASS} data-loading-item>
           <div className="px-2">
             <div className={cn(NAV_ROW_FRAME_CLASS, 'border-ods-border bg-ods-card')}>
               <div className={cn(NAV_ROW_CONTENT_CLASS, rowHeightClass)}>
                 <MediaSkeleton.Icon size="sm" className="mr-2 flex-shrink-0" />
-                <TextLineSkeleton type="h6" className={NAV_SKELETON_LABEL_WIDTHS[i % NAV_SKELETON_LABEL_WIDTHS.length]} />
+                <TextLineSkeleton
+                  type="h6"
+                  className={NAV_SKELETON_LABEL_WIDTHS[i % NAV_SKELETON_LABEL_WIDTHS.length]}
+                />
               </div>
             </div>
           </div>
@@ -197,7 +203,7 @@ function NavigationItem({
   const hasChildren = children.length > 0;
 
   return (
-    <div className={NAV_ITEM_CLASS} role="listitem">
+    <div className={NAV_ITEM_CLASS} role="listitem" data-loading-item>
       <div className={cn('px-2', level > 0 && 'ml-4')}>
         <div
           className={cn(
@@ -326,7 +332,7 @@ function MobileNavigationItem({
   const hasChildren = children.length > 0;
 
   return (
-    <div className="space-y-1">
+    <div className={NAV_ITEM_CLASS} data-loading-item>
       <div className={cn('px-2', level > 0 && 'ml-3')}>
         <div
           className={cn(

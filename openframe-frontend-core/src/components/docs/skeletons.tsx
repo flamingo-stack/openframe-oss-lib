@@ -3,6 +3,7 @@ import { EmbedLoadingSkeleton } from '../embeds/embed-iframe';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from '../ui/markdown/base-components';
+import { MARKDOWN_RENDERER_CLASS } from '../ui/markdown/engine';
 import { TEXT_SIZE_PRESETS } from '../ui/markdown/text-size';
 /**
  * Text-style skeleton — matches a rendered markdown article layout.
@@ -33,7 +34,8 @@ export function MarkdownSkeleton({
   // The rendered document's own heading and paragraph elements (the markdown renderer's default preset), each line a
   // bar of the element's line box.
   return (
-    <LoadingRegion label="Loading the document" announce={region} className="mt-6">
+    // The renderer's root class, and its box (no margin of its own, like the rendered body): the document's first fold.
+    <LoadingRegion label="Loading the document" announce={region} className={MARKDOWN_RENDERER_CLASS}>
       {MARKDOWN_SKELETON_BLOCKS.map((block, i) =>
         block.kind === 'h2' ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton blocks never reorder

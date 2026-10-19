@@ -7,7 +7,6 @@ import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from '../../
 import { findDocNodeByPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { CategorySidebarSkeleton } from '../loading/page-layout-skeleton';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
@@ -312,40 +311,36 @@ function DocViewerContent({
             <div className="flex flex-1 flex-col items-start gap-6 content-lg:flex-row content-lg:gap-10">
               <div className="w-full content-lg:w-[320px] content-lg:shrink-0">
                 <div className="content-lg:sticky content-lg:top-20">
-                  {isLoadingStructure ? (
-                    <CategorySidebarSkeleton />
-                  ) : (
-                    <>
-                      <PersistentMobileDropdown isLoading={false}>
-                        <MobileNavigationDropdown
+                  {/* While the tree is read, the dropdown and the sidebar are their own skeletons (`isLoading`), each at
+                      its breakpoint, so the loading state is the loaded tree's frame. */}
+                  <PersistentMobileDropdown isLoading={false}>
+                    <MobileNavigationDropdown
+                      nodes={structure}
+                      selectedPath={selectedPath}
+                      expandedNodes={expandedNodes}
+                      onNodeClick={selectNode}
+                      onToggleExpand={toggleNode}
+                      isLoading={isLoadingStructure}
+                      folderIndexFile={folderIndexFile}
+                    />
+                  </PersistentMobileDropdown>
+
+                  <PersistentSidebar isLoading={false}>
+                    <div className="hidden content-lg:block">
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
+                        <MultiLevelNavigation
                           nodes={structure}
                           selectedPath={selectedPath}
                           expandedNodes={expandedNodes}
                           onNodeClick={selectNode}
                           onToggleExpand={toggleNode}
-                          isLoading={false}
+                          isLoading={isLoadingStructure}
                           folderIndexFile={folderIndexFile}
                         />
-                      </PersistentMobileDropdown>
-
-                      <PersistentSidebar isLoading={false}>
-                        <div className="hidden content-lg:block">
-                          <div className="space-y-4">
-                            <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
-                            <MultiLevelNavigation
-                              nodes={structure}
-                              selectedPath={selectedPath}
-                              expandedNodes={expandedNodes}
-                              onNodeClick={selectNode}
-                              onToggleExpand={toggleNode}
-                              isLoading={false}
-                              folderIndexFile={folderIndexFile}
-                            />
-                          </div>
-                        </div>
-                      </PersistentSidebar>
-                    </>
-                  )}
+                      </div>
+                    </div>
+                  </PersistentSidebar>
                 </div>
               </div>
 

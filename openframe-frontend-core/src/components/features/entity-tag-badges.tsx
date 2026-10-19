@@ -37,6 +37,11 @@ const BADGE_CLASS = TAG_BADGE_CLASS;
  */
 /** The row's layout, read by the row and by its skeleton. */
 const TAG_ROW_CLASS = 'flex w-full flex-wrap items-center gap-2';
+/**
+ * Each tag's box: the tags are a read list (`data-loading-item`: how many there are, and so how many lines the row
+ * wraps to, is the record's).
+ */
+const TAG_ITEM_CLASS = 'inline-flex';
 /** How many tags a row usually shows: what its loading state draws. */
 export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
 
@@ -63,19 +68,26 @@ export function EntityTagBadgesSkeleton({
   return (
     <div aria-hidden className={cn(TAG_ROW_CLASS, className)}>
       {Array.from({ length: Math.max(count, phoneCount) }, (_, i) => (
-        <StatusBadgeSkeleton
+        <span
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton badges never reorder
           key={i}
-          variant="card"
           className={cn(
-            // The loaded badge's 1px border (its colours are the skeleton's).
-            'border',
+            TAG_ITEM_CLASS,
             i >= phoneCount && 'hidden content-md:inline-flex',
             i >= count && 'content-md:hidden',
           )}
-        />
+          data-loading-item
+        >
+          {/* The loaded badge's 1px border (its colours are the skeleton's). */}
+          <StatusBadgeSkeleton variant="card" className="border" />
+        </span>
       ))}
-      {overflow && <StatusBadgeSkeleton variant="card" className={cn('border', OVERFLOW_BADGE_SKELETON_CLASS)} />}
+      {/* The "+N" badge counts the tags left out: read data, so it is one of the list's items. */}
+      {overflow && (
+        <span className={TAG_ITEM_CLASS} data-loading-item>
+          <StatusBadgeSkeleton variant="card" className={cn('border', OVERFLOW_BADGE_SKELETON_CLASS)} />
+        </span>
+      )}
     </div>
   );
 }
@@ -105,7 +117,7 @@ export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBad
         const label = (tag.name || '').toUpperCase();
         if (basePath && tag.slug) {
           return (
-            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className="inline-flex">
+            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className={TAG_ITEM_CLASS} data-loading-item>
               <StatusBadge
                 text={label}
                 variant="card"
@@ -114,10 +126,16 @@ export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBad
             </Link>
           );
         }
-        return <StatusBadge key={key} text={label} variant="card" className={BADGE_CLASS} />;
+        return (
+          <span key={key} className={TAG_ITEM_CLASS} data-loading-item>
+            <StatusBadge text={label} variant="card" className={BADGE_CLASS} />
+          </span>
+        );
       })}
       {overflow > 0 && (
-        <StatusBadge text={`+${overflow}`} variant="card" className={cn(BADGE_CLASS, 'text-ods-text-secondary')} />
+        <span className={TAG_ITEM_CLASS} data-loading-item>
+          <StatusBadge text={`+${overflow}`} variant="card" className={cn(BADGE_CLASS, 'text-ods-text-secondary')} />
+        </span>
       )}
     </div>
   );

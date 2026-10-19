@@ -71,6 +71,11 @@ export interface StackedRowsPanelProps {
   className?: string;
   /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty). */
   skeleton?: StackedRowsPanelSkeletonShape;
+  /**
+   * The rows are a read list (how many there are is the data's, and a loading state draws a fold of them): every
+   * row carries `data-loading-item`. Default false (a panel of fixed fields).
+   */
+  listItems?: boolean;
 }
 
 /** How many rows a loading panel draws, and how many value/label columns each carries. */
@@ -182,11 +187,16 @@ function PanelCell({ column }: { column: PanelColumn }) {
   );
 }
 
-function PanelRowView({ row }: { row: PanelRow }) {
+function PanelRowView({ row, listItem }: { row: PanelRow; listItem?: boolean }) {
+  const item = listItem ? { 'data-loading-item': '' } : undefined;
   // Arbitrary content (e.g. a nested table): keep it edge-to-edge unless the caller
   // overrides via `className`. No fixed height — let the content size itself.
   if (row.content !== undefined) {
-    return <div className={cn('border-b border-ods-border last:border-b-0', row.className)}>{row.content}</div>;
+    return (
+      <div className={cn('border-b border-ods-border last:border-b-0', row.className)} {...item}>
+        {row.content}
+      </div>
+    );
   }
 
   const columns = row.columns ?? [];
@@ -194,12 +204,10 @@ function PanelRowView({ row }: { row: PanelRow }) {
 
   // A single-column row is a full-width title/subtitle row: pad symmetrically
   // (ODS `m`) instead of using a fixed column-row height.
-  const rowClass = isFullWidth
-    ? cn(FULL_WIDTH_ROW_CLASS, row.className)
-    : cn(ROW_CLASS, row.className);
+  const rowClass = isFullWidth ? cn(FULL_WIDTH_ROW_CLASS, row.className) : cn(ROW_CLASS, row.className);
 
   return (
-    <div className={rowClass}>
+    <div className={rowClass} {...item}>
       {columns.map(column => (
         <PanelCell key={column.key} column={column} />
       ))}
@@ -207,15 +215,16 @@ function PanelRowView({ row }: { row: PanelRow }) {
   );
 }
 
-export function StackedRowsPanel({ rows, title, className, skeleton }: StackedRowsPanelProps) {
+export function StackedRowsPanel({ rows, title, className, skeleton, listItems = false }: StackedRowsPanelProps) {
   // In a page's loading state with no rows yet (they are read) the panel is its skeleton; rows it is given there
   // are the page's own copy and draw as they are.
   const inScope = useLoadingScope();
-  if (inScope && rows.length === 0) return <StackedRowsPanelSkeleton {...skeleton} title={title} className={className} />;
+  if (inScope && rows.length === 0)
+    return <StackedRowsPanelSkeleton {...skeleton} title={title} className={className} listItems={listItems} />;
   const card = (
     <div className={CARD_CLASS}>
       {rows.map(row => (
-        <PanelRowView key={row.id} row={row} />
+        <PanelRowView key={row.id} row={row} listItem={listItems} />
       ))}
     </div>
   );
@@ -242,11 +251,16 @@ export function StackedRowsPanelSkeleton({
   labels = true,
   title,
   className,
-}: StackedRowsPanelSkeletonShape & Pick<StackedRowsPanelProps, 'title' | 'className'>) {
+  listItems = false,
+}: StackedRowsPanelSkeletonShape & Pick<StackedRowsPanelProps, 'title' | 'className' | 'listItems'>) {
   const card = (
     <div className={CARD_CLASS} aria-hidden>
       {Array.from({ length: rows }, (_, row) => (
-        <div key={row} className={columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS}>
+        <div
+          key={row}
+          className={columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS}
+          {...(listItems ? { 'data-loading-item': '' } : undefined)}
+        >
           {Array.from({ length: columns }, (_cell, column) => (
             <div key={column} className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
               <TextLineSkeleton type="h4" className="w-1/2" />

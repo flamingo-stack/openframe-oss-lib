@@ -19,7 +19,8 @@ interface FaqAccordionProps {
 }
 
 /** The accordion's layout, read by the accordion and by its skeleton, so the skeleton is the accordion's size. */
-const ACCORDION_FRAME_CLASS = 'divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent';
+const ACCORDION_FRAME_CLASS =
+  'divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-transparent';
 const ROW_HEADER_CLASS = 'flex w-full items-center gap-6 px-6 py-4 text-left content-md:gap-10';
 const QUESTION_CLASS = 'min-w-0 flex-1 break-words';
 const CHEVRON_CLASS = 'shrink-0 text-ods-text-primary';
@@ -61,6 +62,8 @@ export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) 
             // category anchors).
             id={faqItemAnchor(item.id)}
             className="scroll-mt-24 transition-colors hover:bg-ods-bg-hover"
+            // A question is a read list's row: how many there are is the data's.
+            data-loading-item
           >
             {/* Header */}
             <div
@@ -127,7 +130,7 @@ export function FaqAccordionSkeleton({
     <div className={cn(ACCORDION_FRAME_CLASS, className)} aria-hidden>
       {Array.from({ length: count }, (_, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-        <div key={i} className={ROW_HEADER_CLASS}>
+        <div key={i} className={ROW_HEADER_CLASS} data-loading-item>
           <h3 className={QUESTION_CLASS}>
             {/* On a phone about every other question wraps to a second line; from `content-md` each is one line. */}
             {i % 2 === 0 ? (

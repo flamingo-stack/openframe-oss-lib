@@ -585,8 +585,9 @@ export interface RelatedCardContext {
 /** One registered content type. `Row` is erased here — `cardEntry` below is
  *  what keeps each branch's row type concrete. */
 export interface RelatedCardRegistryEntry {
-  /** Sized to match the resolved card exactly (zero layout shift). */
-  skeleton: (size: CardSize) => React.ReactNode;
+  /** Sized to match the resolved card exactly (zero layout shift). `extras` are the host's (a program's config says
+   *  whether its cards show hosts). */
+  skeleton: (size: CardSize, extras?: ChatCardDispatchExtras) => React.ReactNode;
   render: (row: unknown, ctx: RelatedCardContext) => React.ReactNode;
 }
 
@@ -600,7 +601,7 @@ export interface RelatedCardRegistryEntry {
  * used to do, minus the promise it could not keep.
  */
 function cardEntry<Row>(definition: {
-  skeleton: (size: CardSize) => React.ReactNode;
+  skeleton: (size: CardSize, extras?: ChatCardDispatchExtras) => React.ReactNode;
   decode: (row: unknown) => Row;
   render: (row: Row, ctx: RelatedCardContext) => React.ReactNode;
 }): RelatedCardRegistryEntry {
@@ -620,10 +621,13 @@ const EVENT_CARD_SKELETON_MEDIA = 4;
 function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRegistryEntry {
   return cardEntry({
     // An event's list API serves its gallery (the loaded card draws its photo row), the other programs' none.
-    skeleton: size => (
+    // Hosts are drawn only for a type whose cards show them (its config's `cardShowsHosts`): elsewhere a record may
+    // have none.
+    skeleton: (size, extras) => (
       <ProgramCardSkeleton
         size={size === 'sm' ? 'sm' : 'default'}
         media={configKey === 'event' ? EVENT_CARD_SKELETON_MEDIA : 0}
+        hosts={extras?.programConfigs?.[configKey]?.cardShowsHosts ? 1 : 0}
       />
     ),
     decode: decodeProgramRow,

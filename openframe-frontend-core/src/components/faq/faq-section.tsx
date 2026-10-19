@@ -107,7 +107,9 @@ const DEFAULT_HEADING_TEXT = 'Frequently Asked Questions';
 
 /** The block's layout, read by the block and by its skeleton, so the skeleton is the block's size. */
 const SECTION_DEFAULT_CLASS = 'space-y-10';
-const COLUMN_STACK_CLASS = 'space-y-8';
+/** The nav's gap to its neighbour, inside the nav's own wrapper (padding), so the nav takes its gap with it. */
+const NAV_ABOVE_QUESTIONS_CLASS = 'pb-8';
+const NAV_BELOW_HEADING_CLASS = 'pt-8';
 const QUESTIONS_STACK_CLASS = 'space-y-10';
 const ASIDE_GRID_CLASS =
   'grid gap-10 content-lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] content-lg:grid-rows-[auto_1fr] content-lg:gap-x-16';
@@ -117,7 +119,12 @@ const TOPIC_STACK_CLASS = 'space-y-1';
 const TOPIC_CLASS = 'text-ods-text-muted text-h6';
 const CATEGORY_NAV_CLASS = 'flex flex-wrap gap-2';
 const CATEGORY_PILL_CLASS = 'rounded-full border px-4 py-2 transition-colors text-h6';
-const CATEGORY_SECTION_CLASS = 'scroll-mt-24 space-y-4';
+const CATEGORY_SECTION_CLASS = 'scroll-mt-24';
+/**
+ * A category's heading, with the gap to its questions inside its own box (padding, not the group's spacing): only a
+ * named group has one, so it is the group's optional part (`data-loading-optional`) and takes its gap with it.
+ */
+const CATEGORY_HEADING_CLASS = cn(SECTION_HEADING_CLASS, 'pb-4');
 /** Questions the block's skeleton draws when the host states no count (`minResults`): one screen of the accordion's rows. */
 export const FAQ_SECTION_SKELETON_QUESTIONS = FAQ_ACCORDION_SKELETON_ROWS;
 
@@ -136,10 +143,16 @@ function FaqLayout({
   questions: React.ReactNode;
   aside?: React.ReactNode;
 }) {
+  // The category nav is drawn only when the FAQs fall into two or more categories: a part of the record
+  // (`data-loading-optional`), carrying its own gap.
   if (!aside) {
     return (
-      <div className={COLUMN_STACK_CLASS}>
-        {nav}
+      <div>
+        {nav && (
+          <div className={NAV_ABOVE_QUESTIONS_CLASS} data-loading-optional>
+            {nav}
+          </div>
+        )}
         {questions}
       </div>
     );
@@ -148,9 +161,13 @@ function FaqLayout({
   // document (and on a narrow area), in the right column from `lg`.
   return (
     <div className={ASIDE_GRID_CLASS}>
-      <div className={COLUMN_STACK_CLASS}>
+      <div>
         {heading}
-        {nav}
+        {nav && (
+          <div className={NAV_BELOW_HEADING_CLASS} data-loading-optional>
+            {nav}
+          </div>
+        )}
       </div>
       <div className={ASIDE_QUESTIONS_CELL_CLASS}>{questions}</div>
       <div className={ASIDE_CELL_CLASS}>{aside}</div>
@@ -460,7 +477,12 @@ function GroupedFaqList({
         return (
           // A category is a record's group: how many there are is the data's (`data-loading-item`, like a list row).
           <section key={key} id={group.slug ?? undefined} className={CATEGORY_SECTION_CLASS} data-loading-item>
-            {group.section && <CategoryHeading className={SECTION_HEADING_CLASS}>{group.section}</CategoryHeading>}
+            {/* Only a named group has a heading (the uncategorized one has none): a part of the record, not of every group. */}
+            {group.section && (
+              <CategoryHeading className={CATEGORY_HEADING_CLASS} data-loading-optional>
+                {group.section}
+              </CategoryHeading>
+            )}
             <FaqAccordion
               // Re-key on item-hash changes so the remount picks up the new
               // `defaultOpenIds` (the accordion is uncontrolled). Stable for
@@ -598,8 +620,10 @@ export function FaqSection({
   );
 }
 
-export interface FaqSectionSkeletonProps
-  extends Pick<FaqSectionProps, 'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'> {
+export interface FaqSectionSkeletonProps extends Pick<
+  FaqSectionProps,
+  'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'
+> {
   /** Questions drawn (the instance's `minResults`). Default `FAQ_SECTION_SKELETON_QUESTIONS`. */
   count?: number;
   /** Named categories drawn (each its section, a heading bar and its rows), then the uncategorized rows. Default 0. */
@@ -632,9 +656,7 @@ export function FaqSectionSkeleton({
   const CategoryHeading = heading === null ? 'h2' : 'h3';
   // A stated shape names every group's rows; otherwise the count is spread over the groups, each at least one.
   const shapeGroups = shape?.filter(rows => rows > 0);
-  const named = shapeGroups?.length
-    ? Math.max(0, shapeGroups.length - (uncategorized ? 1 : 0))
-    : Math.max(0, sections);
+  const named = shapeGroups?.length ? Math.max(0, shapeGroups.length - (uncategorized ? 1 : 0)) : Math.max(0, sections);
   const groups = shapeGroups?.length ? shapeGroups.length : named + (uncategorized || named === 0 ? 1 : 0);
   const rowsOf = (group: number) =>
     shapeGroups?.length
@@ -659,7 +681,7 @@ export function FaqSectionSkeleton({
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton groups never reorder
           <section key={group} className={CATEGORY_SECTION_CLASS} data-loading-item>
             {isNamed && (
-              <CategoryHeading className={SECTION_HEADING_CLASS}>
+              <CategoryHeading className={CATEGORY_HEADING_CLASS} data-loading-optional>
                 <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
               </CategoryHeading>
             )}

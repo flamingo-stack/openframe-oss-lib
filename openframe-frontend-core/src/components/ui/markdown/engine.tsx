@@ -202,7 +202,9 @@ const SKELETON_SECTION_PARAGRAPHS = [3, 2] as const;
 const SKELETON_TITLE_LINES = { phone: 2, wide: 1 } as const;
 const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
 /** The renderer's own frame: read by the engine and by its skeleton. */
-const RENDERER_CLASS = 'simple-markdown-renderer';
+/** The renderer's root class, on the rendered document and on every skeleton of one: it names a markdown body. */
+export const MARKDOWN_RENDERER_CLASS = 'simple-markdown-renderer';
+const RENDERER_CLASS = MARKDOWN_RENDERER_CLASS;
 const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
 const ARTICLE_CLASS = 'prose prose-lg max-w-none';
 
