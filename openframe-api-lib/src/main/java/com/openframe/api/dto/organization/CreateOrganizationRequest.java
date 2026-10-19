@@ -8,12 +8,7 @@ import lombok.Builder;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-/**
- * Shared DTO for creating a new organization.
- * Used by both GraphQL (api-service-core) and REST (external-api).
- * 
- * Note: organizationId is generated automatically on the backend as UUID.
- */
+// organizationId is generated automatically on the backend as UUID.
 @Builder
 public record CreateOrganizationRequest(
         @NotBlank(message = "Name is required")
@@ -39,3 +34,4 @@ public record CreateOrganizationRequest(
         LocalDate contractEndDate
 ) {
 }
+
