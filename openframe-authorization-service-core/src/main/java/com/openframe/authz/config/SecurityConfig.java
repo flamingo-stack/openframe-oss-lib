@@ -37,9 +37,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 
@@ -120,8 +120,22 @@ public class SecurityConfig {
                 authErrorResponder.send(response, request, "oauth2-login", exception, SSO_LOGIN_FAILED);
     }
 
-    /** One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs. */
-    private final Map<String, JwtDecoder> ssoDecoderCache = new ConcurrentHashMap<>();
+    /**
+     * One entry per distinct SSO config (its cache key), NOT per login — bounded by active configs.
+     * Backed by a fixed-capacity LRU map (access-order {@link LinkedHashMap}) rather than a raw
+     * {@code ConcurrentHashMap} so that repeated tenant-driven SSO credential rotations (clientId,
+     * jwkSetUri, issuer are all admin-settable per tenant) cannot grow this cache without bound —
+     * the oldest entry is evicted once the cap is reached. Access is synchronized since
+     * {@code LinkedHashMap} is not thread-safe, including for reads in access-order mode.
+     */
+    private static final int SSO_DECODER_CACHE_MAX_SIZE = 500;
+
+    private final Map<String, JwtDecoder> ssoDecoderCache = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, JwtDecoder> eldest) {
+            return size() > SSO_DECODER_CACHE_MAX_SIZE;
+        }
+    };
 
     /**
      * Builds the ID-token decoder for whichever provider the registration belongs to, supplying the
@@ -134,7 +148,8 @@ public class SecurityConfig {
      * here (registrations are built per TENANT under "google"/"microsoft"/"apple"), so it would pin
      * the first tenant's client onto the pod for everyone. This key reuses a decoder — keeping the
      * JWKS keys cached process-wide — while rebuilding whenever a tenant's clientId, JWKS URI or
-     * issuer differs or is rotated; a rotated config's stale entry is harmless and rare.
+     * issuer differs or is rotated; the cache is capped (see {@link #ssoDecoderCache}) so rotated
+     * configs' stale entries are bounded rather than accumulating forever.
      */
     @Bean
     public JwtDecoderFactory<ClientRegistration> ssoJwtDecoderFactory(SsoProviderRegistry ssoProviderRegistry) {
@@ -145,7 +160,11 @@ public class SecurityConfig {
                     + "|" + clientRegistration.getClientId()
                     + "|" + jwkSetUri
                     + "|" + issuer;
-            return ssoDecoderCache.computeIfAbsent(cacheKey, k -> {
+            synchronized (ssoDecoderCache) {
+                JwtDecoder cached = ssoDecoderCache.get(cacheKey);
+                if (cached != null) {
+                    return cached;
+                }
                 // EVERY provider gets the full OIDC validator set — the audience check is what
                 // stops an ID token minted for any other application. Registrations that pin an
                 // issuer (Google, Apple) get it enforced; Microsoft's varies per directory and is
@@ -159,8 +178,9 @@ public class SecurityConfig {
 
                 NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
                 decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(validators));
+                ssoDecoderCache.put(cacheKey, decoder);
                 return decoder;
-            });
+            }
         };
     }
 }
