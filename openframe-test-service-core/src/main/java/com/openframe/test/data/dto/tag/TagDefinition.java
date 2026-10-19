@@ -8,10 +8,8 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * A tag key definition shared across entity types (DEVICE, TICKET, KNOWLEDGE_ARTICLE) — the
- * GraphQL {@code Tag} type. Named {@code TagDefinition} to avoid clashing with JUnit's {@code @Tag}.
- */
+// A tag key definition shared across entity types (DEVICE, TICKET, KNOWLEDGE_ARTICLE) — the
+// GraphQL Tag type. Named TagDefinition to avoid clashing with JUnit's @Tag.
 @Data
 @Builder
 @NoArgsConstructor
