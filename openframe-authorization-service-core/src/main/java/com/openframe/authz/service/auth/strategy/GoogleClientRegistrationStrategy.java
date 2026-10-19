@@ -31,11 +31,7 @@ public class GoogleClientRegistrationStrategy extends BaseOidcClientRegistration
         return googleProps;
     }
 
-    /**
-     * Google has exactly one issuer, so pin it on the registration — with it set, the standard
-     * validator stack enforces the issuer too. (The base builder leaves issuerUri empty because
-     * Microsoft's multi-tenant issuer varies per directory and is validated by pattern instead.)
-     */
+    // Google has exactly one issuer; pinning it lets the standard validator stack enforce it too.
     @Override
     protected void customize(ClientRegistration.Builder builder, SSOConfig cfg) {
         if (hasText(googleProps.getIssuerUri())) {
