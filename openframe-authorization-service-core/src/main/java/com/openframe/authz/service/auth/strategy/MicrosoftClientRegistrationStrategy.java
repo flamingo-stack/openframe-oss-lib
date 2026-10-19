@@ -18,10 +18,7 @@ import java.util.regex.Pattern;
 @Component
 public class MicrosoftClientRegistrationStrategy extends BaseOidcClientRegistrationStrategy {
 
-    /**
-     * A multi-tenant Microsoft app receives ID tokens issued by the signing-in directory, so the
-     * issuer varies per tenant and cannot be compared literally.
-     */
+    // Multi-tenant Microsoft apps issue tokens per signing-in directory, so the issuer can't be compared literally; matched by pattern instead.
     private static final Pattern MS_ISSUER_PATTERN =
             Pattern.compile("^https://login\\.microsoftonline\\.com/[^/]+/v2\\.0/?$");
 
@@ -57,6 +54,7 @@ public class MicrosoftClientRegistrationStrategy extends BaseOidcClientRegistrat
         });
     }
 }
+
 
 
 
