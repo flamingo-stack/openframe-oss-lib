@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
@@ -103,7 +104,7 @@ public class HubspotApiEmailService implements EmailService {
         );
 
         if (log.isDebugEnabled()) {
-            log.debug("[HubSpot API] {} Payload: {}", debugContext, payload);
+            log.debug("[HubSpot API] {} Payload: {}", debugContext, maskPayloadForLogging(payload));
         }
 
         webClient.post()
@@ -123,6 +124,43 @@ public class HubspotApiEmailService implements EmailService {
                             )));
                 })
                 .block();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> maskPayloadForLogging(Map<String, Object> payload) {
+        Map<String, Object> masked = new HashMap<>(payload);
+
+        Object messageObj = payload.get("message");
+        if (messageObj instanceof Map) {
+            Map<String, Object> message = new HashMap<>((Map<String, Object>) messageObj);
+            Object to = message.get("to");
+            if (to instanceof String) {
+                message.put("to", maskEmail((String) to));
+            }
+            masked.put("message", message);
+        }
+
+        Object customPropsObj = payload.get("customProperties");
+        if (customPropsObj instanceof Map) {
+            Map<String, Object> customProperties = new HashMap<>((Map<String, Object>) customPropsObj);
+            if (customProperties.containsKey("link")) {
+                customProperties.put("link", "***REDACTED***");
+            }
+            masked.put("customProperties", customProperties);
+        }
+
+        return masked;
+    }
+
+    private String maskEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        int atIndex = email.indexOf('@');
+        if (atIndex <= 1) {
+            return "***" + email.substring(atIndex);
+        }
+        return email.charAt(0) + "***" + email.substring(atIndex);
     }
 }
 
