@@ -62,6 +62,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_ORDER = "order";
     private static final String FIELD_LAST_ACTIVITY_AT = "lastActivityAt";
     private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
+    private static final String FIELD_VERSION = "version";
 
     private static final String CASE_INSENSITIVE = "i";
 
@@ -500,6 +501,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     private Optional<Ticket> stamp(Query query, Update update) {
+        // $inc by 0 stops Spring from adding its own +1, so a chat message never conflicts with a user edit.
+        update.inc(FIELD_VERSION, 0);
         FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true);
         return Optional.ofNullable(mongoTemplate.findAndModify(query, update, options, Ticket.class));
     }

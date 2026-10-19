@@ -250,16 +250,13 @@ public class UserService {
      * Update lastLogin timestamp for a user identified by email within the given tenant.
      * No-op if user is not found.
      */
-    @RetryOnOptimisticLockingFailure
     public void touchLastLogin(String email, String tenantId) {
         if (email == null || tenantId == null) {
             return;
         }
         String normalized = email.trim().toLowerCase(Locale.ROOT);
-        userRepository.findByEmailAndTenantId(normalized, tenantId).ifPresent(user -> {
-            user.setLastLogin(Instant.now());
-            userRepository.save(user);
-        });
+        Instant now = Instant.now();
+        userRepository.updateLastLogin(normalized, tenantId, now);
     }
 
     /**
