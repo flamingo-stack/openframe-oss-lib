@@ -90,10 +90,7 @@ public class ScheduleScriptDeviceService {
                 requested.size(), scheduleId, tenantId, toAdd.size(), toRemove.size());
     }
 
-    /**
-     * Incrementally assign devices to a schedule (idempotent — already-assigned ids are skipped).
-     * Platform-validated: rejects devices whose OS doesn't match the schedule's supportedPlatforms.
-     */
+    // idempotent: already-assigned ids are skipped
     @Transactional
     public void addDevices(String scheduleId, List<String> machineIds, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -178,19 +175,11 @@ public class ScheduleScriptDeviceService {
         onlineDeviceDispatchRepository.deleteByTenantIdAndScheduleIdAndMachineIdIn(tenantId, scheduleId, machineIds);
     }
 
-    /**
-     * The current target machineIds for a single schedule (empty if none / schedule missing).
-     * Mode-aware: SPECIFIC schedules read their join rows, CRITERIA schedules resolve dynamically.
-     */
+    // mode-aware: SPECIFIC reads join rows, CRITERIA resolves dynamically
     public List<String> getMachineIds(String scheduleId) {
         return getMachineIdsByScheduleIds(List.of(scheduleId)).getOrDefault(scheduleId, List.of());
     }
 
-    /**
-     * Target machineIds per schedule, resolved by each schedule's selection mode. SPECIFIC schedules
-     * are batched over their join rows in one query; CRITERIA schedules are resolved individually
-     * against the machines collection (so newly-registered matching devices are included).
-     */
     public Map<String, List<String>> getMachineIdsByScheduleIds(Collection<String> scheduleIds) {
         if (scheduleIds == null || scheduleIds.isEmpty()) {
             return Map.of();
@@ -223,11 +212,6 @@ public class ScheduleScriptDeviceService {
         return result;
     }
 
-    /**
-     * Target device count per schedule (the DEVICES column), resolved by mode without materialising the
-     * device ids: SPECIFIC schedules are counted from their join rows in one batched query; CRITERIA
-     * schedules use a count query each (no id list is fetched just to size it).
-     */
     public Map<String, Integer> getMachineCountsByScheduleIds(Collection<String> scheduleIds) {
         if (scheduleIds == null || scheduleIds.isEmpty()) {
             return Map.of();
@@ -260,11 +244,7 @@ public class ScheduleScriptDeviceService {
         return result;
     }
 
-    /**
-     * Switch a schedule to CRITERIA selection and store its rule (the "Select Devices by Criteria"
-     * save). The target set is then resolved dynamically at read/dispatch time; existing SPECIFIC
-     * join rows are left untouched and simply ignored while in CRITERIA mode.
-     */
+    // existing SPECIFIC join rows are left untouched and ignored while in CRITERIA mode
     @Transactional
     public void applyCriteria(String scheduleId, ScheduleDeviceCriteria criteria, String actorUserId) {
         String tenantId = tenantIdProvider.getTenantId();
@@ -314,21 +294,6 @@ public class ScheduleScriptDeviceService {
         }
     }
 
-    /**
-     * Guards a device-assignment request. Two checks, in order:
-     * <ol>
-     *   <li><b>Existence + tenant scope</b> — every requested machineId must resolve to a device in
-     *       the current tenant. {@code machineRepository.findByTenantIdAndMachineIdIn} only returns
-     *       matching docs, so an unknown or cross-tenant id would otherwise be silently persisted as
-     *       a {@link ScheduleScriptMachineAssigned} row; here it is rejected instead.</li>
-     *   <li><b>Platform compatibility</b> (only when the schedule declares platforms) — each device's
-     *       {@code Machine.osType} (e.g. "windows"/"macos") must match one of the schedule's
-     *       {@code supportedPlatforms}, case-insensitively (osType is lowercase, {@link OsType}
-     *       names are upper). A device with no known osType is allowed (can't determine). Prevents e.g.
-     *       assigning a Windows device to a macOS schedule.</li>
-     * </ol>
-     * No-op when nothing is being assigned.
-     */
     private void validateDevices(String tenantId, List<OsType> schedulePlatforms, Set<String> machineIds) {
         if (machineIds.isEmpty()) {
             return;
