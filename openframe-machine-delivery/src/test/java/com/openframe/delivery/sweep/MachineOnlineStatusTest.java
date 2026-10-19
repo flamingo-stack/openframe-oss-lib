@@ -43,6 +43,26 @@ class MachineOnlineStatusTest {
     }
 
     @Test
+    void isOnline_machineTalkingToUs_true() {
+        // setup
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(Set.of(ONLINE_ID), TelemetryStatus.ONLINE))
+                .thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.ONLINE)));
+
+        // execution + verifications
+        assertThat(status.isOnline(ONLINE_ID)).isTrue();
+    }
+
+    @Test
+    void isOnline_machineSilentOrUnknown_false() {
+        // setup
+        when(machineRepository.findByMachineIdInAndTelemetryStatus(Set.of(UNKNOWN_ID), TelemetryStatus.ONLINE))
+                .thenReturn(List.of());
+
+        // execution + verifications
+        assertThat(status.isOnline(UNKNOWN_ID)).isFalse();
+    }
+
+    @Test
     void statuses_knownMachines_mappedUnknownAbsent() {
         // setup
         when(machineRepository.findByMachineIdIn(ALL)).thenReturn(List.of(machine(ONLINE_ID, DeviceStatus.ONLINE), machine(LEAVING_ID, DeviceStatus.PENDING_DELETION)));

@@ -51,11 +51,18 @@ public class LocalDeliverySink implements DeliverySink {
 
     private void dispatchToMachine(DeliveryRequest<?> request) {
         DeliveryRecordOutcome outcome = recorder.record(request);
-        if (outcome == DeliveryRecordOutcome.RECORDED) {
-            publish(request);
-        } else {
-            skip(request, outcome);
+        switch (outcome) {
+            case RECORDED -> publish(request);
+            case HELD -> hold(request);
+            default -> skip(request, outcome);
         }
+    }
+
+    private void hold(DeliveryRequest<?> request) {
+        DeliveryType type = request.getType();
+        metrics.recordDispatchHeld(type);
+        log.info("Delivery held until the machine is online, the sweep publishes it: type={} targetId={} machineId={}",
+                type, request.getTargetId(), request.getMachineId());
     }
 
     // replayed = the hand-off was repeated; outranked = a newer dispatch of the same key holds the row

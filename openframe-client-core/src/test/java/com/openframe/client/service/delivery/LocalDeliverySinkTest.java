@@ -132,6 +132,20 @@ class LocalDeliverySinkTest {
     }
 
     @Test
+    void accept_machineNotOnline_rowHeldForTheSweepNothingPublished() {
+        // setup
+        when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.HELD);
+
+        // execution
+        sink.accept(request);
+
+        // verifications
+        verifyNoInteractions(publisher, registry);
+        verify(metrics).recordDispatchHeld(DeliveryType.TOOL_INSTALLATION);
+        verify(metrics, never()).recordDispatched(any(), any());
+    }
+
+    @Test
     void accept_replayedHandOff_nothingPublished() {
         // setup
         when(recorder.record(request)).thenReturn(DeliveryRecordOutcome.REPLAYED);
