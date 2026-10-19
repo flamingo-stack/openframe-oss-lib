@@ -32,7 +32,7 @@ public class DynamicClientRegistrationRepository implements ClientRegistrationRe
         try {
             return dynamic.loadClient(registrationId, tenantId);
         } catch (IllegalArgumentException ex) {
-            log.warn("Dynamic client resolution failed for provider '{}' and tenant {}: {}", registrationId, tenantId, ex.getMessage());
+            log.warn("Dynamic client resolution failed for provider '{}' and tenant {}", registrationId, tenantId, ex);
             return null;
         }
     }
