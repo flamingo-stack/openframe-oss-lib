@@ -1,5 +1,6 @@
 package com.openframe.authz.service.user;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.user.UserStatus;
 import com.openframe.data.document.user.UserRole;
@@ -166,6 +167,7 @@ public class UserService {
      * Register or reactivate a user via SSO provider.
      * Sets emailVerified=true and loginProvider to the given provider.
      */
+    @RetryOnOptimisticLockingFailure
     public AuthUser registerOrReactivateFromSso(String tenantId,
                                                 String email,
                                                 String firstName,
@@ -248,6 +250,7 @@ public class UserService {
      * Update lastLogin timestamp for a user identified by email within the given tenant.
      * No-op if user is not found.
      */
+    @RetryOnOptimisticLockingFailure
     public void touchLastLogin(String email, String tenantId) {
         if (email == null || tenantId == null) {
             return;
@@ -262,6 +265,7 @@ public class UserService {
     /**
      * Mark user's email as verified.
      */
+    @RetryOnOptimisticLockingFailure
     public void markEmailVerified(String userId) {
         if (userId == null || userId.isBlank()) {
             return;

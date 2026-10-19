@@ -1,5 +1,6 @@
 package com.openframe.client.service.agentregistration;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.client.dto.agent.AgentRegistrationRequest;
 import com.openframe.client.dto.agent.AgentRegistrationResponse;
 import com.openframe.client.exception.InvalidClientSecretException;
@@ -112,6 +113,7 @@ public class AgentRegistrationService {
         return savedMachine;
     }
 
+    @RetryOnOptimisticLockingFailure
     public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
 

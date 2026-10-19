@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.repository.device.MachineRepository;
@@ -16,6 +17,7 @@ public class MachineHostnameService {
 
     private final MachineRepository machineRepository;
 
+    @RetryOnOptimisticLockingFailure
     public void updateHostname(String machineId, String hostname) {
         Optional<Machine> foundMachine = machineRepository.findByMachineId(machineId);
         if (foundMachine.isEmpty()) {

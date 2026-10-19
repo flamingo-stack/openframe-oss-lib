@@ -1,5 +1,6 @@
 package com.openframe.client.service;
 
+import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -23,6 +24,7 @@ public class AgentUninstallService {
     private final ToolConnectionService toolConnectionService;
     private final InstalledAgentService installedAgentService;
 
+    @RetryOnOptimisticLockingFailure
     public void uninstall(String machineId, String clientSecret) {
         Optional<OAuthClient> client = oauthClientRepository.findByMachineId(machineId);
         if (client.isEmpty()) {

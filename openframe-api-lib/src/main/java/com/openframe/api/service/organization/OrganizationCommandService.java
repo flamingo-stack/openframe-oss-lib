@@ -1,6 +1,5 @@
 package com.openframe.api.service.organization;
 
-import com.openframe.data.retry.RetryOnOptimisticLockingFailure;
 import com.openframe.api.dto.organization.CreateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationRequest;
 import com.openframe.api.dto.organization.UpdateOrganizationStatusRequest;
@@ -47,7 +46,6 @@ public class OrganizationCommandService {
      * @param request update organization request
      * @return updated organization
      */
-    @RetryOnOptimisticLockingFailure
     public Organization updateOrganization(String id, UpdateOrganizationRequest request) {
         log.debug("Updating organization {} from request", id);
         
