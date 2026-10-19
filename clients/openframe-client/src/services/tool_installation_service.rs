@@ -146,13 +146,9 @@ impl ToolInstallationService {
         }
 
         // Resolve the download before any destructive step
-        let download_configs = tool_installation_message
-            .download_configurations
-            .as_ref()
-            .with_context(|| format!("No download configurations for tool {}", tool_agent_id))?;
         let resolved_config = self
             .github_download_service
-            .find_config_for_current_os(download_configs)
+            .find_config_for_current_os(&tool_installation_message.download_configurations)
             .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
             .with_version_override(&version_clone, &effective_version);
 

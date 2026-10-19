@@ -22,6 +22,7 @@ public class ToolInstallationMessage implements DeliveryPayload {
     private String toolType;
     private String version;
     private SessionType sessionType;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<DownloadConfiguration> downloadConfigurations;
     private List<Asset> assets;
 
