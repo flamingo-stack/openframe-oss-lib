@@ -8,21 +8,17 @@ public interface DefaultProviderConfig {
 
     String getDefaultClientSecret();
 
-    /** Apple only: Developer Team ID for the client-secret JWT. */
+    // Apple only: Developer Team ID for the client-secret JWT.
     default String getDefaultTeamId() {
         return null;
     }
 
-    /** Apple only: Key ID of the .p8 signing key. */
+    // Apple only: Key ID of the .p8 signing key.
     default String getDefaultKeyId() {
         return null;
     }
 
-    /**
-     * Whether enough defaults are present to actually complete a login. Gates the provider out of
-     * signup/login lists when misconfigured, instead of showing a button that fails at the
-     * client-registration step.
-     */
+    // Gates a misconfigured provider out of signup/login lists instead of failing at client registration.
     default boolean isConfigured() {
         return notBlank(getDefaultClientId()) && notBlank(getDefaultClientSecret());
     }
