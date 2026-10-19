@@ -820,43 +820,6 @@ export function HubSpotMeetingScheduler({
   );
   const degradedCard = degraded("We couldn't load available call times. Please try again shortly.");
 
-  if (modal && coldStart) {
-    return (
-      <div className={cn(MODAL_STACK_CLASS, className)}>
-        <LoadingRegion label="Loading available times" className={MODAL_CARD_CLASS}>
-          <SchedulerModalHeader
-            loading
-            hosts={shownHosts}
-            durationsMs={durations}
-            selectedDurationMs={durationMs}
-            onSelectDuration={NOOP}
-            timezone={timezone}
-          />
-          <SlotPicker
-            loading
-            layout="modal"
-            slots={slots}
-            timezone={timezone}
-            monthOffset={monthOffset}
-            onMonthOffsetChange={NOOP}
-            selectedSlot={null}
-            onSelectSlot={NOOP}
-            selectedDay={null}
-            onSelectDay={NOOP}
-          />
-        </LoadingRegion>
-        <ModalFooter
-          onCancel={onBack}
-          primary={
-            <Button disabled onClick={NOOP} className={MODAL_PRIMARY_CLASS}>
-              Continue
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
-
   if (!coldStart) {
     if (availabilityError || !availability) return degradedCard;
     if (!isNativelyBookable(availability)) {
@@ -882,7 +845,8 @@ export function HubSpotMeetingScheduler({
         : null;
     return (
       <div className={cn(MODAL_STACK_CLASS, className)}>
-        <div className={MODAL_CARD_CLASS}>
+        {/* One tree loading and loaded: the region announces only on a cold start, so the first read never remounts the card. */}
+        <LoadingRegion label="Loading available times" announce={coldStart} className={MODAL_CARD_CLASS}>
           {/* The window's one back edge: on the form it returns to the
               calendar at every width; on the calendar it is the host's exit,
               drawn on a phone only - the window has an X everywhere else. */}
@@ -896,6 +860,7 @@ export function HubSpotMeetingScheduler({
             />
           )}
           <SchedulerModalHeader
+            loading={coldStart}
             hosts={shownHosts}
             durationsMs={durations}
             selectedDurationMs={durationMs}
@@ -942,15 +907,15 @@ export function HubSpotMeetingScheduler({
                   </AlertDescription>
                 </Alert>
               )}
-              {(!timezone || durationMs == null) && durations.length === 0 && !isFetchingAvailability ? (
+              {!coldStart && (!timezone || durationMs == null) && durations.length === 0 && !isFetchingAvailability ? (
                 <div className={cn(MODAL_STEP_CLASS, 'items-start gap-[var(--spacing-system-m)]')}>
                   <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
                   {escapeHatch}
                 </div>
               ) : (
-                // Waiting for the zone or the length, the picker draws its own skeleton (`loading`).
+                // On a cold start, or waiting for the zone or the length, the picker draws its own skeleton (`loading`).
                 <SlotPicker
-                  loading={!timezone || durationMs == null}
+                  loading={coldStart || !timezone || durationMs == null}
                   layout="modal"
                   slots={slots}
                   timezone={timezone}
@@ -969,7 +934,7 @@ export function HubSpotMeetingScheduler({
               )}
             </>
           )}
-        </div>
+        </LoadingRegion>
         {step === 'slot' && (
           <ModalFooter
             onCancel={onBack}

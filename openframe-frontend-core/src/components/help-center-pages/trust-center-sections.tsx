@@ -249,9 +249,10 @@ function countLabel(n: number, noun: string): string {
  */
 const CONTROLS_LIST_HEIGHT = 'h-[calc(var(--controls-rows)*(var(--control-row-h)+1px)+2px)]';
 
-/** The controls section's stack, loaded and loading. */
-/** It states a control row's height (3.5rem, 5rem from md: one line of name, one of description), which the rows and
- *  the list box read. */
+/**
+ * The controls section's stack, loaded and loading. It states a control row's height (3.5rem, 5rem from md: one line
+ * of name, one of description), which the rows and the list box read.
+ */
 const CONTROLS_SECTION_CLASS =
   'flex flex-col gap-[var(--spacing-system-m)] [--control-row-h:3.5rem] content-md:[--control-row-h:5rem]';
 /** The controls toolbar (summary line + search), loaded and loading. */

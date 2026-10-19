@@ -698,7 +698,9 @@ export function ProgramCard<T extends BaseProgramItem>({
       </div>
 
       {hosts.length > 0 && (
-        <div className={DEFAULT_HOSTS_ROW}>
+        // A type whose cards always show hosts (`cardShowsHosts`) draws them while loading; elsewhere only some
+        // records have hosts, so the row is record-dependent.
+        <div className={DEFAULT_HOSTS_ROW} data-loading-optional={config.cardShowsHosts ? undefined : true}>
           {hosts.map((host, index) => (
             <SquareAvatar
               variant="round"
