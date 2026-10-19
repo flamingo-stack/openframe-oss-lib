@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 
 @Component
@@ -19,7 +20,7 @@ public class ToolCommandParamsResolver {
 
     public List<String> process(String toolId, List<String> commandArgs) {
         if (commandArgs == null) {
-            return null;
+            return Collections.emptyList();
         }
 
         // Process each argument and replace placeholders where found
