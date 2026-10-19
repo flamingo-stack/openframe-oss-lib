@@ -64,8 +64,8 @@ export interface CommandBoxProps {
  *
  * Usage Example:
  * ```tsx
- * import { CommandBox } from '@flamingo/ui-kit/components/features'
- * import { Copy, Play } from 'lucide-react'
+ * import { CommandBox } from '@flamingo-stack/openframe-frontend-core/components/features'
+ * import { Copy02Icon } from '@flamingo-stack/openframe-frontend-core/components/icons-v2-generated/documents/copy-02-icon'
  *
  * <CommandBox
  *   title="Device Add Command"
@@ -73,13 +73,13 @@ export interface CommandBoxProps {
  *   primaryAction={{
  *     label: 'Copy Command',
  *     onClick: handleCopy,
- *     icon: <Copy className="w-5 h-5" />,
- *     variant: 'primary'
+ *     icon: <Copy02Icon className="w-5 h-5" />,
+ *     variant: 'accent'
  *   }}
  *   secondaryAction={{
  *     label: 'Run on Current Machine',
  *     onClick: handleRun,
- *     icon: <Play className="w-5 h-5" />,
+ *     icon: <Copy02Icon className="w-5 h-5" />,
  *     variant: 'outline'
  *   }}
  * />
