@@ -1,10 +1,8 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.CveMetadata;
 import com.openframe.data.document.rmm.software.TenantCve;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.repository.rmm.software.CveMetadataRepository;
 import com.openframe.data.repository.rmm.software.TenantCveRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.handler.MessageHandler;
@@ -28,7 +26,6 @@ import static com.openframe.stream.handler.software.FleetRowFields.str;
 public class TenantCveHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private final TenantCveRepository tenantCveRepository;
-    private final CveMetadataRepository cveMetadataRepository;
 
     @Override
     public EventHandlerType getType() {
@@ -74,7 +71,6 @@ public class TenantCveHandler implements MessageHandler<DeserializedDebeziumMess
         tenantCve.setTenantId(tenantId);
         tenantCve.setCveId(cveId);
         tenantCve.setDevicesCount(intOr(row, "host_count", 0));
-        applyMetadata(tenantCve, cveId);
         Instant now = Instant.now();
         if (tenantCve.getDiscoveredAt() == null) {
             tenantCve.setDiscoveredAt(now);
@@ -83,27 +79,5 @@ public class TenantCveHandler implements MessageHandler<DeserializedDebeziumMess
         tenantCveRepository.save(tenantCve);
         log.debug("[software-cdc] tenant_cve upserted: tenant={} cve={} devices={}",
                 tenantId, cveId, tenantCve.getDevicesCount());
-    }
-
-    private void applyMetadata(TenantCve tenantCve, String cveId) {
-        CveMetadata meta = cveMetadataRepository.findByCveId(cveId).orElse(null);
-        if (meta == null) {
-            ensurePlaceholder(cveId);
-            return;
-        }
-        tenantCve.setSeverity(meta.getSeverity());
-        tenantCve.setCvssScore(meta.getCvssScore());
-        tenantCve.setEpssProbability(meta.getEpssProbability());
-        tenantCve.setCisaKnownExploit(meta.getCisaKnownExploit());
-        tenantCve.setPublishedAt(meta.getPublishedAt());
-    }
-
-    private void ensurePlaceholder(String cveId) {
-        try {
-            cveMetadataRepository.save(CveMetadata.builder().cveId(cveId).build());
-        } catch (RuntimeException e) {
-            // Concurrent event already created it (unique cveId) — nothing to do.
-            log.debug("[software-cdc] cve_metadata placeholder already present: {}", cveId);
-        }
     }
 }

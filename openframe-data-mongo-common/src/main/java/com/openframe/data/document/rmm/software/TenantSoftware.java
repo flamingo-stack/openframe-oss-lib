@@ -51,8 +51,6 @@ public class TenantSoftware implements TenantScoped {
 
     private int cveCount;
 
-    private String highestSeverity;
-
     @Indexed
     private List<OsType> osTypes;
 

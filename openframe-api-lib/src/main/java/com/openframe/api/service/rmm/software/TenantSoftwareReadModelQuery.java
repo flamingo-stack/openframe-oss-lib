@@ -1,6 +1,5 @@
 package com.openframe.api.service.rmm.software;
 
-import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
@@ -11,12 +10,10 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.software.CveMetadata;
 import com.openframe.data.document.rmm.software.DeviceCve;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.TenantSoftware;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.rmm.software.CveMetadataRepository;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.TenantSoftwareRepository;
@@ -45,14 +42,11 @@ public class TenantSoftwareReadModelQuery {
     private static final Map<String, String> SORT_FIELD = Map.of(
             "name", "nameLower",
             "devicesCount", "devicesCount",
-            "cveCount", "cveCount",
-            "highestSeverity", "highestSeverity",
-            "severity", "highestSeverity");
+            "cveCount", "cveCount");
 
     private final TenantSoftwareRepository tenantSoftwareRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final DeviceCveRepository deviceCveRepository;
-    private final CveMetadataRepository cveMetadataRepository;
     private final MachineRepository machineRepository;
 
     public Optional<SoftwareResponse> findById(String tenantId, String softwareId) {
@@ -88,23 +82,17 @@ public class TenantSoftwareReadModelQuery {
         if (byCve.isEmpty()) {
             return PageResult.empty(page);
         }
-        Map<String, CveMetadata> metaByCve = cveMetadataRepository.findByCveIdIn(byCve.keySet()).stream()
-                .collect(Collectors.toMap(CveMetadata::getCveId, m -> m, (a, b) -> a));
         List<SoftwareVulnerabilityResponse> all = byCve.entrySet().stream()
-                .map(e -> toSoftwareVuln(e.getKey(), e.getValue(), metaByCve.get(e.getKey())))
+                .map(e -> toSoftwareVuln(e.getKey(), e.getValue()))
                 .filter(v -> isBlank(search) || (v.getCveId() != null && v.getCveId().toLowerCase().contains(search.toLowerCase())))
                 .sorted(vulnComparator(sortField, sortAsc))
                 .toList();
         return paginate(all, page, perPage);
     }
 
-    private SoftwareVulnerabilityResponse toSoftwareVuln(String cveId, List<DeviceCve> rows, CveMetadata meta) {
+    private SoftwareVulnerabilityResponse toSoftwareVuln(String cveId, List<DeviceCve> rows) {
         SoftwareVulnerabilityResponse v = new SoftwareVulnerabilityResponse();
         v.setCveId(cveId);
-        if (meta != null) {
-            v.setSeverity(severityOf(meta.getSeverity()));
-            v.setCvssScore(meta.getCvssScore());
-        }
         v.setAffectedVersion(rows.stream().map(DeviceCve::getInstalledVersion).filter(Objects::nonNull)
                 .distinct().collect(Collectors.joining(", ")));
         v.setDiscoveredAt(rows.stream().map(DeviceCve::getDiscoveredAt).filter(Objects::nonNull)
@@ -113,9 +101,10 @@ public class TenantSoftwareReadModelQuery {
     }
 
     private Comparator<SoftwareVulnerabilityResponse> vulnComparator(String sortField, boolean sortAsc) {
-        Comparator<SoftwareVulnerabilityResponse> base = "discoveredAt".equals(sortField)
-                ? Comparator.comparing(SoftwareVulnerabilityResponse::getDiscoveredAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                : Comparator.comparing(SoftwareVulnerabilityResponse::getCvssScore, Comparator.nullsLast(Comparator.naturalOrder()));
+        // Scoring (cvss/severity) lives in the CVE-enrichment feature; sort by discovery date or CVE id here.
+        Comparator<SoftwareVulnerabilityResponse> base = "cveId".equals(sortField)
+                ? Comparator.comparing(SoftwareVulnerabilityResponse::getCveId, Comparator.nullsLast(Comparator.naturalOrder()))
+                : Comparator.comparing(SoftwareVulnerabilityResponse::getDiscoveredAt, Comparator.nullsLast(Comparator.naturalOrder()));
         return sortAsc ? base : base.reversed();
     }
 
@@ -183,17 +172,6 @@ public class TenantSoftwareReadModelQuery {
         return new PageResult<>(slice, to < all.size(), pageIndex > 0, all.size(), pageIndex);
     }
 
-    private static SoftwareCveSeverity severityOf(String severity) {
-        if (isBlank(severity)) {
-            return null;
-        }
-        try {
-            return SoftwareCveSeverity.valueOf(severity);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
     public PageResult<SoftwareResponse> listSoftware(String tenantId, String search, int page, Integer perPage,
                                                      SortInput sort, Boolean vulnerable) {
         int size = perPage == null || perPage <= 0 ? DEFAULT_PER_PAGE : perPage;
@@ -243,7 +221,6 @@ public class TenantSoftwareReadModelQuery {
 
         SoftwareVulnerabilitySummaryResponse summary = new SoftwareVulnerabilitySummaryResponse();
         summary.setCveCount(ts.getCveCount());
-        summary.setHighestSeverity(severityOf(ts.getHighestSeverity()));
         row.setVulnerabilitySummary(summary);
         return row;
     }
