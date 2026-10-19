@@ -6,10 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * A script environment variable. Doubles as the {@code ScriptEnvVarInput} payload
- * for create/update mutations (identical {@code name}/{@code value}/{@code secret} shape).
- */
+// A script environment variable. Doubles as the ScriptEnvVarInput payload
+// for create/update mutations (identical name/value/secret shape).
 @Data
 @Builder
 @NoArgsConstructor
