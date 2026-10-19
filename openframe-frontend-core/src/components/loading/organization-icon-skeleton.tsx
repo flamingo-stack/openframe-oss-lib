@@ -47,7 +47,7 @@ const sizeClasses = {
 const backgroundClasses = {
   dark: 'bg-ods-bg border border-ods-border',
   light: 'bg-ods-card border border-ods-border',
-  white: 'bg-white border border-[#E5E5E5]',
+  white: 'bg-white border border-ods-border',
 };
 
 /**
