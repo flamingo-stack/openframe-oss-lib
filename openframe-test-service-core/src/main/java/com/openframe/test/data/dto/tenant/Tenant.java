@@ -9,10 +9,8 @@ import org.bson.codecs.pojo.annotations.BsonId;
 
 import java.time.LocalDateTime;
 
-/**
- * Tenant DTO for multi-tenant architecture.
- * Each tenant represents an organization/company using OpenFrame.
- */
+// Tenant DTO for multi-tenant architecture.
+// Each tenant represents an organization/company using OpenFrame.
 @Data
 @Builder
 @NoArgsConstructor
@@ -30,3 +28,4 @@ public class Tenant {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }
+
