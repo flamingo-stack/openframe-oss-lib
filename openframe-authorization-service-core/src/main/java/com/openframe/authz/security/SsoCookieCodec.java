@@ -22,7 +22,7 @@ public class SsoCookieCodec {
 
     private final ObjectMapper objectMapper;
 
-    @Value("${openframe.sso.registration-cookie.secret:change-me-in-config}")
+    @Value("${openframe.sso.registration-cookie.secret}")
     private String hmacSecret;
 
     public String encode(SsoCookiePayload payload) {
