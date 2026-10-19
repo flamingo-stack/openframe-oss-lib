@@ -9,10 +9,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * GraphQL input filter for Log operations.
- * Optimized for GraphQL schema and client requirements.
- */
+// GraphQL input filter for Log operations
 @Data
 @Builder
 @NoArgsConstructor
