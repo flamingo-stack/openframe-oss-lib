@@ -1,5 +1,4 @@
 pub mod binary_writer;
-pub mod code_signature;
 pub mod console;
 pub mod detached_process;
 pub mod directories;
