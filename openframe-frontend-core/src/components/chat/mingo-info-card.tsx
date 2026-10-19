@@ -9,6 +9,7 @@ import { Ellipsis01Icon } from '../icons-v2-generated';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
 import { tagVariants, type TagProps } from '../ui/tag';
+import { Button } from '@flamingo-stack/openframe-frontend-core';
 
 // =============================================================================
 // Types
@@ -238,9 +239,15 @@ export function MingoInfoCard({
       )}
 
       {action && (
-        <button type="button" aria-label={action.label} onClick={action.onClick} className={TRAILING_BUTTON_CLASS}>
+        <Button
+          type="button"
+          variant="transparent"
+          aria-label={action.label}
+          onClick={action.onClick}
+          className={TRAILING_BUTTON_CLASS}
+        >
           {action.icon}
-        </button>
+        </Button>
       )}
       {hasMenu && (
         <ActionsMenuDropdown
@@ -263,3 +270,4 @@ export function MingoInfoCard({
     </span>
   );
 }
+
