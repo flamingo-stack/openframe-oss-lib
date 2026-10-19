@@ -198,6 +198,11 @@ export default defineConfig([
       // every `[id]` in the container and asserts the set size, which is the only
       // formulation of that claim.
       'src/components/ui/__tests__/store-badges.test.tsx',
+      // A header action's icon in the mobile "..." row: what is under test is the
+      // re-tint wrapper around it, a role-less <span> whose class IS the contract
+      // (an accent-tinted icon must not stay dark on the menu's dark row). No
+      // `screen` query reaches it, so the test walks up from the icon.
+      'src/components/ui/__tests__/page-actions-menu-icon.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',
