@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { formatDateTimeYmd } from '../../utils/format';
+import { formatDate, formatTime } from '../../utils/format-date';
 import type { OSPlatformId } from '../../utils/os-platforms';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
@@ -61,13 +61,12 @@ export function DeviceCard({
   className,
   ...props
 }: DeviceCardProps) {
-  // Format date for last seen
+  // "Last seen" is read as "your local time", the same way the devices table
+  // column renders it: the viewer's zone and locale, never UTC.
   const formatLastSeen = (lastSeen?: string | Date) => {
     if (!lastSeen) return null;
-
-    // UTC-pinned so the server and every client agree (React #418), through the
-    // one renderer rather than hand-built `getUTC*` strings.
-    return formatDateTimeYmd(lastSeen, null) || null;
+    const date = formatDate(lastSeen);
+    return date === '—' ? null : `${date} ${formatTime(lastSeen)}`;
   };
 
   return (
