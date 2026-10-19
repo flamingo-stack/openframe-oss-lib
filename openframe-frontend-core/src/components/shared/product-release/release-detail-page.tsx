@@ -169,8 +169,8 @@ const SUMMARY_CLASS = 'text-ods-text-primary text-h4';
 const RELEASE_TAG_ROW_FOLD = 3;
 /**
  * A release tag's typical label width while it is read: a release is tagged with product areas, longer than most tags
- * (sampled badges measure 64 to 155px, typically about 105px: ten characters of the badge's type), so on a phone its
- * three tags fill the first line and the "+N" wraps to a second, as a typical release's row does.
+ * (sampled badges measure 64 to 155px, typically about 105px: ten characters of the badge's type), so its row wraps
+ * where a typical release's row wraps (on a phone, the tag row's phone cap and the "+N" on one line).
  */
 const RELEASE_TAG_SKELETON_WIDTH_CLASS = 'w-[10ch]';
 /** The metadata grid's value labels (static copy). */
@@ -442,13 +442,10 @@ export function ReleaseDetailPage({
           />
         </div>
 
-        {/* Image gallery — shared strip + lightbox (images) / inline clips. A release's media is optional: the loading
-            layout leaves the strip out, so the gate leaves it out too. */}
-        {releaseMedia && releaseMedia.length > 0 && (
-          <div data-loading-optional="">
-            <MediaGalleryStrip items={releaseMedia} />
-          </div>
-        )}
+        {/* Image gallery — shared strip + lightbox (images) / inline clips. Every release carries media (22 of 22
+            published on 2026-10-19), so the strip is drawn while the release is read: in the loading scope it is its
+            own skeleton. */}
+        {(loading || (releaseMedia && releaseMedia.length > 0)) && <MediaGalleryStrip items={releaseMedia ?? []} />}
 
         {/* Summary */}
         <ReleaseSummary summary={releaseSummary} />

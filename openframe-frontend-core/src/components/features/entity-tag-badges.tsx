@@ -15,7 +15,8 @@ interface EntityTagBadgesProps {
    * render non-interactive even when basePath is set).
    */
   basePath?: string;
-  /** Cap visible badges; the remainder collapse into a "+N" badge. */
+  /** Cap visible badges from tablet width up (a phone shows at most `ENTITY_TAG_BADGES_PHONE_CAP`); the remainder
+   *  collapse into a "+N" badge. */
   max?: number;
   /** In a loading state with no `max`: how many tag boxes the row draws from tablet width up (default the row's fold). */
   skeletonCount?: number;
@@ -55,22 +56,31 @@ export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
 /**
  * A tag's label while it is read: a typical label's width, eight characters of the badge's monospaced type (loaded
  * badges measure 41 to 132px, typically about 90px: "AI AGENTS", "AI IN IT"), so the row wraps where a typical row
- * wraps: a capped row's three tags and its "+N" fit one line of a phone (342px), as a typical capped row does.
+ * wraps: a capped row's phone cap of tags and its "+N" fit one line of a phone (342px), as a typical capped row does.
  */
 const TAG_SKELETON_WIDTH_CLASS = 'w-[8ch]';
 /** The "+N" badge's skeleton: the width of a two-digit count. */
 const OVERFLOW_BADGE_SKELETON_CLASS = 'w-5';
+/**
+ * How many tags a CAPPED row (`max`) shows on a phone, loaded and loading: one line of a phone's column (342px) holds
+ * two typical tags and the "+N" badge, while a third typical tag wraps the row to a second line. A layout fold, the
+ * same for every host; from tablet width up the row shows its `max`.
+ */
+export const ENTITY_TAG_BADGES_PHONE_CAP = 2;
+/** A capped row's tags past the phone cap: drawn from tablet width up only. */
+const PAST_PHONE_CAP_CLASS = 'hidden content-md:inline-flex';
 
 /**
  * A tag row while its tags are read: `count` badge boxes of the tag badge's size (the row's fold from tablet width
  * up), and `phoneCount` below that width when a phone's row shows fewer (or more) before it wraps. Hosts pass their
  * row's layout fold (`<THING>_TAG_ROW_FOLD`); the default is `ENTITY_TAG_BADGES_SKELETON_COUNT`. `overflow` adds the
- * "+N" badge a row capped by `max` draws after its tags.
+ * "+N" badge a row capped by `max` draws after its tags, and a capped row's phone count defaults to the phone cap
+ * (`ENTITY_TAG_BADGES_PHONE_CAP`), as the loaded capped row shows.
  */
 export function EntityTagBadgesSkeleton({
   count = ENTITY_TAG_BADGES_SKELETON_COUNT,
-  phoneCount = count,
   overflow = false,
+  phoneCount = overflow ? Math.min(count, ENTITY_TAG_BADGES_PHONE_CAP) : count,
   className,
   itemClassName,
 }: {
@@ -140,15 +150,19 @@ export function EntityTagBadges({
   const visibleLimit = max == null ? items.length : Math.max(0, max);
   const shown = items.slice(0, visibleLimit);
   const overflow = items.length - shown.length;
+  // A capped row shows fewer tags on a phone (the phone cap), and its "+N" counts what the phone row leaves out.
+  const phoneLimit = max == null ? shown.length : Math.min(shown.length, ENTITY_TAG_BADGES_PHONE_CAP);
+  const phoneOverflow = items.length - phoneLimit;
+  const itemClass = (index: number) => cn(TAG_ITEM_CLASS, index >= phoneLimit && PAST_PHONE_CAP_CLASS);
 
   return (
     <div className={cn(TAG_ROW_CLASS, className)}>
-      {shown.map(tag => {
+      {shown.map((tag, index) => {
         const key = tag.tag_id ?? tag.id ?? tag.slug ?? tag.name;
         const label = (tag.name || '').toUpperCase();
         if (basePath && tag.slug) {
           return (
-            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className={TAG_ITEM_CLASS} data-loading-item>
+            <Link key={key} href={`${basePath}?tags=${tag.slug}`} className={itemClass(index)} data-loading-item>
               <StatusBadge
                 text={label}
                 variant="card"
@@ -158,16 +172,28 @@ export function EntityTagBadges({
           );
         }
         return (
-          <span key={key} className={TAG_ITEM_CLASS} data-loading-item>
+          <span key={key} className={itemClass(index)} data-loading-item>
             <StatusBadge text={label} variant="card" className={BADGE_CLASS} />
           </span>
         );
       })}
-      {overflow > 0 && (
-        <span className={TAG_ITEM_CLASS} data-loading-item>
-          <StatusBadge text={`+${overflow}`} variant="card" className={cn(BADGE_CLASS, 'text-ods-text-secondary')} />
-        </span>
+      {phoneOverflow === overflow ? (
+        overflow > 0 && <OverflowBadge count={overflow} />
+      ) : (
+        <>
+          {phoneOverflow > 0 && <OverflowBadge count={phoneOverflow} className="content-md:hidden" />}
+          {overflow > 0 && <OverflowBadge count={overflow} className={PAST_PHONE_CAP_CLASS} />}
+        </>
       )}
     </div>
+  );
+}
+
+/** The "+N" badge: how many tags the row leaves out (a phone's row and a wider row may leave out different counts). */
+function OverflowBadge({ count, className }: { count: number; className?: string }) {
+  return (
+    <span className={cn(TAG_ITEM_CLASS, className)} data-loading-item>
+      <StatusBadge text={`+${count}`} variant="card" className={cn(BADGE_CLASS, 'text-ods-text-secondary')} />
+    </span>
   );
 }
