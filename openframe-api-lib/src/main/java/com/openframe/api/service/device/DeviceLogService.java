@@ -38,16 +38,8 @@ import java.util.TreeSet;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 
-/**
- * Device agent logs, read from Loki where {@code openframe-saas-logs-stream} writes them as
- * {@code {job="agent-logs", tenant_domain, level}} streams with {@code machine_id}, {@code organization_id},
- * {@code hostname}, {@code agent_ts} and {@code count} as structured metadata.
- * <p>
- * The tenant domain that pins the stream selector comes from {@link TenantDomainService}, never from a caller, so no
- * argument reaching this service can widen the query past its own tenant. The same domain is declared as the Loki
- * scheduler actor: Loki has no multi-tenancy here, so without it every tenant shares one queue and one tenant's heavy
- * queries hold up everyone else's small ones.
- */
+// The tenant domain pinning the stream selector comes from TenantDomainService, never from a caller, so no argument
+// reaching this service can widen the query past its own tenant.
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -55,9 +47,7 @@ import static java.util.stream.Collectors.toSet;
 public class DeviceLogService {
 
     static final Duration DEFAULT_LOOKBACK = Duration.ofDays(7);
-    /**
-     * A whole tenant produces far more lines than one device, so an unbounded query defaults to a shorter window.
-     */
+    // A whole tenant produces far more lines than one device, so an unbounded query defaults to a shorter window.
     static final Duration DEFAULT_TENANT_LOOKBACK = Duration.ofDays(1);
     static final Duration MAX_RANGE = Duration.ofDays(30);
     static final int MAX_DEVICES = 50;
@@ -79,10 +69,6 @@ public class DeviceLogService {
     private final DeviceLogProperties properties;
     private final OrganizationRepository organizationRepository;
 
-    /**
-     * Logs of one device, newest first. Shorthand for {@link #queryLogs(List, DeviceLogFilterCriteria,
-     * CursorPaginationCriteria)} with a single device.
-     */
     public GenericQueryResult<DeviceLogEntry> queryDeviceLogs(String machineId,
                                                               DeviceLogFilterCriteria filter,
                                                               CursorPaginationCriteria pagination) {
@@ -90,30 +76,14 @@ public class DeviceLogService {
         return queryLogs(Collections.singletonList(machineId), filter, pagination);
     }
 
-    /**
-     * Agent logs of this tenant, newest first, narrowed to {@code machineIds} or covering every device when that
-     * list is null.
-     * <p>
-     * Tenant isolation does not rely on anything in the request: every named device must be visible to this tenant,
-     * and the stream selector is pinned to this tenant's own domain from the {@code tenants} collection. Whether a
-     * device is named only adds a metadata filter on top of that selector, so it can never widen the scope.
-     */
     public GenericQueryResult<DeviceLogEntry> queryLogs(List<String> machineIds,
                                                         DeviceLogFilterCriteria filter,
                                                         CursorPaginationCriteria pagination) {
         return queryLogs(machineIds, null, filter, pagination);
     }
 
-    /**
-     * Agent logs of this tenant, newest first, narrowed to {@code machineIds} and to devices of
-     * {@code organizationIds}; a null list leaves that dimension open, and both together keep the lines that match
-     * both (their intersection).
-     * <p>
-     * The organization filter relies on the {@code organization_id} metadata the agent sends with each batch, so it
-     * only matches lines written since agents started sending it. Organizations are checked against this tenant like
-     * devices are, so an id from another tenant is a 404 rather than an empty page; the stream selector keeps the
-     * query on this tenant either way.
-     */
+    // The organization filter relies on the organization_id metadata the agent sends with each batch, so it only
+    // matches lines written since agents started sending it.
     public GenericQueryResult<DeviceLogEntry> queryLogs(List<String> machineIds,
                                                         List<String> organizationIds,
                                                         DeviceLogFilterCriteria filter,
@@ -162,12 +132,8 @@ public class DeviceLogService {
         return result(items, hasNextPage, hasPreviousPage);
     }
 
-    /**
-     * True only once the whole window is known to carry the {@code bucket} label. A window that starts before the
-     * cutover is queried unbucketed in full rather than split into a bucketed and an unbucketed half: the cursor is a
-     * timestamp alone and paging assumes one Loki result set, so merging two would reopen the gap-and-duplicate bug
-     * that whole-timestamp paging exists to prevent.
-     */
+    // A window that starts before the bucket cutover is queried unbucketed in full rather than split: the cursor is
+    // a timestamp alone and paging assumes one Loki result set, so merging two would reopen the gap-and-duplicate bug.
     private boolean bucketed(Instant from) {
         Instant cutover = properties.getBucketCutover();
         return cutover != null && !from.isBefore(cutover);
@@ -199,11 +165,7 @@ public class DeviceLogService {
         return query.toString();
     }
 
-    /**
-     * The one part of the selector the index can use to skip a device's logs. Named devices hash to at most as many
-     * buckets as there are devices, so a handful of devices reads a fraction of the tenant's data; a set spanning every
-     * bucket, or no devices at all, adds nothing and is left off.
-     */
+    // A set spanning every bucket, or no devices at all, adds nothing to the selector and is left off.
     private static void appendBucketMatcher(StringBuilder query, List<String> machineIds) {
         if (machineIds.isEmpty()) {
             return;
@@ -218,20 +180,12 @@ public class DeviceLogService {
         query.append(", bucket=~").append(LogQl.quote(String.join("|", buckets)));
     }
 
-    /**
-     * {@code machine_id} is structured metadata rather than a stream label, so the selector above already spans every
-     * device of the tenant and naming devices only drops lines from the result. An empty list therefore needs no
-     * filter at all. Several devices chain with {@code or} instead of a regex alternation: no escaping, and no
-     * dependence on how Loki anchors a label-filter regex.
-     */
+    // Several devices chain with "or" instead of a regex alternation: no escaping, and no dependence on how Loki
+    // anchors a label-filter regex.
     private static void appendDeviceFilter(StringBuilder query, List<String> machineIds) {
         appendMetadataFilter(query, "machine_id", machineIds);
     }
 
-    /**
-     * One {@code |} stage per metadata key, its values chained with {@code or}. Separate stages AND together, so naming
-     * devices and organizations keeps only lines that match both.
-     */
     private static void appendMetadataFilter(StringBuilder query, String key, List<String> values) {
         if (values.isEmpty()) {
             return;
@@ -245,10 +199,8 @@ public class DeviceLogService {
         }
     }
 
-    /**
-     * A null list means every device of the tenant. A list that is present but holds no usable id is rejected instead:
-     * it is far more likely a client that failed to load its device picker than a deliberate tenant-wide query.
-     */
+    // A list that is present but holds no usable id is rejected: it is far more likely a client that failed to load
+    // its device picker than a deliberate tenant-wide query.
     private static List<String> validateDevices(List<String> machineIds) {
         if (machineIds == null) {
             return List.of();
@@ -263,9 +215,6 @@ public class DeviceLogService {
         return devices;
     }
 
-    /**
-     * Same rules as devices: null means no organization filter, a present list without a usable id is rejected.
-     */
     private static List<String> validateOrganizations(List<String> organizationIds) {
         if (organizationIds == null) {
             return List.of();
@@ -281,10 +230,7 @@ public class DeviceLogService {
         return organizations;
     }
 
-    /**
-     * {@link Organization} is tenant-scoped, so the lookup only sees this tenant's organizations: an id from another
-     * tenant is a 404 here, the same as a typo.
-     */
+    // Organization is tenant-scoped, so an id from another tenant is a 404 here, the same as a typo.
     private void verifyOrganizationsExist(List<String> organizationIds) {
         if (organizationIds.isEmpty()) {
             return;
@@ -299,10 +245,6 @@ public class DeviceLogService {
         }
     }
 
-    /**
-     * One lookup for the whole set. Tenant isolation does not depend on this check - the stream selector does that -
-     * but it turns a typo into a 404 instead of an empty page.
-     */
     private void verifyDevicesExist(List<String> machineIds) {
         if (machineIds.isEmpty()) {
             return;
@@ -317,9 +259,6 @@ public class DeviceLogService {
         }
     }
 
-    /**
-     * One line filter per term, so several terms narrow the result instead of being matched as one phrase.
-     */
     private static void appendTermFilters(StringBuilder query, String operator, List<String> terms) {
         if (terms == null) {
             return;
@@ -331,11 +270,8 @@ public class DeviceLogService {
         }
     }
 
-    /**
-     * Loki cuts a result at the limit without regard to timestamps, and does not guarantee which of the lines sharing
-     * the cut timestamp it keeps. The page therefore ends before that timestamp, and the next page starts with all of
-     * its lines. When one timestamp fills the whole page, its lines are fetched in full instead.
-     */
+    // Loki cuts a result at the limit without regard to timestamps and does not guarantee which of the lines sharing
+    // the cut timestamp it keeps, so the page ends before that timestamp unless one timestamp fills the whole page.
     private List<LokiLogEntry> wholeTimestampsOnly(List<LokiLogEntry> entries, int pageSize, String query,
                                                   String tenantDomain) {
         if (entries.size() <= pageSize) {
@@ -384,10 +320,7 @@ public class DeviceLogService {
                 .build();
     }
 
-    /**
-     * Larger than the shared 100-item cap: the agent ships up to 50 lines a minute per device, so 100 lines cover
-     * only a couple of minutes of a busy device.
-     */
+    // Larger than the shared 100-item cap: the agent ships up to 50 lines a minute per device.
     private static int pageSize(Integer requested) {
         if (requested == null) {
             return DEFAULT_PAGE_SIZE;
@@ -401,10 +334,7 @@ public class DeviceLogService {
         validateTerms(criteria.getExcludes(), "excludes");
     }
 
-    /**
-     * Counts only the terms that reach the query: blank ones are skipped when the filters are built, so they do not
-     * use up the term budget either.
-     */
+    // Counts only the terms that reach the query: blank ones are skipped when the filters are built.
     private static void validateTerms(List<String> terms, String field) {
         if (terms == null) {
             return;
