@@ -28,7 +28,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 public class OnboardingTest extends BaseTest {
 
     private static final List<String> USER_STEPS =
-            List.of("MEET_MINGO", "TICKETS", "SCRIPTING", "MONITORING", "LOGGING", "KNOWLEDGE_MANAGEMENT");
+            List.of("MEET_MINGO", "DEVICES", "TICKETS", "SCRIPTING", "MONITORING", "LOGGING", "INCIDENTS",
+                    "KNOWLEDGE_MANAGEMENT");
     // A value of the tenant Initial Setup enum, which is not a UserOnboardingStep.
     private static final String TENANT_ONLY_STEP = "MSP_SETUP";
     // Local and server clocks may drift; a stamp counts as "set now" within this window of the call.
@@ -94,9 +95,9 @@ public class OnboardingTest extends BaseTest {
             assertThat(progress.getSkipped()).as("Completing %s does not skip the flow", step).isFalse();
         }
         UserOnboardingProgress read = OnboardingApi.getUserOnboardingProgress();
-        assertThat(read.getCompletedSteps()).as("A read shows all six steps completed")
+        assertThat(read.getCompletedSteps()).as("A read shows all eight steps completed")
                 .containsExactlyInAnyOrderElementsOf(USER_STEPS);
-        assertThat(read.getCompleted()).as("All six steps done is still not finished; only Finish sets completed").isFalse();
+        assertThat(read.getCompleted()).as("All eight steps done is still not finished; only Finish sets completed").isFalse();
         stage = Stage.ALL_STEPS;
     }
 
@@ -209,8 +210,33 @@ public class OnboardingTest extends BaseTest {
 
     @Tag("feature")
     @Test
-    @DisplayName("Restore the progress the user had before the run")
+    @DisplayName("Start with Mingo remembers the tour dialog, a second Start overwrites it, and reset clears it")
     @Order(10)
+    public void testTourDialog() {
+        requireStage(Stage.CLEAN, "Reset clears a skipped progress");
+
+        UserOnboardingProgress started = OnboardingApi.setUserOnboardingTourDialog("e2e-tour-dialog-1");
+
+        assertThat(started.getTourDialogId()).as("Start remembers the dialog").isEqualTo("e2e-tour-dialog-1");
+        assertThat(started.getCompletedSteps()).as("Start completes no step").isEmpty();
+        assertThat(started.getCompleted()).as("Start does not finish").isFalse();
+        assertThat(started.getSkipped()).as("Start does not skip").isFalse();
+        assertSameAsRead(started, "The Start answer");
+
+        UserOnboardingProgress again = OnboardingApi.setUserOnboardingTourDialog("e2e-tour-dialog-2");
+        assertThat(again.getTourDialogId()).as("A second Start overwrites the dialog").isEqualTo("e2e-tour-dialog-2");
+        assertSameAsRead(again, "The second Start answer");
+
+        UserOnboardingProgress reset = OnboardingApi.resetUserOnboarding();
+        assertClean(reset, "The reset answer after Start");
+        assertClean(OnboardingApi.getUserOnboardingProgress(), "A read after resetting a started tour");
+        stage = Stage.CLEAN;
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Restore the progress the user had before the run")
+    @Order(11)
     public void testRestoreOriginalProgress() {
         requireOriginal();
         assumeTrue(progressChanged, "No case changed the progress, so there is nothing to restore");
@@ -225,6 +251,9 @@ public class OnboardingTest extends BaseTest {
         if (original.getSkipped()) {
             OnboardingApi.skipUserOnboarding();
         }
+        if (original.getTourDialogId() != null) {
+            OnboardingApi.setUserOnboardingTourDialog(original.getTourDialogId());
+        }
         originalRestored = true;
 
         UserOnboardingProgress restored = OnboardingApi.getUserOnboardingProgress();
@@ -234,6 +263,7 @@ public class OnboardingTest extends BaseTest {
         assertThat(restored.getSkipped()).as("The original skipped flag is back").isEqualTo(original.getSkipped());
         assertThat(restored.getCompletedAt() != null).as("completedAt is set exactly when it was").isEqualTo(original.getCompletedAt() != null);
         assertThat(restored.getSkippedAt() != null).as("skippedAt is set exactly when it was").isEqualTo(original.getSkippedAt() != null);
+        assertThat(restored.getTourDialogId()).as("The original tour dialog is back").isEqualTo(original.getTourDialogId());
     }
 
     // Puts the original progress back when the run stopped before the restore case did; the raw calls never throw.
@@ -251,6 +281,9 @@ public class OnboardingTest extends BaseTest {
         }
         if (original.getSkipped()) {
             OnboardingApi.attemptSkipUserOnboarding();
+        }
+        if (original.getTourDialogId() != null) {
+            OnboardingApi.attemptSetUserOnboardingTourDialog(original.getTourDialogId());
         }
     }
 
@@ -270,6 +303,7 @@ public class OnboardingTest extends BaseTest {
         assertThat(progress.getCompletedAt()).as("%s has no completedAt", what).isNull();
         assertThat(progress.getSkipped()).as("%s is not skipped", what).isFalse();
         assertThat(progress.getSkippedAt()).as("%s has no skippedAt", what).isNull();
+        assertThat(progress.getTourDialogId()).as("%s has no tour dialog", what).isNull();
     }
 
     // A mutation answers with the full progress object, so it must equal a fresh read (stamps compared at the stored millisecond precision).
@@ -281,6 +315,7 @@ public class OnboardingTest extends BaseTest {
         assertThat(millis(read.getCompletedAt())).as("%s and a read agree on completedAt", what).isEqualTo(millis(answer.getCompletedAt()));
         assertThat(read.getSkipped()).as("%s and a read agree on skipped", what).isEqualTo(answer.getSkipped());
         assertThat(millis(read.getSkippedAt())).as("%s and a read agree on skippedAt", what).isEqualTo(millis(answer.getSkippedAt()));
+        assertThat(read.getTourDialogId()).as("%s and a read agree on the tour dialog", what).isEqualTo(answer.getTourDialogId());
     }
 
     private static void assertStampedNow(Instant stamp, Instant calledAt, String field) {

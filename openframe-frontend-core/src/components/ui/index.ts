@@ -249,6 +249,7 @@ export * from './incident-feed';
 export * from './status-line';
 export * from './snap-carousel';
 export * from './sticky-action-bar';
+export * from './super-user-banner-view';
 export { RequiredMark } from './required-mark';
 export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';
