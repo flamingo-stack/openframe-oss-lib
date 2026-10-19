@@ -196,13 +196,22 @@ class MongoAuthorizationMapper {
         if (e.getAccessTokenValue() != null) {
             OAuth2AccessToken access = new OAuth2AccessToken(OAuth2AccessToken.TokenType.BEARER, e.getAccessTokenValue(), e.getAccessTokenIssuedAt(), e.getAccessTokenExpiresAt(),
                     e.getAccessTokenScopes() != null ? Set.of(e.getAccessTokenScopes().split(" ")) : null);
-            b.token(access, meta -> meta.putAll(e.getAccessTokenMetadata()));
+            java.util.Map<String, Object> accessMeta = new java.util.HashMap<>();
+            if (e.getAccessTokenMetadata() != null) {
+                accessMeta.putAll(e.getAccessTokenMetadata());
+            }
+            b.token(access, meta -> meta.putAll(accessMeta));
         }
         if (e.getRefreshTokenValue() != null) {
             OAuth2RefreshToken refresh = new OAuth2RefreshToken(e.getRefreshTokenValue(), e.getRefreshTokenIssuedAt(), e.getRefreshTokenExpiresAt());
-            b.token(refresh, meta -> meta.putAll(e.getRefreshTokenMetadata()));
+            java.util.Map<String, Object> refreshMeta = new java.util.HashMap<>();
+            if (e.getRefreshTokenMetadata() != null) {
+                refreshMeta.putAll(e.getRefreshTokenMetadata());
+            }
+            b.token(refresh, meta -> meta.putAll(refreshMeta));
         }
         return b.build();
     }
 
 }
+
