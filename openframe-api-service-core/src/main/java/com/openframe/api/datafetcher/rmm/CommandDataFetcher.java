@@ -17,9 +17,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * GraphQL resolver for RMM ad-hoc command dispatch.
- */
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j
@@ -48,3 +45,4 @@ public class CommandDataFetcher {
         return AuthPrincipal.fromJwt((Jwt) auth.getPrincipal()).getId();
     }
 }
+
