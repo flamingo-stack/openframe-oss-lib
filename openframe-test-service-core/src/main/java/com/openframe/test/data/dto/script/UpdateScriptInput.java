@@ -8,11 +8,9 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * Full-replacement (PUT) payload for the {@code updateScript} mutation. The target
- * script {@code id} travels inside the input; required fields (name, shell,
- * scriptBody, privilegeLevel) must be present.
- */
+// Full-replacement (PUT) payload for the updateScript mutation. The target
+// script id travels inside the input; required fields (name, shell,
+// scriptBody, privilegeLevel) must be present.
 @Data
 @Builder
 @NoArgsConstructor
