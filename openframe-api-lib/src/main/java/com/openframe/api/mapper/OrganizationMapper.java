@@ -7,17 +7,9 @@ import org.springframework.stereotype.Component;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-/**
- * Shared mapper for organization DTOs and entities.
- * Used by both GraphQL and REST APIs.
- */
 @Component
 public class OrganizationMapper {
 
-    /**
-     * Convert CreateOrganizationRequest to Organization entity.
-     * Generates organizationId automatically as UUID.
-     */
     public Organization toEntity(CreateOrganizationRequest request) {
         if (request == null) {
             return null;
@@ -38,25 +30,16 @@ public class OrganizationMapper {
                 .build();
     }
 
-    /**
-     * Generate unique organizationId as UUID.
-     */
     private String generateOrganizationId() {
         return UUID.randomUUID().toString();
     }
 
-    /**
-     * Update Organization entity from UpdateOrganizationRequest.
-     * Only updates non-null fields from the request (partial update).
-     * 
-     * Note: organizationId cannot be updated - it's immutable once created.
-     */
+    // organizationId is immutable once created, so it is intentionally not updated here
     public Organization updateEntity(Organization existing, UpdateOrganizationRequest request) {
         if (request == null) {
             return existing;
         }
 
-        // Update only allowed fields (organizationId is immutable)
         if (request.name() != null) {
             existing.setName(request.name());
         }
@@ -88,9 +71,6 @@ public class OrganizationMapper {
         return existing;
     }
 
-    /**
-     * Convert Organization entity to OrganizationResponse DTO.
-     */
     public OrganizationResponse toResponse(Organization organization) {
         if (organization == null) {
             return null;
@@ -215,10 +195,6 @@ public class OrganizationMapper {
                 .build();
     }
 
-    /**
-     * Create a copy of an address.
-     * Used when mailingAddressSameAsPhysical is true.
-     */
     private Address copyAddress(Address source) {
         if (source == null) {
             return null;
