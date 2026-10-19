@@ -32,7 +32,8 @@ export type PageActionButton = {
   /**
    * Render the desktop button as icon-only (label hidden, icon centered). The full
    * label still appears in the mobile "..." dropdown. The desktop icon is forced to
-   * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color.
+   * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color
+   * (re-tinted only when it was picked for a filled variant, see `menuRowIcon`).
    */
   iconOnlyOnDesktop?: boolean;
   /** Render as a link (next/link). Mutually exclusive with `submenu`. */
@@ -61,6 +62,29 @@ function actionKey(action: PageActionButton, idx: number) {
   return `${action.label ?? action.ariaLabel ?? 'action'}-${idx}`;
 }
 
+/** Variants that paint the button: the caller tints its icon for that fill (`text-ods-text-on-accent`). */
+const FILLED_VARIANTS: ReadonlySet<NonNullable<PageActionButton['variant']>> = new Set([
+  'accent',
+  'destructive',
+  'warning',
+]);
+
+/**
+ * The action's icon as a "..." menu row shows it. An icon tinted for a filled
+ * button (an empty list's accent "Add ...") is dark on the menu's dark row, so it
+ * is re-tinted to the row's secondary icon color. Outline and transparent buttons
+ * sit on the page background like the row does, so their icon is kept as is. No
+ * variant renders as accent, the Button default.
+ *
+ * `&&` doubles the class (specificity 0,2,1): a caller that tints the fill with its
+ * own `[&_svg]:!text-...` wrapper ties with a single class, and the tie would go to
+ * whichever rule the consumer's stylesheet happens to emit last.
+ */
+function menuRowIcon(action: PageActionButton): React.ReactNode {
+  if (!action.icon || !FILLED_VARIANTS.has(action.variant ?? 'accent')) return action.icon;
+  return <span className="inline-flex [&&_svg]:!text-ods-text-secondary">{action.icon}</span>;
+}
+
 function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuItem[] {
   if (action.submenu && action.submenu.length > 0) {
     // When a split-button action collapses into the merged mobile "..." menu,
@@ -78,7 +102,7 @@ function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuIt
     {
       id: `action-${idx}`,
       label: action.label,
-      icon: action.icon,
+      icon: menuRowIcon(action),
       onClick: action.onClick,
       disabled: action.disabled,
       href: action.href,
