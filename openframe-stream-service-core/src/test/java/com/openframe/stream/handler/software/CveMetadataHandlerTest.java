@@ -1,15 +1,21 @@
 package com.openframe.stream.handler.software;
 
+import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.rmm.software.CveMetadata;
+import com.openframe.data.document.rmm.software.TenantCve;
 import com.openframe.data.repository.rmm.software.CveMetadataRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -19,6 +25,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -30,8 +39,17 @@ class CveMetadataHandlerTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     @Mock private CveMetadataRepository cveMetadataRepository;
+    @Mock private MongoTemplate mongoTemplate;
 
     @InjectMocks private CveMetadataHandler handler;
+
+    @BeforeEach
+    void setUp() {
+        UpdateResult emptyResult = mock(UpdateResult.class);
+        lenient().when(emptyResult.getModifiedCount()).thenReturn(0L);
+        lenient().when(mongoTemplate.updateMulti(any(Query.class), any(Update.class), eq(TenantCve.class)))
+                .thenReturn(emptyResult);
+    }
 
     private DeserializedDebeziumMessage msg(String op, JsonNode before, JsonNode after) {
         DebeziumMessage.Payload<JsonNode> payload = new DebeziumMessage.Payload<>();
@@ -103,6 +121,31 @@ class CveMetadataHandlerTest {
         assertThat(saved.getDescription()).isEqualTo("remote code execution");
         assertThat(saved.getSource()).isEqualTo("fleet_cve_meta");
         assertThat(saved.getCachedAt()).isNotNull();
+    }
+
+    @Test
+    void handle_upsert_backfillsSeverityOntoExistingTenantCve() {
+        ObjectNode after = row().put("cve", "CVE-2024-X").put("cvss_score", 7.4);
+        when(cveMetadataRepository.findByCveId("CVE-2024-X")).thenReturn(Optional.empty());
+
+        handler.handle(msg("c", null, after), null);
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).updateMulti(queryCaptor.capture(), updateCaptor.capture(), eq(TenantCve.class));
+        assertThat(queryCaptor.getValue().getQueryObject().get("cveId")).isEqualTo("CVE-2024-X");
+        assertThat(updateCaptor.getValue().getUpdateObject().get("$set").toString())
+                .contains("severity=HIGH")
+                .contains("cvssScore=7.4");
+    }
+
+    @Test
+    void handle_delete_doesNotPropagate() {
+        when(cveMetadataRepository.findByCveId("CVE-DEL")).thenReturn(Optional.empty());
+
+        handler.handle(msg("d", row().put("cve", "CVE-DEL"), null), null);
+
+        verifyNoInteractions(mongoTemplate);
     }
 
     @Test

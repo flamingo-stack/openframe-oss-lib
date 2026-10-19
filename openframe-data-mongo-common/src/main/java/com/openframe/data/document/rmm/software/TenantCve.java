@@ -23,6 +23,7 @@ import java.util.List;
         unique = true)
 @CompoundIndex(name = "tenant_severity_score", def = "{'tenantId': 1, 'severity': 1, 'cvssScore': -1}")
 @CompoundIndex(name = "tenant_discoveredAt", def = "{'tenantId': 1, 'discoveredAt': -1}")
+@CompoundIndex(name = "cveId", def = "{'cveId': 1}")
 public class TenantCve implements TenantScoped {
 
     @Id
