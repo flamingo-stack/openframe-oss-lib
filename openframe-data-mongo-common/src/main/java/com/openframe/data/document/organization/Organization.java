@@ -98,6 +98,10 @@ public class Organization implements TenantScoped {
      * Timestamp when organization status was last changed (archived or deleted)
      */
     private Instant statusChangedAt;
+
+    @Builder.Default
+    private Long version = 0L;
+
     /**
      * Check if the contract is currently active
      */
