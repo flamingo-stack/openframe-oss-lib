@@ -42,10 +42,10 @@ public class NotificationBroadcaster {
     @Value("${openframe.features.notifications.enabled:false}")
     private boolean notificationsEnabled;
 
-    public Notification broadcast(NotificationCommand command) {
+    public Optional<Notification> broadcast(NotificationCommand command) {
         if (!notificationsEnabled) {
             log.debug("Notifications feature disabled — broadcast skipped (no persistence, no NATS publish)");
-            return null;
+            return Optional.empty();
         }
 
         NotificationCategory category = command.getCategory();
@@ -55,7 +55,7 @@ public class NotificationBroadcaster {
         Set<String> machines = recipients.getMachines();
         if (admins.isEmpty() && machines.isEmpty()) {
             log.info("No recipients left after settings filtering — nothing persisted for '{}'", command.getTitle());
-            return null;
+            return Optional.empty();
         }
 
         NotificationType commandType = command.getType();
@@ -111,7 +111,7 @@ public class NotificationBroadcaster {
             channelDispatcher.dispatch(admins, saved, category);
         }
 
-        return saved;
+        return Optional.of(saved);
     }
 
     /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively. Absent settings deliver; a failed lookup drops every admin — like every other Mongo failure in broadcast, it must not deliver against unknown preferences. */
