@@ -3,7 +3,6 @@ package com.openframe.api.service.rmm.software;
 import com.openframe.api.dto.rmm.software.SoftwareCveSeverity;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareOnDeviceResponse;
-import com.openframe.api.dto.rmm.software.SoftwareOnDeviceStatus;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilityResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
@@ -161,11 +160,10 @@ public class TenantSoftwareReadModelQuery {
         if (machine == null) {
             return null;
         }
-        // Up-to-date status needs a latest-version comparison the read-model doesn't carry yet.
         return SoftwareOnDeviceResponse.builder()
                 .device(machine)
                 .softwareVersion(ds.getVersion())
-                .status(SoftwareOnDeviceStatus.UP_TO_DATE)
+                .status(null) // deliberately return null until that lands, so a status filter honestly matches nothing instead of UP_TO_DATE.
                 .build();
     }
 

@@ -75,7 +75,11 @@ public class TenantCveHandler implements MessageHandler<DeserializedDebeziumMess
         tenantCve.setCveId(cveId);
         tenantCve.setDevicesCount(intOr(row, "host_count", 0));
         applyMetadata(tenantCve, cveId);
-        tenantCve.setUpdatedAt(Instant.now());
+        Instant now = Instant.now();
+        if (tenantCve.getDiscoveredAt() == null) {
+            tenantCve.setDiscoveredAt(now);
+        }
+        tenantCve.setUpdatedAt(now);
         tenantCveRepository.save(tenantCve);
         log.debug("[software-cdc] tenant_cve upserted: tenant={} cve={} devices={}",
                 tenantId, cveId, tenantCve.getDevicesCount());
