@@ -3,6 +3,7 @@ package com.openframe.management.controller;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.IntegratedToolService;
+import com.openframe.management.dto.IntegratedToolView;
 import com.openframe.management.hook.IntegratedToolPostSaveHook;
 import com.openframe.debezium.service.DebeziumService;
 import lombok.Data;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
@@ -32,14 +34,16 @@ public class IntegratedToolController {
     public Map<String, Object> getTools() {
         return Map.of(
             "status", "success",
-            "tools", toolService.getAllTools()
+            "tools", toolService.getAllTools().stream()
+                .map(IntegratedToolView::from)
+                .collect(Collectors.toList())
         );
     }
 
     @GetMapping("/{id}")
     public Map<String, Object> getTool(@PathVariable String id) {
         return toolService.getTool(id)
-            .map(tool -> Map.of("status", "success", "tool", tool))
+            .map(tool -> Map.of("status", "success", "tool", (Object) IntegratedToolView.from(tool)))
             .orElse(Map.of("status", "error", "message", "Tool not found"));
     }
 
@@ -55,36 +59,8 @@ public class IntegratedToolController {
             @PathVariable String key,
             @RequestBody SaveToolRequest request) {
         try {
-            IntegratedTool tool = request.getTool();
             String tenantId = tenantIdProvider.getTenantId();
-            // Reuse this tenant's existing _id (update in place); otherwise force a fresh unique _id.
-            // The request payload may carry _id == key, but _id is global in the shared multi-tenant DB —
-            // keeping it would make save() replace another tenant's doc by _id (last-writer-wins ownership
-            // flip). Uniqueness is on (tenantId, key) via tenant_key_idx.
-            Optional<IntegratedTool> existingTool = toolService.getToolByKey(key);
-            existingTool.ifPresentOrElse(
-                    existing -> {
-                        tool.setId(existing.getId());
-                        // The chart's register Job re-posts the tool on every sync without the API key
-                        // FleetMdmSetupScheduler minted; don't wipe the stored one with null.
-                        if (tool.getCredentials() != null && tool.getCredentials().getApiKey() == null
-                                && existing.getCredentials() != null) {
-                            tool.getCredentials().setApiKey(existing.getCredentials().getApiKey());
-                        }
-                    },
-                    () -> tool.setId(null));
-            tool.setKey(key);
-            tool.setTenantId(tenantId);
-            tool.setEnabled(true);
-
-            IntegratedTool savedTool;
-            if (existingTool.isPresent() && existingTool.get().equals(tool)) {
-                savedTool = existingTool.get();
-                log.info("Tool configuration unchanged, not saving: {}", key);
-            } else {
-                savedTool = toolService.saveTool(tool);
-                log.info("Successfully saved tool configuration for: {}", key);
-            }
+            IntegratedTool savedTool = toolService.saveTool(key, tenantId, request.getTool());
 
             debeziumService.createOrUpdateDebeziumConnector(savedTool.getDebeziumConnectors());
 
@@ -95,7 +71,7 @@ public class IntegratedToolController {
                     log.warn("Post-save hook failed for toolKey={}: {}", key, hookEx.getMessage(), hookEx);
                 }
             }
-            return ResponseEntity.ok(Map.of("status", "success", "tool", savedTool));
+            return ResponseEntity.ok(Map.of("status", "success", "tool", IntegratedToolView.from(savedTool)));
         } catch (Exception e) {
             log.error("Failed to save tool: {}", key, e);
             return ResponseEntity.status(INTERNAL_SERVER_ERROR)
