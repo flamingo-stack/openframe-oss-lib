@@ -2,7 +2,6 @@ package com.openframe.client.listener;
 
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineStatusService;
-import com.openframe.core.exception.NatsException;
 import com.openframe.data.nats.model.ClientConnectionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,8 +32,7 @@ public class ClientConnectionListener {
                 Instant eventTimestamp = Instant.parse(event.getTimestamp());
                 machineStatusService.updateToOnline(machineId, eventTimestamp);
             } catch (Exception e) {
-                log.error("Failed to process tool connection event", e);
-                throw new NatsException("Failed to process client connected event", e);
+                log.error("Failed to process tool connection event, dropping unprocessable message", e);
             }
         };
     }
@@ -49,8 +47,7 @@ public class ClientConnectionListener {
                 Instant eventTimestamp = Instant.parse(event.getTimestamp());
                 machineStatusService.updateToOffline(machineId, eventTimestamp);
             } catch (Exception e) {
-                log.error("Failed to process client disconnected event", e);
-                throw new NatsException("Failed to process disconnected connect event", e);
+                log.error("Failed to process client disconnected event, dropping unprocessable message", e);
             }
         };
     }
