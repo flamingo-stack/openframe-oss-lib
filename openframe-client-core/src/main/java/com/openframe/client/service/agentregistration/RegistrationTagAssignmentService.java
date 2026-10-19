@@ -39,6 +39,7 @@ public class RegistrationTagAssignmentService {
      *
      * @param machineId the registered machine's ID
      * @param tags      tags from the registration request
+     * @throws TagAssignmentException if one or more tags could not be assigned
      */
     public void assignTags(String machineId, List<AgentRegistrationTagInput> tags) {
         if (tags == null || tags.isEmpty()) {
@@ -46,6 +47,8 @@ public class RegistrationTagAssignmentService {
         }
 
         Instant now = Instant.now();
+        List<String> failedKeys = new ArrayList<>();
+        Exception lastFailure = null;
 
         for (AgentRegistrationTagInput tagInput : tags) {
             try {
@@ -67,7 +70,15 @@ public class RegistrationTagAssignmentService {
             } catch (Exception e) {
                 log.error("Failed to assign tag '{}' to machine {} during registration: {}",
                         tagInput.getKey(), machineId, e.getMessage(), e);
+                failedKeys.add(tagInput.getKey());
+                lastFailure = e;
             }
+        }
+
+        if (!failedKeys.isEmpty()) {
+            throw new TagAssignmentException(
+                    "Failed to assign tag(s) " + failedKeys + " to machine " + machineId + " during registration",
+                    lastFailure);
         }
     }
 
