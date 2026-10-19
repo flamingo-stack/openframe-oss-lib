@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ICON_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { trialLabels } from '../../utils/trial';
 import { FileOffIcon } from '../icons-v2-generated/documents/file-off-icon';
@@ -39,7 +40,7 @@ function LoadingLabel({ label, typical }: { label: string; typical: string }) {
 
 /** A benefit's layout, read by the benefit and by its loading form. */
 const BENEFIT_ITEM_CLASS = 'flex items-center gap-[var(--spacing-system-xs)]';
-const BENEFIT_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary [&_svg]:size-4';
+const BENEFIT_ICON_CLASS = `flex ${ICON_SIZE.sm} shrink-0 items-center justify-center text-ods-text-secondary [&_svg]:size-4`;
 const BENEFIT_LABEL_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 
 /** The mark of each of the trial's terms, wherever a term is listed. */

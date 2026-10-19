@@ -46,17 +46,33 @@ describe('FaqSection loading state', () => {
   it('draws the categories the host usually shows, each with its heading, then the uncategorized group', () => {
     render(
       <LoadingScope>
-        <FaqSection entityType="blog_post" entityId={7} skeletonSections={3} />
+        <FaqSection
+          entityType="blog_post"
+          entityId={7}
+          skeletonShape={[
+            { heading: true, rows: 2 },
+            { heading: true, rows: 2 },
+            { heading: true, rows: 1 },
+            { rows: 1 },
+          ]}
+        />
       </LoadingScope>,
     );
-    // 3 category headings + the 6 question rows spread over the 4 groups.
-    expect(level3()).toBe(3 + FAQ_SECTION_SKELETON_QUESTIONS);
+    // 3 category headings + the 6 question rows the shape names.
+    expect(level3()).toBe(3 + 6);
   });
 
   it('leaves the uncategorized group out when the host says its FAQs all have a category', () => {
     render(
       <LoadingScope>
-        <FaqSection entityType="blog_post" entityId={7} skeletonSections={2} skeletonUncategorized={false} minResults={4} />
+        <FaqSection
+          entityType="blog_post"
+          entityId={7}
+          skeletonShape={[
+            { heading: true, rows: 2 },
+            { heading: true, rows: 2 },
+          ]}
+        />
       </LoadingScope>,
     );
     expect(level3()).toBe(2 + 4);

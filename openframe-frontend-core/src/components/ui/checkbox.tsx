@@ -3,6 +3,7 @@
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'react';
 
+import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
 
@@ -24,7 +25,7 @@ export interface CheckboxProps extends Omit<CheckboxPrimitiveProps, 'onCheckedCh
 }
 
 /** The checkbox's box (its size and corners): read by the checkbox and by every skeleton that stands for one. */
-export const CHECKBOX_BOX_CLASS = 'h-4 w-4 shrink-0 rounded-sm';
+export const CHECKBOX_BOX_CLASS = `${CONTROL_SIZE.checkbox} shrink-0 rounded-sm`;
 
 const Checkbox = forwardRef<ElementRef<typeof CheckboxPrimitive.Root>, CheckboxProps>(
   ({ className, onCheckedChange, ...props }, ref) => (

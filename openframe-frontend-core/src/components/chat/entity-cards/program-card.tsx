@@ -32,11 +32,13 @@ import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
+import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { programItemToStripProfile } from '../../features/video-bites-shared';
 import { CardHoverPlay } from '../../features/video-center-badge';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
@@ -44,13 +46,7 @@ import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
 import { Tag, TagSkeleton } from '../../ui/tag';
-import {
-  programItemToStripProfile,
-  type BaseProgramItem,
-  type ProgramConfig,
-  type ProgramMedia,
-  type ProgramHost,
-} from '../types/entities/program-types';
+import type { BaseProgramItem, ProgramConfig, ProgramMedia, ProgramHost } from '../types/entities/program-types';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
@@ -75,9 +71,9 @@ type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
 const EDITORIAL_FRAME = CONTENT_CARD_SKELETON_FRAME_CLASS;
 const EDITORIAL_ROW_GRID =
   'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]';
-const EDITORIAL_ROW_THUMB = 'relative block aspect-square w-full overflow-hidden rounded-md';
+const EDITORIAL_ROW_THUMB = `relative block ${MEDIA_ASPECT.square} w-full overflow-hidden rounded-md`;
 const EDITORIAL_ROW_TEXT = 'flex min-w-0 flex-col gap-[var(--spacing-system-xs)]';
-const EDITORIAL_FEATURE_COVER = 'relative block aspect-video w-full overflow-hidden';
+const EDITORIAL_FEATURE_COVER = `relative block ${MEDIA_ASPECT.video} w-full overflow-hidden`;
 const EDITORIAL_FEATURE_BODY = 'flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]';
 const EDITORIAL_META_ROW =
   'flex h-[1lh] min-w-0 items-center gap-x-[var(--spacing-system-s)] overflow-hidden whitespace-nowrap text-h6';

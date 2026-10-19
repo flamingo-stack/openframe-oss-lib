@@ -1,3 +1,4 @@
+import { DOT_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { ChatTypingIndicator } from '../chat/chat-typing-indicator';
 import { LIVE_PULSE_CLASS } from './skeleton-surface';
@@ -13,7 +14,7 @@ const ROW_OPACITY = ['opacity-100', 'opacity-60', 'opacity-30'] as const;
 /** Each row pulses a beat after the one above it, so the eye reads them as a scan. */
 const ROW_STAGGER_MS = 200;
 /** A row's marks: a live dot and two bars of the row's own words, on ODS tokens. Live, not a loading state. */
-const ROW_DOT_CLASS = cn('h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan', LIVE_PULSE_CLASS);
+const ROW_DOT_CLASS = cn(DOT_SIZE.sm, 'shrink-0 rounded-full bg-ods-flamingo-cyan', LIVE_PULSE_CLASS);
 const ROW_BAR_CLASS = cn('h-2.5 rounded-md bg-ods-border', LIVE_PULSE_CLASS);
 
 /**

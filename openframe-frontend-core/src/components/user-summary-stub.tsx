@@ -1,7 +1,7 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
-import { getProxiedImageUrl } from '../utils/image-proxy-stub';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 
 /**
  * NOTE — this is the STUB user summary (see the filename). Five props below are
@@ -90,6 +90,8 @@ export function UserSummary({
   compact = false,
   avatarSize = 40,
 }: Props) {
+  const avatarSrc = useProxiedImageUrl(avatarUrl, { directHttps: false });
+  const mspLogoSrc = useProxiedImageUrl(mspPreview?.logoUrl, { directHttps: false });
   // Compact variant: minimal horizontal row
   if (compact) {
     return (
@@ -97,7 +99,7 @@ export function UserSummary({
         <div className="relative shrink-0">
           {avatarUrl ? (
             <Image
-              src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
+              src={avatarSrc}
               alt={name}
               width={avatarSize}
               height={avatarSize}
@@ -117,7 +119,7 @@ export function UserSummary({
           )}
           {mspPreview && mspPreview.logoUrl && (
             <Image
-              src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
+              src={mspLogoSrc}
               alt={mspPreview.name || 'MSP'}
               width={24}
               height={24}
@@ -153,13 +155,7 @@ export function UserSummary({
         {/* Avatar with badge wrapper */}
         <div className="relative h-24 w-24 shrink-0 overflow-visible">
           {avatarUrl ? (
-            <Image
-              src={getProxiedImageUrl(avatarUrl) ?? avatarUrl}
-              alt={name}
-              width={96}
-              height={96}
-              className="rounded-full object-cover"
-            />
+            <Image src={avatarSrc} alt={name} width={96} height={96} className="rounded-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center rounded-full border border-ods-border bg-ods-card font-heading text-3xl text-ods-text-secondary">
               {name.charAt(0).toUpperCase()}
@@ -171,7 +167,7 @@ export function UserSummary({
             <div className="absolute -bottom-1 -right-1 flex size-10 select-none items-center justify-center overflow-hidden rounded-full bg-ods-bg ring-2 ring-ods-border">
               {mspPreview.logoUrl ? (
                 <Image
-                  src={getProxiedImageUrl(mspPreview.logoUrl) ?? mspPreview.logoUrl}
+                  src={mspLogoSrc}
                   alt={mspPreview.name || 'MSP Logo'}
                   width={40}
                   height={40}

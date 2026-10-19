@@ -2,6 +2,7 @@
 
 import { ChevronRight } from 'lucide-react';
 import { type ButtonHTMLAttributes, forwardRef } from 'react';
+import { TILE_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
@@ -62,7 +63,7 @@ const UNREAD_NOTICE = 'You have a new unread message';
 // The row's boxes, read by the row AND its skeleton, so the two are one size.
 const TICKET_ROW = cn('flex h-20 w-full items-center gap-4 px-4', 'border-b border-ods-border bg-ods-card');
 const TICKET_ROW_TEXT = 'flex min-w-0 flex-1 flex-col justify-center';
-const TICKET_ROW_CHEVRON = 'flex size-12 shrink-0 items-center justify-center rounded-md border';
+const TICKET_ROW_CHEVRON = `flex ${TILE_SIZE.xl} shrink-0 items-center justify-center rounded-md border`;
 
 /**
  * A ticket row while it is read: the title as a `text-h3` line and the reference line as a `text-h6` line, the status

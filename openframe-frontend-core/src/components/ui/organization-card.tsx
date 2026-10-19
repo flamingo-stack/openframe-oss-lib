@@ -36,18 +36,6 @@ export interface Organization {
   [key: string]: unknown;
 }
 
-export {
-  ORGANIZATION_CARD_RADIUS_CLASS,
-  ORGANIZATION_CARD_LAYOUT_CLASS,
-  ORGANIZATION_CARD_SURFACE_CLASS,
-  ORGANIZATION_CARD_HEADER_CLASS,
-  ORGANIZATION_CARD_TEXT_CLASS,
-  ORGANIZATION_CARD_DESCRIPTION_CLASS,
-  ORGANIZATION_CARD_FOOTER_CLASS,
-  ORGANIZATION_CARD_STATS_CLASS,
-  ORGANIZATION_CARD_STAT_CLASS,
-} from '../loading/organization-card-skeleton';
-
 export interface OrganizationCardProps {
   organization: Organization;
   fetchedImageUrl?: string;

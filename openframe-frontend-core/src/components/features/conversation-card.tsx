@@ -54,8 +54,9 @@ const OUTCOME_CHECK_STYLE = { height: '1lh' } as const;
 const CARD_FRAME_CLASS =
   'relative flex h-full flex-col gap-[var(--spacing-system-mf)] overflow-hidden rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
 const ANSWER_BLOCK_CLASS = 'rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]';
+/** Only stacks its label and text: a one-column grid, not a column flexbox inside the card's own (WEBVIEW-001). */
 const CONTEXT_BLOCK_CLASS =
-  'flex flex-col gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]';
+  'grid grid-cols-1 gap-[var(--spacing-system-xxs)] border-ods-border border-t pt-[var(--spacing-system-sf)]';
 const FOOTER_ROW_CLASS = 'mt-auto flex items-center justify-between gap-[var(--spacing-system-sf)]';
 /** The speakers' avatar size the skeleton draws when the card draws it in a loading scope. */
 export const CONVERSATION_CARD_AVATAR_PX = 32;
@@ -138,7 +139,8 @@ export function ConversationCard({
         context={!!context}
         requesterMeta={!!requester.meta}
         responderMeta={!!responder.meta}
-        footer={!!footerLabel}
+        // The loaded card draws a footer only with a label AND a value; a value left undefined says there is none.
+        footer={!!footerLabel && footerValue !== undefined}
         footerLabel={footerLabel}
         lines={lines}
         className={className}

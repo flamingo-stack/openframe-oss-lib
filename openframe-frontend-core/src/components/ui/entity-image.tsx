@@ -3,13 +3,14 @@
 import React from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
 
 /** The design size, when a caller does not state one. */
-export const ENTITY_IMAGE_SIZE = 'size-[52px] content-md:size-[60px]';
+export const ENTITY_IMAGE_SIZE = TILE_SIZE.entity;
 /** The image's corner, read by the image, its initials fallback and its skeleton. */
 const ENTITY_IMAGE_RADIUS_CLASS = 'rounded-md';
 
@@ -86,6 +87,13 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
 }
 
 /** An EntityImage while its record is read: a box of the image's own size and corner. */
-export function EntityImageSkeleton({ sizeClassName, className }: Pick<EntityImageProps, 'sizeClassName' | 'className'>) {
-  return <UnifiedSkeleton className={cn('shrink-0', ENTITY_IMAGE_RADIUS_CLASS, sizeClassName ?? ENTITY_IMAGE_SIZE, className)} />;
+export function EntityImageSkeleton({
+  sizeClassName,
+  className,
+}: Pick<EntityImageProps, 'sizeClassName' | 'className'>) {
+  return (
+    <UnifiedSkeleton
+      className={cn('shrink-0', ENTITY_IMAGE_RADIUS_CLASS, sizeClassName ?? ENTITY_IMAGE_SIZE, className)}
+    />
+  );
 }

@@ -16,8 +16,6 @@ import { ToolIcon } from '../tool-icon';
 import { useLoadingScope } from '../ui/loading-scope';
 import { TOOL_MARK_CLASS } from './tool-badge-mark';
 
-export type { ToolType } from '../../types/tool.types';
-
 export interface ToolBadgeProps {
   /** A built-in tool: its label and grey mark come from the tool registry. */
   toolType?: ToolType;

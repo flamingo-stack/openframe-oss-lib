@@ -30,7 +30,7 @@ import {
   COMPACT_CARD_TITLE_ROW,
   safeHref,
 } from '../utils/compact-card-classes';
-import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
+import { ActivityRowSkeleton, CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 export interface SlackMessageCardAnchorProps {
   href: string;
@@ -162,16 +162,24 @@ export function SlackMessageCardSkeleton({
 }) {
   if (variant === 'row') {
     return (
-      <div className={`flex min-w-0 items-center gap-3 ${className ?? ''}`}>
-        <UnifiedSkeleton className="h-3.5 w-3.5 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-32 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-2/3 flex-1 rounded" />
-        <UnifiedSkeleton className="h-3 w-24 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-20 shrink-0 rounded" />
-      </div>
+      <ActivityRowSkeleton
+        lead={
+          <>
+            <UnifiedSkeleton className="h-3.5 w-3.5 shrink-0 rounded" />
+            <UnifiedSkeleton className="h-3 w-32 shrink-0 rounded" />
+          </>
+        }
+        trailingWidths={['w-24', 'w-20']}
+        className={className}
+      />
     );
   }
   return (
-    <CompactCardSkeleton titleWidth="w-2/3" rows={[{ width: 'w-5/6' }, { width: 'w-1/3' }]} trailingIcon className={className} />
+    <CompactCardSkeleton
+      titleWidth="w-2/3"
+      rows={[{ width: 'w-5/6' }, { width: 'w-1/3' }]}
+      trailingIcon
+      className={className}
+    />
   );
 }

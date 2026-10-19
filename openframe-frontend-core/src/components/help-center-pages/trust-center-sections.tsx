@@ -17,6 +17,7 @@
 import { createElement, useState, type CSSProperties, type ReactNode } from 'react';
 import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
+import { ICON_SIZE } from '../../styles/component-sizes';
 import {
   TRUST_CENTER_SEARCH_DEBOUNCE_MS,
   normalizeTrustControlQuery,
@@ -521,7 +522,7 @@ export function DocumentRequestModal({
 // ---------------------------------------------------------------------------
 
 /** A row's glyph mark (a subprocessor's icon, a document's glyph): read by the rows and their skeleton. */
-const TRUST_GLYPH_SIZE_CLASS = 'size-6';
+const TRUST_GLYPH_SIZE_CLASS = ICON_SIZE.lg;
 
 /**
  * A subprocessor's mark, best source first: its own site's icon (the hub looks

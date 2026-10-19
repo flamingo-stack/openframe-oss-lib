@@ -7,6 +7,7 @@ import type { ChangelogEntry } from '../../types/product-release';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Badge, BadgeSkeleton } from './badge';
+import { Button } from './button';
 import { FadePreview } from './fade-preview';
 import { useLoadingScope } from './loading-scope';
 import { RichMarkdownRenderer } from './markdown';
@@ -53,11 +54,20 @@ const PREVIEW_COLLAPSED_HEIGHT = 120;
 /** The section's layout, read by the section and by its skeleton, so the skeleton is the section's size. */
 const SECTION_CLASS = 'space-y-4';
 const COLLAPSIBLE_TITLE_ROW_CLASS = 'flex w-full cursor-pointer items-center justify-between';
+/**
+ * The collapsible title row as a `glyph` `Button` (no surface, no box of its own: `size="wrap"`): it lets the
+ * heading wrap, and restates the heading icon's 24px, because a Button sizes every svg inside it.
+ */
+const COLLAPSIBLE_TITLE_BUTTON_CLASS = cn(
+  COLLAPSIBLE_TITLE_ROW_CLASS,
+  'whitespace-normal text-left [&_svg]:h-6 [&_svg]:w-6',
+);
 const TITLE_BASE_CLASS = 'flex items-center gap-2 text-h2';
 const titleClass = (isBreaking: boolean) =>
   `${TITLE_BASE_CLASS} ${isBreaking ? 'text-ods-error' : 'text-ods-text-primary'}`;
 const COUNT_BADGE_CLASS = 'ml-2';
-const CHEVRON_CLASS = 'h-4 w-4 shrink-0 text-ods-text-secondary transition-transform duration-200';
+/** 16px, kept against the title Button's svg size (`!`). */
+const CHEVRON_CLASS = '!h-4 !w-4 shrink-0 text-ods-text-secondary transition-transform duration-200';
 const ENTRY_LIST_CLASS = 'space-y-6';
 const ENTRY_CLASS = 'ml-0 border-l-2 border-ods-border pl-4';
 const ENTRY_TITLE_CLASS =
@@ -108,7 +118,14 @@ export function ReleaseChangelogSection({
     <div className={SECTION_CLASS} data-loading-optional={loadingOptional || undefined}>
       {!hideTitle &&
         (collapsible ? (
-          <button type="button" onClick={() => setCollapsed(!collapsed)} className={COLLAPSIBLE_TITLE_ROW_CLASS}>
+          <Button
+            type="button"
+            variant="glyph"
+            size="wrap"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-expanded={!collapsed}
+            className={COLLAPSIBLE_TITLE_BUTTON_CLASS}
+          >
             <h2 className={titleClass(isBreaking)}>
               {icon}
               {title}
@@ -117,7 +134,7 @@ export function ReleaseChangelogSection({
               </Badge>
             </h2>
             <ChevronDown className={`${CHEVRON_CLASS} ${!collapsed ? 'rotate-180' : ''}`} />
-          </button>
+          </Button>
         ) : (
           <h2 className={titleClass(isBreaking)}>
             {icon}

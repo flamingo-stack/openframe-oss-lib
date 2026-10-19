@@ -11,6 +11,7 @@
 import { Video } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 import type { CustomerInterview } from '../../../types/customer-interview';
 import { cn } from '../../../utils/cn';
 import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
@@ -52,7 +53,7 @@ export interface CustomerInterviewCardProps {
 
 // The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
 const INTERVIEW_CARD_BODY = 'flex flex-col gap-6 p-6';
-const INTERVIEW_CARD_COVER = 'relative aspect-[1200/630] w-full shrink-0 overflow-hidden rounded-sm';
+const INTERVIEW_CARD_COVER = `relative ${MEDIA_ASPECT.og} w-full shrink-0 overflow-hidden rounded-sm`;
 const INTERVIEW_CARD_PERSON_ZONE = 'mt-auto flex h-[60px] shrink-0 items-center';
 const INTERVIEW_CARD_PERSON_ROW = 'flex w-full min-w-0 items-center gap-3';
 const INTERVIEW_CARD_PERSON_TEXT = 'min-w-0 flex-1';
@@ -80,9 +81,7 @@ export function CustomerInterviewCardSkeleton({
     );
   }
   if (size === 'sm') {
-    return (
-      <CompactCardSkeleton className={className} />
-    );
+    return <CompactCardSkeleton className={className} />;
   }
   return (
     <div className={cn('block h-full', className)} aria-hidden>

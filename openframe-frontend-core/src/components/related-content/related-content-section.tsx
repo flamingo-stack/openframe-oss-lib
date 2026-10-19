@@ -84,8 +84,6 @@ import {
   type RelatedCardRegistryEntry,
 } from './card-registry';
 
-export type { CardLinkAnchorProps };
-
 /** Render-prop component injection for the navigation decision — keeps hook
  *  calls legal (hooks live INSIDE the injected component; `CardForType`
  *  itself calls zero hooks). The hub injects a `useNavLink`-backed provider;

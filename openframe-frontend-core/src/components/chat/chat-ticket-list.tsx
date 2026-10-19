@@ -65,4 +65,3 @@ const ChatTicketList = forwardRef<HTMLDivElement, ChatTicketListProps>(
 ChatTicketList.displayName = 'ChatTicketList';
 
 export { ChatTicketList };
-export type { ChatTicketItemData };

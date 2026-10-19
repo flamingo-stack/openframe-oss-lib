@@ -1,4 +1,5 @@
 import type React from 'react';
+import { TEXT_LINES_HEIGHT } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { BUTTON_SIZE_CLASS, type ButtonSizeKey } from '../ui/button/button-styles';
 import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from '../ui/input-styles';
@@ -128,14 +129,6 @@ const TEXT_LINE_TYPE = {
   code: 'text-code',
   inherit: '',
 } as const;
-const TEXT_LINE_HEIGHT: Record<number, string> = {
-  1: 'h-[1lh]',
-  2: 'h-[2lh]',
-  3: 'h-[3lh]',
-  4: 'h-[4lh]',
-  5: 'h-[5lh]',
-  6: 'h-[6lh]',
-};
 
 export type TextLineType = keyof typeof TEXT_LINE_TYPE;
 
@@ -164,7 +157,7 @@ export interface TextLineSkeletonProps {
  */
 export function TextLineSkeleton({ type, lines = 1, as = 'div', width, className }: TextLineSkeletonProps) {
   const Tag = as;
-  const heightClass = TEXT_LINE_HEIGHT[lines];
+  const heightClass = (TEXT_LINES_HEIGHT as Record<number, string>)[lines];
   // A run of separate lines, like the text it stands for: each line is one line-height row holding a bar narrower
   // than the row (the gap between bars is the leading), and a paragraph's last line is shorter. The box is exactly
   // `lines` line heights, so the loaded text takes its place without moving the page.

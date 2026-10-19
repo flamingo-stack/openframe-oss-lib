@@ -26,6 +26,7 @@
  */
 
 import type { ReactNode } from 'react';
+import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { useLoadingScope } from '../../ui/loading-scope';
@@ -47,11 +48,10 @@ export interface DevCardRowContentProps {
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
 const ROW_INNER_CLASS =
   'flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]';
-const ROW_TEXT_COLUMN_CLASS =
-  'flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]';
-const ROW_TITLE_LINE_CLASS = 'flex min-h-[24px] items-center';
-const ROW_SUBTITLE_LINE_CLASS = 'flex min-h-[20px] items-center';
-const ROW_DESCRIPTION_LINE_CLASS = 'flex min-h-[72px] items-center';
+const ROW_TEXT_COLUMN_CLASS = 'flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]';
+const ROW_TITLE_LINE_CLASS = `flex items-center text-h3 ${TEXT_LINES_MIN[1]}`;
+const ROW_SUBTITLE_LINE_CLASS = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
+const ROW_DESCRIPTION_LINE_CLASS = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
 const ROW_BADGES_CLASS = 'flex flex-shrink-0 flex-col gap-2 self-start';
 
 export function DevCardRowContent({

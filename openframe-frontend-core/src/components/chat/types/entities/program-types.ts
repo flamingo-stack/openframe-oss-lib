@@ -35,11 +35,6 @@ export interface ProgramHost {
   role?: string; // e.g., "Host", "Speaker", "Guest"
 }
 
-// The author ref and its strip-profile adapter live in the server-safe leaf
-// (`features/video-bites-shared`): a server module that imports them from this
-// chat tree makes the whole chat a client reference of its page.
-export { programItemToStripProfile, type ProgramAuthorRef } from '../../../features/video-bites-shared';
-
 // ============================================================================
 // DATABASE ROW TYPES
 // ============================================================================

@@ -83,3 +83,29 @@ export function CompactCardSkeleton({
     </span>
   );
 }
+
+/**
+ * THE one-line activity row (a card's `variant="row"`) while it is read: the card's leading cells, the flexible text
+ * bar, then one fixed `text-h6`-high bar per trailing cell. Shared by every activity row (GitHub, Slack).
+ */
+export function ActivityRowSkeleton({
+  lead,
+  trailingWidths,
+  className,
+}: {
+  /** The row's leading cells (its kind icon and its id or author), drawn in the loaded row's own boxes. */
+  lead: React.ReactNode;
+  /** Width classes of the fixed cells after the text (a repository, a channel, a date). */
+  trailingWidths: string[];
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex min-w-0 items-center gap-3', className)}>
+      {lead}
+      <UnifiedSkeleton className="h-3 w-2/3 flex-1 rounded" />
+      {trailingWidths.map((width, i) => (
+        <UnifiedSkeleton key={i} className={cn('h-3 shrink-0 rounded', width)} />
+      ))}
+    </div>
+  );
+}

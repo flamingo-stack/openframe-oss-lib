@@ -57,17 +57,6 @@ import {
   type VideoYouTubeFacadeProps,
 } from './video-shared';
 
-export {
-  VIDEO_PLAYBACK_FAILED_EVENT,
-  type VideoFailureKind,
-  type VideoFailureReason,
-  type VideoLayout,
-  type VideoMutedFallbackState,
-  type VideoPlaybackFailureDetail,
-  type VideoPlayerHandle,
-  type VideoProps,
-} from './video-shared';
-
 /**
  * The Mux player, fetched when a file video is drawn and not before: the
  * player and hls.js are the largest script a page can load, and most pages

@@ -37,7 +37,7 @@ import {
   COMPACT_CARD_TITLE_ROW,
   safeHref,
 } from '../utils/compact-card-classes';
-import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
+import { ActivityRowSkeleton, CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 /** Extract owner/repo from a GitHub URL. */
 function parseRepoFromUrl(url: string | null | undefined): string | null {
@@ -297,18 +297,17 @@ export function GitHubActivityCardSkeleton({
 }) {
   if (variant === 'row') {
     return (
-      <div className={`flex min-w-0 items-center gap-3 ${className ?? ''}`}>
-        <div className="flex w-28 shrink-0 items-center gap-2">
-          <UnifiedSkeleton className="h-3.5 w-3.5 rounded" />
-          <UnifiedSkeleton className="h-3 w-16 rounded" />
-        </div>
-        <UnifiedSkeleton className="h-3 w-2/3 flex-1 rounded" />
-        <UnifiedSkeleton className="h-3 w-40 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-20 shrink-0 rounded" />
-      </div>
+      <ActivityRowSkeleton
+        lead={
+          <div className="flex w-28 shrink-0 items-center gap-2">
+            <UnifiedSkeleton className="h-3.5 w-3.5 rounded" />
+            <UnifiedSkeleton className="h-3 w-16 rounded" />
+          </div>
+        }
+        trailingWidths={['w-40', 'w-20']}
+        className={className}
+      />
     );
   }
-  return (
-    <CompactCardSkeleton titleWidth="w-2/3" rows={[{ width: 'w-1/2' }, {}]} trailingIcon className={className} />
-  );
+  return <CompactCardSkeleton titleWidth="w-2/3" rows={[{ width: 'w-1/2' }, {}]} trailingIcon className={className} />;
 }

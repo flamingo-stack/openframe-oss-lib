@@ -83,7 +83,7 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
               <div className={RELEASE_CARD_CELL_STACK_CLASS}>
                 {/* The Type value is a card StatusBadge loaded; the others are a text-h4 line. */}
                 {i === 0 ? (
-                  <StatusBadgeSkeleton variant="card" className="self-start" />
+                  <StatusBadgeSkeleton variant="card" className="justify-self-start" />
                 ) : (
                   <p className="text-h4">
                     <TextLineSkeleton type="inherit" as="span" className="w-24" />

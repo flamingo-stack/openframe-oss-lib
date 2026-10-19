@@ -21,6 +21,7 @@
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { ICON_SIZE, MEDIA_ASPECT } from '../../../styles/component-sizes';
 import type { CaseStudyCardData, CaseStudyMetric } from '../../../types/case-study';
 import { cn } from '../../../utils/cn';
 import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
@@ -97,7 +98,7 @@ const CASE_STUDY_RESULT_FOOTER_BOX =
   'mt-auto flex h-[60px] shrink-0 items-center justify-between gap-3 border-t border-ods-border pt-4';
 /** The `default` card's boxes, shared with its skeleton. */
 const CASE_STUDY_DEFAULT_BODY = 'flex flex-col gap-6 p-6';
-const CASE_STUDY_COVER = 'relative aspect-[1200/630] w-full shrink-0 overflow-hidden rounded-sm';
+const CASE_STUDY_COVER = `relative ${MEDIA_ASPECT.og} w-full shrink-0 overflow-hidden rounded-sm`;
 const CASE_STUDY_TITLE_ZONE = 'flex h-[72px] shrink-0 items-center';
 /** The person row's boxes (a fixed 60px zone), shared with its skeleton. */
 const CASE_STUDY_PERSON_ZONE = 'flex h-[60px] shrink-0 items-center';
@@ -108,11 +109,11 @@ const CASE_STUDY_MENU_FRAME =
   'group/card group flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)] text-ods-text-primary transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent';
 const CASE_STUDY_MENU_SKELETON_FRAME =
   'flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
-const CASE_STUDY_MENU_MEDIA = 'relative block aspect-video w-full shrink-0 overflow-hidden rounded-md';
+const CASE_STUDY_MENU_MEDIA = `relative block ${MEDIA_ASPECT.video} w-full shrink-0 overflow-hidden rounded-md`;
 const CASE_STUDY_MENU_MSP_ROW = 'flex items-center gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6';
 /** The MSP's icon in the menu card's MSP row (20px), read by the card and its skeleton. */
 const MSP_ICON_PX = 20;
-const MSP_ICON_CLASS = 'size-5 shrink-0 rounded';
+const MSP_ICON_CLASS = `${ICON_SIZE.md} shrink-0 rounded`;
 /** The content-type chip a portrait case study shows (a static label). */
 const CASE_STUDY_TYPE_LABEL = 'Case Study';
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { Filter } from 'lucide-react';
+import { ICON_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
@@ -47,7 +48,7 @@ export interface StatusFilterComponentProps {
 /** The row's frame, label and controls, read by the row and by its skeleton, so the skeleton is the row's size. */
 const STATUS_FILTER_ROW_CLASS = 'flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4';
 const STATUS_FILTER_LABEL_CLASS = 'flex items-center gap-2';
-const STATUS_FILTER_ICON_CLASS = 'h-4 w-4 text-ods-accent';
+const STATUS_FILTER_ICON_CLASS = `${ICON_SIZE.sm} text-ods-accent`;
 const STATUS_FILTER_LABEL_TEXT_CLASS = 'text-ods-text-secondary text-h5';
 /** The option buttons' type, read by the row and by its skeleton. */
 const STATUS_FILTER_BUTTON_CLASS = 'text-h3';

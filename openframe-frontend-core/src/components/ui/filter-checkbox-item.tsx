@@ -2,6 +2,7 @@
 
 import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import type { ReactNode } from 'react';
+import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
@@ -9,7 +10,7 @@ import { useLoadingScope } from './loading-scope';
 
 /** The item's row, box and text, read by the item and by its skeleton, so the skeleton is the item's size. */
 const ITEM_ROW_CLASS = 'flex items-center gap-3 border-b border-ods-border bg-ods-card last:border-b-0';
-const ITEM_BOX_CLASS = 'h-6 w-6 shrink-0 rounded-[6px] border-2';
+const ITEM_BOX_CLASS = `${CONTROL_SIZE.selection} shrink-0 rounded-[6px] border-2`;
 const ITEM_LABEL_CLASS = 'min-w-0 flex-1 text-ods-text-primary text-h4';
 const ITEM_COUNT_CLASS = 'shrink-0 text-ods-text-secondary text-h5';
 const itemPaddingClass = (hasCount: boolean) => (hasCount ? 'px-4 py-3' : 'p-3');
@@ -104,7 +105,7 @@ export function FilterCheckboxItemSkeleton({
       )}
       {count && (
         <span className={ITEM_COUNT_CLASS}>
-          <TextLineSkeleton type="inherit" as="span" className="inline-block align-top w-6" />
+          <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" />
         </span>
       )}
     </div>

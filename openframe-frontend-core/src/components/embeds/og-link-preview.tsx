@@ -6,6 +6,7 @@ import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../hooks';
 import { useOgPlaceholderUrl } from '../../hooks/use-og-placeholder-url';
+import { ICON_SIZE, MEDIA_ASPECT, TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -179,16 +180,16 @@ const COMPACT_BODY_CLASS = 'flex min-w-0 flex-1 flex-col justify-center p-3';
 /** The compact card with no image: one row of a favicon box, the title and description lines, the link mark. */
 const COMPACT_ROW_CLASS =
   'flex flex-row items-center gap-3 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-4 py-3';
-const COMPACT_ICON_BOX_CLASS = 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface';
+const COMPACT_ICON_BOX_CLASS = `flex ${TILE_SIZE.sm} flex-shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface`;
 /** The no-image compact row's favicon, read by the row and by its skeleton. */
 const COMPACT_FAVICON_CLASS = 'w-5 h-5';
 /** The default card's publication logo beside the title, read by the card and by its skeleton. */
-const DEFAULT_LOGO_CLASS = 'mt-0.5 h-6 w-6 flex-shrink-0 rounded';
+const DEFAULT_LOGO_CLASS = `mt-0.5 ${ICON_SIZE.lg} flex-shrink-0 rounded`;
 const COMPACT_ROW_TEXT_CLASS = 'min-w-0 flex-1';
 const COMPACT_ROW_LINE_CLASS = 'truncate text-h6';
 const DEFAULT_OUTER_CLASS = 'my-6 flex flex-1 flex-col';
 const DEFAULT_FRAME_CLASS = 'flex flex-1 flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card';
-const DEFAULT_MEDIA_CLASS = 'aspect-video w-full flex-none rounded-lg';
+const DEFAULT_MEDIA_CLASS = `${MEDIA_ASPECT.video} w-full flex-none rounded-lg`;
 const DEFAULT_BODY_CLASS = 'flex-1 p-4';
 const DEFAULT_ROW_CLASS = 'flex items-start gap-3';
 

@@ -75,8 +75,9 @@ export function RemoteDesktopChatPanel({
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex min-h-full flex-col justify-end gap-[var(--spacing-system-xsf)]">
           {rows.length === 0 && loading ? (
-            // The chat while it is read: a screen of the panel's own message rows.
-            <LoadingRegion label="Loading the chat" className="flex flex-col gap-[var(--spacing-system-xsf)]">
+            // The chat while it is read: a screen of the panel's own message rows, stacked by a one-column grid
+            // (the thread above is already the column flexbox: WEBVIEW-001).
+            <LoadingRegion label="Loading the chat" className="grid grid-cols-1 gap-[var(--spacing-system-xsf)]">
               {Array.from({ length: CHAT_PANEL_FOLD }, (_, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
                 <RemoteDesktopChatMessageRowSkeleton key={i} />

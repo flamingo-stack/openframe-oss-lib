@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import {
   complianceStandardForName,
@@ -34,7 +35,7 @@ function markFontSize(mark: string): number {
 }
 
 /** A compliance logo's box (the official mark's frame and the drawn badge alike): read by its skeletons too. */
-export const COMPLIANCE_LOGO_SIZE_CLASS = 'size-10';
+export const COMPLIANCE_LOGO_SIZE_CLASS = TILE_SIZE.lg;
 
 /**
  * A compliance standard's badge, for a standard the icon set has no official

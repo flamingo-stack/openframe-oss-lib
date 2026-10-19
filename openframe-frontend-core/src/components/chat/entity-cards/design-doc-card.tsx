@@ -8,6 +8,7 @@
  */
 
 import Link from '../../../embed-shims/next-link';
+import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import { cn } from '../../../utils/cn';
 import { formatDateShort } from '../../../utils/date-formatters';
@@ -60,10 +61,10 @@ const DESIGN_DOC_CARD_BODY = 'flex h-full flex-col gap-[var(--spacing-system-mf)
 const DESIGN_DOC_CARD_HEADER = 'flex w-full items-center gap-[16px]';
 const DESIGN_DOC_CARD_HEADING = 'flex min-w-0 flex-1 flex-col';
 /** Two `text-h3` lines. */
-const DESIGN_DOC_CARD_TITLE_ROW = 'flex min-h-[48px] items-center';
-const DESIGN_DOC_CARD_META_ROW = 'flex min-h-[20px] items-center';
+const DESIGN_DOC_CARD_TITLE_ROW = `flex items-center text-h3 ${TEXT_LINES_MIN[2]}`;
+const DESIGN_DOC_CARD_META_ROW = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
 /** Three `text-h4` lines. */
-const DESIGN_DOC_CARD_SUMMARY_ROW = 'flex min-h-[72px] items-center';
+const DESIGN_DOC_CARD_SUMMARY_ROW = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
 const DESIGN_DOC_CARD_FOOTER = 'flex w-full items-center justify-between gap-2';
 
 /**

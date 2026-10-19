@@ -25,6 +25,7 @@
  */
 
 import Link from '../../../embed-shims/next-link';
+import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { type DeliveryItem, TASK_TYPE_LABELS, TASK_TYPE_TEXT_COLORS } from '../../../types/delivery';
 import { getStatusColorScheme } from '../../../utils';
 import { cn } from '../../../utils/cn';
@@ -78,12 +79,11 @@ export interface DeliveryRowProps {
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
 const ROW_INNER_CLASS =
   'flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]';
-const ROW_TEXT_COLUMN_CLASS =
-  'flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]';
+const ROW_TEXT_COLUMN_CLASS = 'flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]';
 const ROW_CAPTION_CLASS = 'text-ods-text-secondary text-h5';
-const ROW_TITLE_LINE_CLASS = 'flex min-h-[24px] items-center content-md:min-h-[24px]';
-const ROW_SUBTITLE_LINE_CLASS = 'flex min-h-[20px] items-center';
-const ROW_DESCRIPTION_LINE_CLASS = 'flex min-h-[72px] items-center';
+const ROW_TITLE_LINE_CLASS = `flex items-center text-h3 ${TEXT_LINES_MIN[1]}`;
+const ROW_SUBTITLE_LINE_CLASS = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
+const ROW_DESCRIPTION_LINE_CLASS = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
 const ROW_META_CLASS =
   'flex w-full flex-shrink-0 flex-row items-center gap-2 self-stretch content-md:w-auto content-md:flex-col content-md:items-end content-md:self-start';
 const ROW_BASE_CLASS = 'block p-[12px] text-inherit no-underline transition-colors duration-150 content-md:p-[16px]';

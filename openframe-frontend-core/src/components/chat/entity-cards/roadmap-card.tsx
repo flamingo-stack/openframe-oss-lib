@@ -14,8 +14,8 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { MEDIA_ASPECT, TEXT_LINES_MIN, TILE_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
-import { getProxiedImageUrl } from '../../../utils/image-proxy';
 import { ImageClassicIcon } from '../../icons-v2-generated/audio-and-visual/image-classic-icon';
 import { FigmaClassicIcon } from '../../icons-v2-generated/brand-logos/figma-classic-icon';
 import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
@@ -24,6 +24,7 @@ import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge, StatusBadgeSkeleton, generationTierFromLabel } from '../../ui/status-badge';
+import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import type { RoadmapItem } from '../types/entities/roadmap-item';
 import { getStatusColorScheme } from '../utils/agent-status-message';
 import { getTaskTypeLabel } from '../utils/clickup-task-type-utils';
@@ -47,18 +48,19 @@ type CardSize = 'default' | 'sm';
 export type VoteType = 'up' | 'down' | null;
 
 /** The compact card's bordered 48px logo box, read by the card and its skeleton. */
-const ROADMAP_COMPACT_SLOT = 'aspect-square h-12 w-12 shrink-0 self-start overflow-hidden rounded-md border border-ods-border p-1.5';
+const ROADMAP_COMPACT_SLOT = `${MEDIA_ASPECT.square} ${TILE_SIZE.xl} shrink-0 self-start overflow-hidden rounded-md border border-ods-border p-1.5`;
 
 // The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
-const ROADMAP_CARD_BODY = 'flex h-full scroll-mt-24 flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]';
+const ROADMAP_CARD_BODY =
+  'flex h-full scroll-mt-24 flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]';
 const ROADMAP_CARD_HEADER = 'flex w-full items-center gap-[16px]';
-const ROADMAP_CARD_ICON_BOX = 'flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg';
+const ROADMAP_CARD_ICON_BOX = `flex ${TILE_SIZE.feature} flex-shrink-0 items-center justify-center rounded-lg`;
 const ROADMAP_CARD_HEADING = 'flex min-w-0 flex-1 flex-col';
 /** Two `text-h3` lines. */
-const ROADMAP_CARD_TITLE_ROW = 'flex min-h-[48px] items-center';
-const ROADMAP_CARD_META_ROW = 'flex min-h-[20px] items-center';
+const ROADMAP_CARD_TITLE_ROW = `flex items-center text-h3 ${TEXT_LINES_MIN[2]}`;
+const ROADMAP_CARD_META_ROW = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
 /** Three `text-h4` lines. */
-const ROADMAP_CARD_SUMMARY_ROW = 'flex min-h-[72px] items-center';
+const ROADMAP_CARD_SUMMARY_ROW = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
 const ROADMAP_CARD_FOOTER = 'flex w-full items-center justify-between';
 const ROADMAP_CARD_VOTES = 'flex h-[48px] overflow-hidden rounded-[6px]';
 const ROADMAP_CARD_FOOTER_END = 'flex min-w-0 items-center gap-2';
@@ -181,7 +183,7 @@ export function RoadmapCard({
   const loading = useLoadingScope();
 
   const logoUrl = item.icon && item.icon.startsWith('http') ? item.icon : null;
-  const iconSrc = logoUrl ? getProxiedImageUrl(logoUrl, { directHttps: true }) || logoUrl : null;
+  const iconSrc = useProxiedImageUrl(logoUrl) || null;
   if (loading) return <RoadmapCardSkeleton size={size} votes={!!onVote} className={className} />;
 
   if (size === 'sm') {
@@ -292,14 +294,7 @@ export function RoadmapCard({
   }
 
   return (
-    <div
-      id={id}
-      className={cn(
-        CONTENT_CARD_FRAME_CLASS,
-        ROADMAP_CARD_BODY,
-        className,
-      )}
-    >
+    <div id={id} className={cn(CONTENT_CARD_FRAME_CLASS, ROADMAP_CARD_BODY, className)}>
       <div className={ROADMAP_CARD_HEADER}>
         <div className={cn(ROADMAP_CARD_ICON_BOX, 'border border-ods-border bg-ods-bg')}>
           {iconSrc ? (

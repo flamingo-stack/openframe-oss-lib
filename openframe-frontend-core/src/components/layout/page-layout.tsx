@@ -154,8 +154,4 @@ export function PageLayout({
     </div>
   );
 }
-
-export type { PageActionButton } from '../ui/page-actions';
-export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from './title-block';
-export type { TitleBlockProps, TitleSkeletonLines } from './title-block';
 export default PageLayout;

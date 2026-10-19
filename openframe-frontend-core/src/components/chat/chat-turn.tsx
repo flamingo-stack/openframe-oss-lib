@@ -61,7 +61,8 @@ export function ChatTurn({
     return (
       <ChatTurnSkeleton
         nameSize={nameSize}
-        time={skeleton?.time ?? time !== undefined}
+        // `null` says the turn has no time; a placeholder's `''` is a time still to be read.
+        time={skeleton?.time ?? time != null}
         meta={skeleton?.meta ?? !!meta}
         lines={skeleton?.lines}
         avatarPx={skeleton?.avatarPx}

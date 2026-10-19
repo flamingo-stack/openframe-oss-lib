@@ -1,5 +1,6 @@
 'use client';
 
+import { TILE_SIZE } from '../styles/component-sizes';
 import { cn } from '../utils/cn';
 import { formatRelativeTime } from '../utils/date-utils';
 import { useAuth } from './auth-stub';
@@ -83,7 +84,7 @@ const commentBodyRow = (compact: boolean) => (compact ? 'flex h-[60px] items-cen
 /** The commenter header's avatar (UserSummary `compact`, `avatarSize`). */
 const COMMENT_CARD_AVATAR_PX = 48;
 /** The delete button's box (`Button` size `icon`). */
-const COMMENT_CARD_DELETE_BOX = 'h-11 w-11 md:h-12 md:w-12';
+const COMMENT_CARD_DELETE_BOX = TILE_SIZE.touch;
 
 export function CommentCard({
   comment,

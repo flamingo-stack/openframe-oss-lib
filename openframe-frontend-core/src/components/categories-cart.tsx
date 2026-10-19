@@ -2,6 +2,7 @@
 
 import { ChevronRight } from 'lucide-react';
 import Link from '../embed-shims/next-link';
+import { ICON_SIZE } from '../styles/component-sizes';
 import type { RealCategoryCardProps } from '../types/category';
 import { cn } from '../utils/cn';
 import { TextLineSkeleton } from './loading/unified-skeleton';
@@ -16,12 +17,13 @@ const ICON_ROW_CLASS = 'flex w-full gap-2 md:gap-3';
 /** The strip's vendor icons: one size and frame for the loaded icon and its skeleton. */
 const VENDOR_ICON_SIZE = 'md';
 const VENDOR_ICON_CLASS = 'overflow-hidden rounded opacity-60 grayscale filter';
-const INFO_STACK_CLASS = 'flex flex-col gap-2';
-const TITLE_STACK_CLASS = 'flex flex-col gap-1';
+/** The inner stacks only stack: a one-column grid, not another column flexbox (WEBVIEW-001). */
+const INFO_STACK_CLASS = 'grid grid-cols-1 gap-2';
+const TITLE_STACK_CLASS = 'grid grid-cols-1 gap-1';
 const FOOT_ROW_CLASS = 'flex items-start justify-between gap-4 md:items-end md:gap-6';
 const ARROW_BOX_CLASS =
   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-ods-border bg-transparent transition-colors md:h-12 md:w-12';
-const ARROW_ICON_CLASS = 'h-5 w-5 text-ods-text-primary transition-colors md:h-6 md:w-6';
+const ARROW_ICON_CLASS = `${ICON_SIZE.step} text-ods-text-primary transition-colors`;
 /** As many icon boxes as the widest strip shows (the strip clips the rest). */
 const ICON_STRIP_FOLD = 20;
 

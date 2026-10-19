@@ -3,6 +3,7 @@
 import { type HTMLAttributes, memo, forwardRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -11,6 +12,7 @@ import { useLoadingScope } from './loading-scope';
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
+  /** A step of the shared avatar scale (`AVATAR_SIZE`). */
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   /** Exact pixel size (width & height). Overrides the `size` bucket dimensions —
    *  for callers with a numeric-px API (e.g. UserDisplay/MSPDisplay). */
@@ -28,19 +30,6 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
    *  so callers can shrink/recolor the initials for compact avatars. */
   initialsClassName?: string;
 }
-
-/**
- * The avatar's box at each size: ONE scale, read by the avatar and by every skeleton that stands in for one.
- * xs (24px): dense card meta rows (avatar stacks on delivery and roadmap cards). Part of the shared scale so no
- * caller ever bypasses the buckets with raw sizePx for a standard size.
- */
-export const SQUARE_AVATAR_SIZE_CLASS = {
-  xs: 'h-6 w-6',
-  sm: 'h-8 w-8',
-  md: 'h-10 w-10',
-  lg: 'h-12 w-12',
-  xl: 'h-16 w-16',
-} as const;
 
 /** The avatar's corner at each variant, read by the avatar and by its skeleton. */
 const SQUARE_AVATAR_VARIANT_CLASS = {
@@ -73,15 +62,8 @@ const SquareAvatar = memo(
         return <SquareAvatarSkeleton size={size} sizePx={sizePx} variant={variant} className={className} />;
       }
       const resolvedSrc = authedSrc;
-      const sizeClasses = SQUARE_AVATAR_SIZE_CLASS;
-
-      const sizePxBySize = {
-        xs: 24,
-        sm: 32,
-        md: 40,
-        lg: 48,
-        xl: 64,
-      };
+      const sizeClasses = AVATAR_SIZE;
+      const sizePxBySize = AVATAR_SIZE_PX;
 
       const variantClasses = SQUARE_AVATAR_VARIANT_CLASS;
 
@@ -163,7 +145,7 @@ export function SquareAvatarSkeleton({
     <UnifiedSkeleton
       className={cn(
         'shrink-0',
-        sizePx === undefined && SQUARE_AVATAR_SIZE_CLASS[size],
+        sizePx === undefined && AVATAR_SIZE[size],
         SQUARE_AVATAR_VARIANT_CLASS[variant],
         className,
       )}

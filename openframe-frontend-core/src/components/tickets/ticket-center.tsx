@@ -193,6 +193,7 @@ function TicketCenterPending({
         <TicketCenterView
           tickets={[]}
           loading
+          formInert
           sync={syncInPage ? undefined : null}
           onSubmit={() => Promise.resolve(false)}
           isSubmitting={false}
@@ -208,6 +209,7 @@ function TicketCenterPending({
 function TicketCenterView({
   tickets,
   loading,
+  formInert = false,
   sync,
   onRefresh,
   refreshing,
@@ -219,6 +221,8 @@ function TicketCenterView({
   tickets: AnyTicket[];
   /** The tickets are being read: the list draws its skeleton. */
   loading: boolean;
+  /** The identity is not read yet: the form is drawn for real but cannot be focused, typed into or submitted. */
+  formInert?: boolean;
   /** `undefined`: the page states the sync, the header draws no line. */
   sync: DataSync | null | undefined;
   /** Absent while loading, where the button is drawn but cannot be used. */
@@ -231,7 +235,10 @@ function TicketCenterView({
 }) {
   return (
     <div className={TICKET_CENTER_CLASS}>
-      <TicketOpenForm onSubmit={onSubmit} isSubmitting={isSubmitting} supportSystemDown={supportSystemDown} />
+      {/* `contents`: the wrapper adds no box, the form stays the view's own child. */}
+      <div inert={formInert || undefined} className="contents">
+        <TicketOpenForm onSubmit={onSubmit} isSubmitting={isSubmitting} supportSystemDown={supportSystemDown} />
+      </div>
 
       <div className={TICKET_LIST_BLOCK_CLASS}>
         <TicketListHeader sync={sync} syncLoading={loading} onRefresh={onRefresh} refreshing={refreshing} />

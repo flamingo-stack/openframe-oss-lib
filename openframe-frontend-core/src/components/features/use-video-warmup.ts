@@ -39,13 +39,6 @@ import { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { useNearViewport } from '../../hooks/use-near-viewport';
-// Re-export from the server-safe `mux-origins.ts` module so the
-// constants are NOT bound to this `'use client'` file. See the
-// JSDoc in `mux-origins.ts` for the bug history. Backward-compat:
-// existing imports that read `MUX_STREAM_ORIGIN` from
-// `@flamingo-stack/openframe-frontend-core/components/features`
-// continue to resolve through this re-export.
-export { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins';
 import { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins';
 
 /**

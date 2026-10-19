@@ -60,7 +60,6 @@ import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
 import { HowIWorkCard, HowIWorkCardSkeleton, type HowIWorkCardData } from '../chat/entity-cards/how-i-work-card';
 import { InvestorUpdateCard, InvestorUpdateCardSkeleton } from '../chat/entity-cards/investor-update-card';
 import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
-import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
 import { buildProductReleaseCardProps } from '../chat/entity-cards/product-release-card-defaults';
 import { ProgramCard, ProgramCardSkeleton } from '../chat/entity-cards/program-card';
 import { RoadmapCard, RoadmapCardSkeleton } from '../chat/entity-cards/roadmap-card';
@@ -73,6 +72,8 @@ import type { InvestorUpdate } from '../chat/types/entities/investor-update';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import type { BaseProgramItem, ProgramHost, ProgramMedia } from '../chat/types/entities/program-types';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
+import { ProductReleaseCard } from '../shared/product-release/product-release-card';
+import { ProductReleaseCardSkeleton } from '../shared/product-release/product-release-card-skeleton';
 
 export type CardSize = 'lg' | 'default' | 'sm';
 

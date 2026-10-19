@@ -193,23 +193,24 @@ export function PageContainerSubtitleSkeleton({ className }: { className?: strin
 }
 
 // Advanced implementation (from UI component)
-function renderAdvancedPageContainer({
-  children,
-  variant = 'content',
-  title,
-  subtitle,
-  backButton,
-  headerActions,
-  headerContent,
-  actions,
-  actionsVariant,
-  menuActions,
-  padding = 'none',
-  background = 'transparent',
-  className,
-  contentClassName,
-  showHeader = true,
-}: AdvancedPageContainerProps,
+function renderAdvancedPageContainer(
+  {
+    children,
+    variant = 'content',
+    title,
+    subtitle,
+    backButton,
+    headerActions,
+    headerContent,
+    actions,
+    actionsVariant,
+    menuActions,
+    padding = 'none',
+    background = 'transparent',
+    className,
+    contentClassName,
+    showHeader = true,
+  }: AdvancedPageContainerProps,
   inScope = false,
 ) {
   // A title or subtitle that is READ arrives as '' in a page's loading state (an absent one is undefined): it is
@@ -430,9 +431,6 @@ export const FormPageContainer = (props: Omit<AdvancedPageContainerProps, 'varia
 export const ContentPageContainer = (props: Omit<AdvancedPageContainerProps, 'variant'>) => (
   <PageContainer {...props} variant="content" />
 );
-
-// Re-export PageActionButton type for convenience
-export type { PageActionButton } from '../ui/page-actions';
 
 /** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default PageContainer;

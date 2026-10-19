@@ -1,3 +1,4 @@
+import { MEDIA_ASPECT, TILE_SIZE } from '../../../styles/component-sizes';
 import { UNSAFE_URL_CHARS, isSameOriginPath } from '../../../utils/url-safety';
 
 /**
@@ -35,7 +36,7 @@ export const COMPACT_CARD_IMAGE_SLOT =
   'relative block shrink-0 self-start w-14 h-14 aspect-square overflow-hidden rounded-md bg-ods-bg';
 
 /** 56×56 placeholder slot for skeletons: the box of a `UnifiedSkeleton as="span"`, which draws the surface. */
-export const COMPACT_CARD_SKELETON_IMAGE_SLOT = 'block h-14 w-14 aspect-square shrink-0 self-start rounded-md';
+export const COMPACT_CARD_SKELETON_IMAGE_SLOT = `block ${TILE_SIZE.thumb} ${MEDIA_ASPECT.square} shrink-0 self-start rounded-md`;
 
 /** 56×56 icon slot — for cards without a cover image. */
 export const COMPACT_CARD_ICON_SLOT =

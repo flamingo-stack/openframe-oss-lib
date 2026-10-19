@@ -1,11 +1,12 @@
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
+import { AVATAR_SIZE } from '../../../styles/component-sizes';
 import type { EntityAuthor } from '../../../types/entity-author';
 import { cn } from '../../../utils/cn';
 import { formatDate, nameInitials } from '../../../utils/format';
 import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { SQUARE_AVATAR_SIZE_CLASS, SquareAvatar } from '../../ui/square-avatar';
+import { SquareAvatar } from '../../ui/square-avatar';
 
 /**
  * Author + publication metadata, rendered as the SAME 2-or-N-cell grid pattern
@@ -203,7 +204,7 @@ export function EntityMetadataAuthorCell({
 export function EntityMetadataAuthorCellSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn(AUTHOR_CELL_CLASS, className)}>
-      <UnifiedSkeleton variant="circular" className={cn('shrink-0', SQUARE_AVATAR_SIZE_CLASS[AUTHOR_AVATAR_SIZE])} />
+      <UnifiedSkeleton variant="circular" className={cn('shrink-0', AVATAR_SIZE[AUTHOR_AVATAR_SIZE])} />
       <div className={AUTHOR_TEXT_CLASS}>
         <TextLineSkeleton type="h3" className="w-32" />
         <TextLineSkeleton type="h6" className="w-20" />

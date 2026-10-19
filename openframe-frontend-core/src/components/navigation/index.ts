@@ -10,9 +10,11 @@ export type { NavPanelProps } from './nav-panel';
 export { NavItemRow } from './nav-item-row';
 export type { NavItemRowProps, NavItemRowVariant } from './nav-item-row';
 export type { AskAiOpenDetail } from './mingo-ai-button';
-export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, MingoAiButton, openAskAi } from './mingo-ai-button';
+export { MingoAiButton, openAskAi } from './mingo-ai-button';
+export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
 export type { MingoAiButtonProps } from './mingo-ai-button';
-export { MobileNavSheet, MOBILE_NAV_SHEET_ID, siteNavHasMobileMenus } from './mobile-nav-sheet';
+export { MobileNavSheet, siteNavHasMobileMenus } from './mobile-nav-sheet';
+export { MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet-id';
 export type { MobileNavSheetProps } from './mobile-nav-sheet';
 export { SiteFooter } from './site-footer';
 export type { SiteFooterProps } from './site-footer';
@@ -44,7 +46,8 @@ export type { NavigationSidebarProps } from './navigation-sidebar';
 export { AppHeader } from './app-header';
 export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
 
-export { AppLayout, useAppLayoutDrawerContainer } from './app-layout';
+export { AppLayout } from './app-layout';
+export { useAppLayoutDrawerContainer } from './app-layout-context';
 export type { AppLayoutProps } from './app-layout';
 export type {
   AppLayoutSidePanelConfig,

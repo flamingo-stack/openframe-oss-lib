@@ -41,6 +41,14 @@ export default defineConfig([
   ]),
 
   {
+    // A module exports what it declares; only an index barrel re-exports (see ./eslint-config/re-exports.js).
+    name: 'openframe-frontend-core/no-re-export',
+    files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/no-re-export': 'error' },
+  },
+
+  {
     // Every extension the Next preset matches, not just ts/tsx: the rule prints
     // its "Pages directory cannot be found" warning from inside `create()`, so a
     // single unconfigured `.js` file in the repo is enough to emit it. Off since

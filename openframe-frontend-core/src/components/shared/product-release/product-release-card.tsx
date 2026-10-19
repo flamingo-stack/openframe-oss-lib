@@ -354,7 +354,7 @@ export function ProductReleaseCard({
                     variant="card"
                     colorScheme={cell.colorScheme}
                     singleLine
-                    className="self-start"
+                    className="justify-self-start"
                   />
                 ) : (
                   <p

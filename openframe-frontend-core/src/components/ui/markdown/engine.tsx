@@ -48,8 +48,6 @@ import {
 import { completeStreamingTail, splitStreamingBlocks } from './streaming';
 import { resolveTextSizeConfig, type TextSizeConfig } from './text-size';
 
-export type { ResolveLinkResult };
-
 /**
  * Module-scope empty default for `brokenLinks`.
  *

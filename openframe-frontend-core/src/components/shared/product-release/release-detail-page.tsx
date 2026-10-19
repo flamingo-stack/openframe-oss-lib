@@ -50,13 +50,6 @@ import type { DeliveryResponse } from '../../../types/delivery';
 // type fixes the collision while keeping the same import path for
 // downstream consumers of `./release-detail-page`.
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
-// Re-export both types for source-compat with consumers importing
-// through this module. Canonical sources:
-//   - RoadmapItem  → `../../chat/types/entities/roadmap-item`
-//   - DeliveryResponse → `../../../types/delivery` (single source of
-//     truth, shared with the lib `<DeliveryLists>` / `<DeliveryTable>`
-//     components and the new types barrel).
-export type { RoadmapItem, DeliveryResponse };
 
 /** Wire shape of `${roadmapApiEndpoint}?task_ids=…` — `{ items, count }`. */
 interface RoadmapTasksResponse {

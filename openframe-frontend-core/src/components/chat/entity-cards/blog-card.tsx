@@ -21,6 +21,7 @@
 import { Eye } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { AVATAR_SIZE, MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import type { BlogPostSummary } from '../../../types/blog';
 import { cn } from '../../../utils/cn';
 import { formatDateWithTimezone } from '../../../utils/format';
@@ -74,18 +75,18 @@ export interface BlogCardProps {
 
 // The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
 const BLOG_CARD_FRAME = 'flex h-full flex-col';
-const BLOG_CARD_COVER = 'relative aspect-[1200/630] w-full overflow-hidden';
+const BLOG_CARD_COVER = `relative ${MEDIA_ASPECT.og} w-full overflow-hidden`;
 const BLOG_CARD_BODY = 'flex flex-grow flex-col p-4';
 /** The title row keeps two lines of `text-h3` whatever the title's length. */
-const BLOG_CARD_TITLE_ROW = 'mb-3 flex min-h-[50.4px] items-center md:min-h-[56px] lg:min-h-[61.6px]';
+const BLOG_CARD_TITLE_ROW = `mb-3 flex items-center text-h3 ${TEXT_LINES_MIN[2]}`;
 /** The summary row keeps two lines of `text-h6`. */
-const BLOG_CARD_SUMMARY_ROW = 'mb-3 flex min-h-[42px] items-center md:min-h-[45px] lg:min-h-[48px]';
+const BLOG_CARD_SUMMARY_ROW = `mb-3 flex items-center text-h6 ${TEXT_LINES_MIN[2]}`;
 const BLOG_CARD_BYLINE = 'mt-auto flex items-center justify-between gap-2 text-ods-text-secondary text-h6';
 const BLOG_CARD_BYLINE_PERSON = 'flex min-w-0 items-center gap-2';
 const BLOG_CARD_VIEWS = 'flex shrink-0 items-center gap-1';
 /** The byline avatar's box (32px, the photo cropped to it): an author photo of any shape takes exactly this box, and
  *  the skeleton draws the same box. */
-const BLOG_CARD_AVATAR = 'size-8 shrink-0 rounded-full object-cover';
+const BLOG_CARD_AVATAR = `${AVATAR_SIZE.sm} shrink-0 rounded-full object-cover`;
 /** The content-type chip a portrait blog card shows (a static label). */
 const BLOG_POST_TYPE_LABEL = 'Blog Post';
 

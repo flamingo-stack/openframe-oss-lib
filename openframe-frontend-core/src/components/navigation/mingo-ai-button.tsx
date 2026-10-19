@@ -7,7 +7,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import { AgentMark } from '../agent-mark';
-import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
+import { ASK_AI_OPEN_EVENT } from '../chat/utils/ask-ai-events';
 import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -33,8 +33,6 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  event. */
   variant?: 'inline' | 'button' | 'field';
 }
-
-export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT };
 
 /** What an `ask-ai:open` event carries. */
 export interface AskAiOpenDetail {

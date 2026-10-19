@@ -9,9 +9,6 @@ import { AdminContentCardSkeleton } from './admin-content-card';
 export const ADMIN_CONTENT_CARD_GRID_CLASS =
   'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--spacing-system-lf)]';
 
-/** The card's own skeleton, kept on this module's exports for its callers. */
-export { AdminContentCardSkeleton };
-
 export interface AdminContentCardGridSkeletonProps {
   /** How many placeholder cards: one page. */
   count?: number;

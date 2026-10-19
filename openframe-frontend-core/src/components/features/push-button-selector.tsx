@@ -3,6 +3,7 @@
 import { Check } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef } from 'react';
+import { CONTROL_SIZE, TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -99,10 +100,10 @@ const OPTION_ROW_CLASS = 'flex items-center justify-between gap-4';
 /** The row's lead: its icon, then its name and description. */
 const OPTION_LEAD_CLASS = 'flex min-w-0 flex-1 items-center gap-3';
 /** The selection box's frame; the box itself is static chrome, so the skeleton draws it for real (unchecked). */
-const SELECTION_BOX_CLASS = 'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded border-2';
+const SELECTION_BOX_CLASS = `flex ${CONTROL_SIZE.selection} flex-shrink-0 items-center justify-center rounded border-2`;
 const SELECTION_BOX_IDLE_CLASS = 'border-ods-border';
 /** The box an option's icon sits in, read by the row and by its skeleton, so the skeleton's icon is the row's. */
-const OPTION_ICON_BOX_CLASS = 'flex size-8 shrink-0 items-center justify-center';
+const OPTION_ICON_BOX_CLASS = `flex ${TILE_SIZE.sm} shrink-0 items-center justify-center`;
 /** An option row's resting surface (not selected, not disabled). */
 const OPTION_IDLE_SURFACE_CLASS = 'border-ods-border bg-ods-bg';
 

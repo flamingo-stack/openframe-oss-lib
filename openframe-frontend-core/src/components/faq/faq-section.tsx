@@ -89,22 +89,14 @@ export interface FaqSectionProps {
    */
   ask?: false | FaqAskOptions;
   /**
-   * How many named categories the block's loading state draws (each a category section with its heading and rows,
-   * then the questions with no category): the number its host usually shows. Default 0 (one flat list).
+   * The loading state's groups of questions, in order: THE one way to say what the skeleton draws (see
+   * `FaqSkeletonShape`). Absent: one group with no category heading, of `minResults` rows (else one screen of rows).
    */
-  skeletonSections?: number;
-  /** The loading state draws the group of questions with no category after the named ones. Default true. */
-  skeletonUncategorized?: boolean;
-  /**
-   * The loading state's first fold, group by group: how many questions each group draws, in order (the named
-   * categories first, then the uncategorized group when `skeletonUncategorized` is not false). Wins over
-   * `skeletonSections` / `minResults` for the skeleton. Absent: `minResults` spread over `skeletonSections` groups.
-   */
-  skeletonShape?: number[];
+  skeletonShape?: FaqSkeletonShape;
   /**
    * The host's FAQs fall into named categories, so the loaded block draws its category nav (the platform's full,
    * categorised list): the loading state draws the nav's row too, so what follows it (the ask card) does not move.
-   * Default false (a nav only when `skeletonSections` names two or more categories).
+   * Default false (a nav only when `skeletonShape` names two or more categories).
    */
   skeletonNav?: boolean;
 }
@@ -143,6 +135,21 @@ const CATEGORY_SECTION_CLASS = 'scroll-mt-24';
 const CATEGORY_HEADING_CLASS = cn(SECTION_HEADING_CLASS, 'pb-4');
 /** Questions the block's skeleton draws when the host states no count (`minResults`): one screen of the accordion's rows. */
 export const FAQ_SECTION_SKELETON_QUESTIONS = FAQ_ACCORDION_SKELETON_ROWS;
+
+/** One group of questions the FAQ's loading state draws. */
+export interface FaqSkeletonGroup {
+  /** The group is a named category: drawn with its heading bar (and counted for the category nav). Default false. */
+  heading?: boolean;
+  /** Question rows the group draws. Default `FAQ_SECTION_SKELETON_QUESTIONS`, one screen of rows. */
+  rows?: number;
+}
+
+/**
+ * What the FAQ's loading state draws, group by group in order: the one shape `FaqSection`, `FaqSectionSkeleton`,
+ * `FaqDocumentPage` and `TrustCenterPage` take. Stated by the host from what it knows before the read (its FAQs are
+ * filed in categories, the server's page size), never copied from today's FAQs.
+ */
+export type FaqSkeletonShape = readonly FaqSkeletonGroup[];
 
 /**
  * The block's arrangement, for the loaded list and its skeleton alike: without an aside the category nav above the
@@ -566,8 +573,6 @@ export function FaqSection({
   apiBaseUrl = '',
   aside: asideProp,
   ask,
-  skeletonSections,
-  skeletonUncategorized,
   skeletonShape,
   skeletonNav = false,
 }: FaqSectionProps) {
@@ -613,10 +618,7 @@ export function FaqSection({
         topic={topic}
         showTopic={showTopic}
         aside={aside}
-        count={minResults}
-        sections={skeletonSections}
-        uncategorized={skeletonUncategorized}
-        shape={skeletonShape}
+        shape={skeletonShape ?? [{ rows: minResults }]}
         navRow={skeletonNav}
         className={className}
         id={id}
@@ -655,47 +657,33 @@ export interface FaqSectionSkeletonProps extends Pick<
   FaqSectionProps,
   'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'
 > {
-  /** Questions drawn (the instance's `minResults`). Default `FAQ_SECTION_SKELETON_QUESTIONS`. */
-  count?: number;
-  /** Named categories drawn (each its section, a heading bar and its rows), then the uncategorized rows. Default 0. */
-  sections?: number;
-  /** Draw the uncategorized group after the named ones. Default true (always drawn when `sections` is 0). */
-  uncategorized?: boolean;
-  /** Questions per group, in order (named first, then the uncategorized one when drawn): wins over `count`/`sections`. */
-  shape?: number[];
+  /** The groups drawn, in order. Default one group with no heading, of one screen of rows. */
+  shape?: FaqSkeletonShape;
   /** Draw the category nav's row (one line of pills) whatever `sections` is: the host's FAQs are categorised. */
   navRow?: boolean;
 }
 
 /**
  * The FAQ block while its questions are read: the heading (the host's node, or "Frequently Asked Questions") and the
- * topic line real, the aside (the ask card, which draws its own loading state) in its place, `sections` category
- * sections (nav pills, a heading bar, rows) when the host groups its FAQs, then the uncategorized rows: `count`
- * question rows in all, as bars.
+ * topic line real, the aside (the ask card, which draws its own loading state) in its place, then the `shape`'s groups:
+ * a named one with its heading bar (two or more named ones draw the nav's pills), each its question rows, as bars.
  */
+const DEFAULT_SKELETON_SHAPE: FaqSkeletonShape = [{}];
+
 export function FaqSectionSkeleton({
   heading,
   topic,
   showTopic = false,
   aside,
-  count = FAQ_SECTION_SKELETON_QUESTIONS,
-  sections = 0,
-  uncategorized = true,
-  shape,
+  shape = DEFAULT_SKELETON_SHAPE,
   navRow = false,
   className,
   id,
 }: FaqSectionSkeletonProps) {
   const headingNode = faqHeadingNode(heading, showTopic, topic);
   const CategoryHeading = heading === null ? 'h2' : 'h3';
-  // A stated shape names every group's rows; otherwise the count is spread over the groups, each at least one.
-  const shapeGroups = shape?.filter(rows => rows > 0);
-  const named = shapeGroups?.length ? Math.max(0, shapeGroups.length - (uncategorized ? 1 : 0)) : Math.max(0, sections);
-  const groups = shapeGroups?.length ? shapeGroups.length : named + (uncategorized || named === 0 ? 1 : 0);
-  const rowsOf = (group: number) =>
-    shapeGroups?.length
-      ? shapeGroups[group]
-      : Math.max(1, Math.floor((count * (group + 1)) / groups) - Math.floor((count * group) / groups));
+  const groups = shape.length > 0 ? shape : DEFAULT_SKELETON_SHAPE;
+  const named = groups.filter(group => group.heading).length;
   const pill = (i: number) => (
     // biome-ignore lint/suspicious/noArrayIndexKey: skeleton pills never reorder
     <span key={i} className={cn(CATEGORY_PILL_CLASS, 'shrink-0 border-ods-border bg-ods-card')}>
@@ -713,17 +701,16 @@ export function FaqSectionSkeleton({
   ) : undefined;
   const questions = (
     <div className={QUESTIONS_STACK_CLASS}>
-      {Array.from({ length: groups }, (_, group) => {
-        const isNamed = group < named;
+      {groups.map((group, index) => {
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton groups never reorder
-          <section key={group} className={CATEGORY_SECTION_CLASS} data-loading-item>
-            {isNamed && (
+          <section key={index} className={CATEGORY_SECTION_CLASS} data-loading-item>
+            {group.heading && (
               <CategoryHeading className={CATEGORY_HEADING_CLASS} data-loading-optional={navRow ? undefined : true}>
                 <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
               </CategoryHeading>
             )}
-            <FaqAccordionSkeleton count={rowsOf(group)} />
+            <FaqAccordionSkeleton count={Math.max(1, group.rows ?? FAQ_SECTION_SKELETON_QUESTIONS)} />
           </section>
         );
       })}

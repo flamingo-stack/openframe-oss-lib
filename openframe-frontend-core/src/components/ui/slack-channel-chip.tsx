@@ -1,6 +1,7 @@
 'use client';
 
 import Link from '../../embed-shims/next-link';
+import { ICON_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { SlackIcon } from '../icons-v2-generated/brand-logos/slack-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
@@ -8,7 +9,7 @@ import { useLoadingScope } from './loading-scope';
 
 /** The chip: Slack's mark, then the channel. Read by the chip and by its skeleton. */
 const CHIP_CLASS = 'inline-flex items-center gap-1 align-baseline text-ods-text-primary';
-const MARK_CLASS = 'h-4 w-4 flex-shrink-0';
+const MARK_CLASS = `${ICON_SIZE.sm} flex-shrink-0`;
 
 export interface SlackChannelChipProps {
   /** Channel display name, no '#' prefix. Falls back to plain "Slack" when null. */

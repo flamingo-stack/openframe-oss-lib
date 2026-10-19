@@ -27,10 +27,10 @@ import { getPlatformUrl } from '../../../platform-domains';
 import type { ComposeContentUrl } from '../../../utils/content-href';
 import { canonicalContentRefType } from '../../../utils/list-url';
 import { DOC_TABLE_TYPES } from '../../../utils/source-grouping';
+import { getSourceIconName } from '../../../utils/source-icons';
 import type { ChatRef } from '../chat-ref.types';
 import { safeHref } from './compact-card-classes';
 import { resolveIcon } from './icon-library';
-import { getSourceIconName } from './source-icons';
 
 /** Path sanitization — keep alphanumerics, slash, dash, dot, underscore;
  *  strip everything else. Defends against a hostile mapper returning a
@@ -154,10 +154,6 @@ function pickSourceIcon(sourceRepo: string | null, documentType: string | null |
   const iconLabel = documentType ?? 'Source';
   return { icon, iconLabel };
 }
-
-// Declared once in `utils/source-grouping`; re-exported so embedders that key
-// `docPlatformTargets` by it keep their import.
-export { DOC_TABLE_TYPES };
 
 /**
  * Only doc-table rows (DOC_TABLE_TYPES) fall back to doc-viewer navigation when no

@@ -2,6 +2,7 @@
 
 import { type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { useContentLgUp } from '../../hooks/ui/use-content-breakpoint';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { AgentAvatarSkeleton } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
@@ -100,7 +101,7 @@ const PANEL_SCREEN_HEIGHT_CLASS = 'h-[420px]';
 const PANEL_FOOTER_HEIGHT_CLASS = 'h-[52px]';
 const CARD_HEIGHT_CLASS = 'h-[700px]';
 /** A job's icon tile's box (in the list, a card's head and their skeletons). */
-const JOB_ICON_TILE_BOX = 'size-9 shrink-0 rounded-lg';
+const JOB_ICON_TILE_BOX = `${TILE_SIZE.md} shrink-0 rounded-lg`;
 const JOB_ICON_TILE_CLASS = cn(
   JOB_ICON_TILE_BOX,
   'flex items-center justify-center border border-ods-border bg-ods-bg',

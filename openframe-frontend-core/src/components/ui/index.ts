@@ -130,6 +130,8 @@ export * from './avatar-stack';
 export * from './people-cell';
 export * from './deleted-user-avatar';
 export * from './square-avatar';
+// THE sizes of the library's components (avatars, icons, tiles, media, text rows).
+export * from '../../styles/component-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';
@@ -256,3 +258,18 @@ export * from './super-user-banner-view';
 export { RequiredMark } from './required-mark';
 export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';
+export type { DateRange } from 'react-day-picker';
+export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from '../layout/title-block';
+export type { TitleBlockProps, TitleSkeletonLines } from '../layout/title-block';
+export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
+export {
+  ORGANIZATION_CARD_RADIUS_CLASS,
+  ORGANIZATION_CARD_LAYOUT_CLASS,
+  ORGANIZATION_CARD_SURFACE_CLASS,
+  ORGANIZATION_CARD_HEADER_CLASS,
+  ORGANIZATION_CARD_TEXT_CLASS,
+  ORGANIZATION_CARD_DESCRIPTION_CLASS,
+  ORGANIZATION_CARD_FOOTER_CLASS,
+  ORGANIZATION_CARD_STATS_CLASS,
+  ORGANIZATION_CARD_STAT_CLASS,
+} from '../loading/organization-card-skeleton';

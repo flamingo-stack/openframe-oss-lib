@@ -4,6 +4,7 @@ import type React from 'react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
+import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { PlatformBadge, PlatformBadgeSkeleton } from '../../features/platform-badge';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
@@ -12,7 +13,7 @@ import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './c
 
 // The card's boxes, read by the card AND `AdminContentCardSkeleton`, so the two are one size at every width.
 const ADMIN_CARD_FRAME = 'flex h-full flex-col';
-const ADMIN_CARD_COVER = 'relative aspect-[3/2] w-full shrink-0 overflow-hidden';
+const ADMIN_CARD_COVER = `relative ${MEDIA_ASPECT.photo} w-full shrink-0 overflow-hidden`;
 /** `p-5` has no ODS token (20px); it is the card's own padding. */
 const ADMIN_CARD_BODY = 'flex flex-1 flex-col gap-3 p-5';
 const ADMIN_CARD_BADGES = 'flex flex-wrap items-center gap-2';
@@ -92,11 +93,7 @@ export function AdminContentCard({
 
   if (useLoadingScope()) {
     return (
-      <AdminContentCardSkeleton
-        className={className}
-        subtitleRow={subtitleRow}
-        actions={actions ? actions : false}
-      />
+      <AdminContentCardSkeleton className={className} subtitleRow={subtitleRow} actions={actions ? actions : false} />
     );
   }
 
@@ -160,16 +157,10 @@ export function AdminContentCard({
         )}
 
         {/* Meta row */}
-        {(meta || reserveRows) && (
-          <div className={cn(ADMIN_CARD_META, reserveRows && 'min-h-[1lh]')}>
-            {meta}
-          </div>
-        )}
+        {(meta || reserveRows) && <div className={cn(ADMIN_CARD_META, reserveRows && 'min-h-[1lh]')}>{meta}</div>}
 
         {/* Actions — pushed to bottom */}
-        {actions && (
-          <div className={ADMIN_CARD_ACTIONS}>{actions}</div>
-        )}
+        {actions && <div className={ADMIN_CARD_ACTIONS}>{actions}</div>}
       </div>
     </article>
   );

@@ -5,9 +5,6 @@ import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-pl
 import { iconOf, type IconComponent, type IconRef } from './chat/utils/icon-loading';
 import { Button } from './ui/button';
 
-/** Re-exported for call sites that already import the link type from this module. */
-export type { SocialIconLink };
-
 interface SocialIconRowProps {
   className?: string;
   links?: SocialIconLink[];

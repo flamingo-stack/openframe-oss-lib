@@ -24,12 +24,12 @@
  */
 
 import type React from 'react';
-import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Image from '../../embed-shims/next-image';
+import { AVATAR_SIZE } from '../../styles/component-sizes';
 import type { AuthorProfile } from '../../types/entity-author';
 import { cn } from '../../utils/cn';
 import { formatBioText } from '../../utils/format';
-import { getProxiedImageUrl } from '../../utils/image-proxy';
+import { useProxiedImageUrl } from '../chat/hooks/use-proxied-image-url';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { SocialIconRow, socialIconRowClass } from '../social-icon-row';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -48,7 +48,7 @@ export interface AuthorDetailViewProps {
 /** The view's layout, read by the view and by its skeleton, so the skeleton is the view's size. */
 const VIEW_CLASS = 'flex flex-col gap-5 md:gap-6';
 const IDENTITY_ROW_CLASS = 'flex w-full items-start gap-6';
-const AVATAR_BOX_CLASS = 'relative h-24 w-24 shrink-0';
+const AVATAR_BOX_CLASS = `relative ${AVATAR_SIZE.profile} shrink-0`;
 const IDENTITY_TEXT_CLASS = 'flex min-w-0 flex-col justify-center gap-2';
 const NAME_CLASS = 'truncate leading-none text-ods-text-primary text-h2';
 const SUBTITLE_CLASS = 'truncate text-h4 leading-none text-ods-text-secondary';
@@ -58,23 +58,10 @@ const TOPICS_CLASS = 'flex flex-wrap gap-2';
 const AUTHOR_SKELETON_SOCIALS = 5;
 
 export function AuthorDetailView({ author, proxyImageUrl, children, className }: AuthorDetailViewProps) {
-  // Optional runtime — null-safe outside a provider (bare embeds render the
-  // raw avatar URL; the hub's app-wide HubRuntimeProvider supplies the proxy).
-  const runtime = useChatRuntime();
   // In a loading scope the host passes an empty profile and the view draws itself: each part holds its place with a
   // skeleton of its own size, and `children` (the host's rail) draws its own.
   const loading = useLoadingScope();
-
-  const proxiedAvatar =
-    !loading && author.avatarUrl
-      ? proxyImageUrl
-        ? proxyImageUrl(author.avatarUrl)
-        : (getProxiedImageUrl(author.avatarUrl, {
-            proxyPrefix: runtime?.endpoints.imageProxyUrlPrefix,
-            skipDomains: runtime?.endpoints.imageProxySkipDomains,
-            directHttps: true,
-          }) ?? author.avatarUrl)
-      : null;
+  const proxiedAvatar = useProxiedImageUrl(loading ? null : author.avatarUrl, { proxyImageUrl }) || null;
 
   const subtitle = [author.jobTitle, author.company].filter(Boolean).join(' @ ');
   const bioText = formatBioText(author.about);

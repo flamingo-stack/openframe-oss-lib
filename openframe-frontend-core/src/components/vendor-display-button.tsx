@@ -1,15 +1,16 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
+import { TILE_SIZE } from '../styles/component-sizes';
 import { cn } from '../utils/cn';
-import { getProxiedImageUrl } from '../utils/image-proxy-stub';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 
 /** The default button's frame, without its surface and hover (a skeleton draws the same box). */
 export const VENDOR_DISPLAY_BUTTON_FRAME_CLASS =
   'flex max-w-full items-center gap-2 overflow-hidden rounded-lg border border-ods-border px-3 py-2';
 /** The default button's logo box. */
-export const VENDOR_DISPLAY_BUTTON_LOGO_CLASS = 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg';
+export const VENDOR_DISPLAY_BUTTON_LOGO_CLASS = `flex ${TILE_SIZE.sm} flex-shrink-0 items-center justify-center rounded-lg`;
 
 interface VendorDisplayButtonProps {
   vendor: VendorWithMedia;
@@ -34,6 +35,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   // `getVendorLogo` three times and assert the third, which is also three
   // chances for the three calls to disagree.
   const logoUrl = getVendorLogo(vendor);
+  const logoSrc = useProxiedImageUrl(logoUrl, { directHttps: false });
 
   // Compact variant
   if (variant === 'compact') {
@@ -45,7 +47,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
         {logoUrl ? (
           <div className="h-5 w-5 flex-shrink-0 overflow-hidden rounded">
             <Image
-              src={getProxiedImageUrl(logoUrl) || logoUrl}
+              src={logoSrc}
               alt={`${vendor.title} logo`}
               width={20}
               height={20}
@@ -72,13 +74,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
     >
       {logoUrl ? (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-card')}>
-          <Image
-            src={getProxiedImageUrl(logoUrl) || logoUrl}
-            alt={`${vendor.title} logo`}
-            width={24}
-            height={24}
-            className="rounded object-cover"
-          />
+          <Image src={logoSrc} alt={`${vendor.title} logo`} width={24} height={24} className="rounded object-cover" />
         </div>
       ) : (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-border')}>

@@ -12,8 +12,8 @@ export {
   type ReleaseDetailPageProps,
   type VideoDisplaySectionProps,
   type MarkdownRendererProps,
-  type RoadmapItem,
 } from './release-detail-page';
+export { type RoadmapItem } from '../../chat/types/entities/roadmap-item';
 // NOTE: `RoadmapSectionProps` / `DeliverySectionProps` (the injectable-
 // component slot types for ReleaseDetailPage) are intentionally NOT
 // re-exported from this barrel — they collide with the prop types of

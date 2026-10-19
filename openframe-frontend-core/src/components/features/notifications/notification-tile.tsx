@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Image from '../../../embed-shims/next-image';
+import { ICON_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
@@ -43,8 +44,8 @@ const headerControlClass =
   'absolute inset-0 flex items-center justify-center text-ods-text-secondary transition-opacity duration-200 hover:text-ods-text-primary';
 
 /** The header's icon box and its trailing control's box, read by the tile and by its skeleton. */
-const TILE_ICON_BOX_CLASS = 'flex size-4 shrink-0 items-center justify-center';
-const TILE_CONTROL_BOX_CLASS = 'relative size-4 shrink-0';
+const TILE_ICON_BOX_CLASS = `flex ${ICON_SIZE.sm} shrink-0 items-center justify-center`;
+const TILE_CONTROL_BOX_CLASS = `relative ${ICON_SIZE.sm} shrink-0`;
 
 export interface NotificationTileProps {
   notification: Notification;

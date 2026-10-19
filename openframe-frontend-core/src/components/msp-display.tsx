@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '../utils/cn';
-import { getProxiedImageUrl } from '../utils/image-proxy';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { useLoadingScope } from './ui/loading-scope';
 import { SquareAvatar, SquareAvatarSkeleton } from './ui/square-avatar';
@@ -18,15 +18,11 @@ const MSP_ROW_CLASS = 'flex min-w-0 items-center gap-2';
 const MSP_NAME_CLASS = 'truncate pl-2';
 
 export function MSPDisplay({ name, logoUrl, size = 40, className }: MSPDisplayProps) {
+  const logoSrc = useProxiedImageUrl(logoUrl);
   if (useLoadingScope()) return <MSPDisplaySkeleton size={size} className={className} />;
   return (
     <div className={cn(MSP_ROW_CLASS, className)}>
-      <SquareAvatar
-        src={logoUrl ? getProxiedImageUrl(logoUrl) || logoUrl : undefined}
-        fallback={name}
-        alt={name}
-        sizePx={size}
-      />
+      <SquareAvatar src={logoSrc || undefined} fallback={name} alt={name} sizePx={size} />
       <h2 className={MSP_NAME_CLASS}>{name}</h2>
     </div>
   );

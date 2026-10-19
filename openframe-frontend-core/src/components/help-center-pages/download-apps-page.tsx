@@ -36,6 +36,7 @@ import type { ComponentType, ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloads } from '../../hooks/use-downloads';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import {
   DESKTOP_OS_LABELS,
   DOWNLOAD_ARCHITECTURE_LABELS,
@@ -116,7 +117,7 @@ const CARD_HEADER_CLASS = 'flex items-center gap-[var(--spacing-system-sf)]';
 const BUTTONS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-sf)]';
 const COMMANDS_CLASS = 'flex flex-col gap-[var(--spacing-system-mf)]';
 const SCAN_CARD_CLASS = 'content-md:flex-row content-md:items-center content-md:justify-between';
-const QR_CLASS = 'h-[144px] w-[144px] shrink-0';
+const QR_CLASS = `${TILE_SIZE.qr} shrink-0`;
 /** `StoreBadgeLinks`' row and badge size, which the loading store card draws with the same artwork. */
 const STORE_BADGES_CLASS = 'flex flex-wrap items-center gap-[var(--spacing-system-lf)]';
 const STORE_BADGE_CLASS = 'h-12 w-auto';
@@ -356,19 +357,20 @@ export function DownloadAppsPage({
   if (error && !data && !scoped) {
     body = <LoadError message="Could not load the downloads" onRetry={reload} />;
   } else if (!data || scoped) {
-    body = isLoading || scoped ? (
-      // ONE region announces the page's loading; the sections inside it are silent.
-      <LoadingRegion label="Loading the downloads" className={SECTIONS_CLASS}>
-        {showDesktop && (
-          <Section id="download-desktop" title="Desktop app">
-            <SystemCardsSkeleton />
+    body =
+      isLoading || scoped ? (
+        // ONE region announces the page's loading; the sections inside it are silent.
+        <LoadingRegion label="Loading the downloads" className={SECTIONS_CLASS}>
+          {showDesktop && (
+            <Section id="download-desktop" title="Desktop app">
+              <SystemCardsSkeleton />
+            </Section>
+          )}
+          <Section id="download-mobile" title="Mobile app">
+            <MobileCardsSkeleton />
           </Section>
-        )}
-        <Section id="download-mobile" title="Mobile app">
-          <MobileCardsSkeleton />
-        </Section>
-      </LoadingRegion>
-    ) : null;
+        </LoadingRegion>
+      ) : null;
   } else {
     body = (
       <>

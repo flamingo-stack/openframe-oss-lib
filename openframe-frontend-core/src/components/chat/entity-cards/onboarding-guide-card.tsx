@@ -44,6 +44,7 @@ import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrai
 
 /** The content-type chip a portrait guide shows (a static label). */
 const GUIDE_TYPE_LABEL = 'Guide';
+import { MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -90,12 +91,12 @@ function stripMarkdownPreview(text: string): string {
 const CATALOG_BODY = 'flex flex-col gap-4 p-6';
 const CATALOG_ROW = 'flex flex-col gap-4 md:flex-row md:gap-6';
 const CATALOG_COVER_COL = 'w-full flex-shrink-0 md:w-[256px]';
-const CATALOG_COVER = 'relative aspect-[1200/630] w-full overflow-hidden rounded-lg';
+const CATALOG_COVER = `relative ${MEDIA_ASPECT.og} w-full overflow-hidden rounded-lg`;
 const CATALOG_TEXT = 'flex min-w-0 flex-1 flex-col';
 /** Two `text-h2` lines at most. */
-const CATALOG_TITLE_ROW = 'mb-3 flex min-h-[60px] items-start md:min-h-[72px]';
+const CATALOG_TITLE_ROW = `mb-3 flex items-start text-h2 ${TEXT_LINES_MIN[2]}`;
 /** Two `text-h6` lines. */
-const CATALOG_SUMMARY_ROW = 'min-h-[46px] md:min-h-[52px]';
+const CATALOG_SUMMARY_ROW = `text-h6 ${TEXT_LINES_MIN[2]}`;
 /** The catalog card's metadata cells before Published (the card's own label). */
 const CATALOG_EXTRA_CELL_LABELS = ['Section'];
 

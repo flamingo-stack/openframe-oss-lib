@@ -2,6 +2,7 @@
 
 import { type ButtonHTMLAttributes, type ReactNode, type TextareaHTMLAttributes, forwardRef, useId } from 'react';
 
+import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
@@ -10,7 +11,7 @@ import { FieldWrapper } from './field-wrapper';
  * The plain textarea's box: its type step (which sets the line height its rows are counted in), padding, 1px border,
  * radius and minimum height. Read by `Textarea` and by `TextareaSkeleton`, so a field's skeleton is the field's box.
  */
-export const TEXTAREA_BOX_CLASS = 'flex min-h-[96px] w-full rounded-[6px] border p-3 text-h4';
+export const TEXTAREA_BOX_CLASS = `flex ${CONTROL_SIZE.textarea} w-full rounded-[6px] border p-3 text-h4`;
 /** What the box adds around its rows: `p-3` and the 1px border, on both sides. */
 const TEXTAREA_BOX_CHROME_PX = 2 * 12 + 2 * 1;
 /** The browser's own default for a textarea that names no `rows`. */

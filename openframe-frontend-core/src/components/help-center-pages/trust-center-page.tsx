@@ -51,7 +51,7 @@ import {
 } from '../../types/trust-center';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
-import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
+import { FaqSection, type FaqSectionProps, type FaqSkeletonShape } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { LoadingRegion } from '../loading/loading-region';
@@ -108,12 +108,8 @@ export interface TrustCenterPageProps {
    * them twice; the monitoring status stays.
    */
   attribution?: boolean;
-  /** Named FAQ categories the loading state draws (the FAQ's `skeletonSections`). */
-  faqSkeletonSections?: number;
-  /** The FAQ's loading state draws the uncategorized group (the FAQ's `skeletonUncategorized`). Default true. */
-  faqSkeletonUncategorized?: boolean;
-  /** The FAQ's loading-state first fold, questions per group (the FAQ's `skeletonShape`). */
-  faqSkeletonShape?: number[];
+  /** The FAQ's loading state, group by group (the FAQ's `skeletonShape`). */
+  faqSkeletonShape?: FaqSkeletonShape;
   /**
    * Rows each panel's loading state draws, for a host whose lists are curated (it knows their lengths: the frameworks
    * it is audited against). Absent: the layout's fold, the rows one screen holds.
@@ -191,8 +187,6 @@ export function TrustCenterPage({
   ask,
   beforeFaq,
   attribution = true,
-  faqSkeletonSections,
-  faqSkeletonUncategorized,
   faqSkeletonShape,
   panelSkeletonRows,
 }: TrustCenterPageProps) {
@@ -297,16 +291,7 @@ export function TrustCenterPage({
     },
     // The FAQ's skeleton props shape only its loading state (in the scope it draws its own skeleton).
     faq: {
-      render: d => (
-        <FaqSection
-          initialFaqs={d.faqs}
-          heading={null}
-          ask={ask}
-          skeletonSections={faqSkeletonSections}
-          skeletonUncategorized={faqSkeletonUncategorized}
-          skeletonShape={faqSkeletonShape}
-        />
-      ),
+      render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={ask} skeletonShape={faqSkeletonShape} />,
     },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };

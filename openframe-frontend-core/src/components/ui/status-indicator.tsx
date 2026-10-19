@@ -1,12 +1,13 @@
 'use client';
 
 import Link from '../../embed-shims/next-link';
+import { DOT_SIZE } from '../../styles/component-sizes';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
 
 /** The indicator's row and dot, read by the indicator and by its skeleton. */
 const ROW_CLASS = 'flex items-center gap-1.5';
-const DOT_CLASS = 'h-3 w-3 rounded-full';
+const DOT_CLASS = `${DOT_SIZE.md} rounded-full`;
 
 interface StatusIndicatorProps {
   status: 'success' | 'pending' | 'error' | 'missing';

@@ -2,8 +2,8 @@
 
 import Image from '../embed-shims/next-image';
 import { cn } from '../utils/cn';
-import { getProxiedImageUrl } from '../utils/image-proxy-stub';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 import { UnifiedSkeleton } from './loading/unified-skeleton';
 import { useLoadingScope } from './ui/loading-scope';
 
@@ -77,6 +77,7 @@ export function VendorIcon({
 }: VendorIconProps) {
   const loading = useLoadingScope();
   const logoUrl = getVendorLogo(vendor);
+  const logoSrc = useProxiedImageUrl(logoUrl, { directHttps: false });
   const { width, height } = showBackground ? imageSizeMap[size] : { width: tilePxMap[size], height: tilePxMap[size] };
 
   const containerClasses = cn(
@@ -93,7 +94,7 @@ export function VendorIcon({
     <div className={containerClasses}>
       {logoUrl ? (
         <Image
-          src={getProxiedImageUrl(logoUrl) || logoUrl}
+          src={logoSrc}
           alt={`${vendor.title} logo`}
           width={width}
           height={height}

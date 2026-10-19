@@ -752,5 +752,3 @@ export function useDocumentTree(config: UseDocumentTreeConfig, initialPath?: str
     setExpandedNodes,
   };
 }
-
-export type { DocNode, DocContent };

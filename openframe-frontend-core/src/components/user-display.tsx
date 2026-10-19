@@ -1,7 +1,7 @@
 'use client';
 
 import { cn } from '../utils/cn';
-import { getProxiedImageUrl } from '../utils/image-proxy';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { useLoadingScope } from './ui/loading-scope';
 import { SquareAvatar, SquareAvatarSkeleton } from './ui/square-avatar';
@@ -37,20 +37,21 @@ export function UserDisplay({
   compact = false,
   className,
 }: UserDisplayProps) {
+  const avatarSrc = useProxiedImageUrl(avatarUrl);
   if (useLoadingScope()) {
     return (
-      <UserDisplaySkeleton size={size} shape={shape} compact={compact} subtitle={subtitle !== undefined} className={className} />
+      <UserDisplaySkeleton
+        size={size}
+        shape={shape}
+        compact={compact}
+        subtitle={subtitle !== undefined}
+        className={className}
+      />
     );
   }
   return (
     <div className={cn(USER_ROW_CLASS, className)}>
-      <SquareAvatar
-        src={avatarUrl ? getProxiedImageUrl(avatarUrl) || avatarUrl : undefined}
-        fallback={name}
-        alt={name}
-        sizePx={size}
-        variant={shape}
-      />
+      <SquareAvatar src={avatarSrc || undefined} fallback={name} alt={name} sizePx={size} variant={shape} />
       <div className={USER_TEXT_CLASS}>
         <p className={cn('truncate text-ods-text-primary', compact ? 'text-h6' : 'text-h4')}>{name}</p>
         {subtitle && <span className="block truncate text-ods-text-secondary text-h6">{subtitle}</span>}

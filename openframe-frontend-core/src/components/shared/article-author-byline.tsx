@@ -26,12 +26,12 @@
  */
 
 import { Calendar, User } from 'lucide-react';
-import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
+import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { formatBioText, formatDateWithTimezone } from '../../utils/format';
-import { getProxiedImageUrl } from '../../utils/image-proxy';
+import { useProxiedImageUrl } from '../chat/hooks/use-proxied-image-url';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
 
@@ -72,7 +72,8 @@ const BYLINE_FRAME_CLASS = cn(
   'rounded-lg border border-ods-border bg-ods-card p-6',
   'flex flex-col items-start gap-4 content-md:flex-row',
 );
-const AVATAR_SIZE_CLASS = { md: 'w-14 h-14', lg: 'w-16 h-16' } as const;
+/** The byline's avatar at each density, on the shared avatar scale. */
+const BYLINE_AVATAR_SIZE = { md: 'byline', lg: 'xl' } as const;
 const AVATAR_BORDER_CLASS = 'rounded-full border-2 border-ods-border';
 const BODY_CLASS = 'min-w-0 flex-1';
 const NAME_ROW_CLASS = 'flex flex-wrap items-baseline gap-x-3 gap-y-1';
@@ -98,32 +99,19 @@ export function ArticleAuthorByline({
   proxyImageUrl,
   className,
 }: ArticleAuthorBylineProps) {
-  // Optional runtime — `useChatRuntime` returns null outside a provider, so
-  // the byline works in bare embeds (raw avatar URL) and proxies whenever the
-  // host mounted a runtime with `imageProxyUrlPrefix` (the hub always does).
-  const runtime = useChatRuntime();
+  // Before the early returns: a hook is called on every render.
+  const proxiedAvatar = useProxiedImageUrl(avatar, { proxyImageUrl });
   const loading = useLoadingScope();
   // ONE switch: in a loading scope with no author yet (it is read) the byline is its skeleton; an author it is given
   // there is the page's own and is drawn as it is.
   if (loading && !author) return <ArticleAuthorBylineSkeleton size={size} className={className} />;
   if (!author) return null;
 
-  const proxiedAvatar = avatar
-    ? proxyImageUrl
-      ? proxyImageUrl(avatar)
-      : (getProxiedImageUrl(avatar, {
-          proxyPrefix: runtime?.endpoints.imageProxyUrlPrefix,
-          skipDomains: runtime?.endpoints.imageProxySkipDomains,
-          directHttps: true,
-        }) ?? avatar)
-    : '';
-
-  // Class-driven sizing (md = 56px, lg = 64px). The numeric pair feeds only
-  // the Image element's intrinsic width/height attributes (required by the
-  // Next image shim) — layout comes from the classes.
-  const avatarSizeClass = AVATAR_SIZE_CLASS[size];
+  // Class-driven sizing from the shared avatar scale. The pixel size feeds only the Image element's intrinsic
+  // width/height attributes (required by the Next image shim): layout comes from the class.
+  const avatarSizeClass = AVATAR_SIZE[BYLINE_AVATAR_SIZE[size]];
   const avatarIconClass = size === 'lg' ? 'w-8 h-8' : 'w-7 h-7';
-  const avatarDim = size === 'lg' ? 64 : 56;
+  const avatarDim = AVATAR_SIZE_PX[BYLINE_AVATAR_SIZE[size]];
   const formattedBio = formatBioText(bio ?? null);
   const dateLabel = publishedAt ? formatDate(publishedAt) : '';
 
@@ -184,7 +172,7 @@ export function ArticleAuthorBylineSkeleton({ size = 'md', className }: { size?:
   return (
     <div className={cn(BYLINE_FRAME_CLASS, className)} aria-hidden>
       <div className="flex-shrink-0">
-        <UnifiedSkeleton variant="circular" className={AVATAR_SIZE_CLASS[size]} />
+        <UnifiedSkeleton variant="circular" className={AVATAR_SIZE[BYLINE_AVATAR_SIZE[size]]} />
       </div>
       <div className={cn(BODY_CLASS, 'w-full')}>
         <div className={NAME_ROW_CLASS}>

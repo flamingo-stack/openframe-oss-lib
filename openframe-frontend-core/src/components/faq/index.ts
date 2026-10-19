@@ -17,6 +17,8 @@ export {
   pageFaqProps,
   type FaqSectionProps,
   type FaqSectionSkeletonProps,
+  type FaqSkeletonGroup,
+  type FaqSkeletonShape,
   type PageFaqSlot,
 } from './faq-section';
 export { FaqDocumentPage, type FaqDocumentPageProps } from './faq-document-page';

@@ -61,11 +61,11 @@ export {
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
   ProductReleaseCard,
-  ProductReleaseCardSkeleton,
   type ProductReleaseCardProps,
   type ProductReleaseCardSize,
   type ProductReleaseCardAnchorProps,
-} from './product-release-card';
+} from '../../shared/product-release/product-release-card';
+export { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton';
 // Card-prop builders: `defaultBuildProductReleaseCardProps` (sm chat default) +
 // `buildProductReleaseCardProps` (RICH lg builder — the ProductReleasesView
 // default; lifted from the hub so embedders get the full metadata grid).
@@ -153,5 +153,5 @@ export {
 // Program author-ref + video-bites profile adapter — re-exported through the
 // PACKAGE-EXPORTED chat barrel so the hub can value-import them (deep paths
 // into chat/types/* are not in the package exports map and 404 at runtime).
-export { programItemToStripProfile, type ProgramAuthorRef } from '../types/entities/program-types';
+export { programItemToStripProfile, type ProgramAuthorRef } from '../../features/video-bites-shared';
 export { type MingoInfoCardAction, MingoInfoCardActionProvider } from '../mingo-info-card';

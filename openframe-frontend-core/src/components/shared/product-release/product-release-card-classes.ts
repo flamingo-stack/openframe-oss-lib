@@ -1,3 +1,4 @@
+import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 /**
  * The large product-release card's layout, ONE copy read by `ProductReleaseCard` and `ProductReleaseCardSkeleton`,
  * so the skeleton is the card's size at every width.
@@ -5,7 +6,7 @@
 export const RELEASE_CARD_LG_FRAME_CLASS = 'flex flex-col gap-4 p-6';
 export const RELEASE_CARD_HERO_CLASS = 'flex flex-col gap-4 content-md:flex-row content-md:gap-6';
 export const RELEASE_CARD_COVER_COLUMN_CLASS = 'w-full flex-shrink-0 content-md:w-[256px]';
-export const RELEASE_CARD_COVER_BOX_CLASS = 'relative aspect-[1200/630] w-full overflow-hidden rounded-lg';
+export const RELEASE_CARD_COVER_BOX_CLASS = `relative ${MEDIA_ASPECT.og} w-full overflow-hidden rounded-lg`;
 export const RELEASE_CARD_TEXT_COLUMN_CLASS = 'flex min-w-0 flex-1 flex-col';
 export const RELEASE_CARD_VERSION_ROW_CLASS = 'mb-3 flex items-center gap-3';
 export const RELEASE_CARD_VERSION_CLASS = 'truncate font-semibold text-ods-text-primary text-code';
@@ -20,7 +21,8 @@ export const RELEASE_CARD_GRID_CLASS =
   'grid grid-cols-1 content-md:grid-cols-4 w-full overflow-hidden rounded-md border border-ods-border';
 export const RELEASE_CARD_CELL_DIVIDER_CLASS = 'border-b content-md:border-b-0 content-md:border-r border-ods-border';
 export const RELEASE_CARD_CELL_CLASS = 'flex flex-col gap-3 p-4';
-export const RELEASE_CARD_CELL_STACK_CLASS = 'flex flex-col gap-0';
+/** The value over its label: only stacks, so a one-column grid, not a second column flexbox (WEBVIEW-001). */
+export const RELEASE_CARD_CELL_STACK_CLASS = 'grid grid-cols-1 gap-0';
 export const RELEASE_CARD_CELL_LABEL_CLASS = 'text-ods-text-secondary text-h6';
 /** The grid's three value cells' labels (static copy). */
 export const RELEASE_CARD_CELL_LABELS = ['Type', 'Status', 'Released'] as const;

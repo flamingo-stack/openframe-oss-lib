@@ -235,9 +235,9 @@ export function EntityVideoSection({
  */
 export function EntityVideoSectionSkeleton({ tabs = false, className }: { tabs?: boolean; className?: string }) {
   if (!tabs) return <VideoSkeleton layout="centered" className={className} />;
-  // The real tabs (static labels): TabsTrigger draws its own box in a scope.
+  // The real tabs (static labels): TabsTrigger draws its own box in a scope. `inert`: nothing in it can be focused or clicked.
   return (
-    <Tabs defaultValue="full-video" className={cn('w-full', className)} aria-hidden>
+    <Tabs defaultValue="full-video" className={cn('w-full', className)} aria-hidden inert>
       <TabsList className={VIDEO_TAB_LIST_CLASS}>
         <TabsTrigger value="full-video" className={VIDEO_TAB_TRIGGER_CLASS}>
           {FULL_VIDEO_TAB_LABEL}
