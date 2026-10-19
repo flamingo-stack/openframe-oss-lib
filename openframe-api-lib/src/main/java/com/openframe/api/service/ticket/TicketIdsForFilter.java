@@ -29,9 +29,10 @@ public class TicketIdsForFilter {
     private final TenantIdProvider tenantIdProvider;
     private final ObjectProvider<TicketUnreadMessagesProvider> unreadMessagesProvider;
 
-    // null means "no restriction at all"; an empty list means "nothing matches" — the two are opposite
-    // outcomes downstream, so a filter that applied and found nothing must not collapse to null.
-    public List<String> resolve(AuthPrincipal principal, TicketFilterInput filter) {
+    // TicketIdRestriction.restricted() == false means "no restriction at all"; a restricted
+    // restriction with an empty list means "nothing matches" — the two are opposite
+    // outcomes downstream, so a filter that applied and found nothing must not collapse to unrestricted.
+    public TicketIdRestriction resolve(AuthPrincipal principal, TicketFilterInput filter) {
         List<String> restricted = null;
         if (hasTagFilter(filter)) {
             restricted = taggedTicketIds(filter);
@@ -40,7 +41,7 @@ public class TicketIdsForFilter {
             List<String> unread = unreadTicketIds(principal);
             restricted = restricted == null ? unread : intersect(restricted, unread);
         }
-        return restricted;
+        return restricted == null ? TicketIdRestriction.unrestricted() : TicketIdRestriction.of(restricted);
     }
 
     private boolean hasTagFilter(TicketFilterInput filter) {
