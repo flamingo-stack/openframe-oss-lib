@@ -24,20 +24,10 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
     private static final String TAGS = "tags";
     private static final String TAG_KEY_VALUES = "tagKeyValues";
 
-    /**
-     * Statuses considered "active" for the organization device counts facet
-     * ({@link #getOrganizationFilterOptions}). That facet counts only ONLINE and OFFLINE
-     * devices; every other facet and the filtered device count keep the default behaviour
-     * of excluding only DELETED devices.
-     */
+    // Statuses counted as "active" for the organization device counts facet (getOrganizationFilterOptions)
     private static final List<String> ACTIVE_STATUSES = List.of(ONLINE.name(), OFFLINE.name());
 
-    /**
-     * Explicit upper bound for faceted GROUP BY queries. Without an explicit LIMIT,
-     * Pinot caps GROUP BY results at its default of 10 groups, which silently drops
-     * low-count buckets (e.g. an organization with a single device). 10000 is the
-     * builder's max and is comfortably above the number of distinct filter values.
-     */
+    // Explicit LIMIT, since Pinot's default GROUP BY cap of 10 groups would silently drop low-count buckets
     private static final int MAX_FILTER_OPTIONS = 10000;
 
     @Value("${pinot.tables.devices.name:devices}")
@@ -123,12 +113,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         return executeCountQuery(queryBuilder.build());
     }
 
-    /**
-     * Executes a faceted filter-option query, counting every device except DELETED
-     * (unless the caller explicitly requested DELETED in {@code statuses}):
-     * SELECT {facetField}, COUNT(*) as count FROM devices WHERE <filters excluding facetField> GROUP BY {facetField} ORDER BY count DESC LIMIT {MAX_FILTER_OPTIONS}
-     * The explicit LIMIT overrides Pinot's default GROUP BY cap of 10 groups so every bucket is returned.
-     */
+    // Explicit LIMIT overrides Pinot's default GROUP BY cap of 10 groups so every bucket is returned
     private Map<String, Integer> executeFacetQuery(String facetField,
                                                     String tenantId,
                                                     List<String> statuses,
@@ -143,10 +128,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         return executeKeyCountQuery(queryBuilder.build());
     }
 
-    /**
-     * Same as {@link #executeFacetQuery} but counts only active devices (status ONLINE or OFFLINE).
-     * Used by the organization device counts facet.
-     */
+    // Same as executeFacetQuery but counts only active devices (status ONLINE or OFFLINE)
     private Map<String, Integer> executeActiveFacetQuery(String facetField,
                                                          String tenantId,
                                                          List<String> statuses,
@@ -170,13 +152,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                 .limit(MAX_FILTER_OPTIONS);
     }
 
-    /**
-     * Applies the shared device filter set to a builder. DELETED devices are excluded by default,
-     * but a caller that explicitly lists DELETED in {@code statuses} opts into counting them
-     * (archive page and dashboard archived-devices card); the lift applies to the facet queries too,
-     * so the status facet can return a DELETED bucket.
-     * If {@code excludeField} matches a filter's field, that filter is skipped (used for faceted filter-option queries).
-     */
+    // DELETED devices are excluded by default unless explicitly requested in statuses (archive page/dashboard)
     private void applyDeviceFilters(PinotQueryBuilder queryBuilder,
                                     List<String> statuses,
                                     List<String> deviceTypes,
@@ -193,11 +169,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
         applyNonStatusFilters(queryBuilder, deviceTypes, osTypes, organizationIds, tagKeys, tagKeyValues, excludeField);
     }
 
-    /**
-     * Applies the shared device filter set to a builder, restricting the counted universe to
-     * active devices (status ONLINE or OFFLINE) instead of the default exclude-only-DELETED rule.
-     * If {@code excludeField} matches a filter's field, that filter is skipped.
-     */
+    // Restricts the counted universe to active devices (status ONLINE or OFFLINE) instead of exclude-only-DELETED
     private void applyActiveDeviceFilters(PinotQueryBuilder queryBuilder,
                                           List<String> statuses,
                                           List<String> deviceTypes,
@@ -220,12 +192,7 @@ public class PinotClientDeviceRepository extends AbstractPinotRepository impleme
                 .toList();
     }
 
-    /**
-     * Applies the caller-supplied status filter verbatim. The base status restriction is applied
-     * separately by the caller, so a selection with no overlap with the allowed universe becomes
-     * a contradiction that correctly yields zero rows rather than broadening the query.
-     * Skipped when status is the faceted field.
-     */
+    // A selection with no overlap with the allowed universe should yield zero rows, not broaden the query
     private void applyStatusFilter(PinotQueryBuilder queryBuilder,
                                    List<String> requestedStatuses,
                                    String excludeField) {
