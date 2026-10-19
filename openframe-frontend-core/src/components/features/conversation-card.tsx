@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useId } from 'react';
+import { type CSSProperties, type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
 import { isOwnClick } from '../../utils/own-click';
 import { useAgentTint } from '../agent-identity';
@@ -16,19 +16,32 @@ import { SquareAvatarSkeleton } from '../ui/square-avatar';
 import { Tag } from '../ui/tag';
 
 /**
- * The lines the outcome takes at least, on a narrow card (below `content-md`) and from `content-md`: a typical
- * outcome is a sentence or two, which takes four lines in a phone's card and three in a wide one. The outcome is
- * never cut: a longer one grows its card (the cards of a row stretch to the tallest). Static classes (a class built at
- * runtime emits no CSS); the skeleton draws the same counts.
+ * The lines a part (the outcome, the context "Today") takes at least, on a narrow card (below `content-md`) and from
+ * `content-md`. A typical outcome or status quo is a sentence or two: four lines in a phone's card and three in a wide
+ * one. A part is never cut: a longer one grows its card (the cards of a row, or of a carousel, stretch to the tallest).
+ * A host that lists its own cards (a curated row) may state the counts its list needs (`lines`), so every card of the
+ * row keeps the tallest card's lines and the skeleton draws them. The counts reach the class through CSS variables
+ * (a class built at runtime emits no CSS); the skeleton draws the same counts.
  */
-const OUTCOME_LINES = { phone: 4, wide: 3 } as const;
-const OUTCOME_LINES_CLASS = 'min-h-[4lh] content-md:min-h-[3lh]';
-/**
- * The lines the context ("Today") takes at least, the same way: a typical status quo is a sentence or two, four
- * lines in a phone's card and three in a wide one, never cut (a longer one grows its card).
- */
-const CONTEXT_LINES = { phone: 4, wide: 3 } as const;
-const CONTEXT_LINES_CLASS = 'min-h-[4lh] content-md:min-h-[3lh]';
+export interface ConversationCardPartLines {
+  phone: number;
+  wide: number;
+}
+export interface ConversationCardLines {
+  context?: ConversationCardPartLines;
+  outcome?: ConversationCardPartLines;
+}
+const DEFAULT_PART_LINES: ConversationCardPartLines = { phone: 4, wide: 3 };
+/** A part's minimum height, from its two counts (`--cc-lines` below `content-md`, `--cc-lines-wide` from it). */
+const PART_LINES_CLASS = 'min-h-[calc(var(--cc-lines)*1lh)] content-md:min-h-[calc(var(--cc-lines-wide)*1lh)]';
+const partLines = (lines: ConversationCardPartLines | undefined) => lines ?? DEFAULT_PART_LINES;
+/** The style that sets a part's counts on its text. */
+const partLinesStyle = (lines: ConversationCardPartLines | undefined) => {
+  const { phone, wide } = partLines(lines);
+  return { '--cc-lines': phone, '--cc-lines-wide': wide } as CSSProperties;
+};
+const CONTEXT_LINES_CLASS = PART_LINES_CLASS;
+const OUTCOME_LINES_CLASS = PART_LINES_CLASS;
 /** The context's text and the outcome's row and text: ONE string each, read by the card and its skeleton. */
 const CONTEXT_TEXT_CLASS = cn('m-0 text-ods-text-secondary text-h4', CONTEXT_LINES_CLASS);
 const OUTCOME_ROW_CLASS = 'flex items-start gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h4';
@@ -90,6 +103,8 @@ export interface ConversationCardProps {
    * and a picked card takes the accent ring.
    */
   selection?: { pressed: boolean; onToggle: () => void };
+  /** The lines the context and the outcome keep at least (default four on a phone, three wide). */
+  lines?: ConversationCardLines;
   className?: string;
 }
 
@@ -110,6 +125,7 @@ export function ConversationCard({
   agent,
   selection,
   context,
+  lines,
   className,
 }: ConversationCardProps) {
   const tint = useAgentTint(agent);
@@ -124,6 +140,7 @@ export function ConversationCard({
         responderMeta={!!responder.meta}
         footer={!!footerLabel}
         footerLabel={footerLabel}
+        lines={lines}
         className={className}
       />
     );
@@ -182,7 +199,9 @@ export function ConversationCard({
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
           <span className="text-ods-text-secondary text-h6">{context.label}</span>
-          <p className={CONTEXT_TEXT_CLASS}>{context.text}</p>
+          <p className={CONTEXT_TEXT_CLASS} style={partLinesStyle(lines?.context)}>
+            {context.text}
+          </p>
         </div>
       )}
       {/* The answer is a command block: who did it, what was done, and its check. */}
@@ -194,7 +213,9 @@ export function ConversationCard({
         className={ANSWER_BLOCK_CLASS}
       >
         <div className={OUTCOME_ROW_CLASS}>
-          <p className={OUTCOME_TEXT_CLASS}>{outcome}</p>
+          <p className={OUTCOME_TEXT_CLASS} style={partLinesStyle(lines?.outcome)}>
+            {outcome}
+          </p>
           {outcomeAside}
           <span className={OUTCOME_CHECK_CLASS} style={OUTCOME_CHECK_STYLE}>
             <CheckCircleIcon size={16} className="text-ods-success" aria-hidden />
@@ -227,7 +248,7 @@ function TurnSkeleton({ avatarPx, meta, children }: { avatarPx: number; meta: bo
 /**
  * The card while it loads: the SAME frame, then each part at the number of
  * lines the loaded card keeps for it (the request's two, the context's
- * `CONTEXT_LINES`, the outcome's `OUTCOME_LINES`), so a loaded card takes the skeleton's place without
+ * `lines`, four on a phone and three wide by default), so a loaded card takes the skeleton's place without
  * moving the page. Pass the parts the loaded card will have.
  */
 export function ConversationCardSkeleton({
@@ -237,6 +258,7 @@ export function ConversationCardSkeleton({
   responderMeta = false,
   footer = false,
   footerLabel,
+  lines,
   label = 'Loading a conversation',
   announce = true,
   className,
@@ -257,8 +279,12 @@ export function ConversationCardSkeleton({
   responderMeta?: boolean | string;
   /** The loaded card has a footer. */
   footer?: boolean;
+  /** The lines the loaded card keeps for its context and outcome (`ConversationCardProps.lines`). */
+  lines?: ConversationCardLines;
   className?: string;
 }) {
+  const contextLines = partLines(lines?.context);
+  const outcomeLines = partLines(lines?.outcome);
   return (
     <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
       <TurnSkeleton avatarPx={avatarPx} meta={requesterMeta}>
@@ -267,9 +293,9 @@ export function ConversationCardSkeleton({
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
           <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
-          <p className={CONTEXT_TEXT_CLASS}>
-            <TextLineSkeleton as="span" lines={CONTEXT_LINES.phone} type="h4" className="content-md:hidden" />
-            <TextLineSkeleton as="span" lines={CONTEXT_LINES.wide} type="h4" className="hidden content-md:flex" />
+          <p className={CONTEXT_TEXT_CLASS} style={partLinesStyle(contextLines)}>
+            <TextLineSkeleton as="span" lines={contextLines.phone} type="h4" className="content-md:hidden" />
+            <TextLineSkeleton as="span" lines={contextLines.wide} type="h4" className="hidden content-md:flex" />
           </p>
         </div>
       )}
@@ -277,9 +303,9 @@ export function ConversationCardSkeleton({
         <TurnSkeleton avatarPx={avatarPx} meta={responderMeta}>
           {/* The outcome's row: its text at a typical line count, beside the check's place (the row's width). */}
           <div className={OUTCOME_ROW_CLASS}>
-            <p className={OUTCOME_TEXT_CLASS}>
-              <TextLineSkeleton as="span" lines={OUTCOME_LINES.phone} type="h4" className="content-md:hidden" />
-              <TextLineSkeleton as="span" lines={OUTCOME_LINES.wide} type="h4" className="hidden content-md:flex" />
+            <p className={OUTCOME_TEXT_CLASS} style={partLinesStyle(outcomeLines)}>
+              <TextLineSkeleton as="span" lines={outcomeLines.phone} type="h4" className="content-md:hidden" />
+              <TextLineSkeleton as="span" lines={outcomeLines.wide} type="h4" className="hidden content-md:flex" />
             </p>
             <span className={cn(OUTCOME_CHECK_CLASS, 'invisible')} style={OUTCOME_CHECK_STYLE}>
               <CheckCircleIcon size={16} aria-hidden />

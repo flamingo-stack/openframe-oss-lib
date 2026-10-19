@@ -19,7 +19,7 @@ export { REMOTE_DESKTOP_CHAT_END_USER_NAME, RemoteDesktopChatPanel } from './rem
 export type { RemoteDesktopChatPanelProps, RemoteDesktopChatTechnician } from './remote-desktop-chat-panel';
 export { RemoteDesktopFullscreenToolbar } from './remote-desktop-fullscreen-toolbar';
 export type { RemoteDesktopFullscreenToolbarProps } from './remote-desktop-fullscreen-toolbar';
-export { RemoteDesktopView, RemoteDesktopViewSkeleton } from './remote-desktop-view';
+export { RemoteDesktopView } from './remote-desktop-view';
 export type { RemoteDesktopViewProps } from './remote-desktop-view';
 export { RemoteSessionDialog } from './remote-session-dialog';
 export type { RemoteSessionDialogProps } from './remote-session-dialog';

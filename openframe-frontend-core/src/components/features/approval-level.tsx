@@ -10,6 +10,7 @@ import { UserIcon } from '../icons-v2-generated/users/user-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { TOGGLE_GROUP_CLASS, ToggleGroup, ToggleGroupItem } from '../toggle-group';
 import { TextHold } from '../ui/layout-hold';
+import { useLoadingScope } from '../ui/loading-scope';
 import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { TouchFriendlyTooltip } from '../ui/touch-friendly-tooltip';
@@ -92,6 +93,8 @@ export interface ApprovalLevelViewProps {
   showLabel?: boolean;
   /** Editable: the id of the element that names what is being decided (the rule's label). */
   'aria-labelledby'?: string;
+  /** The level is still being read: the view draws its own skeleton (also in a loading scope). */
+  loading?: boolean;
   className?: string;
 }
 
@@ -112,13 +115,16 @@ export function ApprovalLevelView({
   disabled = false,
   showLabel = true,
   'aria-labelledby': labelledBy,
+  loading = false,
   className,
 }: ApprovalLevelViewProps) {
-  const current = APPROVAL_LEVEL_META[value];
   const canEdit = editable ?? onChange !== undefined;
-  const name = showLabel ? (
-    <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span>
-  ) : null;
+  // One switch: while the level is read (a prop, or a page's loading scope) the view is its own skeleton.
+  if (useLoadingScope() || loading) {
+    return <ApprovalLevelSkeleton editable={canEdit} showLabel={showLabel} className={className} />;
+  }
+  const current = APPROVAL_LEVEL_META[value];
+  const name = showLabel ? <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span> : null;
 
   if (!canEdit) {
     const icon = (
@@ -184,7 +190,7 @@ export function ApprovalLevelView({
   );
 }
 
-export interface ApprovalLevelViewSkeletonProps {
+export interface ApprovalLevelSkeletonProps {
   /** The editable form (the four levels' group) or the read-only one (the level's icon). */
   editable?: boolean;
   /** Whether the level's name is written before the icons (default true, like the view). */
@@ -193,10 +199,10 @@ export interface ApprovalLevelViewSkeletonProps {
 }
 
 /**
- * A level while it is read: the view's own row, the name a bar at its type step (the longest name's width), and the
+ * `ApprovalLevelView`'s own skeleton (a level chip, not a whole view): a level while it is read: the view's own row, the name a bar at its type step (the longest name's width), and the
  * read-only icon's box or the editable group's four small toggle boxes. Inert: nothing in it can be picked.
  */
-export function ApprovalLevelViewSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelViewSkeletonProps) {
+export function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelSkeletonProps) {
   const name = showLabel ? (
     <span className={LEVEL_NAME_CLASS}>
       <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>

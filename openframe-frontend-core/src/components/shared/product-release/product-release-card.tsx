@@ -108,6 +108,8 @@ export interface ProductReleaseCardProps {
   className?: string;
   /** Card density. Defaults to `'lg'` (the canonical large card). */
   size?: ProductReleaseCardSize;
+  /** The release is still being read: the card draws its own skeleton (also in a page's loading scope). */
+  loading?: boolean;
 
   // ─── Catalog-only props (ignored by `default` / `sm` branches) ─────────
   /** Cover image URL. Falls back to a neutral `Package`-icon placeholder. */
@@ -160,9 +162,10 @@ export function ProductReleaseCard({
   viewCount,
   author,
   changelogCounts,
+  loading = false,
 }: ProductReleaseCardProps) {
-  // In a loading scope the card is its skeleton (its props are the empty record).
-  if (useLoadingScope()) return <ProductReleaseCardSkeleton size={size} className={className} />;
+  // One switch: while the release is read (a prop, or a page's loading scope) the card is its skeleton.
+  if (useLoadingScope() || loading) return <ProductReleaseCardSkeleton size={size} className={className} />;
   // ----- LG branch (rich /releases catalog row + related-content rail) -----
   // The card has THREE zones:
   //   1. Hero — cover image LEFT, version pill + title + summary RIGHT.

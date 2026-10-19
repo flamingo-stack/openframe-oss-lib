@@ -31,6 +31,12 @@ const CHEVRON_CLASS = 'shrink-0 text-ods-text-primary';
  * an 844px one). 12 fills the first screen at both widths without drawing a second.
  */
 export const FAQ_ACCORDION_SKELETON_ROWS = 12;
+/**
+ * Whether a skeleton row's question takes two lines on a phone (one from `content-md`, where a question fits a line).
+ * On a phone about every other question wraps to a second line, and a list opens with its broadest questions, the
+ * longest: the first two rows wrap, then every other row.
+ */
+const wrapsOnPhone = (index: number) => index < 2 || index % 2 === 1;
 
 export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) {
   const [openSet, setOpenSet] = useState<Set<string | number>>(new Set(defaultOpenIds));
@@ -132,8 +138,8 @@ export function FaqAccordionSkeleton({
         // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
         <div key={i} className={ROW_HEADER_CLASS} data-loading-item>
           <h3 className={QUESTION_CLASS}>
-            {/* On a phone about every other question wraps to a second line; from `content-md` each is one line. */}
-            {i % 2 === 0 ? (
+            {/* A typical question's lines: `wrapsOnPhone` on a phone, one from `content-md`. */}
+            {wrapsOnPhone(i) ? (
               <>
                 <TextLineSkeleton type="inherit" as="span" lines={2} className="w-5/6 content-md:hidden" />
                 <TextLineSkeleton type="inherit" as="span" className="hidden w-5/6 content-md:block" />

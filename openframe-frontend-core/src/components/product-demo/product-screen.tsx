@@ -2,10 +2,11 @@
 
 import { lazy, type LazyExoticComponent, type ReactNode, Suspense } from 'react';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ProductScreenFrame, type ProductScreenFrameProps } from '../ui/product-screen-frame';
 import { PRODUCT_SCREEN_LOADERS } from './registry';
 import { PRODUCT_SCREEN_KEYS, PRODUCT_SCREEN_LABELS, type ProductScreenKey } from './screen-keys';
-import { PRODUCT_SCREEN_SKELETONS } from './screen-skeletons';
+import { PRODUCT_SCREEN_LOADING } from './screen-loading';
 import type { ProductScreenComponent } from './types';
 
 /** One lazy component per screen, made once: a screen's code is fetched the first time it renders. */
@@ -13,7 +14,7 @@ const LAZY_SCREENS = Object.fromEntries(
   PRODUCT_SCREEN_KEYS.map(key => [key, lazy(PRODUCT_SCREEN_LOADERS[key])]),
 ) as Record<ProductScreenKey, LazyExoticComponent<ProductScreenComponent>>;
 
-/** Frame heights of the two renderings: constants, so a skeleton and the loaded screen are one box. */
+/** Frame heights of the two renderings: constants, so the loading state and the loaded screen are one box. */
 export const PRODUCT_SCREEN_HEIGHT = 440;
 export const PRODUCT_SCREEN_COMPACT_HEIGHT = 300;
 
@@ -53,7 +54,7 @@ export interface ProductScreenProps extends Omit<ProductScreenFrameProps, 'child
   height?: number | string;
 }
 
-/** A screen's frame: its label, height and layout width, shared by the screen and by its skeleton. */
+/** A screen's frame: its label, height and layout width, shared by the screen and by its loading state. */
 function ProductScreenShell({
   screen,
   compact = false,
@@ -84,49 +85,31 @@ function ProductScreenShell({
   );
 }
 
-/** What a screen draws while its code loads: its own skeleton (`PRODUCT_SCREEN_SKELETONS`), else the frame's box. */
+/** What a screen draws while its code loads: its own view in its loading state (`PRODUCT_SCREEN_LOADING`), else the
+ *  frame's box. */
 function ScreenLoading({ screen, compact }: { screen: ProductScreenKey; compact: boolean }) {
-  const Skeleton = PRODUCT_SCREEN_SKELETONS[screen];
-  return Skeleton ? <Skeleton compact={compact} /> : <UnifiedSkeleton className="h-full w-full" />;
-}
-
-/**
- * A product screen while it loads. Given a `screen`, the screen's own frame (its layout width, scale and height)
- * around that screen's skeleton, so it is the loaded picture's box; without one, the box the frame occupies.
- */
-export function ProductScreenSkeleton({
-  screen,
-  compact = false,
-  height,
-  className,
-  ...frame
-}: Partial<Pick<ProductScreenProps, 'screen'>> & Omit<ProductScreenProps, 'screen'>) {
-  if (screen) {
-    return (
-      <ProductScreenShell screen={screen} compact={compact} height={height} className={className} {...frame}>
-        <ScreenLoading screen={screen} compact={compact} />
-      </ProductScreenShell>
-    );
-  }
-  return (
-    <UnifiedSkeleton
-      className={className}
-      height={height ?? (compact ? PRODUCT_SCREEN_COMPACT_HEIGHT : PRODUCT_SCREEN_HEIGHT)}
-    />
-  );
+  const Loading = PRODUCT_SCREEN_LOADING[screen];
+  return Loading ? <Loading compact={compact} /> : <UnifiedSkeleton className="h-full w-full" />;
 }
 
 /**
  * One product screen of the registry, in its frame. The screen's code is
- * downloaded when this mounts; until then the frame draws the screen's skeleton.
+ * downloaded when this mounts; until then the frame draws the screen in its
+ * loading state. In a page's loading scope it stays in that state and fetches
+ * nothing.
  */
 export function ProductScreen({ screen, compact = false, ...frame }: ProductScreenProps) {
   const Screen = LAZY_SCREENS[screen];
+  const loading = useLoadingScope();
   return (
     <ProductScreenShell screen={screen} compact={compact} {...frame}>
-      <Suspense fallback={<ScreenLoading screen={screen} compact={compact} />}>
-        <Screen compact={compact} />
-      </Suspense>
+      {loading ? (
+        <ScreenLoading screen={screen} compact={compact} />
+      ) : (
+        <Suspense fallback={<ScreenLoading screen={screen} compact={compact} />}>
+          <Screen compact={compact} />
+        </Suspense>
+      )}
     </ProductScreenShell>
   );
 }

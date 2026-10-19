@@ -17,6 +17,10 @@ interface EntityTagBadgesProps {
   basePath?: string;
   /** Cap visible badges; the remainder collapse into a "+N" badge. */
   max?: number;
+  /** In a loading state with no `max`: how many tag boxes the row draws from tablet width up (default the row's fold). */
+  skeletonCount?: number;
+  /** In a loading state with no `max`: how many tag boxes a phone's row draws (default `skeletonCount`). */
+  skeletonPhoneCount?: number;
   /** Extra classes on the wrapper row. */
   className?: string;
 }
@@ -105,12 +109,19 @@ export function EntityTagBadgesSkeleton({
   );
 }
 
-export function EntityTagBadges({ tags, basePath, max, className }: EntityTagBadgesProps) {
+export function EntityTagBadges({
+  tags,
+  basePath,
+  max,
+  skeletonCount,
+  skeletonPhoneCount,
+  className,
+}: EntityTagBadgesProps) {
   // A capped row draws its cap and its "+N" badge while it loads, in the row's own wrapping layout: the skeleton
   // takes the lines a typical capped row takes, and a loaded tag is never cut to fit it.
   if (useLoadingScope()) {
     return max == null ? (
-      <EntityTagBadgesSkeleton className={className} />
+      <EntityTagBadgesSkeleton count={skeletonCount} phoneCount={skeletonPhoneCount} className={className} />
     ) : (
       <EntityTagBadgesSkeleton count={max} overflow className={className} />
     );

@@ -104,7 +104,6 @@ import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
-import { CampaignCardAdminSkeleton } from './campaign-card-admin';
 import { CaseStudyCardSkeleton } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 import { CustomerInterviewCardSkeleton } from './customer-interview-card';
@@ -892,6 +891,11 @@ function CampaignChatCard({
       menuAriaLabel="Campaign actions"
     />
   );
+}
+
+/** `CampaignChatCard` while its campaign is fetched: the info card it draws (`MingoInfoCard`), as its skeleton. */
+function CampaignChatCardSkeleton() {
+  return <MingoInfoCardSkeleton />;
 }
 
 /**
@@ -1863,7 +1867,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
-    skeleton: () => <CampaignCardAdminSkeleton />,
+    skeleton: () => <CampaignChatCardSkeleton />,
     // No public viewer — synthesize the hub-internal admin URL post-fetch
     // so the wrapper + isNewTab computation see the actual destination.
     fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),

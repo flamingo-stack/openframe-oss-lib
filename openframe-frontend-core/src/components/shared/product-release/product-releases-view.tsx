@@ -35,12 +35,10 @@ import { executeNavigationImperative } from '../../chat/utils/execute-navigation
 import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
 import { LoadingRegion } from '../../loading/loading-region';
-import { PaginationSkeleton } from '../../pagination';
 import { LoadError } from '../../ui/error-state';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { UnifiedPagination } from '../../unified-pagination';
 import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
-import { ProductReleaseCardSkeleton } from './product-release-card-skeleton';
 
 const DEFAULT_ENDPOINT = '/api/releases';
 /** The pager's row inside the list's bottom slot: no margin of its own (the slot spaces it), so the loaded pager is
@@ -234,12 +232,11 @@ export function ProductReleasesView({
                     key={release?.id ?? `slot-${i}`}
                     style={{ visibility: isLoading || hasData ? 'visible' : 'hidden' }}
                   >
-                    {isLoading ? (
-                      <ProductReleaseCardSkeleton size="lg" />
-                    ) : release ? (
+                    {!isLoading && release ? (
                       <ReleaseRow release={release} basePath={basePath} buildCardProps={buildCardProps} />
                     ) : (
-                      <ProductReleaseCardSkeleton size="lg" />
+                      // Read, or a hidden slot past the page's last release: the card draws its own skeleton.
+                      <ProductReleaseCard loading size="lg" title="" version="" formattedDate="" />
                     )}
                   </div>
                 );
@@ -249,17 +246,14 @@ export function ProductReleasesView({
             {/* Pagination: always present at the bottom, one row height in every state (its skeleton while the list
                 is read, the hidden real control for a single page), so the list above never moves. */}
             <div className="mt-6 flex justify-center content-md:mt-8">
-              {isLoading ? (
-                <PaginationSkeleton />
-              ) : (
-                <UnifiedPagination
-                  currentPage={currentPage}
-                  totalPages={releases.length > 0 ? totalPages : 0}
-                  onPageChange={goToPage}
-                  className={PAGER_ROW_CLASS}
-                  reserveSpace
-                />
-              )}
+              <UnifiedPagination
+                loading={isLoading}
+                currentPage={currentPage}
+                totalPages={releases.length > 0 ? totalPages : 0}
+                onPageChange={goToPage}
+                className={PAGER_ROW_CLASS}
+                reserveSpace
+              />
             </div>
           </>
         )}

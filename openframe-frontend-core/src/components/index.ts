@@ -118,11 +118,7 @@ export {
 // Author detail-page body (identity + socials + bio + expertise, rail as
 // children) — the one implementation behind /authors/[slug] and embedded
 // author pages.
-export {
-  AuthorDetailView,
-  AuthorDetailViewSkeleton,
-  type AuthorDetailViewProps,
-} from './authors/author-detail-view';
+export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-detail-view';
 
 // Priority UI components that exist in main components directory
 // Note: These are re-exported from ./ui already, no need to duplicate

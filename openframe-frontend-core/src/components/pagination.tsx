@@ -22,6 +22,11 @@ interface PaginationProps {
    * are buttons.
    */
   getPageHref?: (page: number) => string;
+  /**
+   * The list is still being read: the pager draws its own skeleton, for `totalPages` on `currentPage` when the count
+   * is known (more than one page), else for a list of many pages. Also drawn in a page's loading scope.
+   */
+  loading?: boolean;
 }
 
 interface PaginationControlProps {
@@ -159,9 +164,19 @@ const PAGINATION_LIST_CLASS = 'flex flex-row items-center gap-1';
  */
 export const PAGINATION_SKELETON_TOTAL_PAGES = 10;
 
-const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageHref }: PaginationProps) => {
-  // While the list is read its pages are not known: the pager is drawn as its skeleton.
-  if (useLoadingScope()) return <PaginationSkeleton className={className} />;
+const Pagination = ({ currentPage, totalPages, onPageChange, className, getPageHref, loading }: PaginationProps) => {
+  // One switch: while the list is read (a prop, or a page's loading scope) the pager is drawn as its skeleton, for
+  // the page count when it is already known.
+  if (useLoadingScope() || loading) {
+    const known = totalPages > 1;
+    return (
+      <PaginationSkeleton
+        className={className}
+        totalPages={known ? totalPages : undefined}
+        currentPage={known ? currentPage : undefined}
+      />
+    );
+  }
 
   const pageNumbers = paginationSlots(currentPage, totalPages);
 

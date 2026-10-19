@@ -161,6 +161,12 @@ const METADATA_GRID_CLASS =
 /** A metadata cell's edge (divider + card fill); the cell's own frame is the shared value cell's. */
 const METADATA_CELL_EDGE_CLASS = 'border-b border-ods-border bg-ods-card content-md:border-b-0 content-md:border-r';
 const SUMMARY_CLASS = 'text-ods-text-primary text-h4';
+/**
+ * The tags the tag row shows before its "+N" badge, on every width (the case study's and the blog's capped row): a
+ * release carries more tags than a phone's line holds (three badges), so the row is capped to that line and drawn the
+ * same while it is read: the badges and the "+N" never move the page under them.
+ */
+const RELEASE_TAG_ROW_FOLD = 3;
 /** The metadata grid's value labels (static copy). */
 const RELEASE_TYPE_LABEL = 'Release Type';
 const RELEASE_STATUS_LABEL = 'Release Status';
@@ -393,7 +399,7 @@ export function ReleaseDetailPage({
     >
       <div className={CONTENT_STACK_CLASS}>
         {/* Tags — flat product_release_tags[] from entity_tags */}
-        <EntityTagBadges tags={view.product_release_tags as TagAssoc[] | undefined} />
+        <EntityTagBadges tags={view.product_release_tags as TagAssoc[] | undefined} max={RELEASE_TAG_ROW_FOLD} />
 
         {/* Metadata Grid */}
         <div className={METADATA_GRID_CLASS}>

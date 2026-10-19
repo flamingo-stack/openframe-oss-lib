@@ -15,10 +15,12 @@ import { useMarkdownLinkCommand } from './markdown-link-command';
 const MARKDOWN_EDITOR_DEFAULT_HEIGHT = 600;
 
 /**
- * The editor while its code loads: one box at the editor's own height (the frame the editor draws at `height`), so
- * the form around it does not move when the editor arrives.
+ * The editor's FIELD while its code loads: one box at the field's own height (the frame the editor draws at
+ * `height`), so the form around it does not move when the editor arrives. It stands for one form field, not a
+ * whole view: the `next/dynamic` `loading:` fallback (and the `Suspense` fallback for a `React.lazy` host) of
+ * the editor package, where the editor cannot draw itself yet.
  */
-export function MarkdownEditorSkeleton({
+export function MarkdownEditorFieldSkeleton({
   height = MARKDOWN_EDITOR_DEFAULT_HEIGHT,
   className,
 }: {
@@ -36,7 +38,7 @@ export function MarkdownEditorSkeleton({
 const MarkdownEditorHeightContext = createContext(MARKDOWN_EDITOR_DEFAULT_HEIGHT);
 
 function MarkdownEditorPending() {
-  return <MarkdownEditorSkeleton height={useContext(MarkdownEditorHeightContext)} />;
+  return <MarkdownEditorFieldSkeleton height={useContext(MarkdownEditorHeightContext)} />;
 }
 
 const MDEditor = dynamic(() => import('@uiw/react-md-editor'), {
@@ -376,7 +378,7 @@ export function MarkdownEditor({
 
       {/* `next/dynamic` draws the loader's `loading`; a host on `React.lazy` reaches this boundary. Both are the skeleton. */}
       <MarkdownEditorHeightContext.Provider value={height}>
-        <Suspense fallback={<MarkdownEditorSkeleton height={height} />}>
+        <Suspense fallback={<MarkdownEditorFieldSkeleton height={height} />}>
           <MDEditor
             value={value}
             onChange={handleChange}

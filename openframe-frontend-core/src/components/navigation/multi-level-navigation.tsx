@@ -50,40 +50,67 @@ const NAV_ITEM_CLASS = 'space-y-1';
 const NAV_ROW_FRAME_CLASS = 'relative w-full rounded-lg border transition-all duration-150';
 const NAV_ROW_CONTENT_CLASS = 'flex w-full items-center rounded-lg px-2 text-h6';
 /**
- * How many rows each skeleton draws (the desktop tree, the mobile dropdown): the one root entry every tree has. How many
- * entries sit at a tree's root, and which folder is open on the reader's path, are the repository's, so a skeleton that
- * drew more would lose rows (and move the article under it) when a tree has fewer.
+ * How many rows each skeleton draws (the desktop tree, the mobile dropdown): a layout fold, the rows one screen holds.
+ * A row is 48px (44px in the dropdown) with its border and the list's gap, about 54px (50px): a first screen of 900px
+ * (844px on a phone) holds 17. The tree opens on the reader's path, so the skeleton draws that shape: the first root
+ * entry open, the rest of the fold its entries (indented as the tree indents them). A tree whose open folder holds
+ * fewer entries ends past the first screen anyway, and the tree's other root entries are list growth below it.
  */
-export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 1;
-export const MOBILE_NAVIGATION_SKELETON_ROWS = 1;
+export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 17;
+export const MOBILE_NAVIGATION_SKELETON_ROWS = 17;
 const NAV_SKELETON_LABEL_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3'] as const;
+/** An open folder's entries: the list under its row, and each entry's indent (the desktop tree's, the dropdown's). */
+const NAV_CHILDREN_CLASS = 'space-y-1';
+const NAV_INDENT_CLASS = { desktop: 'ml-4', mobile: 'ml-3' } as const;
+
+/** One row's frame while it loads: an icon box and a bar of its name. */
+function NavigationRowSkeleton({
+  index,
+  rowHeightClass,
+  indentClass,
+}: {
+  index: number;
+  rowHeightClass: string;
+  indentClass?: string;
+}) {
+  return (
+    <div className={cn('px-2', indentClass)}>
+      <div className={cn(NAV_ROW_FRAME_CLASS, 'border-ods-border bg-ods-card')}>
+        <div className={cn(NAV_ROW_CONTENT_CLASS, rowHeightClass)}>
+          <MediaSkeleton.Icon size="sm" className="mr-2 flex-shrink-0" />
+          <TextLineSkeleton type="h6" className={NAV_SKELETON_LABEL_WIDTHS[index % NAV_SKELETON_LABEL_WIDTHS.length]} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NavigationTreeSkeleton({
   rows,
   rowHeightClass,
+  indentClass,
   className,
 }: {
   rows: number;
   rowHeightClass: string;
+  indentClass: string;
   className?: string;
 }) {
   return (
     <div className={cn(NAV_LIST_CLASS, className)} aria-hidden>
-      {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className={NAV_ITEM_CLASS} data-loading-item>
-          <div className="px-2">
-            <div className={cn(NAV_ROW_FRAME_CLASS, 'border-ods-border bg-ods-card')}>
-              <div className={cn(NAV_ROW_CONTENT_CLASS, rowHeightClass)}>
-                <MediaSkeleton.Icon size="sm" className="mr-2 flex-shrink-0" />
-                <TextLineSkeleton
-                  type="h6"
-                  className={NAV_SKELETON_LABEL_WIDTHS[i % NAV_SKELETON_LABEL_WIDTHS.length]}
-                />
+      {/* The open root entry: its row, then its entries, each an item of the tree's read list. */}
+      <div className={NAV_ITEM_CLASS} data-loading-item>
+        <NavigationRowSkeleton index={0} rowHeightClass={rowHeightClass} />
+        {rows > 1 && (
+          <div className={NAV_CHILDREN_CLASS}>
+            {Array.from({ length: rows - 1 }, (_, i) => (
+              <div key={i} className={NAV_ITEM_CLASS} data-loading-item>
+                <NavigationRowSkeleton index={i + 1} rowHeightClass={rowHeightClass} indentClass={indentClass} />
               </div>
-            </div>
+            ))}
           </div>
-        </div>
-      ))}
+        )}
+      </div>
     </div>
   );
 }
@@ -96,7 +123,14 @@ export function MultiLevelNavigationSkeleton({
   rows?: number;
   className?: string;
 }) {
-  return <NavigationTreeSkeleton rows={rows} rowHeightClass="h-12" className={className} />;
+  return (
+    <NavigationTreeSkeleton
+      rows={rows}
+      rowHeightClass="h-12"
+      indentClass={NAV_INDENT_CLASS.desktop}
+      className={className}
+    />
+  );
 }
 
 /** The mobile documentation dropdown while it is read: the same rows at the dropdown's height. */
@@ -107,7 +141,14 @@ export function MobileNavigationDropdownSkeleton({
   rows?: number;
   className?: string;
 }) {
-  return <NavigationTreeSkeleton rows={rows} rowHeightClass="h-11" className={className} />;
+  return (
+    <NavigationTreeSkeleton
+      rows={rows}
+      rowHeightClass="h-11"
+      indentClass={NAV_INDENT_CLASS.mobile}
+      className={className}
+    />
+  );
 }
 
 /**
@@ -208,7 +249,7 @@ function NavigationItem({
 
   return (
     <div className={NAV_ITEM_CLASS} role="listitem" data-loading-item>
-      <div className={cn('px-2', level > 0 && 'ml-4')}>
+      <div className={cn('px-2', level > 0 && NAV_INDENT_CLASS.desktop)}>
         <div
           className={cn(
             NAV_ROW_FRAME_CLASS,
@@ -271,7 +312,7 @@ function NavigationItem({
       </div>
 
       {hasChildren && isExpanded && (
-        <div className="space-y-1">
+        <div className={NAV_CHILDREN_CLASS}>
           {children.map(child => (
             <NavigationItem
               key={child.id}
@@ -337,7 +378,7 @@ function MobileNavigationItem({
 
   return (
     <div className={NAV_ITEM_CLASS} data-loading-item>
-      <div className={cn('px-2', level > 0 && 'ml-3')}>
+      <div className={cn('px-2', level > 0 && NAV_INDENT_CLASS.mobile)}>
         <div
           className={cn(
             NAV_ROW_FRAME_CLASS,
@@ -399,7 +440,7 @@ function MobileNavigationItem({
       </div>
 
       {hasChildren && isExpanded && (
-        <div className="space-y-1">
+        <div className={NAV_CHILDREN_CLASS}>
           {children.map(child => (
             <MobileNavigationItem
               key={child.id}

@@ -2,7 +2,7 @@
 
 import { useSearchParams, usePathname } from '../embed-shims/next-navigation';
 import { withQuery } from '../utils/search-params';
-import { Pagination, PaginationSkeleton } from './pagination';
+import { Pagination } from './pagination';
 import { useLoadingScope } from './ui/loading-scope';
 
 interface UnifiedPaginationProps {
@@ -21,6 +21,8 @@ interface UnifiedPaginationProps {
    * nothing. Stops a one-page result from shifting the content above it.
    */
   reserveSpace?: boolean;
+  /** The list is still being read: the pager draws its own skeleton (also in a page's loading scope). */
+  loading?: boolean;
 }
 
 export function UnifiedPagination({
@@ -30,10 +32,11 @@ export function UnifiedPagination({
   className = 'mt-8 flex justify-center w-full',
   syncUrl = true,
   reserveSpace = false,
+  loading: loadingProp = false,
 }: UnifiedPaginationProps) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || loadingProp;
 
   /**
    * The address of a page of this list: the current URL with `page` set. Page 1
@@ -72,15 +75,12 @@ export function UnifiedPagination({
     }, 0);
   };
 
-  // While the list is read its page count is not known (0 in a loading state): the pager is its skeleton, never
-  // left out, so the content above it keeps its place.
+  // While the list is read its page count may not be known (0 in a loading state): the pager draws its own skeleton,
+  // never left out, so the content above it keeps its place.
   if (loading) {
     return (
       <div className={className}>
-        <PaginationSkeleton
-          totalPages={totalPages > 1 ? totalPages : undefined}
-          currentPage={totalPages > 1 ? currentPage : undefined}
-        />
+        <Pagination loading currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
       </div>
     );
   }

@@ -305,17 +305,15 @@ export function SchedulerContextPanel({
           // there it stays.
           <div className={cn(STRIP_ASIDE, locked && TIMEZONE_WIDE_ONLY_CLASS)}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
-            {timezone ? (
-              <TimezoneSelect
-                value={timezone}
-                disabled={disabled}
-                onChange={tz => {
-                  if (tz) onTimezoneChange?.(tz);
-                }}
-              />
-            ) : (
-              <AutocompleteSkeleton />
-            )}
+            {/* Until the visitor's zone is known the picker draws its own skeleton (`loading`). */}
+            <TimezoneSelect
+              value={timezone ?? null}
+              loading={!timezone}
+              disabled={disabled}
+              onChange={tz => {
+                if (tz) onTimezoneChange?.(tz);
+              }}
+            />
           </div>
         )}
       </div>
