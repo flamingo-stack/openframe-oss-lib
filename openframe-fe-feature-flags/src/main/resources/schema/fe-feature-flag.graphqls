@@ -1,4 +1,4 @@
-type FeFeatureFlag {
+type FeFeatureFlag @shareable {
     name: String!
     enabled: Boolean!
 }
@@ -9,5 +9,5 @@ extend type Query {
     Returns the requested flags with their enabled status.
     Unknown flags default to false.
     """
-    feFeatureFlags(names: [String!]): [FeFeatureFlag!]!
+    feFeatureFlags(names: [String!]): [FeFeatureFlag!]! @shareable
 }

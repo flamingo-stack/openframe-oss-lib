@@ -1,15 +1,18 @@
 # Shared GraphQL schema definitions
 # This file contains common types and base types used across multiple schemas
 
+# The api subgraph's only federation @link: an assembled schema allows one, and every file api loads may use these.
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@shareable", "@override"])
+
 # Base types that can be extended by other schemas
 interface Node {
     id: ID!
 }
 
 type Query {
-    # Relay Node interface queries
-    node(id: ID!): Node
-    nodes(ids: [ID!]!): [Node]!
+    # Relay Node interface queries; in the federated supergraph api answers them for every subgraph's nodes
+    node(id: ID!): Node @override(from: "ai-agent")
+    nodes(ids: [ID!]!): [Node]! @override(from: "ai-agent")
 }
 
 type Mutation {
@@ -23,7 +26,7 @@ scalar Long  # 64-bit integer for large numbers like file sizes
 scalar JSON  # Opaque JSON value (maps/lists serialized as-is); not accepted as an argument literal
 
 # Relay Connection Spec page info
-type PageInfo {
+type PageInfo @shareable {
     hasNextPage: Boolean!
     hasPreviousPage: Boolean!
     startCursor: String
