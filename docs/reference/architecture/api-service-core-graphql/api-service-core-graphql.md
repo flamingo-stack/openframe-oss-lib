@@ -44,7 +44,7 @@ flowchart TD
 
 ### 1. Relay Compliance
 
-The module uses `graphql.relay.Relay` to:
+The module uses the shared `RelayIdCodec` (`openframe-graphql-relay`, byte-compatible with `graphql.relay.Relay`) to:
 
 - Encode global IDs (`TypeName:rawId` → Base64)
 - Decode incoming IDs before service invocation
@@ -52,8 +52,8 @@ The module uses `graphql.relay.Relay` to:
 
 Implemented via:
 
-- `NodeDataFetcher`
-- `NodeTypeResolver`
+- `NodeDataFetcher` — the `node` / `nodes` queries, a thin adapter over `RelayNodeFinder` from `openframe-graphql-node`
+- `ApiNodeLoaderConfiguration` — one `NodeLoader` bean per supported node type
 
 This enables uniform object identification across the entire graph.
 
@@ -286,7 +286,7 @@ Includes:
 
 ## Node Resolution
 
-Two core resolvers provide interface-level polymorphism.
+The `openframe-graphql-node` library owns node lookup, the `Node` / `_Entity` type resolution and the Federation `_entities` query. This module supplies the loaders and the two queries.
 
 ### NodeDataFetcher
 
@@ -295,21 +295,21 @@ Implements:
 - `node(id)`
 - `nodes(ids)`
 
-Dispatches by `NodeType` to appropriate service.
+Delegates to `RelayNodeFinder`, which decodes the global ID and finds the `NodeLoader` registered for its `NodeType`. The loaders are the beans of `ApiNodeLoaderConfiguration`, each backed by a service.
 
 ```mermaid
 flowchart TD
-    NodeQuery["node(id)"] --> Decode["Relay.fromGlobalId"]
-    Decode --> Switch["NodeType Switch"]
-    Switch --> Device["DeviceService"]
-    Switch --> Org["OrganizationService"]
-    Switch --> Event["EventService"]
-    Switch --> Script["ScriptService"]
+    NodeQuery["node(id)"] --> Finder["RelayNodeFinder"]
+    Finder --> Registry["NodeLoaderRegistry"]
+    Registry --> Device["Machine loader (DeviceService)"]
+    Registry --> Org["Organization loader (OrganizationService)"]
+    Registry --> Script["Script loader (ScriptService)"]
+    Registry --> Other["Other ApiNodeLoaderConfiguration loaders"]
 ```
 
-### NodeTypeResolver
+### Node type mapping
 
-Maps runtime objects to GraphQL type names for the `Node` interface.
+`NodeTypeResolver` (from the library) maps a runtime object to its GraphQL type name for the `Node` interface and for `_entities`, using the class of each registered loader.
 
 ---
 
