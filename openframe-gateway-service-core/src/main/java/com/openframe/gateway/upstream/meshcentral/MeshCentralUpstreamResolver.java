@@ -13,18 +13,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
 
-/**
- * MeshCentral-specific routing strategy.
- *
- * Reads upstream addresses from {@link MeshCentralRoutingProperties}, populated
- * from {@code openframe.tools.meshcentral.*} in {@code application.yml}.
- * This avoids a MongoDB lookup on every request (which the
- * {@link com.openframe.gateway.upstream.DefaultToolUpstreamResolver} would do).
- *
- * MeshCentral is a single service on one port — no path-based fan-out needed.
- * Both REST and WebSocket traffic go to the same host, just with different
- * URL schemes (http vs ws).
- */
+// MeshCentral is a single service on one port, so unlike DefaultToolUpstreamResolver this
+// reads static addresses from MeshCentralRoutingProperties instead of hitting MongoDB per request.
 @Component
 @RequiredArgsConstructor
 public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
@@ -34,12 +24,8 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
     private final MeshCentralRoutingProperties props;
     private final ProxyUrlResolver proxyUrlResolver;
 
-    /**
-     * Multi-tenant routing mode. When true the trusted {@code X-Tenant-Ns}/{@code X-Tenant-Id} headers
-     * are guaranteed by the upstream tenant-context enforcement and drive the namespace/path-prefix
-     * rewrites; when false (single-tenant pods) headers are never read and the configured values are
-     * used verbatim.
-     */
+    // When true, the trusted X-Tenant-Ns/X-Tenant-Id headers (guaranteed by upstream tenant-context
+    // enforcement) drive namespace/path-prefix rewrites; when false, headers are never read.
     @Value("${openframe.gateway.tenant-routing.enabled:false}")
     private boolean tenantRoutingEnabled;
 
@@ -72,10 +58,8 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
         return prependPathPrefix(resolved, resolveTenantPathPrefix(upstream.getPathPrefix(), request));
     }
 
-    /**
-     * Substitute the {@code tenant-uuid} placeholder token in the configured path-prefix with the
-     * per-request tenant id. Multi-tenant mode only — the {@code X-Tenant-Id} header is guaranteed.
-     */
+    // Substitutes the tenant-uuid placeholder in the configured path-prefix; multi-tenant mode only,
+    // where the X-Tenant-Id header is guaranteed.
     private static String resolveTenantPathPrefix(String pathPrefix, ServerHttpRequest request) {
         if (pathPrefix == null) {
             return null;
@@ -102,17 +86,10 @@ public class MeshCentralUpstreamResolver implements ToolUpstreamResolver {
         return withPath(uri, prefix + existingPath);
     }
 
-    /**
-     * Rebuild {@code uri} with a new path, preserving every other component
-     * verbatim from its raw form.
-     * <p>
-     * We deliberately avoid {@link org.springframework.web.util.UriComponentsBuilder}'s
-     * {@code build(true)} here — its strict {@code QUERY_PARAM} validation
-     * rejects '=' in query values (e.g. base64 padding in mesh auth cookies),
-     * which would crash the resolver on every WS request. Concatenating the
-     * already-encoded raw components and letting {@link URI#URI(String)} parse
-     * the result sidesteps that validation.
-     */
+    // Deliberately avoid UriComponentsBuilder's build(true) here — its strict QUERY_PARAM validation
+    // rejects '=' in query values (e.g. base64 padding in mesh auth cookies), which would crash the
+    // resolver on every WS request. Concatenating raw components and letting URI(String) parse them
+    // sidesteps that validation.
     private URI withPath(URI uri, String newPath) {
         StringBuilder sb = new StringBuilder();
         sb.append(uri.getScheme()).append("://");
