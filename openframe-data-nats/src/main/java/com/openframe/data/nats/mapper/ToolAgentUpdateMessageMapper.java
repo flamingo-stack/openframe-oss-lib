@@ -29,7 +29,7 @@ public class ToolAgentUpdateMessageMapper {
 
     private List<ToolAgentUpdateMessage.AssetUpdate> mapAssets(List<ToolAgentAsset> assets) {
         if (assets == null) {
-            return null;
+            return List.of();
         }
         return assets.stream()
                 .map(this::mapAsset)
