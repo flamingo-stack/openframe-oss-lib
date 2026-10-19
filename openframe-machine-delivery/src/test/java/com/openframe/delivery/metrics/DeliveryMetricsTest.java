@@ -26,6 +26,17 @@ class DeliveryMetricsTest {
     }
 
     @Test
+    void recordDispatchHeld_machineNotOnline_countedByType() {
+        // execution
+        metrics.recordDispatchHeld(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.dispatch.held").tags("type", "tool_installation").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
     void recordDispatchReceived_everyCall_countedWithoutTags() {
         // execution
         metrics.recordDispatchReceived();

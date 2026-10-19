@@ -48,7 +48,7 @@ input DeviceFilterInput {
     tagValues: [String!]
 }
 
-type Machine implements Node {
+type Machine implements Node @key(fields: "machineId") @shareable {
     id: ID!
     machineId: String!
     ip: String
