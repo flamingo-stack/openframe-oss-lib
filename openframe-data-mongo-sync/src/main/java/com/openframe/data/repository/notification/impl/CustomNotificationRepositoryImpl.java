@@ -91,7 +91,8 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
         for (String id : idsToStatus.keySet()) {
             try {
                 objectIds.add(new ObjectId(id));
-            } catch (IllegalArgumentException ignored) {
+            } catch (IllegalArgumentException ex) {
+                log.warn("Skipping notification with malformed id: {}", id);
             }
         }
         if (objectIds.isEmpty()) {
@@ -142,3 +143,4 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
         criteria.and(FIELD_TITLE).regex(Pattern.quote(search), "i");
     }
 }
+
