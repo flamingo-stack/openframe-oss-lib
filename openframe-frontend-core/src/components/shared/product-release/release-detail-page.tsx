@@ -14,13 +14,9 @@ import type { ChangelogEntry } from '../../../types/product-release';
 import type { VideoTeaser } from '../../../types/video-processing';
 import { formatReleaseDate } from '../../../utils/date-formatters';
 import { contentFetch } from '../../../utils/embed-content-fetch';
-import {
-  EntityMetadataAuthorCell,
-  EntityMetadataAuthorCellSkeleton,
-  EntityMetadataValueCellSkeleton,
-} from '../../chat/entity-cards/entity-author-card';
+import { EntityMetadataAuthorCell, EntityMetadataValueCell } from '../../chat/entity-cards/entity-author-card';
 import type { CaptionSrtFields } from '../../features/captions-url';
-import { EntityTagBadges, EntityTagBadgesSkeleton } from '../../features/entity-tag-badges';
+import { EntityTagBadges } from '../../features/entity-tag-badges';
 import { useCaptions } from '../../features/use-captions';
 import { Video } from '../../features/video';
 import {
@@ -31,12 +27,13 @@ import {
 import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
+import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Card, CardContent } from '../../ui/card';
 import { FadePreview } from '../../ui/fade-preview';
-import { useLoadingScope } from '../../ui/loading-scope';
+import { LoadingScope, useLoadingScope } from '../../ui/loading-scope';
 import { RichMarkdownRenderer } from '../../ui/markdown';
-import { ReleaseChangelogSection, ReleaseChangelogSectionSkeleton } from '../../ui/release-changelog-section';
+import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { MediaGalleryStrip } from '../media-gallery-strip';
 
 // Types for injectable components
@@ -152,37 +149,58 @@ export interface ReleaseDetailPageProps {
 // override via the `MarkdownRenderer` prop.
 const DefaultMarkdownRenderer = RichMarkdownRenderer;
 
-/** The page's layout, read by the page and by its skeleton, so the skeleton is the page's size. */
+/** The page's layout, read by the page and by its parts' skeletons, so the loading state is the page's size. */
 const CONTENT_STACK_CLASS = 'space-y-6 content-md:space-y-8';
 /**
  * A release title's typical lines at the page's `text-h1` (a name, a version and a headline, about 60 characters):
  * five on a phone's 342px, three from `content-md`, two from `content-lg`.
  */
 const RELEASE_TITLE_SKELETON_LINES = { phone: 5, md: 3, lg: 2 } as const;
-/**
- * The release's tag row while it is read: ONE line of badges of a typical tag's width (`w-20`, 88px with the gap) at the
- * narrowest width of each step: three on a phone's 342px, seven from `content-md` (720px). A release has at least that
- * line's worth or fewer on it (fewer leave the line as tall); more wrap when they land.
- */
-const RELEASE_TAG_ROW_FOLD = { phone: 3, wide: 7 } as const;
-const RELEASE_TAG_SKELETON_WIDTH_CLASS = 'w-20';
 const METADATA_GRID_CLASS =
   'grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border content-md:grid-cols-4';
 /** A metadata cell's edge (divider + card fill); the cell's own frame is the shared value cell's. */
 const METADATA_CELL_EDGE_CLASS = 'border-b border-ods-border bg-ods-card content-md:border-b-0 content-md:border-r';
-const METADATA_CELL_CLASS = `flex flex-col gap-3 ${METADATA_CELL_EDGE_CLASS} p-4`;
 const SUMMARY_CLASS = 'text-ods-text-primary text-h4';
 /** The metadata grid's value labels (static copy). */
 const RELEASE_TYPE_LABEL = 'Release Type';
 const RELEASE_STATUS_LABEL = 'Release Status';
 const RELEASE_DATE_LABEL = 'Release Date';
-/** The three preview-first changelog sections, in page order (static copy and icons). */
-const PREVIEW_CHANGELOG_SECTIONS = [
-  { title: 'Features Added', Icon: Sparkles },
-  { title: 'Bugs Fixed', Icon: Wrench },
-  { title: 'Improvements', Icon: TrendingUp },
-] as const;
-const CHANGELOG_ICON_CLASS = 'h-6 w-6';
+/**
+ * The release the page renders while it is read: every field empty, so each part draws its own skeleton (a host's
+ * empty placeholder, in its loading scope, takes its place).
+ */
+const EMPTY_RELEASE: Record<string, unknown> = {
+  title: '',
+  version: '',
+  summary: null,
+  content: null,
+  release_date: '',
+  release_type: '',
+  release_status: '',
+};
+
+/**
+ * The release's summary: its own skeleton while the release is read (`useLoadingScope()`), a typical summary of about
+ * 350 characters (seven lines on a phone, three on a wide screen); nothing when the release has none.
+ */
+function ReleaseSummary({ summary }: { summary: string | null }) {
+  if (useLoadingScope()) {
+    return (
+      <div className={SUMMARY_CLASS}>
+        <p>
+          <TextLineSkeleton type="inherit" as="span" lines={7} className="w-full content-md:hidden" />
+          <TextLineSkeleton type="inherit" as="span" lines={3} className="hidden w-full content-md:block" />
+        </p>
+      </div>
+    );
+  }
+  if (!summary) return null;
+  return (
+    <div className={SUMMARY_CLASS}>
+      <p>{summary}</p>
+    </div>
+  );
+}
 /**
  * The delivery tables' collapsed preview (px): about the first rows of a table and the start of the next. The loaded
  * tables and their loading state both sit in a `FadePreview` this high, so the section is one height in both.
@@ -310,19 +328,11 @@ export function ReleaseDetailPage({
   }, [release, scoped, RoadmapSection, DeliverySection, roadmapApiEndpoint, deliveryApiEndpoint]);
 
   // `isLoading` is false whenever `initialData` seeded the read, so a
-  // pre-fetched (SSR / admin-preview) release never flashes the skeleton.
+  // pre-fetched (SSR / admin-preview) release never flashes the loading state.
   // In a loading scope the host's record is empty: the scope alone decides.
-  if (scoped || (isLoading && !release)) {
-    return renderShell(
-      <ReleaseLoadingLayout
-        backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
-      >
-        {relatedContent}
-      </ReleaseLoadingLayout>,
-    );
-  }
+  const loading = scoped || (isLoading && !release);
 
-  if (error || !release) {
+  if (!loading && (error || !release)) {
     return renderShell(
       <div className="py-16 text-center">
         <h1 className="mb-4 text-ods-text-primary text-h1">Release Not Found</h1>
@@ -330,82 +340,80 @@ export function ReleaseDetailPage({
       </div>,
     );
   }
+  // While loading: the host's empty placeholder (in its scope) or the page's own empty release.
+  const view = release ?? EMPTY_RELEASE;
 
-  const hasBreakingChanges = Array.isArray(release.breaking_changes) && release.breaking_changes.length > 0;
+  const hasBreakingChanges = Array.isArray(view.breaking_changes) && view.breaking_changes.length > 0;
 
   // Type assertions for release data
-  const releaseTitle = release.title as string;
-  const releaseVersion = release.version as string;
-  const releaseSummary = release.summary as string | null;
-  const releaseContent = release.content as string | null;
-  const releaseDate = release.release_date as string;
-  const releaseType = release.release_type as string;
-  const releaseStatus = release.release_status as string;
-  const releaseMedia = release.release_media as
+  const releaseTitle = view.title as string;
+  const releaseVersion = view.version as string;
+  const releaseSummary = view.summary as string | null;
+  const releaseContent = view.content as string | null;
+  const releaseDate = view.release_date as string;
+  const releaseType = view.release_type as string;
+  const releaseStatus = view.release_status as string;
+  const releaseMedia = view.release_media as
     Array<{ id?: string; media_type: string; media_url: string; title?: string }> | undefined;
   // Field-cast per this file's loose-release idiom (release_type etc. above)
   // — but to the SHARED EntityAuthor, never an inline shadow author shape.
-  const author = release.author as EntityAuthor | undefined;
-  const githubReleases = release.github_releases as Array<{ id: string; github_release_url: string }> | undefined;
-  const knowledgeBaseLinks = release.knowledge_base_links as
+  const author = view.author as EntityAuthor | undefined;
+  const githubReleases = view.github_releases as Array<{ id: string; github_release_url: string }> | undefined;
+  const knowledgeBaseLinks = view.knowledge_base_links as
     Array<{ id?: string; kb_article_path: string }> | string[] | undefined;
-  const migrationGuideUrl = release.migration_guide_url as string | undefined;
-  const documentationUrl = release.documentation_url as string | undefined;
-  const youtubeUrl = release.youtube_url as string | undefined;
-  const mainVideoUrl = release.main_video_url as string | undefined;
-  const videoBites = release.video_bites as VideoTeaser[] | undefined;
-  const highlightVideoUrl = release.highlight_video_url as string | undefined;
-  const highlightVideoThumbnail = release.highlight_video_thumbnail as string | undefined;
+  const migrationGuideUrl = view.migration_guide_url as string | undefined;
+  const documentationUrl = view.documentation_url as string | undefined;
+  const youtubeUrl = view.youtube_url as string | undefined;
+  const mainVideoUrl = view.main_video_url as string | undefined;
+  const videoBites = view.video_bites as VideoTeaser[] | undefined;
+  const highlightVideoUrl = view.highlight_video_url as string | undefined;
+  const highlightVideoThumbnail = view.highlight_video_thumbnail as string | undefined;
   // Caption tracks — host-provided values win (the hub's wrapper enriches
   // them); otherwise built HERE from the release's SRT columns, based on
   // `runtime.endpoints.captionsUrlPrefix` (standard runtime-endpoint wiring),
   // so embedders get correctly proxied `<track>` URLs with zero per-host code.
-  const entityCaptions = captions.forEntity('product_release', release as unknown as CaptionSrtFields);
-  const captionsUrl = (release.captionsUrl as string | undefined) ?? entityCaptions.captionsUrl;
-  const highlightCaptionsUrl =
-    (release.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;
-  const breakingChanges = release.breaking_changes as ChangelogEntry[] | undefined;
-  const featuresAdded = release.features_added as ChangelogEntry[] | undefined;
-  const bugFixed = release.bugs_fixed as ChangelogEntry[] | undefined;
-  const improvements = release.improvements as ChangelogEntry[] | undefined;
+  const entityCaptions = captions.forEntity('product_release', view as unknown as CaptionSrtFields);
+  const captionsUrl = (view.captionsUrl as string | undefined) ?? entityCaptions.captionsUrl;
+  const highlightCaptionsUrl = (view.highlightCaptionsUrl as string | undefined) ?? entityCaptions.highlightCaptionsUrl;
+  const breakingChanges = view.breaking_changes as ChangelogEntry[] | undefined;
+  const featuresAdded = view.features_added as ChangelogEntry[] | undefined;
+  const bugFixed = view.bugs_fixed as ChangelogEntry[] | undefined;
+  const improvements = view.improvements as ChangelogEntry[] | undefined;
 
-  return renderShell(
+  const page = (
     <PageLayout
       title={releaseTitle}
-      subtitle={`Version: ${releaseVersion}`}
+      subtitle={loading ? undefined : `Version: ${releaseVersion}`}
+      loading={loading}
+      subtitleRow="always"
       titleSize="h1"
       titleWrap
+      titleSkeletonLines={RELEASE_TITLE_SKELETON_LINES}
       backButton={showBackButton ? { label: backLabel, onClick: () => router.push(backHref) } : undefined}
     >
       <div className={CONTENT_STACK_CLASS}>
         {/* Tags — flat product_release_tags[] from entity_tags */}
-        <EntityTagBadges tags={release.product_release_tags as TagAssoc[] | undefined} />
+        <EntityTagBadges tags={view.product_release_tags as TagAssoc[] | undefined} />
 
         {/* Metadata Grid */}
         <div className={METADATA_GRID_CLASS}>
-          {/* Release Type */}
-          <div className={METADATA_CELL_CLASS}>
-            <div className="flex flex-col gap-0">
-              <p className="text-ods-text-primary text-h4">{releaseType.toLocaleUpperCase()}</p>
-              <p className="text-ods-text-secondary text-h6">{RELEASE_TYPE_LABEL}</p>
-            </div>
-          </div>
-
-          {/* Release Status */}
-          <div className={METADATA_CELL_CLASS}>
-            <div className="flex flex-col gap-0">
-              <p className="text-ods-text-primary text-h4">{releaseStatus.toLocaleUpperCase()}</p>
-              <p className="text-ods-text-secondary text-h6">{RELEASE_STATUS_LABEL}</p>
-            </div>
-          </div>
-
-          {/* Release Date */}
-          <div className={METADATA_CELL_CLASS}>
-            <div className="flex flex-col gap-0">
-              <p className="text-ods-text-primary text-h4">{formatReleaseDate(releaseDate)}</p>
-              <p className="text-ods-text-secondary text-h6">{RELEASE_DATE_LABEL}</p>
-            </div>
-          </div>
+          {/* Release Type, Status and Date: the shared value cell (its own skeleton in a loading scope). */}
+          <EntityMetadataValueCell
+            value={releaseType}
+            label={RELEASE_TYPE_LABEL}
+            className={METADATA_CELL_EDGE_CLASS}
+          />
+          <EntityMetadataValueCell
+            value={releaseStatus}
+            label={RELEASE_STATUS_LABEL}
+            className={METADATA_CELL_EDGE_CLASS}
+          />
+          <EntityMetadataValueCell
+            value={releaseDate ? formatReleaseDate(releaseDate) : ''}
+            label={RELEASE_DATE_LABEL}
+            className={METADATA_CELL_EDGE_CLASS}
+            uppercase={false}
+          />
 
           {/* Author — the shared metadata-grid author cell (it was extracted
               FROM this page; rendering the export instead of an inline copy
@@ -427,53 +435,53 @@ export function ReleaseDetailPage({
         )}
 
         {/* Summary */}
-        {releaseSummary && (
-          <div className={SUMMARY_CLASS}>
-            <p>{releaseSummary}</p>
-          </div>
-        )}
+        <ReleaseSummary summary={releaseSummary} />
 
         {/* Video Display Section - Injectable or fallback */}
         {/* A release's video is optional: the loading state leaves it out, so the gate leaves it out too. */}
         {/* A block of the page's own stack spacing (its videos keep their gaps), hidden when the slot draws nothing. */}
-        <div data-loading-optional className={`${CONTENT_STACK_CLASS} empty:hidden`}>
-          {VideoDisplaySection ? (
-            <VideoDisplaySection
-              mainVideoUrl={mainVideoUrl}
-              youtubeUrl={youtubeUrl}
-              highlightVideoUrl={highlightVideoUrl}
-              highlightVideoThumbnail={highlightVideoThumbnail}
-              title={releaseTitle}
-              videoBites={videoBites}
-              bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
-              filterPublishedBites={true}
-              bitesProfile={toStripProfile(author)}
-              bitesHref={typeof release.slug === 'string' ? `/releases/${release.slug}` : undefined}
-              captionsUrl={captionsUrl}
-              highlightCaptionsUrl={highlightCaptionsUrl}
-            />
-          ) : (
-            <>
-              {/*
+        {loading ? null : (
+          <div data-loading-optional className={`${CONTENT_STACK_CLASS} empty:hidden`}>
+            {VideoDisplaySection ? (
+              <VideoDisplaySection
+                mainVideoUrl={mainVideoUrl}
+                youtubeUrl={youtubeUrl}
+                highlightVideoUrl={highlightVideoUrl}
+                highlightVideoThumbnail={highlightVideoThumbnail}
+                title={releaseTitle}
+                videoBites={videoBites}
+                bitesTitle={DEFAULT_VIDEO_BITES_TITLE}
+                filterPublishedBites={true}
+                bitesProfile={toStripProfile(author)}
+                bitesHref={typeof view.slug === 'string' ? `/releases/${view.slug}` : undefined}
+                captionsUrl={captionsUrl}
+                highlightCaptionsUrl={highlightCaptionsUrl}
+              />
+            ) : (
+              <>
+                {/*
               Fallback when no `VideoDisplaySection` is injected. `<Video>` is the
               SSoT for every video surface — single source of truth across YouTube,
               HLS, and MP4 paths.
             */}
-              {youtubeUrl && (
-                <Video kind="youtube" url={youtubeUrl} title={`${releaseTitle} - Video`} layout="native" />
-              )}
-              {!youtubeUrl && mainVideoUrl && <Video url={mainVideoUrl} captionsUrl={captionsUrl} layout="centered" />}
-              {highlightVideoUrl && (
-                <Video
-                  url={highlightVideoUrl}
-                  poster={highlightVideoThumbnail}
-                  captionsUrl={highlightCaptionsUrl}
-                  layout="centered"
-                />
-              )}
-            </>
-          )}
-        </div>
+                {youtubeUrl && (
+                  <Video kind="youtube" url={youtubeUrl} title={`${releaseTitle} - Video`} layout="native" />
+                )}
+                {!youtubeUrl && mainVideoUrl && (
+                  <Video url={mainVideoUrl} captionsUrl={captionsUrl} layout="centered" />
+                )}
+                {highlightVideoUrl && (
+                  <Video
+                    url={highlightVideoUrl}
+                    poster={highlightVideoThumbnail}
+                    captionsUrl={highlightCaptionsUrl}
+                    layout="centered"
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         {/* Record-dependent blocks the loading state does not draw carry `data-loading-optional`. */}
@@ -503,15 +511,18 @@ export function ReleaseDetailPage({
         {/* Changelog Sections — icons match the catalog card's changelog
             strip taxonomy (Sparkles/Wrench/TrendingUp/AlertTriangle) so the
             user sees a consistent visual signature across catalog → detail. */}
-        <ReleaseChangelogSection
-          title="Breaking Changes"
-          entries={breakingChanges || []}
-          isBreaking
-          hideTitle
-          loadingOptional
-          icon={<AlertTriangle className="h-6 w-6" />}
-          MarkdownRenderer={MarkdownRenderer}
-        />
+        {/* Breaking changes are optional per release: the loading state leaves them out (`loadingOptional`). */}
+        {loading ? null : (
+          <ReleaseChangelogSection
+            title="Breaking Changes"
+            entries={breakingChanges || []}
+            isBreaking
+            hideTitle
+            loadingOptional
+            icon={<AlertTriangle className="h-6 w-6" />}
+            MarkdownRenderer={MarkdownRenderer}
+          />
+        )}
         {/* Features / Bugs / Improvements use `previewFirst` — same
             progressive-disclosure pattern as the investor-update detail
             page's Key Highlights / Financial Notes sections. Shows the
@@ -698,65 +709,16 @@ export function ReleaseDetailPage({
        * A keyed Fragment emits no DOM, so output is byte-identical either way.
        */}
       <Fragment key="related-content">{relatedContent}</Fragment>
-    </PageLayout>,
-  );
-}
-
-interface ReleaseLoadingLayoutProps {
-  /** The page's back button (static copy: drawn for real). */
-  backButton?: { label?: string; onClick: () => void };
-  /** The host's slot below the article (byline, related content), drawn as is. */
-  children?: ReactNode;
-}
-
-/**
- * The release page while its release is read: the title and version as bars in the page's own title block (the back
- * button real), the tag row, the four-cell metadata grid with its real labels, the summary lines, the
- * the three changelog sections with their real headings, and the host's slot below. Rendered
- * inside the caller's shell (`ReleaseDetailPage` draws it in a scope, in its own `PageShell`): each part is its own
- * component's skeleton.
- */
-function ReleaseLoadingLayout({ backButton, children }: ReleaseLoadingLayoutProps) {
-  return (
-    <PageLayout
-      loading
-      subtitleRow="always"
-      titleSize="h1"
-      titleWrap
-      titleSkeletonLines={RELEASE_TITLE_SKELETON_LINES}
-      backButton={backButton}
-    >
-      <div className={CONTENT_STACK_CLASS} aria-hidden>
-        <EntityTagBadgesSkeleton
-          count={RELEASE_TAG_ROW_FOLD.wide}
-          phoneCount={RELEASE_TAG_ROW_FOLD.phone}
-          itemClassName={RELEASE_TAG_SKELETON_WIDTH_CLASS}
-        />
-        <div className={METADATA_GRID_CLASS}>
-          <EntityMetadataValueCellSkeleton label={RELEASE_TYPE_LABEL} className={METADATA_CELL_EDGE_CLASS} />
-          <EntityMetadataValueCellSkeleton label={RELEASE_STATUS_LABEL} className={METADATA_CELL_EDGE_CLASS} />
-          <EntityMetadataValueCellSkeleton label={RELEASE_DATE_LABEL} className={METADATA_CELL_EDGE_CLASS} />
-          <EntityMetadataAuthorCellSkeleton />
-        </div>
-        {/* A release's media is optional (`data-loading-optional` on the loaded strip): its strip is left out. */}
-        {/* A summary of about 350 characters: seven lines on a phone, three on a wide screen. */}
-        <div className={SUMMARY_CLASS}>
-          <p>
-            <TextLineSkeleton type="inherit" as="span" lines={7} className="w-full content-md:hidden" />
-            <TextLineSkeleton type="inherit" as="span" lines={3} className="hidden w-full content-md:block" />
-          </p>
-        </div>
-        {/* A release's video is optional: the loading layout leaves its slot out. */}
-        {PREVIEW_CHANGELOG_SECTIONS.map(({ title, Icon }) => (
-          <ReleaseChangelogSectionSkeleton
-            key={title}
-            title={title}
-            icon={<Icon className={CHANGELOG_ICON_CLASS} />}
-            previewFirst
-          />
-        ))}
-      </div>
-      <Fragment key="related-content">{children}</Fragment>
     </PageLayout>
+  );
+  // The loading state is the page itself in a scope, announced once unless a host's scope already did.
+  return renderShell(
+    loading ? (
+      <LoadingRegion label="Loading the release" announce={!scoped}>
+        <LoadingScope>{page}</LoadingScope>
+      </LoadingRegion>
+    ) : (
+      page
+    ),
   );
 }

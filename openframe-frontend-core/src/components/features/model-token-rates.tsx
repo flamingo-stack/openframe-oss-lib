@@ -21,12 +21,12 @@ import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/ques
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Autocomplete, type AutocompleteOption, AutocompleteSkeleton } from '../ui/autocomplete';
+import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { Slider } from '../ui/slider';
 import { TabSelector } from '../ui/tab-selector';
-import { PushButtonSelector, PushButtonSelectorSkeleton } from './push-button-selector';
+import { PushButtonSelector } from './push-button-selector';
 
 /**
  * The per-model AI token exchange rates, in the two places they are shown:
@@ -570,51 +570,47 @@ export function ModelTokenExchange({
       </ExchangeStep>
 
       <ExchangeStep step={2} title={copy.use.title}>
-        {/* While the providers load: the selector's own skeleton (its rows, the option row's own boxes). */}
-        {providers.length === 0 && !failed ? (
-          <PushButtonSelectorSkeleton count={PROVIDER_ROWS_FOLD} description={false} region={false} />
-        ) : (
-          <PushButtonSelector<string>
-            options={providers.map(providerType => {
-              // What the server stated for the provider rides its models' rows.
-              const stated =
-                models.find(option => option.providerType === providerType) ??
-                (rate?.providerType === providerType ? rate : null);
-              return {
-                id: providerType,
-                name: tokenRateProviderLabel(providerType, stated?.providerLabel),
-                icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
-              };
-            })}
-            selectedIds={provider ? [provider] : []}
-            onSelectionChange={ids => {
-              // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
-              if (ids[0]) onProviderChange?.(ids[0]);
-            }}
-            multiSelect={false}
-          />
-        )}
-        {/* While the rates load (the priming search included): the field's own skeleton, its label real. A spinner
-            is for a search the reader typed. */}
-        {loading ? (
-          <AutocompleteSkeleton label={copy.use.model} />
-        ) : (
-          <Autocomplete<string>
-            label={copy.use.model}
-            value={rate?.modelName ?? null}
-            onChange={modelName => {
-              if (modelName) onPick?.(modelName);
-            }}
-            options={options}
-            inputValue={query}
-            onInputChange={value => onQueryChange?.(value)}
-            disableClientFilter
-            loading={searching && Boolean(query)}
-            disabled={providers.length === 0}
-            placeholder={copy.use.search}
-            noOptionsText={copy.use.noMatch}
-          />
-        )}
+        {/* While the providers load the selector draws its own skeleton (its rows, the option row's own boxes). */}
+        <PushButtonSelector<string>
+          isLoading={providers.length === 0 && !failed}
+          skeletonCount={PROVIDER_ROWS_FOLD}
+          optionDescriptions={false}
+          options={providers.map(providerType => {
+            // What the server stated for the provider rides its models' rows.
+            const stated =
+              models.find(option => option.providerType === providerType) ??
+              (rate?.providerType === providerType ? rate : null);
+            return {
+              id: providerType,
+              name: tokenRateProviderLabel(providerType, stated?.providerLabel),
+              icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
+            };
+          })}
+          selectedIds={provider ? [provider] : []}
+          onSelectionChange={ids => {
+            // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
+            if (ids[0]) onProviderChange?.(ids[0]);
+          }}
+          multiSelect={false}
+        />
+        {/* While the rates load (the priming search included) the field draws its own skeleton, its label real. A
+            spinner is for a search the reader typed. */}
+        <Autocomplete<string>
+          fieldLoading={loading}
+          label={copy.use.model}
+          value={rate?.modelName ?? null}
+          onChange={modelName => {
+            if (modelName) onPick?.(modelName);
+          }}
+          options={options}
+          inputValue={query}
+          onInputChange={value => onQueryChange?.(value)}
+          disableClientFilter
+          loading={searching && Boolean(query)}
+          disabled={providers.length === 0}
+          placeholder={copy.use.search}
+          noOptionsText={copy.use.noMatch}
+        />
       </ExchangeStep>
 
       <ExchangeStep step={3} title={copy.charge.title}>

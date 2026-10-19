@@ -70,6 +70,9 @@ interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
   isLoading?: boolean;
   error?: string | null;
   skeletonCount?: number;
+  /** Whether the option rows carry a description line, for the skeleton drawn before the rows arrive (default
+   *  true; with rows given, the rows decide). */
+  optionDescriptions?: boolean;
   sections?: SectionDefinition[]; // Optional sections for grouping options
   /** Built-in server-side search input (see PushButtonSelectorSearch). */
   search?: PushButtonSelectorSearch;
@@ -98,6 +101,8 @@ const OPTION_LEAD_CLASS = 'flex min-w-0 flex-1 items-center gap-3';
 /** The selection box's frame; the box itself is static chrome, so the skeleton draws it for real (unchecked). */
 const SELECTION_BOX_CLASS = 'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded border-2';
 const SELECTION_BOX_IDLE_CLASS = 'border-ods-border';
+/** The box an option's icon sits in, read by the row and by its skeleton, so the skeleton's icon is the row's. */
+const OPTION_ICON_BOX_CLASS = 'flex size-8 shrink-0 items-center justify-center';
 /** An option row's resting surface (not selected, not disabled). */
 const OPTION_IDLE_SURFACE_CLASS = 'border-ods-border bg-ods-bg';
 
@@ -108,7 +113,7 @@ function OptionRowSkeleton({ description = true }: { description?: boolean }) {
     <div className={cn(OPTION_FRAME_CLASS, OPTION_IDLE_SURFACE_CLASS)}>
       <div className={OPTION_ROW_CLASS}>
         <div className={OPTION_LEAD_CLASS}>
-          <UnifiedSkeleton className="h-8 w-8 shrink-0" />
+          <UnifiedSkeleton className={OPTION_ICON_BOX_CLASS} />
           <div className="min-w-0 flex-1">
             <TextLineSkeleton type="h6" className="w-24" />
             {description && <TextLineSkeleton type="h6" className="w-36" />}
@@ -222,6 +227,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
   isLoading = false,
   error = null,
   skeletonCount = 3,
+  optionDescriptions = true,
   sections,
   search,
   lazyLoad,
@@ -237,7 +243,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
   const inScope = useLoadingScope();
   const loading = isLoading || inScope;
   // The rows' skeleton takes the given rows' shape (a name only, or a name and a description) when there are rows.
-  const skeletonDescription = options.length > 0 ? options.some(option => !!option.description) : true;
+  const skeletonDescription = options.length > 0 ? options.some(option => !!option.description) : optionDescriptions;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const lazyHasMore = lazyLoad?.hasMore ?? false;
@@ -352,7 +358,11 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
           <div className={OPTION_LEAD_CLASS}>
             {option.icon && (
               <div
-                className={`flex-shrink-0 transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}
+                className={cn(
+                  OPTION_ICON_BOX_CLASS,
+                  'transition-transform duration-200',
+                  isSelected ? 'scale-110' : 'group-hover:scale-105',
+                )}
               >
                 {option.icon}
               </div>

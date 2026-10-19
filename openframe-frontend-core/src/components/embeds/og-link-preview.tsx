@@ -180,6 +180,10 @@ const COMPACT_BODY_CLASS = 'flex min-w-0 flex-1 flex-col justify-center p-3';
 const COMPACT_ROW_CLASS =
   'flex flex-row items-center gap-3 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-4 py-3';
 const COMPACT_ICON_BOX_CLASS = 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface';
+/** The no-image compact row's favicon, read by the row and by its skeleton. */
+const COMPACT_FAVICON_CLASS = 'w-5 h-5';
+/** The default card's publication logo beside the title, read by the card and by its skeleton. */
+const DEFAULT_LOGO_CLASS = 'mt-0.5 h-6 w-6 flex-shrink-0 rounded';
 const COMPACT_ROW_TEXT_CLASS = 'min-w-0 flex-1';
 const COMPACT_ROW_LINE_CLASS = 'truncate text-h6';
 const DEFAULT_OUTER_CLASS = 'my-6 flex flex-1 flex-col';
@@ -205,7 +209,7 @@ export function OGLinkPreviewSkeleton({
       <div className={COMPACT_OUTER_CLASS} aria-hidden>
         <div className={COMPACT_ROW_CLASS}>
           <div className={COMPACT_ICON_BOX_CLASS}>
-            <UnifiedSkeleton className="h-5 w-5 rounded" />
+            <UnifiedSkeleton className={cn(COMPACT_FAVICON_CLASS, 'rounded')} />
           </div>
           <div className={COMPACT_ROW_TEXT_CLASS}>
             <p className={COMPACT_ROW_LINE_CLASS}>
@@ -239,7 +243,7 @@ export function OGLinkPreviewSkeleton({
         <UnifiedSkeleton className={DEFAULT_MEDIA_CLASS} />
         <div className={DEFAULT_BODY_CLASS}>
           <div className={DEFAULT_ROW_CLASS}>
-            <UnifiedSkeleton className="mt-0.5 h-6 w-6 flex-shrink-0 rounded" />
+            <UnifiedSkeleton className={DEFAULT_LOGO_CLASS} />
             <div className="min-w-0 flex-1">
               {/* The title and the description each reserve two `text-h4` lines (the loaded `TruncateText`s). */}
               <TextLineSkeleton type="h4" lines={2} className="mb-2 w-full" />
@@ -607,7 +611,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             className={cn(COMPACT_ROW_CLASS, 'group transition-all duration-200 hover:border-ods-accent')}
           >
             <div className={COMPACT_ICON_BOX_CLASS}>
-              <Favicon src={faviconSrc} size="w-5 h-5" />
+              <Favicon src={faviconSrc} size={COMPACT_FAVICON_CLASS} />
             </div>
             <div className={COMPACT_ROW_TEXT_CLASS}>
               <h3 className="truncate font-semibold text-ods-text-primary transition-colors text-h6 group-hover:text-ods-accent">
@@ -705,7 +709,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
             <Image
               src={logoSrc}
               alt={publicationName || ''}
-              className="mt-0.5 h-6 w-6 flex-shrink-0 rounded object-contain"
+              className={cn(DEFAULT_LOGO_CLASS, 'object-contain')}
               width={24}
               height={24}
               unoptimized

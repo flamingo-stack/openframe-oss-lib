@@ -31,6 +31,8 @@ export interface SchedulerModalHeaderProps {
   disabled?: boolean;
   /** Whether the timezone row renders (not on the confirmation). */
   showTimezone?: boolean;
+  /** The meeting is read on the client and has not arrived: the header draws its skeleton, as in a loading scope. */
+  loading?: boolean;
 }
 
 const ROW_CLASS = 'border-b border-ods-border p-[var(--spacing-system-m)]';
@@ -84,10 +86,11 @@ export function SchedulerModalHeader({
   locked = false,
   disabled = false,
   showTimezone = true,
+  loading = false,
 }: SchedulerModalHeaderProps) {
   const chips = !locked && durationsMs.length > 1;
   // While the meeting is read the header is its skeleton (the hosts and durations are read data).
-  if (useLoadingScope()) return <SchedulerModalHeaderSkeleton showTimezone={showTimezone} />;
+  if (useLoadingScope() || loading) return <SchedulerModalHeaderSkeleton showTimezone={showTimezone} />;
   return (
     <>
       <div className={STRIP_CLASS}>
@@ -108,26 +111,22 @@ export function SchedulerModalHeader({
           </div>
         ) : (
           selectedDurationMs != null && (
-            <p className={DURATION_LINE_CLASS}>
-              {formatDurationCompact(selectedDurationMs / 1000)} call
-            </p>
+            <p className={DURATION_LINE_CLASS}>{formatDurationCompact(selectedDurationMs / 1000)} call</p>
           )
         )}
       </div>
       {showTimezone && (
         <div className={TIMEZONE_ROW_CLASS}>
           <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          {timezone ? (
-            <TimezoneSelect
-              value={timezone}
-              disabled={disabled}
-              onChange={tz => {
-                if (tz) onTimezoneChange?.(tz);
-              }}
-            />
-          ) : (
-            <AutocompleteSkeleton />
-          )}
+          {/* The zone resolves after mount: until then the picker draws its own skeleton. */}
+          <TimezoneSelect
+            value={timezone}
+            loading={!timezone}
+            disabled={disabled}
+            onChange={tz => {
+              if (tz) onTimezoneChange?.(tz);
+            }}
+          />
         </div>
       )}
     </>

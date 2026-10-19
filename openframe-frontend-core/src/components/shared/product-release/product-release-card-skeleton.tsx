@@ -71,8 +71,11 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
             </div>
           </div>
         </div>
+        {/* The changelog's counts are read list items (which ones show is read data): one row's first item. */}
         <div className={RELEASE_CARD_CHANGELOG_CLASS}>
-          <TextLineSkeleton type="inherit" as="span" className="w-2/3" />
+          <span data-loading-item className="inline-flex">
+            <TextLineSkeleton type="inherit" as="span" className="w-24" />
+          </span>
         </div>
         <div className={RELEASE_CARD_GRID_CLASS}>
           {RELEASE_CARD_CELL_LABELS.map((label, i) => (

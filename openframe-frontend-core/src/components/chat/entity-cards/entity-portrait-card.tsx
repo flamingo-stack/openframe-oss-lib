@@ -53,7 +53,9 @@ const PORTRAIT_BODY = 'flex h-full flex-col gap-6 p-6';
 const PORTRAIT_MEDIA =
   'relative flex aspect-[1200/630] w-full shrink-0 items-center justify-center overflow-hidden rounded-sm';
 const PORTRAIT_TITLE_ZONE = 'flex h-[72px] shrink-0 flex-col justify-center gap-1.5';
-const PORTRAIT_TITLE = 'break-words leading-6 text-ods-text-primary text-h4';
+/** The title's line height, read by the title and by its skeleton's lines. */
+const PORTRAIT_TITLE_LEADING = 'leading-6';
+const PORTRAIT_TITLE = cn('break-words text-ods-text-primary text-h4', PORTRAIT_TITLE_LEADING);
 const PORTRAIT_FOOTER = 'flex h-[60px] shrink-0 items-center';
 const PORTRAIT_PERSON_ROW = 'flex w-full min-w-0 items-center gap-3';
 const PORTRAIT_PERSON_TEXT = 'flex min-w-0 flex-col';
@@ -226,7 +228,7 @@ export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel
               className="self-start"
             />
           )}
-          <TextLineSkeleton type="h4" lines={typeLabel ? 2 : 3} className="w-full leading-6" />
+          <TextLineSkeleton type="h4" lines={typeLabel ? 2 : 3} className={cn('w-full', PORTRAIT_TITLE_LEADING)} />
         </div>
         <div className={PORTRAIT_FOOTER}>
           <div className={PORTRAIT_PERSON_ROW}>

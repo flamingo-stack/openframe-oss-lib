@@ -64,7 +64,6 @@ import { pageCount } from '../../utils/search-params';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
-import { GenericEntityCardSkeleton } from '../chat/entity-cards/generic-entity-card';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
 import { accentSentenceMarks } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
@@ -170,15 +169,12 @@ function renderSkeletonForType(
   adminCampaignCard?: AdminCampaignCardSlot,
   extras?: ChatCardDispatchExtras,
 ): React.ReactNode {
+  // A type with no card (no host slot, no registry entry) draws nothing loaded (`CardForType`), so nothing loading.
   if (type === 'marketing_campaign') {
-    return adminCampaignCard ? (
-      <adminCampaignCard.Skeleton size={size === 'sm' ? 'sm' : 'default'} />
-    ) : (
-      <GenericEntityCardSkeleton />
-    );
+    return adminCampaignCard ? <adminCampaignCard.Skeleton size={size === 'sm' ? 'sm' : 'default'} /> : null;
   }
   const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
-  return entry ? entry.skeleton(size, extras) : <GenericEntityCardSkeleton />;
+  return entry ? entry.skeleton(size, extras) : null;
 }
 
 /**
@@ -335,6 +331,11 @@ const RAIL_SKELETON_CARDS = 3;
  */
 const RAIL_LIST_FOLD = 2;
 const RAIL_GRID_FOLD_ROWS = 2;
+/**
+ * The card an unknown-type group draws while its type is read: the rail's grid content card (a cover over a title
+ * and an excerpt), the shape the read types' grid cards share, so the group holds a grid card's height.
+ */
+const UNKNOWN_TYPE_CARD = 'blog_post_existing';
 /** The grid's column count per step, as `gridClassFor` sets it: [phone, sm, lg]. */
 const GRID_COLUMNS_BY_STEP: Record<2 | 3, readonly [number, number, number]> = { 2: [1, 2, 2], 3: [1, 2, 3] };
 
@@ -821,7 +822,7 @@ export interface RelatedContentSectionSkeletonProps extends Pick<
   /**
    * The rail's content types (its `includeTypes`, or the types of the refs it holds). Ordered like the loaded rail.
    * Empty: the types are read data (an author's rail): one group of an unknown type, its heading a bar and its cards
-   * the generic card's skeleton.
+   * the rail's grid content card's skeleton.
    */
   types: string[];
 }
@@ -852,7 +853,7 @@ export function RelatedContentSectionSkeleton({
           {Array.from({ length: Math.max(...GRID_COLUMNS_BY_STEP[columns]) * RAIL_GRID_FOLD_ROWS }, (_, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
             <div key={i} className={gridFoldClass(i, columns)} data-loading-item>
-              <GenericEntityCardSkeleton />
+              {renderSkeletonForType(UNKNOWN_TYPE_CARD, 'default', adminCampaignCard, extras)}
             </div>
           ))}
         </div>

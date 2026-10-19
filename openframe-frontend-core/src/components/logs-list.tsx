@@ -3,8 +3,8 @@ import type { LogsListProps, LogEntry } from '../types/logs.types';
 import { cn } from '../utils/cn';
 import { formatDateTimeYmd } from '../utils/format';
 import { LoadingRegion } from './loading/loading-region';
-import { TextLineSkeleton, UnifiedSkeleton } from './loading/unified-skeleton';
-import { LogSeverityDot } from './log-severity-dot';
+import { TextLineSkeleton } from './loading/unified-skeleton';
+import { LogSeverityDot, LogSeverityDotSkeleton } from './log-severity-dot';
 import { ToolIcon } from './tool-icon';
 
 // UTC-pinned so the server and every client agree (React #418), through the one
@@ -27,9 +27,7 @@ const LOGS_LIST_FOLD = 6;
 function LogCardSkeleton() {
   return (
     <div className={LOG_ROW_CLASS} aria-hidden>
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-        <UnifiedSkeleton variant="circular" className="h-3 w-3" />
-      </span>
+      <LogSeverityDotSkeleton size="md" />
       <div className={LOG_ROW_TEXT_CLASS}>
         <TextLineSkeleton type="h6" className="w-3/4" />
         <div className={LOG_META_ROW_CLASS}>
@@ -144,11 +142,7 @@ export const LogsList = forwardRef<HTMLDivElement, LogsListProps>(
     }
 
     return (
-      <div
-        ref={ref}
-        className={cn(LOG_FRAME_CLASS, getContainerClasses(), className)}
-        style={getContainerStyles()}
-      >
+      <div ref={ref} className={cn(LOG_FRAME_CLASS, getContainerClasses(), className)} style={getContainerStyles()}>
         <div ref={containerRef} className={LOG_SCROLL_CLASS}>
           {logs.map((log, index) => (
             <LogCard

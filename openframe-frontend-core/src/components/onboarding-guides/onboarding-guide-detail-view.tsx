@@ -13,6 +13,12 @@
  * (markdown, video warmup, captions, related-card hrefs via
  * `runtime.composeContentUrl`). Optional `MarkdownRenderer` lets hosts swap a
  * renderer with extra plugins.
+ *
+ * LOADING: the view is its own loading state. While the guide is read (or in a host's loading scope) it renders the
+ * SAME page over an empty guide (`EMPTY_ONBOARDING_GUIDE`, or the host's empty placeholder) inside a `LoadingScope`:
+ * the title block, the tags, the metadata grid, the body, the byline and the related guides each draw their own
+ * skeleton; the back button and the static labels are real. Parts a guide may not have (its video, its bites) are left
+ * out while loading and carry `data-loading-optional` once loaded.
  */
 
 import { Fragment, type ComponentType, type ReactNode } from 'react';
@@ -22,10 +28,10 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { VideoTeaser } from '../../types/video-processing';
 import { resolveContentHref } from '../../utils/content-href';
 import { buildOgPlaceholderUrl } from '../../utils/og-placeholder';
-import { EntityAuthorCard, EntityAuthorCardSkeleton } from '../chat/entity-cards/entity-author-card';
-import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
+import { EntityAuthorCard } from '../chat/entity-cards/entity-author-card';
+import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
-import { EntityTagBadges, EntityTagBadgesSkeleton } from '../features/entity-tag-badges';
+import { EntityTagBadges } from '../features/entity-tag-badges';
 import { EntityVideoSection } from '../features/entity-video-section';
 import { useCaptions } from '../features/use-captions';
 import { useVideoWarmup } from '../features/use-video-warmup';
@@ -37,10 +43,11 @@ import { VideoBitesStrip } from '../features/video-bites-strip';
 // the detail block visibly narrower than the rail.
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
+import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { ArticleAuthorByline, ArticleAuthorBylineSkeleton } from '../shared/article-author-byline';
+import { ArticleAuthorByline } from '../shared/article-author-byline';
 import { LoadError } from '../ui/error-state';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { RichMarkdownRenderer } from '../ui/markdown';
 
 export interface OnboardingGuideDetailViewProps {
@@ -92,57 +99,85 @@ const RELATED_LIST_CLASS = 'flex flex-col gap-3';
 const BODY_CLASS = 'space-y-4';
 /** The metadata grid's extra cell label (static copy). */
 const SECTION_CELL_LABEL = 'Section';
-/** Related guides and body paragraphs the skeleton draws (a guide's first fold). */
+/** Related guide cards the related block's skeleton draws (a guide's first fold). */
 export const ONBOARDING_GUIDE_RELATED_SKELETON_COUNT = 3;
-const ONBOARDING_GUIDE_BODY_SKELETON_PARAGRAPHS = 3;
 
-export interface OnboardingGuideDetailViewSkeletonProps {
-  /** The real back button (static copy). */
-  backButton?: { label?: string; onClick: () => void };
-  /** Related guide cards drawn. Default `ONBOARDING_GUIDE_RELATED_SKELETON_COUNT`; 0 draws no related block. */
-  relatedCount?: number;
-  /** The host's slot below the guide, drawn as is. */
-  children?: ReactNode;
-}
+/** The guide the view renders while it is read: every field empty, so each part draws its own skeleton. */
+const EMPTY_ONBOARDING_GUIDE: OnboardingGuide = {
+  id: '',
+  title: '',
+  slug: '',
+  section: '',
+  step_order: 0,
+  section_order: 0,
+  content: '',
+  video_summary: null,
+  transcript: null,
+  transcript_words_data: null,
+  srt_content: null,
+  ai_transcript_formatted: null,
+  main_video_url: null,
+  main_video_thumbnail: null,
+  youtube_url: null,
+  highlight_video_url: null,
+  highlight_video_thumbnail: null,
+  highlight_video_duration_ms: null,
+  highlight_video_source: null,
+  video_bites: [],
+  featured_image: null,
+  og_image_url: null,
+  seo_title: null,
+  seo_description: null,
+  seo_keywords: null,
+  status: 'published',
+  published_at: null,
+  author_id: null,
+  custom_instructions: null,
+  config: null,
+  ai_effort_score: null,
+  onboarding_guide_tags: [],
+  created_at: '',
+  updated_at: '',
+  created_by: null,
+  updated_by: null,
+};
 
 /**
- * The guide page while its guide is read: the title as a bar in the page's own title block (the back button real),
- * the tag row, the metadata grid (real "Section" / "Published" labels), body paragraphs, the author byline, and the
- * related block ("More in" real, the section a bar, guide card skeletons). Rendered inside the caller's shell.
+ * The same-section guides under the article: "More in <section>" over their cards, each a read list item. While the
+ * guide is read (`useLoadingScope()`) it renders a fold of empty guides, whose cards draw their own skeletons, under
+ * the heading's real words with the section as a bar.
  */
-export function OnboardingGuideDetailViewSkeleton({
-  backButton,
-  relatedCount = ONBOARDING_GUIDE_RELATED_SKELETON_COUNT,
-  children,
-}: OnboardingGuideDetailViewSkeletonProps) {
+function RelatedGuides({
+  section,
+  related,
+  renderCard,
+}: {
+  section: string;
+  related: OnboardingGuide[];
+  renderCard: (guide: OnboardingGuide) => ReactNode;
+}) {
+  const loading = useLoadingScope();
+  const guides = loading
+    ? Array.from({ length: ONBOARDING_GUIDE_RELATED_SKELETON_COUNT }, (_, i) => ({
+        ...EMPTY_ONBOARDING_GUIDE,
+        id: `skeleton-${i}`,
+      }))
+    : related;
+  if (guides.length === 0) return null;
   return (
-    <PageLayout loading titleSize="h1" titleWrap backButton={backButton}>
-      <EntityTagBadgesSkeleton />
-      <EntityAuthorCardSkeleton extraCellLabels={[SECTION_CELL_LABEL]} />
-      <div className={BODY_CLASS} aria-hidden>
-        {Array.from({ length: ONBOARDING_GUIDE_BODY_SKELETON_PARAGRAPHS }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton paragraphs never reorder
-          <TextLineSkeleton key={i} type="h4" lines={3} className="w-full" />
+    <div className={RELATED_BLOCK_CLASS}>
+      <h2 className={RELATED_HEADING_CLASS}>
+        More in{' '}
+        {loading ? <TextLineSkeleton type="inherit" as="span" className="inline-block w-32 align-middle" /> : section}
+      </h2>
+      <ul className={RELATED_LIST_CLASS}>
+        {guides.map(guide => (
+          <li key={guide.id} data-loading-item>
+            {renderCard(guide)}
+          </li>
         ))}
-      </div>
-      <ArticleAuthorBylineSkeleton />
-      {relatedCount > 0 && (
-        <div className={RELATED_BLOCK_CLASS} aria-hidden>
-          <h2 className={RELATED_HEADING_CLASS}>
-            More in <TextLineSkeleton type="inherit" as="span" className="inline-block w-32 align-middle" />
-          </h2>
-          <ul className={RELATED_LIST_CLASS}>
-            {Array.from({ length: relatedCount }, (_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-              <li key={i}>
-                <OnboardingGuideCardSkeleton />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <Fragment key="related-content">{children}</Fragment>
-    </PageLayout>
+      </ul>
+    </div>
   );
 }
 
@@ -175,7 +210,12 @@ export function OnboardingGuideDetailView({
   const url = initialData ? null : slug && guideEndpoint ? guideEndpoint(slug) : null;
   // In a page's loading state the guide is read (the host passes an empty record): nothing is fetched.
   const scoped = useLoadingScope();
-  const { data: guide, isLoading, error, reload } = useSelfFetch<OnboardingGuide>(scoped ? null : url, {
+  const {
+    data: guide,
+    isLoading,
+    error,
+    reload,
+  } = useSelfFetch<OnboardingGuide>(scoped ? null : url, {
     initialData,
   });
 
@@ -188,26 +228,23 @@ export function OnboardingGuideDetailView({
 
   const backCfg = { label: backLabel, onClick: () => router.push(resolvedBackHref) };
   const loading = scoped || (!guide && isLoading);
-  if (loading) {
-    return renderShell(
-      <OnboardingGuideDetailViewSkeleton backButton={backCfg}>{relatedContent}</OnboardingGuideDetailViewSkeleton>,
-    );
-  }
-  if (error || !guide) {
+  if (!loading && (error || !guide)) {
     return renderShell(<LoadError message="Guide not found." onRetry={reload} />);
   }
+  // While loading: the host's empty placeholder (in its scope) or the view's own empty guide.
+  const view = guide ?? EMPTY_ONBOARDING_GUIDE;
 
   // Track URLs via the ONE captions configurer (`useCaptions`); same-origin
   // hosts get the relative `/api/captions/...` default. Zero per-page wiring.
-  const { captionsUrl, highlightCaptionsUrl } = captions.forEntity('onboarding_guide', guide);
+  const { captionsUrl, highlightCaptionsUrl } = captions.forEntity('onboarding_guide', view);
 
   const videoPoster =
-    guide.main_video_thumbnail ||
-    guide.featured_image ||
-    guide.og_image_url ||
+    view.main_video_thumbnail ||
+    view.featured_image ||
+    view.og_image_url ||
     // `buildOgPlaceholderUrl` always returns a usable string (relative route at
     // worst), so it's the terminal fallback — no trailing `|| undefined` needed.
-    buildOgPlaceholderUrl(runtime?.endpoints, guide.title, { aspect: 'wide' });
+    buildOgPlaceholderUrl(runtime?.endpoints, view.title, { aspect: 'wide' });
 
   const defaultRenderRelatedCard = (g: OnboardingGuide) => {
     const cta = resolveContentHref(runtime?.composeContentUrl, {
@@ -220,24 +257,19 @@ export function OnboardingGuideDetailView({
   };
   const renderRelatedCardFn = renderRelatedCard ?? defaultRenderRelatedCard;
 
-  return renderShell(
-    <PageLayout
-      title={guide.title}
-      titleSize="h1"
-      titleWrap
-      backButton={backCfg}
-    >
+  const page = (
+    <PageLayout title={view.title} loading={loading} titleSize="h1" titleWrap backButton={backCfg}>
       {/* Tags — flat onboarding_guide_tags[] from entity_tags. */}
-      <EntityTagBadges tags={guide.onboarding_guide_tags} />
+      <EntityTagBadges tags={view.onboarding_guide_tags} />
 
       {/* Metadata grid — Section · Step | Published | Author. */}
       <EntityAuthorCard
-        author={guide.author}
+        author={view.author}
         authorHref={authorHref}
-        publishedAt={guide.published_at}
+        publishedAt={view.published_at}
         extraCells={[
           {
-            value: `${guide.section} · Step ${guide.step_order}`,
+            value: `${view.section} · Step ${view.step_order}`,
             label: SECTION_CELL_LABEL,
             uppercase: false,
           },
@@ -246,17 +278,18 @@ export function OnboardingGuideDetailView({
 
       {/* Video. `main_video_url` (Mux/MP4) and `youtube_url` are independent
             columns — either populated renders the player. */}
-      {(guide.main_video_url || guide.youtube_url) && (
-        <div ref={videoWarmupRef}>
+      {!loading && (view.main_video_url || view.youtube_url) && (
+        // A guide's video is optional: the loading state leaves it out.
+        <div ref={videoWarmupRef} data-loading-optional="">
           <EntityVideoSection
-            mainVideoUrl={guide.main_video_url}
-            youtubeUrl={guide.youtube_url || undefined}
-            highlightVideoUrl={guide.highlight_video_url}
+            mainVideoUrl={view.main_video_url}
+            youtubeUrl={view.youtube_url || undefined}
+            highlightVideoUrl={view.highlight_video_url}
             mainVideoPoster={videoPoster}
-            highlightVideoThumbnail={guide.highlight_video_thumbnail || undefined}
+            highlightVideoThumbnail={view.highlight_video_thumbnail || undefined}
             videoSummary={undefined}
             videoBites={undefined}
-            title={guide.title}
+            title={view.title}
             captionsUrl={captionsUrl}
             highlightCaptionsUrl={highlightCaptionsUrl}
             MarkdownRenderer={MarkdownRenderer}
@@ -264,45 +297,41 @@ export function OnboardingGuideDetailView({
         </div>
       )}
 
-      {/* Markdown body */}
-      {guide.content && (
+      {/* Markdown body (in the loading scope, the renderer's own skeleton) */}
+      {(loading || view.content) && (
         <div className={BODY_CLASS}>
-          <MarkdownRenderer content={guide.content} />
+          <MarkdownRenderer content={view.content ?? ''} />
         </div>
       )}
 
-      {/* Video Bites — unified strip; renders nothing when no published bites. */}
-      <VideoBitesStrip
-        bites={(guide.video_bites as VideoTeaser[] | null) ?? []}
-        filterPublished={true}
-        showTitle={false}
-        profile={toStripProfile(guide.author)}
-        href={`/onboarding-guides/${guide.slug}`}
-      />
+      {/* Video Bites — unified strip; renders nothing when no published bites. Optional per guide: the loading state
+          leaves it out (no box of its own: `contents`). */}
+      {loading ? null : (
+        <div className="contents" data-loading-optional="">
+          <VideoBitesStrip
+            bites={(view.video_bites as VideoTeaser[] | null) ?? []}
+            filterPublished={true}
+            showTitle={false}
+            profile={toStripProfile(view.author)}
+            href={`/onboarding-guides/${view.slug}`}
+          />
+        </div>
+      )}
 
       {/* End-of-article author byline (avatar + linked name + bio) — the
             author DESCRIPTION block every article-shaped detail page renders.
             Hidden when the guide has no author (the byline returns null). */}
       <ArticleAuthorByline
-        author={guide.author?.full_name ?? null}
-        avatar={guide.author?.avatar_url}
-        jobTitle={guide.author?.job_title}
-        bio={authorBio ?? guide.author?.about}
+        author={view.author?.full_name ?? null}
+        avatar={view.author?.avatar_url}
+        jobTitle={view.author?.job_title}
+        bio={authorBio ?? view.author?.about}
         href={authorHref}
         fallbackBio={fallbackBio}
       />
 
       {/* Related — same-section, ordered by step. */}
-      {related.length > 0 && (
-        <div className={RELATED_BLOCK_CLASS}>
-          <h2 className={RELATED_HEADING_CLASS}>More in {guide.section}</h2>
-          <ul className={RELATED_LIST_CLASS}>
-            {related.map(r => (
-              <li key={r.id}>{renderRelatedCardFn(r)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <RelatedGuides section={view.section} related={related} renderCard={renderRelatedCardFn} />
 
       {/*
        * Host slot — cross-type related-content / FAQ rail.
@@ -324,6 +353,16 @@ export function OnboardingGuideDetailView({
        * all of them, and that file carries an explicit FROZEN contract.
        */}
       <Fragment key="related-content">{relatedContent}</Fragment>
-    </PageLayout>,
+    </PageLayout>
+  );
+  // The loading state is the page itself in a scope, announced once unless a host's scope already did.
+  return renderShell(
+    loading ? (
+      <LoadingRegion label="Loading the guide" announce={!scoped}>
+        <LoadingScope>{page}</LoadingScope>
+      </LoadingRegion>
+    ) : (
+      page
+    ),
   );
 }

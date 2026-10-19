@@ -168,10 +168,10 @@ describe('TrustCenterPage', () => {
     expect(screen.getByRole('heading', { level: 1, hidden: true, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
   });
 
-  it('is ONE page: every section is an anchored h2, in reading order — Controls first, AI & data use after Subprocessors, Contact before FAQ', () => {
+  it('is ONE page: every section is an anchored h2, in reading order — AI & data use after Subprocessors, Contact before FAQ', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
-    expect(headings).toEqual(['Controls', 'Compliance', 'Documents', 'Subprocessors', 'AI & data use', 'Contact']);
+    expect(headings).toEqual(['Compliance', 'Controls', 'Documents', 'Subprocessors', 'AI & data use', 'Contact']);
     // Each section is a labelled landmark (a deep-linkable `#id`).
     expect(screen.getByRole('region', { name: 'Controls' })).toHaveAttribute('id', 'controls');
     expect(screen.queryByRole('tab')).toBeNull();

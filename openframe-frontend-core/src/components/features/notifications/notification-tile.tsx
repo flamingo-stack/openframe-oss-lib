@@ -42,6 +42,10 @@ const progressColorByVariant: Record<NotificationVariant, string> = {
 const headerControlClass =
   'absolute inset-0 flex items-center justify-center text-ods-text-secondary transition-opacity duration-200 hover:text-ods-text-primary';
 
+/** The header's icon box and its trailing control's box, read by the tile and by its skeleton. */
+const TILE_ICON_BOX_CLASS = 'flex size-4 shrink-0 items-center justify-center';
+const TILE_CONTROL_BOX_CLASS = 'relative size-4 shrink-0';
+
 export interface NotificationTileProps {
   notification: Notification;
   liveDurationMs?: number;
@@ -153,7 +157,7 @@ export function NotificationTile({
       >
         {/* Header: icon/image + type label (both severity-colored) + time + dismiss/complete control. */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <span className={cn('flex size-4 shrink-0 items-center justify-center', typeColorByVariant[accentVariant])}>
+          <span className={cn(TILE_ICON_BOX_CLASS, typeColorByVariant[accentVariant])}>
             {image ? (
               <Image
                 src={image}
@@ -195,7 +199,7 @@ export function NotificationTile({
             <>
               {/* Live X and settled check swap in the same 16px slot; the inactive
               one is removed from the a11y tree and disabled, not just faded. */}
-              <span className="relative size-4 shrink-0">
+              <span className={TILE_CONTROL_BOX_CLASS}>
                 {[
                   {
                     active: isLive,
@@ -296,10 +300,10 @@ export interface NotificationTileSkeletonProps {
   className?: string;
 }
 
-/** The header's icon and trailing control: a 16px square with its bar filling it. */
-function TileSquare({ bar }: { bar: string }) {
+/** The header's icon and trailing control: the box each sits in, with a bar filling it. */
+function TileSquare({ box, bar }: { box: string; bar: string }) {
   return (
-    <span className="flex size-4 shrink-0 items-center">
+    <span className={box}>
       <UnifiedSkeleton as="span" width="1rem" className={cn('h-4', bar)} />
     </span>
   );
@@ -328,11 +332,11 @@ export function NotificationTileSkeleton({
     >
       <span className="relative flex flex-col gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]">
         <span className="flex items-center gap-[var(--spacing-system-xs)]">
-          <TileSquare bar="rounded-[2px]" />
+          <TileSquare box={TILE_ICON_BOX_CLASS} bar="rounded-[2px]" />
           <TextLineSkeleton as="span" type={lockscreen ? 'h6' : 'h5'} className="w-28" />
           <span className="min-w-0 flex-1" />
           <TextLineSkeleton as="span" type="h6" className={cn('w-14', lockscreen && 'self-start')} />
-          {!lockscreen && <TileSquare bar="rounded-full" />}
+          {!lockscreen && <TileSquare box={TILE_CONTROL_BOX_CLASS} bar="rounded-full" />}
         </span>
         <span className="grid min-w-0 grid-cols-1">
           <TextLineSkeleton as="span" type="h4" className="w-3/5" />

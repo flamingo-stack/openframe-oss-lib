@@ -102,6 +102,11 @@ interface AutocompleteBaseProps<T = string> {
   loading?: boolean;
   /** Loading text */
   loadingText?: string;
+  /**
+   * The field itself is read and has not arrived (its value and its options): it draws its skeleton, as in a
+   * loading scope. DISTINCT from `loading`, a search in flight under a field that stays up.
+   */
+  fieldLoading?: boolean;
   /** When true, shows a clickable "+ Create" option when no results match the input */
   creatable?: boolean;
   /** Callback fired after a new option is created via creatable. Use it to persist the new option server-side, etc. */
@@ -209,6 +214,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     onInputChange,
     loading = false,
     loadingText = 'Loading options',
+    fieldLoading = false,
     creatable = false,
     onCreateOption,
     maxCreateLength,
@@ -798,7 +804,8 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     </PopoverPrimitive.Root>
   );
 
-  if (inScope) return <AutocompleteSkeleton label={label} labelVariant={labelVariant} className={className} />;
+  if (inScope || fieldLoading)
+    return <AutocompleteSkeleton label={label} labelVariant={labelVariant} className={className} />;
 
   return (
     <FieldWrapper

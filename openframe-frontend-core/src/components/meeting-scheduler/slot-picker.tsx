@@ -60,8 +60,8 @@ export interface SlotPickerProps {
   slots: number[];
   /** Column layout; `card` unless the host says otherwise. */
   layout?: SlotPickerLayout;
-  /** IANA zone every label renders in (parent resolves post-mount). */
-  timezone: string;
+  /** IANA zone every label renders in (parent resolves post-mount; null until then, which draws the skeleton). */
+  timezone: string | null;
   monthOffset: number;
   onMonthOffsetChange: (offset: number) => void;
   selectedSlot: number | null;
@@ -77,6 +77,11 @@ export interface SlotPickerProps {
    * the visitor can see WHICH time is being booked.
    */
   isSubmitting?: boolean;
+  /**
+   * The availability (or the duration and zone it is read for) has not arrived: the whole picker draws its
+   * skeleton, as in a loading scope. DISTINCT from `isLoading`, a month refetch under a mounted picker.
+   */
+  loading?: boolean;
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -392,10 +397,12 @@ export function SlotPicker({
   onSelectDay,
   isLoading = false,
   isSubmitting = false,
+  loading = false,
 }: SlotPickerProps) {
-  const inScope = useLoadingScope();
+  const inScope = useLoadingScope() || loading;
   const slotsByDay = useMemo(() => {
     const map = new Map<string, number[]>();
+    if (timezone == null) return map;
     for (const ms of slots) {
       const key = dayKeyInZone(ms, timezone);
       const list = map.get(key) ?? [];
@@ -420,8 +427,9 @@ export function SlotPicker({
   const monthHasSlots = [...slotsByDay.keys()].some(key => key.startsWith(monthPrefix));
 
   const modal = layout === 'modal';
-  // While the availability is read the picker is its skeleton: the calendar real, the times as chip boxes.
-  if (inScope) return <SlotPickerSkeleton monthOffset={monthOffset} layout={layout} />;
+  // While the availability (or the zone it is shown in) is read the picker is its skeleton: the calendar real, the
+  // times as chip boxes.
+  if (inScope || timezone == null) return <SlotPickerSkeleton monthOffset={monthOffset} layout={layout} />;
   return (
     <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>
       <div

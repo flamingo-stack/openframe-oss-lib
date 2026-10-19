@@ -22,12 +22,9 @@
 export { OnboardingGuidesCatalogView, type OnboardingGuidesCatalogViewProps } from './onboarding-guides-catalog-view';
 export {
   OnboardingGuideDetailView,
-  OnboardingGuideDetailViewSkeleton,
   ONBOARDING_GUIDE_RELATED_SKELETON_COUNT,
   type OnboardingGuideDetailViewProps,
-  type OnboardingGuideDetailViewSkeletonProps,
 } from './onboarding-guide-detail-view';
-export { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton';
 
 export {
   useOnboardingGuides,

@@ -36,6 +36,8 @@ export interface FilterPillRowProps {
   countLabel?: string;
   /** Optional children to render instead of options (for custom filter content). */
   children?: ReactNode;
+  /** The options are read on the client and have not arrived: the row draws its skeleton, as in a loading scope. */
+  loading?: boolean;
 }
 
 /** The row's shell, label and count line, read by the row and by its skeleton, so the skeleton is the row's box. */
@@ -78,10 +80,11 @@ export function FilterPillRow({
   options,
   countLabel,
   children,
+  loading = false,
 }: FilterPillRowProps) {
   // In a page's loading state the row is its skeleton: options the page states are its own words (drawn for
   // real), read ones arrive empty (boxes), and a count label is read data (a bar).
-  if (useLoadingScope() && !children) {
+  if ((useLoadingScope() || loading) && !children) {
     return (
       <FilterPillRowSkeleton
         label={label}

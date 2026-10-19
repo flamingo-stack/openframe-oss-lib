@@ -500,7 +500,6 @@ function UnifiedUI({ state, handlers, config, iframeRef }: UnifiedUIProps) {
                 Warming up <span className="text-ods-open-yellow">Fae</span> and{' '}
                 <span className="text-ods-open-yellow">Mingo</span>
               </div>
-              <div className="mt-2 text-ods-text-secondary text-h6">Loading AI Co-Pilots...</div>
             </div>
           </div>
         )}

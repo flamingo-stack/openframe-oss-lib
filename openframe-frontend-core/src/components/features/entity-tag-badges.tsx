@@ -45,6 +45,11 @@ const TAG_ITEM_CLASS = 'inline-flex';
 /** How many tags a row usually shows: what its loading state draws. */
 export const ENTITY_TAG_BADGES_SKELETON_COUNT = 3;
 
+/**
+ * A tag's label while it is read: a typical label's width, ten characters of the badge's monospaced type (measured
+ * across records, a tag is about ten characters, e.g. "COMPLIANCE"), so the row wraps where a typical row wraps.
+ */
+const TAG_SKELETON_WIDTH_CLASS = 'w-[10ch]';
 /** The "+N" badge's skeleton: the width of a two-digit count. */
 const OVERFLOW_BADGE_SKELETON_CLASS = 'w-5';
 
@@ -83,7 +88,11 @@ export function EntityTagBadgesSkeleton({
           data-loading-item
         >
           {/* The loaded badge's 1px border (its colours are the skeleton's). */}
-          <StatusBadgeSkeleton variant="card" className="border" />
+          {/* A host's typical tag width (`itemClassName`) is the box's: the badge fills it. */}
+          <StatusBadgeSkeleton
+            variant="card"
+            className={cn('border', itemClassName ? 'box-border w-full' : TAG_SKELETON_WIDTH_CLASS)}
+          />
         </span>
       ))}
       {/* The "+N" badge counts the tags left out: read data, so it is one of the list's items. */}

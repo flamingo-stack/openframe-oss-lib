@@ -102,10 +102,15 @@ export interface VideoBitesStripProps {
 // Component
 // =============================================================================
 
+/** A card's height in px per breakpoint (Figma: 416 desktop), the strip's default and its loading state's. */
+export const VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX = 416;
+export const VIDEO_BITES_CARD_HEIGHT_MOBILE_PX = 300;
 /** The widest line a strip bleeds across: a marquee's loading state fills it, the track clips the rest. */
 export const STRIP_LINE_MAX_PX = 2560;
 /** A marquee's loading state is a FULL line of cards: as many 9:16 cards at the desktop height as fill the widest line. */
-export const VIDEO_BITES_SKELETON_COUNT = Math.ceil(STRIP_LINE_MAX_PX / ((416 * 9) / 16));
+export const VIDEO_BITES_SKELETON_COUNT = Math.ceil(
+  STRIP_LINE_MAX_PX / ((VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX * 9) / 16),
+);
 export function VideoBitesStrip({
   bites,
   title = DEFAULT_VIDEO_BITES_TITLE,
@@ -117,8 +122,8 @@ export function VideoBitesStrip({
   autoScroll = true,
   autoScrollSpeed = 60,
   pauseOnHover = true,
-  cardHeightDesktop = 416,
-  cardHeightMobile = 300,
+  cardHeightDesktop = VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX,
+  cardHeightMobile = VIDEO_BITES_CARD_HEIGHT_MOBILE_PX,
   showChevrons = true,
   onBiteNavigate,
   sortComparator = sortBitesByCreatedAtDesc,
@@ -227,7 +232,12 @@ export interface VideoBiteCardSkeletonProps {
  * A bite card while it is read: the card's own frame and its media box as the skeleton's surface. The title and
  * the speaker sit in the hover overlay, unseen at rest, so they are not drawn.
  */
-export function VideoBiteCardSkeleton({ aspect = '9:16', height, heightMobile, className }: VideoBiteCardSkeletonProps) {
+export function VideoBiteCardSkeleton({
+  aspect = '9:16',
+  height,
+  heightMobile,
+  className,
+}: VideoBiteCardSkeletonProps) {
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(aspect))];
   return (
     <div
@@ -269,8 +279,8 @@ export function VideoBitesStripSkeleton({
   title = DEFAULT_VIDEO_BITES_TITLE,
   showTitle = true,
   headerSlot,
-  cardHeightDesktop = 416,
-  cardHeightMobile = 300,
+  cardHeightDesktop = VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX,
+  cardHeightMobile = VIDEO_BITES_CARD_HEIGHT_MOBILE_PX,
   className,
 }: VideoBitesStripSkeletonProps) {
   const cells = useMemo(() => Array.from({ length: count }, (_, i) => i), [count]);
@@ -530,12 +540,7 @@ export function VideoBiteCard({
       // (cards move under a stationary pointer — see cards-strip.tsx). The
       // hover area is exactly this card root: media + overlay + toolbar.
       data-strip-card-key={key}
-      className={cn(
-        'group/card',
-        BITE_CARD_FRAME_CLASS,
-        height !== undefined ? 'shrink-0' : 'w-full',
-        className,
-      )}
+      className={cn('group/card', BITE_CARD_FRAME_CLASS, height !== undefined ? 'shrink-0' : 'w-full', className)}
       style={height !== undefined ? { maxWidth: STRIP_CELL_MAX_WIDTH } : undefined}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}

@@ -34,6 +34,9 @@ export interface SnapCarouselProps<T> {
   nextLabel?: string;
   /** A slide to bring into view whenever this value changes (a link that names it). Only the track moves, never the page. */
   focusIndex?: number;
+  /** The slides are read data (a list whose length is the record's): each slide is marked an item of ONE read list
+   *  (`data-loading-item`), so a loading state drawn with the same carousel has the same structure as the loaded one. */
+  readItems?: boolean;
   className?: string;
 }
 
@@ -90,6 +93,7 @@ export function SnapCarousel<T>({
   prevLabel = 'Previous',
   nextLabel = 'Next',
   focusIndex,
+  readItems = false,
   className,
 }: SnapCarouselProps<T>) {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -174,6 +178,7 @@ export function SnapCarousel<T>({
             // Never `aria-hidden`: the neighbouring slides are on screen and their links take focus.
             aria-current={itemIndex === index ? 'true' : undefined}
             className={cn('flex shrink-0 grow-0 snap-start', slideClassName)}
+            data-loading-item={readItems || undefined}
           >
             <div className="min-w-0 flex-1">{renderItem(item, itemIndex)}</div>
           </div>

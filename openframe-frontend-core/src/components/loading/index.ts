@@ -14,15 +14,19 @@ export {
 export { CardSkeleton, CardSkeletonGrid } from './card-skeleton';
 
 // Unified skeleton components
-export { UnifiedSkeleton, TextSkeleton, TextLineSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
+export {
+  UnifiedSkeleton,
+  TextSkeleton,
+  TextLineSkeleton,
+  MediaSkeleton,
+  InteractiveSkeleton,
+} from './unified-skeleton';
 
 // New unified loading components
 export { ContentLoadingContainer, useContentLoading } from '../content-loading-container';
 
 // Profile system loading skeleton
 export { ProfileLoadingSkeleton } from '../profile/ProfileLoadingSkeleton';
-
-export { SettingsFormSkeleton, type SettingsFormSkeletonProps } from './settings-form-skeleton';
 
 export { CategoryCardSkeleton } from './category-card-skeleton';
 

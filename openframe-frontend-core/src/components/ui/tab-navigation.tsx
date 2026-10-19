@@ -57,7 +57,7 @@ export interface TabItem {
   badge?: string;
   /** A second, quieter line of text: beside the label from `md`, under it below. */
   sublabel?: string;
-  /** A leading visual used instead of `icon` (an avatar, a logo). Rendered as given. */
+  /** A leading visual used instead of `icon` (an avatar, a logo), drawn `TAB_AVATAR_PX` square. Rendered as given. */
   avatar?: React.ReactNode;
   /**
    * 0..1. Set on the ACTIVE tab, the underline stops being a selection marker
@@ -166,6 +166,8 @@ const ADMIN_TAB_GAP_CLASS = 'gap-[var(--spacing-system-xxs)]';
 const TAB_CLASS =
   'group relative flex shrink-0 items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]';
 const TAB_AVATAR_GAP_CLASS = 'gap-[var(--spacing-system-xsf)]';
+/** A tab's avatar, in px: the size a host draws `TabItem.avatar` at, and the circle the skeleton draws for it. */
+export const TAB_AVATAR_PX = 24;
 const TAB_STRETCH_CLASS = 'flex-1';
 const tabAlignClass = (tabAlign: 'center' | 'start') =>
   tabAlign === 'start' ? 'justify-start text-left' : 'justify-center';
@@ -597,7 +599,7 @@ const TabBar = memo(function TabBarImpl({
 export interface TabNavigationSkeletonProps {
   /** How many tabs the strip draws. */
   count: number;
-  /** Each tab leads with an avatar: a 24px circle before its label. */
+  /** Each tab leads with an avatar: a `TAB_AVATAR_PX` circle before its label. */
   avatar?: boolean;
   /** Each tab carries a quieter second line (`TabItem.sublabel`): beside the label from md, under it below. */
   sublabel?: boolean;
@@ -636,7 +638,9 @@ export function TabNavigationSkeleton({
               avatar && TAB_AVATAR_GAP_CLASS,
             )}
           >
-            {avatar && <UnifiedSkeleton variant="circular" className="size-6 shrink-0" />}
+            {avatar && (
+              <UnifiedSkeleton variant="circular" width={TAB_AVATAR_PX} height={TAB_AVATAR_PX} className="shrink-0" />
+            )}
             {sublabel ? (
               <span className={TAB_SUBLABEL_WRAP_CLASS}>
                 <TextLineSkeleton as="span" type="h4" className="w-20" />

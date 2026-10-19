@@ -70,7 +70,7 @@ import {
 } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel, ContextPanelSkeleton } from './context-panel';
-import { SchedulerModalHeader, SchedulerModalHeaderSkeleton } from './modal-header';
+import { SchedulerModalHeader } from './modal-header';
 import { SlotPicker, SlotPickerSkeleton, dayKeyInZone } from './slot-picker';
 
 /**
@@ -902,8 +902,26 @@ export function HubSpotMeetingScheduler({
     return (
       <div className={cn(MODAL_STACK_CLASS, className)}>
         <LoadingRegion label="Loading available times" className={MODAL_CARD_CLASS}>
-          <SchedulerModalHeaderSkeleton />
-          <SlotPickerSkeleton monthOffset={monthOffset} layout="modal" />
+          <SchedulerModalHeader
+            loading
+            hosts={shownHosts}
+            durationsMs={durations}
+            selectedDurationMs={durationMs}
+            onSelectDuration={NOOP}
+            timezone={timezone}
+          />
+          <SlotPicker
+            loading
+            layout="modal"
+            slots={slots}
+            timezone={timezone}
+            monthOffset={monthOffset}
+            onMonthOffsetChange={NOOP}
+            selectedSlot={null}
+            onSelectSlot={NOOP}
+            selectedDay={null}
+            onSelectDay={NOOP}
+          />
         </LoadingRegion>
         <ModalFooter
           onCancel={onBack}
@@ -1023,8 +1041,15 @@ export function HubSpotMeetingScheduler({
                   </AlertDescription>
                 </Alert>
               )}
-              {timezone && durationMs != null ? (
+              {(!timezone || durationMs == null) && durations.length === 0 && !isFetchingAvailability ? (
+                <div className={cn(MODAL_STEP_CLASS, 'items-start gap-[var(--spacing-system-m)]')}>
+                  <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
+                  {escapeHatch}
+                </div>
+              ) : (
+                // Waiting for the zone or the length, the picker draws its own skeleton (`loading`).
                 <SlotPicker
+                  loading={!timezone || durationMs == null}
                   layout="modal"
                   slots={slots}
                   timezone={timezone}
@@ -1040,13 +1065,6 @@ export function HubSpotMeetingScheduler({
                   onSelectDay={setSelectedDay}
                   isLoading={isLoadingAvailability}
                 />
-              ) : durations.length === 0 && !isFetchingAvailability ? (
-                <div className={cn(MODAL_STEP_CLASS, 'items-start gap-[var(--spacing-system-m)]')}>
-                  <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
-                  {escapeHatch}
-                </div>
-              ) : (
-                <SlotPickerSkeleton monthOffset={monthOffset} layout="modal" />
               )}
             </>
           )}
@@ -1194,11 +1212,24 @@ export function HubSpotMeetingScheduler({
                   </AlertDescription>
                 </Alert>
               )}
-              {timezone && durationMs != null ? (
-                // The picker owns BOTH the loading and the empty month now —
-                // it keeps the calendar up either way, so there is no branch
-                // here that can take it off screen mid-flow.
+              {(!timezone || durationMs == null) && durations.length === 0 && (!isFetchingAvailability || formOnly) ? (
+                // The LINK publishes nothing at all — a different thing from a
+                // fully-booked month, and the only case the escape hatch is
+                // the right answer to. In the form-only layout it holds through
+                // a refetch too: the alternative frame is a calendar skeleton
+                // where a form belongs.
+                <div className="flex flex-col items-start gap-[var(--spacing-system-m)]">
+                  <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
+                  {escapeHatch}
+                </div>
+              ) : (
+                // The picker owns the loading and the empty month — it keeps
+                // the calendar up either way, so there is no branch here that
+                // can take it off screen mid-flow. In the pre-mount
+                // timezone-resolution window (every SSR load hits it for one
+                // frame-batch) it draws its own skeleton (`loading`).
                 <SlotPicker
+                  loading={!timezone || durationMs == null}
                   slots={slots}
                   timezone={timezone}
                   monthOffset={monthOffset}
@@ -1257,21 +1288,6 @@ export function HubSpotMeetingScheduler({
                   // clicked chip spinning.
                   isSubmitting={detailsFirst ? isSubmitting : undefined}
                 />
-              ) : durations.length === 0 && (!isFetchingAvailability || formOnly) ? (
-                // The LINK publishes nothing at all — a different thing from a
-                // fully-booked month, and the only case the escape hatch is
-                // the right answer to. In the form-only layout it holds through
-                // a refetch too: the alternative frame is a calendar skeleton
-                // where a form belongs.
-                <div className="flex flex-col items-start gap-[var(--spacing-system-m)]">
-                  <p className="text-ods-text-secondary text-h6">No call times are published right now.</p>
-                  {escapeHatch}
-                </div>
-              ) : (
-                // Pre-mount timezone-resolution window (every SSR load hits
-                // this for one frame-batch) — same layout, real calendar, so
-                // nothing shifts when the picker takes over.
-                <SlotPickerSkeleton monthOffset={monthOffset} />
               )}
             </div>
           )}

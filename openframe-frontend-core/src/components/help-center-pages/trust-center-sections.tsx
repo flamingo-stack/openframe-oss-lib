@@ -19,7 +19,6 @@ import { useDebounce } from '../../hooks/ui/use-debounce';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import {
   TRUST_CENTER_SEARCH_DEBOUNCE_MS,
-  TRUST_CENTER_SECTIONS,
   normalizeTrustControlQuery,
   trustCenterControlsUrl,
   trustFrameworkBadge,
@@ -49,18 +48,16 @@ import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { ListEmptyState } from '../list-empty-state';
 import { LoadingRegion } from '../loading/loading-region';
 import { InteractiveSkeleton, TextLineSkeleton, TextSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { Button } from '../ui/button/button';
 import { ComplianceLogo } from '../ui/compliance-badge';
-import { DataAttributionSkeleton } from '../ui/data-attribution';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
 import { ScrollShadow } from '../ui/scroll-fade';
 import { SearchInput } from '../ui/search-input';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
 import { StatusBadge, StatusBadgeSkeleton } from '../ui/status-badge';
-import { StatusIndicatorSkeleton } from '../ui/status-indicator';
 import { TabNavigation, TabNavigationSkeleton, type TabItem } from '../ui/tab-navigation';
 
 /** Monitoring `icon` vocabulary (owned by `TRUST_FRAMEWORK_MONITORING`) → icon component, ONE lookup. */
@@ -140,7 +137,15 @@ export function TrustSection({
  * in Vanta's order: the question as the row title, the answer beneath. The
  * first is the commitment (success shield). The page's ONE row style.
  */
-export function AiSection({ practices }: { practices: TrustCenterAiPractice[] }) {
+export function AiSection({
+  practices,
+  skeletonRows,
+}: {
+  practices: TrustCenterAiPractice[];
+  /** Rows the loading state draws (`TrustPanelRows`). Absent: the layout's fold. */
+  skeletonRows?: TrustPanelRows;
+}) {
+  if (useLoadingScope()) return <TrustPanelSkeleton panel="ai" rows={skeletonRows} />;
   const rows: PanelRow[] = practices.map(practice => ({
     id: practice.label,
     columns: [
@@ -170,7 +175,15 @@ export function AiSection({ practices }: { practices: TrustCenterAiPractice[] })
  * "Planned" — never a certification claim, which Vanta's API does
  * not hold.
  */
-export function ComplianceSection({ frameworks }: { frameworks: TrustCenterFramework[] }) {
+export function ComplianceSection({
+  frameworks,
+  skeletonRows,
+}: {
+  frameworks: TrustCenterFramework[];
+  /** Rows the loading state draws (`TrustPanelRows`): a host whose frameworks are a curated list passes its length. */
+  skeletonRows?: TrustPanelRows;
+}) {
+  if (useLoadingScope()) return <TrustPanelSkeleton panel="compliance" rows={skeletonRows} />;
   const rows: PanelRow[] = frameworks.map(framework => {
     const entry = trustFrameworkMonitoringEntry(framework.monitoring);
     const Icon = FRAMEWORK_ICONS[entry.icon];
@@ -293,6 +306,12 @@ function ControlsListSkeleton({ region = true }: { region?: boolean } = {}) {
  * (the page's own data), so the first paint needs no request.
  */
 export function ControlsSection({ endpoint, seed }: { endpoint: string; seed: TrustCenterControlsPage }) {
+  // In a page's loading state the categories and controls are read: the section is its skeleton and reads nothing.
+  if (useLoadingScope()) return <ControlsSectionSkeleton />;
+  return <ControlsSectionLoaded endpoint={endpoint} seed={seed} />;
+}
+
+function ControlsSectionLoaded({ endpoint, seed }: { endpoint: string; seed: TrustCenterControlsPage }) {
   const [domain, setDomain] = useState<string | null>(seed.domain);
   const [typed, setTyped] = useState('');
   const query = useDebounce(normalizeTrustControlQuery(typed), TRUST_CENTER_SEARCH_DEBOUNCE_MS);
@@ -386,13 +405,17 @@ export function DocumentsSection({
   documents,
   documentUrl,
   onRequest,
+  skeletonRows,
 }: {
   documents: TrustCenterDocument[];
+  /** Rows the loading state draws (`TrustPanelRows`). Absent: the layout's fold. */
+  skeletonRows?: TrustPanelRows;
   /** Where a public document opens (`trustCenterDocumentUrl`); `null` → offer a request instead. */
   documentUrl: (document: TrustCenterDocument) => string | null;
   /** Open the ONE access request, optionally for a named document. */
   onRequest: (documentTitle: string | null) => void;
 }) {
+  if (useLoadingScope()) return <TrustPanelSkeleton panel="documents" rows={skeletonRows} />;
   const rows: PanelRow[] = documents.map(document => {
     const gated = document.access === 'request';
     const href = gated ? null : documentUrl(document);
@@ -515,7 +538,15 @@ function countryWithFlag(country: string): string {
   return flag ? `${flag} ${country}` : country;
 }
 
-export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCenterSubprocessor[] }) {
+export function SubprocessorsSection({
+  subprocessors,
+  skeletonRows,
+}: {
+  subprocessors: TrustCenterSubprocessor[];
+  /** Rows the loading state draws (`TrustPanelRows`). Absent: the layout's fold. */
+  skeletonRows?: TrustPanelRows;
+}) {
+  if (useLoadingScope()) return <TrustPanelSkeleton panel="subprocessors" rows={skeletonRows} />;
   // The location column exists only when Vanta holds a location for at least one of them.
   const anyLocation = subprocessors.some(subprocessor => subprocessor.location);
   const rows: PanelRow[] = subprocessors.map(subprocessor => ({
@@ -546,7 +577,7 @@ export function SubprocessorsSection({ subprocessors }: { subprocessors: TrustCe
 }
 
 // ---------------------------------------------------------------------------
-// Contact + loading
+// Contact
 // ---------------------------------------------------------------------------
 
 /**
@@ -595,20 +626,31 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
  * Rows a panel's skeleton draws, on a phone (below `content-md`) and from `content-md`: the rows of a panel one screen
  * holds below its section's heading (a row of a typical description is about 100px on a phone and 80px wide). The
  * panels list what the host's data lists, so the skeleton draws the layout's fold, never one record set's length; a
- * host whose lists are curated passes their lengths (`TrustCenterSkeleton`'s `panelRows`).
+ * host whose list is curated passes its length (each section's `skeletonRows`, the page's `panelSkeletonRows`).
  */
 const TRUST_PANEL_FOLD = { phone: 4, wide: 5 } as const;
-/**
- * The lines a typical row description takes (`text-h6` lines): a sentence wraps to a few lines in a phone's narrow
- * cell and fits one line from `content-md` up. A longer description growing past it is a settle below the row.
- */
-const TRUST_ROW_DESCRIPTION_LINES = { phone: 4, wide: 1 } as const;
 
-/** The panels whose rows the skeleton draws (the Controls, Contact and FAQ sections draw their own). */
+/** The panels whose rows `TrustPanelSkeleton` draws (Controls, Contact and the FAQ draw their own). */
 export type TrustCenterPanelId = 'compliance' | 'documents' | 'subprocessors' | 'ai';
 
 /** Rows a panel's skeleton draws: one count, or one per breakpoint. */
 export type TrustPanelRows = number | { phone: number; wide: number };
+
+/**
+ * Each panel's row: its mark (a 40px compliance logo or a 24px glyph), its right-hand cell, and the lines its TYPICAL
+ * description takes (`text-h6` lines) on a phone (below `content-md`) and from `content-md`. A framework's or an AI
+ * statement's text is a few sentences that wrap in a phone's narrow cell; a document's and a subprocessor's is a short
+ * phrase on one line. A description longer than typical is the record's length, a settle below its row.
+ */
+const TRUST_PANEL_SHAPES: Record<
+  TrustCenterPanelId,
+  { mark: 'logo' | 'glyph'; action: 'badge' | 'button' | 'none'; lines: { phone: number; wide: number } }
+> = {
+  compliance: { mark: 'logo', action: 'badge', lines: { phone: 4, wide: 1 } },
+  documents: { mark: 'glyph', action: 'button', lines: { phone: 1, wide: 1 } },
+  subprocessors: { mark: 'glyph', action: 'none', lines: { phone: 1, wide: 1 } },
+  ai: { mark: 'glyph', action: 'none', lines: { phone: 6, wide: 2 } },
+};
 
 function panelFold(rows: TrustPanelRows | undefined): { phone: number; wide: number } {
   if (rows === undefined) return TRUST_PANEL_FOLD;
@@ -616,17 +658,14 @@ function panelFold(rows: TrustPanelRows | undefined): { phone: number; wide: num
 }
 
 /**
- * Rows of the REAL `StackedRowsPanel` (its own row heights and borders) whose
- * cells hold bars: a mark (a 40px compliance logo or a 24px glyph), a value over
- * a label, and the right-hand badge or button in the page's `ACTION_COLUMN`.
+ * A panel section while it is read: rows of the REAL `StackedRowsPanel` (its own row heights and borders, each row a
+ * read list item) whose cells hold bars: the panel's mark, a value over its typical description, and the right-hand
+ * badge or button in the page's `ACTION_COLUMN`.
  */
-function skeletonRows(shape: {
-  rows: TrustPanelRows | undefined;
-  mark: 'logo' | 'glyph';
-  action: 'badge' | 'button' | 'none';
-}): PanelRow[] {
-  const fold = panelFold(shape.rows);
-  return Array.from({ length: Math.max(fold.phone, fold.wide) }, (_, index) => ({
+function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?: TrustPanelRows }) {
+  const shape = TRUST_PANEL_SHAPES[panel];
+  const fold = panelFold(rows);
+  const panelRows: PanelRow[] = Array.from({ length: Math.max(fold.phone, fold.wide) }, (_, index) => ({
     id: `skeleton-${index}`,
     // A row past a breakpoint's fold is not drawn there; the last row drawn on a phone drops its divider like the
     // panel's last row (`last:` cannot see a hidden sibling).
@@ -649,16 +688,11 @@ function skeletonRows(shape: {
         value: <TextLineSkeleton type="inherit" as="span" className="w-1/3" />,
         label: (
           <>
+            <TextLineSkeleton type="inherit" as="span" lines={shape.lines.phone} className="w-full content-md:hidden" />
             <TextLineSkeleton
               type="inherit"
               as="span"
-              lines={TRUST_ROW_DESCRIPTION_LINES.phone}
-              className="w-full content-md:hidden"
-            />
-            <TextLineSkeleton
-              type="inherit"
-              as="span"
-              lines={TRUST_ROW_DESCRIPTION_LINES.wide}
+              lines={shape.lines.wide}
               className="hidden w-full content-md:block"
             />
           </>
@@ -683,6 +717,7 @@ function skeletonRows(shape: {
           ]),
     ],
   }));
+  return <StackedRowsPanel rows={panelRows} listItems />;
 }
 
 /** The controls summary line while its counts are read. */
@@ -713,88 +748,5 @@ function ControlsSectionSkeleton() {
         <ControlsListSkeleton region={false} />
       </div>
     </div>
-  );
-}
-
-export interface TrustCenterSkeletonProps {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-  /** The status row's sync line (`TrustCenterPage`'s `attribution`). Default true. */
-  attribution?: boolean;
-  /** The status row's PDF link (static: drawn as given). */
-  download?: ReactNode;
-  /**
-   * The FAQ section's content while loading (the page's `FaqSection` in a scope, which draws its own skeleton).
-   * Absent: the FAQ is not drawn in the sections column (the page draws it last, after the host's content).
-   */
-  faq?: ReactNode;
-  /**
-   * Rows each panel's skeleton draws, for a host whose lists are curated (it knows their lengths). Absent: the
-   * layout's fold, the rows one screen holds.
-   */
-  panelRows?: Partial<Record<TrustCenterPanelId, TrustPanelRows>>;
-}
-
-/**
- * The page BODY while the trust center loads: the loaded body's own layout classes, the status row (status and sync
- * line as skeletons, the PDF link real), then EVERY section in the page's order with its real heading and lead and
- * its content as a skeleton (the Contact section is static: drawn for real), beside the real section rail.
- */
-export function TrustCenterSkeleton({
-  region = true,
-  attribution = true,
-  download,
-  faq,
-  panelRows,
-}: TrustCenterSkeletonProps = {}) {
-  const content: Record<TrustCenterSectionId, ReactNode> = {
-    compliance: (
-      <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.compliance, mark: 'logo', action: 'badge' })} listItems />
-    ),
-    controls: <ControlsSectionSkeleton />,
-    documents: (
-      <StackedRowsPanel
-        rows={skeletonRows({ rows: panelRows?.documents, mark: 'glyph', action: 'button' })}
-        listItems
-      />
-    ),
-    subprocessors: (
-      <StackedRowsPanel
-        rows={skeletonRows({ rows: panelRows?.subprocessors, mark: 'glyph', action: 'none' })}
-        listItems
-      />
-    ),
-    ai: <StackedRowsPanel rows={skeletonRows({ rows: panelRows?.ai, mark: 'glyph', action: 'none' })} listItems />,
-    contact: <ContactSection onContact={() => undefined} />,
-    faq,
-  };
-  const sections = TRUST_CENTER_SECTIONS.filter(section => section.id !== 'faq' || faq !== undefined);
-  return (
-    <>
-      {/* Inert: the real controls drawn here (the PDF link, the search, Contact's button, the rail) are not usable
-          while the page loads. */}
-      <div className={TRUST_STATUS_ROW_CLASS} aria-hidden="true" inert>
-        <StatusIndicatorSkeleton />
-        {attribution ? <DataAttributionSkeleton action={download} /> : null}
-      </div>
-      <LoadingRegion label="Loading the trust center" announce={region} className={TRUST_BODY_GRID_CLASS}>
-        <div className={TRUST_SECTIONS_COLUMN_CLASS} aria-hidden="true" inert>
-          {sections.map(section => (
-            <TrustSection key={section.id} id={section.id} title={section.label} lead={TRUST_SECTION_LEADS[section.id]}>
-              {content[section.id]}
-            </TrustSection>
-          ))}
-        </div>
-        <aside className="hidden content-lg:block" aria-hidden="true" inert>
-          <div className="sticky" style={{ top: STICKY_HEADER_OFFSET_PX }}>
-            <StickySectionNav
-              sections={TRUST_CENTER_SECTIONS.map(section => ({ id: section.id, label: section.label }))}
-              activeSection={TRUST_CENTER_SECTIONS[0].id}
-              onSectionClick={() => undefined}
-            />
-          </div>
-        </aside>
-      </LoadingRegion>
-    </>
   );
 }

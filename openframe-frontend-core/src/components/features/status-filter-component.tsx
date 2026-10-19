@@ -40,6 +40,8 @@ export interface StatusFilterComponentProps {
    * (which React then pairs against this component during hydration).
    */
   showAll?: boolean;
+  /** The options are read on the client and have not arrived: the row draws its skeleton, as in a loading scope. */
+  loading?: boolean;
 }
 
 /** The row's frame, label and controls, read by the row and by its skeleton, so the skeleton is the row's size. */
@@ -70,11 +72,12 @@ export function StatusFilterComponent({
   disabledValues = [],
   label = 'Status',
   showAll = true,
+  loading = false,
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
 
-  if (useLoadingScope()) {
+  if (useLoadingScope() || loading) {
     return (
       <StatusFilterComponentSkeleton
         label={label}

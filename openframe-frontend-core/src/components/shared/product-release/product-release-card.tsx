@@ -298,37 +298,40 @@ export function ProductReleaseCard({
             always-on changelog placeholder matches the loaded shape
             (zero reflow on resolve). When `totalChangelog === 0`, an
             empty-state line takes the same vertical space as the
-            populated row. */}
+            populated row. Which counts show is read data, so each one is a
+            read list item (`data-loading-item`): the skeleton draws the first. */}
         <div className={RELEASE_CARD_CHANGELOG_CLASS}>
           {totalChangelog > 0 && changelogCounts ? (
             <>
               {changelogCounts.features > 0 && (
-                <span className="inline-flex items-center gap-1.5">
+                <span data-loading-item className="inline-flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5" />
                   {changelogCounts.features} {changelogCounts.features === 1 ? 'feature' : 'features'}
                 </span>
               )}
               {changelogCounts.fixes > 0 && (
-                <span className="inline-flex items-center gap-1.5">
+                <span data-loading-item className="inline-flex items-center gap-1.5">
                   <Wrench className="h-3.5 w-3.5" />
                   {changelogCounts.fixes} {changelogCounts.fixes === 1 ? 'fix' : 'fixes'}
                 </span>
               )}
               {changelogCounts.improvements > 0 && (
-                <span className="inline-flex items-center gap-1.5">
+                <span data-loading-item className="inline-flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5" />
                   {changelogCounts.improvements} {changelogCounts.improvements === 1 ? 'improvement' : 'improvements'}
                 </span>
               )}
               {changelogCounts.breaking > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-ods-warning">
+                <span data-loading-item className="inline-flex items-center gap-1.5 text-ods-warning">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {changelogCounts.breaking} breaking
                 </span>
               )}
             </>
           ) : (
-            <span className="text-ods-text-secondary">No changelog entries yet</span>
+            <span data-loading-item className="text-ods-text-secondary">
+              No changelog entries yet
+            </span>
           )}
         </div>
 

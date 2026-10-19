@@ -51,7 +51,7 @@ const IDENTITY_ROW_CLASS = 'flex w-full items-start gap-6';
 const AVATAR_BOX_CLASS = 'relative h-24 w-24 shrink-0';
 const IDENTITY_TEXT_CLASS = 'flex min-w-0 flex-col justify-center gap-2';
 const NAME_CLASS = 'truncate leading-none text-ods-text-primary text-h2';
-const SUBTITLE_CLASS = 'truncate font-body text-lg leading-none text-ods-text-secondary';
+const SUBTITLE_CLASS = 'truncate text-h4 leading-none text-ods-text-secondary';
 const BIO_CLASS = 'text-ods-text-secondary text-h6';
 const TOPICS_CLASS = 'flex flex-wrap gap-2';
 /** Social icons (compact, icon-sm 32px, gap-2) a skeleton draws: a profile's typical row (192px, five links). */
