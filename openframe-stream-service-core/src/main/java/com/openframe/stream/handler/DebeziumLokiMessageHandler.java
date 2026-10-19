@@ -114,8 +114,8 @@ public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEvent
                 return;
             }
             log.error("Loki refused the tool event, its details are lost: tenantId={}, toolType={}, toolEventId={}, "
-                            + "eventTimestamp={}, reason={}",
-                    event.getTenantId(), event.getToolType(), event.getToolEventId(), event.getEventTimestamp(), e.getMessage());
+                            + "eventTimestamp={}",
+                    event.getTenantId(), event.getToolType(), event.getToolEventId(), event.getEventTimestamp(), e);
         }
     }
 
