@@ -1,0 +1,20 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key"])
+
+type Query {
+    node(id: ID!): Node
+    nodes(ids: [ID!]!): [Node]!
+}
+
+interface Node {
+    id: ID!
+}
+
+type Machine implements Node @key(fields: "machineId") {
+    id: ID!
+    machineId: String!
+    hostname: String
+}
+
+type Dialog implements Node @key(fields: "id", resolvable: false) {
+    id: ID!
+}

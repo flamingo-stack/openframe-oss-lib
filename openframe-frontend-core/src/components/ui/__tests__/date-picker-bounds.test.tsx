@@ -58,9 +58,15 @@ function dayButton(iso: string): HTMLElement {
   return within(dayCell(iso)).getByRole('button');
 }
 
+/** The trigger label of June 15, 2026 — the picker's default format is the
+ *  viewer's locale, so the expectation is computed the same way it is. */
+const JUNE_15_LABEL = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+  new Date(2026, 5, 15),
+);
+
 /** Opens the picker's popover — the trigger shows the current value. */
 function openCalendar(): void {
-  fireEvent.click(screen.getByRole('button', { name: /06\/15\/2026/ }));
+  fireEvent.click(screen.getByRole('button', { name: JUNE_15_LABEL }));
 }
 
 describe('date picker bounds', () => {
