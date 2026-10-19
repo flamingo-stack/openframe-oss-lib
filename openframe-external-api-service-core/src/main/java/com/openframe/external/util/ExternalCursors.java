@@ -4,10 +4,7 @@ import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.core.exception.BadRequestException;
 import org.bson.types.ObjectId;
 
-/**
- * Cursor validation for the external API: a corrupted cursor must fail loudly with 400 instead of
- * silently answering with page one (a client restarting its pagination forever would never notice).
- */
+// Cursor validation for the external API: a corrupted cursor must fail loudly with 400 instead of silently answering with page one.
 public final class ExternalCursors {
 
     private ExternalCursors() {
