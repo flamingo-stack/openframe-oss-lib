@@ -3,12 +3,16 @@
 import { type HTMLAttributes, memo, forwardRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
+  /** A step of the shared avatar scale (`AVATAR_SIZE`). */
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   /** Exact pixel size (width & height). Overrides the `size` bucket dimensions —
    *  for callers with a numeric-px API (e.g. UserDisplay/MSPDisplay). */
@@ -26,6 +30,12 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
    *  so callers can shrink/recolor the initials for compact avatars. */
   initialsClassName?: string;
 }
+
+/** The avatar's corner at each variant, read by the avatar and by its skeleton. */
+const SQUARE_AVATAR_VARIANT_CLASS = {
+  square: 'rounded-md',
+  round: 'rounded-full',
+} as const;
 
 const SquareAvatar = memo(
   forwardRef<HTMLDivElement, SquareAvatarProps>(
@@ -45,30 +55,17 @@ const SquareAvatar = memo(
       },
       ref,
     ) => {
-      const resolvedSrc = useAuthedImageSrc(src);
-      const sizeClasses = {
-        // xs (24px): dense card meta rows — avatar stacks on delivery/
-        // roadmap cards. Part of the shared scale so no caller ever
-        // bypasses the buckets with raw sizePx for a standard size.
-        xs: 'h-6 w-6',
-        sm: 'h-8 w-8',
-        md: 'h-10 w-10',
-        lg: 'h-12 w-12',
-        xl: 'h-16 w-16',
-      };
+      // In a loading scope the avatar is its skeleton, and its image is not fetched.
+      const held = useLoadingScope();
+      const authedSrc = useAuthedImageSrc(held ? undefined : src);
+      if (held) {
+        return <SquareAvatarSkeleton size={size} sizePx={sizePx} variant={variant} className={className} />;
+      }
+      const resolvedSrc = authedSrc;
+      const sizeClasses = AVATAR_SIZE;
+      const sizePxBySize = AVATAR_SIZE_PX;
 
-      const sizePxBySize = {
-        xs: 24,
-        sm: 32,
-        md: 40,
-        lg: 48,
-        xl: 64,
-      };
-
-      const variantClasses = {
-        square: 'rounded-md',
-        round: 'rounded-full',
-      };
+      const variantClasses = SQUARE_AVATAR_VARIANT_CLASS;
 
       return (
         <div
@@ -136,3 +133,24 @@ const SquareAvatar = memo(
 SquareAvatar.displayName = 'SquareAvatar';
 
 export { SquareAvatar };
+
+/** A SquareAvatar while its person is read: a box of the avatar's own size and corner. */
+export function SquareAvatarSkeleton({
+  size = 'md',
+  sizePx,
+  variant = 'square',
+  className,
+}: Pick<SquareAvatarProps, 'size' | 'sizePx' | 'variant' | 'className'>) {
+  return (
+    <UnifiedSkeleton
+      className={cn(
+        'shrink-0',
+        sizePx === undefined && AVATAR_SIZE[size],
+        SQUARE_AVATAR_VARIANT_CLASS[variant],
+        className,
+      )}
+      width={sizePx}
+      height={sizePx}
+    />
+  );
+}

@@ -4,6 +4,12 @@ import type { CSSProperties, ReactElement, ReactNode } from 'react';
 import { breakpoints } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
 
+/**
+ * The bar's height (the 44px one-line strip, see the design note on `AnnouncementBarView`): read by the bar and by
+ * every shape that stands for it (a preview's loading state).
+ */
+export const ANNOUNCEMENT_BAR_HEIGHT_CLASS = 'min-h-11';
+
 export interface AnnouncementBarViewProps {
   /**
    * Leading slot — typically an icon, at content width before the title. Size
@@ -89,7 +95,7 @@ export function AnnouncementBarView({
     : undefined;
 
   return (
-    <div className={cn('flex min-h-11 w-full max-w-full items-center', className)} style={style}>
+    <div className={cn('flex w-full max-w-full items-center', ANNOUNCEMENT_BAR_HEIGHT_CLASS, className)} style={style}>
       {/* Content row — the tap target below `md`, where the CTA is hidden.
           Its vertical padding never drives the height; the 44px strip does. */}
       <div

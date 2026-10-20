@@ -3,6 +3,7 @@
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
+import { isOwnClick } from '../../../utils/own-click';
 import { Checkbox } from '../checkbox';
 import { TableCell } from './table-cell';
 import { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP } from './table-skeleton';
@@ -42,10 +43,7 @@ export function TableRow<T = TableRowData>({
     : {};
 
   const handleRowClick = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('[data-no-row-click]')) {
-      return;
-    }
+    if (!isOwnClick(e.target, e.currentTarget)) return;
 
     if (onClick) {
       onClick(item);

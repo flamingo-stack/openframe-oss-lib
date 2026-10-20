@@ -7,7 +7,7 @@ import { DataTableEmpty } from './data-table-empty';
 import { DataTableHeader } from './data-table-header';
 import { DataTableInfiniteFooter } from './data-table-infinite-footer';
 import { DataTableRow } from './data-table-row';
-import { DataTableRowCount } from './data-table-row-count';
+import { DataTableRowCount, DataTableRowCountSkeleton } from './data-table-row-count';
 import { DataTableSkeleton } from './data-table-skeleton';
 
 /**
@@ -45,6 +45,7 @@ export {
   DataTableInfiniteFooter,
   DataTableCursorFooter,
   DataTableRowCount,
+  DataTableRowCountSkeleton,
 };
 
 export { useDataTableContext } from './data-table';

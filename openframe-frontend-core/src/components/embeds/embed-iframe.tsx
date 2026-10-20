@@ -3,6 +3,7 @@
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 
 /** Loading skeleton for iframe embeds: a clean iframe-sized `UnifiedSkeleton`
  *  rectangle. No fake inner placeholder cruft: a real loading iframe shows a
@@ -86,6 +87,7 @@ export function EmbedIframe({
   const isLoaded = loadedSrc === src;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const handleLoad = useCallback(() => setLoadedSrc(src), [src]);
+  const held = useLoadingScope();
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -101,6 +103,9 @@ export function EmbedIframe({
   }, [src]);
 
   const resolvedHeight = height || 'calc(100vh - 250px)';
+
+  // In a loading scope the embed is its loading box, and nothing is framed.
+  if (held) return <EmbedLoadingSkeleton height={resolvedHeight} />;
 
   return (
     <>

@@ -26,8 +26,11 @@
  */
 
 import type { ReactNode } from 'react';
+import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { LoadingRegion } from '../../loading/loading-region';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { StatusBadgeSkeleton } from '../../ui/status-badge';
 
 export interface DevCardRowContentProps {
   title: string;
@@ -42,6 +45,15 @@ export interface DevCardRowContentProps {
   rightBadges: ReactNode;
 }
 
+/** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
+const ROW_INNER_CLASS =
+  'flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]';
+const ROW_TEXT_COLUMN_CLASS = 'flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]';
+const ROW_TITLE_LINE_CLASS = `flex items-center text-h3 ${TEXT_LINES_MIN[1]}`;
+const ROW_SUBTITLE_LINE_CLASS = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
+const ROW_DESCRIPTION_LINE_CLASS = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
+const ROW_BADGES_CLASS = 'flex flex-shrink-0 flex-col gap-2 self-start';
+
 export function DevCardRowContent({
   title,
   subtitle,
@@ -49,22 +61,47 @@ export function DevCardRowContent({
   emptyDescription = 'No description provided',
   rightBadges,
 }: DevCardRowContentProps) {
+  // While the page is read the record is not known: the row's content is its skeleton.
+  if (useLoadingScope()) return <DevCardRowContentSkeleton />;
   return (
-    <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
-        <div className="flex min-h-[24px] items-center">
+    <div className={ROW_INNER_CLASS}>
+      <div className={ROW_TEXT_COLUMN_CLASS}>
+        <div className={ROW_TITLE_LINE_CLASS}>
           <h3 className="line-clamp-2 flex-1 break-words tracking-[-0.36px] text-ods-text-primary text-h3 content-md:truncate">
             {title}
           </h3>
         </div>
-        <div className="flex min-h-[20px] items-center">
+        <div className={ROW_SUBTITLE_LINE_CLASS}>
           <p className="truncate uppercase tracking-[-0.28px] text-ods-text-secondary text-h5">{subtitle}</p>
         </div>
-        <div className="flex min-h-[72px] items-center">
+        <div className={ROW_DESCRIPTION_LINE_CLASS}>
           <p className="line-clamp-3 break-words text-ods-text-secondary text-h4">{description || emptyDescription}</p>
         </div>
       </div>
-      <div className="flex flex-shrink-0 flex-col gap-2 self-start">{rightBadges}</div>
+      <div className={ROW_BADGES_CLASS}>{rightBadges}</div>
+    </div>
+  );
+}
+
+/** A row's content while its record is read: the title, subtitle and description as bars, two badge skeletons. */
+export function DevCardRowContentSkeleton() {
+  return (
+    <div className={ROW_INNER_CLASS} aria-hidden>
+      <div className={ROW_TEXT_COLUMN_CLASS}>
+        <div className={ROW_TITLE_LINE_CLASS}>
+          <TextLineSkeleton type="h3" className="w-full" />
+        </div>
+        <div className={ROW_SUBTITLE_LINE_CLASS}>
+          <TextLineSkeleton type="h5" className="w-1/2" />
+        </div>
+        <div className={ROW_DESCRIPTION_LINE_CLASS}>
+          <TextLineSkeleton type="h4" lines={3} className="w-full" />
+        </div>
+      </div>
+      <div className={ROW_BADGES_CLASS}>
+        <StatusBadgeSkeleton variant="card" />
+        <StatusBadgeSkeleton variant="card" />
+      </div>
     </div>
   );
 }
@@ -77,27 +114,7 @@ export function DevCardRowContent({
 export function DevCardRowSkeleton() {
   return (
     <div className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]">
-      <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
-          <div className="flex min-h-[24px] items-center">
-            <UnifiedSkeleton className="h-[20px] w-full rounded" />
-          </div>
-          <div className="flex min-h-[20px] items-center">
-            <UnifiedSkeleton className="h-[20px] w-1/2 rounded" />
-          </div>
-          <div className="flex min-h-[72px] items-center">
-            <div className="flex-1 space-y-1">
-              <UnifiedSkeleton className="h-[20px] w-full rounded" />
-              <UnifiedSkeleton className="h-[20px] w-full rounded" />
-              <UnifiedSkeleton className="h-[20px] w-2/3 rounded" />
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-shrink-0 flex-col gap-2 self-start">
-          <UnifiedSkeleton className="h-[32px] w-[100px] rounded" />
-          <UnifiedSkeleton className="h-[32px] w-[120px] rounded" />
-        </div>
-      </div>
+      <DevCardRowContentSkeleton />
     </div>
   );
 }

@@ -408,12 +408,24 @@ function toValidDate(date: DateInput): Date | null {
 }
 
 /**
+ * The viewer's locale: the language the user put first in the browser's own
+ * Languages setting (`navigator.language`), not `Intl`'s default. The two
+ * differ on macOS, where Chrome's default locale is the OS language — a user
+ * with an English (US) Mac who chose English (Australia) in Chrome reads
+ * `en-AU` here and `en-US` from a bare `Intl.DateTimeFormat()`. Undefined off
+ * the client (SSR, a test without a navigator): the runtime's own default.
+ */
+export const viewerLocale = (): string | undefined =>
+  typeof navigator === 'undefined' ? undefined : navigator.language || undefined;
+
+/**
  * Render a date (and, for a date-time style, its time) in an explicit zone.
  * Returns `''` for a missing or unparseable value.
  *
- * `options.viewerLocale` renders in the runtime's own LOCALE instead of the
- * fixed `en-US` — for client-only UI that should read the way its user writes
- * dates. The locale is never implied, for the same hydration reason as the zone.
+ * `options.viewerLocale` renders in the viewer's LOCALE (`viewerLocale()`)
+ * instead of the fixed `en-US` — for client-only UI that should read the way
+ * its user writes dates. The locale is never implied, for the same hydration
+ * reason as the zone.
  */
 export function formatDateWithTimezone(
   date: DateInput,
@@ -424,7 +436,7 @@ export function formatDateWithTimezone(
   const dateObj = toValidDate(date);
   if (!dateObj) return '';
   const { timeZone: _ignored, ...fields } = typeof style === 'string' ? ZONED_DATE_STYLES[style] : style;
-  return formatterFor(timezone, fields, options?.viewerLocale ? undefined : 'en-US').format(dateObj);
+  return formatterFor(timezone, fields, options?.viewerLocale ? viewerLocale() : 'en-US').format(dateObj);
 }
 
 /**

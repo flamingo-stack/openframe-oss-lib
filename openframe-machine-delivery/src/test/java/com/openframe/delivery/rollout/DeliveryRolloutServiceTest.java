@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.domain.Limit;
 
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
@@ -48,7 +50,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class DeliveryRolloutServiceTest {
 
-    private static final String ROLLOUT_ID = "CLIENT_UPDATE:openframe-client";
+    private static final String ROLLOUT_ID = "t-1:CLIENT_UPDATE:openframe-client";
     private static final String TARGET_ID = "openframe-client";
     private static final int SEQUENCE = 7;
     private static final int BATCH_SIZE = 2;
@@ -82,6 +84,7 @@ class DeliveryRolloutServiceTest {
                 .sequence(SEQUENCE)
                 .status(DeliveryRolloutStatus.RUNNING)
                 .cursor(DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE)
+                .startedAt(Instant.now())
                 .build();
         when(repository.findByStatus(DeliveryRolloutStatus.RUNNING)).thenReturn(List.of(rollout));
         doReturn(spec).when(registry).require(DeliveryType.CLIENT_UPDATE);
@@ -110,6 +113,23 @@ class DeliveryRolloutServiceTest {
         assertThat(first.getDispatchId()).isNotEqualTo(second.getDispatchId()).isNotEqualTo("d-rollout");
         verify(repository).advance(ROLLOUT_ID, SEQUENCE, "id-m-2", 2);
         verify(repository, never()).finish(any(), anyInt(), anyInt());
+        verify(metrics).recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 2);
+        verify(metrics, never()).recordRolloutFinished(any(), any());
+    }
+
+    @Test
+    void advance_runningRollouts_countedPerTypeZeroForTheOthers() {
+        // setup
+        when(machineRepository.findByStatusInAndIdGreaterThanOrderByIdAsc(DELIVERABLE, DeliveryRolloutRecorder.BEFORE_FIRST_MACHINE, Limit.of(BATCH_SIZE)))
+                .thenReturn(List.of(machine("m-1")));
+
+        // execution
+        service.advance();
+
+        // verifications
+        verify(metrics).recordRolloutsRunning(DeliveryType.CLIENT_UPDATE, 1);
+        verify(metrics).recordRolloutsRunning(DeliveryType.TOOL_UPDATE, 0);
+        verify(metrics).recordRolloutsRunning(DeliveryType.CLIENT_FEATURE_FLAGS, 0);
     }
 
     @Test
@@ -125,6 +145,8 @@ class DeliveryRolloutServiceTest {
         verify(sink).accept(any());
         verify(repository).finish(ROLLOUT_ID, SEQUENCE, 1);
         verify(repository, never()).advance(any(), anyInt(), any(), anyInt());
+        verify(metrics).recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 1);
+        verify(metrics).recordRolloutFinished(eq(DeliveryType.CLIENT_UPDATE), any());
     }
 
     @Test

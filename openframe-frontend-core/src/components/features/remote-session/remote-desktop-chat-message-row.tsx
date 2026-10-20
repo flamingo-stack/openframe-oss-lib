@@ -2,7 +2,13 @@
 
 import { cn } from '../../../utils/cn';
 import { formatTime } from '../../../utils/format-date';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { SquareAvatar } from '../../ui/square-avatar';
+
+/** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
+const MESSAGE_ROW_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-xxs)]';
+const MESSAGE_HEAD_CLASS = 'flex items-center gap-[var(--spacing-system-xxs)]';
+const MESSAGE_NAME_CLASS = 'min-w-0 flex-1 truncate text-h4 [font-family:var(--font-family-heading)]';
 
 export interface RemoteDesktopChatMessageRowProps {
   authorName: string;
@@ -32,17 +38,12 @@ export function RemoteDesktopChatMessageRow({
   body,
 }: RemoteDesktopChatMessageRowProps) {
   return (
-    <div className="grid grid-cols-1 gap-[var(--spacing-system-xxs)]">
-      <div className="flex items-center gap-[var(--spacing-system-xxs)]">
+    <div className={MESSAGE_ROW_CLASS}>
+      <div className={MESSAGE_HEAD_CLASS}>
         {isTechnician && (
           <SquareAvatar variant="round" sizePx={24} src={avatarUrl} alt={authorName} className="shrink-0" />
         )}
-        <span
-          className={cn(
-            'min-w-0 flex-1 truncate text-h4 [font-family:var(--font-family-heading)]',
-            isTechnician ? 'text-ods-accent' : 'text-ods-text-secondary',
-          )}
-        >
+        <span className={cn(MESSAGE_NAME_CLASS, isTechnician ? 'text-ods-accent' : 'text-ods-text-secondary')}>
           {authorName}
         </span>
         {/* The time is in the viewer's zone, which a server render cannot know. */}
@@ -51,6 +52,21 @@ export function RemoteDesktopChatMessageRow({
         </span>
       </div>
       <p className="whitespace-pre-wrap text-ods-text-primary text-h4">{body}</p>
+    </div>
+  );
+}
+
+/** A message row while the chat is read: the name and the time as bars on the name row, one line of the body. */
+export function RemoteDesktopChatMessageRowSkeleton() {
+  return (
+    <div className={MESSAGE_ROW_CLASS} aria-hidden>
+      <div className={MESSAGE_HEAD_CLASS}>
+        <span className={MESSAGE_NAME_CLASS}>
+          <TextLineSkeleton type="inherit" as="span" className="w-24" />
+        </span>
+        <TextLineSkeleton type="h6" as="span" className="w-12 shrink-0" />
+      </div>
+      <TextLineSkeleton type="h4" className="w-3/4" />
     </div>
   );
 }

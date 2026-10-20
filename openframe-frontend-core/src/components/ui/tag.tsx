@@ -5,22 +5,28 @@ import type React from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from './floating-tooltip';
 
-const tagVariants = cva(['inline-flex items-center justify-center rounded-md', 'transition-colors duration-150'], {
+/** The tag's frame: read by `tagVariants` and by `TagSkeleton`. */
+const TAG_FRAME_CLASS = 'inline-flex items-center justify-center rounded-md';
+
+/**
+ * Chip scale, read by `tagVariants` and by `TagSkeleton`. `default` is the classic 32px mono-uppercase tag;
+ * `large` is the Figma "Feature Item" chip (48px, h3 bold body label) used by chip groups acting as tabs
+ * (OpenFrame categories). `sentence`: a sentence, not a label: body type in the case it was written in (a question
+ * a visitor can ask), on the same chip surface. One line, always: a longer sentence clips and shows whole in the
+ * label's tooltip.
+ */
+export const TAG_SIZE_CLASS = {
+  default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
+  large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
+  sentence: 'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
+} as const;
+
+const tagVariants = cva([TAG_FRAME_CLASS, 'transition-colors duration-150'], {
   variants: {
-    // Chip scale. `default` is the classic 32px mono-uppercase tag; `large`
-    // is the Figma "Feature Item" chip (48px, h3 bold body label) used by
-    // chip groups acting as tabs (OpenFrame categories).
-    size: {
-      default: 'h-8 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-xsf)] text-h5',
-      large: 'h-12 gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] font-bold text-h3',
-      // A sentence, not a label: body type in the case it was written in (a
-      // question a visitor can ask), on the same chip surface. One line, always:
-      // a longer sentence clips and shows whole in the label's tooltip.
-      sentence:
-        'h-9 gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-h6',
-    },
+    size: TAG_SIZE_CLASS,
     variant: {
       primary: ['bg-ods-accent text-ods-text-on-accent', 'hover:bg-ods-accent-hover active:bg-ods-accent-active'],
       outline: [
@@ -180,3 +186,19 @@ function Tag({
 }
 
 export { Tag, tagVariants };
+
+/**
+ * A tag while its label is read: one skeleton box of the tag's own frame and size (its height and padding), a fixed
+ * width standing for the label.
+ */
+export function TagSkeleton({
+  size = 'default',
+  className,
+}: {
+  size?: keyof typeof TAG_SIZE_CLASS;
+  className?: string;
+}) {
+  return (
+    <UnifiedSkeleton as="span" className={cn(TAG_FRAME_CLASS, TAG_SIZE_CLASS[size], 'w-16 shrink-0', className)} />
+  );
+}

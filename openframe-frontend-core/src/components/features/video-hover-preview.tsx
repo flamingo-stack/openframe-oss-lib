@@ -27,8 +27,9 @@ import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { toMuxPreviewUrl } from './mux-origins';
-import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
+import { Video } from './video';
 import { VideoPlayBadge } from './video-center-badge';
+import type { VideoPlayerHandle, VideoMutedFallbackState } from './video-shared';
 
 export interface VideoHoverPreviewSurfaceProps {
   /** Source URL (Mux HLS / Supabase mp4). Rendition-capped internally. */

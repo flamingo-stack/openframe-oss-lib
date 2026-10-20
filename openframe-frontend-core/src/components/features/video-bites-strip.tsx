@@ -30,6 +30,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { UserDisplay } from '../user-display';
 import { CardHitLayer } from './card-hit-layer';
 import { CardsStrip, STRIP_CELL_MAX_WIDTH } from './cards-strip';
@@ -90,6 +92,9 @@ export interface VideoBitesStripProps {
    *  surfaces pass `sortBitesByFeaturedAtDesc` so display order matches the
    *  featured-recency ranking their server aggregation is capped by. */
   sortComparator?: (a: VideoBiteStripItem, b: VideoBiteStripItem) => number;
+  /** How many cards the strip's loading state draws (in a `LoadingScope`). Default `VIDEO_BITES_SKELETON_COUNT`, a
+   *  full line; 0 where the host's records usually carry none (nothing is drawn). */
+  skeletonCount?: number;
   className?: string;
 }
 
@@ -97,6 +102,15 @@ export interface VideoBitesStripProps {
 // Component
 // =============================================================================
 
+/** A card's height in px per breakpoint (Figma: 416 desktop), the strip's default and its loading state's. */
+export const VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX = 416;
+export const VIDEO_BITES_CARD_HEIGHT_MOBILE_PX = 300;
+/** The widest line a strip bleeds across: a marquee's loading state fills it, the track clips the rest. */
+export const STRIP_LINE_MAX_PX = 2560;
+/** A marquee's loading state is a FULL line of cards: as many 9:16 cards at the desktop height as fill the widest line. */
+export const VIDEO_BITES_SKELETON_COUNT = Math.ceil(
+  STRIP_LINE_MAX_PX / ((VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX * 9) / 16),
+);
 export function VideoBitesStrip({
   bites,
   title = DEFAULT_VIDEO_BITES_TITLE,
@@ -108,20 +122,36 @@ export function VideoBitesStrip({
   autoScroll = true,
   autoScrollSpeed = 60,
   pauseOnHover = true,
-  cardHeightDesktop = 416,
-  cardHeightMobile = 300,
+  cardHeightDesktop = VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX,
+  cardHeightMobile = VIDEO_BITES_CARD_HEIGHT_MOBILE_PX,
   showChevrons = true,
   onBiteNavigate,
   sortComparator = sortBitesByCreatedAtDesc,
+  skeletonCount,
   className,
 }: VideoBitesStripProps): React.ReactElement | null {
+  const inScope = useLoadingScope();
   const items = useMemo(() => {
     const filtered = filterPublished ? bites.filter(b => b.published) : [...bites];
     return filtered.sort(sortComparator);
   }, [bites, filterPublished, sortComparator]);
 
   // Preconnect Mux/Supabase origins once so first hover starts fast.
-  const warmup = useVideoWarmup<HTMLDivElement>({ videoUrl: items[0]?.url || null });
+  const warmup = useVideoWarmup<HTMLDivElement>({ videoUrl: inScope ? null : items[0]?.url || null });
+
+  if (inScope) {
+    return (
+      <VideoBitesStripSkeleton
+        count={skeletonCount ?? VIDEO_BITES_SKELETON_COUNT}
+        title={title}
+        showTitle={showTitle}
+        headerSlot={headerSlot}
+        cardHeightDesktop={cardHeightDesktop}
+        cardHeightMobile={cardHeightMobile}
+        className={className}
+      />
+    );
+  }
 
   return (
     <CardsStrip
@@ -169,6 +199,107 @@ export function VideoBitesStrip({
 // renders it standalone (self-managed hover, grid-cell sizing, action slots,
 // inline title editing) so the admin sees EXACTLY the public card.
 // =============================================================================
+
+/** The card's layout, read by the card and by its skeleton, so the skeleton is the card's size. */
+const BITE_CARD_FRAME_CLASS = 'relative overflow-hidden rounded-md border border-ods-border bg-ods-card';
+const BITE_MEDIA_CLASS = 'relative w-full';
+const BITE_MEDIA_FIXED_HEIGHT_CLASS = 'h-[var(--bite-height-mobile)] min-[768px]:h-[var(--bite-height)]';
+
+/** The media box's size: its aspect, and with a fixed `height` the strip's heights per breakpoint. */
+function biteMediaStyle(cssAspect: string, height?: number, heightMobile?: number): React.CSSProperties {
+  return {
+    aspectRatio: cssAspect,
+    ...(height !== undefined
+      ? ({
+          '--bite-height': `${height}px`,
+          '--bite-height-mobile': `${heightMobile ?? height}px`,
+          maxWidth: STRIP_CELL_MAX_WIDTH,
+        } as React.CSSProperties)
+      : {}),
+  };
+}
+
+export interface VideoBiteCardSkeletonProps {
+  /** The bite's aspect ratio ('9:16' portrait by default). */
+  aspect?: string;
+  /** Fixed card height (strip); omitted, the card fills its cell and the aspect sets the height. */
+  height?: number;
+  heightMobile?: number;
+  className?: string;
+}
+
+/**
+ * A bite card while it is read: the card's own frame and its media box as the skeleton's surface. The title and
+ * the speaker sit in the hover overlay, unseen at rest, so they are not drawn.
+ */
+export function VideoBiteCardSkeleton({
+  aspect = '9:16',
+  height,
+  heightMobile,
+  className,
+}: VideoBiteCardSkeletonProps) {
+  const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(aspect))];
+  return (
+    <div
+      aria-hidden
+      className={cn(BITE_CARD_FRAME_CLASS, height !== undefined ? 'shrink-0' : 'w-full', className)}
+      style={height !== undefined ? { maxWidth: STRIP_CELL_MAX_WIDTH } : undefined}
+    >
+      <div
+        className={cn(BITE_MEDIA_CLASS, height !== undefined && BITE_MEDIA_FIXED_HEIGHT_CLASS)}
+        style={biteMediaStyle(cssAspect, height, heightMobile)}
+      >
+        <UnifiedSkeleton className="absolute inset-0 h-full rounded-none" />
+      </div>
+    </div>
+  );
+}
+
+export interface VideoBitesStripSkeletonProps {
+  /** How many cards. Default `VIDEO_BITES_SKELETON_COUNT` (a full line); 0 draws nothing. */
+  count?: number;
+  /** The bites' aspect ratio ('9:16' by default). */
+  aspect?: string;
+  /** The strip's heading: static copy, drawn as it is. */
+  title?: string;
+  showTitle?: boolean;
+  headerSlot?: React.ReactNode;
+  cardHeightDesktop?: number;
+  cardHeightMobile?: number;
+  className?: string;
+}
+
+/**
+ * The strip while its bites are read: the same `CardsStrip` (its heading, track, gaps and edge bleed), with no
+ * marquee, each card a `VideoBiteCardSkeleton`. `VideoBitesStrip` draws it in a loading scope.
+ */
+export function VideoBitesStripSkeleton({
+  count = VIDEO_BITES_SKELETON_COUNT,
+  aspect = '9:16',
+  title = DEFAULT_VIDEO_BITES_TITLE,
+  showTitle = true,
+  headerSlot,
+  cardHeightDesktop = VIDEO_BITES_CARD_HEIGHT_DESKTOP_PX,
+  cardHeightMobile = VIDEO_BITES_CARD_HEIGHT_MOBILE_PX,
+  className,
+}: VideoBitesStripSkeletonProps) {
+  const cells = useMemo(() => Array.from({ length: count }, (_, i) => i), [count]);
+  return (
+    <CardsStrip
+      items={cells}
+      itemKey={i => `bite-skeleton-${i}`}
+      title={title}
+      showTitle={showTitle}
+      headerSlot={headerSlot}
+      autoScroll={false}
+      showChevrons={false}
+      className={className}
+      renderCard={() => (
+        <VideoBiteCardSkeleton aspect={aspect} height={cardHeightDesktop} heightMobile={cardHeightMobile} />
+      )}
+    />
+  );
+}
 
 export interface VideoBiteCardProps {
   bite: VideoBiteStripItem;
@@ -363,22 +494,10 @@ export function VideoBiteCard({
 
   const media = (
     <div
-      className={cn(
-        'relative w-full',
-        height !== undefined && 'h-[var(--bite-height-mobile)] min-[768px]:h-[var(--bite-height)]',
-      )}
+      className={cn(BITE_MEDIA_CLASS, height !== undefined && BITE_MEDIA_FIXED_HEIGHT_CLASS)}
       // Strip mode: fixed height + aspect drive the width (capped at 90vw,
       // same as the old single-box layout). Editor mode: width-driven.
-      style={{
-        aspectRatio: cssAspect,
-        ...(height !== undefined
-          ? {
-              '--bite-height': `${height}px`,
-              '--bite-height-mobile': `${heightMobile ?? height}px`,
-              maxWidth: STRIP_CELL_MAX_WIDTH,
-            }
-          : {}),
-      }}
+      style={biteMediaStyle(cssAspect, height, heightMobile)}
     >
       {/* THE shared hover-preview media zone (poster → facade → badge →
           controlled hover playback + near-viewport mount gate). The bite strip
@@ -421,11 +540,7 @@ export function VideoBiteCard({
       // (cards move under a stationary pointer — see cards-strip.tsx). The
       // hover area is exactly this card root: media + overlay + toolbar.
       data-strip-card-key={key}
-      className={cn(
-        'group/card relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
-        height !== undefined ? 'shrink-0' : 'w-full',
-        className,
-      )}
+      className={cn('group/card', BITE_CARD_FRAME_CLASS, height !== undefined ? 'shrink-0' : 'w-full', className)}
       style={height !== undefined ? { maxWidth: STRIP_CELL_MAX_WIDTH } : undefined}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
