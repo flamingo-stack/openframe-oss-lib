@@ -12,13 +12,14 @@ import {
 } from '../../icons-v2-generated';
 import { PageLayout } from '../../layout/page-layout';
 import { LoadingRegion } from '../../loading/loading-region';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton } from '../../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../../ui/actions-menu';
 import { Button } from '../../ui/button/button';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { TruncateText } from '../../ui/truncate-text';
 import { RemoteDesktopFullscreenToolbar } from './remote-desktop-fullscreen-toolbar';
 
-/** The page chrome both the view and its skeleton render in. */
+/** The page chrome the view renders in, loaded and loading. */
 const PAGE_CLASS = 'h-full overflow-hidden px-[var(--spacing-system-l)] pb-[var(--spacing-system-l)]';
 
 /** The header card: the device row, and under it the display row when there is one to pick. */
@@ -70,6 +71,11 @@ export interface RemoteDesktopViewProps {
   chat?: ReactNode;
   /** Dialogs the page owns (settings, shortcuts), rendered after the session. */
   children?: ReactNode;
+  /**
+   * The device is still being read: the view draws itself with its header's text and controls as skeletons over an
+   * empty screen (also in a page's loading scope). `screen`, `chat` and `children` are not drawn while loading.
+   */
+  loading?: boolean;
 }
 
 /**
@@ -93,8 +99,33 @@ export function RemoteDesktopView({
   screen,
   chat,
   children,
+  loading: loadingProp = false,
 }: RemoteDesktopViewProps) {
-  const controlsBar = (
+  const inScope = useLoadingScope();
+  // One switch: while the device is read (a prop, or a page's loading scope) the view draws its own loading state.
+  const loading = inScope || loadingProp;
+  const controlsBar = loading ? (
+    <div className={CONTROLS_BAR_CLASS} aria-hidden>
+      <div className={CONTROLS_ROW_CLASS}>
+        <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
+          <div className="flex-shrink-0 rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)]">
+            <MonitorIcon className="h-4 w-4 text-ods-text-primary" />
+          </div>
+          <div className="flex min-w-0 flex-col">
+            {/* A typical device name and customer line, at the header's own type steps (h4, h6). */}
+            <TextLineSkeleton type="h4" className="w-48 max-w-full" />
+            <TextLineSkeleton type="h6" className="w-36 max-w-full" />
+          </div>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
+          {/* The actions menu, settings and fullscreen controls: three icon buttons. */}
+          <InteractiveSkeleton.Button size="icon" />
+          <InteractiveSkeleton.Button size="icon" />
+          <InteractiveSkeleton.Button size="icon" />
+        </div>
+      </div>
+    </div>
+  ) : (
     <div className={CONTROLS_BAR_CLASS}>
       <div className={CONTROLS_ROW_CLASS}>
         <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
@@ -166,6 +197,19 @@ export function RemoteDesktopView({
     </div>
   );
 
+  if (loading) {
+    return (
+      <PageLayout className={PAGE_CLASS} backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}>
+        {/* `contents`: the page's own children stay its layout items; the region adds the one announcement (a page's
+            loading scope already announces for it). */}
+        <LoadingRegion label="Loading the remote session" announce={!inScope} className="contents">
+          {controlsBar}
+          <div className="min-h-0 min-w-0 flex-1 rounded-lg bg-black" />
+        </LoadingRegion>
+      </PageLayout>
+    );
+  }
+
   return (
     <PageLayout
       className={PAGE_CLASS}
@@ -202,41 +246,6 @@ export function RemoteDesktopView({
       </div>
 
       {children}
-    </PageLayout>
-  );
-}
-
-/** The page while the device is still loading: the header bar as placeholders over an empty screen. */
-export function RemoteDesktopViewSkeleton({
-  onBack,
-  region = true,
-}: Pick<RemoteDesktopViewProps, 'onBack'> & {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-}) {
-  return (
-    <PageLayout className={PAGE_CLASS} backButton={onBack ? { label: 'Back', onClick: onBack } : undefined}>
-      {/* `contents`: the page's own children stay its layout items; the region adds the one announcement. */}
-      <LoadingRegion label="Loading the remote session" announce={region} className="contents">
-        <div className={CONTROLS_BAR_CLASS}>
-          <div className={CONTROLS_ROW_CLASS}>
-            <div className="flex min-w-0 items-center gap-[var(--spacing-system-mf)]">
-              <UnifiedSkeleton className="h-9 w-9 flex-shrink-0 rounded-md" />
-              <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-                <UnifiedSkeleton className="h-5 w-48" />
-                <UnifiedSkeleton className="h-4 w-36" />
-              </div>
-            </div>
-            <div className="flex flex-shrink-0 items-center gap-[var(--spacing-system-xs)]">
-              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-              <UnifiedSkeleton className="h-11 w-11 rounded-lg md:h-12 md:w-12" />
-            </div>
-          </div>
-        </div>
-
-        <div className="min-h-0 min-w-0 flex-1 rounded-lg bg-black" />
-      </LoadingRegion>
     </PageLayout>
   );
 }

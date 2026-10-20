@@ -18,6 +18,20 @@ export interface DetailPageSkeletonProps {
   region?: boolean;
 }
 
+/** `content-md:grid-cols-N` as static classes the build can see (a class built from a number is never generated). */
+const METADATA_COLUMNS_CLASS: Record<number, string> = {
+  1: 'content-md:grid-cols-1',
+  2: 'content-md:grid-cols-2',
+  3: 'content-md:grid-cols-3',
+  4: 'content-md:grid-cols-4',
+  5: 'content-md:grid-cols-5',
+  6: 'content-md:grid-cols-6',
+};
+
+/**
+ * @deprecated Render the detail page itself inside a `LoadingScope` (e.g. `ArticleDetailLayout` with its sections): each part draws its own skeleton. Kept so hosts on an older release keep compiling; nothing in the lib uses it.
+ */
+// loading-standard-ok: deprecated re-export kept for external consumers
 export function DetailPageSkeleton({
   metadataColumns = 4,
   showImageGallery = true,
@@ -41,7 +55,7 @@ export function DetailPageSkeleton({
 
       {/* Metadata Grid Skeleton */}
       <div
-        className={`grid grid-cols-1 content-md:grid-cols-${metadataColumns} w-full overflow-hidden rounded-md border border-ods-border`}
+        className={`grid grid-cols-1 ${METADATA_COLUMNS_CLASS[metadataColumns] ?? METADATA_COLUMNS_CLASS[4]} w-full overflow-hidden rounded-md border border-ods-border`}
       >
         {Array.from({ length: metadataColumns }).map((_, i) => (
           <div

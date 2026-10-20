@@ -6,8 +6,8 @@
  * ONE page, not tabs (2026 trust-center practice: buyers skim and Ctrl-F, and a
  * questionnaire needs a deep link per section): hero with the monitoring status
  * (with the page's PDF as a quiet link at its end) and the Request access action, then anchored sections in reading order
- * (`TRUST_CENTER_SECTIONS`: AI & data use → compliance → controls → documents →
- * subprocessors → FAQ → questions) with a sticky section rail on desktop
+ * (`TRUST_CENTER_SECTIONS`: compliance → controls → documents → subprocessors →
+ * AI & data use → contact → FAQ) with a sticky section rail on desktop
  * (`StickySectionNav` + `useScrollSpy`, the vendor-page / DocViewer pattern).
  * Built ONLY from existing lib components (see `trust-center-sections.tsx`); the
  * chrome is the canonical `PageShell` + frozen `PageLayout`.
@@ -24,6 +24,10 @@
  * revalidation. Before hydration the status is NEUTRAL (never a claim that
  * flips). The subtitle is the brand-neutral `TRUST_CENTER_TAGLINE` unless the
  * host overrides it.
+ *
+ * LOADING: the page is its own loading state. While the projection is read (or in a host's loading scope) it renders
+ * the SAME view over an empty projection (`EMPTY_TRUST_CENTER`) inside a `LoadingScope`, every section shown: each
+ * section's component draws its own skeleton, static copy (headings, leads, Contact, the rail) is real.
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -35,6 +39,7 @@ import {
   TRUST_CENTER_API_PATH,
   TRUST_CENTER_CACHE_SECONDS,
   TRUST_CENTER_TAGLINE,
+  TRUST_CENTER_SECTIONS,
   TRUST_CENTER_TITLE,
   trustCenterMonitoringStatus,
   trustCenterDocumentUrl,
@@ -46,14 +51,16 @@ import {
 } from '../../types/trust-center';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { useScrollSpy } from '../docs/use-scroll-spy';
-import { FaqSection, type FaqSectionProps } from '../faq/faq-section';
+import { FaqSection, type FaqSectionProps, type FaqSkeletonShape } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
+import { LoadingRegion } from '../loading/loading-region';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { DataAttribution } from '../ui/data-attribution';
 import { DownloadButton } from '../ui/download-button';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
+import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { StatusIndicator } from '../ui/status-indicator';
 import {
   AiSection,
@@ -67,7 +74,8 @@ import {
   TRUST_SECTIONS_COLUMN_CLASS,
   TRUST_SECTION_LEADS,
   TRUST_STATUS_ROW_CLASS,
-  TrustCenterSkeleton,
+  type TrustCenterPanelId,
+  type TrustPanelRows,
   TrustSection,
 } from './trust-center-sections';
 
@@ -100,6 +108,13 @@ export interface TrustCenterPageProps {
    * them twice; the monitoring status stays.
    */
   attribution?: boolean;
+  /** The FAQ's loading state, group by group (the FAQ's `skeletonShape`). */
+  faqSkeletonShape?: FaqSkeletonShape;
+  /**
+   * Rows each panel's loading state draws, for a host whose lists are curated (it knows their lengths: the frameworks
+   * it is audited against). Absent: the layout's fold, the rows one screen holds.
+   */
+  panelSkeletonRows?: Partial<Record<TrustCenterPanelId, TrustPanelRows>>;
 }
 
 /** One section's page content. Its `h2` is the `TRUST_CENTER_SECTIONS` label — never a literal here. */
@@ -123,6 +138,26 @@ function controlsSeed(data: TrustCenterPublic): TrustCenterControlsPage {
     total: data.controlDomains.reduce((sum, domain) => sum + domain.controls.length, 0),
   };
 }
+
+/**
+ * The projection the page renders while it is read: nothing listed, so every section's component, in the loading
+ * scope, draws its own skeleton. Never shown as data (the scope draws no read word).
+ */
+const EMPTY_TRUST_CENTER: TrustCenterPublic = {
+  frameworks: [],
+  controlDomains: [],
+  policies: [],
+  documents: [],
+  subprocessors: [],
+  aiPractices: [],
+  faqs: [],
+  checkedAt: null,
+  syncedAt: null,
+  monitoredWindowMs: 0,
+  connected: true,
+  dataSource: { name: '', logoUrl: null },
+  documentRequestCategory: '',
+};
 
 /** How often an open page re-judges "monitored" against the clock. */
 const MONITORING_CLOCK_TICK_MS = 60_000;
@@ -152,7 +187,11 @@ export function TrustCenterPage({
   ask,
   beforeFaq,
   attribution = true,
+  faqSkeletonShape,
+  panelSkeletonRows,
 }: TrustCenterPageProps) {
+  // In a page's loading state the projection is read (the host passes none): the page draws its skeleton.
+  const scoped = useLoadingScope();
   const { data, isLoading, error, reload } = useSelfFetch<TrustCenterPublic>(endpoint, {
     initialData,
     revalidateOnVisibleAfterMs: TRUST_CENTER_CACHE_SECONDS * 1000,
@@ -180,7 +219,13 @@ export function TrustCenterPage({
     documentTitle: null,
   });
 
-  const sections = useMemo(() => (data ? visibleTrustCenterSections(data) : []), [data]);
+  const loading = scoped || (!data && isLoading && !error);
+  // While loading every section is drawn (which ones the data fills is not known yet), each as its own skeleton.
+  const view = loading ? EMPTY_TRUST_CENTER : data;
+  const sections = useMemo<Array<(typeof TRUST_CENTER_SECTIONS)[number]>>(
+    () => (loading ? [...TRUST_CENTER_SECTIONS] : data ? visibleTrustCenterSections(data) : []),
+    [loading, data],
+  );
   // Anchors. The scroll spy lights the rail from whatever scrolls the sections
   // (the window, or a host shell's `<main overflow-y-auto>` — OpenFrame's
   // `AppLayout`) and keeps the URL's hash on the section in view (`syncHash`;
@@ -195,13 +240,13 @@ export function TrustCenterPage({
     syncHash: true,
     headerOffset: STICKY_HEADER_OFFSET_PX,
   });
-  useScrollToHash(sections.length > 0 ? sections.map(section => section.id).join('|') : null, {
+  useScrollToHash(!loading && sections.length > 0 ? sections.map(section => section.id).join('|') : null, {
     headerOffset: STICKY_HEADER_OFFSET_PX,
   });
   const openRequest = useCallback((documentTitle: string | null) => setRequest({ open: true, documentTitle }), []);
   const closeRequest = useCallback(() => setRequest(current => ({ ...current, open: false })), []);
 
-  const hasGatedDocuments = data?.documents.some(document => document.access === 'request') ?? false;
+  const hasGatedDocuments = view?.documents.some(document => document.access === 'request') ?? false;
   const actions = hasGatedDocuments
     ? [{ label: 'Request access', variant: 'accent' as const, onClick: () => openRequest(null) }]
     : undefined;
@@ -217,11 +262,11 @@ export function TrustCenterPage({
   const views: Record<TrustCenterSectionId, TrustSectionView> = {
     ai: {
       lead: TRUST_SECTION_LEADS.ai,
-      render: d => <AiSection practices={d.aiPractices} />,
+      render: d => <AiSection practices={d.aiPractices} skeletonRows={panelSkeletonRows?.ai} />,
     },
     compliance: {
       lead: TRUST_SECTION_LEADS.compliance,
-      render: d => <ComplianceSection frameworks={d.frameworks} />,
+      render: d => <ComplianceSection frameworks={d.frameworks} skeletonRows={panelSkeletonRows?.compliance} />,
     },
     controls: {
       lead: TRUST_SECTION_LEADS.controls,
@@ -234,14 +279,20 @@ export function TrustCenterPage({
           documents={d.documents}
           documentUrl={document => trustCenterDocumentUrl(endpoint, document)}
           onRequest={openRequest}
+          skeletonRows={panelSkeletonRows?.documents}
         />
       ),
     },
     subprocessors: {
       lead: TRUST_SECTION_LEADS.subprocessors,
-      render: d => <SubprocessorsSection subprocessors={d.subprocessors} />,
+      render: d => (
+        <SubprocessorsSection subprocessors={d.subprocessors} skeletonRows={panelSkeletonRows?.subprocessors} />
+      ),
     },
-    faq: { render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={ask} /> },
+    // The FAQ's skeleton props shape only its loading state (in the scope it draws its own skeleton).
+    faq: {
+      render: d => <FaqSection initialFaqs={d.faqs} heading={null} ask={ask} skeletonShape={faqSkeletonShape} />,
+    },
     contact: { render: () => <ContactSection onContact={() => openRequest(null)} /> },
   };
 
@@ -250,31 +301,42 @@ export function TrustCenterPage({
   const faqLast = Boolean(beforeFaq) && Boolean(faqSection);
   const columnSections = faqLast ? sections.filter(section => section.id !== 'faq') : sections;
 
+  // The page's view in its loading state: the same components in a loading scope (no element of its own in the
+  // layout: `contents`), announced once unless a host's scope already did.
+  const inLoadingScope = (node: ReactNode, label: string): ReactNode =>
+    loading ? (
+      <LoadingRegion label={label} announce={!scoped} className="contents">
+        <LoadingScope className="contents">{node}</LoadingScope>
+      </LoadingRegion>
+    ) : (
+      node
+    );
+
   let body: ReactNode;
-  if (error && !data) {
+  if (!loading && error && !data) {
     body = <LoadError message="Could not load the trust center" onRetry={reload} />;
-  } else if (!data) {
-    body = isLoading ? <TrustCenterSkeleton /> : null;
+  } else if (!view) {
+    body = null;
   } else {
-    const status = monitoringStatus(data, hydrated, nowMs);
-    body = (
+    const status = monitoringStatus(view, hydrated, nowMs);
+    body = inLoadingScope(
       <>
         <div className={TRUST_STATUS_ROW_CLASS}>
           <StatusIndicator status={status.status} label={status.label} />
-          {data.connected && attribution ? (
+          {view.connected && attribution ? (
             <DataAttribution
               icon={
-                data.dataSource.logoUrl ? (
+                view.dataSource.logoUrl ? (
                   <EntityImage
-                    src={data.dataSource.logoUrl}
-                    alt={data.dataSource.name}
-                    fallbackText={data.dataSource.name}
+                    src={view.dataSource.logoUrl}
+                    alt={view.dataSource.name}
+                    fallbackText={view.dataSource.name}
                     sizeClassName="size-4"
                   />
                 ) : undefined
               }
-              source={data.dataSource.name}
-              lastUpdated={data.syncedAt}
+              source={view.dataSource.name}
+              lastUpdated={view.syncedAt}
               action={download}
             />
           ) : attribution ? (
@@ -285,10 +347,10 @@ export function TrustCenterPage({
         <div className={TRUST_BODY_GRID_CLASS}>
           <div className={TRUST_SECTIONS_COLUMN_CLASS}>
             {columnSections.map(section => {
-              const view = views[section.id];
+              const sectionView = views[section.id];
               return (
-                <TrustSection key={section.id} id={section.id} title={section.label} lead={view.lead}>
-                  {view.render(data)}
+                <TrustSection key={section.id} id={section.id} title={section.label} lead={sectionView.lead}>
+                  {sectionView.render(view)}
                 </TrustSection>
               );
             })}
@@ -305,13 +367,16 @@ export function TrustCenterPage({
           </aside>
         </div>
 
-        <DocumentRequestModal
-          open={request.open}
-          documentTitle={request.documentTitle}
-          category={data.documentRequestCategory}
-          onClose={closeRequest}
-        />
-      </>
+        {loading ? null : (
+          <DocumentRequestModal
+            open={request.open}
+            documentTitle={request.documentTitle}
+            category={view.documentRequestCategory}
+            onClose={closeRequest}
+          />
+        )}
+      </>,
+      'Loading the trust center',
     );
   }
 
@@ -321,18 +386,41 @@ export function TrustCenterPage({
         {body}
       </TrustCenterChrome>
       {beforeFaq}
-      {faqLast && faqSection && data ? (
-        // The page's own content box at its FULL width (no section-rail column): a closing FAQ takes the
-        // same space the FAQ block takes at the foot of every other page.
-        <div className={shell ? 'bg-ods-bg' : undefined}>
-          <div className={shell ? 'page-shell-content mx-auto max-w-[1920px]' : 'page-shell-content'}>
-            <TrustSection id={faqSection.id} title={faqSection.label} lead={views.faq.lead}>
-              {views.faq.render(data)}
-            </TrustSection>
-          </div>
-        </div>
-      ) : null}
+      {faqLast && faqSection && view
+        ? // The page's own content box at its FULL width (no section-rail column): a closing FAQ takes the
+          // same space the FAQ block takes at the foot of every other page.
+          inLoadingScope(
+            <div className={shell ? 'bg-ods-bg' : undefined}>
+              <div className={shell ? 'page-shell-content mx-auto max-w-[1920px]' : 'page-shell-content'}>
+                <TrustSection id={faqSection.id} title={faqSection.label} lead={views.faq.lead}>
+                  {views.faq.render(view)}
+                </TrustSection>
+              </div>
+            </div>,
+            'Loading the FAQ',
+          )
+        : null}
     </>
+  );
+}
+
+/**
+ * @deprecated Render `<TrustCenterPage>` inside a `LoadingScope`: the page draws its own loading state (this is what
+ * it does). Kept so hosts on an older release keep compiling; nothing in the lib uses it. `region` is ignored: the
+ * page announces its own loading state.
+ */
+// loading-standard-ok: deprecated re-export kept for external consumers
+export function TrustCenterPageSkeleton({
+  region: _region,
+  ...chrome
+}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'> & {
+  /** Ignored: the page announces its own loading state. */
+  region?: boolean;
+}) {
+  return (
+    <LoadingScope>
+      <TrustCenterPage {...chrome} />
+    </LoadingScope>
   );
 }
 
@@ -371,26 +459,4 @@ function TrustCenterChrome({
     </PageLayout>
   );
   return shell ? <PageShell>{inner}</PageShell> : <div className="page-shell-content">{inner}</div>;
-}
-
-/**
- * The whole page while a host loads the data itself (the hub's admin preview):
- * the SAME chrome and the same body skeleton `TrustCenterPage` shows while it
- * self-fetches. Pass the chrome props the page will get.
- */
-export function TrustCenterPageSkeleton({
-  shell = true,
-  backButton = false,
-  title = TRUST_CENTER_TITLE,
-  subtitle = TRUST_CENTER_TAGLINE,
-  region = true,
-}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'> & {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-}) {
-  return (
-    <TrustCenterChrome shell={shell} title={title} subtitle={subtitle} backButton={backButton}>
-      <TrustCenterSkeleton region={region} />
-    </TrustCenterChrome>
-  );
 }

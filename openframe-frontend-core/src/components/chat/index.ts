@@ -1,9 +1,10 @@
 'use client';
 
 // Chat components exports
-import { createElement, forwardRef, lazy, Suspense, useEffect } from 'react';
+import { createElement, forwardRef, lazy, Suspense, useEffect, useState } from 'react';
+import { afterPageLoad } from '../../utils/after-page-load';
 import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
-import { holdAskAiOpens } from './utils/ask-ai-events';
+import { ASK_AI_OPEN_EVENTS, holdAskAiOpens } from './utils/ask-ai-events';
 export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
@@ -104,15 +105,31 @@ export * from './stream';
 export * from './utils';
 
 // EmbeddableChat — THE chat. Hosts mount it once at the root after providing a
-// <ChatRuntimeContext.Provider>. Its module is loaded on its own, after the
-// page's code (`lazy`), so a page never ships the chat with its first script;
-// an open sent before it has loaded is held and delivered (`ask-ai-events`).
+// <ChatRuntimeContext.Provider>. Its module is loaded on its own (`lazy`), and
+// only once the page has loaded and the browser is idle (`afterPageLoad`), or at
+// once when something asks for it (an open event, `open` or `defaultOpen`): a
+// chat that starts closed must not download and run beside the page's first
+// paint, which is what slowed every page's LCP on phones. An open sent before it
+// has loaded is held and delivered (`ask-ai-events`).
 export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
 const LoadedEmbeddableChat = lazy(() =>
   import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
 );
 export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatProps>((props, ref) => {
+  const [loadRequested, setLoadRequested] = useState(false);
+  const load = loadRequested || Boolean(props.open) || Boolean(props.defaultOpen);
   useEffect(() => holdAskAiOpens(), []);
+  useEffect(() => {
+    if (load) return undefined;
+    const start = () => setLoadRequested(true);
+    for (const name of ASK_AI_OPEN_EVENTS) window.addEventListener(name, start);
+    const cancel = afterPageLoad(start);
+    return () => {
+      cancel();
+      for (const name of ASK_AI_OPEN_EVENTS) window.removeEventListener(name, start);
+    };
+  }, [load]);
+  if (!load) return null;
   return createElement(Suspense, { fallback: null }, createElement(LoadedEmbeddableChat, { ...props, ref }));
 });
 EmbeddableChat.displayName = 'EmbeddableChat';

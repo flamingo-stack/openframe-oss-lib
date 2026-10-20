@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { cn } from '../../utils/cn';
 import { Video } from '../features/video';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ImageGalleryModal } from '../ui/image-gallery-modal';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface MediaGalleryStripItem {
   media_type: string;
@@ -17,6 +20,13 @@ export interface MediaGalleryStripItem {
 function isGalleryImage(mediaType: string): boolean {
   return mediaType !== 'video' && mediaType !== 'demo';
 }
+
+/** The strip's layout, read by the strip and by its skeleton, so the skeleton is the strip's size. */
+const STRIP_CLASS = 'flex w-full gap-6 overflow-x-auto';
+const TILE_SIZE_CLASS = 'shrink-0 w-[240px] h-[200px] rounded-md';
+const TILE_CLASS = `${TILE_SIZE_CLASS} overflow-hidden border border-ods-border bg-ods-bg transition-opacity`;
+/** Tiles a skeleton draws when not told how many (a strip's first fold on a wide screen). */
+export const MEDIA_GALLERY_STRIP_SKELETON_COUNT = 4;
 
 export interface MediaGalleryStripProps {
   items: MediaGalleryStripItem[];
@@ -37,16 +47,20 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
+  // ONE switch: in a loading scope with no items yet (they are read) the strip is its skeleton; items it is given
+  // there are the page's own and are drawn as they are. A record's media is optional: a page whose loading layout
+  // leaves the strip out wraps the loaded one in `data-loading-optional`.
+  if (useLoadingScope() && !items?.length) return <MediaGalleryStripSkeleton className={className} />;
+
   if (!items || items.length === 0) return null;
 
   const galleryImages = items.filter(m => isGalleryImage(m.media_type)).map(m => m.media_url);
 
-  const tileClass =
-    'shrink-0 w-[240px] h-[200px] rounded-md overflow-hidden border border-ods-border bg-black transition-opacity';
+  const tileClass = TILE_CLASS;
 
   return (
     <>
-      <div className={`flex w-full gap-6 overflow-x-auto ${className ?? ''}`}>
+      <div className={`${STRIP_CLASS} ${className ?? ''}`}>
         {items.map((mediaItem, index) => {
           // Image tiles open the lightbox, so they're real <button>s — keyboard
           // focusable + Enter/Space activatable. Clips render in <Video>, which
@@ -92,5 +106,23 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
         />
       )}
     </>
+  );
+}
+
+/** The media strip while it is read: `count` tiles of the strip's own 240×200 size. */
+export function MediaGalleryStripSkeleton({
+  count = MEDIA_GALLERY_STRIP_SKELETON_COUNT,
+  className,
+}: {
+  count?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn(STRIP_CLASS, 'overflow-hidden', className)} aria-hidden>
+      {Array.from({ length: count }, (_, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tiles never reorder
+        <UnifiedSkeleton key={i} className={TILE_SIZE_CLASS} />
+      ))}
+    </div>
   );
 }

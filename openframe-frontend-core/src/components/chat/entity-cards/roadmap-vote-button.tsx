@@ -9,7 +9,9 @@
 import { cn } from '../../../utils/cn';
 import { ThumbsDownClassicIcon } from '../../icons-v2-generated/shopping/thumbs-down-classic-icon';
 import { ThumbsUpClassicIcon } from '../../icons-v2-generated/shopping/thumbs-up-classic-icon';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
+import { useLoadingScope } from '../../ui/loading-scope';
 
 export interface RoadmapVoteButtonProps {
   voteType: 'up' | 'down';
@@ -33,11 +35,15 @@ export function RoadmapVoteButton({
   className,
 }: RoadmapVoteButtonProps) {
   const Icon = voteType === 'up' ? ThumbsUpClassicIcon : ThumbsDownClassicIcon;
+  // In a scope the button and its icon are drawn as they are; only the read count is a bar.
+  const loading = useLoadingScope();
   return (
     <Button
       variant="outline"
       onClick={onClick}
       disabled={disabled}
+      // In a loading scope the button is part of a skeleton: never focused, never announced.
+      {...(loading ? { tabIndex: -1, 'aria-hidden': true } : {})}
       leftIcon={<Icon className="h-5 w-5" color={color} />}
       className={cn(
         className,
@@ -47,7 +53,12 @@ export function RoadmapVoteButton({
         isActive && 'bg-ods-border',
       )}
     >
-      {showCount && <span className="text-h6">{count}</span>}
+      {showCount &&
+        (loading ? (
+          <TextLineSkeleton as="span" type="h6" className="inline-block w-4" />
+        ) : (
+          <span className="text-h6">{count}</span>
+        ))}
     </Button>
   );
 }

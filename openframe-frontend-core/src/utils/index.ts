@@ -34,7 +34,6 @@ export {
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
 export {
-  getPlatformAccentColor,
   getCurrentPlatform,
   getPlatformConfig,
   usePlatformColors,
@@ -42,14 +41,13 @@ export {
   getSemanticColor,
   type ColorCategory,
   HEX_PATTERN,
-  // Custom-color helpers so consumers (e.g. the chat client's accent theming)
-  // reuse the design-system math instead of re-implementing darken/hex utils.
   getReadableTextColor,
   hexToRgb,
   rgbToHex,
   deriveHoverColor,
   deriveActiveColor,
 } from './ods-color-utils';
+export { getPlatformAccentColor } from './platform-identity';
 export {
   errorMessage,
   delay,
@@ -63,6 +61,7 @@ export {
   NO_CLIENT_CACHE,
 } from './common';
 export { escapeRegExp } from './escape-regexp';
+export { isOwnClick } from './own-click';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';
@@ -139,6 +138,7 @@ export * from './announcement-storage';
 export * from './announcement-surface';
 // cookie id-match dismissal store (walkthrough video widget)
 export * from './dismiss-cookie';
+export * from './after-page-load';
 export * from './dismissal-storage';
 // walkthrough deep-link query param (widget default + host URL minters)
 export * from './walkthrough-deep-link';
@@ -293,12 +293,8 @@ export {
   type BuildAutoContinuationOptions,
 } from '../components/chat/utils/auto-continuation-directive';
 export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content';
-export {
-  SCROLL_ANCHOR,
-  type ScrollAnchor,
-  SCROLL_ANCHOR_WIRE_KEY,
-  parseScrollAnchor,
-} from '../components/chat/utils/scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from '../components/chat/utils/scroll-anchor';
+export { SCROLL_ANCHOR, type ScrollAnchor } from '../components/chat/types/message.types';
 export {
   type WireCommandOverride,
   parseWireCommandOverride,
@@ -481,3 +477,5 @@ export * from './path-pattern';
 export * from './random-id';
 export * from './demo-clock';
 export * from './identity-tint';
+export { createFenceTracker, isBlankLine } from './markdown-fences';
+export type { FenceTracker, FenceLineRole } from './markdown-fences';

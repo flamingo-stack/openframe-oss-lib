@@ -10,6 +10,10 @@ interface CategoryVendorSelectorSkeletonProps {
   className?: string;
 }
 
+/**
+ * @deprecated Render the selector itself inside a `LoadingScope`: its parts draw their own skeletons. Kept so hosts on an older release keep compiling; nothing in the lib uses it.
+ */
+// loading-standard-ok: deprecated re-export kept for external consumers
 export function CategoryVendorSelectorSkeleton({
   region = true,
   subcategories = 3,

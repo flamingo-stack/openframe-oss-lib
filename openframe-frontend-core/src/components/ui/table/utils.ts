@@ -1,5 +1,10 @@
 import type { TableColumn, TailwindBreakpoint } from './types';
 
+/** The synthetic column `Table` adds for its row actions (`rowActions` / `renderRowActions`). */
+export const TABLE_ACTIONS_COLUMN_KEY = '__actions__';
+/** The synthetic column `Table` adds for its row link (`rowHref`): one chevron icon button. */
+export const TABLE_CHEVRON_COLUMN_KEY = '__chevron__';
+
 /** @deprecated Use `data-table` instead. */
 export function getHideClasses(hideAt?: TailwindBreakpoint | TailwindBreakpoint[]): string {
   if (!hideAt) {

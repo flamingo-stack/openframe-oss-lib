@@ -14,7 +14,7 @@ export type { FigmaEmbedProps } from './figma-embed';
 export { ClaudeEmbed } from './claude-embed';
 export type { ClaudeEmbedProps, ClaudeEmbedKind } from './claude-embed';
 
-export { OGLinkPreview, OGLinkErrorBoundary, OGLinkTileSkeleton } from './og-link-preview';
+export { OGLinkPreview, OGLinkErrorBoundary, OGLinkPreviewSkeleton, OGLinkTileSkeleton } from './og-link-preview';
 export type { OGLinkPreviewProps, OGData } from './og-link-preview';
 
 export { FileDownloadCard } from './file-download-card';

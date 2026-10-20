@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useLoadingScope } from '../components/ui/loading-scope';
 import { DOWNLOADS_API_PATH, type AppDownload, type DownloadsPublic } from '../types/downloads';
 import { contentFetch } from '../utils/embed-content-fetch';
 import { desktopOsOf } from '../utils/visitor-os';
@@ -78,7 +79,14 @@ export interface UseDownloadsOptions {
  * environment; no client holds a copy of its own. Every caller on a page shares
  * one request.
  */
-export function useDownloads({ endpoint = DOWNLOADS_API_PATH, initialData, enabled = true }: UseDownloadsOptions = {}) {
+export function useDownloads({
+  endpoint = DOWNLOADS_API_PATH,
+  initialData,
+  enabled: enabledGiven = true,
+}: UseDownloadsOptions = {}) {
+  // In a loading scope nothing is asked for.
+  const held = useLoadingScope();
+  const enabled = enabledGiven && !held;
   const entry = entryFor(endpoint);
   // A server copy is the answer: held from the first render (server and client alike), and never re-requested.
   // Written during render so THIS caller's first paint has it; a render cannot notify other callers.
