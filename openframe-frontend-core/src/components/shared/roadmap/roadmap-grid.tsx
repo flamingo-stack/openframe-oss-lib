@@ -155,14 +155,16 @@ function RoadmapGridSingle({
         // `buildDevSectionUrl('roadmap', <id>)` → `#roadmap-<external_id>`;
         // `useScrollToHash` in `roadmap-view.tsx` finds the card by id
         // and scrolls.
-        <RoadmapCard
-          key={item.id}
-          item={item}
-          id={devSectionAnchorId('roadmap', item.id)}
-          userVote={getVote(item.id)}
-          onVote={voteType => onVote(item.id, voteType)}
-          isVoting={votingTasks.has(item.id)}
-        />
+        // `data-loading-item`: how many items a quarter holds is read data (the loading-state gate measures it as a list).
+        <div key={item.id} className="min-w-0" data-loading-item>
+          <RoadmapCard
+            item={item}
+            id={devSectionAnchorId('roadmap', item.id)}
+            userVote={getVote(item.id)}
+            onVote={voteType => onVote(item.id, voteType)}
+            isVoting={votingTasks.has(item.id)}
+          />
+        </div>
       ))}
     </div>
   );
@@ -188,7 +190,7 @@ export function RoadmapGridQuarterSkeleton({
 }) {
   return (
     <div className={QUARTER_LIST_CLASS} aria-hidden>
-      <div className="flex flex-col">
+      <div className="flex flex-col" data-loading-item>
         <div className={QUARTER_HEAD_CLASS}>
           <TextLineSkeleton type="h2" className="w-40" />
           <TextLineSkeleton type="h6" className="w-16" />
@@ -357,6 +359,8 @@ export function RoadmapGrid({
             value={quarter}
             id={`quarter-${quarter.replace(/\s+/g, '-').toLowerCase()}`}
             className="border-0"
+            // How many quarters the roadmap spans is read data: a list to the loading-state gate.
+            data-loading-item
           >
             <AccordionTrigger className="w-full p-0 hover:no-underline [&>svg]:ml-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:shrink-0 [&>svg]:text-ods-text-secondary">
               <div className={QUARTER_HEAD_CLASS}>

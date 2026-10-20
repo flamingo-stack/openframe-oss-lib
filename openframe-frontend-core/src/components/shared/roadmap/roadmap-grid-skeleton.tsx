@@ -39,7 +39,9 @@ export function RoadmapGridSkeleton({
   return (
     <LoadingRegion label="Loading the roadmap" announce={region} className={roadmapGridClass(columns, showLeftMargin)}>
       {Array.from({ length: count }).map((_, i) => (
-        <RoadmapCardSkeleton key={i} />
+        <div key={i} className="min-w-0" data-loading-item>
+          <RoadmapCardSkeleton />
+        </div>
       ))}
     </LoadingRegion>
   );
