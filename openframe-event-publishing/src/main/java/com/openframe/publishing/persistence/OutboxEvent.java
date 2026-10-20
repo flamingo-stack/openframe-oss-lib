@@ -1,0 +1,38 @@
+package com.openframe.publishing.persistence;
+
+import com.openframe.data.document.TenantScoped;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.time.Instant;
+import java.util.Map;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@Document(collection = "outbox")
+public class OutboxEvent implements TenantScoped {
+
+    @Id
+    private String id;
+
+    private String aggregateType;
+    private String aggregateId;
+    private String tenantId;
+
+    // The aggregate's @Version after the write: consumers drop an event older than what they already applied.
+    private Long version;
+
+    private boolean deleted;
+    private int schemaVersion;
+
+    // Expires through the TTL index of OutboxIndexInitializer.
+    private Instant occurredAt;
+
+    private Map<String, Object> payload;
+}
