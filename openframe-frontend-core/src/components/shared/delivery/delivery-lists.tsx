@@ -40,6 +40,7 @@ import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { DeliveryTable } from './delivery-table';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
@@ -87,7 +88,10 @@ export function DeliveryLists({
   const pathname = usePathname();
 
   const [data, setData] = useState<DeliveryResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsLoading] = useState(true);
+  // ONE switch: in a page's loading state nothing is fetched and the lists are their skeletons.
+  const inScope = useLoadingScope();
+  const isLoading = inScope || isFetching;
   const [error, setError] = useState<string | null>(null);
   const [sync, setSync] = useState<DataSync | null>(null);
 
@@ -100,6 +104,7 @@ export function DeliveryLists({
     // rewrites the query string re-runs this effect while the previous pair of
     // requests is still open. Without this guard a slower EARLIER response can
     // resolve last and paint results for a query the user already moved past.
+    if (inScope) return undefined;
     let cancelled = false;
 
     async function fetchDeliveryData() {
@@ -156,7 +161,15 @@ export function DeliveryLists({
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, taskTypeFilter, completedApiEndpoint, inProgressApiEndpoint, searchParamKey, taskTypeParamKey]);
+  }, [
+    inScope,
+    searchQuery,
+    taskTypeFilter,
+    completedApiEndpoint,
+    inProgressApiEndpoint,
+    searchParamKey,
+    taskTypeParamKey,
+  ]);
 
   const filteredCompleted = data?.completed || [];
   const filteredInProgress = data?.inProgress || [];

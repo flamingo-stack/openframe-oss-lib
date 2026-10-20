@@ -1,10 +1,9 @@
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
-import { getProxiedImageUrl } from '../../../utils/image-proxy-stub';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
-import { AdminContentCard } from './admin-content-card';
-import { AdminContentCardSkeleton } from './admin-content-card-grid';
+import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
+import { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
 
 /** The fields every people-hub employee entry shares. Entity-specific bindings
  *  (`WhatIShippedCard`, `HowIWorkCard`) map their own date column to `dateLabel`
@@ -76,6 +75,7 @@ export function EmployeeEntryCard({
   anchorProps,
   className,
 }: EmployeeEntryCardProps) {
+  const authorAvatar = useProxiedImageUrl(entry.author?.avatar_url, { directHttps: false });
   const card = (
     <AdminContentCard
       imageUrl={entry.featured_image || entry.main_video_thumbnail}
@@ -100,9 +100,9 @@ export function EmployeeEntryCard({
       meta={
         <>
           <span className="flex min-w-0 items-center gap-2">
-            {entry.author?.avatar_url ? (
+            {authorAvatar ? (
               <Image
-                src={getProxiedImageUrl(entry.author.avatar_url) ?? entry.author.avatar_url}
+                src={authorAvatar}
                 alt=""
                 // One line of the meta row tall (16px on a phone, 20px from md), so the
                 // row is exactly the line the skeleton reserves.

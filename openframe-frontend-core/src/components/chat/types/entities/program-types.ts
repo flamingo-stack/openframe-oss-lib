@@ -35,11 +35,6 @@ export interface ProgramHost {
   role?: string; // e.g., "Host", "Speaker", "Guest"
 }
 
-// The author ref and its strip-profile adapter live in the server-safe leaf
-// (`features/video-bites-shared`): a server module that imports them from this
-// chat tree makes the whole chat a client reference of its page.
-export { programItemToStripProfile, type ProgramAuthorRef } from '../../../features/video-bites-shared';
-
 // ============================================================================
 // DATABASE ROW TYPES
 // ============================================================================
@@ -292,6 +287,8 @@ export interface ProgramConfig<T extends BaseProgramItem = BaseProgramItem> {
   showInNav?: boolean; // Whether to show in navigation
   platformUrl?: string; // Fallback URL to external platform (e.g., Podbean main page)
   heroCoverAspect?: 'landscape' | 'square'; // Hero cover image aspect ratio (default: 'landscape')
+  /** A card of this type shows its hosts (a webinar presents its speakers): the card's skeleton draws the hosts row. */
+  cardShowsHosts?: boolean;
 }
 
 // ============================================================================

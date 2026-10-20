@@ -64,8 +64,10 @@ export type DatePickerProps = SingleDatePickerProps | RangeDatePickerProps;
 
 // A picked date is a LOCAL calendar date (the grid builds it from y/m/d in the
 // browser's zone), so it renders in the viewer's zone — UTC would move it a day
-// for anyone east of Greenwich.
-const defaultFormatDate = (date: Date): string => formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric');
+// for anyone east of Greenwich — and in the viewer's locale: the field reads the
+// way its user writes dates (`03/20/2026` in en-US, `20/03/2026` in en-AU).
+const defaultFormatDate = (date: Date): string =>
+  formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric', { viewerLocale: true });
 
 const formatDateRange = (range: DateRange | undefined, formatFn: (date: Date) => string): string => {
   if (!range?.from) return '';
@@ -464,7 +466,8 @@ export function DatePickerCalendar({
   const handlePreviousMonth = () => shiftMonth(-1);
   const handleNextMonth = () => shiftMonth(1);
 
-  const formatMonthYear = (date: Date): string => formatDateWithTimezone(date, VIEWER_TIMEZONE, 'monthYear');
+  const formatMonthYear = (date: Date): string =>
+    formatDateWithTimezone(date, VIEWER_TIMEZONE, 'monthYear', { viewerLocale: true });
 
   const getSecondMonth = (date: Date): Date => {
     const next = new Date(date);
@@ -1458,9 +1461,3 @@ export function DateFilterMenu({
     </Popover.Root>
   );
 }
-
-// ============================================================================
-// Exports
-// ============================================================================
-
-export { type DateRange };

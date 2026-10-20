@@ -26,13 +26,25 @@ import { useMemo, useTransition, type ReactNode } from 'react';
 import { useChatRuntime } from '../../contexts/chat-runtime-context';
 import { useRouter, useSearchParams } from '../../embed-shims';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
+import { cn } from '../../utils/cn';
 import { resolveContentHref } from '../../utils/content-href';
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
+import { LoadingRegion } from '../loading/loading-region';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
 import { LoadError } from '../ui/error-state';
 import { FilterPillRow } from '../ui/filter-pill-row';
-import { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton';
+import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import {
+  CATALOG_CONTROLS_CLASS,
+  CATALOG_LIST_CLASS,
+  CATALOG_SECTION_CLASS,
+  CATALOG_SECTION_COUNT_CLASS,
+  CATALOG_SECTION_HEADING_CLASS,
+  CATALOG_SECTIONS_CLASS,
+  CATALOG_VIEW_CLASS,
+  OnboardingCatalogSectionsSkeleton,
+} from './onboarding-guides-catalog-skeleton';
 
 type SectionSummary = { section: string; section_order: number; count: number };
 
@@ -67,8 +79,11 @@ export function OnboardingGuidesCatalogView({
   const [isPending, startTransition] = useTransition();
   const runtime = useChatRuntime();
 
+  // In a page's loading state the catalog is read: it renders its own view in the scope (every part its own
+  // skeleton) and fetches nothing.
+  const scoped = useLoadingScope();
   // Self-fetch only when the host supplied NO data but DID give an endpoint.
-  const selfFetch = initialGuides === undefined && guidesEndpoint !== undefined;
+  const selfFetch = !scoped && initialGuides === undefined && guidesEndpoint !== undefined;
   // Active section: from the URL when self-fetching, from the prop (host RSC
   // already read the URL server-side) when controlled.
   const sectionValue = selfFetch ? (searchParams.get('section') ?? '') : initialSection;
@@ -96,6 +111,8 @@ export function OnboardingGuidesCatalogView({
     [initialSections, sectionsRes.data],
   );
   const isLoading = selfFetch ? guidesRes.isLoading : false;
+  // The catalog's first read (no guides yet), or a host's loading scope: the view renders in a loading scope.
+  const loading = scoped || (selfFetch && guidesRes.data == null && isLoading);
 
   // Section grouping. Data arrives already filtered (server-side `?section=`
   // for the host, or our `?section=` fetch); this just buckets visible rows.
@@ -163,7 +180,7 @@ export function OnboardingGuidesCatalogView({
   const renderCardFn = renderCard ?? defaultRenderCard;
 
   const preControls = (
-    <div className="space-y-4">
+    <div className={CATALOG_CONTROLS_CLASS}>
       <DocSearchBar
         placeholder="Search onboarding guides, releases, case studies…"
         query={docSearch.query}
@@ -173,12 +190,14 @@ export function OnboardingGuidesCatalogView({
         onResultSelect={docSearch.handleResultSelect}
         showDropdown={docSearch.keepDropdownOpen}
       />
-      {sections.length > 0 && (
+      {(loading || sections.length > 0) && (
         <FilterPillRow
           label="Section"
           selectedValue={activeSection}
           onValueChange={setSection}
-          options={sectionFilterOptions}
+          // While loading the options (their counts) are read: the row draws its own skeleton.
+          options={loading ? [] : sectionFilterOptions}
+          loading={loading}
         />
       )}
     </div>
@@ -186,50 +205,77 @@ export function OnboardingGuidesCatalogView({
 
   // A failed guides fetch → a RETRYABLE error (not the indistinguishable-from-
   // empty "no guides found" state) — parity with the sibling self-fetch views.
-  if (selfFetch && guidesRes.error) {
+  if (!loading && selfFetch && guidesRes.error) {
     return <LoadError message="Failed to load onboarding guides." onRetry={guidesRes.reload} />;
   }
-  // Full-page skeleton ONLY on the very first load (no data has loaded yet) — a
-  // later section toggle that legitimately returns ZERO guides keeps the page
-  // chrome (search + section pills) and dims the grid via the className below.
-  if (selfFetch && guidesRes.data == null && isLoading) {
-    return <OnboardingGuidesCatalogSkeleton />;
-  }
 
-  return (
-    <div className="flex w-full flex-col gap-10">
+  const view = (
+    <div className={CATALOG_VIEW_CLASS}>
       {preControls}
-      {guides.length === 0 ? (
-        <div className="py-16 text-center">
-          <GraduationCap className="mx-auto mb-4 h-12 w-12 text-ods-text-secondary" />
-          <h2 className="mb-2 text-ods-text-primary text-h3">No onboarding guides found</h2>
-          <p className="text-ods-text-secondary text-h6">
-            {activeSection !== 'all'
-              ? 'No guides in this section yet.'
-              : "We're working on the onboarding library. Check back soon."}
-          </p>
-        </div>
-      ) : (
-        <div className={isPending || isLoading ? 'space-y-10 opacity-60 transition-opacity' : 'space-y-10'}>
-          {grouped.map(sec => (
-            <section key={sec.section} className="space-y-4">
-              <h2 className="flex items-center gap-2 text-ods-text-primary text-h3">
-                {sec.section}
-                <span className="inline-flex items-center justify-center rounded-full bg-ods-text-secondary/20 px-2 py-0.5 text-ods-text-secondary text-h6">
-                  {sec.guides.length}
-                </span>
-              </h2>
-              {/* HORIZONTAL catalog list — single column so consecutive steps
-                  read top-to-bottom; a grid would visually reorder them. */}
-              <ul className="flex flex-col gap-4">
-                {sec.guides.map(guide => (
-                  <li key={guide.id}>{renderCardFn(guide)}</li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
+      <OnboardingCatalogSections
+        grouped={grouped}
+        loading={loading}
+        dimmed={isPending || isLoading}
+        allSections={activeSection === 'all'}
+        renderCard={renderCardFn}
+      />
+    </div>
+  );
+  // The first read (no data yet): the SAME view in a loading scope. A later section toggle that returns ZERO guides
+  // keeps the page's controls and dims the grid (`dimmed`).
+  if (!loading) return view;
+  return (
+    <LoadingRegion label="Loading onboarding guides" announce={!scoped}>
+      <LoadingScope>{view}</LoadingScope>
+    </LoadingRegion>
+  );
+}
+
+/** The catalog's sections: their own skeleton while the guides are read (`useLoadingScope() || loading`). */
+function OnboardingCatalogSections({
+  grouped,
+  loading,
+  dimmed,
+  allSections,
+  renderCard,
+}: {
+  grouped: Array<{ section: string; guides: OnboardingGuide[] }>;
+  loading: boolean;
+  dimmed: boolean;
+  /** No section is selected (the empty state's wording). */
+  allSections: boolean;
+  renderCard: (guide: OnboardingGuide) => ReactNode;
+}) {
+  if (useLoadingScope() || loading) return <OnboardingCatalogSectionsSkeleton />;
+  if (grouped.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <GraduationCap className="mx-auto mb-4 h-12 w-12 text-ods-text-secondary" />
+        <h2 className="mb-2 text-ods-text-primary text-h3">No onboarding guides found</h2>
+        <p className="text-ods-text-secondary text-h6">
+          {allSections ? "We're working on the onboarding library. Check back soon." : 'No guides in this section yet.'}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className={cn(CATALOG_SECTIONS_CLASS, dimmed && 'opacity-60 transition-opacity')}>
+      {grouped.map(sec => (
+        // A section is the data's group: how many there are is the record's (`data-loading-item`).
+        <section key={sec.section} className={CATALOG_SECTION_CLASS} data-loading-item>
+          <h2 className={CATALOG_SECTION_HEADING_CLASS}>
+            {sec.section}
+            <span className={CATALOG_SECTION_COUNT_CLASS}>{sec.guides.length}</span>
+          </h2>
+          {/* HORIZONTAL catalog list — single column so consecutive steps
+              read top-to-bottom; a grid would visually reorder them. */}
+          <ul className={CATALOG_LIST_CLASS}>
+            {sec.guides.map(guide => (
+              <li key={guide.id}>{renderCard(guide)}</li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image, { resizedImageUrl } from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 import { MarqueeWall } from './marquee-wall';
 
 export interface PhotoWallImage {
@@ -175,7 +176,17 @@ export interface PhotoWallProps {
   loading?: boolean;
 }
 
-export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, className, loading = false }: PhotoWallProps) {
+export function PhotoWall({
+  images,
+  columns = 2,
+  speed = 24,
+  fadeColor,
+  className,
+  loading: loadingProp = false,
+}: PhotoWallProps) {
+  // In a page's loading state the pictures are read: the wall draws its placeholder frames and measures nothing.
+  const inScope = useLoadingScope();
+  const loading = loadingProp || inScope;
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [box, setBox] = useState<{ width: number; height: number } | null>(null);
   useEffect(() => {
@@ -208,11 +219,11 @@ export function PhotoWall({ images, columns = 2, speed = 24, fadeColor, classNam
   // One frame per picture: a url listed twice is its first entry. Nothing is
   // asked for before the wall knows its width.
   const unique = useMemo(() => {
-    if (requestWidth === undefined) return [];
+    if (requestWidth === undefined || inScope) return [];
     const byUrl = new Map<string, PhotoWallImage>();
     for (const image of images) if (!byUrl.has(image.url)) byUrl.set(image.url, image);
     return Array.from(byUrl.values());
-  }, [images, requestWidth]);
+  }, [images, requestWidth, inScope]);
   // Each picture is measured at the url it is drawn from (the boxed `Image`'s
   // `optimizedWidth`: the host's resizer at the column's width), so it is downloaded once.
   const drawnWidth = requestWidth ?? undefined;

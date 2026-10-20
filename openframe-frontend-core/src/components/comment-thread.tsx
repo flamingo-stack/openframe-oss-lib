@@ -2,9 +2,24 @@
 
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { CommentCard, type CommentCardComment } from './comment-card';
+import { CommentCard, CommentCardSkeleton, type CommentCardComment } from './comment-card';
 import { CommentComposer } from './comment-composer';
+import { TextLineSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
+import { useLoadingScope } from './ui/loading-scope';
+
+/**
+ * The comment cards a thread's skeleton draws: its first fold (about three root cards fill a section's screen). Never
+ * the number of comments held: in a loading scope those are not read.
+ */
+export const COMMENT_THREAD_SKELETON_COUNT = 3;
+// The thread's and the block's boxes, read by them AND their skeletons.
+const COMMENT_THREAD_LIST = 'flex flex-col gap-[var(--spacing-system-sf)]';
+/** A root's actions at the end of its footer (Reply, then the surface's own), loaded and loading. */
+const COMMENT_THREAD_ACTIONS = 'ml-auto flex flex-wrap gap-[var(--spacing-system-xsf)]';
+const COMMENTS_BLOCK = 'space-y-[var(--spacing-system-sf)]';
+const COMMENTS_BLOCK_HEADER = 'px-0 text-ods-text-secondary hover:text-ods-text-primary';
+const commentsBlockChevron = (open: boolean) => `h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`;
 
 /** A root comment with its replies. Replies never nest further (single-level threads). */
 export interface ThreadComment extends CommentCardComment {
@@ -55,11 +70,14 @@ export function CommentThread({
   leadWith,
   onViewProduct,
 }: CommentThreadProps) {
+  if (useLoadingScope()) {
+    return <CommentThreadSkeleton count={COMMENT_THREAD_SKELETON_COUNT} leadWith={leadWith} reply={Boolean(onReply)} />;
+  }
   if (comments.length === 0) {
     return emptyLabel ? <p className="text-ods-text-secondary text-h6">{emptyLabel}</p> : null;
   }
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-sf)]">
+    <div className={COMMENT_THREAD_LIST}>
       {comments.map(comment => (
         <CommentThreadRow
           key={comment.id}
@@ -75,6 +93,15 @@ export function CommentThread({
         />
       ))}
     </div>
+  );
+}
+
+/** A root's Reply button: static copy, drawn for real in the loaded thread and (inert) in its skeleton. */
+function ReplyButton({ onClick, disabled }: { onClick?: () => void; disabled?: boolean }) {
+  return (
+    <Button type="button" variant="outline" size="small-legacy" onClick={onClick} disabled={disabled}>
+      Reply
+    </Button>
   );
 }
 
@@ -101,18 +128,8 @@ function CommentThreadRow({
         </span>
       ) : null}
       {onReply || actions ? (
-        <span className="ml-auto flex flex-wrap gap-[var(--spacing-system-xsf)]">
-          {onReply ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="small-legacy"
-              onClick={() => setReplyOpen(open => !open)}
-              disabled={pending}
-            >
-              Reply
-            </Button>
-          ) : null}
+        <span className={COMMENT_THREAD_ACTIONS}>
+          {onReply ? <ReplyButton onClick={() => setReplyOpen(open => !open)} disabled={pending} /> : null}
           {actions}
         </span>
       ) : null}
@@ -160,6 +177,38 @@ function CommentThreadRow({
   );
 }
 
+/**
+ * A thread while it is read: `count` comment rows, each `CommentCardSkeleton` in the thread's own list, with the
+ * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
+ * so they are not drawn).
+ */
+export function CommentThreadSkeleton({
+  count = COMMENT_THREAD_SKELETON_COUNT,
+  leadWith = 'commenter',
+  showTitle = true,
+  reply = false,
+}: {
+  count?: number;
+  leadWith?: 'vendor' | 'commenter';
+  /** The rows carry a title line (titled reviews); a design-doc thread's comments have none. */
+  showTitle?: boolean;
+  /** The thread takes replies (`CommentThread`'s `onReply`): each root's footer carries its Reply button. */
+  reply?: boolean;
+}) {
+  const footer = reply ? (
+    <span className={COMMENT_THREAD_ACTIONS}>
+      <ReplyButton />
+    </span>
+  ) : undefined;
+  return (
+    <div className={COMMENT_THREAD_LIST} aria-hidden="true" inert>
+      {Array.from({ length: count }, (_, i) => (
+        <CommentCardSkeleton key={i} leadWith={leadWith} showTitle={showTitle} showDelete={false} footer={footer} />
+      ))}
+    </div>
+  );
+}
+
 export interface CommentsBlockProps {
   /** Header label, e.g. "Comments". */
   title: string;
@@ -180,6 +229,7 @@ export interface CommentsBlockProps {
  * (content behind an accordion is content readers miss).
  */
 export function CommentsBlock({ title, summary, defaultOpen = false, children, composer }: CommentsBlockProps) {
+  const loading = useLoadingScope();
   const [open, setOpen] = useState(defaultOpen);
   // New activity AFTER mount (a colleague's comment arrives) flips `defaultOpen`
   // to true and must expand the block; collapsing again stays the reader's call.
@@ -189,15 +239,29 @@ export function CommentsBlock({ title, summary, defaultOpen = false, children, c
     setSeenDefaultOpen(defaultOpen);
     if (defaultOpen) setOpen(true);
   }
+  // In a scope the header keeps its real title and its summary is a bar; the thread under it draws its own skeleton.
+  if (loading) {
+    return (
+      <div className={COMMENTS_BLOCK}>
+        <CommentsBlockHeader title={title} open={open} />
+        {open ? (
+          <>
+            {children}
+            {composer}
+          </>
+        ) : null}
+      </div>
+    );
+  }
   return (
-    <div className="space-y-[var(--spacing-system-sf)]">
+    <div className={COMMENTS_BLOCK}>
       <Button
         type="button"
         variant="transparent"
         size="small-legacy"
-        className="px-0 text-ods-text-secondary hover:text-ods-text-primary"
+        className={COMMENTS_BLOCK_HEADER}
         onClick={() => setOpen(value => !value)}
-        rightIcon={<ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />}
+        rightIcon={<ChevronDown className={commentsBlockChevron(open)} />}
       >
         {`${title} · ${summary}`}
       </Button>
@@ -207,6 +271,55 @@ export function CommentsBlock({ title, summary, defaultOpen = false, children, c
           {composer}
         </>
       ) : null}
+    </div>
+  );
+}
+
+/** The block's header while its summary is read: the real title, a bar for the summary. */
+function CommentsBlockHeader({ title, open }: { title: string; open: boolean }) {
+  return (
+    <Button
+      type="button"
+      variant="transparent"
+      size="small-legacy"
+      className={COMMENTS_BLOCK_HEADER}
+      rightIcon={<ChevronDown className={commentsBlockChevron(open)} />}
+      tabIndex={-1}
+      aria-hidden
+    >
+      {`${title} · `}
+      <TextLineSkeleton as="span" type="h6" className="inline-block w-20 align-middle" />
+    </Button>
+  );
+}
+
+/**
+ * The comments section while it is read: its real title, the summary as a bar, `count` comment rows (none: the
+ * block is collapsed) and, with `composer`, the root composer's real static controls (inert).
+ */
+export function CommentsBlockSkeleton({
+  title,
+  count = 0,
+  composer = false,
+  leadWith,
+  showTitle,
+}: {
+  title: string;
+  count?: number;
+  composer?: boolean;
+  leadWith?: 'vendor' | 'commenter';
+  showTitle?: boolean;
+}) {
+  const open = count > 0 || composer;
+  return (
+    <div className={COMMENTS_BLOCK} aria-hidden>
+      <CommentsBlockHeader title={title} open={open} />
+      {count > 0 && <CommentThreadSkeleton count={count} leadWith={leadWith} showTitle={showTitle} />}
+      {composer && (
+        <div inert>
+          <CommentComposer onSubmit={() => false} />
+        </div>
+      )}
     </div>
   );
 }

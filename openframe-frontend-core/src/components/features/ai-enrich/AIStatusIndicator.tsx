@@ -8,6 +8,7 @@ import {
   getConfidenceLabel,
 } from '../../../utils/confidence-helpers';
 import { SparklesIcon } from '../../icons-v2-generated/interface/sparkles-icon';
+import { LIVE_PULSE_CLASS } from '../../ui/skeleton-surface';
 
 export type AIStatus = 'idle' | 'loading' | 'success' | 'error';
 
@@ -60,7 +61,7 @@ export const AIStatusIndicator: React.FC<AIStatusIndicatorProps> = ({
       <SparklesIcon
         size={16}
         className={cn(
-          status === 'loading' && 'animate-pulse',
+          status === 'loading' && LIVE_PULSE_CLASS,
           confidence !== undefined && status === 'success' ? getConfidenceTextClass(confidence) : config.color,
         )}
       />

@@ -5,6 +5,7 @@ import type React from 'react';
 import { memo, useCallback, useRef, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
+import { isOwnClick } from '../../../utils/own-click';
 import { ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table-skeleton';
 import { alignJustify, getHideClasses } from './utils';
 
@@ -86,15 +87,9 @@ function DataTableRowImpl<T>({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // React-bubbled events from portaled descendants (tooltips, dropdowns, etc.)
-      // reach this handler even though their DOM target lives outside the row.
-      // Suppress them — and in link mode, preventDefault so `<Link>` does not navigate.
-      if (!containerRef.current?.contains(target)) {
-        if (isLinkMode) e.preventDefault();
-        return;
-      }
-      if (target.closest('[data-no-row-click]')) {
+      // Not the row's own click (a portalled descendant, a `data-no-row-click` element): suppressed,
+      // and in link mode `preventDefault` so `<Link>` does not navigate.
+      if (!isOwnClick(e.target, containerRef.current)) {
         if (isLinkMode) e.preventDefault();
         return;
       }

@@ -1,6 +1,7 @@
 import { createElement, type FC } from 'react';
 import type { ToolType } from '../types/tool.types';
-import { findIcon, type IconComponent } from './chat/utils/icon-library';
+import { findIcon } from './chat/utils/icon-library';
+import type { IconComponent } from './chat/utils/icon-loading';
 
 export interface ToolIconProps {
   toolType: ToolType;

@@ -288,7 +288,7 @@ function AttachmentChip({ attachment, onRemove, disabled, size = 'default' }: At
             chip to a single line; uploading/error states still surface. */}
         {(!compact || status !== 'ready') && (
           <div className="text-ods-text-muted text-h6">
-            {status === 'sniffing' && 'Checking…'}
+            {status === 'sniffing' && 'Checking the file'}
             {status === 'uploading' && `${progress}% · ${formatFileSize(file.size)}`}
             {status === 'ready' && formatFileSize(file.size)}
             {status === 'error' && (
