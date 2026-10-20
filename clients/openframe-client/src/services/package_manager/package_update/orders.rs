@@ -154,7 +154,7 @@ impl OrderStore {
                     .pending
                     .iter()
                     .position(|order| {
-                        order.package == message.package
+                        order.package.matches(&message.package)
                             && next.installing.as_deref() != Some(order.request_id.as_str())
                     })
                     .map(|index| next.pending.remove(index));
@@ -218,6 +218,9 @@ impl OrderStore {
             return Ok(());
         };
         let order = next.pending.remove(index);
+        if next.installing.as_deref() == Some(request_id) {
+            next.installing = None;
+        }
         next.finished.retain(|f| f.request_id != request_id);
         next.finished.push(Finished {
             request_id: request_id.to_string(),

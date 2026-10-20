@@ -7,8 +7,7 @@ use super::orders::Order;
 use super::status::{self, Report};
 use super::{close, relaunch, Worker};
 use crate::models::{
-    Done, DoneResult, FailReason, Failed, HolderInfo, PackageRef, UpdateMode, WaitPhase,
-    WaitReason, Waiting,
+    Done, DoneResult, FailReason, Failed, HolderInfo, UpdateMode, WaitPhase, WaitReason, Waiting,
 };
 use crate::services::package_manager::update_gate::{
     self, BlockReason, GateDecision, Holder, Prepared, Undetermined,
@@ -38,6 +37,8 @@ pub(super) struct Progress {
     busy_since: Option<u64>,
     unseen_since: Option<u64>,
     held: Hold,
+    /// Set once a FORCE order installs without a visible gate; an in-use answer then ends it.
+    blind: bool,
     last_report: Option<ReportKey>,
     /// Unix seconds before which the order is not looked at again.
     pub(super) next_at: u64,
@@ -152,7 +153,7 @@ impl Worker {
                 Ok(outdated) => {
                     let Some(found) = outdated
                         .into_iter()
-                        .find(|o| same_package(&o.package, &order.package))
+                        .find(|o| o.package.matches(&order.package))
                     else {
                         p.probe = None;
                         return self
@@ -214,7 +215,9 @@ impl Worker {
             },
             GateDecision::Blocked(BlockReason::Undetermined(reason)) => {
                 // A failed resolution is not kept: the next look resolves the identity again.
-                p.prepared = None;
+                if matches!(reason, Undetermined::Resolver(_)) {
+                    p.prepared = None;
+                }
                 self.undetermined(machine_id, order, p, now, reason).await
             }
         }
@@ -230,7 +233,9 @@ impl Worker {
         reason: Undetermined,
     ) -> Verdict {
         match reason {
-            Undetermined::NotInstalled | Undetermined::ManagerUnsupported => {
+            Undetermined::NotInstalled
+            | Undetermined::ManagerUnsupported
+            | Undetermined::NoInstallLocation => {
                 info!(request_id = %order.request_id, %reason, "Nothing to hold the update, installing");
                 self.install(machine_id, order, p, now).await
             }
@@ -240,6 +245,7 @@ impl Worker {
                     .is_some_and(|since| now >= since + BUSY_BUDGET_SECS);
                 if order.mode == UpdateMode::Force && budget_spent {
                     warn!(request_id = %order.request_id, %reason, "Still cannot tell whether the app is running, forcing the install blind");
+                    p.blind = true;
                     return self.install(machine_id, order, p, now).await;
                 }
                 self.busy(
@@ -283,6 +289,7 @@ impl Worker {
         info!(request_id = %order.request_id, ?holders, "Countdown over, closing the app to update it");
         // Held through the install: a restart between the close and the install would strand the user.
         let _running = self.package_upgrades.begin();
+        self.orders.set_installing(Some(&order.request_id));
         let pids: Vec<u32> = holders.iter().map(|holder| holder.pid).collect();
         let survivors = close::close(&pids).await;
         p.countdown = None;
@@ -291,6 +298,7 @@ impl Worker {
             .filter(|holder| !survivors.contains(&holder.pid))
             .collect();
         if !survivors.is_empty() {
+            self.orders.set_installing(None);
             return self
                 .fail(
                     machine_id,
@@ -315,12 +323,10 @@ impl Worker {
         let outcome = {
             let _running = self.package_upgrades.begin();
             self.orders.set_installing(Some(&order.request_id));
-            let outcome = managers::upgrade(&order.package).await;
-            self.orders.set_installing(None);
-            outcome
+            managers::upgrade(&order.package).await
         };
         info!(request_id = %order.request_id, ?outcome, "Package update attempt finished");
-        match outcome {
+        let verdict = match outcome {
             UpgradeOutcome::Upgraded { reboot_required } => {
                 self.done(machine_id, order, p, DoneResult::Upgraded, reboot_required)
                     .await
@@ -329,7 +335,7 @@ impl Worker {
                 self.done(machine_id, order, p, DoneResult::AlreadyLatest, false)
                     .await
             }
-            UpgradeOutcome::InUse(reason) if !p.closed.is_empty() => {
+            UpgradeOutcome::InUse(reason) if !p.closed.is_empty() || p.blind => {
                 self.fail(machine_id, order, p, FailReason::CloseFailed, None, reason)
                     .await
             }
@@ -379,7 +385,12 @@ impl Worker {
                 )
                 .await
             }
+        };
+        // A finished order stays marked until finish() drops it; a waiting one may be superseded.
+        if matches!(verdict, Verdict::Continue { .. }) {
+            self.orders.set_installing(None);
         }
+        verdict
     }
 
     async fn busy(
@@ -400,7 +411,7 @@ impl Worker {
                     p,
                     FailReason::Timeout,
                     None,
-                    format!("the package manager stayed busy for over an hour: {reason}"),
+                    format!("gave up after an hour: {reason}"),
                 )
                 .await;
         }
@@ -517,6 +528,18 @@ impl Worker {
         relaunch::relaunch(&closed, identity).await
     }
 
+    /// A superseded order's forced close still gets its apps back.
+    pub(super) async fn abandon(&self, request_id: &str, p: Progress) {
+        if p.closed.is_empty() {
+            return;
+        }
+        info!(
+            request_id,
+            "Relaunching the apps a superseded order had closed"
+        );
+        relaunch::relaunch(&p.closed, None).await;
+    }
+
     fn event(
         &self,
         machine_id: &str,
@@ -532,14 +555,6 @@ impl Worker {
             probe.and_then(|probe| probe.available.as_deref()),
             report,
         )
-    }
-}
-
-/// Winget ids are case-insensitive; the rest compare as written.
-fn same_package(a: &PackageRef, b: &PackageRef) -> bool {
-    match (a, b) {
-        (PackageRef::Winget { id: x }, PackageRef::Winget { id: y }) => x.eq_ignore_ascii_case(y),
-        _ => a == b,
     }
 }
 

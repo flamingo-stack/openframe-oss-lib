@@ -90,7 +90,16 @@ async fn run(worker: Arc<Worker>) {
             }
         };
         let pending = worker.orders.pending(&machine_id);
-        progress.retain(|request_id, _| pending.iter().any(|o| &o.request_id == request_id));
+        let abandoned: Vec<String> = progress
+            .keys()
+            .filter(|id| !pending.iter().any(|o| &o.request_id == *id))
+            .cloned()
+            .collect();
+        for request_id in abandoned {
+            if let Some(p) = progress.remove(&request_id) {
+                worker.abandon(&request_id, p).await;
+            }
+        }
         if pending.is_empty() {
             worker.orders.changed().await;
             continue;

@@ -31,6 +31,7 @@ pub(super) enum UpgradeOutcome {
     Upgraded {
         reboot_required: bool,
     },
+    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
     AlreadyLatest,
     /// The app's files are in use: a holder the gate did not see.
     #[cfg_attr(not(target_os = "windows"), allow(dead_code))]

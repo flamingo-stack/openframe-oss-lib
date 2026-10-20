@@ -175,8 +175,29 @@ fn an_order_whose_install_runs_is_not_superseded() {
         .collect();
     assert_eq!(ids, vec!["req-1", "req-2"]);
 
-    store.set_installing(None);
     store.finish("req-1").unwrap();
+    assert_eq!(store.pending(MACHINE).len(), 1);
+    let third = store
+        .submit(MACHINE, 1, 300, wait("req-3", "Vendor.App"), 0)
+        .unwrap();
+    assert!(
+        matches!(third, Submitted::Superseded(ref old) if old.request_id == "req-2"),
+        "finishing clears the install mark: {third:?}"
+    );
+}
+
+#[test]
+fn a_differently_cased_winget_id_is_the_same_package() {
+    let (store, _dir) = store();
+    store
+        .submit(MACHINE, 1, 100, wait("req-1", "Vendor.App"), 0)
+        .unwrap();
+
+    let submitted = store
+        .submit(MACHINE, 1, 200, wait("req-2", "vendor.app"), 0)
+        .unwrap();
+
+    assert!(matches!(submitted, Submitted::Superseded(_)));
     assert_eq!(store.pending(MACHINE).len(), 1);
 }
 
