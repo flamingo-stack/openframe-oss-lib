@@ -5,9 +5,6 @@ import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-pl
 import { iconOf, type IconComponent, type IconRef } from './chat/utils/icon-loading';
 import { Button } from './ui/button';
 
-/** Re-exported for call sites that already import the link type from this module. */
-export type { SocialIconLink };
-
 interface SocialIconRowProps {
   className?: string;
   links?: SocialIconLink[];
@@ -79,6 +76,17 @@ function renderSocialIcon(platform: string) {
   return icon ? createElement(icon, { className: 'h-5 w-5' }) : null;
 }
 
+/** The row's box: what a caller's loading state draws its skeleton buttons in, so they sit where the row's buttons do. */
+export function socialIconRowClass(compact = false): string {
+  return `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'}`;
+}
+
+/** One button's size and stretch in the row (compact: the quiet 32px icon; else the full-width 44/48px one): read by
+ *  the row and by a caller's skeleton buttons. */
+export function socialIconButtonProps(compact = false): { size: 'icon-sm' | 'icon'; className?: string } {
+  return compact ? { size: 'icon-sm' } : { size: 'icon', className: 'flex-1' };
+}
+
 export function SocialIconRow({
   className = '',
   links = defaultLinks,
@@ -109,8 +117,7 @@ export function SocialIconRow({
         key={index}
         type="button"
         variant={resolvedVariant}
-        size={compact ? 'icon-sm' : 'icon'}
-        className={compact ? undefined : 'flex-1'}
+        {...socialIconButtonProps(compact)}
         aria-label={ariaLabel}
         onClick={link.onClick}
       >
@@ -123,8 +130,7 @@ export function SocialIconRow({
       <Button
         key={index}
         variant={resolvedVariant}
-        size={compact ? 'icon-sm' : 'icon'}
-        className={compact ? undefined : 'flex-1'}
+        {...socialIconButtonProps(compact)}
         href={link.href}
         openInNewTab
         aria-label={ariaLabel}
@@ -134,7 +140,7 @@ export function SocialIconRow({
     );
   };
 
-  const rowClass = `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'} ${className}`;
+  const rowClass = `${socialIconRowClass(compact)} ${className}`;
 
   // Two-group mode: external links, a thin divider, then internal links — but only
   // when both groups are present (otherwise it's just a flat row, no stray divider).

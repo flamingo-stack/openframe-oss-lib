@@ -18,9 +18,6 @@ import { AppLayoutSidePanel, type AppLayoutSidePanelConfig, useAppLayoutSidePane
 import { MobileBurgerMenu, type MobileBurgerMenuProps } from './mobile-burger-menu';
 import { NavigationSidebar } from './navigation-sidebar';
 
-export { useAppLayoutDrawerContainer, useAppLayoutDrawerCoordination } from './app-layout-context';
-export type { AppLayoutDrawerHandle } from './app-layout-context';
-
 export interface AppLayoutProps {
   children: ReactNode;
   sidebarConfig: NavigationSidebarConfig;

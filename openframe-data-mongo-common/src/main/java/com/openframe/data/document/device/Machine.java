@@ -34,6 +34,7 @@ public class Machine implements TenantScoped {
     @Indexed
     private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
+    private Instant firstConnectedAt;
     @Indexed
     private String organizationId;
     private String userId;      // User who installed the agent; optional, absent for older registrations
@@ -62,4 +63,5 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private Long version = 0L;
 }

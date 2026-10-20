@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useLoadingScope } from '../../components/ui/loading-scope';
 import { resizedImageUrl } from '../../embed-shims/next-image';
 
 /** The sample is drawn 100px at most, so that is all of the picture that is downloaded. */
@@ -100,7 +101,9 @@ function extractEdgeColor(img: HTMLImageElement): string {
  * @param fallback - Fallback color if extraction fails (default: '#000000')
  * @returns CSS color string (e.g., 'rgb(34, 28, 22)')
  */
-export function useImageEdgeColor(imageUrl: string | undefined | null, fallback = '#000000'): string {
+export function useImageEdgeColor(givenUrl: string | undefined | null, fallback = '#000000'): string {
+  // In a loading scope the picture is not drawn, so its colour is not sampled.
+  const imageUrl = useLoadingScope() ? null : givenUrl;
   const [color, setColor] = useState(fallback);
 
   // Losing the url (or being given a different fallback) is a prop-driven

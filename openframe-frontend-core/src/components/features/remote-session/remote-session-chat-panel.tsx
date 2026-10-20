@@ -129,7 +129,7 @@ export function RemoteSessionChatPanel({
           value={draft}
           onChange={event => onDraftChange(event.target.value)}
           disabled={!ready}
-          placeholder={ready ? 'Enter your Message...' : 'Loading chat...'}
+          placeholder={ready ? 'Enter your Message...' : 'Connecting to the chat'}
           aria-label="Message"
           className="h-12 min-w-0 flex-1 rounded-md border border-ods-border bg-ods-bg px-[var(--spacing-system-s)] text-ods-text-primary outline-none text-h6 placeholder:text-ods-text-secondary"
         />

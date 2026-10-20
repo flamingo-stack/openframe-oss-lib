@@ -297,13 +297,21 @@ export interface TableCellProps {
 
 /** @deprecated Use types from `data-table` instead. */
 export interface TableCardSkeletonProps {
-  /** Only `key` and `width` are read, so any `TableColumn<T>[]` fits. */
-  columns: ReadonlyArray<Pick<TableColumn, 'key' | 'width'>>;
+  /**
+   * The table's columns as its rows draw them, the synthetic actions and chevron columns included (`Table` passes
+   * its own). Only `key`, `width` and `hideAt` are read, so any `TableColumn<T>[]` fits.
+   */
+  columns: ReadonlyArray<Pick<TableColumn, 'key' | 'width' | 'hideAt'>>;
   rows?: number; // Number of skeleton rows to display (default: 10)
   /** Match a `compact` table's row height, so the first paint does not jump. */
   compact?: boolean;
-  hasActions?: boolean;
-  hasChevron?: boolean;
+  /**
+   * The row actions in the actions column, one button each (`iconOnly`: an icon button). Absent: the column's
+   * actions are the host's own (`renderRowActions`), drawn as one icon button.
+   */
+  actions?: ReadonlyArray<{ iconOnly: boolean }>;
+  /** The table's selection checkbox column. */
+  selectable?: boolean;
   className?: string;
   rowClassName?: string; // Additional classes for each skeleton row
 }

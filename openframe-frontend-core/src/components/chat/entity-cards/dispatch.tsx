@@ -56,6 +56,7 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from '../../../utils/source-icons';
 import { AgentMark } from '../../agent-mark';
 import { EntityIcon } from '../../icon-display';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
@@ -82,13 +83,14 @@ import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/q
 import { TrophyIcon } from '../../icons-v2-generated/sport/trophy-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
+import type { ProductReleaseCardProps } from '../../shared/product-release/product-release-card';
+import { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
 import { MingoInfoCard, MingoInfoCardSkeleton, type MingoInfoCardStatus } from '../mingo-info-card';
-import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime';
 import { SourceActionButton } from '../source-action-button';
 import type { PrReviewState, GitHubActivityKind } from '../types/entities/github-activity';
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
@@ -100,11 +102,9 @@ import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
-import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from '../utils/source-icons';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
 import { BlogCardSkeleton } from './blog-card';
-import { CampaignCardAdminSkeleton } from './campaign-card-admin';
 import { CaseStudyCardSkeleton } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
 import { CustomerInterviewCardSkeleton } from './customer-interview-card';
@@ -118,7 +118,6 @@ import {
 } from './github-activity-card';
 import { InvestorUpdateCardSkeleton } from './investor-update-card';
 import { OnboardingGuideCardSkeleton } from './onboarding-guide-card';
-import { ProductReleaseCardSkeleton, type ProductReleaseCardProps } from './product-release-card';
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults';
 import { ProgramCardSkeleton } from './program-card';
 import { RoadmapCardSkeleton } from './roadmap-card';
@@ -892,6 +891,11 @@ function CampaignChatCard({
       menuAriaLabel="Campaign actions"
     />
   );
+}
+
+/** `CampaignChatCard` while its campaign is fetched: the info card it draws (`MingoInfoCard`), as its skeleton. */
+function CampaignChatCardSkeleton() {
+  return <MingoInfoCardSkeleton />;
 }
 
 /**
@@ -1863,7 +1867,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
-    skeleton: () => <CampaignCardAdminSkeleton />,
+    skeleton: () => <CampaignChatCardSkeleton />,
     // No public viewer — synthesize the hub-internal admin URL post-fetch
     // so the wrapper + isNewTab computation see the actual destination.
     fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),
@@ -2253,11 +2257,3 @@ export function renderChatInlineEntityCard(
 
   return loader;
 }
-
-// =============================================================================
-// NavLink wiring for callers that need to compose anchors (Task 2 + Task 3)
-// =============================================================================
-
-/** Re-export so call sites can wrap any subtree with chat-runtime
- *  routing in a single import. */
-export { NavLinkAnchorViaRuntime };

@@ -1,7 +1,11 @@
 'use client';
 
 import { Filter } from 'lucide-react';
+import { ICON_SIZE } from '../../styles/component-sizes';
+import { cn } from '../../utils/cn';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface StatusOption {
   value: string;
@@ -37,7 +41,22 @@ export interface StatusFilterComponentProps {
    * (which React then pairs against this component during hydration).
    */
   showAll?: boolean;
+  /** The options are read on the client and have not arrived: the row draws its skeleton, as in a loading scope. */
+  loading?: boolean;
 }
+
+/** The row's frame, label and controls, read by the row and by its skeleton, so the skeleton is the row's size. */
+const STATUS_FILTER_ROW_CLASS = 'flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4';
+const STATUS_FILTER_LABEL_CLASS = 'flex items-center gap-2';
+const STATUS_FILTER_ICON_CLASS = `${ICON_SIZE.sm} text-ods-accent`;
+const STATUS_FILTER_LABEL_TEXT_CLASS = 'text-ods-text-secondary text-h5';
+/** The option buttons' type, read by the row and by its skeleton. */
+const STATUS_FILTER_BUTTON_CLASS = 'text-h3';
+const STATUS_FILTER_COUNT_CLASS = 'ml-auto shrink-0 text-ods-text-secondary text-h6';
+/** The option buttons' size, read by the row and by its skeleton (`InteractiveSkeleton.Button size`). */
+const STATUS_FILTER_BUTTON_SIZE = 'small-legacy';
+/** How many option buttons the skeleton draws when the options are read with the page. */
+export const STATUS_FILTER_SKELETON_PILLS = 3;
 
 /**
  * StatusFilterComponent - Reusable status filter for admin dashboards
@@ -54,17 +73,29 @@ export function StatusFilterComponent({
   disabledValues = [],
   label = 'Status',
   showAll = true,
+  loading = false,
 }: StatusFilterComponentProps) {
   // Filter out 'all' from options since we render it separately
   const filteredOptions = statusOptions.filter(option => option.value !== 'all');
 
+  if (useLoadingScope() || loading) {
+    return (
+      <StatusFilterComponentSkeleton
+        label={label}
+        // Options the page states itself are its own words: drawn for real. Read ones arrive empty: boxes.
+        options={filteredOptions.length > 0 ? filteredOptions.map(option => option.label) : undefined}
+        showAll={showAll}
+        showCount={showCount}
+        className={className}
+      />
+    );
+  }
+
   return (
-    <div
-      className={`flex flex-wrap items-center gap-3 rounded-lg border border-ods-border bg-ods-card p-4 ${className}`}
-    >
-      <div className="flex items-center gap-2">
-        <Filter className="h-4 w-4 text-ods-accent" />
-        <span className="text-ods-text-secondary text-h5">{label}</span>
+    <div className={`${STATUS_FILTER_ROW_CLASS} ${className}`}>
+      <div className={STATUS_FILTER_LABEL_CLASS}>
+        <Filter className={STATUS_FILTER_ICON_CLASS} />
+        <span className={STATUS_FILTER_LABEL_TEXT_CLASS}>{label}</span>
       </div>
 
       {/* All button */}
@@ -72,10 +103,10 @@ export function StatusFilterComponent({
         <Button
           type="button"
           variant={selectedStatus === 'all' ? 'accent' : 'outline'}
-          size="small-legacy"
+          size={STATUS_FILTER_BUTTON_SIZE}
           onClick={() => onStatusChange('all')}
           disabled={disabledValues.includes('all')}
-          className="text-h3"
+          className={STATUS_FILTER_BUTTON_CLASS}
         >
           All
         </Button>
@@ -87,17 +118,80 @@ export function StatusFilterComponent({
           key={option.value}
           type="button"
           variant={selectedStatus === option.value ? 'accent' : 'outline'}
-          size="small-legacy"
+          size={STATUS_FILTER_BUTTON_SIZE}
           onClick={() => onStatusChange(option.value)}
           disabled={disabledValues.includes(option.value)}
-          className="text-h3"
+          className={STATUS_FILTER_BUTTON_CLASS}
         >
           {option.label}
         </Button>
       ))}
 
       {/* Optional count display */}
-      {showCount && <div className="ml-auto shrink-0 text-ods-text-secondary text-h6">{count} items</div>}
+      {showCount && <div className={STATUS_FILTER_COUNT_CLASS}>{count} items</div>}
+    </div>
+  );
+}
+
+/**
+ * The status filter while its page is read: the same row, its label and "All" for real (the row's own words), the
+ * `options` the page states for real, else `pills` option buttons as boxes of the buttons' size. With `showCount`
+ * the count is a bar before "items".
+ */
+export function StatusFilterComponentSkeleton({
+  label = 'Status',
+  options,
+  pills = STATUS_FILTER_SKELETON_PILLS,
+  showAll = true,
+  showCount = false,
+  className,
+}: {
+  label?: string;
+  /** Option labels the page states itself: drawn as real buttons (in place of `pills` boxes). */
+  options?: string[];
+  pills?: number;
+  showAll?: boolean;
+  showCount?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn(STATUS_FILTER_ROW_CLASS, className)} aria-hidden inert>
+      <div className={STATUS_FILTER_LABEL_CLASS}>
+        <Filter className={STATUS_FILTER_ICON_CLASS} />
+        <span className={STATUS_FILTER_LABEL_TEXT_CLASS}>{label}</span>
+      </div>
+      {showAll && (
+        <Button
+          type="button"
+          variant="outline"
+          size={STATUS_FILTER_BUTTON_SIZE}
+          className={STATUS_FILTER_BUTTON_CLASS}
+          tabIndex={-1}
+        >
+          All
+        </Button>
+      )}
+      {options
+        ? options.map(option => (
+            <Button
+              key={option}
+              type="button"
+              variant="outline"
+              size={STATUS_FILTER_BUTTON_SIZE}
+              className={STATUS_FILTER_BUTTON_CLASS}
+              tabIndex={-1}
+            >
+              {option}
+            </Button>
+          ))
+        : Array.from({ length: pills }, (_, index) => (
+            <InteractiveSkeleton.Button key={index} size={STATUS_FILTER_BUTTON_SIZE} />
+          ))}
+      {showCount && (
+        <div className={STATUS_FILTER_COUNT_CLASS}>
+          <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" /> items
+        </div>
+      )}
     </div>
   );
 }

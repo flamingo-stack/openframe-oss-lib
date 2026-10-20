@@ -48,6 +48,7 @@ import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
+import { getSourceIconName } from '../../utils/source-icons';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 import {
@@ -89,8 +90,8 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
-import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
-import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
+import { fetchSlashCommands, useSlashCommandRegistry } from './hooks/use-slash-commands';
+import type { UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
 import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
@@ -105,9 +106,9 @@ import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
-import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
+import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
-import type { MessageSegment, Message } from './types/message.types';
+import type { ChatSource, MessageSegment, Message } from './types/message.types';
 import type {
   ChatDialogCapabilities,
   UnifiedChatState,
@@ -125,7 +126,6 @@ import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
-import { getSourceIconName } from './utils/source-icons';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
 /**

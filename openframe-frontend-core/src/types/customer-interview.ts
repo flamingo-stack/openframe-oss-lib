@@ -6,17 +6,6 @@ import type { EntityPlatformAssoc } from './entity-platform';
 import type { PlatformRecord } from './platform';
 import type { MSP } from './stack';
 import type { UserProfile } from './user';
-
-// Re-export shared video processing types for backwards compatibility
-export type {
-  VideoTeaser,
-  Speaker,
-  VideoClip,
-  TranscriptWord,
-  SpeakerMapping,
-  ExcludedRange,
-  EntityQuote,
-} from './video-processing';
 import type {
   EntityQuote,
   VideoTeaser,

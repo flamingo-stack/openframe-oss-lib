@@ -2,11 +2,12 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import Image from '../../../embed-shims/next-image';
+import { ICON_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
 import type { Notification, NotificationSeverity, NotificationVariant } from './types';
 
@@ -41,6 +42,10 @@ const progressColorByVariant: Record<NotificationVariant, string> = {
 
 const headerControlClass =
   'absolute inset-0 flex items-center justify-center text-ods-text-secondary transition-opacity duration-200 hover:text-ods-text-primary';
+
+/** The header's icon box and its trailing control's box, read by the tile and by its skeleton. */
+const TILE_ICON_BOX_CLASS = `flex ${ICON_SIZE.sm} shrink-0 items-center justify-center`;
+const TILE_CONTROL_BOX_CLASS = `relative ${ICON_SIZE.sm} shrink-0`;
 
 export interface NotificationTileProps {
   notification: Notification;
@@ -158,7 +163,7 @@ export function NotificationTile({
       >
         {/* Header: icon/image + type label (both severity-colored) + time + dismiss/complete control. */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <span className={cn('flex size-4 shrink-0 items-center justify-center', typeColorByVariant[accentVariant])}>
+          <span className={cn(TILE_ICON_BOX_CLASS, typeColorByVariant[accentVariant])}>
             {image ? (
               <Image
                 src={image}
@@ -201,7 +206,7 @@ export function NotificationTile({
             <>
               {/* Live X and settled check swap in the same 16px slot; the inactive
               one is removed from the a11y tree and disabled, not just faded. */}
-              <span className="relative size-4 shrink-0">
+              <span className={TILE_CONTROL_BOX_CLASS}>
                 {[
                   {
                     active: isLive,
@@ -280,30 +285,54 @@ export function NotificationTile({
   );
 }
 
+/**
+ * The two buttons on a lock-screen approval tile: compact and their own width. Stretched to fill the tile they
+ * dwarfed the notification wherever the tile is wide (a phone-width page shows it at the full content width). Shared
+ * by the approval tile and its skeleton.
+ */
+export const LOCKSCREEN_APPROVAL_BUTTON_CLASS = 'h-9 min-w-24';
+
+/**
+ * The Approve and Reject buttons on a card approval tile: one fixed width that holds either label at every
+ * breakpoint, so the tile's skeleton draws the buttons at their loaded width. Shared by the tile and its skeleton.
+ */
+export const APPROVAL_BUTTON_CLASS = 'w-20';
+
+/** The card approval tile's trailing toggle (the command section's chevron). Shared by the tile and its skeleton. */
+export const APPROVAL_TOGGLE_BUTTON_CLASS = 'ml-auto w-6 shrink-0 px-0 md:w-8';
+
 export interface NotificationTileSkeletonProps {
   /** `approval`: the approval tile, which adds a row of small buttons under the body. */
   variant?: 'default' | 'approval';
+  /** The tile's `presentation`: a lock screen has no trailing control and its approval buttons are compact. */
+  presentation?: 'card' | 'lockscreen';
+  /** The lines the description takes (2 by default: a host that rotates tiles in one cell is as tall as its tallest tile). */
+  descriptionLines?: number;
   className?: string;
 }
 
-/** One row of the tile: the LINE BOX of the text it stands in for, with its bar centred inside. */
-function TileLine({ box, bar, width }: { box: string; bar: string; width: string }) {
+/** The header's icon and trailing control: the box each sits in, with a bar filling it. */
+function TileSquare({ box, bar }: { box: string; bar: string }) {
   return (
-    <span className={cn('flex items-center', box)}>
-      <UnifiedSkeleton as="span" width={width} className={bar} />
+    <span className={box}>
+      <UnifiedSkeleton as="span" width="1rem" className={cn('h-4', bar)} />
     </span>
   );
 }
 
 /**
- * A tile while its notification is read, box for box: the tile's frame and pad,
- * the header (icon, type, time, trailing control), a one-line title over a
- * TWO-line description (a host that rotates tiles in one cell is as tall as its
- * tallest tile), and for `approval` the button row. Each row is its text's line
- * box (h5/h6 20px, the h4 title 24px), so a host panel sizes itself against the
- * height it will have when loaded.
+ * A tile while its notification is read, box for box: the tile's frame and pad, the header (icon, type, time, and on
+ * a card the trailing control), a one-line title over the description's lines, and for `approval` the button row.
+ * Each text row is its text's own line box (`TextLineSkeleton` at the tile's type steps), so the skeleton is the
+ * loaded tile's height at every breakpoint.
  */
-export function NotificationTileSkeleton({ variant = 'default', className }: NotificationTileSkeletonProps) {
+export function NotificationTileSkeleton({
+  variant = 'default',
+  presentation = 'card',
+  descriptionLines = 2,
+  className,
+}: NotificationTileSkeletonProps) {
+  const lockscreen = presentation === 'lockscreen';
   return (
     <output
       aria-hidden
@@ -314,21 +343,27 @@ export function NotificationTileSkeleton({ variant = 'default', className }: Not
     >
       <span className="relative flex flex-col gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)]">
         <span className="flex items-center gap-[var(--spacing-system-xs)]">
-          <TileLine box="size-4" width="1rem" bar="h-4 rounded-[2px]" />
-          <TileLine box="h-5" width="7rem" bar="h-3 rounded" />
+          <TileSquare box={TILE_ICON_BOX_CLASS} bar="rounded-[2px]" />
+          <TextLineSkeleton as="span" type={lockscreen ? 'h6' : 'h5'} className="w-28" />
           <span className="min-w-0 flex-1" />
-          <TileLine box="h-5" width="3.5rem" bar="h-3 rounded" />
-          <TileLine box="size-4" width="1rem" bar="h-4 rounded-full" />
+          <TextLineSkeleton as="span" type="h6" className={cn('w-14', lockscreen && 'self-start')} />
+          {!lockscreen && <TileSquare box={TILE_CONTROL_BOX_CLASS} bar="rounded-full" />}
         </span>
         <span className="grid min-w-0 grid-cols-1">
-          <TileLine box="h-6" width="60%" bar="h-4 rounded" />
-          <TileLine box="h-5" width="88%" bar="h-3 rounded" />
-          <TileLine box="h-5" width="52%" bar="h-3 rounded" />
+          <TextLineSkeleton as="span" type="h4" className="w-3/5" />
+          <TextLineSkeleton as="span" type="h6" lines={descriptionLines} />
         </span>
         {variant === 'approval' && (
           <span className="flex w-full items-center gap-[var(--spacing-system-xs)]">
-            <TileLine box="h-6 md:h-8" width="5.5rem" bar="h-6 rounded md:h-8" />
-            <TileLine box="h-6 md:h-8" width="4.5rem" bar="h-6 rounded md:h-8" />
+            <InteractiveSkeleton.Button
+              size="small"
+              className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
+            />
+            <InteractiveSkeleton.Button
+              size="small"
+              className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
+            />
+            {!lockscreen && <InteractiveSkeleton.Button size="small" className={APPROVAL_TOGGLE_BUTTON_CLASS} />}
           </span>
         )}
       </span>

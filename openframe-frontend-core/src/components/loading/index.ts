@@ -2,19 +2,11 @@
 
 // Page layout skeletons
 export {
-  AnnouncementBarSkeleton,
-  HeroSkeleton,
   SearchContainerSkeleton,
   CategorySidebarSkeleton,
   BreadcrumbSkeleton,
   BreadcrumbLinkSkeleton,
   ResultsHeaderSkeleton,
-  TwoColumnLayoutSkeleton,
-  ArticleLayoutSkeleton,
-  VendorDetailLayoutSkeleton,
-  StatsSectionSkeleton,
-  SlackCommunitySkeleton,
-  BlogCardGridSkeleton,
   VendorGridSkeleton,
 } from './page-layout-skeleton';
 
@@ -22,7 +14,13 @@ export {
 export { CardSkeleton, CardSkeletonGrid } from './card-skeleton';
 
 // Unified skeleton components
-export { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
+export {
+  UnifiedSkeleton,
+  TextSkeleton,
+  TextLineSkeleton,
+  MediaSkeleton,
+  InteractiveSkeleton,
+} from './unified-skeleton';
 
 // New unified loading components
 export { ContentLoadingContainer, useContentLoading } from '../content-loading-container';
@@ -30,13 +28,13 @@ export { ContentLoadingContainer, useContentLoading } from '../content-loading-c
 // Profile system loading skeleton
 export { ProfileLoadingSkeleton } from '../profile/ProfileLoadingSkeleton';
 
-export { MspProfileFormSkeleton } from './msp-profile-form-skeleton';
-
-export { SettingsFormSkeleton, type SettingsFormSkeletonProps } from './settings-form-skeleton';
-
 export { CategoryCardSkeleton } from './category-card-skeleton';
 
+// Deprecated (kept for hosts on an older release; a component draws its own skeleton now)
+export { MspProfileFormSkeleton } from './msp-profile-form-skeleton';
+export { SettingsFormSkeleton, type SettingsFormSkeletonProps } from './settings-form-skeleton';
 export { CategoryVendorSelectorSkeleton } from './category-vendor-selector-skeleton';
+export { BlogCardGridSkeleton, SlackCommunitySkeleton } from './deprecated-layout-skeletons';
 
 export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 

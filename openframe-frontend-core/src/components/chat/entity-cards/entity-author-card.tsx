@@ -1,7 +1,11 @@
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
+import { AVATAR_SIZE } from '../../../styles/component-sizes';
 import type { EntityAuthor } from '../../../types/entity-author';
+import { cn } from '../../../utils/cn';
 import { formatDate, nameInitials } from '../../../utils/format';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 
 /**
@@ -60,8 +64,11 @@ export interface EntityAuthorCardProps {
    * Use for entity-specific labels (e.g. onboarding-guide section/step,
    * webinar host, customer-interview customer). The grid auto-sizes via
    * `grid-cols-N`.
+   *
+   * `optional`: a cell only some records carry (a date a record may leave empty). It is not drawn in a loading scope
+   * (list the cells every record has there) and its loaded cell is marked `data-loading-optional`.
    */
-  extraCells?: Array<{ value: React.ReactNode; label: string; uppercase?: boolean }>;
+  extraCells?: Array<{ value: React.ReactNode; label: string; uppercase?: boolean; optional?: boolean }>;
   /** When true, render the author cell even when `author?.full_name` is
    *  missing — using the `EMPTY_AUTHOR_PLACEHOLDER` shape above. Used by
    *  catalog grids that must keep a fixed shape so skeleton alignment
@@ -75,26 +82,70 @@ export interface EntityAuthorCardProps {
  * `DM_Sans` 14px secondary label. A non-text value (a `DepartmentBadge`) renders
  * as given in the value slot.
  */
+/** The cells' layout, read by the cells and by their skeletons, so a skeleton is its cell's size. */
+const VALUE_CELL_CLASS = 'flex flex-col gap-3 p-4';
+const CELL_STACK_CLASS = 'flex flex-col gap-0';
+const VALUE_TEXT_CLASS = 'text-ods-text-primary text-h4';
+const VALUE_NODE_CLASS = 'flex min-h-6 items-center';
+const LABEL_TEXT_CLASS = 'text-ods-text-secondary text-h6';
+const AUTHOR_CELL_CLASS = 'flex items-center gap-3 p-4';
+const AUTHOR_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col gap-0';
+const AUTHOR_NAME_CLASS = 'truncate text-ods-text-primary text-h3';
+const AUTHOR_AVATAR_SIZE = 'md';
+/** Every cell but the last: a divider below it on a phone, beside it from `md`. */
+const CELL_DIVIDER_CLASS = 'border-b md:border-b-0 md:border-r border-ods-border';
+const GRID_FRAME_CLASS = 'grid grid-cols-1 w-full overflow-hidden rounded-md border border-ods-border';
+
+/** `md:grid-cols-N` for a grid of `cells` cells, as static classes the build can see. */
+function gridColsClass(cells: number): string {
+  return cells >= 4
+    ? 'md:grid-cols-4'
+    : cells === 3
+      ? 'md:grid-cols-3'
+      : cells === 2
+        ? 'md:grid-cols-2'
+        : 'md:grid-cols-1';
+}
+
 export function EntityMetadataValueCell({
   value,
   label,
   className,
   uppercase = true,
+  optional = false,
 }: {
   value: React.ReactNode;
   label: string;
   className?: string;
   uppercase?: boolean;
+  /** A cell only some records carry: marked `data-loading-optional` (its loading state does not draw it). */
+  optional?: boolean;
 }) {
+  if (useLoadingScope()) return <EntityMetadataValueCellSkeleton label={label} className={className} />;
   return (
-    <div className={`flex flex-col gap-3 p-4 ${className ?? ''}`}>
-      <div className="flex flex-col gap-0">
+    <div className={cn(VALUE_CELL_CLASS, className)} data-loading-optional={optional || undefined}>
+      <div className={CELL_STACK_CLASS}>
         {typeof value === 'string' ? (
-          <p className="text-ods-text-primary text-h4">{uppercase ? value.toLocaleUpperCase() : value}</p>
+          <p className={VALUE_TEXT_CLASS}>{uppercase ? value.toLocaleUpperCase() : value}</p>
         ) : (
-          <div className="flex min-h-6 items-center">{value}</div>
+          <div className={VALUE_NODE_CLASS}>{value}</div>
         )}
-        <p className="text-ods-text-secondary text-h6">{label}</p>
+        <p className={LABEL_TEXT_CLASS}>{label}</p>
+      </div>
+    </div>
+  );
+}
+
+/** A value cell while its value is read: the label is the page's own words, the value a bar of its line. */
+export function EntityMetadataValueCellSkeleton({ label, className }: { label: string; className?: string }) {
+  return (
+    <div className={cn(VALUE_CELL_CLASS, className)}>
+      <div className={CELL_STACK_CLASS}>
+        {/* The value's own paragraph (a read value that wraps to more lines pairs with it line for line). */}
+        <p className={VALUE_TEXT_CLASS}>
+          <TextLineSkeleton as="span" type="inherit" className="w-24" />
+        </p>
+        <p className={LABEL_TEXT_CLASS}>{label}</p>
       </div>
     </div>
   );
@@ -115,24 +166,26 @@ export function EntityMetadataAuthorCell({
   authorHref?: string;
   className?: string;
 }) {
+  const loading = useLoadingScope();
+  if (loading) return <EntityMetadataAuthorCellSkeleton className={className} />;
   // Trimmed real name gates the LINK — a placeholder/unknown label must
   // never render as a clickable author (an authorHref passed alongside an
   // empty name would link "Unknown Author").
   const trimmedName = typeof author.full_name === 'string' ? author.full_name.trim() : '';
   const fullName = trimmedName || 'Unknown Author';
   return (
-    <div className={`flex items-center gap-3 p-4 ${className ?? ''}`}>
+    <div className={cn(AUTHOR_CELL_CLASS, className)}>
       <SquareAvatar
         src={author.avatar_url || ''}
         alt={fullName}
         fallback={nameInitials(fullName, '')}
-        size="md"
+        size={AUTHOR_AVATAR_SIZE}
         variant="round"
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-0">
+      <div className={AUTHOR_TEXT_CLASS}>
         {/* title = full-name tooltip on truncation (carried over from the
             release page's cell when it adopted this shared one). */}
-        <p className="truncate text-ods-text-primary text-h3" title={fullName}>
+        <p className={AUTHOR_NAME_CLASS} title={fullName}>
           {authorHref && trimmedName ? (
             <Link href={authorHref} className="transition-colors hover:text-ods-accent">
               {fullName}
@@ -141,8 +194,58 @@ export function EntityMetadataAuthorCell({
             fullName
           )}
         </p>
-        <p className="text-ods-text-secondary text-h6">{author.job_title || roleLabel}</p>
+        <p className={LABEL_TEXT_CLASS}>{author.job_title || roleLabel}</p>
       </div>
+    </div>
+  );
+}
+
+/** The author cell while it is read: the avatar's box and a bar for the name and the role (both read data). */
+export function EntityMetadataAuthorCellSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={cn(AUTHOR_CELL_CLASS, className)}>
+      <UnifiedSkeleton variant="circular" className={cn('shrink-0', AVATAR_SIZE[AUTHOR_AVATAR_SIZE])} />
+      <div className={AUTHOR_TEXT_CLASS}>
+        <TextLineSkeleton type="h3" className="w-32" />
+        <TextLineSkeleton type="h6" className="w-20" />
+      </div>
+    </div>
+  );
+}
+
+export interface EntityAuthorCardSkeletonProps {
+  /** The labels of the extra cells, in order (the page's own words: "Section", "Customer"). */
+  extraCellLabels?: string[];
+  /** The Published cell's label, or `null` when the card has no Published cell. Defaults to "Published". */
+  publishedLabel?: string | null;
+  /**
+   * How many optional cells the loaded card may add (cells only some records carry). They are not drawn, but they
+   * count in the grid's columns, so every drawn cell is as wide as on the loaded card. Default 0.
+   */
+  optionalCells?: number;
+  className?: string;
+}
+
+/**
+ * The card while it is read: the same grid, every label real, every value a bar, the author cell an avatar box and
+ * two bars. `EntityAuthorCard` draws it in a loading scope.
+ */
+export function EntityAuthorCardSkeleton({
+  extraCellLabels = [],
+  publishedLabel = 'Published',
+  optionalCells = 0,
+  className,
+}: EntityAuthorCardSkeletonProps) {
+  const totalCells = extraCellLabels.length + optionalCells + (publishedLabel === null ? 0 : 1) + 1;
+  return (
+    <div className={cn(GRID_FRAME_CLASS, gridColsClass(totalCells), className)}>
+      {extraCellLabels.map((label, i) => (
+        <EntityMetadataValueCellSkeleton key={`${label}-${i}`} label={label} className={CELL_DIVIDER_CLASS} />
+      ))}
+      {publishedLabel !== null && (
+        <EntityMetadataValueCellSkeleton label={publishedLabel} className={CELL_DIVIDER_CLASS} />
+      )}
+      <EntityMetadataAuthorCellSkeleton />
     </div>
   );
 }
@@ -157,6 +260,19 @@ export function EntityAuthorCard({
   renderEmptyAuthor = false,
   className,
 }: EntityAuthorCardProps) {
+  const loading = useLoadingScope();
+  // In a loading scope the card is its skeleton: its cells are the ones the caller asked for (a Published cell
+  // when it passed `publishedAt` at all), never decided by data that is not read yet.
+  if (loading) {
+    return (
+      <EntityAuthorCardSkeleton
+        extraCellLabels={(extraCells ?? []).filter(cell => !cell.optional).map(cell => cell.label)}
+        optionalCells={(extraCells ?? []).filter(cell => cell.optional).length}
+        publishedLabel={publishedAt === undefined ? null : publishedLabel}
+        className={className}
+      />
+    );
+  }
   const hasAuthor = !!author?.full_name;
   if (!hasAuthor && !renderEmptyAuthor) return null;
   const effectiveAuthor = hasAuthor ? author : EMPTY_AUTHOR_PLACEHOLDER;
@@ -169,39 +285,29 @@ export function EntityAuthorCard({
 
   const showDateCell = !!dateLabel;
   const extras = extraCells ?? [];
-  // Total cell count = extras + (optional Published) + Author. Map to
-  // an explicit tailwind `md:grid-cols-N` class string so JIT picks it
-  // up at build time.
+  // Total cell count = extras + (optional Published) + Author. The last cell (Author) closes the grid without a
+  // trailing divider so the rounded corner stays clean.
   const totalCells = extras.length + (showDateCell ? 1 : 0) + 1;
-  const gridColsClass =
-    totalCells >= 4
-      ? 'md:grid-cols-4'
-      : totalCells === 3
-        ? 'md:grid-cols-3'
-        : totalCells === 2
-          ? 'md:grid-cols-2'
-          : 'md:grid-cols-1';
-
-  // Helper — every cell EXCEPT the last needs the dividers (bottom on
-  // mobile, right on desktop). The last cell (Author) closes the grid
-  // without a trailing divider so the rounded corner stays clean.
-  const dividerClass = 'border-b md:border-b-0 md:border-r border-ods-border';
 
   return (
-    <div
-      className={`grid grid-cols-1 ${gridColsClass} w-full overflow-hidden rounded-md border border-ods-border ${className ?? ''}`}
-    >
+    <div className={cn(GRID_FRAME_CLASS, gridColsClass(totalCells), className)}>
       {extras.map((cell, i) => (
         <EntityMetadataValueCell
           key={`${cell.label}-${i}`}
           value={cell.value}
           label={cell.label}
           uppercase={cell.uppercase ?? true}
-          className={dividerClass}
+          optional={cell.optional}
+          className={CELL_DIVIDER_CLASS}
         />
       ))}
       {showDateCell && (
-        <EntityMetadataValueCell value={dateLabel} label={publishedLabel} uppercase={false} className={dividerClass} />
+        <EntityMetadataValueCell
+          value={dateLabel}
+          label={publishedLabel}
+          uppercase={false}
+          className={CELL_DIVIDER_CLASS}
+        />
       )}
       <EntityMetadataAuthorCell author={effectiveAuthor} roleLabel={roleLabel} authorHref={authorHref} />
     </div>

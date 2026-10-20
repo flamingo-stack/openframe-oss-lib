@@ -343,7 +343,3 @@ export const MediaCarousel = memo(function MediaCarouselImpl({
     </div>
   );
 });
-
-// The carousel's item shape is the lib-wide SSOT — re-exported here so hub
-// code can `import type { MediaItem } from '.../components'`.
-export type { MediaItem };

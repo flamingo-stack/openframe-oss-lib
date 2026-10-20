@@ -41,7 +41,10 @@ import {
   type ComponentType,
 } from 'react';
 import { useNearViewport } from '../../hooks/use-near-viewport';
+import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { VideoPlayBadge } from './video-center-badge';
 import type { FilePlayerProps } from './video-file-player';
 import {
@@ -52,17 +55,6 @@ import {
   type VideoLayout,
   type VideoProps,
   type VideoYouTubeFacadeProps,
-} from './video-shared';
-
-export {
-  VIDEO_PLAYBACK_FAILED_EVENT,
-  type VideoFailureKind,
-  type VideoFailureReason,
-  type VideoLayout,
-  type VideoMutedFallbackState,
-  type VideoPlaybackFailureDetail,
-  type VideoPlayerHandle,
-  type VideoProps,
 } from './video-shared';
 
 /**
@@ -205,11 +197,15 @@ export function extractYouTubeId(url: string): string | null {
 export function Video(props: VideoProps): React.ReactElement | null {
   // Hooks run unconditionally; the gate only applies when `lazy` is set.
   const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
+  const loading = useLoadingScope();
   const url = props.url;
+  const layout = props.layout ?? 'native';
+  // ONE switch: in a loading scope with no url yet (it is read) the video is its skeleton and no player is mounted;
+  // a url it is given there is the page's own and plays as it is.
+  if (loading && !url) return <VideoSkeleton layout={layout} className={props.className} />;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);
-  const layout = props.layout ?? 'native';
 
   if (props.lazy && !isNear) {
     // Same box, poster only: the observer target IS the reserved space.
@@ -280,6 +276,14 @@ function resolveKind(props: VideoProps, url: string): 'youtube' | 'file' {
   // length-11 strings were mis-routed to YouTube).
   if (BARE_YT_ID_RE.test(url)) return 'youtube';
   return isYouTubeUrl(url) ? 'youtube' : 'file';
+}
+
+/**
+ * A video while it is read: the player's box in the player's own layout wrapper (so its size and frame are the
+ * player's), drawn as the skeleton's surface. `Video` draws it in a loading scope.
+ */
+export function VideoSkeleton({ layout = 'native', className }: { layout?: VideoLayout; className?: string }) {
+  return wrapWithLayout(<UnifiedSkeleton variant="rectangular" className={cn('h-full w-full', className)} />, layout);
 }
 
 function wrapWithLayout(inner: React.ReactElement, layout: VideoLayout): React.ReactElement {

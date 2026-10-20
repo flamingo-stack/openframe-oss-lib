@@ -63,7 +63,7 @@ extend type Mutation {
     deleteKnowledgeBaseAttachment(input: MutationDeleteInput!): MutationDeletePayload!
 }
 
-type TempAttachment {
+type TempAttachment @shareable {
     id: ID!
     fileName: String!
     contentType: String
@@ -214,7 +214,7 @@ input DeleteFolderInput {
 
 # Minimal User type for KB author resolution.
 # TODO: Extract to shared schema or replace after user management module.
-type User implements Node {
+type User implements Node @key(fields: "id") @shareable {
     id: ID!
     firstName: String
     lastName: String
@@ -224,7 +224,7 @@ type User implements Node {
     image: UserImage
 }
 
-type UserImage {
+type UserImage @shareable {
     imageUrl: String
     hash: String
 }

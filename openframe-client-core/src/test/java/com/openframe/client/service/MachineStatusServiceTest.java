@@ -255,4 +255,46 @@ class MachineStatusServiceTest {
         assertThat(machine.getTelemetryStatus()).isEqualTo(TelemetryStatus.ONLINE);
         assertThat(machine.getStatus()).isEqualTo(DeviceStatus.ONLINE);
     }
+
+    @Test
+    @DisplayName("E1: PENDING→ONLINE stamps firstConnectedAt with the event timestamp (enrollment milestone)")
+    void pendingToOnline_stampsFirstConnectedAtWithEventTimestamp() {
+        machineIs(DeviceStatus.PENDING);
+        service.updateToOnline(MACHINE, LATER);
+        assertThat(savedMachine().getFirstConnectedAt()).isEqualTo(LATER);
+    }
+
+    @Test
+    @DisplayName("E2: PENDING→OFFLINE is also a first connect and stamps firstConnectedAt")
+    void pendingToOffline_stampsFirstConnectedAt() {
+        machineIs(DeviceStatus.PENDING);
+        service.updateToOffline(MACHINE, LATER);
+        assertThat(savedMachine().getFirstConnectedAt()).isEqualTo(LATER);
+    }
+
+    @Test
+    @DisplayName("E3: OFFLINE→ONLINE leaves an existing firstConnectedAt untouched")
+    void offlineToOnline_leavesFirstConnectedAtUntouched() {
+        Machine m = machine(DeviceStatus.OFFLINE);
+        m.setFirstConnectedAt(EARLIER);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(m));
+        service.updateToOnline(MACHINE, LATER);
+        assertThat(savedMachine().getFirstConnectedAt()).isEqualTo(EARLIER);
+    }
+
+    @Test
+    @DisplayName("E4: a PENDING machine that already carries firstConnectedAt keeps the original stamp on reconnect")
+    void pendingToOnline_neverOverwritesAnExistingFirstConnectedAt() {
+        Machine m = machine(DeviceStatus.PENDING);
+        m.setFirstConnectedAt(EARLIER);
+        when(machineRepository.findByMachineId(MACHINE)).thenReturn(Optional.of(m));
+        service.updateToOnline(MACHINE, LATER);
+        assertThat(savedMachine().getFirstConnectedAt()).isEqualTo(EARLIER);
+    }
+
+    private Machine savedMachine() {
+        ArgumentCaptor<Machine> saved = ArgumentCaptor.forClass(Machine.class);
+        verify(machineRepository).save(saved.capture());
+        return saved.getValue();
+    }
 }

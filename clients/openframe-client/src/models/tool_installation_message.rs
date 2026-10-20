@@ -10,8 +10,8 @@ pub struct ToolInstallationMessage {
     pub tool_type: String,
     pub version: String,
     pub reinstall: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub download_configurations: Option<Vec<DownloadConfiguration>>,
+    #[serde(default)]
+    pub download_configurations: Vec<DownloadConfiguration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installation_command_args: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -80,8 +80,6 @@ impl LocalFilenameConfig {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum AssetSource {
-    #[serde(rename = "ARTIFACTORY")]
-    Artifactory,
     #[serde(rename = "TOOL_API")]
     ToolApi,
     #[serde(rename = "GITHUB")]

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { DialogItem } from '../types/component.types';
-import type { FetchDialogsParams, FetchDialogsResult } from './use-nats-chat-adapter';
+import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
 
 export interface UseChatDialogManagerArgs {
   /** Active (non-archived) dialogs from the unified chat state. */

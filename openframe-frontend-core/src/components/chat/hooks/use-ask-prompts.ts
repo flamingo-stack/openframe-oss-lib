@@ -8,6 +8,7 @@ import {
 } from '../../../contexts/assistant-runtime-context';
 import { useSelfFetch } from '../../../hooks/use-self-fetch';
 import { openAskAi } from '../../navigation/mingo-ai-button';
+import { useLoadingScope } from '../../ui/loading-scope';
 import type { AskPrompt } from '../ask-prompts';
 
 /** The answer of a host's questions endpoint (`AssistantRuntime.askPromptsUrl`). */
@@ -227,7 +228,10 @@ export function useAskSurface({
   const assistant = useAssistantRuntime();
   const surface = useId();
   const queue = useAskQueue();
-  const picks = assistantAvailable(assistant) && !!assistant.askPromptsUrl && enabled && exclude !== null;
+  // In a loading scope a surface takes no turn and picks nothing: it draws its loading state.
+  const held = useLoadingScope();
+  const picks =
+    !held && assistantAvailable(assistant) && !!assistant.askPromptsUrl && enabled && exclude !== null;
 
   // A layout effect: surfaces a page mounts together take their turns in document order.
   useLayoutEffect(() => {
