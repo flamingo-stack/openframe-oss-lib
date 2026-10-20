@@ -252,9 +252,6 @@ export interface AnnouncementValidation {
   };
 }
 
-// Import unified platform configuration (removed duplicate definition)
-export type { PlatformConfig } from './platform';
-
 // Component Props Types
 export interface AnnouncementBarProps {
   /**

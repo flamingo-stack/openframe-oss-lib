@@ -11,25 +11,26 @@
 import { Video } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 import type { CustomerInterview } from '../../../types/customer-interview';
 import { cn } from '../../../utils/cn';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Card } from '../../ui/card';
+import { useLoadingScope } from '../../ui/loading-scope';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUBTITLE,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
-import { EntityPortraitCard } from './entity-portrait-card';
+import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
 import { hideOnError } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
@@ -50,46 +51,58 @@ export interface CustomerInterviewCardProps {
   className?: string;
 }
 
-/** `portrait` shares the default skeleton shape (same zone boxes). */
-export function CustomerInterviewCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
-  if (size === 'sm') {
+// The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
+const INTERVIEW_CARD_BODY = 'flex flex-col gap-6 p-6';
+const INTERVIEW_CARD_COVER = `relative ${MEDIA_ASPECT.og} w-full shrink-0 overflow-hidden rounded-sm`;
+const INTERVIEW_CARD_PERSON_ZONE = 'mt-auto flex h-[60px] shrink-0 items-center';
+const INTERVIEW_CARD_PERSON_ROW = 'flex w-full min-w-0 items-center gap-3';
+const INTERVIEW_CARD_PERSON_TEXT = 'min-w-0 flex-1';
+/** The content-type chip a portrait interview card shows (a static label). */
+const INTERVIEW_TYPE_LABEL = 'Customer Interview';
+
+/**
+ * An interview card while it is read, in the card's own boxes: the cover, the title as two `text-h3` lines, the
+ * summary as three `text-h6` lines, and the person row (48px portrait, name and job-title lines). `portrait` is the
+ * shared portrait skeleton with the static chip.
+ */
+export function CustomerInterviewCardSkeleton({
+  size = 'default',
+  showTypeBadge = true,
+  className,
+}: {
+  size?: 'default' | 'sm' | 'portrait';
+  /** `portrait`: the card shows the "Customer Interview" chip. */
+  showTypeBadge?: boolean;
+  className?: string;
+}) {
+  if (size === 'portrait') {
     return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={COMPACT_CARD_TITLE_ROW}>
-            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
-          </span>
-        </span>
-      </span>
+      <EntityPortraitCardSkeleton typeLabel={showTypeBadge ? INTERVIEW_TYPE_LABEL : undefined} className={className} />
     );
   }
+  if (size === 'sm') {
+    return <CompactCardSkeleton className={className} />;
+  }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
-      {/* Aspect matches the loaded image slot (OG 1200×630) */}
-      <UnifiedSkeleton className="aspect-[1200/630] w-full rounded-sm" />
-      <div className="space-y-2">
-        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
-        <UnifiedSkeleton className="h-5 w-1/2 rounded" />
-      </div>
-      <div className="space-y-2">
-        <UnifiedSkeleton className="h-3 w-full rounded" />
-        <UnifiedSkeleton className="h-3 w-5/6 rounded" />
-        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
-      </div>
-      <div className="mt-auto flex h-[60px] items-center gap-3">
-        <UnifiedSkeleton className="h-12 w-12 rounded-full" />
-        <div className="flex-1 space-y-2">
-          <UnifiedSkeleton className="h-4 w-2/3 rounded" />
-          <UnifiedSkeleton className="h-3 w-1/2 rounded" />
+    <div className={cn('block h-full', className)} aria-hidden>
+      <Card className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, INTERVIEW_CARD_BODY)}>
+        <UnifiedSkeleton className={cn(INTERVIEW_CARD_COVER, 'rounded-sm')} />
+        <div className="shrink-0">
+          <TextLineSkeleton type="h3" lines={2} className="w-full" />
         </div>
-      </div>
+        <div className="shrink-0">
+          <TextLineSkeleton type="h6" lines={3} className="w-full" />
+        </div>
+        <div className={INTERVIEW_CARD_PERSON_ZONE}>
+          <div className={INTERVIEW_CARD_PERSON_ROW}>
+            <MediaSkeleton.Avatar size="md" className="shrink-0" />
+            <div className={INTERVIEW_CARD_PERSON_TEXT}>
+              <TextLineSkeleton type="h6" className="w-2/3" />
+              <TextLineSkeleton type="h6" className="w-1/2" />
+            </div>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -117,6 +130,9 @@ export function CustomerInterviewCard({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const thumbnailUrl = interview.featured_image || placeholderUrl || null;
+  if (useLoadingScope()) {
+    return <CustomerInterviewCardSkeleton size={size} showTypeBadge={showTypeBadge} className={className} />;
+  }
 
   if (size === 'sm') {
     return (
@@ -163,7 +179,7 @@ export function CustomerInterviewCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel={showTypeBadge ? 'Customer Interview' : undefined}
+        typeLabel={showTypeBadge ? INTERVIEW_TYPE_LABEL : undefined}
         imageUrl={interview.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={interview.title}
@@ -181,11 +197,11 @@ export function CustomerInterviewCard({
 
   return (
     <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
-      <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
+      <Card className={cn(CONTENT_CARD_FRAME_CLASS, INTERVIEW_CARD_BODY)}>
         {/* Fixed aspect matching standard OG card source (1200×630, 1.91:1)
             — image renders with near-zero CSS-side crop, subject anchored
             consistently via center-66% safe-zone convention. */}
-        <div className="relative aspect-[1200/630] w-full shrink-0 overflow-hidden rounded-sm bg-ods-bg">
+        <div className={cn(INTERVIEW_CARD_COVER, 'bg-ods-bg')}>
           {thumbnailUrl ? (
             <>
               <Image
@@ -222,8 +238,8 @@ export function CustomerInterviewCard({
           </div>
         )}
 
-        <div className="mt-auto flex h-[60px] shrink-0 items-center">
-          <div className="flex w-full min-w-0 items-center gap-3">
+        <div className={INTERVIEW_CARD_PERSON_ZONE}>
+          <div className={INTERVIEW_CARD_PERSON_ROW}>
             <div className="relative h-12 w-12 shrink-0">
               {interview.user?.avatar_url ? (
                 <Image
@@ -254,7 +270,7 @@ export function CustomerInterviewCard({
                 </div>
               )}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={INTERVIEW_CARD_PERSON_TEXT}>
               <p className="truncate text-ods-text-primary text-h6">
                 {interview.user?.full_name || 'Anonymous'}
                 {interview.msp?.name && <span className="text-ods-text-secondary"> • {interview.msp.name}</span>}

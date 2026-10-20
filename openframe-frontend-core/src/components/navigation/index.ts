@@ -10,9 +10,11 @@ export type { NavPanelProps } from './nav-panel';
 export { NavItemRow } from './nav-item-row';
 export type { NavItemRowProps, NavItemRowVariant } from './nav-item-row';
 export type { AskAiOpenDetail } from './mingo-ai-button';
-export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT, MingoAiButton, openAskAi } from './mingo-ai-button';
+export { MingoAiButton, openAskAi } from './mingo-ai-button';
+export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
 export type { MingoAiButtonProps } from './mingo-ai-button';
-export { MobileNavSheet, MOBILE_NAV_SHEET_ID, siteNavHasMobileMenus } from './mobile-nav-sheet';
+export { MobileNavSheet, siteNavHasMobileMenus } from './mobile-nav-sheet';
+export { MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet-id';
 export type { MobileNavSheetProps } from './mobile-nav-sheet';
 export { SiteFooter } from './site-footer';
 export type { SiteFooterProps } from './site-footer';
@@ -24,6 +26,15 @@ export type { SlidingSidebarProps } from './sliding-sidebar';
 
 export { StickySectionNav, useSectionNavigation } from './sticky-section-nav';
 export type { StickyNavSection } from './sticky-section-nav';
+// THE page's sticky section bar (tabs under the site header) and the anchor offsets that go with it.
+export {
+  PAGE_ANCHOR_GAP_PX,
+  PAGE_ANCHOR_SCOPE_CLASS,
+  PAGE_ANCHOR_SCROLL_MARGIN_CLASS,
+  PageSectionBar,
+  SECTION_BAR_HEIGHT_PX,
+} from './page-section-bar';
+export type { PageSectionBarProps } from './page-section-bar';
 // The scroll spy behind a section nav that keeps the URL on the section being
 // read (`syncHash`, two levels of anchors): the docs and trust-center spy.
 export { useScrollSpy } from '../docs/use-scroll-spy';
@@ -35,7 +46,8 @@ export type { NavigationSidebarProps } from './navigation-sidebar';
 export { AppHeader } from './app-header';
 export type { AppHeaderProps, HeaderLoadingCell } from './app-header';
 
-export { AppLayout, useAppLayoutDrawerContainer } from './app-layout';
+export { AppLayout } from './app-layout';
+export { useAppLayoutDrawerContainer } from './app-layout-context';
 export type { AppLayoutProps } from './app-layout';
 export type {
   AppLayoutSidePanelConfig,

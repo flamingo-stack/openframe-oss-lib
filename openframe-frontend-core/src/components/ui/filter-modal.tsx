@@ -1,22 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
+import type { DateRange } from 'react-day-picker';
 import { cn } from '../../utils/cn';
 import { Filter02Icon } from '../icons-v2-generated/sort-and-filter/filter-02-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
-import { DateFilterPanel, type DateFilterResult, type DateRange } from './date-picker';
+import { DateFilterPanel, type DateFilterResult } from './date-picker';
 import { FilterCheckboxItem } from './filter-checkbox-item';
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { ScrollFadeOverlay, useScrollFade } from './scroll-fade';
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item';
 import type { TableFilters } from './table/types';
 import { TagKeyValueFilter, type TagKeyConfig } from './tag-key-value-filter';
-
-// Re-export sub-component types for consumers
-export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
-export type { TagKeyConfig, TagValueOption } from './tag-key-value-filter';
 
 export interface FilterModalOption {
   id: string;

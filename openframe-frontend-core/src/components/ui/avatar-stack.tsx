@@ -1,6 +1,8 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 import { SquareAvatar } from './square-avatar';
 
 /**
@@ -63,6 +65,45 @@ const OVERFLOW_CIRCLE_SIZE: Record<AvatarStackSize, string> = {
   lg: 'h-12 min-w-12',
 };
 
+const STACK_ROW_CLASS = 'flex items-center';
+/** How far each later face tucks under the previous one, as the class both the stack and its skeleton use. */
+const overlapClass = (size: AvatarStackSize) => (size === 'xs' ? '-ml-2' : '-ml-3');
+/** A fixed-width stack's width (`slots`). */
+const slotsWidthStyle = (size: AvatarStackSize, slots?: number) =>
+  slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined;
+
+/** A stack while its people are read: `count` overlapped circles of the faces' size. */
+export function AvatarStackSkeleton({
+  count = 3,
+  size = 'md',
+  slots,
+  className,
+}: {
+  count?: number;
+  size?: AvatarStackSize;
+  slots?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
+      style={slotsWidthStyle(size, slots)}
+    >
+      {Array.from({ length: count }, (_, i) => (
+        <UnifiedSkeleton
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton faces never reorder
+          key={i}
+          variant="circular"
+          className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
+          width={SIZE_PX[size]}
+          height={SIZE_PX[size]}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function AvatarStack({
   people,
   max = 3,
@@ -73,6 +114,8 @@ export function AvatarStack({
   label = 'Assignees',
   className,
 }: AvatarStackProps) {
+  const loading = useLoadingScope();
+  if (loading) return <AvatarStackSkeleton count={slots ?? max} size={size} slots={slots} className={className} />;
   if (people.length === 0) return null;
   const groupSize = Math.max(total ?? people.length, people.length);
   const faces = slots ? (groupSize > slots ? slots - 1 : slots) : max;
@@ -85,8 +128,8 @@ export function AvatarStack({
   const compact = size === 'xs';
   return (
     <div
-      className={cn('flex items-center', slots && 'shrink-0', className)}
-      style={slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined}
+      className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
+      style={slotsWidthStyle(size, slots)}
       role="group"
       aria-label={`${label}: ${names}${unnamed > 0 ? ` and ${unnamed} more` : ''}`}
     >
@@ -99,7 +142,7 @@ export function AvatarStack({
           alt={person.name}
           fallback={person.name}
           title={person.name}
-          className={cn('relative ring-2', ringClassName, i > 0 && (compact ? '-ml-2' : '-ml-3'))}
+          className={cn('relative ring-2', ringClassName, i > 0 && overlapClass(size))}
           // Leftmost (primary assignee) on TOP — later avatars tuck
           // BEHIND, so the first face is always fully visible.
           style={{ zIndex: visible.length - i }}

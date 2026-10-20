@@ -2,8 +2,25 @@
 
 import { type ButtonHTMLAttributes, type ReactNode, type TextareaHTMLAttributes, forwardRef, useId } from 'react';
 
+import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
+
+/**
+ * The plain textarea's box: its type step (which sets the line height its rows are counted in), padding, 1px border,
+ * radius and minimum height. Read by `Textarea` and by `TextareaSkeleton`, so a field's skeleton is the field's box.
+ */
+export const TEXTAREA_BOX_CLASS = `flex ${CONTROL_SIZE.textarea} w-full rounded-[6px] border p-3 text-h4`;
+/** What the box adds around its rows: `p-3` and the 1px border, on both sides. */
+const TEXTAREA_BOX_CHROME_PX = 2 * 12 + 2 * 1;
+/** The browser's own default for a textarea that names no `rows`. */
+const TEXTAREA_DEFAULT_ROWS = 2;
+
+/** The height of a plain textarea of `rows` lines: the rows in the box's own line height, plus its padding and border. */
+export function textareaBoxHeight(rows: number = TEXTAREA_DEFAULT_ROWS): string {
+  return `calc(${rows}lh + ${TEXTAREA_BOX_CHROME_PX}px)`;
+}
 
 export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   /** When true, renders red error border & ring */
@@ -71,8 +88,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
       <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
         <textarea
           className={cn(
-            'flex min-h-[96px] w-full rounded-[6px] border p-3',
-            'text-h4',
+            TEXTAREA_BOX_CLASS,
             'focus:border-ods-accent focus-visible:outline-none',
             'touch-manipulation transition-colors duration-200',
             'border-ods-border bg-ods-card text-ods-text-primary placeholder:text-ods-text-secondary',
@@ -223,4 +239,18 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
 });
 Textarea.displayName = 'Textarea';
 
-export { Textarea };
+/**
+ * A plain `Textarea` while its value is read: the textarea's own box (`TEXTAREA_BOX_CLASS`) at the height `rows` lines
+ * take, never under its minimum. The border is transparent so the one skeleton surface fills the whole box. The label
+ * is the host's: it is static copy and renders for real.
+ */
+function TextareaSkeleton({ rows = TEXTAREA_DEFAULT_ROWS, className }: { rows?: number; className?: string }) {
+  return (
+    <UnifiedSkeleton
+      className={cn(TEXTAREA_BOX_CLASS, 'border-transparent', className)}
+      style={{ height: textareaBoxHeight(rows) }}
+    />
+  );
+}
+
+export { Textarea, TextareaSkeleton };

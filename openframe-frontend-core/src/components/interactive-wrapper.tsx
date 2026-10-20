@@ -3,6 +3,7 @@
 import React, { forwardRef } from 'react';
 import { useInteractiveState, type InteractiveState } from '../hooks/use-interactive-state';
 import { cn } from '../utils/cn';
+import { LIVE_PULSE_CLASS } from './ui/skeleton-surface';
 
 interface InteractiveOptions {
   enableHover?: boolean;
@@ -175,7 +176,10 @@ export const InteractiveWrapper = forwardRef<HTMLElement, InteractiveWrapperProp
       ) : null,
       /* Loading Overlay */
       loading ? (
-        <div key="loading" className="pointer-events-none absolute inset-0 animate-pulse bg-current opacity-10" />
+        <div
+          key="loading"
+          className={cn('pointer-events-none absolute inset-0 bg-current opacity-10', LIVE_PULSE_CLASS)}
+        />
       ) : null,
     );
   },

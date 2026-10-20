@@ -5,14 +5,16 @@ import { cn } from '../../../utils/cn';
 import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
-import { CursorPagination } from '../cursor-pagination';
+import { CursorPagination, CursorPaginationSkeleton } from '../cursor-pagination';
 import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
+import { useLoadingScope } from '../loading-scope';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
 import { TableRow } from './table-row';
-import { COMPACT_ROW_MIN_HEIGHT, TableCardSkeleton } from './table-skeleton';
+import { COMPACT_ROW_MIN_HEIGHT, TABLE_SKELETON_ROWS, TableCardSkeleton } from './table-skeleton';
 import type { RowAction, TableColumn, TableProps, TableRowData } from './types';
 import { useTableMotion } from './use-table-motion';
+import { TABLE_ACTIONS_COLUMN_KEY, TABLE_CHEVRON_COLUMN_KEY } from './utils';
 
 /**
  * Injects synthetic columns (row actions and/or row-level chevron link) at the end of the columns array.
@@ -35,7 +37,7 @@ function injectSyntheticColumns<T>(
 
   if (hasActions) {
     const actionsColumn: TableColumn<T> = {
-      key: '__actions__',
+      key: TABLE_ACTIONS_COLUMN_KEY,
       label: '',
       // A caller-fixed width keeps the header and every row on ONE grid
       // (see `actionsColumnWidth` in types.ts); the default stays
@@ -68,7 +70,7 @@ function injectSyntheticColumns<T>(
 
   if (rowHref) {
     const chevronColumn: TableColumn<T> = {
-      key: '__chevron__',
+      key: TABLE_CHEVRON_COLUMN_KEY,
       label: '',
       width: 'w-12 shrink-0 flex-none',
       align: 'right',
@@ -100,9 +102,9 @@ export function Table<T = TableRowData>({
   data,
   columns,
   rowKey,
-  loading = false,
+  loading: loadingProp = false,
   emptyMessage,
-  skeletonRows = 10,
+  skeletonRows = TABLE_SKELETON_ROWS,
   minRows,
   emptyState,
   keepHeightWhenEmpty,
@@ -135,10 +137,22 @@ export function Table<T = TableRowData>({
   animateRowReorder,
   actionsColumnWidth,
 }: TableProps<T>) {
+  // In a page's loading state the table is loading: its header real, its rows the row skeletons.
+  const loading = useLoadingScope() || loadingProp;
   // Opt-in row-reorder animation: framer-motion is loaded lazily (its own chunk)
   // ONLY when `animateRowReorder` is set, so the default table stays motion-free.
   const tableMotion = useTableMotion(Boolean(animateRowReorder));
   const columnsWithActions = injectSyntheticColumns(columns, rowActions, renderRowActions, rowHref, actionsColumnWidth);
+  // The rows' skeleton: the rows' own columns (the synthetic actions and chevron columns at their widths), its
+  // action buttons as the row draws them.
+  const skeletonShape = {
+    columns: columnsWithActions,
+    compact,
+    selectable,
+    actions: renderRowActions
+      ? undefined
+      : rowActions?.map(action => ({ iconOnly: Boolean(action.icon) && !action.label })),
+  };
 
   // ONE resolution of the two vocabularies, so the render below never asks
   // which spelling the caller used. `minRows` is the current one; the two
@@ -274,13 +288,7 @@ export function Table<T = TableRowData>({
       {/* Table Body */}
       <div className={cn('flex w-full flex-col gap-2', className)}>
         {loading && data.length === 0 ? (
-          <TableCardSkeleton
-            columns={columns}
-            rows={skeletonRows}
-            compact={compact}
-            hasActions={(rowActions?.length ?? 0) > 0}
-            hasChevron={Boolean(rowHref)}
-          />
+          <TableCardSkeleton {...skeletonShape} rows={skeletonRows} />
         ) : data.length === 0 ? (
           /* `minRows` promises a STABLE height, and an empty table is exactly
              when a collapsing one is most visible — the pagination and
@@ -331,12 +339,7 @@ export function Table<T = TableRowData>({
             })()}
             {/* Infinite scroll: skeleton rows */}
             {infiniteScroll?.isFetchingNextPage && (
-              <TableCardSkeleton
-                columns={columns}
-                rows={infiniteScroll.skeletonRows ?? 3}
-                hasActions={(rowActions?.length ?? 0) > 0}
-                hasChevron={Boolean(rowHref)}
-              />
+              <TableCardSkeleton {...skeletonShape} rows={infiniteScroll.skeletonRows ?? 3} />
             )}
             {/* Infinite scroll: sentinel element */}
             {infiniteScroll?.hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
@@ -366,6 +369,20 @@ export function Table<T = TableRowData>({
           itemName={cursorPagination.itemName}
           loading={loading}
           onNext={cursorPagination.onNext}
+          onPrevious={cursorPagination.onPrevious}
+          onReset={cursorPagination.onReset}
+          showInfo={cursorPagination.showInfo ?? true}
+          compact={cursorPagination.compact}
+          resetButtonLabel={cursorPagination.resetButtonLabel}
+          resetButtonIcon={cursorPagination.resetButtonIcon}
+          className={cn('mt-2 border-t border-ods-border pt-3', paginationClassName)}
+        />
+      )}
+
+      {/* While the first page is read: the pager's skeleton in its place (its buttons real and inert). */}
+      {!infiniteScroll && cursorPagination && loading && data.length === 0 && (
+        <CursorPaginationSkeleton
+          hasPreviousPage={cursorPagination.hasPreviousPage}
           onPrevious={cursorPagination.onPrevious}
           onReset={cursorPagination.onReset}
           showInfo={cursorPagination.showInfo ?? true}

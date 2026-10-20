@@ -22,8 +22,7 @@ import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 import { usePageDataSync } from '../../layout/page-data-sync';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
-import { RoadmapGrid } from './roadmap-grid';
-import { RoadmapGridSkeleton } from './roadmap-grid-skeleton';
+import { RoadmapGrid, RoadmapGridQuarterSkeleton } from './roadmap-grid';
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_ENDPOINT = '/api/roadmap';
@@ -103,7 +102,8 @@ export function RoadmapView({
     return (
       <div className={SYNCED_LIST_CLASS}>
         {!syncInPage && <DataSyncLine loading />}
-        <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
+        {/* The view groups by quarter, so its skeleton is the quarter-grouped grid's. */}
+        <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} />
       </div>
     );
   }
