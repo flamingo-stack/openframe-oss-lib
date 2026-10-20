@@ -539,7 +539,12 @@ export function NavigationSidebarGroupedSkeleton() {
       aria-hidden="true"
     >
       <UnifiedSkeleton className="size-5 shrink-0 rounded" />
-      <UnifiedSkeleton className={cn('ml-[var(--spacing-system-xsf)] h-4 min-w-0 flex-1 rounded', EXPANDED_ONLY)} />
+      {/* The label's fade rides a wrapper, not the bar: its `duration-*` also sets
+          `animation-duration` (tailwindcss-animate), which would run the bar's pulse
+          at the fade's 150ms while the icon beside it keeps the shared one. */}
+      <div className={cn('ml-[var(--spacing-system-xsf)] min-w-0 flex-1', EXPANDED_ONLY)}>
+        <UnifiedSkeleton className="h-4 w-full rounded" />
+      </div>
     </div>
   );
 }
