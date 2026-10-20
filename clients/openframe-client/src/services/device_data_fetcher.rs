@@ -1,5 +1,7 @@
 use tracing::{debug, info, warn};
 
+use crate::platform::os_version::{self, OsVersion};
+
 #[derive(Clone)]
 pub struct DeviceDataFetcher;
 
@@ -116,5 +118,15 @@ impl DeviceDataFetcher {
         } else {
             "MAC_OS".to_string()
         }
+    }
+
+    pub fn get_os_version(&self) -> OsVersion {
+        let os = os_version::detect();
+        info!(
+            "OS version: '{}', build: '{}'",
+            os.version.as_deref().unwrap_or_default(),
+            os.build.as_deref().unwrap_or_default()
+        );
+        os
     }
 }
