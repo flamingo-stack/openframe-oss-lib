@@ -27,7 +27,7 @@ const ROW_COUNT_CLASS = 'whitespace-nowrap text-ods-text-secondary text-h6';
 export function DataTableRowCountSkeleton({ label, className }: { label: string; className?: string }) {
   return (
     <span className={cn(ROW_COUNT_CLASS, className)} aria-hidden>
-      <TextLineSkeleton type="inherit" as="span" className="inline-block align-top w-6" /> {label}
+      <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" /> {label}
     </span>
   );
 }

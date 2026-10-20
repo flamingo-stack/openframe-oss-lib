@@ -33,24 +33,24 @@ export function EntityQuotesPanel({ quotes, className }: EntityQuotesPanelProps)
     // Optional per record, so the loading state draws none: the gate leaves the loaded panel out of its comparison.
     // A plain block around the one panel, so the parent's spacing applies to it as it did to the panel.
     <div data-loading-optional>
-    <StackedRowsPanel
-      className={className}
-      title={`${ENTITY_QUOTES_TITLE} · ${quotes.length}`}
-      rows={quotes.map(q => ({
-        id: q.key,
-        columns: [
-          {
-            key: 'quote',
-            content: (
-              <blockquote className={QUOTE_CLASS}>
-                <p className={QUOTE_TEXT_CLASS}>&ldquo;{q.text}&rdquo;</p>
-                {q.speaker && <p className={QUOTE_SPEAKER_CLASS}>{q.speaker}</p>}
-              </blockquote>
-            ),
-          },
-        ],
-      }))}
-    />
+      <StackedRowsPanel
+        className={className}
+        title={`${ENTITY_QUOTES_TITLE} · ${quotes.length}`}
+        rows={quotes.map(q => ({
+          id: q.key,
+          columns: [
+            {
+              key: 'quote',
+              content: (
+                <blockquote className={QUOTE_CLASS}>
+                  <p className={QUOTE_TEXT_CLASS}>&ldquo;{q.text}&rdquo;</p>
+                  {q.speaker && <p className={QUOTE_SPEAKER_CLASS}>{q.speaker}</p>}
+                </blockquote>
+              ),
+            },
+          ],
+        }))}
+      />
     </div>
   );
 }

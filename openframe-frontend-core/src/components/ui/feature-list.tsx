@@ -116,14 +116,8 @@ export function FeatureList({
   return (
     <div className={`${BOXED_LIST_CLASS} ${className}`}>
       {items.map((item, index) => (
-        <div
-          key={index}
-          className={`${BOXED_ROW_CLASS} ${index < items.length - 1 ? BOXED_ROW_DIVIDER_CLASS : ''}`}
-        >
-          <div
-            className={ICON_BOX_CLASS}
-            style={{ width: iconBoxSize, height: iconBoxSize }}
-          >
+        <div key={index} className={`${BOXED_ROW_CLASS} ${index < items.length - 1 ? BOXED_ROW_DIVIDER_CLASS : ''}`}>
+          <div className={ICON_BOX_CLASS} style={{ width: iconBoxSize, height: iconBoxSize }}>
             {item.icon}
           </div>
           <div className={BOXED_TEXT_CLASS}>

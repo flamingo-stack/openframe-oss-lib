@@ -248,7 +248,11 @@ export function SectionEyebrow({
   tone?: HeadingAccentTone;
   className?: string;
 }) {
-  return <span className={['text-h5', headingAccentClass(platform, tone), className].filter(Boolean).join(' ')}>{children}</span>;
+  return (
+    <span className={['text-h5', headingAccentClass(platform, tone), className].filter(Boolean).join(' ')}>
+      {children}
+    </span>
+  );
 }
 
 /**
@@ -272,7 +276,11 @@ export function SectionHeading({
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
   const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
-  const eyebrowNode = eyebrow ? <SectionEyebrow platform={platform} tone={tone}>{eyebrow}</SectionEyebrow> : null;
+  const eyebrowNode = eyebrow ? (
+    <SectionEyebrow platform={platform} tone={tone}>
+      {eyebrow}
+    </SectionEyebrow>
+  ) : null;
   const headingText = (
     <>
       {accentSentenceMarks(title, platform, tone)}
@@ -362,7 +370,11 @@ export function SectionHeadingSkeleton({
         <div className={layout.intro}>
           {Array.from({ length: introLines }, (_, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton lines never reorder
-            <TextLineSkeleton key={i} type="inherit" className={i === introLines - 1 && introLines > 1 ? 'w-2/3' : 'w-full'} />
+            <TextLineSkeleton
+              key={i}
+              type="inherit"
+              className={i === introLines - 1 && introLines > 1 ? 'w-2/3' : 'w-full'}
+            />
           ))}
         </div>
       ) : null}

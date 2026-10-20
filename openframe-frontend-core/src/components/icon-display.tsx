@@ -46,7 +46,12 @@ export function EntityIcon({
   // In a loading scope the icon is data still being read: a box of its size.
   if (held) {
     return (
-      <UnifiedSkeleton as="span" width={size} height={size} className={cn('inline-block shrink-0 rounded-md', className)} />
+      <UnifiedSkeleton
+        as="span"
+        width={size}
+        height={size}
+        className={cn('inline-block shrink-0 rounded-md', className)}
+      />
     );
   }
   if (!icon?.url && identity?.url) {

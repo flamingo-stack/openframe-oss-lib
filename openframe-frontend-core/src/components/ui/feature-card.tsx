@@ -260,11 +260,7 @@ function FeatureCardGridView({
                             </span>
                           )}
                           <h3 className={`text-ods-text-primary text-h2 ${titleClassName}`}>
-                            {loading ? (
-                              <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
-                            ) : (
-                              item.title
-                            )}
+                            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-1/2" /> : item.title}
                           </h3>
                           {item.subtitle && (
                             <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
@@ -294,11 +290,7 @@ function FeatureCardGridView({
                         </h3>
                         {item.subtitle && (
                           <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
-                            {loading ? (
-                              <TextLineSkeleton type="inherit" as="span" className="w-3/4" />
-                            ) : (
-                              item.subtitle
-                            )}
+                            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-3/4" /> : item.subtitle}
                           </p>
                         )}
                       </div>

@@ -56,8 +56,9 @@ export function ResultsCountSkeleton({
   return (
     <div className={RESULTS_COUNT_ROW_CLASS} aria-hidden>
       <p className={RESULTS_COUNT_TEXT_CLASS}>
-        Showing <TextLineSkeleton type="inherit" as="span" className="inline-block align-top w-10" /> of{' '}
-        <TextLineSkeleton type="inherit" as="span" className="inline-block align-top w-6" /> {resultLabel(resultType, false)}
+        Showing <TextLineSkeleton type="inherit" as="span" className="inline-block w-10 align-top" /> of{' '}
+        <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" />{' '}
+        {resultLabel(resultType, false)}
         {sortingMessage && <span className={RESULTS_COUNT_SORTING_CLASS}>• {sortingMessage}</span>}
       </p>
     </div>
