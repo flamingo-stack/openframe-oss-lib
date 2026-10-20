@@ -21,6 +21,7 @@ import java.util.List;
         name = "tenant_cveId",
         def = "{'tenantId': 1, 'cveId': 1}",
         unique = true)
+@CompoundIndex(name = "tenant_severity_score", def = "{'tenantId': 1, 'severity': 1, 'cvssScore': -1}")
 @CompoundIndex(name = "tenant_discoveredAt", def = "{'tenantId': 1, 'discoveredAt': -1}")
 @CompoundIndex(name = "cveId", def = "{'cveId': 1}")
 public class TenantCve implements TenantScoped {
@@ -36,7 +37,19 @@ public class TenantCve implements TenantScoped {
 
     private List<Long> affectedTitleIds;
 
+    private String severity;
+
+    private Double cvssScore;
+
+    private Double epssProbability;
+
+    private Boolean cisaKnownExploit;
+
     private Instant discoveredAt;
+
+    private Instant publishedAt;
+
+    private String detailsLink;
 
     private Instant updatedAt;
 }
