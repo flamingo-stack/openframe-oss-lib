@@ -35,6 +35,7 @@ class DeviceSoftwareHandlerTest {
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetSoftwareRepository fleetSoftwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
+    @Mock private SoftwareProjector softwareProjector;
 
     @InjectMocks private DeviceSoftwareHandler handler;
 
@@ -108,6 +109,7 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getSource()).isEqualTo("apps");
         assertThat(saved.getLastSeenAt()).isEqualTo(Instant.parse("2024-05-01T10:00:00Z"));
         assertThat(saved.getUpdatedAt()).isNotNull();
+        verify(softwareProjector).project("t1", 42L);
     }
 
     @Test
@@ -127,6 +129,7 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getSoftwareTitleId()).isNull();
         assertThat(saved.getName()).isNull();
         assertThat(saved.getVersion()).isNull();
+        verify(softwareProjector).project("t1", null);
     }
 
     @Test
@@ -138,6 +141,7 @@ class DeviceSoftwareHandlerTest {
 
         verify(deviceSoftwareRepository).deleteByTenantIdAndMachineIdAndSoftwareId("t1", "m1", 200L);
         verify(deviceSoftwareRepository, never()).save(any());
+        verify(softwareProjector).project("t1", null);
         verifyNoInteractions(fleetSoftwareRepository);
     }
 }

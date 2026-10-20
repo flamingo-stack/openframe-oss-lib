@@ -10,13 +10,11 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
 import com.openframe.data.document.device.Machine;
-import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.TenantSoftware;
+import com.openframe.data.document.rmm.software.Software;
+import com.openframe.data.document.rmm.software.Vulnerability;
 import com.openframe.data.repository.device.MachineRepository;
-import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.TenantSoftwareRepository;
+import com.openframe.data.repository.rmm.software.SoftwareRepository;
+import com.openframe.data.repository.rmm.software.VulnerabilityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,7 +23,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,9 +41,8 @@ public class TenantSoftwareReadModelQuery {
             "devicesCount", "devicesCount",
             "cveCount", "cveCount");
 
-    private final TenantSoftwareRepository tenantSoftwareRepository;
-    private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final DeviceCveRepository deviceCveRepository;
+    private final SoftwareRepository softwareRepository;
+    private final VulnerabilityRepository vulnerabilityRepository;
     private final MachineRepository machineRepository;
 
     public Optional<SoftwareResponse> findById(String tenantId, String softwareId) {
@@ -54,7 +50,7 @@ public class TenantSoftwareReadModelQuery {
         if (titleId == null) {
             return Optional.empty();
         }
-        return tenantSoftwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, titleId).map(this::toResponse);
+        return softwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, titleId).map(this::toResponse);
     }
 
     private static Long parseLong(String value) {
@@ -75,33 +71,30 @@ public class TenantSoftwareReadModelQuery {
         if (titleId == null) {
             return PageResult.empty(page);
         }
-        Map<String, List<DeviceCve>> byCve = deviceCveRepository.findByTenantIdAndSoftwareTitleId(tenantId, titleId)
-                .stream()
-                .filter(dc -> dc.getCveId() != null)
-                .collect(Collectors.groupingBy(DeviceCve::getCveId, LinkedHashMap::new, Collectors.toList()));
-        if (byCve.isEmpty()) {
-            return PageResult.empty(page);
-        }
-        List<SoftwareVulnerabilityResponse> all = byCve.entrySet().stream()
-                .map(e -> toSoftwareVuln(e.getKey(), e.getValue()))
+        List<SoftwareVulnerabilityResponse> all = vulnerabilityRepository
+                .findByTenantIdAndAffectedSoftwareSoftwareTitleId(tenantId, titleId).stream()
+                .map(v -> toSoftwareVuln(v, titleId))
                 .filter(v -> isBlank(search) || (v.getCveId() != null && v.getCveId().toLowerCase().contains(search.toLowerCase())))
                 .sorted(vulnComparator(sortField, sortAsc))
                 .toList();
         return paginate(all, page, perPage);
     }
 
-    private SoftwareVulnerabilityResponse toSoftwareVuln(String cveId, List<DeviceCve> rows) {
+    private SoftwareVulnerabilityResponse toSoftwareVuln(Vulnerability vuln, Long titleId) {
         SoftwareVulnerabilityResponse v = new SoftwareVulnerabilityResponse();
-        v.setCveId(cveId);
-        v.setAffectedVersion(rows.stream().map(DeviceCve::getInstalledVersion).filter(Objects::nonNull)
-                .distinct().collect(Collectors.joining(", ")));
-        v.setDiscoveredAt(rows.stream().map(DeviceCve::getDiscoveredAt).filter(Objects::nonNull)
-                .min(Comparator.naturalOrder()).orElse(null));
+        v.setCveId(vuln.getCveId());
+        v.setDiscoveredAt(vuln.getDiscoveredAt());
+        if (vuln.getAffectedSoftware() != null) {
+            vuln.getAffectedSoftware().stream()
+                    .filter(a -> titleId.equals(a.getSoftwareTitleId()))
+                    .map(Vulnerability.AffectedSoftware::getInstalledVersion)
+                    .filter(Objects::nonNull).findFirst()
+                    .ifPresent(v::setAffectedVersion);
+        }
         return v;
     }
 
     private Comparator<SoftwareVulnerabilityResponse> vulnComparator(String sortField, boolean sortAsc) {
-        // Scoring (cvss/severity) lives in the CVE-enrichment feature; sort by discovery date or CVE id here.
         Comparator<SoftwareVulnerabilityResponse> base = "cveId".equals(sortField)
                 ? Comparator.comparing(SoftwareVulnerabilityResponse::getCveId, Comparator.nullsLast(Comparator.naturalOrder()))
                 : Comparator.comparing(SoftwareVulnerabilityResponse::getDiscoveredAt, Comparator.nullsLast(Comparator.naturalOrder()));
@@ -122,15 +115,16 @@ public class TenantSoftwareReadModelQuery {
         if (titleId == null) {
             return List.of();
         }
-        List<DeviceSoftware> installed = deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, titleId);
-        if (installed.isEmpty()) {
+        Software software = softwareRepository.findByTenantIdAndSoftwareTitleId(tenantId, titleId).orElse(null);
+        if (software == null || software.getInstallations() == null || software.getInstallations().isEmpty()) {
             return List.of();
         }
+        List<Software.Installation> installations = software.getInstallations();
         Map<String, Machine> machineById = machineRepository.findByMachineIdIn(
-                        installed.stream().map(DeviceSoftware::getMachineId).filter(Objects::nonNull).distinct().toList())
+                        installations.stream().map(Software.Installation::getMachineId).filter(Objects::nonNull).distinct().toList())
                 .stream().collect(Collectors.toMap(Machine::getMachineId, m -> m, (a, b) -> a));
-        return installed.stream()
-                .map(ds -> toOnDevice(ds, machineById.get(ds.getMachineId())))
+        return installations.stream()
+                .map(i -> toOnDevice(i, machineById.get(i.getMachineId())))
                 .filter(Objects::nonNull)
                 .filter(row -> isBlank(search) || (row.getDevice().getHostname() != null
                         && row.getDevice().getHostname().toLowerCase().contains(search.toLowerCase())))
@@ -138,21 +132,21 @@ public class TenantSoftwareReadModelQuery {
     }
 
     public List<SoftwareResponse> allForFilters(String tenantId, String search) {
-        Page<TenantSoftware> page = isBlank(search)
-                ? tenantSoftwareRepository.findByTenantIdAndDevicesCountGreaterThan(tenantId, 0, Pageable.unpaged())
-                : tenantSoftwareRepository.findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(
+        Page<Software> page = isBlank(search)
+                ? softwareRepository.findByTenantIdAndDevicesCountGreaterThan(tenantId, 0, Pageable.unpaged())
+                : softwareRepository.findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(
                         tenantId, search.toLowerCase(), 0, Pageable.unpaged());
         return page.getContent().stream().map(this::toResponse).toList();
     }
 
-    private SoftwareOnDeviceResponse toOnDevice(DeviceSoftware ds, Machine machine) {
+    private SoftwareOnDeviceResponse toOnDevice(Software.Installation installation, Machine machine) {
         if (machine == null) {
             return null;
         }
         return SoftwareOnDeviceResponse.builder()
                 .device(machine)
-                .softwareVersion(ds.getVersion())
-                .status(null) // deliberately return null until that lands, so a status filter honestly matches nothing instead of UP_TO_DATE.
+                .softwareVersion(installation.getVersion())
+                .status(null) // UP_TO_DATE comparison not available yet; null so a status filter matches nothing.
                 .build();
     }
 
@@ -182,19 +176,19 @@ public class TenantSoftwareReadModelQuery {
         boolean hasSearch = !isBlank(search);
         String nameLower = hasSearch ? search.toLowerCase() : null;
 
-        Page<TenantSoftware> result;
+        Page<Software> result;
         if (hasSearch && vuln) {
-            result = tenantSoftwareRepository
+            result = softwareRepository
                     .findByTenantIdAndNameLowerContainingAndCveCountGreaterThanAndDevicesCountGreaterThan(
                             tenantId, nameLower, 0, 0, pageable);
         } else if (hasSearch) {
-            result = tenantSoftwareRepository
+            result = softwareRepository
                     .findByTenantIdAndNameLowerContainingAndDevicesCountGreaterThan(tenantId, nameLower, 0, pageable);
         } else if (vuln) {
-            result = tenantSoftwareRepository
+            result = softwareRepository
                     .findByTenantIdAndCveCountGreaterThanAndDevicesCountGreaterThan(tenantId, 0, 0, pageable);
         } else {
-            result = tenantSoftwareRepository.findByTenantIdAndDevicesCountGreaterThan(tenantId, 0, pageable);
+            result = softwareRepository.findByTenantIdAndDevicesCountGreaterThan(tenantId, 0, pageable);
         }
 
         List<SoftwareResponse> rows = result.getContent().stream().map(this::toResponse).toList();
@@ -209,18 +203,16 @@ public class TenantSoftwareReadModelQuery {
         return Sort.by(direction, property);
     }
 
-    private SoftwareResponse toResponse(TenantSoftware ts) {
+    private SoftwareResponse toResponse(Software sw) {
         SoftwareResponse row = new SoftwareResponse();
-        row.setId(ts.getSoftwareTitleId() == null ? null : String.valueOf(ts.getSoftwareTitleId()));
-        row.setName(ts.getName());
-        row.setSource(FleetSoftwareCategory.of(ts.getSource()).source());
-        row.setLatestVersion(ts.getLatestVersion());
-        row.setOlderVersionsCount(ts.getOlderVersionsCount());
-        row.setDevicesCount(ts.getDevicesCount());
-        row.setCpeMatched(ts.getCpeMatched());
+        row.setId(sw.getSoftwareTitleId() == null ? null : String.valueOf(sw.getSoftwareTitleId()));
+        row.setName(sw.getName());
+        row.setSource(FleetSoftwareCategory.of(sw.getSource()).source());
+        row.setLatestVersion(sw.getLatestVersion());
+        row.setDevicesCount(sw.getDevicesCount());
 
         SoftwareVulnerabilitySummaryResponse summary = new SoftwareVulnerabilitySummaryResponse();
-        summary.setCveCount(ts.getCveCount());
+        summary.setCveCount(sw.getCveCount());
         row.setVulnerabilitySummary(summary);
         return row;
     }

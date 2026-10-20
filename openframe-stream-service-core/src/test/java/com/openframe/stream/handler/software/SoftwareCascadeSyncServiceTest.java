@@ -31,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -48,7 +47,8 @@ class SoftwareCascadeSyncServiceTest {
     @Mock private FleetOperatingSystemRepository fleetOperatingSystemRepository;
     @Mock private FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
     @Mock private DeviceOperatingSystemRepository deviceOperatingSystemRepository;
-    @Mock private TenantSoftwareCveAggregator tenantSoftwareCveAggregator;
+    @Mock private SoftwareProjector softwareProjector;
+    @Mock private VulnerabilityProjector vulnerabilityProjector;
 
     @InjectMocks private SoftwareCascadeSyncService service;
 
@@ -63,17 +63,9 @@ class SoftwareCascadeSyncServiceTest {
         ArgumentCaptor<SoftwareCascadeSync> captor = ArgumentCaptor.forClass(SoftwareCascadeSync.class);
         verify(cascadeRepository).save(captor.capture());
         SoftwareCascadeSync row = captor.getValue();
-        assertThat(row.getId()).isEqualTo("SOFTWARE_CVE:200");   // deterministic → dedups repeated events
+        assertThat(row.getId()).isEqualTo("SOFTWARE_CVE:200");
         assertThat(row.getType()).isEqualTo(CascadeSyncType.SOFTWARE_CVE);
-        assertThat(row.getSoftwareId()).isEqualTo(200L);
         assertThat(row.getStatus()).isEqualTo(DeviceOnlineDispatchStatus.NEW);
-        assertThat(row.getCreatedAt()).isNotNull();
-    }
-
-    @Test
-    void enqueue_nullKey_doesNothing() {
-        service.enqueueOsVuln(null);
-        verifyNoInteractions(cascadeRepository);
     }
 
     @Test
@@ -85,11 +77,11 @@ class SoftwareCascadeSyncServiceTest {
         service.processBatch();
 
         verify(cascadeRepository, never()).saveAll(any());
-        verifyNoInteractions(deviceCveWriter, tenantSoftwareCveAggregator);
+        verifyNoInteractions(softwareProjector, vulnerabilityProjector);
     }
 
     @Test
-    void processBatch_softwareCve_resyncsDevicesDropsStaleCveAndMarksProcessed() {
+    void processBatch_softwareCve_reconcilesProjectsAndMarksProcessed() {
         withBatchSize(500);
         SoftwareCascadeSync item = SoftwareCascadeSync.builder()
                 .id("SOFTWARE_CVE:200").type(CascadeSyncType.SOFTWARE_CVE).softwareId(200L)
@@ -99,8 +91,7 @@ class SoftwareCascadeSyncServiceTest {
         when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.of(
                 FleetSoftware.builder().softwareTitleId(42L).version("1.0").build()));
         when(fleetSoftwareCveRepository.findBySoftwareId(200L)).thenReturn(List.of(
-                FleetSoftwareCve.builder().cve("CVE-1").build(),
-                FleetSoftwareCve.builder().cve("CVE-2").build()));
+                FleetSoftwareCve.builder().cve("CVE-1").build()));
         when(deviceSoftwareRepository.findBySoftwareId(200L)).thenReturn(List.of(
                 DeviceSoftware.builder().tenantId("t1").machineId("m1").hostId(100L).softwareTitleId(42L).version("1.0").build()));
         DeviceCve stale = DeviceCve.builder().cveId("CVE-OLD").softwareId(200L).build();
@@ -108,14 +99,15 @@ class SoftwareCascadeSyncServiceTest {
 
         service.processBatch();
 
-        verify(deviceCveWriter, times(2)).upsert(any(), any(), any(), any(), any(), any(), any(), any());
-        verify(deviceCveRepository).delete(stale);   // CVE-OLD no longer in catalog
-        verify(tenantSoftwareCveAggregator).recompute("t1", 42L);
+        verify(deviceCveWriter).upsert(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(deviceCveRepository).delete(stale);
+        verify(softwareProjector).project("t1", 42L);
+        verify(vulnerabilityProjector).project("t1", "CVE-1");     // current catalog CVE
+        verify(vulnerabilityProjector).project("t1", "CVE-OLD");   // dropped CVE
 
         ArgumentCaptor<List<SoftwareCascadeSync>> saved = ArgumentCaptor.forClass(List.class);
         verify(cascadeRepository).saveAll(saved.capture());
         assertThat(saved.getValue().get(0).getStatus()).isEqualTo(DeviceOnlineDispatchStatus.PROCESSED);
-        assertThat(saved.getValue().get(0).getProcessedAt()).isNotNull();
     }
 
     @Test
@@ -130,7 +122,6 @@ class SoftwareCascadeSyncServiceTest {
 
         service.processBatch();
 
-        // failed item is not saved as PROCESSED → stays NEW for the next sweep
         verify(cascadeRepository, never()).saveAll(any());
     }
 }

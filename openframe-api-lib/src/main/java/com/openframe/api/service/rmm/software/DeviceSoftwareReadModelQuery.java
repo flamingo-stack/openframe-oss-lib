@@ -4,19 +4,12 @@ import com.openframe.api.dto.rmm.software.SoftwareFilterInput;
 import com.openframe.api.dto.rmm.software.SoftwareResponse;
 import com.openframe.api.dto.rmm.software.SoftwareVulnerabilitySummaryResponse;
 import com.openframe.api.service.rmm.fleet.FleetSoftwareCategory;
-import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.TenantSoftware;
-import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.TenantSoftwareRepository;
+import com.openframe.data.document.rmm.software.Software;
+import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -24,58 +17,46 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @RequiredArgsConstructor
 public class DeviceSoftwareReadModelQuery {
 
-    private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final TenantSoftwareRepository tenantSoftwareRepository;
-    private final DeviceCveRepository deviceCveRepository;
+    private final SoftwareRepository softwareRepository;
 
     public List<SoftwareResponse> rowsForDevice(String tenantId, String machineId,
                                                 SoftwareFilterInput filter, String search) {
-        List<DeviceSoftware> installed = deviceSoftwareRepository.findByTenantIdAndMachineId(tenantId, machineId);
-        if (installed.isEmpty()) {
-            return List.of();
-        }
-
-        Map<Long, Long> cveCountBySoftware = deviceCveRepository.findByTenantIdAndMachineId(tenantId, machineId).stream()
-                .map(DeviceCve::getSoftwareId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(id -> id, Collectors.counting()));
-
-        List<Long> titleIds = installed.stream()
-                .map(DeviceSoftware::getSoftwareTitleId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-        Map<Long, Integer> devicesByTitle = titleIds.isEmpty() ? Map.of()
-                : tenantSoftwareRepository.findByTenantIdAndSoftwareTitleIdIn(tenantId, titleIds).stream()
-                .collect(Collectors.toMap(TenantSoftware::getSoftwareTitleId, TenantSoftware::getDevicesCount, (a, b) -> a));
-
-        return installed.stream()
-                .filter(ds -> matchesSearch(ds, search))
-                .map(ds -> toResponse(ds, cveCountBySoftware, devicesByTitle))
+        return softwareRepository.findByTenantIdAndInstallationsMachineId(tenantId, machineId).stream()
+                .map(sw -> toResponse(sw, machineId))
+                .filter(row -> matchesSearch(row, search))
                 .filter(row -> matchesSources(row, filter))
                 .toList();
     }
 
-    private SoftwareResponse toResponse(DeviceSoftware ds, Map<Long, Long> cveCountBySoftware,
-                                        Map<Long, Integer> devicesByTitle) {
+    private SoftwareResponse toResponse(Software sw, String machineId) {
         SoftwareResponse row = new SoftwareResponse();
-        row.setId(ds.getSoftwareId() == null ? null : String.valueOf(ds.getSoftwareId()));
-        row.setName(ds.getName());
-        row.setCurrentVersion(ds.getVersion());
-        row.setSource(FleetSoftwareCategory.of(ds.getSource()).source());
-        row.setDevicesCount(devicesByTitle.get(ds.getSoftwareTitleId()));
+        row.setId(sw.getSoftwareTitleId() == null ? null : String.valueOf(sw.getSoftwareTitleId()));
+        row.setName(sw.getName());
+        row.setCurrentVersion(versionOnDevice(sw, machineId));
+        row.setSource(FleetSoftwareCategory.of(sw.getSource()).source());
+        row.setDevicesCount(sw.getDevicesCount());
 
         SoftwareVulnerabilitySummaryResponse summary = new SoftwareVulnerabilitySummaryResponse();
-        summary.setCveCount(cveCountBySoftware.getOrDefault(ds.getSoftwareId(), 0L).intValue());
+        summary.setCveCount(sw.getCveCount());
         row.setVulnerabilitySummary(summary);
         return row;
     }
 
-    private boolean matchesSearch(DeviceSoftware ds, String search) {
+    private String versionOnDevice(Software sw, String machineId) {
+        if (sw.getInstallations() == null) {
+            return null;
+        }
+        return sw.getInstallations().stream()
+                .filter(i -> machineId.equals(i.getMachineId()))
+                .map(Software.Installation::getVersion)
+                .findFirst().orElse(null);
+    }
+
+    private boolean matchesSearch(SoftwareResponse row, String search) {
         if (isBlank(search)) {
             return true;
         }
-        return ds.getName() != null && ds.getName().toLowerCase().contains(search.toLowerCase());
+        return row.getName() != null && row.getName().toLowerCase().contains(search.toLowerCase());
     }
 
     private boolean matchesSources(SoftwareResponse row, SoftwareFilterInput filter) {

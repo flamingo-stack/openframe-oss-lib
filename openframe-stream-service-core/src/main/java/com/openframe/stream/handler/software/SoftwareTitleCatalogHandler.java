@@ -1,11 +1,11 @@
 package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.FleetSoftwareTitle;
-import com.openframe.data.document.rmm.software.TenantSoftware;
+import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.FleetSoftwareTitleRepository;
-import com.openframe.data.repository.rmm.software.TenantSoftwareRepository;
+import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
@@ -29,7 +28,8 @@ import static com.openframe.stream.handler.software.FleetRowFields.str;
 public class SoftwareTitleCatalogHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private final FleetSoftwareTitleRepository softwareTitleRepository;
-    private final TenantSoftwareRepository tenantSoftwareRepository;
+    private final SoftwareRepository softwareRepository;
+    private final SoftwareProjector softwareProjector;
 
     @Override
     public EventHandlerType getType() {
@@ -83,25 +83,9 @@ public class SoftwareTitleCatalogHandler implements MessageHandler<DeserializedD
         softwareTitleRepository.save(title);
 
         if (nameChanged) {
-            fanOutToTenants(softwareTitleId, title);
+            softwareRepository.findBySoftwareTitleId(softwareTitleId).stream()
+                    .map(Software::getTenantId).filter(Objects::nonNull).distinct()
+                    .forEach(tenant -> softwareProjector.project(tenant, softwareTitleId));
         }
-    }
-
-    private void fanOutToTenants(Long softwareTitleId, FleetSoftwareTitle title) {
-        List<TenantSoftware> rows = tenantSoftwareRepository.findBySoftwareTitleId(softwareTitleId);
-        if (rows.isEmpty()) {
-            return;
-        }
-        Instant now = Instant.now();
-        for (TenantSoftware row : rows) {
-            row.setName(title.getName());
-            row.setNameLower(title.getNameLower());
-            row.setSource(title.getSource());
-            row.setBrowser(title.getBrowser());
-            row.setUpdatedAt(now);
-        }
-        FanOut.saveInChunks(rows, tenantSoftwareRepository::saveAll);
-        log.debug("[software-cdc] title {} name fanned out to {} tenant_software rows",
-                softwareTitleId, rows.size());
     }
 }

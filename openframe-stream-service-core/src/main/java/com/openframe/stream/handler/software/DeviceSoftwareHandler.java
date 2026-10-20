@@ -30,6 +30,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final FleetHostResolver fleetHostResolver;
     private final FleetSoftwareRepository fleetSoftwareRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
+    private final SoftwareProjector softwareProjector;
 
     @Override
     public EventHandlerType getType() {
@@ -66,10 +67,12 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         }
 
         if (delete) {
+            Long titleId = deviceSoftwareRepository
+                    .findByTenantIdAndMachineIdAndSoftwareId(host.tenantId(), host.machineId(), softwareId)
+                    .map(DeviceSoftware::getSoftwareTitleId).orElse(null);
             deviceSoftwareRepository.deleteByTenantIdAndMachineIdAndSoftwareId(
                     host.tenantId(), host.machineId(), softwareId);
-            log.debug("[software-cdc] device_software removed: tenant={} machine={} software={}",
-                    host.tenantId(), host.machineId(), softwareId);
+            softwareProjector.project(host.tenantId(), titleId);
             return;
         }
 
@@ -84,8 +87,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         applyCatalog(deviceSoftware, softwareId);
         deviceSoftware.setUpdatedAt(Instant.now());
         deviceSoftwareRepository.save(deviceSoftware);
-        log.debug("[software-cdc] device_software upserted: tenant={} machine={} software={} title={}",
-                host.tenantId(), host.machineId(), softwareId, deviceSoftware.getSoftwareTitleId());
+        softwareProjector.project(host.tenantId(), deviceSoftware.getSoftwareTitleId());
     }
 
     private void applyCatalog(DeviceSoftware deviceSoftware, Long softwareId) {

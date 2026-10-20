@@ -46,7 +46,8 @@ public class SoftwareCascadeSyncService {
     private final FleetOperatingSystemRepository fleetOperatingSystemRepository;
     private final FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
     private final DeviceOperatingSystemRepository deviceOperatingSystemRepository;
-    private final TenantSoftwareCveAggregator tenantSoftwareCveAggregator;
+    private final SoftwareProjector softwareProjector;
+    private final VulnerabilityProjector vulnerabilityProjector;
 
     @Value("${openframe.rmm.software.cascade.batch-size:500}")
     private int batchSize;
@@ -130,6 +131,7 @@ public class SoftwareCascadeSyncService {
                 .collect(Collectors.toSet());
 
         Set<String> affectedTenants = new HashSet<>();
+        Set<String> touchedCves = new HashSet<>(catalogCves);
         for (DeviceSoftware ds : deviceSoftwareRepository.findBySoftwareId(softwareId)) {
             for (FleetSoftwareCve sc : catalog) {
                 deviceCveWriter.upsert(ds.getTenantId(), ds.getMachineId(), ds.getHostId(), sc.getCve(), softwareId,
@@ -140,13 +142,15 @@ public class SoftwareCascadeSyncService {
             for (DeviceCve existing : deviceCveRepository
                     .findByTenantIdAndMachineIdAndSoftwareId(ds.getTenantId(), ds.getMachineId(), softwareId)) {
                 if (!catalogCves.contains(existing.getCveId())) {
+                    touchedCves.add(existing.getCveId());
                     deviceCveRepository.delete(existing);
                 }
             }
             affectedTenants.add(ds.getTenantId());
         }
         for (String tenant : affectedTenants) {
-            tenantSoftwareCveAggregator.recompute(tenant, titleId);
+            softwareProjector.project(tenant, titleId);
+            touchedCves.forEach(cve -> vulnerabilityProjector.project(tenant, cve));
         }
     }
 
@@ -160,6 +164,8 @@ public class SoftwareCascadeSyncService {
         Set<String> catalogCves = catalog.stream().map(FleetOsVulnerability::getCve).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
+        Set<String> affectedTenants = new HashSet<>();
+        Set<String> touchedCves = new HashSet<>(catalogCves);
         for (DeviceOperatingSystem device : deviceOperatingSystemRepository.findByOsId(osId)) {
             for (FleetOsVulnerability ov : catalog) {
                 deviceCveWriter.upsert(device.getTenantId(), device.getMachineId(), device.getHostId(), ov.getCve(),
@@ -169,9 +175,14 @@ public class SoftwareCascadeSyncService {
             for (DeviceCve existing : deviceCveRepository
                     .findByTenantIdAndMachineId(device.getTenantId(), device.getMachineId())) {
                 if (existing.getSoftwareId() == null && !catalogCves.contains(existing.getCveId())) {
+                    touchedCves.add(existing.getCveId());
                     deviceCveRepository.delete(existing);
                 }
             }
+            affectedTenants.add(device.getTenantId());
+        }
+        for (String tenant : affectedTenants) {
+            touchedCves.forEach(cve -> vulnerabilityProjector.project(tenant, cve));
         }
     }
 
@@ -196,6 +207,8 @@ public class SoftwareCascadeSyncService {
             row.setUpdatedAt(now);
         }
         FanOut.saveInChunks(rows, deviceSoftwareRepository::saveAll);
+        rows.stream().map(DeviceSoftware::getTenantId).filter(Objects::nonNull).distinct()
+                .forEach(tenant -> softwareProjector.project(tenant, software.getSoftwareTitleId()));
     }
 
     private void executeOsDetails(Long osId) {
