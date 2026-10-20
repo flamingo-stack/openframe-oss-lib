@@ -48,6 +48,17 @@ describe('ComposerSheet', () => {
     expect(onDismiss).not.toHaveBeenCalled();
   });
 
+  it('draws the height it is given before the layer is measured, not the floor', () => {
+    // jsdom lays nothing out: the layer measures 0, as an open sheet's first frame does.
+    render(sheet({ height: 500 }));
+    expect(screen.getByRole('dialog', { name: 'Mingo chat' })).toHaveStyle({ height: '500px' });
+  });
+
+  it('eases no change of its height: a drag must follow the pointer', () => {
+    render(sheet());
+    expect(screen.getByRole('dialog', { name: 'Mingo chat' }).className).not.toMatch(/(?:^|\s)duration-/);
+  });
+
   it('resizes from the keyboard, never under its floor', () => {
     const onHeightChange = vi.fn();
     render(sheet({ height: 330, onHeightChange, minHeight: 320 }));

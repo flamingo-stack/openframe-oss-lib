@@ -69,10 +69,14 @@ export function ComposerSheet({
 
   if (!open) return null;
 
-  const maxHeight = Math.max(minHeight, layerHeight);
+  // The first render of an open sheet comes before the layer is measured: no ceiling
+  // yet (CSS `max-height: 100%` holds it to the layer), or a given height would draw at
+  // the floor for that frame and grow from it.
+  const measured = layerHeight > 0;
+  const maxHeight = measured ? Math.max(minHeight, layerHeight) : Number.POSITIVE_INFINITY;
   const clamp = (next: number) => Math.round(Math.min(maxHeight, Math.max(minHeight, next)));
   // Until the layer is measured the share is a percentage, so the first frame is right.
-  const resolved = height === null ? (layerHeight > 0 ? clamp(layerHeight * defaultShare) : null) : clamp(height);
+  const resolved = height === null ? (measured ? clamp(layerHeight * defaultShare) : null) : clamp(height);
 
   return (
     <div ref={setLayer} className="absolute inset-0">
@@ -90,7 +94,9 @@ export function ComposerSheet({
         className={cn(
           'pointer-events-auto absolute inset-x-0 bottom-0 mx-auto flex w-full flex-col',
           'rounded-t-md border border-b-0 border-ods-border bg-ods-bg shadow-xl',
-          'duration-200 animate-in fade-in-0 slide-in-from-bottom-4',
+          // No `duration-*` here: with no transition property set it would ease
+          // every change of the height — a drag lagging behind the pointer.
+          'animate-in fade-in-0 slide-in-from-bottom-4',
           className,
         )}
         style={{
@@ -106,7 +112,7 @@ export function ComposerSheet({
             side="bottom"
             size={resolved ?? minHeight}
             minSize={minHeight}
-            maxSize={maxHeight}
+            maxSize={measured ? maxHeight : (resolved ?? minHeight)}
             onSize={next => onHeightChange(clamp(next))}
             clampSize={clamp}
             panelRef={panelRef}

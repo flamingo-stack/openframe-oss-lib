@@ -183,6 +183,16 @@ describe('EmbeddableChat split: thread portalled into the page', () => {
     expect(page.contains(editor())).toBe(false);
   });
 
+  it("lays the thread's column out with the host's class; the column fills the container without one", () => {
+    const page = pageNode();
+    const { rerender } = renderChat(createState(), { threadContainer: page });
+    // jsdom has no layout: the class is the contract.
+    expect(page.innerHTML).not.toContain('max-w-[760px]');
+    rerender({ threadContainer: page, threadContentClassName: 'mx-auto max-w-[760px]' });
+    expect(within(page).getByText('hello there')).toBeInTheDocument();
+    expect(page.innerHTML).toContain('mx-auto max-w-[760px]');
+  });
+
   it('draws the page header: title, "· owner · day", ⋯ — nothing that closes, collapses or toggles a list', () => {
     const page = pageNode();
     renderChat(createState(), { threadContainer: page, onCollapse: vi.fn(), onExpand: vi.fn(), closable: true });

@@ -557,6 +557,13 @@ export interface EmbeddableChatProps {
    * full chat" and "Back to page"). Split layout only.
    */
   threadHeaderActions?: ReadonlyArray<MingoChatHeaderAction>;
+  /**
+   * The thread's column inside `threadContainer` — e.g. `mx-auto max-w-[760px]` to
+   * centre it at the composer's width on a wide chat page; the header stays full
+   * width. Omitted: the column fills the container (a narrow panel, a sheet).
+   * Split layout only.
+   */
+  threadContentClassName?: string;
 
   /** The model + token row under the composer. `false` hides it (e.g. a home
    *  page that has no chat yet). Default `true`. */
@@ -1182,6 +1189,7 @@ function EmbeddableChatInner({
   rail = 'auto',
   threadContainer,
   threadHeaderActions,
+  threadContentClassName,
   showModel = true,
   onModelClick,
   modelTooltip,
@@ -2885,7 +2893,7 @@ function EmbeddableChatInner({
                 // `p-[var(--spacing-system-m)]`. The default content class
                 // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
                 // double-inset the thread; `pb-0` overrides via twMerge.
-                contentClassName="max-w-none pb-0"
+                contentClassName={cn('max-w-none pb-0', splitMode && threadContentClassName)}
                 fullWidth
                 hasNextPage={hasMoreMessages}
                 isFetchingNextPage={isMessagesLoading}
