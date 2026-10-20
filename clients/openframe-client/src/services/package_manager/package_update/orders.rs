@@ -210,17 +210,18 @@ impl OrderStore {
     pub fn finish(&self, request_id: &str) -> Result<()> {
         let mut state = self.state();
         let mut next = state.clone();
+        if next.installing.as_deref() == Some(request_id) {
+            next.installing = None;
+        }
         let Some(index) = next
             .pending
             .iter()
             .position(|order| order.request_id == request_id)
         else {
+            state.installing = next.installing;
             return Ok(());
         };
         let order = next.pending.remove(index);
-        if next.installing.as_deref() == Some(request_id) {
-            next.installing = None;
-        }
         next.finished.retain(|f| f.request_id != request_id);
         next.finished.push(Finished {
             request_id: request_id.to_string(),

@@ -298,7 +298,6 @@ impl Worker {
             .filter(|holder| !survivors.contains(&holder.pid))
             .collect();
         if !survivors.is_empty() {
-            self.orders.set_installing(None);
             return self
                 .fail(
                     machine_id,
