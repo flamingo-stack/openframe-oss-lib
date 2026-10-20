@@ -85,7 +85,12 @@ export interface CapabilityExplorerProps {
   responderMark?: ReactNode;
   /** The jobs are being read (the host's query runs): the explorer draws its own skeleton. A page's loading scope does too. */
   loading?: boolean;
-  /** The jobs the skeleton's list draws: one screen of the host's list. */
+  /**
+   * The jobs the skeleton's list draws: the number of jobs the host reads (its limit). Default
+   * `CAPABILITY_EXPLORER_SKELETON_JOBS`, a typical count for a host that states none.
+   */
+  skeletonCount?: number;
+  /** @deprecated Use `skeletonCount`. */
   fold?: number;
   className?: string;
 }
@@ -241,6 +246,9 @@ function JobHeadSkeleton() {
   );
 }
 
+/** The jobs the explorer's skeleton lists when its host states no count: a typical count. */
+const CAPABILITY_EXPLORER_SKELETON_JOBS = 8;
+
 /**
  * The explorer while its data loads, drawn as both layouts in their own boxes
  * (the width decides which shows, by CSS, since it is not known yet): the list
@@ -251,11 +259,12 @@ function JobHeadSkeleton() {
 export function CapabilityExplorerSkeleton({
   region = true,
   className,
-  count = 8,
+  count = CAPABILITY_EXPLORER_SKELETON_JOBS,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
   className?: string;
+  /** The jobs the list draws: the jobs the host reads. Default a typical count. */
   count?: number;
 }) {
   return (
@@ -355,6 +364,7 @@ export function CapabilityExplorer({
   requesterMark,
   responderMark,
   loading = false,
+  skeletonCount,
   fold,
   className,
 }: CapabilityExplorerProps) {
@@ -364,10 +374,12 @@ export function CapabilityExplorer({
 
   // While the page is read its jobs are not known (none in a loading state): the explorer is its skeleton, never
   // left out. The page's loading region announces it, so this one does not; a host's own read does.
-  if (inScope || loading) return <CapabilityExplorerSkeleton region={!inScope} count={fold} className={className} />;
+  if (inScope || loading) {
+    return <CapabilityExplorerSkeleton region={!inScope} count={skeletonCount ?? fold} className={className} />;
+  }
   if (items.length === 0) return null;
   // Unknown until measured: one box, so neither layout's ids are in the page twice.
-  if (wide === undefined) return <CapabilityExplorerSkeleton className={className} />;
+  if (wide === undefined) return <CapabilityExplorerSkeleton count={items.length} className={className} />;
 
   if (!wide) {
     return (

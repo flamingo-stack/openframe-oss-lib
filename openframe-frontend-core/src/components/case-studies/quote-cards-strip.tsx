@@ -63,23 +63,28 @@ export interface QuoteCardsStripProps {
   quotes: readonly QuoteCard[];
   /** The quotes are being read (the host's query runs): the strip draws its own skeleton. A page's loading scope does too. */
   loading?: boolean;
-  /** The quote cards the skeleton draws: one screen of the host's strip. */
+  /**
+   * The quote cards the skeleton draws: the number of quotes the host reads (its limit). Default
+   * `QUOTE_STRIP_SKELETON_CARDS`, a typical count for a host that states none.
+   */
+  skeletonCount?: number;
+  /** @deprecated Use `skeletonCount`. */
   fold?: number;
   className?: string;
 }
 
-/** The quote cards a strip's skeleton draws when its host names none: a chip is about a third of a wide page's row. */
-const QUOTE_STRIP_FOLD = 4;
+/** The quote cards a strip's skeleton draws when its host names no count: a typical count. */
+const QUOTE_STRIP_SKELETON_CARDS = 4;
 
 /** The strip while its quotes are read: the same strip engine, still, with the quote card's own skeleton. */
-function QuoteCardsStripSkeleton({ fold, className }: { fold: number; className?: string }) {
+function QuoteCardsStripSkeleton({ count, className }: { count: number; className?: string }) {
   return (
     <CardsStrip
       className={className}
       showTitle={false}
       showChevrons={false}
       autoScroll={false}
-      items={Array.from({ length: fold }, (_, index) => ({ key: `quote-${index}` }))}
+      items={Array.from({ length: count }, (_, index) => ({ key: `quote-${index}` }))}
       itemKey={item => item.key}
       renderCard={(_item, ctx) => <QuoteCardTileSkeleton key={ctx.cardKey} className="shrink-0" />}
     />
@@ -93,9 +98,13 @@ function QuoteCardsStripSkeleton({ fold, className }: { fold: number; className?
  * keeps the click but stays out of the a11y tree. While its quotes are read (a page's loading scope with none handed
  * over, or `loading`) it is its own skeleton; read and empty, it renders nothing.
  */
-export function QuoteCardsStrip({ quotes, loading = false, fold = QUOTE_STRIP_FOLD, className }: QuoteCardsStripProps) {
+export function QuoteCardsStrip({ quotes, loading = false, skeletonCount, fold, className }: QuoteCardsStripProps) {
   const scoped = useLoadingScope();
-  if ((scoped && quotes.length === 0) || loading) return <QuoteCardsStripSkeleton fold={fold} className={className} />;
+  if ((scoped && quotes.length === 0) || loading) {
+    return (
+      <QuoteCardsStripSkeleton count={skeletonCount ?? fold ?? QUOTE_STRIP_SKELETON_CARDS} className={className} />
+    );
+  }
   if (quotes.length === 0) return null;
   return (
     <CardsStrip

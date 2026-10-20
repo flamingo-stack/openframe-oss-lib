@@ -8,10 +8,10 @@ import { RemoteDesktopChatMessageRow, RemoteDesktopChatMessageRowSkeleton } from
 import type { RemoteSessionChatMessage } from './types';
 
 /**
- * Message rows the panel's loading state draws: the panel spans the view's height (about 750px on a 900px screen,
- * less the input), and a one-line message is about 60px with its gap.
+ * Message rows the panel's loading state draws: a typical count. The panel draws the whole history its host hands it
+ * (no page, no limit), so there is no page size to draw.
  */
-const CHAT_PANEL_FOLD = 10;
+const CHAT_PANEL_SKELETON_ROWS = 10;
 
 /** Who is typing on the technician's side of the chat: shown on the technician's rows. */
 export interface RemoteDesktopChatTechnician {
@@ -78,7 +78,7 @@ export function RemoteDesktopChatPanel({
             // The chat while it is read: a screen of the panel's own message rows, stacked by a one-column grid
             // (the thread above is already the column flexbox: WEBVIEW-001).
             <LoadingRegion label="Loading the chat" className="grid grid-cols-1 gap-[var(--spacing-system-xsf)]">
-              {Array.from({ length: CHAT_PANEL_FOLD }, (_, i) => (
+              {Array.from({ length: CHAT_PANEL_SKELETON_ROWS }, (_, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
                 <RemoteDesktopChatMessageRowSkeleton key={i} />
               ))}
