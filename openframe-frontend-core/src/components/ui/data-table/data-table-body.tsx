@@ -11,6 +11,7 @@ import { DataTableEmpty } from './data-table-empty';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
 import { DataTableRow } from './data-table-row';
 import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState, ROW_STACK_CLASSES } from './data-table-skeleton';
+import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
@@ -19,7 +20,10 @@ export interface DataTableBodyProps<T = unknown> {
   emptyMessage?: string;
   /** Props for the empty state (NoData) shown when there are no rows. Overrides `emptyMessage`. */
   emptyState?: NoDataProps;
-  /** Skeleton row count when loading. Default `10`. */
+  /**
+   * Skeleton rows while loading: ONE FULL PAGE. Default the table's page size (`state.pagination.pageSize`), else
+   * `minRows`, else `DATA_TABLE_SKELETON_ROWS` (a typical count for an unpaged table).
+   */
   skeletonRows?: number;
   /**
    * The loading state announces itself (`LoadingRegion`: aria-busy plus one "Loading results" status).
@@ -101,7 +105,7 @@ export function DataTableBody<T = unknown>({
   loading: loadingProp,
   emptyMessage,
   emptyState,
-  skeletonRows = 10,
+  skeletonRows: skeletonRowsProp,
   loadingRegion = true,
   className,
   rowClassName,
@@ -113,6 +117,8 @@ export function DataTableBody<T = unknown>({
   renderSubRow,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>();
+  const skeletonRows =
+    skeletonRowsProp ?? dataTablePageSize(table) ?? (minRows && minRows > 0 ? minRows : DATA_TABLE_SKELETON_ROWS);
   // In a page's loading state the body is loading: its rows are the row skeletons.
   const inScope = useLoadingScope();
   const loading = inScope || loadingProp;

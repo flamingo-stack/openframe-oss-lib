@@ -17,9 +17,12 @@ const SELECT_ROW_CLASS =
   'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left';
 const SELECT_TILE_CLASS =
   'flex min-w-0 flex-col items-center justify-center gap-[var(--spacing-system-xxs)] border-b border-r border-ods-border p-[var(--spacing-system-xs)]';
-/** Options the loading state draws: the `max-h-80` (320px) list holds eight 40px rows, or about twelve tiles. */
-const SELECT_ROWS_FOLD = 8;
-const SELECT_TILES_FOLD = 12;
+/**
+ * Options the loading state draws (rows, or tiles in the grid layout) when its host states no `loadingRows`: a
+ * typical count. A host that reads its options with a limit passes that limit.
+ */
+const SELECT_LOADING_ROWS = 8;
+const SELECT_LOADING_TILES = 12;
 
 export interface SearchableSelectOption {
   value: string;
@@ -47,6 +50,8 @@ export interface SearchableSelectProps {
   emptyText?: string;
   loadingText?: string;
   isLoading?: boolean;
+  /** Options drawn while `isLoading`: the options the host reads (its limit). Default a typical count. */
+  loadingRows?: number;
   disabled?: boolean;
   /**
    * Custom trigger node (rendered via Popover.Trigger asChild). When omitted,
@@ -100,6 +105,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
     emptyText = 'No results found',
     loadingText = 'Loading options',
     isLoading = false,
+    loadingRows,
     disabled = false,
     trigger,
     id,
@@ -248,12 +254,15 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
               // The options while they are read: the list's own rows (or tiles), a label bar each; `loadingText` is
               // what a screen reader hears.
               <LoadingRegion label={loadingText} className="contents">
-                {Array.from({ length: isGrid ? SELECT_TILES_FOLD : SELECT_ROWS_FOLD }, (_, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-                  <div key={i} className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
-                    <TextLineSkeleton type={isGrid ? 'h6' : 'h4'} className={isGrid ? 'w-full' : 'w-2/3'} />
-                  </div>
-                ))}
+                {Array.from(
+                  { length: loadingRows ?? (isGrid ? SELECT_LOADING_TILES : SELECT_LOADING_ROWS) },
+                  (_, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+                    <div key={i} className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
+                      <TextLineSkeleton type={isGrid ? 'h6' : 'h4'} className={isGrid ? 'w-full' : 'w-2/3'} />
+                    </div>
+                  ),
+                )}
               </LoadingRegion>
             ) : filtered.length === 0 ? (
               <div className={statusClass}>{emptyText}</div>

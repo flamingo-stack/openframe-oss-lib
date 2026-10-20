@@ -31,6 +31,11 @@ export interface RealCategoryCardProps {
   subcategoryCount?: number;
   vendors?: Vendor[];
   isLoading?: boolean;
+  /**
+   * The vendors the host reads for the card's strip (its fetch limit): the vendor icons the loading card draws.
+   * Default `CATEGORIES_CART_SKELETON_VENDORS`.
+   */
+  vendorLimit?: number;
   isLoadingVendorCount?: boolean;
   isLoadingSubcategoryCount?: boolean;
   className?: string;

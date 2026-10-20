@@ -103,6 +103,11 @@ interface AutocompleteBaseProps<T = string> {
   /** Loading text */
   loadingText?: string;
   /**
+   * Option rows the list draws while `loading`: the options the host reads (its search's limit). Default a typical
+   * count.
+   */
+  loadingRows?: number;
+  /**
    * The field itself is read and has not arrived (its value and its options): it draws its skeleton, as in a
    * loading scope. DISTINCT from `loading`, a search in flight under a field that stays up.
    */
@@ -172,8 +177,11 @@ const AUTOCOMPLETE_ANCHOR_HEIGHT_CLASS = 'min-h-11 md:min-h-12';
 /** An option row's frame, read by the rows and by the list's loading state. */
 const AUTOCOMPLETE_OPTION_ROW_CLASS =
   'flex min-h-11 items-center border-b border-ods-border px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] last:border-b-0 md:min-h-12 text-h4';
-/** Option rows the list's loading state draws: the 240px scroller holds five 48px rows. */
-const AUTOCOMPLETE_OPTIONS_FOLD = 5;
+/**
+ * Option rows the list's loading state draws when its host states no `loadingRows`: a typical count. A host that
+ * reads its options with a limit (a server search) passes that limit.
+ */
+const AUTOCOMPLETE_LOADING_ROWS = 5;
 const AUTOCOMPLETE_ANCHOR_SHAPE_CLASS = 'rounded-[6px]';
 
 export interface AutocompleteSkeletonProps {
@@ -214,6 +222,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     onInputChange,
     loading = false,
     loadingText = 'Loading options',
+    loadingRows = AUTOCOMPLETE_LOADING_ROWS,
     fieldLoading = false,
     creatable = false,
     onCreateOption,
@@ -690,7 +699,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                 // The options while they are read: the list's own rows, a label bar each (`loadingText` is what a
                 // screen reader hears).
                 <LoadingRegion label={loadingText}>
-                  {Array.from({ length: AUTOCOMPLETE_OPTIONS_FOLD }, (_, i) => (
+                  {Array.from({ length: loadingRows }, (_, i) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
                     <div key={i} className={AUTOCOMPLETE_OPTION_ROW_CLASS} aria-hidden>
                       <TextLineSkeleton type="inherit" className="w-2/3" />

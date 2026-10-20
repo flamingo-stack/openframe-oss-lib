@@ -184,7 +184,7 @@ export interface ModelTokenRatesProps {
   className?: string;
 }
 
-/** How many rows the table's skeleton draws: about what the panel's height shows. */
+/** Rows the table's skeleton draws: a typical count (a provider's tab lists every rate it has, with no page or limit). */
 const TABLE_SKELETON_ROWS = 8;
 
 /**
@@ -414,8 +414,8 @@ export interface ModelTokenExchangeProps {
 export const MODEL_TOKEN_EXCHANGE_BALANCE = 1_000_000;
 export const MODEL_TOKEN_EXCHANGE_RANGE = { min: 1_000_000, max: 50_000_000, step: 1_000_000 } as const;
 
-/** The provider rows drawn while the providers load: the step's fold (three rows beside the calculator's step). */
-const PROVIDER_ROWS_FOLD = 3;
+/** The provider rows drawn while the providers load: a typical count (the host lists every provider with a rate). */
+const PROVIDER_SKELETON_ROWS = 3;
 
 /** A model as a picker option: its name, its provider under it, the provider's mark beside it. */
 function modelOption(rate: ModelTokenRate): AutocompleteOption<string> {
@@ -575,7 +575,7 @@ export function ModelTokenExchange({
         {/* While the providers load the selector draws its own skeleton (its rows, the option row's own boxes). */}
         <PushButtonSelector<string>
           isLoading={providers.length === 0 && !failed}
-          skeletonCount={PROVIDER_ROWS_FOLD}
+          skeletonCount={PROVIDER_SKELETON_ROWS}
           optionDescriptions={false}
           options={providers.map(providerType => {
             // What the server stated for the provider rides its models' rows.
