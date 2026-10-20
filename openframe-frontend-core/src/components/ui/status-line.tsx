@@ -41,10 +41,7 @@ export function StatusLine({ tone, label, className }: StatusLineProps) {
       )}
     >
       {tone === 'working' && (
-        <span
-          className={cn('h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan', LIVE_PULSE_CLASS)}
-          aria-hidden
-        />
+        <span className={cn('h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan', LIVE_PULSE_CLASS)} aria-hidden />
       )}
       {tone === 'success' && <CheckCircleIcon size={16} className="shrink-0 text-ods-success" aria-hidden />}
       {tone === 'error' && <XmarkCircleIcon size={16} className="shrink-0 text-ods-error" aria-hidden />}

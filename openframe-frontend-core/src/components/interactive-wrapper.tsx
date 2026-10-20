@@ -176,7 +176,10 @@ export const InteractiveWrapper = forwardRef<HTMLElement, InteractiveWrapperProp
       ) : null,
       /* Loading Overlay */
       loading ? (
-        <div key="loading" className={cn('pointer-events-none absolute inset-0 bg-current opacity-10', LIVE_PULSE_CLASS)} />
+        <div
+          key="loading"
+          className={cn('pointer-events-none absolute inset-0 bg-current opacity-10', LIVE_PULSE_CLASS)}
+        />
       ) : null,
     );
   },

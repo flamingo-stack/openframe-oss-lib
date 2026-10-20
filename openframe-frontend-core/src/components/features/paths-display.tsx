@@ -158,7 +158,10 @@ export function PathsDisplaySkeleton({
   copyIconSize = 'w-6 h-6',
   leadingIcon,
   className,
-}: Pick<PathsDisplayProps, 'title' | 'description' | 'showCopyButtons' | 'copyIconSize' | 'leadingIcon' | 'className'> & {
+}: Pick<
+  PathsDisplayProps,
+  'title' | 'description' | 'showCopyButtons' | 'copyIconSize' | 'leadingIcon' | 'className'
+> & {
   rows?: number;
 }) {
   return (

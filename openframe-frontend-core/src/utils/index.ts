@@ -171,6 +171,7 @@ export {
   formatDateWithTimezone,
   formatDateTimeYmd,
   VIEWER_TIMEZONE,
+  viewerLocale,
   formatWebinarTimeMeta,
   formatProgramDate,
   formatProgramDateRange,

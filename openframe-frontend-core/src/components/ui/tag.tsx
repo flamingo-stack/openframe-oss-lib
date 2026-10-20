@@ -198,5 +198,7 @@ export function TagSkeleton({
   size?: keyof typeof TAG_SIZE_CLASS;
   className?: string;
 }) {
-  return <UnifiedSkeleton as="span" className={cn(TAG_FRAME_CLASS, TAG_SIZE_CLASS[size], 'w-16 shrink-0', className)} />;
+  return (
+    <UnifiedSkeleton as="span" className={cn(TAG_FRAME_CLASS, TAG_SIZE_CLASS[size], 'w-16 shrink-0', className)} />
+  );
 }

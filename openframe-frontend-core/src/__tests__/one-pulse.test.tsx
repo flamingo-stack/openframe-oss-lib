@@ -59,7 +59,8 @@ describe('one pulse', () => {
 
   it('draws no block skeleton inside a <p> (the parser would split the paragraph)', () => {
     const paragraph = /<p\b[^>]*>((?:(?!<\/p>)[\s\S]){0,400}?)<\/p>/g;
-    const block = /<(TextLineSkeleton|TextSkeleton\.\w+|UnifiedSkeleton|MediaSkeleton\.\w+|InteractiveSkeleton\.\w+|div)\b(?![^>]*as="span")/;
+    const block =
+      /<(TextLineSkeleton|TextSkeleton\.\w+|UnifiedSkeleton|MediaSkeleton\.\w+|InteractiveSkeleton\.\w+|div)\b(?![^>]*as="span")/;
     const offenders = files
       .filter(f => f.path.endsWith('.tsx'))
       .filter(f => [...f.text.matchAll(paragraph)].some(m => block.test(m[1] ?? '')))

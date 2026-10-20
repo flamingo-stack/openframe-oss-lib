@@ -38,8 +38,11 @@ describe('isOwnClick', () => {
   });
 
   it('with controls, leaves a button, a link or a label inside to itself, but not the container acting as one', () => {
-    const { container } = setup('<button id="b">B</button><a id="a" href="#x">A</a><label id="l">L</label><p id="p">P</p>');
-    for (const id of ['b', 'a', 'l']) expect(isOwnClick(container.querySelector(`#${id}`), container, { controls: true })).toBe(false);
+    const { container } = setup(
+      '<button id="b">B</button><a id="a" href="#x">A</a><label id="l">L</label><p id="p">P</p>',
+    );
+    for (const id of ['b', 'a', 'l'])
+      expect(isOwnClick(container.querySelector(`#${id}`), container, { controls: true })).toBe(false);
     expect(isOwnClick(container.querySelector('#p'), container, { controls: true })).toBe(true);
     const button = document.createElement('button');
     document.body.appendChild(button);

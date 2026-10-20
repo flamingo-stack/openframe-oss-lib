@@ -75,7 +75,8 @@ export const MEETING_DIRECTORY_PAGE_SIZE = 6;
 const directoryRowsMinHeight = (pageSize: number) => pageSize * 80 + (pageSize - 1) * 16;
 
 /** A row's frame and columns, read by the row and by its skeleton, so the skeleton is the row's size. */
-const ROW_FRAME_CLASS = 'flex min-h-20 w-full items-center gap-4 rounded-lg border border-ods-border bg-ods-card px-4 py-3';
+const ROW_FRAME_CLASS =
+  'flex min-h-20 w-full items-center gap-4 rounded-lg border border-ods-border bg-ods-card px-4 py-3';
 const ROW_TITLE_COLUMN_CLASS = 'flex min-w-0 flex-1 flex-col justify-center text-left';
 const ROW_NEXT_COLUMN_CLASS = 'hidden w-44 shrink-0 flex-col items-end justify-center content-md:flex';
 const ROW_NEXT_LABEL_CLASS = 'text-ods-text-secondary text-h6';

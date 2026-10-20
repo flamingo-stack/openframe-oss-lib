@@ -95,7 +95,5 @@ export function CampaignCardAdmin({ campaign, className, anchorProps }: Campaign
 }
 
 export function CampaignCardAdminSkeleton({ className }: { className?: string }) {
-  return (
-    <CompactCardSkeleton rows={[{ width: 'w-1/2' }, { width: 'w-11/12' }]} className={className} />
-  );
+  return <CompactCardSkeleton rows={[{ width: 'w-1/2' }, { width: 'w-11/12' }]} className={className} />;
 }

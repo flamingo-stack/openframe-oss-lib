@@ -76,9 +76,7 @@ export function StripCard({
           {caption && <span className="text-ods-text-secondary text-h6">{caption}</span>}
         </div>
       </div>
-      <div className={cn(bodyClass(roomy), bodyClassName)}>
-        {children}
-      </div>
+      <div className={cn(bodyClass(roomy), bodyClassName)}>{children}</div>
     </div>
   );
 }

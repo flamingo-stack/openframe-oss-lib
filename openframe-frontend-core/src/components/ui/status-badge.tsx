@@ -103,7 +103,11 @@ function StatusBadgeSkeleton({ variant, className }: { variant?: 'card' | 'butto
   return (
     <UnifiedSkeleton
       as="span"
-      className={cn(statusBadgeVariants({ variant, colorScheme: null }), 'box-content h-[1lh] w-12 border-transparent', className)}
+      className={cn(
+        statusBadgeVariants({ variant, colorScheme: null }),
+        'box-content h-[1lh] w-12 border-transparent',
+        className,
+      )}
     />
   );
 }

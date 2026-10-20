@@ -45,7 +45,6 @@ export function LeaderRow({ label, value, status, as: Row = 'div', className }: 
   );
 }
 
-
 /**
  * A row while it is read: the label (drawn as it is when the page states it, else a bar), the hairline drawn for
  * real, a bar for the value, a status box. Every bar is one line of the ROW's type step, so a row sized with
