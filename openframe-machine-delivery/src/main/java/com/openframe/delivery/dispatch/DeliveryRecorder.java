@@ -76,6 +76,7 @@ public class DeliveryRecorder {
         long ackThresholdSeconds = policy.getAckThresholdSeconds();
         long ttlSeconds = policy.getTtlSeconds();
         Instant dueAt = online ? now.plusSeconds(ackThresholdSeconds) : now;
+        Instant deadlineAt = policy.hasDeadline() ? now.plusSeconds(policy.getDeadlineSeconds()) : null;
         return MachineDelivery.builder()
                 .id(id)
                 .type(type)
@@ -89,6 +90,7 @@ public class DeliveryRecorder {
                 .payloadJson(json)
                 .dispatchedAt(now)
                 .dueAt(dueAt)
+                .deadlineAt(deadlineAt)
                 .expiresAt(now.plusSeconds(ttlSeconds))
                 .build();
     }

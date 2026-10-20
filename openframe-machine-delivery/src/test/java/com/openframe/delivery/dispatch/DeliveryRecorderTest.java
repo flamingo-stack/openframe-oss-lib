@@ -7,6 +7,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
+import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryTestPolicies;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryAudience;
@@ -39,6 +40,7 @@ class DeliveryRecorderTest {
     private static final String DISPATCH_ID = "d-1";
     private static final String ROW_ID = "CLIENT_UNINSTALL:mach-42:mach-42";
     private static final int SEQUENCE = 7;
+    private static final long DEADLINE = 10L;
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private MachineDeliverySequenceRepository sequences;
@@ -120,6 +122,26 @@ class DeliveryRecorderTest {
         assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(ACK_THRESHOLD));
         assertThat(saved.getExpiresAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(TTL));
         assertThat(saved.getErrors()).isZero();
+        assertThat(saved.getDeadlineAt()).isNull();
+    }
+
+    @Test
+    void record_typeWithADeadline_rowCarriesTheDeadlineFromDispatch() {
+        // setup
+        DeliveryProperties withDeadline = DeliveryTestPolicies.properties();
+        withDeadline.getDefaults().setDeadlineSeconds(DEADLINE);
+        recorder = new DeliveryRecorder(repository, sequences, withDeadline, new DeliveryPayloadJson(new JsonMapper()), onlineStatus);
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        recorder.record(request);
+
+        // verifications
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getDeadlineAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(DEADLINE));
     }
 
     @Test

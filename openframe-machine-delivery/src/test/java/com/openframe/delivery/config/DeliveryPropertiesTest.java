@@ -24,6 +24,8 @@ class DeliveryPropertiesTest {
 
     private static final double UNINSTALL_BACKOFF_MULTIPLIER = 2.0;
 
+    private static final long APPROVAL_DEADLINE = 10L;
+
     private DeliveryProperties properties;
 
     @BeforeEach
@@ -79,6 +81,32 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getBackoff().getMultiplier()).isEqualTo(UNINSTALL_BACKOFF_MULTIPLIER);
         assertThat(resolved.getBackoff().getMaxIntervalSeconds()).isEqualTo(MAX_RETRY_INTERVAL);
         assertThat(resolved.getBackoff().getJitter()).isEqualTo(JITTER);
+    }
+
+    @Test
+    void resolve_typeWithoutOverride_noDeadline() {
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(resolved.hasDeadline()).isFalse();
+    }
+
+    @Test
+    void resolve_typeOverridesDeadline_overrideWinsOthersStayWithoutOne() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setDeadlineSeconds(APPROVAL_DEADLINE);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.REMOTE_ACCESS_REQUEST);
+        Policy other = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        assertThat(resolved.hasDeadline()).isTrue();
+        assertThat(resolved.getDeadlineSeconds()).isEqualTo(APPROVAL_DEADLINE);
+        assertThat(other.hasDeadline()).isFalse();
     }
 
     @Test

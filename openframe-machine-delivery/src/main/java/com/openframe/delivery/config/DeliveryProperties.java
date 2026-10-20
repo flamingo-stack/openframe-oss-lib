@@ -99,6 +99,15 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long ttlSeconds;
+
+        // null = retried until max-attempts. Set = seconds from dispatch after which the row fails DEADLINE, a late
+        // ack is refused and the sweep's fast pass re-publishes it meanwhile: for a request a human is waiting on
+        @Positive
+        private Long deadlineSeconds;
+
+        public boolean hasDeadline() {
+            return deadlineSeconds != null;
+        }
     }
 
     // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
@@ -132,6 +141,7 @@ public class DeliveryProperties {
         private Long reconnectWindowSeconds;
         private Long resultTimeoutSeconds;
         private Long ttlSeconds;
+        private Long deadlineSeconds;
 
         Policy mergeOver(Policy base) {
             Policy merged = new Policy();
@@ -142,6 +152,7 @@ public class DeliveryProperties {
             merged.setReconnectWindowSeconds(requireNonNullElse(reconnectWindowSeconds, base.getReconnectWindowSeconds()));
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
+            merged.setDeadlineSeconds(deadlineSeconds == null ? base.getDeadlineSeconds() : deadlineSeconds);
             return merged;
         }
     }

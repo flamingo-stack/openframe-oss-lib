@@ -360,6 +360,55 @@ class DeliverySweepServiceTest {
     }
 
     @Test
+    void retryPending_deadlinePassed_failedDeadlineNothingPublished() {
+        // setup
+        delivery.setDeadlineAt(Instant.now().minusSeconds(TEN_SECONDS));
+        stubDue(delivery);
+        stubMachineOnline();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer).fail(eq(delivery), eq(DeliveryFailure.DEADLINE), eq(DeliveryStatus.UNACKED), any(Instant.class));
+        verifyNoInteractions(publisher, metrics);
+    }
+
+    @Test
+    void retryPending_deadlineAhead_republishedLikeAnyOtherRow() {
+        // setup
+        delivery.setDeadlineAt(Instant.now().plusSeconds(TEN_SECONDS));
+        stubDue(delivery);
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
+        verifyNoInteractions(closer);
+    }
+
+    @Test
+    void retryPendingWithDeadline_fastPass_onlyDeadlineRowsQueriedAndRepublished() {
+        // setup
+        delivery.setDeadlineAt(Instant.now().plusSeconds(TEN_SECONDS));
+        when(repository.findDueWithDeadline(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(delivery));
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
+
+        // execution
+        service.retryPendingWithDeadline();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
+        verify(repository, never()).findDue(any(DeliveryStatus.class), any(Instant.class), any(Integer.class));
+    }
+
+    @Test
     void retryPending_nothingDue_machinesNotLookedUp() {
         // setup
         stubDue();

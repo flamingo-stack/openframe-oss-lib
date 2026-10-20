@@ -5,5 +5,6 @@ public enum DeliveryFailure {
     OFFLINE,
     TIMEOUT,
     ERROR,
-    AGENT_ERROR
+    AGENT_ERROR,
+    DEADLINE
 }

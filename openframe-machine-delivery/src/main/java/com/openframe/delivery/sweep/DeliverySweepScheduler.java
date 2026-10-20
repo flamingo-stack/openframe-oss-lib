@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class DeliverySweepScheduler {
 
     private static final String PASS_RETRY = "retry";
+    private static final String PASS_FAST_RETRY = "fast_retry";
     private static final String PASS_WATCHDOG = "watchdog";
 
     private final DeliverySweepService sweepService;
@@ -28,6 +29,13 @@ public class DeliverySweepScheduler {
     public void tick() {
         runPass(PASS_RETRY, sweepService::retryPending);
         runPass(PASS_WATCHDOG, watchdogService::reapAcked);
+    }
+
+    // rows with a deadline live seconds: their own clock and lock, no lock-at-least-for so the next tick is not skipped
+    @Scheduled(fixedDelayString = "${openframe.delivery.sweep.fast-interval}")
+    @SchedulerLock(name = "deliveryFastSweep", lockAtMostFor = "${openframe.delivery.sweep.fast-lock-at-most-for}")
+    public void fastTick() {
+        runPass(PASS_FAST_RETRY, sweepService::retryPendingWithDeadline);
     }
 
     private void runPass(String pass, Runnable body) {
