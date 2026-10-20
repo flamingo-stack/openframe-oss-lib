@@ -96,8 +96,9 @@ import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks
 import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
 import { MingoChatHeader } from './mingo-chat-header';
+import type { MingoDialogStatus } from './mingo-chat-list-shared';
 import { ChatDialogModals } from './mingo-chat-modals';
-import { MingoChatRail, type MingoDialogStatus } from './mingo-chat-rail';
+import { MingoChatRail } from './mingo-chat-rail';
 import { MingoHistoryRail } from './mingo-history-rail';
 import { MingoOnboardingCard } from './mingo-onboarding-card';
 import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton';

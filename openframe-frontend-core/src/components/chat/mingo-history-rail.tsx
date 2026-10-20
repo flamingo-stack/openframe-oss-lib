@@ -10,8 +10,6 @@ import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history
 import { ChatListLoadError, type MingoHistoryScope } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
-export type { MingoHistoryScope } from './mingo-chat-list-shared';
-
 // =============================================================================
 // Types
 // =============================================================================

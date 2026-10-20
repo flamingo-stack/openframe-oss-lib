@@ -59,7 +59,7 @@ export * from './chat-context-picker';
 export * from './chat-context-memory-bar';
 export * from './context-items-list';
 export * from './chat-archive-page';
-export { ChatListLoadError } from './mingo-chat-list-shared';
+export { ChatListLoadError, type MingoDialogStatus, type MingoHistoryScope } from './mingo-chat-list-shared';
 export * from './model-display';
 export * from './chat-sidebar';
 export * from './chat-nav-sidebar';

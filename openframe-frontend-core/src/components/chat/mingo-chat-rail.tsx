@@ -33,8 +33,6 @@ import {
 } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
-export type { MingoDialogStatus } from './mingo-chat-list-shared';
-
 export interface MingoChatRailProps extends MingoChatListProps {
   /**
    * `'rail'` (default): the v2 chat panel's own column — the Mingo mark, the
