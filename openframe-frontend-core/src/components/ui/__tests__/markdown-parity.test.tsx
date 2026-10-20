@@ -1,4 +1,6 @@
 import { render, act } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
 /**
  * Phase-0 GOLDEN CHARACTERIZATION TESTS for the markdown renderer unification.
  *
@@ -18,8 +20,6 @@ import { render, act } from '@testing-library/react';
  * sanitization), not the leaves. The same mocks apply pre- and
  * post-refactor, so snapshots stay comparable.
  */
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Leaf mocks (stable across the refactor)
@@ -38,7 +38,9 @@ interface MockUrlProps {
   url?: string;
 }
 
-vi.mock('@/components/features/video', () => ({
+vi.mock('@/components/features/video', async importOriginal => ({
+  // The real URL helpers (the markdown iframe override asks `extractYouTubeId`); only the player is mocked.
+  ...(await importOriginal<Record<string, unknown>>()),
   Video: ({ kind, url, poster }: { kind?: string; url?: string; poster?: string | null }) => (
     <div data-mock="video" data-kind={kind} data-url={url} data-poster={poster ?? ''} />
   ),

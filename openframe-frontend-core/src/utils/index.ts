@@ -138,6 +138,7 @@ export * from './announcement-storage';
 export * from './announcement-surface';
 // cookie id-match dismissal store (walkthrough video widget)
 export * from './dismiss-cookie';
+export * from './after-page-load';
 export * from './dismissal-storage';
 // walkthrough deep-link query param (widget default + host URL minters)
 export * from './walkthrough-deep-link';
