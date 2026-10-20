@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { ContentAreaWidthContext } from '../../hooks/ui/use-content-breakpoint';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
@@ -17,6 +17,13 @@ import {
 import { AppLayoutSidePanel, type AppLayoutSidePanelConfig, useAppLayoutSidePanel } from './app-layout-side-panel';
 import { MobileBurgerMenu, type MobileBurgerMenuProps } from './mobile-burger-menu';
 import { NavigationSidebar } from './navigation-sidebar';
+
+/**
+ * The composer dock's height, on the page column while there is a dock: what a page's
+ * window-pinned bottom bar rises by (`PageActions` on a phone), so it does not cover
+ * the composer. Spelled out where it is read (Tailwind scans literal class names).
+ */
+const COMPOSER_DOCK_HEIGHT_VAR = '--of-composer-dock-height';
 
 export interface AppLayoutProps {
   children: ReactNode;
@@ -184,16 +191,18 @@ export function AppLayout({
   const contentAreaWidth = adaptive ? contentWidth : null;
 
   // The sheet layer ends where the dock begins, and the dock grows with the
-  // composer (a longer draft, a staged attachment): follow its height.
+  // composer (a longer draft, a staged attachment): follow its height. The page
+  // reads it too (`--of-composer-dock-height`): a phone's bottom action bar
+  // (`PageActions`) is pinned to the window and would cover the composer.
   const hasSheet = hasDock && composerSheet != null && composerSheet !== false;
   useIsomorphicLayoutEffect(() => {
-    if (!hasSheet || !dockElement) return undefined;
+    if (!hasDock || !dockElement) return undefined;
     const update = () => setDockHeight(dockElement.offsetHeight);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(dockElement);
     return () => observer.disconnect();
-  }, [hasSheet, dockElement]);
+  }, [hasDock, dockElement]);
 
   // With a side panel the header's Mingo button only exists while the panel
   // cannot dock: it opens the panel over the content and closes it again.
@@ -334,6 +343,7 @@ export function AppLayout({
                   the element types above the page, or React remounts it. */}
                 <div
                   data-surface={columnIsBox ? pageSurface : undefined}
+                  style={hasDock ? ({ [COMPOSER_DOCK_HEIGHT_VAR]: `${dockHeight}px` } as CSSProperties) : undefined}
                   className={
                     columnIsBox
                       ? cn(

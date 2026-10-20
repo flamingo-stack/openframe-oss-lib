@@ -534,7 +534,8 @@ function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]
   return (
     <div
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-50 md:hidden',
+        // Over the composer dock where the layout has one (AppLayout publishes its height).
+        'fixed bottom-[var(--of-composer-dock-height,0px)] left-0 right-0 z-50 md:hidden',
         'border-t border-ods-border bg-ods-card',
         // `lf` (24px at every breakpoint), NOT `l` — this bar is `md:hidden`, so the
         // only value it ever uses is the MOBILE one, and `l` is 16px there. The

@@ -160,6 +160,21 @@ describe('AppLayout composerSheet', () => {
   });
 });
 
+describe('AppLayout composer dock height', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("publishes the dock's height to the page column, for a phone's pinned action bar", () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+    render(layout({ composerDock: <p>dock</p> }));
+    expect(markup()).toMatch(/style="--of-composer-dock-height: 132px;"[^>]*>(?:(?!<main).)*<main/s);
+  });
+
+  it('publishes nothing without a dock', () => {
+    render(layout({ composerDock: undefined }));
+    expect(markup()).not.toContain('--of-composer-dock-height');
+  });
+});
+
 describe('AppLayout desktopHeader + contentCorner', () => {
   afterEach(() => vi.restoreAllMocks());
 
