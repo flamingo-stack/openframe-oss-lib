@@ -1,6 +1,6 @@
 package com.openframe.client.config;
 
-public enum CodeSignaturePolicyMode {
+public enum AgentBinaryPolicyMode {
     DISABLED,
     LOG_ONLY,
     ENFORCE

@@ -45,7 +45,6 @@ public class AgentRegistrationRequest {
     @Valid
     private List<AgentRegistrationTagInput> tags;
 
-    // Signature of the running agent binary as verified by the device OS; optional — older agents don't send it
-    @Valid
-    private AgentCodeSignature codeSignature;
+    // SHA-256 of the running agent executable; optional — older agents don't send it
+    private String binarySha256;
 } 

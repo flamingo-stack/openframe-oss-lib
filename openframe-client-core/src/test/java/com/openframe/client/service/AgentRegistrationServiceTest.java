@@ -7,8 +7,8 @@ import com.openframe.client.exception.AgentRegistrationSecretValidationException
 import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.*;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
-import com.openframe.client.exception.UntrustedAgentSignatureException;
-import com.openframe.client.service.validator.AgentCodeSignatureValidator;
+import com.openframe.client.exception.UntrustedAgentBinaryException;
+import com.openframe.client.service.validator.AgentBinaryChecksumValidator;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.core.exception.ErrorCode;
@@ -59,7 +59,7 @@ class AgentRegistrationServiceTest {
     private AgentRegistrationSecretValidator agentRegistrationSecretValidator;
 
     @Mock
-    private AgentCodeSignatureValidator agentCodeSignatureValidator;
+    private AgentBinaryChecksumValidator agentBinaryChecksumValidator;
 
     @Mock
     private ClientSecretValidator clientSecretValidator;
@@ -108,7 +108,7 @@ class AgentRegistrationServiceTest {
                 machineRepository,
                 organizationIdResolver,
                 agentRegistrationSecretValidator,
-                agentCodeSignatureValidator,
+                agentBinaryChecksumValidator,
                 clientSecretValidator,
                 agentSecretGenerator,
                 passwordEncoder,
@@ -336,12 +336,12 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
-    void registerAgent_WithUntrustedSignature_CreatesNothing() {
-        doThrow(new UntrustedAgentSignatureException("Agent is not signed by a trusted signer"))
-                .when(agentCodeSignatureValidator).validate(request);
+    void registerAgent_WithUntrustedBinary_CreatesNothing() {
+        doThrow(new UntrustedAgentBinaryException("Agent binary is not a published release"))
+                .when(agentBinaryChecksumValidator).validate(request);
 
         assertThrows(
-                UntrustedAgentSignatureException.class,
+                UntrustedAgentBinaryException.class,
                 () -> agentRegistrationService.register(INITIAL_KEY, request)
         );
 
@@ -352,12 +352,12 @@ class AgentRegistrationServiceTest {
     }
 
     @Test
-    void reinstall_WithUntrustedSignature_DoesNotTouchMachine() {
-        doThrow(new UntrustedAgentSignatureException("Agent is not signed by a trusted signer"))
-                .when(agentCodeSignatureValidator).validate(request);
+    void reinstall_WithUntrustedBinary_DoesNotTouchMachine() {
+        doThrow(new UntrustedAgentBinaryException("Agent binary is not a published release"))
+                .when(agentBinaryChecksumValidator).validate(request);
 
         assertThrows(
-                UntrustedAgentSignatureException.class,
+                UntrustedAgentBinaryException.class,
                 () -> agentRegistrationService.reinstall(INITIAL_KEY, MACHINE_ID, CLIENT_SECRET, request)
         );
 

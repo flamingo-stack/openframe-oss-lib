@@ -6,7 +6,7 @@ import com.openframe.client.exception.InvalidClientSecretException;
 import com.openframe.client.service.agentregistration.processor.AgentRegistrationProcessor;
 import com.openframe.client.service.InstalledAgentService;
 import com.openframe.client.service.ToolConnectionService;
-import com.openframe.client.service.validator.AgentCodeSignatureValidator;
+import com.openframe.client.service.validator.AgentBinaryChecksumValidator;
 import com.openframe.client.service.validator.AgentRegistrationSecretValidator;
 import com.openframe.client.service.validator.ClientSecretValidator;
 import com.openframe.data.document.device.DeviceStatus;
@@ -44,7 +44,7 @@ public class AgentRegistrationService {
     private final MachineRepository machineRepository;
     private final OrganizationIdResolver organizationIdResolver;
     private final AgentRegistrationSecretValidator secretValidator;
-    private final AgentCodeSignatureValidator codeSignatureValidator;
+    private final AgentBinaryChecksumValidator binaryChecksumValidator;
     private final ClientSecretValidator clientSecretValidator;
     private final AgentSecretGenerator agentSecretGenerator;
     private final PasswordEncoder passwordEncoder;
@@ -59,7 +59,7 @@ public class AgentRegistrationService {
 
     public AgentRegistrationResponse register(String initialKey, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
-        codeSignatureValidator.validate(request);
+        binaryChecksumValidator.validate(request);
 
         String machineId = machineIdGenerator.generate();
         String clientId = buildClientId(machineId);
@@ -117,7 +117,7 @@ public class AgentRegistrationService {
 
     public AgentRegistrationResponse reinstall(String initialKey, String machineId, String clientSecret, AgentRegistrationRequest request) {
         secretValidator.validate(initialKey);
-        codeSignatureValidator.validate(request);
+        binaryChecksumValidator.validate(request);
 
         OAuthClient client = loadOAuthClient(machineId);
         clientSecretValidator.validate(client, clientSecret);
