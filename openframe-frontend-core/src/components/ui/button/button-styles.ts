@@ -125,4 +125,3 @@ export const BUTTON_SIZE_CLASS = {
 } as const;
 
 export type ButtonSizeKey = keyof typeof BUTTON_SIZE_CLASS;
-

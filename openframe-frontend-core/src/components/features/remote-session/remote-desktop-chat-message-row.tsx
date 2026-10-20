@@ -43,12 +43,7 @@ export function RemoteDesktopChatMessageRow({
         {isTechnician && (
           <SquareAvatar variant="round" sizePx={24} src={avatarUrl} alt={authorName} className="shrink-0" />
         )}
-        <span
-          className={cn(
-            MESSAGE_NAME_CLASS,
-            isTechnician ? 'text-ods-accent' : 'text-ods-text-secondary',
-          )}
-        >
+        <span className={cn(MESSAGE_NAME_CLASS, isTechnician ? 'text-ods-accent' : 'text-ods-text-secondary')}>
           {authorName}
         </span>
         {/* The time is in the viewer's zone, which a server render cannot know. */}

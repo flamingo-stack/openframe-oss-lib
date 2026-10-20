@@ -166,11 +166,7 @@ export function CommandBox({
           and collapsing on each one would fold an expanded box under the
           typist, the exact jump this mode exists to prevent. Nothing goes stale
           without it: the expanded height is re-measured on every commit. */}
-      <FadePreview
-        fixedHeight
-        collapsedHeight={fixedCommandHeight(visibleLines)}
-        labels={COMMAND_TOGGLE_LABELS}
-      >
+      <FadePreview fixedHeight collapsedHeight={fixedCommandHeight(visibleLines)} labels={COMMAND_TOGGLE_LABELS}>
         {text}
       </FadePreview>
     </div>
@@ -185,12 +181,7 @@ export function CommandBox({
         {onCopy ? (
           <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandText}
-            <button
-              type="button"
-              onClick={onCopy}
-              aria-label={copyAriaLabel}
-              className={COMMAND_BOX_COPY_BUTTON_CLASS}
-            >
+            <button type="button" onClick={onCopy} aria-label={copyAriaLabel} className={COMMAND_BOX_COPY_BUTTON_CLASS}>
               <Copy02Icon className="h-5 w-5" />
             </button>
           </div>

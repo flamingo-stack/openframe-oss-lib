@@ -69,11 +69,7 @@ const SOURCE_TAG_CLASS =
   'inline-flex shrink-0 rounded-md border border-ods-border px-2 py-1 text-ods-text-secondary text-h5';
 
 function SourceTag({ children }: { children: ReactNode }) {
-  return (
-    <span className={SOURCE_TAG_CLASS}>
-      {children}
-    </span>
-  );
+  return <span className={SOURCE_TAG_CLASS}>{children}</span>;
 }
 
 /** The row above an item's title: where it was found and when. Nothing to show: no row. */
@@ -93,13 +89,7 @@ function ItemMeta({ item }: { item: IncidentFeedItem }) {
  * to a single row each. An item that is waiting on a person stays open even
  * after newer ones arrive, because it is still the thing to look at.
  */
-export function IncidentFeed({
-  items,
-  statusLabels,
-  emptyLabel,
-  anchor = 'top',
-  className,
-}: IncidentFeedProps) {
+export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', className }: IncidentFeedProps) {
   const lastIndex = items.length - 1;
   return (
     <div className={cn(FEED_CLASS, anchor === 'bottom' && FEED_BOTTOM_CLASS, className)}>
@@ -146,4 +136,3 @@ export function IncidentFeed({
     </div>
   );
 }
-

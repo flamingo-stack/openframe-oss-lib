@@ -152,7 +152,14 @@ export function CursorPagination({
 export function CursorPaginationSkeleton(
   props: Pick<
     CursorPaginationProps,
-    'hasPreviousPage' | 'onPrevious' | 'onReset' | 'className' | 'showInfo' | 'compact' | 'resetButtonLabel' | 'resetButtonIcon'
+    | 'hasPreviousPage'
+    | 'onPrevious'
+    | 'onReset'
+    | 'className'
+    | 'showInfo'
+    | 'compact'
+    | 'resetButtonLabel'
+    | 'resetButtonIcon'
   >,
 ) {
   return <CursorPagination {...props} hasNextPage={false} skeleton />;

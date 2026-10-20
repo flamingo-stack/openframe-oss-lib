@@ -307,7 +307,6 @@ function ManagedCell({
 // Component
 // =============================================================================
 
-
 export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactElement | null {
   const {
     title,
@@ -801,7 +800,9 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     return <ManagedCell item={item} ctx={ctx} cardWidthMobile={cardWidthMobile} cardWidthDesktop={cardWidthDesktop} />;
   };
 
-  const heading = showTitle && title && <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{accentSentenceMarks(title)}</h2>;
+  const heading = showTitle && title && (
+    <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{accentSentenceMarks(title)}</h2>
+  );
   if (items.length === 0) {
     // Outside a loading state an empty strip is nothing; inside one, a strip whose host states a skeleton draws it
     // (a host that states none expects no strip, e.g. a record with no bites).

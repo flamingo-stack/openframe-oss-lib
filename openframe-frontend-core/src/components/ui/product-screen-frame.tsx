@@ -117,12 +117,7 @@ export function ProductScreenFrame({
     >
       <PortalContainerContext.Provider value={portalHost}>
         <CollisionBoundaryContext.Provider value={frame}>
-          <div
-            inert
-            aria-hidden
-            className="ods-content-area"
-            style={screenStyle}
-          >
+          <div inert aria-hidden className="ods-content-area" style={screenStyle}>
             <div className="ods-content-scope">
               {/* Until measured (the server's HTML, a page without scripts) the screen is its own loading state: every
                   component in it draws its skeleton, so the window shows the screen's shape instead of nothing, and

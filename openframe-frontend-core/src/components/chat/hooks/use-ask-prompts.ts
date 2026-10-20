@@ -230,8 +230,7 @@ export function useAskSurface({
   const queue = useAskQueue();
   // In a loading scope a surface takes no turn and picks nothing: it draws its loading state.
   const held = useLoadingScope();
-  const picks =
-    !held && assistantAvailable(assistant) && !!assistant.askPromptsUrl && enabled && exclude !== null;
+  const picks = !held && assistantAvailable(assistant) && !!assistant.askPromptsUrl && enabled && exclude !== null;
 
   // A layout effect: surfaces a page mounts together take their turns in document order.
   useLayoutEffect(() => {

@@ -80,7 +80,12 @@ export function InvestorUpdateCardSkeleton({
   }
   if (size === 'sm') {
     return (
-      <CompactCardSkeleton titleWidth="w-1/2" titleBadges={['w-8']} rows={[{ width: 'w-1/3' }, { width: 'w-11/12' }]} className={className} />
+      <CompactCardSkeleton
+        titleWidth="w-1/2"
+        titleBadges={['w-8']}
+        rows={[{ width: 'w-1/3' }, { width: 'w-11/12' }]}
+        className={className}
+      />
     );
   }
   return null;

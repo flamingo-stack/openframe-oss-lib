@@ -21,10 +21,14 @@ const availability = availabilityWith([
 
 function renderForm(answers?: Record<string, string>) {
   const onSubmit = vi.fn(() => Promise.resolve());
-  const view = render(<BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} answers={answers} />);
+  const view = render(
+    <BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} answers={answers} />,
+  );
   return {
     rerender: (next: Record<string, string>) =>
-      view.rerender(<BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} answers={next} />),
+      view.rerender(
+        <BookingForm {...bookingFormBaseProps()} availability={availability} onSubmit={onSubmit} answers={next} />,
+      ),
   };
 }
 

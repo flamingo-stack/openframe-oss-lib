@@ -85,7 +85,11 @@ export function AvatarStackSkeleton({
   className?: string;
 }) {
   return (
-    <div aria-hidden className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)} style={slotsWidthStyle(size, slots)}>
+    <div
+      aria-hidden
+      className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
+      style={slotsWidthStyle(size, slots)}
+    >
       {Array.from({ length: count }, (_, i) => (
         <UnifiedSkeleton
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton faces never reorder
