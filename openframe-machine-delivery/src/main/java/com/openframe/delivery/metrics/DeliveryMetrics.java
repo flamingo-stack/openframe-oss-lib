@@ -3,11 +3,16 @@ package com.openframe.delivery.metrics;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
 @RequiredArgsConstructor
@@ -27,6 +32,11 @@ public class DeliveryMetrics {
     private static final String SWEEP_TIMER = "openframe.delivery.sweep.duration";
     private static final String ROLLOUT_BATCH_FAILED_COUNTER = "openframe.delivery.rollout.batch_failed";
     private static final String ROLLOUT_MACHINE_SKIPPED_COUNTER = "openframe.delivery.rollout.machine_skipped";
+    private static final String ROLLOUT_STARTED_COUNTER = "openframe.delivery.rollout.started";
+    private static final String ROLLOUT_FINISHED_COUNTER = "openframe.delivery.rollout.finished";
+    private static final String ROLLOUT_MACHINES_COUNTER = "openframe.delivery.rollout.machines";
+    private static final String ROLLOUT_DURATION_TIMER = "openframe.delivery.rollout.duration";
+    private static final String ROLLOUT_RUNNING_GAUGE = "openframe.delivery.rollout.running";
     private static final String TAG_TYPE = "type";
     private static final String TAG_REASON = "reason";
     private static final String TAG_SINK = "sink";
@@ -36,6 +46,8 @@ public class DeliveryMetrics {
     private static final String OUTCOME_ERROR = "error";
 
     private final MeterRegistry meterRegistry;
+    // a gauge keeps only a weak reference to its number; the map keeps the numbers alive
+    private final Map<DeliveryType, AtomicInteger> rolloutsRunning = new ConcurrentHashMap<>();
 
     public void recordRetried(DeliveryType type) {
         String typeTag = tagValue(type.name());
@@ -99,6 +111,34 @@ public class DeliveryMetrics {
     public void recordRolloutMachineSkipped(DeliveryType type) {
         String typeTag = tagValue(type.name());
         meterRegistry.counter(ROLLOUT_MACHINE_SKIPPED_COUNTER, TAG_TYPE, typeTag).increment();
+    }
+
+    public void recordRolloutStarted(DeliveryType type) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_STARTED_COUNTER, TAG_TYPE, typeTag).increment();
+    }
+
+    public void recordRolloutMachines(DeliveryType type, int machines) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_MACHINES_COUNTER, TAG_TYPE, typeTag).increment(machines);
+    }
+
+    public void recordRolloutFinished(DeliveryType type, Duration took) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(ROLLOUT_FINISHED_COUNTER, TAG_TYPE, typeTag).increment();
+        meterRegistry.timer(ROLLOUT_DURATION_TIMER, TAG_TYPE, typeTag).record(took);
+    }
+
+    // set on every rollout pass for every type, so a type with nothing running reads 0 rather than a stale value
+    public void recordRolloutsRunning(DeliveryType type, int count) {
+        AtomicInteger running = rolloutsRunning.computeIfAbsent(type, this::registerRolloutsRunning);
+        running.set(count);
+    }
+
+    private AtomicInteger registerRolloutsRunning(DeliveryType type) {
+        String typeTag = tagValue(type.name());
+        Tags tags = Tags.of(TAG_TYPE, typeTag);
+        return meterRegistry.gauge(ROLLOUT_RUNNING_GAUGE, tags, new AtomicInteger());
     }
 
     public void timeSweepPass(String pass, Runnable body) {

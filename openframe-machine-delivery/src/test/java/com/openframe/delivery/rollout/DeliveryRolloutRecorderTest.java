@@ -9,6 +9,7 @@ import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -35,6 +36,7 @@ class DeliveryRolloutRecorderTest {
     @Mock private MachineDeliveryRolloutRepository repository;
     @Mock private MachineDeliverySequenceRepository sequences;
     @Mock private TenantIdProvider tenants;
+    @Mock private DeliveryMetrics metrics;
 
     @Captor private ArgumentCaptor<MachineDeliveryRollout> rolloutCaptor;
 
@@ -43,7 +45,7 @@ class DeliveryRolloutRecorderTest {
 
     @BeforeEach
     void setUp() {
-        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new JsonMapper()), tenants);
+        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new JsonMapper()), tenants, metrics);
         TestPayload payload = new TestPayload();
         payload.setValue("1.5.11");
         payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));
@@ -76,5 +78,6 @@ class DeliveryRolloutRecorderTest {
         assertThat(rollout.getDispatched()).isZero();
         assertThat(rollout.getStartedAt()).isNotNull();
         assertThat(rollout.getPayloadJson()).contains("1.5.11");
+        verify(metrics).recordRolloutStarted(DeliveryType.CLIENT_UPDATE);
     }
 }
