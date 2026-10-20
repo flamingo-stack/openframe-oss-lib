@@ -1,13 +1,9 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.FleetOsVulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
@@ -28,7 +24,6 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -43,12 +38,12 @@ class DeviceCveHandlerTest {
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetSoftwareCveRepository fleetSoftwareCveRepository;
     @Mock private FleetSoftwareRepository fleetSoftwareRepository;
-    @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
     @Mock private FleetOperatingSystemRepository fleetOperatingSystemRepository;
-    @Mock private DeviceOperatingSystemRepository deviceOperatingSystemRepository;
     @Mock private DeviceCveRepository deviceCveRepository;
+    @Mock private DeviceCveWriter deviceCveWriter;
     @Mock private TenantSoftwareCveAggregator tenantSoftwareCveAggregator;
+    @Mock private SoftwareCascadeSyncService cascadeSyncService;
 
     @InjectMocks private DeviceCveHandler handler;
 
@@ -67,44 +62,37 @@ class DeviceCveHandlerTest {
         return MAPPER.createObjectNode();
     }
 
-    private void verifyNothingWritten() {
-        verify(deviceCveRepository, never()).save(any());
-        verifyNoInteractions(tenantSoftwareCveAggregator);
-    }
-
     @Test
     void handle_unrelatedMessageType_isNoOp() {
-        // A type that does not contribute to device_cve routes to the default no-op branch.
         handler.handle(msg(MessageType.FLEET_MDM_SOFTWARE_TITLE_EVENT, "c", null, row().put("x", 1)), null);
         verifyNoInteractions(fleetHostResolver, fleetSoftwareRepository, fleetSoftwareCveRepository,
-                deviceSoftwareRepository, deviceCveRepository, tenantSoftwareCveAggregator);
+                deviceCveWriter, tenantSoftwareCveAggregator, cascadeSyncService);
     }
 
     @Test
     void handle_nullMessageType_isNoOp() {
         handler.handle(msg(null, "c", null, row().put("host_id", 1)), null);
-        verifyNoInteractions(fleetHostResolver, deviceCveRepository, tenantSoftwareCveAggregator);
+        verifyNoInteractions(fleetHostResolver, deviceCveWriter, cascadeSyncService);
     }
 
     @Test
     void hostSoftware_missingIds_isNoOp() {
         handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, row().put("host_id", 100)), null);
-        verifyNoInteractions(fleetHostResolver, deviceCveRepository, tenantSoftwareCveAggregator);
+        verifyNoInteractions(fleetHostResolver, deviceCveWriter, tenantSoftwareCveAggregator);
     }
 
     @Test
-    void hostSoftware_unresolvedHost_skipsWithoutCatalogLookupOrWrite() {
-        ObjectNode after = row().put("host_id", 100).put("software_id", 200);
+    void hostSoftware_unresolvedHost_skips() {
         when(fleetHostResolver.resolve("100")).thenReturn(null);
 
-        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, after), null);
+        handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null,
+                row().put("host_id", 100).put("software_id", 200)), null);
 
-        verifyNoInteractions(fleetSoftwareRepository, fleetSoftwareCveRepository);
-        verifyNothingWritten();
+        verifyNoInteractions(fleetSoftwareRepository, deviceCveWriter, tenantSoftwareCveAggregator, cascadeSyncService);
     }
 
     @Test
-    void hostSoftware_create_upsertsOneDeviceCvePerKnownCveThenRecomputes() {
+    void hostSoftware_create_upsertsPerCveViaWriterThenRecomputes() {
         ObjectNode after = row().put("host_id", 100).put("software_id", 200);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.of(
@@ -112,12 +100,10 @@ class DeviceCveHandlerTest {
         when(fleetSoftwareCveRepository.findBySoftwareId(200L)).thenReturn(List.of(
                 FleetSoftwareCve.builder().cve("CVE-1").resolvedInVersion("2.0").build(),
                 FleetSoftwareCve.builder().cve("CVE-2").build()));
-        when(deviceCveRepository.findByTenantIdAndMachineIdAndCveIdAndSoftwareId(any(), any(), any(), any()))
-                .thenReturn(Optional.empty());
 
         handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, after), null);
 
-        verify(deviceCveRepository, times(2)).save(any(DeviceCve.class));
+        verify(deviceCveWriter, times(2)).upsert(any(), any(), any(), any(), any(), any(), any(), any());
         verify(tenantSoftwareCveAggregator).recompute("t1", 42L);
     }
 
@@ -126,12 +112,13 @@ class DeviceCveHandlerTest {
         ObjectNode after = row().put("host_id", 100).put("software_id", 200);
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
         when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.of(
-                FleetSoftware.builder().softwareTitleId(42L).version("1.0").build()));
+                FleetSoftware.builder().softwareTitleId(42L).build()));
         when(fleetSoftwareCveRepository.findBySoftwareId(200L)).thenReturn(List.of());
 
         handler.handle(msg(MessageType.FLEET_MDM_HOST_SOFTWARE_EVENT, "c", null, after), null);
 
-        verifyNothingWritten();
+        verify(deviceCveWriter, never()).upsert(any(), any(), any(), any(), any(), any(), any(), any());
+        verifyNoInteractions(tenantSoftwareCveAggregator);
     }
 
     @Test
@@ -145,40 +132,49 @@ class DeviceCveHandlerTest {
 
         verify(deviceCveRepository).deleteByTenantIdAndMachineIdAndSoftwareId("t1", "m1", 200L);
         verify(tenantSoftwareCveAggregator).recompute("t1", 42L);
-        verify(deviceCveRepository, never()).save(any());
+        verifyNoInteractions(deviceCveWriter);
     }
 
     @Test
-    void softwareCve_create_fansOutToDeviceSoftwareRowsAndRecomputesPerTenant() {
+    void softwareCve_create_updatesCatalogAndEnqueuesCascade() {
         ObjectNode after = row().put("software_id", 200).put("cve", "CVE-9").put("resolved_in_version", "3.0");
-        when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.of(
-                FleetSoftware.builder().softwareTitleId(42L).version("1.0").build()));
         when(fleetSoftwareCveRepository.findBySoftwareIdAndCve(200L, "CVE-9")).thenReturn(Optional.empty());
-        when(deviceSoftwareRepository.findBySoftwareId(200L)).thenReturn(List.of(
-                DeviceSoftware.builder().tenantId("t1").machineId("m1").hostId(100L).softwareTitleId(42L).version("1.0").build(),
-                DeviceSoftware.builder().tenantId("t2").machineId("m2").hostId(101L).softwareTitleId(42L).version("1.0").build()));
-        when(deviceCveRepository.findByTenantIdAndMachineIdAndCveIdAndSoftwareId(any(), any(), any(), any()))
-                .thenReturn(Optional.empty());
 
         handler.handle(msg(MessageType.FLEET_MDM_SOFTWARE_CVE_EVENT, "c", null, after), null);
 
-        verify(fleetSoftwareCveRepository).save(any(FleetSoftwareCve.class));   // catalog upsert
-        verify(deviceCveRepository, times(2)).save(any(DeviceCve.class));
-        verify(tenantSoftwareCveAggregator).recompute("t1", 42L);
-        verify(tenantSoftwareCveAggregator).recompute("t2", 42L);
+        verify(fleetSoftwareCveRepository).save(any(FleetSoftwareCve.class));   // catalog upsert, inline
+        verify(cascadeSyncService).enqueueSoftwareCve(200L);                     // heavy fan-out deferred
+        verifyNoInteractions(deviceCveWriter, tenantSoftwareCveAggregator);
     }
 
     @Test
-    void softwareCve_delete_removesCatalogAndDeviceCvesPerDeviceSoftwareRow() {
+    void softwareCve_delete_removesCatalogAndEnqueuesCascade() {
         ObjectNode before = row().put("software_id", 200).put("cve", "CVE-9");
-        when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.empty());
-        when(deviceSoftwareRepository.findBySoftwareId(200L)).thenReturn(List.of(
-                DeviceSoftware.builder().tenantId("t1").machineId("m1").hostId(100L).build()));
 
         handler.handle(msg(MessageType.FLEET_MDM_SOFTWARE_CVE_EVENT, "d", before, null), null);
 
         verify(fleetSoftwareCveRepository).deleteBySoftwareIdAndCve(200L, "CVE-9");
-        verify(deviceCveRepository).deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId("t1", "m1", "CVE-9", 200L);
-        verify(tenantSoftwareCveAggregator).recompute(eq("t1"), any());
+        verify(cascadeSyncService).enqueueSoftwareCve(200L);
+    }
+
+    @Test
+    void osVulnerability_create_updatesCatalogAndEnqueuesCascade() {
+        ObjectNode after = row().put("operating_system_id", 7).put("cve", "CVE-OS").put("resolved_in_version", "14.6");
+        when(fleetOsVulnerabilityRepository.findByOsIdAndCve(7L, "CVE-OS")).thenReturn(Optional.empty());
+
+        handler.handle(msg(MessageType.FLEET_MDM_OS_VULNERABILITY_EVENT, "c", null, after), null);
+
+        verify(fleetOsVulnerabilityRepository).save(any());
+        verify(cascadeSyncService).enqueueOsVuln(7L);
+    }
+
+    @Test
+    void osVulnerability_delete_removesCatalogAndEnqueuesCascade() {
+        ObjectNode before = row().put("operating_system_id", 7).put("cve", "CVE-OS");
+
+        handler.handle(msg(MessageType.FLEET_MDM_OS_VULNERABILITY_EVENT, "d", before, null), null);
+
+        verify(fleetOsVulnerabilityRepository).deleteByOsIdAndCve(7L, "CVE-OS");
+        verify(cascadeSyncService).enqueueOsVuln(7L);
     }
 }

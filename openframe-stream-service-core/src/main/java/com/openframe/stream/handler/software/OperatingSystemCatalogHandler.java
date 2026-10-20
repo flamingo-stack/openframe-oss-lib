@@ -1,10 +1,8 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.DeviceOperatingSystem;
 import com.openframe.data.document.rmm.software.FleetOperatingSystem;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.handler.MessageHandler;
@@ -16,7 +14,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
@@ -29,7 +26,7 @@ import static com.openframe.stream.handler.software.FleetRowFields.str;
 public class OperatingSystemCatalogHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private final FleetOperatingSystemRepository fleetOperatingSystemRepository;
-    private final DeviceOperatingSystemRepository deviceOperatingSystemRepository;
+    private final SoftwareCascadeSyncService cascadeSyncService;
 
     @Override
     public EventHandlerType getType() {
@@ -81,24 +78,8 @@ public class OperatingSystemCatalogHandler implements MessageHandler<Deserialize
         fleetOperatingSystemRepository.save(os);
 
         if (detailsChanged) {
-            fanOutToDevices(osId, os);
+            // Fan-out to every device_operating_system row can be large → defer to the cascade sweep.
+            cascadeSyncService.enqueueOsDetails(osId);
         }
-    }
-
-    private void fanOutToDevices(Long osId, FleetOperatingSystem os) {
-        List<DeviceOperatingSystem> rows = deviceOperatingSystemRepository.findByOsId(osId);
-        if (rows.isEmpty()) {
-            return;
-        }
-        Instant now = Instant.now();
-        for (DeviceOperatingSystem row : rows) {
-            row.setName(os.getName());
-            row.setVersion(os.getVersion());
-            row.setPlatform(os.getPlatform());
-            row.setUpdatedAt(now);
-        }
-        FanOut.saveInChunks(rows, deviceOperatingSystemRepository::saveAll);
-        log.debug("[software-cdc] os {} details fanned out to {} device_operating_system rows",
-                osId, rows.size());
     }
 }

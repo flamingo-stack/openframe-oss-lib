@@ -1,10 +1,8 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.stream.handler.MessageHandler;
@@ -16,7 +14,6 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
@@ -29,7 +26,7 @@ import static com.openframe.stream.handler.software.FleetRowFields.str;
 public class SoftwareCatalogHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private final FleetSoftwareRepository fleetSoftwareRepository;
-    private final DeviceSoftwareRepository deviceSoftwareRepository;
+    private final SoftwareCascadeSyncService cascadeSyncService;
 
     @Override
     public EventHandlerType getType() {
@@ -84,25 +81,8 @@ public class SoftwareCatalogHandler implements MessageHandler<DeserializedDebezi
         fleetSoftwareRepository.save(software);
 
         if (detailsChanged) {
-            fanOutToDevices(softwareId, software);
+            // Fan-out to every device_software row can be large → defer to the cascade sweep.
+            cascadeSyncService.enqueueSoftwareDetails(softwareId);
         }
-    }
-
-    private void fanOutToDevices(Long softwareId, FleetSoftware software) {
-        List<DeviceSoftware> rows = deviceSoftwareRepository.findBySoftwareId(softwareId);
-        if (rows.isEmpty()) {
-            return;
-        }
-        Instant now = Instant.now();
-        for (DeviceSoftware row : rows) {
-            row.setSoftwareTitleId(software.getSoftwareTitleId());
-            row.setName(software.getName());
-            row.setVersion(software.getVersion());
-            row.setSource(software.getSource());
-            row.setUpdatedAt(now);
-        }
-        FanOut.saveInChunks(rows, deviceSoftwareRepository::saveAll);
-        log.debug("[software-cdc] software {} details fanned out to {} device_software rows",
-                softwareId, rows.size());
     }
 }

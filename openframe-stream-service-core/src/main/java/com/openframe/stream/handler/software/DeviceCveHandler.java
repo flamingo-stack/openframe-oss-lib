@@ -1,8 +1,5 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.DeviceOperatingSystem;
-import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.FleetOperatingSystem;
 import com.openframe.data.document.rmm.software.FleetOsVulnerability;
 import com.openframe.data.document.rmm.software.FleetSoftware;
@@ -11,8 +8,6 @@ import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
-import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.FleetOsVulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
@@ -28,9 +23,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
@@ -44,12 +37,12 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
     private final FleetHostResolver fleetHostResolver;
     private final FleetSoftwareCveRepository fleetSoftwareCveRepository;
     private final FleetSoftwareRepository fleetSoftwareRepository;
-    private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
     private final FleetOperatingSystemRepository fleetOperatingSystemRepository;
-    private final DeviceOperatingSystemRepository deviceOperatingSystemRepository;
     private final DeviceCveRepository deviceCveRepository;
+    private final DeviceCveWriter deviceCveWriter;
     private final TenantSoftwareCveAggregator tenantSoftwareCveAggregator;
+    private final SoftwareCascadeSyncService cascadeSyncService;
 
     @Override
     public EventHandlerType getType() {
@@ -107,7 +100,7 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         }
         String version = software == null ? null : software.getVersion();
         for (FleetSoftwareCve sc : cves) {
-            upsert(host.tenantId(), host.machineId(), hostId, sc.getCve(), softwareId, titleId, version,
+            deviceCveWriter.upsert(host.tenantId(), host.machineId(), hostId, sc.getCve(), softwareId, titleId, version,
                     sc.getResolvedInVersion());
         }
         tenantSoftwareCveAggregator.recompute(host.tenantId(), titleId);
@@ -124,34 +117,12 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         if (softwareId == null || cve == null || cve.isBlank()) {
             return;
         }
-
-        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
-        Long softwareTitleId = software == null ? null : software.getSoftwareTitleId();
-        String version = software == null ? null : software.getVersion();
-        String resolvedInVersion = str(row, "resolved_in_version");
-
         if (delete) {
             fleetSoftwareCveRepository.deleteBySoftwareIdAndCve(softwareId, cve);
         } else {
-            upsertCatalog(softwareId, cve, resolvedInVersion);
+            upsertCatalog(softwareId, cve, str(row, "resolved_in_version"));
         }
-
-        Set<String> affectedTenants = new HashSet<>();
-        for (DeviceSoftware ds : deviceSoftwareRepository.findBySoftwareId(softwareId)) {
-            if (delete) {
-                deviceCveRepository.deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId(
-                        ds.getTenantId(), ds.getMachineId(), cve, softwareId);
-            } else {
-                upsert(ds.getTenantId(), ds.getMachineId(), ds.getHostId(), cve, softwareId,
-                        softwareTitleId != null ? softwareTitleId : ds.getSoftwareTitleId(),
-                        version != null ? version : ds.getVersion(),
-                        resolvedInVersion);
-            }
-            affectedTenants.add(ds.getTenantId());
-        }
-        for (String tenant : affectedTenants) {
-            tenantSoftwareCveAggregator.recompute(tenant, softwareTitleId);
-        }
+        cascadeSyncService.enqueueSoftwareCve(softwareId);
     }
 
     private void handleHostOperatingSystem(DebeziumMessage.Payload<JsonNode> payload) {
@@ -181,7 +152,8 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         }
         String version = osVersion(osId);
         for (FleetOsVulnerability ov : cves) {
-            upsert(host.tenantId(), host.machineId(), hostId, ov.getCve(), null, null, version, ov.getResolvedInVersion());
+            deviceCveWriter.upsert(host.tenantId(), host.machineId(), hostId, ov.getCve(), null, null, version,
+                    ov.getResolvedInVersion());
         }
     }
 
@@ -196,24 +168,12 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         if (osId == null || cve == null || cve.isBlank()) {
             return;
         }
-
         if (delete) {
             fleetOsVulnerabilityRepository.deleteByOsIdAndCve(osId, cve);
-            for (DeviceOperatingSystem device : deviceOperatingSystemRepository.findByOsId(osId)) {
-                deviceCveRepository.deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId(
-                        device.getTenantId(), device.getMachineId(), cve, null);
-            }
-            return;
+        } else {
+            upsertOsCatalog(osId, cve, str(row, "resolved_in_version"));
         }
-
-        String resolvedInVersion = str(row, "resolved_in_version");
-        upsertOsCatalog(osId, cve, resolvedInVersion);
-
-        String version = osVersion(osId);
-        for (DeviceOperatingSystem device : deviceOperatingSystemRepository.findByOsId(osId)) {
-            upsert(device.getTenantId(), device.getMachineId(), device.getHostId(), cve, null, null,
-                    device.getVersion() != null ? device.getVersion() : version, resolvedInVersion);
-        }
+        cascadeSyncService.enqueueOsVuln(osId);
     }
 
     private String osVersion(Long osId) {
@@ -240,30 +200,5 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         entry.setResolvedInVersion(resolvedInVersion);
         entry.setUpdatedAt(Instant.now());
         fleetSoftwareCveRepository.save(entry);
-    }
-
-    private void upsert(String tenantId, String machineId, Long hostId, String cve, Long softwareId,
-                        Long softwareTitleId, String installedVersion, String resolvedInVersion) {
-        if (tenantId == null || machineId == null) {
-            return;
-        }
-        DeviceCve deviceCve = deviceCveRepository
-                .findByTenantIdAndMachineIdAndCveIdAndSoftwareId(tenantId, machineId, cve, softwareId)
-                .orElseGet(DeviceCve::new);
-        boolean isNew = deviceCve.getId() == null;
-        Instant now = Instant.now();
-        deviceCve.setTenantId(tenantId);
-        deviceCve.setMachineId(machineId);
-        deviceCve.setHostId(hostId);
-        deviceCve.setCveId(cve);
-        deviceCve.setSoftwareId(softwareId);
-        deviceCve.setSoftwareTitleId(softwareTitleId);
-        deviceCve.setInstalledVersion(installedVersion);
-        deviceCve.setResolvedInVersion(resolvedInVersion);
-        if (isNew || deviceCve.getDiscoveredAt() == null) {
-            deviceCve.setDiscoveredAt(now);
-        }
-        deviceCve.setUpdatedAt(now);
-        deviceCveRepository.save(deviceCve);
     }
 }

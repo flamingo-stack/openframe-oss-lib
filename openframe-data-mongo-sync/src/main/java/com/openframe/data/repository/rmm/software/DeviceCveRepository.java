@@ -18,6 +18,8 @@ public interface DeviceCveRepository extends MongoRepository<DeviceCve, String> 
 
     long deleteByTenantIdAndMachineIdAndSoftwareId(String tenantId, String machineId, Long softwareId);
 
+    List<DeviceCve> findByTenantIdAndMachineIdAndSoftwareId(String tenantId, String machineId, Long softwareId);
+
     long deleteByTenantIdAndMachineIdAndSoftwareIdIsNull(String tenantId, String machineId);
 
     List<DeviceCve> findByTenantIdAndMachineId(String tenantId, String machineId);
