@@ -105,6 +105,7 @@ fn interpret(result: &ExecResult) -> UpgradeOutcome {
         return UpgradeOutcome::TimedOut;
     }
     match result.retcode {
+        0 if is_already_latest(result) => UpgradeOutcome::AlreadyLatest,
         0 => UpgradeOutcome::Upgraded {
             reboot_required: false,
         },
@@ -117,6 +118,12 @@ fn interpret(result: &ExecResult) -> UpgradeOutcome {
             message: format!("brew exited {code}: {}", last_line(&result.stderr)),
         },
     }
+}
+
+/// brew exits 0 with a warning when nothing was upgraded; an actual upgrade announces itself.
+fn is_already_latest(result: &ExecResult) -> bool {
+    let output = format!("{}\n{}", result.stdout, result.stderr);
+    !output.contains("==> Upgrading") && output.contains("already installed")
 }
 
 #[cfg(test)]

@@ -33,6 +33,22 @@ fn without_an_identity_a_missing_image_is_not_searched() {
 }
 
 #[test]
+fn the_shallowest_match_wins() {
+    let dir = tempfile::tempdir().unwrap();
+    let main = dir.path().join("bin").join("app.exe");
+    let helper = dir.path().join("resources").join("helpers").join("app.exe");
+    for path in [&main, &helper] {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"").unwrap();
+    }
+
+    assert_eq!(
+        find_named(dir.path(), OsStr::new("app.exe"), SEARCH_DEPTH),
+        Some(main)
+    );
+}
+
+#[test]
 fn the_search_depth_is_bounded() {
     let dir = tempfile::tempdir().unwrap();
     let deep = dir

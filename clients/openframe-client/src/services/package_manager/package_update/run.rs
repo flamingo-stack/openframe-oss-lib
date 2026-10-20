@@ -7,10 +7,11 @@ use super::orders::Order;
 use super::status::{self, Report};
 use super::{close, relaunch, Worker};
 use crate::models::{
-    Done, DoneResult, FailReason, Failed, HolderInfo, UpdateMode, WaitPhase, WaitReason, Waiting,
+    Done, DoneResult, FailReason, Failed, HolderInfo, PackageRef, UpdateMode, WaitPhase,
+    WaitReason, Waiting,
 };
 use crate::services::package_manager::update_gate::{
-    self, AppIdentity, BlockReason, GateDecision, Holder, Prepared,
+    self, BlockReason, GateDecision, Holder, Prepared, Undetermined,
 };
 use crate::services::package_manager::{is_supported, ManagerId, Presence};
 
@@ -24,17 +25,19 @@ const BUSY_BUDGET_SECS: u64 = 60 * 60;
 /// How long a manager's presence and outdated answer stay trusted.
 const PROBE_TTL_SECS: u64 = 4 * 60 * 60;
 
-/// What the worker remembers about one order between looks; gone after a restart by design,
-/// so an interrupted countdown starts over in full.
+/// What the worker remembers about one order between looks; lost on restart, so a countdown restarts in full.
 #[derive(Default)]
 pub(super) struct Progress {
-    revision: Option<u64>,
+    pub(super) revision: Option<u64>,
     present_at: Option<u64>,
     probe: Option<Probe>,
     prepared: Option<Arc<Prepared>>,
     countdown: Option<u64>,
+    /// The apps a forced close stopped; relaunched once the order ends.
+    closed: Vec<Holder>,
     busy_since: Option<u64>,
     unseen_since: Option<u64>,
+    held: Hold,
     last_report: Option<ReportKey>,
     /// Unix seconds before which the order is not looked at again.
     pub(super) next_at: u64,
@@ -44,6 +47,15 @@ struct Probe {
     installed: Option<String>,
     available: Option<String>,
     at: u64,
+}
+
+/// What a look ended up waiting on; the other clock is cleared when a look ends without it.
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+enum Hold {
+    #[default]
+    None,
+    Busy,
+    Unseen,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +74,24 @@ pub(super) enum Verdict {
 impl Worker {
     /// One look at an order: reports where it stands and installs when it may.
     pub(super) async fn look(
+        &self,
+        machine_id: &str,
+        order: &Order,
+        p: &mut Progress,
+        now: u64,
+    ) -> Verdict {
+        p.held = Hold::None;
+        let verdict = self.look_inner(machine_id, order, p, now).await;
+        if p.held != Hold::Busy {
+            p.busy_since = None;
+        }
+        if p.held != Hold::Unseen {
+            p.unseen_since = None;
+        }
+        verdict
+    }
+
+    async fn look_inner(
         &self,
         machine_id: &str,
         order: &Order,
@@ -120,17 +150,13 @@ impl Worker {
         {
             match managers::outdated(manager).await {
                 Ok(outdated) => {
-                    let Some(found) = outdated.into_iter().find(|o| o.package == order.package)
+                    let Some(found) = outdated
+                        .into_iter()
+                        .find(|o| same_package(&o.package, &order.package))
                     else {
+                        p.probe = None;
                         return self
-                            .done(
-                                machine_id,
-                                order,
-                                p,
-                                DoneResult::AlreadyLatest,
-                                false,
-                                false,
-                            )
+                            .done(machine_id, order, p, DoneResult::AlreadyLatest, false)
                             .await;
                     };
                     p.probe = Some(Probe {
@@ -166,9 +192,8 @@ impl Worker {
                 prepared
             }
         };
-        let identity = prepared.identity(&order.package);
         match prepared.check_now(&order.package).await {
-            GateDecision::Clear => self.install(machine_id, order, p, now, &[], identity).await,
+            GateDecision::Clear => self.install(machine_id, order, p, now).await,
             GateDecision::Blocked(BlockReason::Running { holders }) => match order.mode {
                 UpdateMode::Wait => {
                     self.report_waiting(
@@ -185,18 +210,46 @@ impl Worker {
                         next_at: now + POLL_SECS,
                     }
                 }
-                UpdateMode::Force => {
-                    self.countdown(machine_id, order, p, now, holders, identity)
-                        .await
-                }
+                UpdateMode::Force => self.countdown(machine_id, order, p, now, holders).await,
             },
             GateDecision::Blocked(BlockReason::Undetermined(reason)) => {
-                info!(
-                    request_id = %order.request_id,
-                    %reason,
-                    "Cannot tell whether the app is running, letting the package manager decide"
-                );
-                self.install(machine_id, order, p, now, &[], identity).await
+                // A failed resolution is not kept: the next look resolves the identity again.
+                p.prepared = None;
+                self.undetermined(machine_id, order, p, now, reason).await
+            }
+        }
+    }
+
+    /// The gate cannot see the app: nothing to hold for some reasons, a transient failure for others.
+    async fn undetermined(
+        &self,
+        machine_id: &str,
+        order: &Order,
+        p: &mut Progress,
+        now: u64,
+        reason: Undetermined,
+    ) -> Verdict {
+        match reason {
+            Undetermined::NotInstalled | Undetermined::ManagerUnsupported => {
+                info!(request_id = %order.request_id, %reason, "Nothing to hold the update, installing");
+                self.install(machine_id, order, p, now).await
+            }
+            reason => {
+                let budget_spent = p
+                    .busy_since
+                    .is_some_and(|since| now >= since + BUSY_BUDGET_SECS);
+                if order.mode == UpdateMode::Force && budget_spent {
+                    warn!(request_id = %order.request_id, %reason, "Still cannot tell whether the app is running, forcing the install blind");
+                    return self.install(machine_id, order, p, now).await;
+                }
+                self.busy(
+                    machine_id,
+                    order,
+                    p,
+                    now,
+                    &format!("cannot tell whether the app is running: {reason}"),
+                )
+                .await
             }
         }
     }
@@ -208,7 +261,6 @@ impl Worker {
         p: &mut Progress,
         now: u64,
         holders: Vec<Holder>,
-        identity: Option<&AppIdentity>,
     ) -> Verdict {
         let closes_at = *p
             .countdown
@@ -229,8 +281,15 @@ impl Worker {
             };
         }
         info!(request_id = %order.request_id, ?holders, "Countdown over, closing the app to update it");
+        // Held through the install: a restart between the close and the install would strand the user.
+        let _running = self.package_upgrades.begin();
         let pids: Vec<u32> = holders.iter().map(|holder| holder.pid).collect();
         let survivors = close::close(&pids).await;
+        p.countdown = None;
+        p.closed = holders
+            .into_iter()
+            .filter(|holder| !survivors.contains(&holder.pid))
+            .collect();
         if !survivors.is_empty() {
             return self
                 .fail(
@@ -243,8 +302,7 @@ impl Worker {
                 )
                 .await;
         }
-        self.install(machine_id, order, p, now, &holders, identity)
-            .await
+        self.install(machine_id, order, p, now).await
     }
 
     async fn install(
@@ -253,44 +311,30 @@ impl Worker {
         order: &Order,
         p: &mut Progress,
         now: u64,
-        closed: &[Holder],
-        identity: Option<&AppIdentity>,
     ) -> Verdict {
         let outcome = {
             let _running = self.package_upgrades.begin();
-            managers::upgrade(&order.package).await
+            self.orders.set_installing(Some(&order.request_id));
+            let outcome = managers::upgrade(&order.package).await;
+            self.orders.set_installing(None);
+            outcome
         };
         info!(request_id = %order.request_id, ?outcome, "Package update attempt finished");
         match outcome {
             UpgradeOutcome::Upgraded { reboot_required } => {
-                let relaunched = !closed.is_empty() && relaunch::relaunch(closed, identity).await;
-                self.done(
-                    machine_id,
-                    order,
-                    p,
-                    DoneResult::Upgraded,
-                    reboot_required,
-                    relaunched,
-                )
-                .await
+                self.done(machine_id, order, p, DoneResult::Upgraded, reboot_required)
+                    .await
             }
             UpgradeOutcome::AlreadyLatest => {
-                let relaunched = !closed.is_empty() && relaunch::relaunch(closed, identity).await;
-                self.done(
-                    machine_id,
-                    order,
-                    p,
-                    DoneResult::AlreadyLatest,
-                    false,
-                    relaunched,
-                )
-                .await
+                self.done(machine_id, order, p, DoneResult::AlreadyLatest, false)
+                    .await
             }
-            UpgradeOutcome::InUse(reason) if !closed.is_empty() => {
+            UpgradeOutcome::InUse(reason) if !p.closed.is_empty() => {
                 self.fail(machine_id, order, p, FailReason::CloseFailed, None, reason)
                     .await
             }
             UpgradeOutcome::InUse(reason) => {
+                p.held = Hold::Unseen;
                 let since = *p.unseen_since.get_or_insert(now);
                 if order.mode == UpdateMode::Force && now >= since + BUSY_BUDGET_SECS {
                     return self
@@ -346,6 +390,7 @@ impl Worker {
         now: u64,
         reason: &str,
     ) -> Verdict {
+        p.held = Hold::Busy;
         let since = *p.busy_since.get_or_insert(now);
         if now >= since + BUSY_BUDGET_SECS {
             return self
@@ -398,10 +443,18 @@ impl Worker {
             return;
         }
         p.last_report = Some(key);
+        let user = if holders.is_empty() {
+            None
+        } else {
+            console_user_name()
+        };
         let waiting = Waiting {
             reason,
             phase,
-            holders: holders.iter().map(holder_info).collect(),
+            holders: holders
+                .iter()
+                .map(|holder| holder_info(holder, user.clone()))
+                .collect(),
             closes_at: closes_at.map(status::rfc3339),
         };
         self.status
@@ -416,8 +469,8 @@ impl Worker {
         p: &mut Progress,
         result: DoneResult,
         reboot_required: bool,
-        relaunched: bool,
     ) -> Verdict {
+        let relaunched = self.relaunch_closed(order, p).await;
         let done = Done {
             result,
             reboot_required,
@@ -439,6 +492,7 @@ impl Worker {
         message: String,
     ) -> Verdict {
         warn!(request_id = %order.request_id, ?reason, %message, "Package update failed");
+        self.relaunch_closed(order, p).await;
         let failed = Failed {
             reason,
             exit_code,
@@ -448,6 +502,19 @@ impl Worker {
             .report(self.event(machine_id, order, p, Report::Failed(failed)))
             .await;
         Verdict::Finished
+    }
+
+    /// Brings back what a forced close stopped, whatever the install came to.
+    async fn relaunch_closed(&self, order: &Order, p: &mut Progress) -> bool {
+        let closed = std::mem::take(&mut p.closed);
+        if closed.is_empty() {
+            return false;
+        }
+        let identity = p
+            .prepared
+            .as_ref()
+            .and_then(|prepared| prepared.identity(&order.package));
+        relaunch::relaunch(&closed, identity).await
     }
 
     fn event(
@@ -468,16 +535,21 @@ impl Worker {
     }
 }
 
-fn holder_info(holder: &Holder) -> HolderInfo {
+/// Winget ids are case-insensitive; the rest compare as written.
+fn same_package(a: &PackageRef, b: &PackageRef) -> bool {
+    match (a, b) {
+        (PackageRef::Winget { id: x }, PackageRef::Winget { id: y }) => x.eq_ignore_ascii_case(y),
+        _ => a == b,
+    }
+}
+
+fn holder_info(holder: &Holder, user: Option<String>) -> HolderInfo {
     let app = holder
         .image
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| holder.image.to_string_lossy().into_owned());
-    HolderInfo {
-        app,
-        user: console_user_name(),
-    }
+    HolderInfo { app, user }
 }
 
 #[cfg(target_os = "macos")]
@@ -489,3 +561,7 @@ fn console_user_name() -> Option<String> {
 fn console_user_name() -> Option<String> {
     None
 }
+
+#[cfg(test)]
+#[path = "run_tests.rs"]
+mod tests;

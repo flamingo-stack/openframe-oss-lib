@@ -51,6 +51,9 @@ struct Orders {
     pending: Vec<Order>,
     #[serde(default)]
     finished: Vec<Finished>,
+    /// The request whose install is running right now; never persisted.
+    #[serde(skip)]
+    installing: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -63,8 +66,7 @@ pub enum Submitted {
     Superseded(Order),
 }
 
-/// The pending update orders, persisted so they survive a restart; the worker learns about a
-/// change through [`OrderStore::changed`].
+/// The pending update orders, persisted to survive a restart; the worker learns of a change through `changed`.
 pub struct OrderStore {
     path: PathBuf,
     state: Mutex<Orders>,
@@ -112,6 +114,7 @@ impl OrderStore {
             }
             next = Orders {
                 machine_id: machine_id.to_string(),
+                installing: next.installing,
                 ..Orders::default()
             };
         }
@@ -146,10 +149,14 @@ impl OrderStore {
                 None
             }
             None => {
+                // An order whose install is running finishes on its own; the new one follows it.
                 let replaced = next
                     .pending
                     .iter()
-                    .position(|order| order.package == message.package)
+                    .position(|order| {
+                        order.package == message.package
+                            && next.installing.as_deref() != Some(order.request_id.as_str())
+                    })
                     .map(|index| next.pending.remove(index));
                 next.pending.push(Order {
                     request_id: message.request_id,
@@ -175,9 +182,13 @@ impl OrderStore {
         })
     }
 
-    /// Pending orders, most urgent first: manual before automatic, then oldest first.
-    pub fn pending(&self) -> Vec<Order> {
-        let mut pending = self.state().pending.clone();
+    /// The pending orders of `machine_id`, most urgent first: manual before automatic, then oldest first.
+    pub fn pending(&self, machine_id: &str) -> Vec<Order> {
+        let state = self.state();
+        if state.machine_id != machine_id {
+            return Vec::new();
+        }
+        let mut pending = state.pending.clone();
         pending.sort_by(|a, b| a.priority().cmp(&b.priority()));
         pending
     }
@@ -190,29 +201,41 @@ impl OrderStore {
             .cloned()
     }
 
+    /// Marks the request whose install is running, so a newer request for its package waits for it.
+    pub fn set_installing(&self, request_id: Option<&str>) {
+        self.state().installing = request_id.map(str::to_string);
+    }
+
     /// Drops a finished request and remembers its sequence, so a late re-send is stale.
-    pub fn finish(&self, request_id: &str, sequence: i64) -> Result<()> {
+    pub fn finish(&self, request_id: &str) -> Result<()> {
         let mut state = self.state();
         let mut next = state.clone();
-        next.pending.retain(|order| order.request_id != request_id);
+        let Some(index) = next
+            .pending
+            .iter()
+            .position(|order| order.request_id == request_id)
+        else {
+            return Ok(());
+        };
+        let order = next.pending.remove(index);
         next.finished.retain(|f| f.request_id != request_id);
         next.finished.push(Finished {
             request_id: request_id.to_string(),
-            sequence,
+            sequence: order.sequence,
         });
         if next.finished.len() > FINISHED_MEMORY {
             let excess = next.finished.len() - FINISHED_MEMORY;
             next.finished.drain(..excess);
         }
-        self.persist(&next)?;
+        // The memory moves on even when the disk does not: a restart re-runs the order once, a loop never.
+        let persisted = self.persist(&next);
         *state = next;
         drop(state);
         self.changed.notify_one();
-        Ok(())
+        persisted
     }
 
-    /// Resolves once the orders have changed since the last call; a change made while nobody
-    /// waits is not lost.
+    /// Resolves once the orders have changed since the last call; a change made while nobody waits is kept.
     pub async fn changed(&self) {
         self.changed.notified().await;
     }

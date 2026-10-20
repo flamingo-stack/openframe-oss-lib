@@ -65,6 +65,19 @@ fn exit_codes_map_to_outcomes() {
         UpgradeOutcome::Busy(_)
     ));
     assert_eq!(
+        interpret(&exited(0, "Warning: postman 11.2.0 already installed\n")),
+        UpgradeOutcome::AlreadyLatest
+    );
+    assert_eq!(
+        interpret(&ExecResult {
+            stdout: "==> Upgrading postman\n  11.1.0 -> 11.2.0\n".to_string(),
+            ..exited(0, "Warning: node 20.1.0 already installed\n")
+        }),
+        UpgradeOutcome::Upgraded {
+            reboot_required: false
+        }
+    );
+    assert_eq!(
         interpret(&exited(1, "Error: Cask 'x' is not installed.\n")),
         UpgradeOutcome::Failed {
             exit_code: 1,

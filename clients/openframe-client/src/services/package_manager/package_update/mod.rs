@@ -89,7 +89,7 @@ async fn run(worker: Arc<Worker>) {
                 continue;
             }
         };
-        let pending = worker.orders.pending();
+        let pending = worker.orders.pending(&machine_id);
         progress.retain(|request_id, _| pending.iter().any(|o| &o.request_id == request_id));
         if pending.is_empty() {
             worker.orders.changed().await;
@@ -104,7 +104,8 @@ async fn run(worker: Arc<Worker>) {
                 break;
             }
             let p = progress.entry(order.request_id.clone()).or_default();
-            if p.next_at > now {
+            // A re-sent order is looked at at once, whatever its schedule.
+            if p.next_at > now && p.revision == Some(order.revision) {
                 next_wake = next_wake.min(p.next_at);
                 continue;
             }
@@ -119,7 +120,7 @@ async fn run(worker: Arc<Worker>) {
                 }
                 Verdict::Finished => {
                     progress.remove(&current.request_id);
-                    if let Err(e) = worker.orders.finish(&current.request_id, current.sequence) {
+                    if let Err(e) = worker.orders.finish(&current.request_id) {
                         warn!(request_id = %current.request_id, "Failed to persist a finished order: {:#}", e);
                     }
                 }

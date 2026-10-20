@@ -144,7 +144,7 @@ pub(super) fn build(
         event_id: uuid::Uuid::new_v4().to_string(),
         request_id: order.request_id.clone(),
         machine_id: machine_id.to_string(),
-        at: Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+        at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         source: order.source.clone(),
         package: order.package.clone(),
         installed_version: installed_version.map(str::to_string),

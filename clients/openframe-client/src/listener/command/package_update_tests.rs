@@ -80,7 +80,7 @@ async fn an_order_is_stored_and_done_at_once() {
         .await;
 
     assert_eq!(outcome, Outcome::Done);
-    let pending = f.orders.pending();
+    let pending = f.orders.pending(MACHINE);
     assert_eq!(pending.len(), 1);
     assert_eq!(pending[0].mode, UpdateMode::Wait);
     assert!(f.events.lock().unwrap().is_empty(), "nothing to report yet");
@@ -100,7 +100,7 @@ async fn an_order_without_a_sequence_fails() {
         .await;
 
     assert!(matches!(outcome, Outcome::Failed(_)));
-    assert!(f.orders.pending().is_empty());
+    assert!(f.orders.pending(MACHINE).is_empty());
 }
 
 #[tokio::test]
@@ -117,7 +117,7 @@ async fn an_unsupported_manager_is_refused_and_dropped() {
     let outcome = f.handler.run(MACHINE, &delivery(Some(1)), command).await;
 
     assert!(matches!(outcome, Outcome::Failed(_)));
-    assert!(f.orders.pending().is_empty());
+    assert!(f.orders.pending(MACHINE).is_empty());
 }
 
 #[tokio::test]
@@ -141,7 +141,7 @@ async fn a_stale_sequence_is_done_without_changing_the_order() {
         .await;
 
     assert_eq!(outcome, Outcome::Done);
-    assert_eq!(f.orders.pending()[0].mode, UpdateMode::Wait);
+    assert_eq!(f.orders.pending(MACHINE)[0].mode, UpdateMode::Wait);
 }
 
 #[tokio::test]
@@ -173,7 +173,7 @@ async fn a_superseded_order_is_reported_as_failed() {
         events[0].failed.as_ref().map(|failed| failed.reason),
         Some(FailReason::Superseded)
     );
-    assert_eq!(f.orders.pending()[0].request_id, "req-2");
+    assert_eq!(f.orders.pending(MACHINE)[0].request_id, "req-2");
 }
 
 #[test]

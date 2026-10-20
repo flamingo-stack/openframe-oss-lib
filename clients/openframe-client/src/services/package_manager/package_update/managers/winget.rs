@@ -7,11 +7,7 @@ use super::{
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
 
-/// Packages with an update available, with their versions. Rows without a source (not
-/// installed from winget or the Store) and with an inexact installed version (`< 1.2`,
-/// `> 1.2`) are left out: winget cannot upgrade the former and reports the latter as
-/// outdated forever. Without the WinGet PowerShell module there is nothing to query: a
-/// distinct exit code says so.
+/// Updatable rows with versions; sourceless or inexact-version rows are skipped, exit 3 means no WinGet module.
 const OUTDATED_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) { exit 3 }

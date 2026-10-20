@@ -37,7 +37,11 @@ fn a_built_event_carries_the_order_and_a_fresh_id() {
     assert!(event.done.as_ref().is_some_and(|d| d.reboot_required));
     assert!(event.waiting.is_none() && event.failed.is_none());
     assert!(uuid::Uuid::parse_str(&event.event_id).is_ok());
-    assert!(event.at.ends_with('Z'), "{}", event.at);
+    assert!(
+        event.at.ends_with('Z') && event.at.contains('.'),
+        "{}",
+        event.at
+    );
 }
 
 #[test]

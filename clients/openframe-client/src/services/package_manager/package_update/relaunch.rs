@@ -36,25 +36,32 @@ fn locate(image: &Path, identity: Option<&AppIdentity>) -> Option<PathBuf> {
     find_named(install_dir, image.file_name()?, SEARCH_DEPTH)
 }
 
+/// Breadth first, so a main executable near the top wins over a helper buried in resources.
 fn find_named(dir: &Path, name: &OsStr, depth: usize) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(dir).ok()?;
-    let mut subdirs = Vec::new();
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_file()
-            && path
-                .file_name()
-                .is_some_and(|n| n.eq_ignore_ascii_case(name))
-        {
-            return Some(path);
+    let mut level = vec![dir.to_path_buf()];
+    for _ in 0..=depth {
+        let mut next = Vec::new();
+        for dir in &level {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file()
+                    && path
+                        .file_name()
+                        .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                {
+                    return Some(path);
+                }
+                if path.is_dir() {
+                    next.push(path);
+                }
+            }
         }
-        if depth > 0 && path.is_dir() {
-            subdirs.push(path);
-        }
+        level = next;
     }
-    subdirs
-        .into_iter()
-        .find_map(|subdir| find_named(&subdir, name, depth - 1))
+    None
 }
 
 #[cfg(target_os = "macos")]

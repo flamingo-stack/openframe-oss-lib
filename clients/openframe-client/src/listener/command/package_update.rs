@@ -12,8 +12,7 @@ const DEFAULT_COUNTDOWN_SECS: u64 = 300;
 const MIN_COUNTDOWN_SECS: u64 = 60;
 const MAX_COUNTDOWN_SECS: u64 = 1800;
 
-/// Takes update orders in; the receipt is DONE once the order is on disk, the outcome comes
-/// later on the status stream.
+/// Takes update orders in: DONE once the order is on disk, the outcome follows on the status stream.
 #[derive(Clone)]
 pub struct PackageUpdateHandler {
     orders: Arc<OrderStore>,
