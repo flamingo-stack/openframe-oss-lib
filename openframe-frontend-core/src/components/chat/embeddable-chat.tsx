@@ -95,7 +95,7 @@ import type { UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
 import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
-import { MingoChatHeader } from './mingo-chat-header';
+import { MingoChatHeader, type MingoChatHeaderAction } from './mingo-chat-header';
 import type { MingoDialogStatus } from './mingo-chat-list-shared';
 import { ChatDialogModals } from './mingo-chat-modals';
 import { MingoChatRail } from './mingo-chat-rail';
@@ -551,6 +551,12 @@ export interface EmbeddableChatProps {
    * holds the thread and the composer (`AppLayout`'s `pageSurface="mingo"`).
    */
   threadContainer?: HTMLElement | null;
+  /**
+   * Icon cells at the end of the header portalled into `threadContainer`, after the
+   * chat's ⋯ — what the host that shows the thread there adds (a sheet's "Open as
+   * full chat" and "Back to page"). Split layout only.
+   */
+  threadHeaderActions?: ReadonlyArray<MingoChatHeaderAction>;
 
   /** The model + token row under the composer. `false` hides it (e.g. a home
    *  page that has no chat yet). Default `true`. */
@@ -565,6 +571,12 @@ export interface EmbeddableChatProps {
   /** Controls under the input, at the end of the model row (e.g. "Compact chat
    *  memory" as a button rather than in the composer's ⋯). */
   composerFooterActions?: React.ReactNode;
+  /**
+   * A host control at the start of the composer's context strip — e.g. a chat
+   * minimised behind the page ("Continue <chat>"). The strip shows for it even
+   * with nothing remembered.
+   */
+  composerContextLeading?: React.ReactNode;
   /** The composer's prompt. Default: "Enter your Request..." (v2) /
    *  "Ask a question..." (classic). Uploads in flight still say so instead. */
   composerPlaceholder?: string;
@@ -1169,11 +1181,13 @@ function EmbeddableChatInner({
   chatMenuExtraItems,
   rail = 'auto',
   threadContainer,
+  threadHeaderActions,
   showModel = true,
   onModelClick,
   modelTooltip,
   composerMenuItems,
   composerFooterActions,
+  composerContextLeading,
   composerPlaceholder,
   renameMode = 'modal',
   safeAreaBottom = true,
@@ -3032,6 +3046,7 @@ function EmbeddableChatInner({
       onToggleContextItem={toggleContextItem}
       onRemoveContextItem={removeContextItem}
       contextMemoryItems={contextMemory?.items}
+      contextLeading={composerContextLeading}
       onRemoveContextMemoryItem={contextMemory?.onRemove}
       contextPickerOpen={contextPickerOpen}
       onOpenContextPicker={openContextPicker}
@@ -3440,6 +3455,7 @@ function EmbeddableChatInner({
       renaming={inlineRenaming && !archiveOpen}
       onRenameSubmit={submitInlineRename}
       onRenameCancel={cancelInlineRename}
+      actions={threadHeaderActions}
     />
   );
 

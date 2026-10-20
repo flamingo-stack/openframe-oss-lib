@@ -69,6 +69,9 @@ export interface ChatComposerProps {
    *  as a summary strip at the top of the composer card, above the assigned-item
    *  chips. Empty/omitted → no strip. */
   contextMemoryItems?: ChatContextItem[];
+  /** A host control at the start of the context memory strip (e.g. "Continue
+   *  <chat>"); the strip shows for it alone when nothing is remembered. */
+  contextLeading?: ReactNode;
   /** Drop one entity from the context memory (dropdown row ×). */
   onRemoveContextMemoryItem?: (item: ChatContextItem) => void;
   /** Controlled picker open state. */
@@ -122,6 +125,7 @@ export function ChatComposer({
   onToggleContextItem,
   onRemoveContextItem,
   contextMemoryItems,
+  contextLeading,
   onRemoveContextMemoryItem,
   contextPickerOpen = false,
   onOpenContextPicker,
@@ -267,6 +271,7 @@ export function ChatComposer({
                 onRemove={onRemoveContextMemoryItem}
                 resolveIcon={resolveContextIcon}
                 disabled={sending || locked}
+                leading={contextLeading}
                 className="rounded-t-md"
               />
               {selected.length > 0 && (
@@ -278,7 +283,7 @@ export function ChatComposer({
                   className={cn(
                     'border-b border-ods-border bg-ods-bg p-2',
                     // Only the TOP strip rounds into the card corner.
-                    memory.length === 0 && 'rounded-t-md',
+                    memory.length === 0 && !contextLeading && 'rounded-t-md',
                   )}
                 />
               )}

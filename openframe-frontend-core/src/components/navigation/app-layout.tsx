@@ -72,6 +72,20 @@ export interface AppLayoutProps {
    */
   composerDock?: ReactNode;
   /**
+   * A layer over the page that ends at the `composerDock`'s top edge — the
+   * conversation sheet that rises from the composer over the page (a scrim over
+   * the page, the thread above the composer). The layer spans the page column,
+   * takes no pointer events itself (what the host draws in it opts in with
+   * `pointer-events-auto`) and is the positioning box for it: anchor the sheet to
+   * its bottom. It follows the dock's height as the composer grows. It is a
+   * content area like the dock, so `content-md:` / `content-lg:` and
+   * `useContentBreakpoint()` answer from the column's width. Above the page's own
+   * layers (sticky bars, the `contentCorner`), under in-layout drawers and modals.
+   * Only with a `composerDock`; omitted, `null` or `false` draws nothing and the
+   * page is unchanged.
+   */
+  composerSheet?: ReactNode;
+  /**
    * Paints the page column — the page and the `composerDock` under it — as one
    * surface: that surface's ground and the accent corner glow, so a chat page's
    * background runs under the composer to the bottom of the window (`'mingo'`,
@@ -131,6 +145,7 @@ export function AppLayout({
   topBar,
   sidePanel,
   composerDock,
+  composerSheet,
   pageSurface,
   desktopHeader = true,
   contentCorner,
@@ -143,6 +158,8 @@ export function AppLayout({
   const [drawerContainer, setDrawerContainer] = useState<HTMLDivElement | null>(null);
   const [mainElement, setMainElement] = useState<HTMLElement | null>(null);
   const [contentWidth, setContentWidth] = useState<number | null>(null);
+  const [dockElement, setDockElement] = useState<HTMLDivElement | null>(null);
+  const [dockHeight, setDockHeight] = useState(0);
 
   const hasSidePanel = sidePanel !== undefined;
   const hasDock = composerDock !== undefined;
@@ -165,6 +182,18 @@ export function AppLayout({
     return () => observer.disconnect();
   }, [adaptive, mainElement]);
   const contentAreaWidth = adaptive ? contentWidth : null;
+
+  // The sheet layer ends where the dock begins, and the dock grows with the
+  // composer (a longer draft, a staged attachment): follow its height.
+  const hasSheet = hasDock && composerSheet != null && composerSheet !== false;
+  useIsomorphicLayoutEffect(() => {
+    if (!hasSheet || !dockElement) return undefined;
+    const update = () => setDockHeight(dockElement.offsetHeight);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(dockElement);
+    return () => observer.disconnect();
+  }, [hasSheet, dockElement]);
 
   // With a side panel the header's Mingo button only exists while the panel
   // cannot dock: it opens the panel over the content and closes it again.
@@ -343,10 +372,24 @@ export function AppLayout({
                       <div className={adaptive ? 'ods-content-scope' : 'contents'}>{children}</div>
                     </ContentAreaWidthContext.Provider>
                   </main>
+                  {hasSheet && (
+                    // Over the page down to the dock's top edge. z-40: the
+                    // layer of the corner and the page's own sticky bars' top —
+                    // in-layout drawers (45) and modals still cover it.
+                    <div
+                      data-composer-sheet-layer=""
+                      className="ods-content-area pointer-events-none absolute inset-x-0 top-0 z-40"
+                      style={{ bottom: dockHeight }}
+                    >
+                      <ContentAreaWidthContext.Provider value={contentAreaWidth}>
+                        <div className="ods-content-scope">{composerSheet}</div>
+                      </ContentAreaWidthContext.Provider>
+                    </div>
+                  )}
                   {hasDock && (
                     // Its own container + token scope: a container query cannot
                     // reach from <main> to a sibling. Same column width.
-                    <div className="ods-content-area shrink-0">
+                    <div ref={setDockElement} className="ods-content-area shrink-0">
                       <ContentAreaWidthContext.Provider value={contentAreaWidth}>
                         <div className="ods-content-scope">{composerDock}</div>
                       </ContentAreaWidthContext.Provider>

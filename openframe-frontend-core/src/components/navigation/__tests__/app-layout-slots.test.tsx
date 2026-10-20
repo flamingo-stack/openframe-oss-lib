@@ -22,7 +22,10 @@ const SIDE_PANEL: NonNullable<AppLayoutProps['sidePanel']> = {
   children: ({ mode }) => <p>panel {mode}</p>,
 };
 
-type SlotProps = Pick<AppLayoutProps, 'sidePanel' | 'composerDock' | 'contentCorner' | 'desktopHeader'>;
+type SlotProps = Pick<
+  AppLayoutProps,
+  'sidePanel' | 'composerDock' | 'composerSheet' | 'contentCorner' | 'desktopHeader'
+>;
 
 function layout(props: SlotProps, children: ReactNode = <Page />) {
   return (
@@ -118,6 +121,42 @@ describe('AppLayout composerDock', () => {
     expect(markup()).toMatch(
       /<div class="contents"><main class="flex-1 overflow-y-auto"><div class="contents"><h1>Page<\/h1><\/div><\/main><\/div>/,
     );
+  });
+});
+
+describe('AppLayout composerSheet', () => {
+  afterEach(() => {
+    mounts.count = 0;
+    vi.restoreAllMocks();
+  });
+
+  it('lays the sheet over the page, between <main> and the dock, outside the scroll container', () => {
+    render(layout({ composerDock: <p>dock</p>, composerSheet: <p>sheet</p> }));
+    expect(within(screen.getByRole('main')).queryByText('sheet')).not.toBeInTheDocument();
+    expect(markup()).toMatch(
+      /<\/main><div data-composer-sheet-layer="" class="ods-content-area pointer-events-none absolute inset-x-0 top-0 z-40" style="bottom: 0px;"><div class="ods-content-scope"><p>sheet<\/p><\/div><\/div><div class="ods-content-area shrink-0">/,
+    );
+  });
+
+  it('draws no layer for an empty sheet, nor without a dock', () => {
+    const { rerender } = render(layout({ composerDock: <p>dock</p>, composerSheet: null }));
+    expect(markup()).not.toContain('data-composer-sheet-layer');
+    rerender(layout({ composerSheet: <p>sheet</p> }));
+    expect(screen.queryByText('sheet')).not.toBeInTheDocument();
+  });
+
+  it('keeps the page and the dock mounted while the sheet comes and goes', () => {
+    const { rerender } = render(layout({ composerDock: <p>dock</p> }));
+    rerender(layout({ composerDock: <p>dock</p>, composerSheet: <p>sheet</p> }));
+    rerender(layout({ composerDock: <p>dock</p>, composerSheet: false }));
+    rerender(layout({ composerDock: <p>dock</p>, composerSheet: <p>sheet</p> }));
+    expect(mounts.count).toBe(1);
+  });
+
+  it('hands the sheet the measured content width', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600);
+    render(layout({ composerDock: <p>dock</p>, composerSheet: <BreakpointProbe name="sheet" /> }));
+    expect(screen.getByText('sheet mobile')).toBeInTheDocument();
   });
 });
 

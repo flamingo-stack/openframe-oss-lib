@@ -46,6 +46,7 @@ export * from './msp-organization-card-skeleton';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
 export * from './mingo-archive-list';
+export * from './composer-sheet';
 export * from './mingo-chat-header';
 export * from './mingo-chat-rail';
 export { MingoChatSearchModal, type MingoChatSearchModalProps } from './mingo-chat-history-section';

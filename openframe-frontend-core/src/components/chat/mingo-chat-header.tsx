@@ -1,11 +1,21 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderRenameField } from './chat-header-rename-field';
+
+/** An icon cell at the header's end, after the ⋯ (e.g. "Open as full chat", "Back to page"). */
+export interface MingoChatHeaderAction {
+  id: string;
+  /** The cell's accessible name and tooltip. */
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+}
 
 export interface MingoChatHeaderProps {
   /**
@@ -44,6 +54,8 @@ export interface MingoChatHeaderProps {
   onRenameSubmit?: (title: string) => void;
   /** Escape in the rename field. */
   onRenameCancel?: () => void;
+  /** Icon cells after the ⋯, in order — what the host that shows the chat adds (either variant). */
+  actions?: ReadonlyArray<MingoChatHeaderAction>;
 }
 
 /**
@@ -68,6 +80,7 @@ export function MingoChatHeader({
   renaming = false,
   onRenameSubmit,
   onRenameCancel,
+  actions = [],
 }: MingoChatHeaderProps) {
   const isPage = variant === 'page';
   const menuGroups: ActionsMenuGroup[] = [
@@ -147,6 +160,11 @@ export function MingoChatHeader({
           }
         />
       )}
+      {actions.map(action => (
+        <ChatHeaderIconButton key={action.id} onClick={action.onClick} aria-label={action.label} title={action.label}>
+          {action.icon}
+        </ChatHeaderIconButton>
+      ))}
       {!isPage && onCollapse && (
         <ChatHeaderIconButton onClick={onCollapse} aria-label="Collapse chat">
           <Arrow02RightIcon size={24} />
