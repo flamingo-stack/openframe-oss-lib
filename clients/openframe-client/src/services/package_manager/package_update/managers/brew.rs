@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
-use super::{last_line, QueryError, UpgradeOutcome, OUTDATED_TIMEOUT_SECS, UPGRADE_TIMEOUT_SECS};
+use super::{
+    last_line, OutdatedPackage, QueryError, UpgradeOutcome, OUTDATED_TIMEOUT_SECS,
+    UPGRADE_TIMEOUT_SECS,
+};
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::{BrewKind, PackageRef};
 use crate::services::package_manager::brew;
@@ -18,17 +21,21 @@ const COULD_NOT_LAUNCH: i32 = 85;
 #[derive(Deserialize)]
 struct Outdated {
     #[serde(default)]
-    formulae: Vec<Named>,
+    formulae: Vec<Entry>,
     #[serde(default)]
-    casks: Vec<Named>,
+    casks: Vec<Entry>,
 }
 
 #[derive(Deserialize)]
-struct Named {
+struct Entry {
     name: String,
+    #[serde(default)]
+    installed_versions: Vec<String>,
+    #[serde(default)]
+    current_version: Option<String>,
 }
 
-pub(super) async fn outdated() -> Result<Vec<PackageRef>, QueryError> {
+pub(super) async fn outdated() -> Result<Vec<OutdatedPackage>, QueryError> {
     let result = execute_script(ScriptParams {
         code: &brew::script(OUTDATED),
         shell: "bash",
@@ -50,7 +57,10 @@ pub(super) async fn outdated() -> Result<Vec<PackageRef>, QueryError> {
 
 pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     let PackageRef::Brew { kind, name } = package else {
-        return UpgradeOutcome::Failed(format!("not a brew package: {package:?}"));
+        return UpgradeOutcome::Failed {
+            exit_code: 0,
+            message: format!("not a brew package: {package:?}"),
+        };
     };
     let flag = match kind {
         BrewKind::Formula => "--formula",
@@ -69,36 +79,43 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     interpret(&result)
 }
 
-fn parse_outdated(stdout: &str) -> Result<Vec<PackageRef>, String> {
+fn parse_outdated(stdout: &str) -> Result<Vec<OutdatedPackage>, String> {
     let start = stdout
         .find('{')
         .ok_or_else(|| "no JSON in the outdated query output".to_string())?;
     let outdated: Outdated = serde_json::from_str(&stdout[start..])
         .map_err(|e| format!("unparseable outdated query output: {e}"))?;
-    let formulae = outdated.formulae.into_iter().map(|f| PackageRef::Brew {
-        kind: BrewKind::Formula,
-        name: f.name,
-    });
-    let casks = outdated.casks.into_iter().map(|c| PackageRef::Brew {
-        kind: BrewKind::Cask,
-        name: c.name,
-    });
+    let entry = |kind: BrewKind| {
+        move |entry: Entry| OutdatedPackage {
+            package: PackageRef::Brew {
+                kind,
+                name: entry.name,
+            },
+            installed_version: entry.installed_versions.into_iter().last(),
+            available_version: entry.current_version.filter(|v| !v.is_empty()),
+        }
+    };
+    let formulae = outdated.formulae.into_iter().map(entry(BrewKind::Formula));
+    let casks = outdated.casks.into_iter().map(entry(BrewKind::Cask));
     Ok(formulae.chain(casks).collect())
 }
 
 fn interpret(result: &ExecResult) -> UpgradeOutcome {
     if result.timed_out {
-        return UpgradeOutcome::Failed("timed out".to_string());
+        return UpgradeOutcome::TimedOut;
     }
     match result.retcode {
-        0 => UpgradeOutcome::Upgraded,
-        COULD_NOT_LAUNCH => UpgradeOutcome::Deferred(format!(
+        0 => UpgradeOutcome::Upgraded {
+            reboot_required: false,
+        },
+        COULD_NOT_LAUNCH => UpgradeOutcome::Busy(format!(
             "could not run as the console user: {}",
             result.stderr.trim()
         )),
-        code => {
-            UpgradeOutcome::Failed(format!("brew exited {code}: {}", last_line(&result.stderr)))
-        }
+        code => UpgradeOutcome::Failed {
+            exit_code: i64::from(code),
+            message: format!("brew exited {code}: {}", last_line(&result.stderr)),
+        },
     }
 }
 

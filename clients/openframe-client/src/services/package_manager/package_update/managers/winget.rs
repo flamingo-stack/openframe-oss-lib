@@ -1,22 +1,28 @@
-use super::{last_line, QueryError, UpgradeOutcome, OUTDATED_TIMEOUT_SECS, UPGRADE_TIMEOUT_SECS};
+use serde::Deserialize;
+
+use super::{
+    last_line, OutdatedPackage, QueryError, UpgradeOutcome, OUTDATED_TIMEOUT_SECS,
+    UPGRADE_TIMEOUT_SECS,
+};
 use crate::executor::{execute_script, ExecResult, Privilege, ScriptParams};
 use crate::models::PackageRef;
 
-/// Ids with an update available. Rows without a source (not installed from winget or the
-/// Store) and with an inexact installed version (`< 1.2`, `> 1.2`) are left out: winget
-/// cannot upgrade the former and reports the latter as outdated forever. Without the WinGet
-/// PowerShell module there is nothing to query: a distinct exit code says so.
+/// Packages with an update available, with their versions. Rows without a source (not
+/// installed from winget or the Store) and with an inexact installed version (`< 1.2`,
+/// `> 1.2`) are left out: winget cannot upgrade the former and reports the latter as
+/// outdated forever. Without the WinGet PowerShell module there is nothing to query: a
+/// distinct exit code says so.
 const OUTDATED_SCRIPT: &str = r#"$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 if (-not (Get-Module -ListAvailable -Name Microsoft.WinGet.Client)) { exit 3 }
 Import-Module Microsoft.WinGet.Client
 
-$ids = @(
+$rows = @(
     Get-WinGetPackage |
         Where-Object { $_.Source -and $_.IsUpdateAvailable -and $_.InstalledVersion -notmatch '^[<>]' } |
-        ForEach-Object { $_.Id }
+        ForEach-Object { [pscustomobject]@{ id = $_.Id; installed = $_.InstalledVersion; available = @($_.AvailableVersions)[0] } }
 )
-ConvertTo-Json -InputObject $ids -Compress
+ConvertTo-Json -InputObject $rows -Compress
 "#;
 
 /// The backend's `winget-update-software.ps1`, verbatim, so both paths upgrade the same way.
@@ -41,7 +47,16 @@ const MSI_INSTALL_ALREADY_RUNNING: u32 = 1618;
 const COULD_NOT_LAUNCH: u32 = 85;
 const MODULE_MISSING: i32 = 3;
 
-pub(super) async fn outdated() -> Result<Vec<PackageRef>, QueryError> {
+#[derive(Deserialize)]
+struct Row {
+    id: String,
+    #[serde(default)]
+    installed: Option<String>,
+    #[serde(default)]
+    available: Option<String>,
+}
+
+pub(super) async fn outdated() -> Result<Vec<OutdatedPackage>, QueryError> {
     let result = execute_script(ScriptParams {
         code: OUTDATED_SCRIPT,
         shell: "powershell",
@@ -56,7 +71,10 @@ pub(super) async fn outdated() -> Result<Vec<PackageRef>, QueryError> {
 
 pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     let PackageRef::Winget { id } = package else {
-        return UpgradeOutcome::Failed(format!("not a winget package: {package:?}"));
+        return UpgradeOutcome::Failed {
+            exit_code: 0,
+            message: format!("not a winget package: {package:?}"),
+        };
     };
     let args = ["--id".to_string(), id.clone(), "-e".to_string()];
     let result = execute_script(ScriptParams {
@@ -71,7 +89,7 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
     interpret(&result)
 }
 
-fn read_outdated(result: &ExecResult) -> Result<Vec<PackageRef>, QueryError> {
+fn read_outdated(result: &ExecResult) -> Result<Vec<OutdatedPackage>, QueryError> {
     match result.retcode {
         0 => {}
         MODULE_MISSING => {
@@ -86,38 +104,48 @@ fn read_outdated(result: &ExecResult) -> Result<Vec<PackageRef>, QueryError> {
             )))
         }
     }
-    let ids: Vec<String> = serde_json::from_str(result.stdout.trim())
+    let rows: Vec<Row> = serde_json::from_str(result.stdout.trim())
         .map_err(|e| QueryError::Failed(format!("unparseable outdated query output: {e}")))?;
-    Ok(ids
+    Ok(rows
         .into_iter()
-        .map(|id| PackageRef::Winget { id })
+        .map(|row| OutdatedPackage {
+            package: PackageRef::Winget { id: row.id },
+            installed_version: row.installed.filter(|v| !v.is_empty()),
+            available_version: row.available.filter(|v| !v.is_empty()),
+        })
         .collect())
 }
 
 fn interpret(result: &ExecResult) -> UpgradeOutcome {
     if result.timed_out {
-        return UpgradeOutcome::Failed("timed out".to_string());
+        return UpgradeOutcome::TimedOut;
     }
-    match result.retcode as u32 {
-        0 | REBOOT_REQUIRED_TO_FINISH => UpgradeOutcome::Upgraded,
+    let code = result.retcode as u32;
+    match code {
+        0 => UpgradeOutcome::Upgraded {
+            reboot_required: false,
+        },
+        REBOOT_REQUIRED_TO_FINISH => UpgradeOutcome::Upgraded {
+            reboot_required: true,
+        },
         UPDATE_NOT_APPLICABLE => UpgradeOutcome::AlreadyLatest,
         PACKAGE_IN_USE | FILE_IN_USE => {
-            UpgradeOutcome::Deferred("the package's files are in use".to_string())
+            UpgradeOutcome::InUse("the package's files are in use".to_string())
         }
         INSTALL_IN_PROGRESS | MSI_INSTALL_ALREADY_RUNNING => {
-            UpgradeOutcome::Deferred("another installation is in progress".to_string())
+            UpgradeOutcome::Busy("another installation is in progress".to_string())
         }
         REBOOT_REQUIRED_FOR_INSTALL => {
-            UpgradeOutcome::Deferred("a reboot is required before installing".to_string())
+            UpgradeOutcome::Busy("a reboot is required before installing".to_string())
         }
-        COULD_NOT_LAUNCH => UpgradeOutcome::Deferred(format!(
+        COULD_NOT_LAUNCH => UpgradeOutcome::Busy(format!(
             "could not run in the console user's session: {}",
             result.stderr.trim()
         )),
-        code => UpgradeOutcome::Failed(format!(
-            "winget exited 0x{code:08X}: {}",
-            last_line(&result.stdout)
-        )),
+        code => UpgradeOutcome::Failed {
+            exit_code: i64::from(code),
+            message: format!("winget exited 0x{code:08X}: {}", last_line(&result.stdout)),
+        },
     }
 }
 

@@ -8,28 +8,44 @@ use crate::services::package_manager::ManagerId;
 
 const OUTDATED_TIMEOUT_SECS: u32 = 300;
 /// Also the longest a client self-update can wait for a running upgrade.
-const UPGRADE_TIMEOUT_SECS: u32 = 900;
+pub(super) const UPGRADE_TIMEOUT_SECS: u32 = 900;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum QueryError {
-    /// The manager cannot be queried on this machine right now (e.g. winget without its
-    /// PowerShell module). Skipped like an absent manager: not a failure, not retried early.
+    /// The manager cannot be queried on this machine (e.g. winget without its PowerShell module).
     Unavailable(String),
-    /// The query ran and failed; the pass counts the manager as not answered.
+    /// The query ran and failed; worth another try later.
     Failed(String),
+}
+
+/// A package the manager reports an update for, with the versions it knows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct OutdatedPackage {
+    pub package: PackageRef,
+    pub installed_version: Option<String>,
+    pub available_version: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum UpgradeOutcome {
-    Upgraded,
+    Upgraded {
+        reboot_required: bool,
+    },
     #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     AlreadyLatest,
-    /// Could not run now (files in use, another installer, no session); retried next pass.
-    Deferred(String),
-    Failed(String),
+    /// The app's files are in use: a holder the gate did not see.
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    InUse(String),
+    /// Another installer, a pending reboot or no user session; retried later.
+    Busy(String),
+    Failed {
+        exit_code: i64,
+        message: String,
+    },
+    TimedOut,
 }
 
-pub(super) async fn outdated(manager: ManagerId) -> Result<Vec<PackageRef>, QueryError> {
+pub(super) async fn outdated(manager: ManagerId) -> Result<Vec<OutdatedPackage>, QueryError> {
     match manager {
         #[cfg(target_os = "windows")]
         ManagerId::Winget => winget::outdated().await,
@@ -47,7 +63,10 @@ pub(super) async fn upgrade(package: &PackageRef) -> UpgradeOutcome {
         PackageRef::Winget { .. } => winget::upgrade(package).await,
         #[cfg(target_os = "macos")]
         PackageRef::Brew { .. } => brew::upgrade(package).await,
-        _ => UpgradeOutcome::Failed(format!("no package manager for {package:?} here")),
+        _ => UpgradeOutcome::Failed {
+            exit_code: 0,
+            message: format!("no package manager for {package:?} here"),
+        },
     }
 }
 

@@ -1,7 +1,7 @@
 mod core_nats;
 mod delivery;
 mod handlers;
-mod package_policy;
+mod package_update;
 mod restart;
 
 use std::future::Future;
@@ -23,7 +23,7 @@ use crate::services::AgentConfigurationService;
 use delivery::Delivery;
 
 pub use handlers::FeatureFlagsHandler;
-pub use package_policy::PackagePolicyHandler;
+pub use package_update::PackageUpdateHandler;
 pub use restart::RestartGate;
 
 pub trait CommandHandler: Clone + Send + Sync + 'static {

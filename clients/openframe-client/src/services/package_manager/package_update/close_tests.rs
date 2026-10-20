@@ -18,9 +18,10 @@ async fn closing_holders_stops_them_even_when_they_ignore_the_request() {
             .unwrap()
     };
 
-    timeout(CLOSE_GRACE + BOUND, close(&[app.id()]))
+    let survivors = timeout(CLOSE_GRACE + BOUND, close(&[app.id()]))
         .await
         .expect("closing the holders hung");
+    assert!(survivors.is_empty(), "survivors: {survivors:?}");
 
     let exited = timeout(BOUND, async {
         loop {
@@ -39,7 +40,8 @@ async fn closing_holders_stops_them_even_when_they_ignore_the_request() {
 
 #[tokio::test]
 async fn closing_nothing_returns_at_once() {
-    timeout(Duration::from_secs(1), close(&[]))
+    let survivors = timeout(Duration::from_secs(1), close(&[]))
         .await
         .expect("an empty close waited");
+    assert!(survivors.is_empty());
 }

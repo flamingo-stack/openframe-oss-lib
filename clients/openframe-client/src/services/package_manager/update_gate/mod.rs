@@ -95,6 +95,12 @@ impl Prepared {
         self.decide(package, &snapshot().await)
     }
 
+    pub fn identity(&self, package: &PackageRef) -> Option<&AppIdentity> {
+        self.identities
+            .get(package)
+            .and_then(|identity| identity.as_ref().ok())
+    }
+
     fn decide(
         &self,
         package: &PackageRef,

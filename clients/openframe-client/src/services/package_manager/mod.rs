@@ -1,10 +1,12 @@
-pub mod auto_update;
 pub(crate) mod brew;
+pub mod package_update;
 pub mod report_publisher;
 pub mod report_run_manager;
 mod state;
 mod support;
 pub mod update_gate;
+
+pub use support::is_supported;
 
 use crate::models::PackageRef;
 use serde::Serialize;

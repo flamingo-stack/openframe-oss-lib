@@ -7,9 +7,10 @@ use crate::services::tool_kill_service::ToolKillService;
 
 pub(super) const CLOSE_GRACE: Duration = Duration::from_secs(10);
 
-pub(super) async fn close(holders: &[u32]) {
+/// Asks the holders to close, stops what ignores the request, and returns what survived even that.
+pub(super) async fn close(holders: &[u32]) -> Vec<u32> {
     if holders.is_empty() {
-        return;
+        return Vec::new();
     }
     app_close::ask_to_close(holders).await;
     let asked = Instant::now();
@@ -26,9 +27,9 @@ pub(super) async fn close(holders: &[u32]) {
         waited = ?asked.elapsed(),
         "Asked the apps holding a forced upgrade to close"
     );
-    for pid in alive {
+    for pid in &alive {
         if let Err(e) = ToolKillService::new()
-            .stop_process(pid, "forced package upgrade")
+            .stop_process(*pid, "forced package upgrade")
             .await
         {
             warn!(
@@ -37,6 +38,11 @@ pub(super) async fn close(holders: &[u32]) {
             );
         }
     }
+    if alive.is_empty() {
+        return alive;
+    }
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    still_running(&alive).await
 }
 
 async fn still_running(pids: &[u32]) -> Vec<u32> {

@@ -46,7 +46,7 @@ use crate::config::update_config::{
 };
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::command::{
-    CommandContext, CommandListener, FeatureFlagsHandler, PackagePolicyHandler, RestartGate,
+    CommandContext, CommandListener, FeatureFlagsHandler, PackageUpdateHandler, RestartGate,
 };
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
@@ -82,8 +82,8 @@ use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
 use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
-use crate::services::package_manager::auto_update::{
-    PackageAutoUpdateRunManager, PolicyStore, RestartSignals,
+use crate::services::package_manager::package_update::{
+    OrderStore, PackageUpdateRunManager, RestartSignals, StatusReporter,
 };
 use crate::services::package_manager::report_publisher::PackageManagerReportPublisher;
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
@@ -172,9 +172,9 @@ impl Default for ClientConfiguration {
     }
 }
 
-struct PackageAutoUpdate {
-    policy_listener: CommandListener<PackagePolicyHandler>,
-    manager: PackageAutoUpdateRunManager,
+struct PackageUpdate {
+    listener: CommandListener<PackageUpdateHandler>,
+    manager: PackageUpdateRunManager,
 }
 
 pub struct Client {
@@ -192,7 +192,7 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
-    package_auto_update: Option<PackageAutoUpdate>,
+    package_update: Option<PackageUpdate>,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
@@ -605,29 +605,30 @@ impl Client {
             result_store.clone(),
             flush_notify.clone(),
         );
-        let package_auto_update = package_auto_update_enabled.then(|| {
-            let store = Arc::new(PolicyStore::load(
-                directory_manager.secured_dir().join("package_policy.json"),
+        let package_update = package_auto_update_enabled.then(|| {
+            let orders = Arc::new(OrderStore::load(
+                directory_manager.secured_dir().join("package_updates.json"),
             ));
-            let policy_listener = CommandListener::new(
-                PackagePolicyHandler::new(store.clone()),
+            let status = StatusReporter::new(
+                nats_message_publisher.clone(),
+                result_store.clone(),
+                flush_notify.clone(),
+            );
+            let listener = CommandListener::new(
+                PackageUpdateHandler::new(orders.clone(), status.clone()),
                 command_context.clone(),
             );
-            let (manager, _force_now) = PackageAutoUpdateRunManager::new(
-                store,
-                directory_manager
-                    .secured_dir()
-                    .join("package_update_state.json"),
+            let manager = PackageUpdateRunManager::new(
+                orders,
+                status,
+                config_service.clone(),
                 RestartSignals {
                     client_update: tool_run_manager.client_update_pending(),
                     agent_restart: agent_restart.view(),
                 },
                 package_upgrades.clone(),
             );
-            PackageAutoUpdate {
-                policy_listener,
-                manager,
-            }
+            PackageUpdate { listener, manager }
         });
         let feature_flags_listener = CommandListener::new(
             FeatureFlagsHandler::new(feature_flags_service),
@@ -715,7 +716,7 @@ impl Client {
             client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
-            package_auto_update,
+            package_update,
             restart_gate,
             command_execution_listener,
             script_execution_listener,
@@ -804,8 +805,8 @@ impl Client {
         }
 
         self.feature_flags_listener.start().await?;
-        if let Some(auto_update) = &self.package_auto_update {
-            auto_update.policy_listener.start().await?;
+        if let Some(package_update) = &self.package_update {
+            package_update.listener.start().await?;
         }
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
@@ -909,8 +910,8 @@ impl Client {
         info!("Script schedule execution listener started");
 
         self.package_manager_report_run_manager.start();
-        if let Some(auto_update) = &self.package_auto_update {
-            auto_update.manager.start();
+        if let Some(package_update) = &self.package_update {
+            package_update.manager.start();
         }
 
         if let Err(e) = self.tool_run_manager.run().await {
