@@ -102,6 +102,7 @@ tempfile = "3.10"
 semver = "1.0"
 sys-info = "0.9"
 aes-gcm = "0.10"
+sha2 = "0.10"
 base64 = "0.21"
 log = "0.4.27"
 clap = { version = "4.5", features = ["derive", "env", "std", "cargo", "string"] }
