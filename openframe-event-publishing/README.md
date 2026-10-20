@@ -6,6 +6,8 @@ Debezium will later read the `outbox` collection and send each row to Kafka. Not
 `openframe-data-mongo-sync` depends on this module, so every service with Mongo has it on the classpath.
 It does nothing until you switch it on.
 
+Import only from `com.openframe.publishing.api`. The other packages are internal to the module.
+
 ## How it works
 
 ```
