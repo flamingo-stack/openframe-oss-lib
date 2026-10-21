@@ -1,6 +1,7 @@
 package com.openframe.publishing.config;
 
 import com.openframe.publishing.api.OutboxPublisher;
+import com.openframe.publishing.api.PublishedAggregates;
 import com.openframe.publishing.repository.PublishedRepositorySpecs;
 import com.openframe.publishing.repository.PublishingRepositoryPostProcessor;
 import com.openframe.publishing.repository.PublishingRepositoryStartupCheck;
@@ -15,7 +16,7 @@ import org.springframework.context.annotation.Import;
 @AutoConfiguration
 @ConditionalOnBooleanProperty(name = {"spring.data.mongodb.enabled", "openframe.events.publishing.enabled"})
 @Import({EventsConfiguration.class, PublishedAggregateTopics.class, PublishedAggregateSpecRegistry.class,
-        PublishedAggregateStartupCheck.class, OutboxPublisher.class, PublishedRepositorySpecs.class,
+        PublishedAggregateStartupCheck.class, OutboxPublisher.class, PublishedAggregates.class, PublishedRepositorySpecs.class,
         PublishingRepositoryStartupCheck.class})
 public class OutboxAutoConfiguration {
 

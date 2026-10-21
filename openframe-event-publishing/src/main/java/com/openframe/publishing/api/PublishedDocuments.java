@@ -11,9 +11,9 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.util.ClassUtils;
 
 // What an outbox row takes from a published document, through Spring Data's mapping metadata: class, id, version, tenant.
-class PublishedDocuments {
+public class PublishedDocuments {
 
-    static final String ID_FIELD = "_id";
+    public static final String ID_FIELD = "_id";
     private static final String TENANT_PROPERTY = "tenantId";
     private static final int DOCUMENT_TYPE_ARGUMENT = 0;
 

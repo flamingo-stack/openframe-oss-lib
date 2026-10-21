@@ -1,4 +1,4 @@
-package com.openframe.processing.runner;
+package com.openframe.publishing.api;
 
 import com.mongodb.MongoException;
 import com.mongodb.MongoNodeIsRecoveringException;
@@ -10,21 +10,20 @@ import org.springframework.dao.OptimisticLockingFailureException;
 
 import java.util.List;
 
-// Mongo cannot be reached, so every processor would fail: the only exception the listeners' error handler retries.
-public class MongoUnavailableException extends RuntimeException {
+// Whether a failure means Mongo cannot be reached, so retrying later helps: the processing listeners and the backfill ask it.
+public final class MongoUnavailability {
 
     // RetryableWriteError has no constant in the driver.
     private static final List<String> TRANSIENT_LABELS = List.of(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL,
             "RetryableWriteError");
 
-    public MongoUnavailableException(Throwable cause) {
-        super("Mongo is unavailable", cause);
+    private MongoUnavailability() {
     }
 
     // Network errors, no server to select, a primary stepping down or recovering, and errors Mongo labels as transient.
-    static boolean isMongoUnavailable(Throwable failure) {
+    public static boolean isMongoUnavailable(Throwable failure) {
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            // A write conflict is the processor's own failure, even when Mongo labels it transient.
+            // A write conflict is the caller's own failure, even when Mongo labels it transient.
             if (cause instanceof OptimisticLockingFailureException) {
                 return false;
             }

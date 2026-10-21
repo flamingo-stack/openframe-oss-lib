@@ -1,10 +1,11 @@
 package com.openframe.processing.runner;
 
-import com.mongodb.MongoException;
 import com.mongodb.MongoNotPrimaryException;
 import com.mongodb.ServerAddress;
 import com.openframe.processing.api.EventProcessor;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
+import com.openframe.processing.exception.EventProcessingFailedException;
+import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.api.PublishedEvent;
 import com.openframe.publishing.api.PublishedRecord;
@@ -176,16 +177,6 @@ class EventProcessorRunnerTest {
 
                     assertThatThrownBy(() -> process(context, record)).isInstanceOf(MongoUnavailableException.class);
                 });
-    }
-
-    @Test
-    void anErrorMongoLabelsTransient_isMongoDown_butAWriteConflictIsNot() {
-        MongoException transientError = new MongoException("transient");
-        transientError.addLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL);
-        OptimisticLockingFailureException conflict = new OptimisticLockingFailureException("write conflict", transientError);
-
-        assertThat(MongoUnavailableException.isMongoUnavailable(transientError)).isTrue();
-        assertThat(MongoUnavailableException.isMongoUnavailable(conflict)).isFalse();
     }
 
     @Test

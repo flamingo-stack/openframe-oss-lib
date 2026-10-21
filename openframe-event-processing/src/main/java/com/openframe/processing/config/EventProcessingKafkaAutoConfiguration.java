@@ -1,12 +1,12 @@
 package com.openframe.processing.config;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
+import com.openframe.processing.exception.EventProcessingFailedException;
+import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.listener.AggregateEventListener;
 import com.openframe.processing.listener.OrganizationEventListener;
 import com.openframe.processing.registry.EventProcessorRegistry;
-import com.openframe.processing.runner.EventProcessingFailedException;
 import com.openframe.processing.runner.EventProcessorRunner;
-import com.openframe.processing.runner.MongoUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;

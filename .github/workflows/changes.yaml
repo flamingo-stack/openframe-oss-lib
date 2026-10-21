@@ -53,6 +53,7 @@ jobs:
                 "openframe-data-redis/**",
                 "openframe-data-timeentry-aspect/**",
                 "openframe-debezium-initializer/**",
+                "openframe-event-jobs/**",
                 "openframe-event-processing/**",
                 "openframe-event-publishing/**",
                 "openframe-exception/**",

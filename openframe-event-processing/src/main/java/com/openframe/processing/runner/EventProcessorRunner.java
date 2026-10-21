@@ -1,8 +1,11 @@
 package com.openframe.processing.runner;
 
 import com.openframe.processing.api.EventProcessor;
+import com.openframe.processing.exception.EventProcessingFailedException;
+import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.mode.ProcessingModes;
 import com.openframe.processing.registry.EventProcessorRegistry;
+import com.openframe.publishing.api.MongoUnavailability;
 import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.api.PublishedRecord;
 import io.micrometer.core.instrument.Timer;
@@ -74,7 +77,7 @@ public class EventProcessorRunner {
         } catch (OutOfMemoryError | InternalError | UnknownError brokenJvm) {
             throw brokenJvm;
         } catch (RuntimeException | Error failure) {
-            if (MongoUnavailableException.isMongoUnavailable(failure)) {
+            if (MongoUnavailability.isMongoUnavailable(failure)) {
                 metrics.recordMongoUnavailable(sample, name);
                 throw new MongoUnavailableException(failure);
             }

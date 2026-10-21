@@ -27,4 +27,13 @@ public class PublishedAggregateSpecRegistry {
     public boolean hasSpec(PublishedAggregateType type) {
         return byType.containsKey(type);
     }
+
+    public PublishedAggregateSpec<?, ?> specOf(PublishedAggregateType type) {
+        PublishedAggregateSpec<?, ?> spec = byType.get(type);
+        if (spec == null) {
+            String typeName = type.getName();
+            throw new IllegalStateException("No published aggregate spec for " + typeName);
+        }
+        return spec;
+    }
 }

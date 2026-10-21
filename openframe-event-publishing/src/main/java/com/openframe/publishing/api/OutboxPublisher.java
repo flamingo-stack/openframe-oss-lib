@@ -16,6 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -122,6 +123,26 @@ public class OutboxPublisher {
             insertChangedRows(spec, changed);
             return result;
         });
+    }
+
+    // The backfill's write: the documents' current state, read and written in one transaction; returns the version of each row.
+    public Map<String, Long> publishCurrent(PublishedAggregateSpec<?, ?> spec, Collection<?> ids) {
+        log.debug("publishCurrent of {}: starting", spec.getType().getName());
+        return whenPublishing(spec, Map::of, () -> {
+            List<?> current = findByIds(spec, ids);
+            insertChangedRows(spec, current);
+            return versionsById(current);
+        });
+    }
+
+    private Map<String, Long> versionsById(List<?> documentsWritten) {
+        Map<String, Long> versions = new LinkedHashMap<>();
+        for (Object document : documentsWritten) {
+            String id = documents.idOf(document);
+            long version = documents.versionOf(document);
+            versions.put(id, version);
+        }
+        return versions;
     }
 
     private <R> R whenPublishing(PublishedAggregateSpec<?, ?> spec, Supplier<R> write, Supplier<R> writeWithRows) {

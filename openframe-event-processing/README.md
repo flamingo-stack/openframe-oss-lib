@@ -29,7 +29,7 @@ events.organizations ──> OrganizationEventListener         one listener per 
   read into the listener's parameter type. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
-- [`EventProcessorRunner`](src/main/java/com/openframe/processing/runner/EventProcessorRunner.java#L22) runs each processor on its own: a failed
+- [`EventProcessorRunner`](src/main/java/com/openframe/processing/runner/EventProcessorRunner.java#L25) runs each processor on its own: a failed
   processor does not stop the others.
 
 ## Configuration
@@ -134,7 +134,7 @@ listener ([`EventListenerStartupCheck`](src/main/java/com/openframe/processing/c
 
 | What fails | What happens |
 |---|---|
-| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailableException`](src/main/java/com/openframe/processing/runner/MongoUnavailableException.java#L14)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
+| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/MongoUnavailability.java#L24), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
 | A processor: any other exception, a write conflict too, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The other processors still run. The record then goes to `<topic>-dlt` once. |
 | An unreadable value, or a `schemaVersion` newer than this build | The record goes to `<topic>-dlt` without reaching a processor. |
 

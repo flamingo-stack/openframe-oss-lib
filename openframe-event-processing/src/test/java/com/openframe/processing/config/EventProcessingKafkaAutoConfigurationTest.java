@@ -1,9 +1,9 @@
 package com.openframe.processing.config;
 
 import com.openframe.data.repository.organization.publishing.OrganizationEvent;
+import com.openframe.processing.exception.EventProcessingFailedException;
+import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.listener.OrganizationEventListener;
-import com.openframe.processing.runner.EventProcessingFailedException;
-import com.openframe.processing.runner.MongoUnavailableException;
 import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.api.PublishedRecord;
 import io.micrometer.core.instrument.MeterRegistry;

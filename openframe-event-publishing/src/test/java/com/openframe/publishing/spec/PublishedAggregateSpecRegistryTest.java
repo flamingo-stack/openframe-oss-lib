@@ -36,6 +36,17 @@ class PublishedAggregateSpecRegistryTest {
     }
 
     @Test
+    void specOf_returnsTheRegisteredSpec_andRefusesAnUnknownType() {
+        WidgetSpec spec = new WidgetSpec();
+        PublishedAggregateSpecRegistry withSpec = new PublishedAggregateSpecRegistry(provider(spec));
+        PublishedAggregateSpecRegistry withoutSpec = new PublishedAggregateSpecRegistry(provider());
+
+        assertThat(withSpec.specOf(PublishedAggregateType.ORGANIZATIONS)).isSameAs(spec);
+        assertThatThrownBy(() -> withoutSpec.specOf(PublishedAggregateType.ORGANIZATIONS))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
     void twoSpecsForTheSameType_failAtStartup() {
         assertThatThrownBy(() -> new PublishedAggregateSpecRegistry(provider(new WidgetSpec(), new WidgetSpec())))
                 .isInstanceOf(IllegalStateException.class);
