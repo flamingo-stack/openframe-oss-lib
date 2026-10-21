@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentRef } from '../../../types/content-ref';
-import { GROUP_PAGE_SIZE, RelatedContentSection } from '../related-content-section';
+import { GROUP_PAGE_SIZE } from '../../../utils/content-ref-groups';
+import { RelatedContentSection } from '../related-content-section';
 
 const fetchMock = vi.fn<typeof fetch>();
 

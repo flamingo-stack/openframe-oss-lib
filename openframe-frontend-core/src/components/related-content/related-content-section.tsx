@@ -54,6 +54,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import {
   CONTENT_REF_GROUPS,
+  GROUP_PAGE_SIZE,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,
   type ContentRefGroupConfig,
@@ -310,15 +311,8 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
   );
 }
 
-/** Items per page within one type group. Groups larger than this paginate
- *  with the standard Pagination control (NO nested scrolling — a bounded
- *  scrollbox inside the page traps wheel events and hides the sections
- *  below it). MUST stay at or above the largest suggestion fill
- *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
- *  current rails never paginate — only genuinely big groups (author pages)
- *  do. Exported through the subpath barrel for the hub's module-load
- *  assertion of that relation (entity-suggestion-sections.tsx). */
-export const GROUP_PAGE_SIZE = 12;
+// The page size (`GROUP_PAGE_SIZE`) lives with the groups' other settings (`utils/content-ref-groups`, server-safe), so
+// a server page can read a group's first page for `initialRows`.
 
 /** A group's layout, read by the group and by the rail's skeleton, so the skeleton is the rail's size. */
 const GROUP_CLASS = 'space-y-4';
