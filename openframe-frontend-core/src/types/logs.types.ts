@@ -21,6 +21,8 @@ export interface LogsListProps {
   showConnector?: boolean;
   onLogClick?: (log: LogEntry) => void;
   loading?: boolean;
+  /** Rows the loading state draws: the logs the host reads (its page size or limit). Default a typical count. */
+  skeletonRows?: number;
   emptyMessage?: string;
   className?: string;
 }

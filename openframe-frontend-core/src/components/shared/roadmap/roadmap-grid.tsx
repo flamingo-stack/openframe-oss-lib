@@ -126,7 +126,12 @@ export interface RoadmapGridProps {
   quartersToKeepClosed?: number;
   /** The items are being read (the host's query runs): the grid draws its own skeleton. A page's loading scope does too. */
   isLoading?: boolean;
-  /** The cards the flat grid's skeleton draws: one screen of the host's grid (default the skeleton's own). */
+  /**
+   * The cards the grid's skeleton draws: the number of items the host reads (its limit), drawn at every width.
+   * Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count for a roadmap that lists everything it holds.
+   */
+  skeletonCount?: number;
+  /** @deprecated Use `skeletonCount`. */
   fold?: number;
 }
 
@@ -184,9 +189,12 @@ const QUARTER_CONTENT_INNER_CLASS = 'pb-4';
 export function RoadmapGridQuarterSkeleton({
   showLeftMargin = true,
   columns = 2,
+  count,
 }: {
   showLeftMargin?: boolean;
   columns?: 1 | 2;
+  /** The quarter's skeleton cards. Default the grid skeleton's own. */
+  count?: number;
 }) {
   return (
     <div className={QUARTER_LIST_CLASS} aria-hidden>
@@ -198,7 +206,7 @@ export function RoadmapGridQuarterSkeleton({
         {/* The quarter's content box: the `AccordionContent` padding (`pt-4` here, the content's own `pb-4` inside). */}
         <div className={QUARTER_CONTENT_CLASS}>
           <div className={QUARTER_CONTENT_INNER_CLASS}>
-            <RoadmapGridSkeleton region={false} showLeftMargin={showLeftMargin} columns={columns} />
+            <RoadmapGridSkeleton region={false} count={count} showLeftMargin={showLeftMargin} columns={columns} />
           </div>
         </div>
       </div>
@@ -217,8 +225,10 @@ export function RoadmapGrid({
   hasActiveFilters = false,
   quartersToKeepClosed = 2,
   isLoading = false,
+  skeletonCount,
   fold,
 }: RoadmapGridProps) {
+  const skeletonCards = skeletonCount ?? fold;
   // ── Voting (shared across all quarters) ──
   const { getVote, toggleVote } = useRoadmapVoting(votingOptions);
   const inScope = useLoadingScope();
@@ -313,9 +323,9 @@ export function RoadmapGrid({
   // empty state. The page's loading region announces a scope's; a host's own read announces itself.
   if (inScope || isLoading) {
     return groupByQuarter ? (
-      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} />
+      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} count={skeletonCards} />
     ) : (
-      <RoadmapGridSkeleton region={!inScope} count={fold} showLeftMargin={showLeftMargin} columns={columns} />
+      <RoadmapGridSkeleton region={!inScope} count={skeletonCards} showLeftMargin={showLeftMargin} columns={columns} />
     );
   }
 
