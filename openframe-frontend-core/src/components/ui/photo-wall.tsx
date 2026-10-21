@@ -26,6 +26,13 @@ import { MarqueeWall } from './marquee-wall';
 export interface PhotoWallImage {
   url: string;
   alt?: string;
+  /**
+   * The picture's pixel size, when the host knows it (a server that read the file). A picture with a size is laid
+   * out at once; one without is measured in the browser first, and the wall waits for that, so it is the page's
+   * largest paint only after every picture has loaded (CU-17tkuw5xp4q).
+   */
+  width?: number;
+  height?: number;
 }
 
 export type PhotoOrientation = 'tall' | 'wide' | 'square';
@@ -228,8 +235,23 @@ export function PhotoWall({
   // `optimizedWidth`: the host's resizer at the column's width), so it is downloaded once.
   const drawnWidth = requestWidth ?? undefined;
   const drawnUrl = useCallback((url: string) => (drawnWidth ? resizedImageUrl(url, drawnWidth) : url), [drawnWidth]);
-  const urls = useMemo(() => unique.map(image => drawnUrl(image.url)), [unique, drawnUrl]);
-  const orientations = usePhotoOrientations(urls);
+  // A picture whose size the host stated has its orientation now; only the others are measured.
+  const known = useMemo(() => {
+    const byUrl = new Map<string, PhotoOrientation>();
+    for (const image of unique) {
+      if (image.width && image.height) byUrl.set(drawnUrl(image.url), photoOrientation(image.width, image.height));
+    }
+    return byUrl;
+  }, [unique, drawnUrl]);
+  const urls = useMemo(
+    () => unique.map(image => drawnUrl(image.url)).filter(url => !known.has(url)),
+    [unique, drawnUrl, known],
+  );
+  const probed = usePhotoOrientations(urls);
+  const orientations = useMemo(() => {
+    if (urls.length === 0) return known;
+    return probed ? new Map([...known, ...probed]) : null;
+  }, [urls, known, probed]);
 
   const layout = useMemo(() => {
     if (!orientations) return null;
