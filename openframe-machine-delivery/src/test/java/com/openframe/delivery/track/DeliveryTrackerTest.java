@@ -79,7 +79,7 @@ class DeliveryTrackerTest {
     @Test
     void acknowledge_byKey_currentDispatchOfTheRowAcknowledged() {
         // setup
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(row()));
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(row()));
         when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(true);
 
         // execution
@@ -92,7 +92,7 @@ class DeliveryTrackerTest {
     @Test
     void acknowledge_byKey_noRow_nothingMarked() {
         // setup
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.empty());
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.empty());
 
         // execution
         tracker.acknowledge(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID);
@@ -118,7 +118,7 @@ class DeliveryTrackerTest {
     @Test
     void done_byKey_currentDispatchOfTheRowMarkedDone() {
         // setup
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(row()));
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(row()));
         when(repository.markDone(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.COMPLETABLE), any(Instant.class), any(Instant.class))).thenReturn(true);
 
         // execution
@@ -141,7 +141,7 @@ class DeliveryTrackerTest {
     void cancel_byKey_openRowCancelledWithTheReason() {
         // setup
         MachineDelivery row = row();
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.of(row));
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(row));
 
         // execution
         tracker.cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, REASON);
@@ -153,7 +153,7 @@ class DeliveryTrackerTest {
     @Test
     void cancel_byKey_noRow_nothingCancelled() {
         // setup
-        when(repository.findById(DELIVERY_ID)).thenReturn(Optional.empty());
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.empty());
 
         // execution
         tracker.cancel(DeliveryType.TOOL_INSTALLATION, TARGET_ID, MACHINE_ID, REASON);

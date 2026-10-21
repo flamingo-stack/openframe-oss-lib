@@ -87,7 +87,7 @@ public class DeliveryTracker {
 
     private Optional<MachineDelivery> currentRow(DeliveryType type, String targetId, String machineId) {
         String id = DeliveryId.of(type, targetId, machineId);
-        return repository.findById(id);
+        return repository.findByIdOnPrimary(id);
     }
 
     private Instant expiresAt(DeliveryType type, Instant now) {

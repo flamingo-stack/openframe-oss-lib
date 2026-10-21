@@ -19,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -58,6 +59,14 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     public List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
         Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).in(types).and(FIELD_DUE_AT).lt(before);
         return findDue(due, limit);
+    }
+
+    // primary on purpose: a receiver that reports by key does so milliseconds after the row was written
+    @Override
+    public Optional<MachineDelivery> findByIdOnPrimary(String id) {
+        Query query = new Query(Criteria.where(FIELD_ID).is(id)).withReadPreference(ReadPreference.primary());
+        MachineDelivery row = mongoTemplate.findOne(query, MachineDelivery.class);
+        return Optional.ofNullable(row);
     }
 
     // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due

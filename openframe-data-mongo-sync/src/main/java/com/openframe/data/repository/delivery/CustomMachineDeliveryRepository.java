@@ -7,6 +7,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface CustomMachineDeliveryRepository {
@@ -14,6 +15,8 @@ public interface CustomMachineDeliveryRepository {
     List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit);
 
     List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit);
+
+    Optional<MachineDelivery> findByIdOnPrimary(String id);
 
     boolean upsertPending(MachineDelivery delivery);
 
