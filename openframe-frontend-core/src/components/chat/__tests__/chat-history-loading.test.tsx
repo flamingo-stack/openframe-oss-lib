@@ -145,7 +145,7 @@ describe('round 2: chat rows are their loaded twins', () => {
     const { container } = render(<ChatMessageSkeleton isUser bodyLines={1} />);
     expect(container.querySelector('.rounded-xl.bg-ods-bg-active')).not.toBeNull();
     expect(container.querySelector('.justify-end')).not.toBeNull();
-    const face = container.querySelector('.ods-skeleton.rounded-full') as HTMLElement | null;
+    const face = container.querySelector<HTMLElement>('.ods-skeleton.rounded-full');
     expect(face?.style.width).toBe('20px');
   });
 
