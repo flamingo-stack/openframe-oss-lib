@@ -7,12 +7,16 @@ import { Button } from '../button';
 import { useOptionalDataTableContext } from './data-table';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
 import { DataTableSkeleton, ROW_STACK_CLASSES } from './data-table-skeleton';
+import { dataTablePageSize } from './utils';
 
 export interface DataTableInfiniteFooterProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
-  /** Skeleton rows shown while fetching. Default `3`. */
+  /**
+   * Skeleton rows shown while the next page is fetched: that page, in full. Default the table's page size
+   * (`state.pagination.pageSize`), else a typical `3`.
+   */
   skeletonRows?: number;
   /**
    * `IntersectionObserver` rootMargin — how far ahead of the sentinel the next
@@ -93,7 +97,7 @@ export function DataTableInfiniteFooter({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
-  skeletonRows = 3,
+  skeletonRows: skeletonRowsProp,
   rootMargin = DEFAULT_ROOT_MARGIN,
   loadedCount,
 }: DataTableInfiniteFooterProps) {
@@ -105,6 +109,9 @@ export function DataTableInfiniteFooter({
   useEffect(() => {
     onLoadMoreRef.current = onLoadMore;
   });
+
+  const table = useOptionalDataTableContext();
+  const skeletonRows = skeletonRowsProp ?? (table ? dataTablePageSize(table) : undefined) ?? 3;
 
   const loadMore = useDataTableLoadMoreStore();
   const bodyDrawsRows = useSyncExternalStore(loadMore.subscribe, loadMore.getHasRowsBody, getNoBody);
@@ -122,7 +129,7 @@ export function DataTableInfiniteFooter({
   // TAIL (how many rows, and which one is last) rather than the count alone: a
   // search that replaces 40 rows with 20 while a page is in flight ends that
   // fetch with FEWER rows, and that is a new list, not a stalled one.
-  const tableRows = useOptionalDataTableContext()?.getRowModel().rows;
+  const tableRows = table?.getRowModel().rows;
   const progressCount = loadedCount ?? tableRows?.length;
   const lastRowId = tableRows?.[tableRows.length - 1]?.id ?? '';
   const tail = progressCount === undefined ? null : `${progressCount}:${lastRowId}`;

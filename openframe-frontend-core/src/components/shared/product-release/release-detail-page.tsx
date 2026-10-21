@@ -159,7 +159,7 @@ const SUMMARY_CLASS = 'text-ods-text-primary text-h4';
  * release carries more tags than a phone's line holds (three badges), so the row is capped to that line and drawn the
  * same while it is read: the badges and the "+N" never move the page under them.
  */
-const RELEASE_TAG_ROW_FOLD = 3;
+const RELEASE_TAG_ROW_MAX = 3;
 /**
  * A release tag's typical label width while it is read: a release is tagged with product areas, longer than most tags
  * (sampled badges measure 64 to 155px, typically about 105px: ten characters of the badge's type), so its row wraps
@@ -400,7 +400,7 @@ export function ReleaseDetailPage({
         {/* Tags — flat product_release_tags[] from entity_tags */}
         <EntityTagBadges
           tags={view.product_release_tags as TagAssoc[] | undefined}
-          max={RELEASE_TAG_ROW_FOLD}
+          max={RELEASE_TAG_ROW_MAX}
           skeletonItemClassName={RELEASE_TAG_SKELETON_WIDTH_CLASS}
         />
 

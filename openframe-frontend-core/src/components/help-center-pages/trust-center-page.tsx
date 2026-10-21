@@ -112,7 +112,7 @@ export interface TrustCenterPageProps {
   faqSkeletonShape?: FaqSkeletonShape;
   /**
    * Rows each panel's loading state draws, for a host whose lists are curated (it knows their lengths: the frameworks
-   * it is audited against). Absent: the layout's fold, the rows one screen holds.
+   * it is audited against). Absent: a typical count, at every width.
    */
   panelSkeletonRows?: Partial<Record<TrustCenterPanelId, TrustPanelRows>>;
 }

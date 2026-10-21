@@ -10,7 +10,11 @@ export const ADMIN_CONTENT_CARD_GRID_CLASS =
   'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[var(--spacing-system-lf)]';
 
 export interface AdminContentCardGridSkeletonProps {
-  /** How many placeholder cards: one page. */
+  /**
+   * How many placeholder cards: ONE FULL PAGE, the host's page size (the `pageSize` the grid it stands in for
+   * loads). A host that pages its grid passes it; the default `12` is the typical admin page, for a host that
+   * states none.
+   */
   count?: number;
   /** The placeholder card. Default `AdminContentCardSkeleton`. */
   Skeleton?: ComponentType<{ className?: string }>;

@@ -109,7 +109,8 @@ export interface TableProps<T = TableRowData> {
   emptyMessage?: string;
 
   // Skeleton configuration
-  skeletonRows?: number; // Number of skeleton rows to show when loading (default: 10)
+  /** Skeleton rows while loading: one full page. Default `pagePagination.pageSize`, else `TABLE_SKELETON_ROWS`. */
+  skeletonRows?: number;
   /**
    * Keep the table height stable by padding with invisible rows when the page
    * is short, AND by reserving the same slots (empty state centred over them)
