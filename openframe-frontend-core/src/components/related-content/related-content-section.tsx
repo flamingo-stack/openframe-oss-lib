@@ -259,10 +259,18 @@ function CardForType({
 // refetch, no cross-mount cache.
 // =============================================================================
 
-function useGroupItems(type: string, refs: ContentRef[], buildUrl: (type: string, ids: string[]) => string | null) {
+function useGroupItems(
+  type: string,
+  refs: ContentRef[],
+  buildUrl: (type: string, ids: string[]) => string | null,
+  seedRows?: ReadonlyArray<unknown>,
+) {
   const ids = refs.map(r => r.id);
   const url = ids.length > 0 ? buildUrl(type, ids) : null;
-  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() => new Map());
+  // The page the server already read (`initialRows`) is in hand from the first render, the server's included.
+  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() =>
+    seedRows && url !== null ? new Map([[url, [...seedRows]]]) : new Map(),
+  );
   const cached = url !== null ? pages.get(url) : undefined;
   const { data, dataUrl, error } = useSelfFetch<unknown>(cached ? null : url);
   if (data != null && dataUrl !== null && !pages.has(dataUrl)) {
@@ -358,9 +366,12 @@ function ContentGroup({
   adminCampaignCard,
   heading,
   onLoadingChange,
+  seedRows,
 }: {
   type: string;
   refs: ContentRef[];
+  /** The rows of this group's FIRST page, read by the server (`initialRows`). */
+  seedRows?: ReadonlyArray<unknown>;
   columns: 2 | 3;
   buildUrl: (type: string, ids: string[]) => string | null;
   resolveHref: (ref: ContentRef) => { href: string | null; targetPlatform: string | null };
@@ -392,7 +403,7 @@ function ContentGroup({
   }
   const totalGroupPages = pageCount(refs.length, GROUP_PAGE_SIZE);
   const pageRefs = refs.slice((page - 1) * GROUP_PAGE_SIZE, page * GROUP_PAGE_SIZE);
-  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl);
+  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl, seedRows);
   const groupPagination =
     totalGroupPages > 1 ? <Pagination currentPage={page} totalPages={totalGroupPages} onPageChange={setPage} /> : null;
   useEffect(() => {
@@ -540,6 +551,13 @@ export interface RelatedContentSectionProps {
    *  drills the refs here; the first client fetch is skipped (useSelfFetch
    *  initialData contract). */
   initialItems?: ContentRefWithReason[];
+  /**
+   * The rows of each group's FIRST page, read by the server, keyed by the refs' `type`: exactly what the group's list
+   * URL answers for those ids (`buildListUrl(type, firstPageIds)`). The cards are then in the server HTML instead of
+   * appearing after a request per group in the browser, which on an author page made a card the page's largest paint
+   * seconds after load (CU-17tkuw5xp4q). A group with no entry fetches as before; later pages always fetch.
+   */
+  initialRows?: Readonly<Record<string, ReadonlyArray<unknown>>>;
   /** Section title (default: "Related Content") */
   title?: string;
   /**
@@ -612,6 +630,7 @@ export function RelatedContentSection({
   sameTypeMinResults,
   includeTypes,
   initialItems,
+  initialRows,
   title = 'Related Content',
   columns = 2,
   excludeTypes,
@@ -787,6 +806,7 @@ export function RelatedContentSection({
           adminCampaignCard={adminCampaignCard}
           heading={<GroupHeading type={type} />}
           onLoadingChange={onGroupLoadingChange}
+          seedRows={initialRows?.[type]}
         />
       ))}
     </LoadingRegion>

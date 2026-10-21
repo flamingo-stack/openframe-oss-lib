@@ -51,3 +51,27 @@ describe('RelatedContentSection group paging', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('RelatedContentSection rows the server read', () => {
+  it('draws the first page from initialRows with no request, and still fetches later pages', async () => {
+    fetchMock.mockImplementation(input =>
+      Promise.resolve(
+        new Response(JSON.stringify({ items: idsOf(input).map(id => ({ id: Number(id), title: `Case ${id}` })) }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    const firstPage = REFS.slice(0, GROUP_PAGE_SIZE).map(r => ({ id: Number(r.id), title: r.title }));
+    render(<RelatedContentSection contentRefs={REFS} initialRows={{ case_study: firstPage }} />);
+
+    // In the first render: no skeleton, no request.
+    expect(screen.getByText('Case 1')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    expect(await screen.findByText('Case 13')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => idsOf(input))).toEqual([
+      REFS.slice(GROUP_PAGE_SIZE, 2 * GROUP_PAGE_SIZE).map(r => r.id),
+    ]);
+  });
+});
