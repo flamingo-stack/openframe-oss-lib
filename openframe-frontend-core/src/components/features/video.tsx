@@ -46,7 +46,6 @@ import { useNearViewport } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { VideoPlayBadge } from './video-center-badge';
 import type { FilePlayerProps } from './video-file-player';
@@ -136,65 +135,7 @@ function FilePlayerFallback({
   return <PosterBox poster={poster} className={className} priority={priority} fill />;
 }
 
-/**
- * A video nobody has asked to play yet starts as its poster and a play button, the way a YouTube video does
- * (`YouTubeFacade`): the player and hls.js are the largest script a page can load, and on a page whose video waits for
- * a click (a session, an episode, a release) loading them up front cost every visitor a long main-thread task before
- * anyone pressed play (CU-17tkuw5xp4q). A pointer, focus or touch on the button starts the download, so the player is
- * usually there by the click, and the click plays it with sound. A video that plays by itself (autoplay, hover
- * playback, a resumed position, chrome-less) or whose host drives it through a handle mounts its player as before.
- */
-function waitsForPlay(props: FilePlayerProps): boolean {
-  return (
-    !props.autoPlay &&
-    !props.autoPlayUnmuted &&
-    !props.playOnHover &&
-    props.playWhenHovered === undefined &&
-    props.startTime === undefined &&
-    !props.playerHandleRef &&
-    !props.chromeless
-  );
-}
-
-function FilePlayer({
-  title,
-  priority,
-  ...props
-}: FilePlayerProps & { title?: string; priority?: boolean }): React.ReactElement {
-  // Decided once: a video that started as a facade stays the player once pressed, whatever its props do later.
-  const [facade] = useState(() => waitsForPlay(props));
-  const [pressed, setPressed] = useState(false);
-  if (facade && !pressed) {
-    return (
-      <div className={cn('relative', props.className)} style={{ width: '100%', height: '100%' }}>
-        <FilePlayerFallback poster={props.poster} className="absolute inset-0" priority={priority} />
-        <Button
-          type="button"
-          variant="glyph"
-          size="wrap"
-          aria-label={title ? `Play: ${title}` : 'Play video'}
-          onPointerEnter={loadFilePlayer}
-          onFocus={loadFilePlayer}
-          onTouchStart={loadFilePlayer}
-          onClick={() => {
-            loadFilePlayer();
-            setPressed(true);
-          }}
-          className="group absolute inset-0 rounded-none"
-        >
-          <VideoPlayBadge
-            size="lg"
-            className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
-          />
-        </Button>
-      </div>
-    );
-  }
-  // Pressed: the click is the visitor's gesture, so the player starts with sound (muted if the browser refuses).
-  return <LoadedFilePlayer {...props} priority={priority} {...(facade ? { autoPlayUnmuted: true } : {})} />;
-}
-
-function LoadedFilePlayer({ priority, ...props }: FilePlayerProps & { priority?: boolean }): React.ReactElement {
+function FilePlayer({ priority, ...props }: FilePlayerProps & { priority?: boolean }): React.ReactElement {
   // The player's component when its module has arrived (a loaded module, drawn through `createElement`).
   const arrived = useSyncExternalStore(subscribeToFilePlayer, loadedFilePlayer, noFilePlayer);
   if (arrived) return createElement(arrived, props);
@@ -289,10 +230,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
 
   const effectiveKind = resolveKind(props, url);
 
-  // Drawn when it comes near the screen, like it plays when it is on it: the player and hls.js are the largest
-  // script a page can load, so a video below the fold costs its poster until it is approached. `lazy={false}`
-  // mounts the player at once (a caller that drives playback itself before it is seen).
-  if ((props.lazy ?? true) && !isNear) {
+  if (props.lazy && !isNear) {
     // Same box, poster only: the observer target IS the reserved space.
     return wrapWithLayout(
       <PosterBox
@@ -327,7 +265,6 @@ export function Video(props: VideoProps): React.ReactElement | null {
       <FilePlayer
         url={url}
         poster={props.poster}
-        title={props.title}
         priority={props.priority}
         muted={props.muted}
         {...pickFilePlayback(props)}

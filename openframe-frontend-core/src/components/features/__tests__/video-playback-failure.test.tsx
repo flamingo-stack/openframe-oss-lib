@@ -76,12 +76,9 @@ import { VIDEO_PLAYBACK_FAILED_EVENT } from '../video-shared';
 const YT_ORIGIN = 'https://www.youtube-nocookie.com';
 const ERROR_TEXT = 'This video failed to play.';
 
-/** Draw a file video, press its play button as a visitor does (a video that waits for a click starts as its
- *  poster), and wait for its player, which `<Video>` loads on demand. */
+/** Draw a file video and wait for its player, which `<Video>` loads on demand. */
 async function renderFileVideo(ui: React.ReactElement): Promise<void> {
   render(ui);
-  const play = screen.queryByRole('button', { name: 'Play video' });
-  if (play) fireEvent.click(play);
   await act(async () => {
     await import('../video-file-player');
   });
@@ -138,11 +135,9 @@ describe('Video — file playback failure handling', () => {
       vi.advanceTimersByTime(15_000);
     });
 
-    // The press that started the video played it once already; Try again plays it once more.
-    const playsBefore = muxEl?.playCalls ?? 0;
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(muxEl?.loadCalls).toBe(1);
-    expect((muxEl?.playCalls ?? 0) - playsBefore).toBe(1);
+    expect(muxEl?.playCalls).toBe(1);
     expect(screen.queryByText(ERROR_TEXT)).toBeNull();
   });
 

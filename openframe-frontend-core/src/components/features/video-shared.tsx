@@ -164,7 +164,7 @@ export interface VideoCommonProps {
   priority?: boolean;
   /** Tailwind classes applied to the underlying player root. */
   className?: string;
-  /** Accessible label: the play button of either facade (YouTube, or a file video that waits for a click). */
+  /** Accessible label (used as YT facade title; ignored for file branch). */
   title?: string;
   /**
    * Mount the player only once its box comes near the viewport (shared
@@ -172,7 +172,6 @@ export interface VideoCommonProps {
    * Until then the box shows the poster (or nothing) — the caller's container
    * still owns the size, so nothing shifts when the player mounts. For grids
    * of players: a library of 20 clips costs 20 posters, not 20 players.
-   * Default `true` (every video is drawn on approach); `false` mounts it at once.
    */
   lazy?: boolean;
   /**
