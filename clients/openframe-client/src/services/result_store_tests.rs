@@ -363,7 +363,7 @@ async fn the_next_start_settles_only_its_own_type_waiting_for_the_restart() {
         .await
         .unwrap();
 
-    assert_eq!(settled, 1);
+    assert_eq!(settled, vec![update]);
     let failed = queued(&s, "update").await.unwrap();
     assert_eq!(failed.result, DeliveryResult::Failed);
     assert_eq!(failed.error.as_deref(), Some("rolled back"));
@@ -421,4 +421,28 @@ async fn the_applied_sequence_belongs_to_one_registration_and_never_goes_down() 
     s.record_applied_sequence(&update, "m2", 3).await.unwrap();
     assert_eq!(s.applied_sequence(&update, "m2").await.unwrap(), 3);
     assert_eq!(s.applied_sequence(&update, "m").await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn an_unreadable_ledger_entry_neither_blocks_settling_nor_a_new_claim() {
+    let (s, _d) = store();
+    s.with_db(|db| {
+        let txn = db.begin_write()?;
+        {
+            txn.open_table(DELIVERY_LEDGER)?
+                .insert("future", br#"{"state":"from_a_newer_version"}"#.as_slice())?;
+        }
+        txn.commit()?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let interrupted = delivery("TOOL_INSTALLATION", "in-flight", None);
+    claim(&s, &interrupted).await;
+
+    assert_eq!(s.recover_deliveries().await.unwrap(), 1);
+    assert_eq!(
+        claim(&s, &delivery("TOOL_INSTALLATION", "future", None)).await,
+        DeliveryClaim::Claimed
+    );
 }

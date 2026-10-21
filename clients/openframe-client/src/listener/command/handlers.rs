@@ -20,6 +20,7 @@ use crate::services::tool_run_manager::{ClientUpdatePending, ToolRunManager};
 
 const TOOL_BUSY: &str = "tool busy with another operation";
 const CLIENT_UPDATE_PENDING: &str = "client update pending";
+const CLIENT_UPDATE_RUNNING: &str = "client update already running";
 
 #[derive(Clone)]
 pub struct FeatureFlagsHandler {
@@ -62,6 +63,10 @@ impl CommandHandler for FeatureFlagsHandler {
             Ok(FlagsApplied::RestartRequired) => Outcome::RestartRequired,
             Err(e) => Outcome::Failed(format!("{e:#}")),
         }
+    }
+
+    fn applied_sequence(&self, machine_id: &str) -> i64 {
+        self.service.applied_sequence(machine_id)
     }
 
     fn awaiting_restart(&self) -> Option<DeliveryRef> {
@@ -204,6 +209,9 @@ impl CommandHandler for ClientUpdateHandler {
 
     // marked before the busy check, as the legacy path does, so new tool operations wait behind the update
     fn begin(&self, _command: &Self::Command) -> Begin<()> {
+        if self.service.is_update_in_progress() {
+            return Begin::Busy(CLIENT_UPDATE_RUNNING);
+        }
         self.tool_run_manager.mark_client_update_pending();
         if self.tool_ops.any_busy() {
             return Begin::Busy(TOOL_BUSY);
@@ -266,8 +274,11 @@ impl CommandHandler for ClientUninstallHandler {
                 "client self-uninstall is not supported on this platform".to_string(),
             );
         }
-        self.deactivation_service.request_uninstall().await;
         Outcome::Done
+    }
+
+    async fn remove_agent(&self) {
+        self.deactivation_service.request_uninstall().await;
     }
 }
 

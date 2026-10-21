@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use futures::StreamExt;
@@ -197,7 +197,10 @@ impl Agent {
     }
 
     async fn launch_fake(&mut self) -> FakeHandler {
-        let handler = FakeHandler::default();
+        self.launch_command(FakeHandler::default()).await
+    }
+
+    async fn launch_command<H: CommandHandler>(&mut self, handler: H) -> H {
         let (_gate, context) = self.context();
         CommandListener::new(handler.clone(), context)
             .start()
@@ -205,7 +208,8 @@ impl Agent {
             .unwrap();
         timeout(BOUND, async {
             loop {
-                self.send_fake(fake(PROBE, Some(0), "done")).await;
+                self.send_to(H::subject(MACHINE), fake(PROBE, Some(0), "done"))
+                    .await;
                 if timeout(Duration::from_millis(200), self.next_result(PROBE))
                     .await
                     .is_ok()
@@ -604,6 +608,7 @@ async fn invalid_flag_entries_are_done_without_a_restart() {
 #[derive(Clone, Default)]
 struct FakeHandler {
     busy: Arc<AtomicBool>,
+    floor: Arc<AtomicI64>,
     runs: Arc<Mutex<Vec<String>>>,
     release: Arc<Notify>,
 }
@@ -635,6 +640,10 @@ impl CommandHandler for FakeHandler {
             return Begin::Busy("busy");
         }
         Begin::Accepted(())
+    }
+
+    fn applied_sequence(&self, _machine_id: &str) -> i64 {
+        self.floor.load(Ordering::Acquire)
     }
 
     async fn run(
@@ -759,4 +768,106 @@ async fn a_failed_run_does_not_move_the_applied_sequence() {
     agent.expect("f8", DeliveryResult::Acked).await;
     agent.expect("f8", DeliveryResult::Done).await;
     assert_eq!(handler.runs(), vec!["f7", "f8"]);
+}
+
+#[tokio::test]
+async fn a_sequence_at_or_below_the_handler_floor_is_done_without_running() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    handler.floor.store(10, Ordering::Release);
+
+    agent.send_fake(fake("f9", Some(10), "done")).await;
+    agent.expect("f9", DeliveryResult::Acked).await;
+    agent.expect("f9", DeliveryResult::Done).await;
+    agent.send_fake(fake("f10", Some(11), "done")).await;
+    agent.expect("f10", DeliveryResult::Acked).await;
+    agent.expect("f10", DeliveryResult::Done).await;
+
+    assert_eq!(handler.runs(), vec!["f10"]);
+}
+
+#[derive(Clone, Default)]
+struct LeavingHandler {
+    events: Arc<Mutex<Vec<String>>>,
+}
+
+impl LeavingHandler {
+    fn events_of(&self, dispatch_id: &str) -> Vec<String> {
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|event| event.ends_with(&format!(":{dispatch_id}")))
+            .cloned()
+            .collect()
+    }
+}
+
+impl CommandHandler for LeavingHandler {
+    type Command = FakeCommand;
+    type Guard = ();
+
+    const KIND: &'static str = "leaving";
+    const REMOVES_AGENT: bool = true;
+
+    fn subject(machine_id: &str) -> String {
+        format!("machine.{machine_id}.leaving.v2")
+    }
+
+    fn begin(&self, _command: &FakeCommand) -> Begin<()> {
+        Begin::Accepted(())
+    }
+
+    async fn run(
+        &self,
+        _machine_id: &str,
+        delivery: &DeliveryRef,
+        command: FakeCommand,
+        _guard: (),
+    ) -> Outcome {
+        self.events
+            .lock()
+            .unwrap()
+            .push(format!("run:{}", delivery.dispatch_id));
+        match command.action.as_str() {
+            "fail" => Outcome::Failed("unsupported".to_string()),
+            _ => Outcome::Done,
+        }
+    }
+
+    async fn remove_agent(&self) {
+        let mut events = self.events.lock().unwrap();
+        let last = events.last().cloned().unwrap_or_default();
+        events.push(last.replacen("run:", "removed:", 1));
+    }
+}
+
+#[tokio::test]
+async fn the_agent_is_removed_only_after_done_is_published() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_command(LeavingHandler::default()).await;
+    let subject = LeavingHandler::subject(MACHINE);
+
+    agent
+        .send_to(subject.clone(), fake("u1", None, "done"))
+        .await;
+    agent.expect("u1", DeliveryResult::Acked).await;
+    agent.expect("u1", DeliveryResult::Done).await;
+    timeout(BOUND, async {
+        while handler.events_of("u1") != ["run:u1", "removed:u1"] {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the agent was never removed");
+
+    agent.send_to(subject, fake("u2", None, "fail")).await;
+    agent.expect("u2", DeliveryResult::Acked).await;
+    agent.expect("u2", DeliveryResult::Failed).await;
+    agent.expect_silence("u2").await;
+    assert_eq!(handler.events_of("u2"), ["run:u2"]);
 }

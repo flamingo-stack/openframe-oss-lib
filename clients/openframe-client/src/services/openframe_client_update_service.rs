@@ -80,6 +80,10 @@ impl OpenFrameClientUpdateService {
         }
     }
 
+    pub fn is_update_in_progress(&self) -> bool {
+        self.update_in_progress.load(Ordering::Acquire)
+    }
+
     pub async fn process_update(
         &self,
         message: OpenFrameClientUpdateMessage,

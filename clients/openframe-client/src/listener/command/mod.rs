@@ -51,6 +51,16 @@ pub trait CommandHandler: Clone + Send + Sync + 'static {
         guard: Self::Guard,
     ) -> impl Future<Output = Outcome> + Send;
 
+    // the floor for SEQUENCED types kept outside the shared store, e.g. by a service that predates it
+    fn applied_sequence(&self, _machine_id: &str) -> i64 {
+        0
+    }
+
+    // REMOVES_AGENT: starts the removal once the done result is out
+    fn remove_agent(&self) -> impl Future<Output = ()> + Send {
+        async {}
+    }
+
     fn awaiting_restart(&self) -> Option<DeliveryRef> {
         None
     }

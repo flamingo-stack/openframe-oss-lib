@@ -332,7 +332,8 @@ impl ResultStore {
                 DeliveryResult::Failed,
                 Some(ERROR_DELIVERY_INTERRUPTED.to_string()),
             )
-            .await?;
+            .await?
+            .len();
         if interrupted > 0 {
             info!(
                 interrupted,
@@ -441,9 +442,9 @@ impl ResultStore {
         delivery_type: String,
         result: DeliveryResult,
         error: Option<String>,
-    ) -> Result<usize> {
+    ) -> Result<Vec<DeliveryRef>> {
         if !self.enabled() {
-            return Ok(0);
+            return Ok(Vec::new());
         }
         self.settle_ledger(
             move |record| {
@@ -533,27 +534,28 @@ impl ResultStore {
         select: F,
         result: DeliveryResult,
         error: Option<String>,
-    ) -> Result<usize>
+    ) -> Result<Vec<DeliveryRef>>
     where
         F: Fn(&LedgerRecord) -> bool + Send + 'static,
     {
         let settled = self
             .with_db(move |db| {
                 let txn = db.begin_write()?;
-                let settled;
+                let mut settled = Vec::new();
                 {
                     let mut ledger = txn.open_table(DELIVERY_LEDGER)?;
                     prune_expired_ledger(&mut ledger)?;
                     let mut selected = Vec::new();
                     for entry in ledger.iter()? {
-                        let (_, value) = entry?;
-                        let record: LedgerRecord = serde_json::from_slice(value.value())?;
-                        if select(&record) {
-                            selected.push(record);
+                        let (key, value) = entry?;
+                        if let Some(record) = decode_ledger(key.value(), value.value()) {
+                            if select(&record) {
+                                selected.push(record);
+                            }
                         }
                     }
-                    settled = selected.len();
                     for mut record in selected {
+                        settled.push(record.delivery.clone());
                         let message = DeliveryResultMessage {
                             delivery: record.delivery.clone(),
                             result,
@@ -569,7 +571,7 @@ impl ResultStore {
                 Ok(settled)
             })
             .await?;
-        if settled > 0 {
+        if !settled.is_empty() {
             self.prune_over_cap().await;
         }
         Ok(settled)
@@ -709,14 +711,24 @@ fn write_settled_result(
     )
 }
 
+// a row this version cannot read (written by a newer one before a rollback) counts as absent
+fn decode_ledger(dispatch_id: &str, bytes: &[u8]) -> Option<LedgerRecord> {
+    match serde_json::from_slice(bytes) {
+        Ok(record) => Some(record),
+        Err(e) => {
+            warn!(dispatch_id, error = %e, "Unreadable delivery ledger entry, ignoring it");
+            None
+        }
+    }
+}
+
 fn read_ledger(
     ledger: &impl ReadableTable<&'static str, &'static [u8]>,
     dispatch_id: &str,
 ) -> Result<Option<LedgerRecord>> {
     Ok(ledger
         .get(dispatch_id)?
-        .map(|value| serde_json::from_slice(value.value()))
-        .transpose()?)
+        .and_then(|value| decode_ledger(dispatch_id, value.value())))
 }
 
 fn write_ledger(
@@ -736,10 +748,12 @@ fn prune_expired_ledger(ledger: &mut redb::Table<&'static str, &'static [u8]>) -
     let mut expired = Vec::new();
     for entry in ledger.iter()? {
         let (key, value) = entry?;
-        let record: LedgerRecord = serde_json::from_slice(value.value())?;
-        if !matches!(record.state, LedgerState::InFlight)
-            && now.saturating_sub(record.updated_at_secs) > DELIVERY_LEDGER_TTL_SECS
-        {
+        let expired_or_unreadable =
+            decode_ledger(key.value(), value.value()).is_none_or(|record| {
+                !matches!(record.state, LedgerState::InFlight)
+                    && now.saturating_sub(record.updated_at_secs) > DELIVERY_LEDGER_TTL_SECS
+            });
+        if expired_or_unreadable {
             expired.push(key.value().to_string());
         }
     }
@@ -759,8 +773,7 @@ fn read_sequence(
 ) -> Result<Option<AppliedSequence>> {
     Ok(sequences
         .get(key)?
-        .map(|value| serde_json::from_slice(value.value()))
-        .transpose()?)
+        .and_then(|value| serde_json::from_slice(value.value()).ok()))
 }
 
 fn journal_contains_batch(

@@ -15,6 +15,10 @@ use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::Notify;
 use tracing::{info, warn};
+
+const ERROR_INTERRUPTED_BEFORE_LAUNCH: &str =
+    "interrupted by agent restart before the updater started";
+
 #[derive(Clone)]
 pub struct UpdateHandlerService {
     state_service: UpdateStateService,
@@ -130,7 +134,14 @@ impl UpdateHandlerService {
     pub async fn handle_pending_update(&self) -> Result<()> {
         let update_state = match self.state_service.load().await? {
             Some(state) => state,
-            None => return Ok(()),
+            None => {
+                self.report_delivery(
+                    DeliveryResult::Failed,
+                    Some(ERROR_INTERRUPTED_BEFORE_LAUNCH.to_string()),
+                )
+                .await;
+                return Ok(());
+            }
         };
 
         info!(
@@ -247,22 +258,62 @@ impl UpdateHandlerService {
         Ok(())
     }
 
-    // settles a CLIENT_UPDATE delivery whose run launched the updater; a legacy update has none
+    // settles a CLIENT_UPDATE delivery waiting for this start; a legacy update has none
     async fn report_delivery(&self, result: DeliveryResult, error: Option<String>) {
-        match self
+        let settled = match self
             .result_store
-            .delivery_settle_awaiting_restart(CLIENT_UPDATE_DELIVERY_TYPE.to_string(), result, error)
+            .delivery_settle_awaiting_restart(
+                CLIENT_UPDATE_DELIVERY_TYPE.to_string(),
+                result,
+                error,
+            )
             .await
         {
-            Ok(0) => {}
-            Ok(settled) => {
-                self.flush_notify.notify_one();
-                info!(settled, ?result, "Client update delivery result queued");
+            Ok(settled) => settled,
+            Err(e) => {
+                warn!(
+                    "Failed to queue the client update delivery result, the backend closes it on timeout: {:#}",
+                    e
+                );
+                return;
             }
-            Err(e) => warn!(
-                "Failed to queue the client update delivery result, the backend closes it on timeout: {:#}",
-                e
-            ),
+        };
+        if settled.is_empty() {
+            return;
+        }
+        self.flush_notify.notify_one();
+        info!(
+            settled = settled.len(),
+            ?result,
+            "Client update delivery result queued"
+        );
+        if result != DeliveryResult::Done {
+            return;
+        }
+        let machine_id = match self.config_service.get_machine_id() {
+            Ok(machine_id) => machine_id,
+            Err(e) => {
+                warn!(
+                    "Failed to resolve the machine id to record the applied client update: {:#}",
+                    e
+                );
+                return;
+            }
+        };
+        for delivery in settled {
+            let Some(sequence) = delivery.sequence else {
+                continue;
+            };
+            if let Err(e) = self
+                .result_store
+                .record_applied_sequence(&delivery, &machine_id, sequence)
+                .await
+            {
+                warn!(
+                    sequence,
+                    "Failed to record the applied client update sequence: {:#}", e
+                );
+            }
         }
     }
 

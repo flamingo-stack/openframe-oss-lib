@@ -82,21 +82,29 @@ impl Delivery {
     }
 
     // the applied sequence when this one is at or below it
-    pub(super) async fn stale(&self, machine_id: &str, delivery: &DeliveryRef) -> Option<i64> {
+    pub(super) async fn stale(
+        &self,
+        machine_id: &str,
+        delivery: &DeliveryRef,
+        floor: i64,
+    ) -> Option<i64> {
         let sequence = delivery.sequence?;
-        if !self.store.enabled() {
-            return None;
-        }
-        match self.store.applied_sequence(delivery, machine_id).await {
-            Ok(applied) => (sequence <= applied).then_some(applied),
-            Err(e) => {
-                warn!(
-                    dispatch_id = %delivery.dispatch_id,
-                    "Failed to read the applied sequence, running the command: {:#}", e
-                );
-                None
+        let stored = if self.store.enabled() {
+            match self.store.applied_sequence(delivery, machine_id).await {
+                Ok(applied) => applied,
+                Err(e) => {
+                    warn!(
+                        dispatch_id = %delivery.dispatch_id,
+                        "Failed to read the applied sequence: {:#}", e
+                    );
+                    0
+                }
             }
-        }
+        } else {
+            0
+        };
+        let applied = stored.max(floor);
+        (sequence <= applied).then_some(applied)
     }
 
     pub(super) async fn record_applied(&self, machine_id: &str, delivery: &DeliveryRef) {

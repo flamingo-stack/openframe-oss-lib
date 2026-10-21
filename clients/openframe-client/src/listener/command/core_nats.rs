@@ -127,7 +127,8 @@ async fn handle<H: CommandHandler>(
     }
 
     if H::SEQUENCED {
-        if let Some(applied) = context.delivery.stale(machine_id, &delivery).await {
+        let floor = listener.handler.applied_sequence(machine_id);
+        if let Some(applied) = context.delivery.stale(machine_id, &delivery, floor).await {
             info!(kind = H::KIND, dispatch_id = %dispatch_id, sequence = ?delivery.sequence, applied, "Stale sequence, a newer one is already applied");
             context.delivery.acked(machine_id, &delivery).await;
             context
@@ -167,7 +168,7 @@ async fn handle<H: CommandHandler>(
             error!(kind = H::KIND, dispatch_id = %dispatch_id, "Command failed: {}", reason)
         }
     }
-    if H::SEQUENCED && !matches!(outcome, Outcome::Failed(_)) {
+    if H::SEQUENCED && matches!(outcome, Outcome::Done | Outcome::RestartRequired) {
         context.delivery.record_applied(machine_id, &delivery).await;
     }
 
@@ -179,10 +180,14 @@ async fn handle<H: CommandHandler>(
             context.restart.drain_and_request().await;
         }
         outcome if H::REMOVES_AGENT => {
+            let done = outcome == Outcome::Done;
             context
                 .delivery
                 .settle_now(machine_id, delivery, outcome)
                 .await;
+            if done {
+                listener.handler.remove_agent().await;
+            }
         }
         outcome => {
             context.delivery.settle(machine_id, delivery, outcome).await;
