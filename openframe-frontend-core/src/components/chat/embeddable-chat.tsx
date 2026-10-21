@@ -75,7 +75,6 @@ import { CHAT_BLOCK_MIN_WIDTH, MINGO_V2_RAIL_WIDTH } from './chat-dimensions';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
-import { ChatMessageListSkeleton } from './chat-message-skeleton';
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context';
 import { ChatPanelHeader, type ChatPanelHeaderProps } from './chat-panel-header';
 import type { ChatRef } from './chat-ref.types';
@@ -99,7 +98,7 @@ import { ChatDialogModals } from './mingo-chat-modals';
 import { MingoChatRail, type MingoDialogStatus } from './mingo-chat-rail';
 import { MingoHistoryRail } from './mingo-history-rail';
 import { MingoOnboardingCard } from './mingo-onboarding-card';
-import { MingoOnboardingCardSkeleton } from './mingo-onboarding-card-skeleton';
+import { MINGO_ONBOARDING_SKELETON_ROWS } from './mingo-onboarding-card-skeleton';
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
@@ -412,6 +411,15 @@ export interface EmbeddableChatProps {
   >;
 
   /**
+   * The host's conversation page size: how many dialogs one page of the list
+   * holds (the `limit` the host's dialog reader asks for). Every conversation
+   * list's loading state (the history rails, the v2 chat list, the welcome's
+   * history) draws exactly one page of rows. Defaults to
+   * `CHAT_HISTORY_PAGE_SIZE` (the lib's own adapters' page).
+   */
+  historyPageSize?: number;
+
+  /**
    * Content overrides for the Guide-mode empty state (`<GuideWelcome>`):
    * greeting `title`/`subtitle` and the `quickActions` chips. Each field falls
    * back to the built-in OpenFrame defaults. `onQuickAction` and the
@@ -648,29 +656,6 @@ function RailSlot({
  * cross-origin embedders behind a proxy override with their absolute path.
  */
 const DEFAULT_AI_AGENT_CONFIG_URL = (slug: string): string => `/api/ai-agents/${encodeURIComponent(slug)}`;
-
-/**
- * Per-row width palette for the empty-state skeleton stack. Cycled
- * by index so each render is deterministic (no jitter between
- * loading frames) and the stack reads like a real, irregular list:
- *
- *   - titles vary from short ("Webinars") to long ("OpenFrame Pull Requests")
- *   - slashes vary from `/docs` to `/getting-started`
- *   - one row collapses to a single-line description to mimic the
- *     short-copy entries returned by `/api/docs/commands`.
- */
-const SKELETON_ROW_VARIANTS: ReadonlyArray<{
-  titleWidth: string;
-  slashWidth: string;
-  descriptionLines: 1 | 2;
-}> = [
-  { titleWidth: 'w-32', slashWidth: 'w-20', descriptionLines: 2 },
-  { titleWidth: 'w-28', slashWidth: 'w-16', descriptionLines: 2 },
-  { titleWidth: 'w-40', slashWidth: 'w-24', descriptionLines: 2 },
-  { titleWidth: 'w-44', slashWidth: 'w-28', descriptionLines: 2 },
-  { titleWidth: 'w-36', slashWidth: 'w-24', descriptionLines: 1 },
-  { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
-];
 
 // =============================================================================
 // Slash-command dispatch
@@ -1073,6 +1058,7 @@ function EmbeddableChatInner({
   userDisplayName,
   userAvatarUrl,
   mingoWelcome,
+  historyPageSize,
   guideWelcome,
   contextPicker,
   renderMention,
@@ -2563,6 +2549,7 @@ function EmbeddableChatInner({
       void loadMoreDialogs();
     },
     isLoadingHistory: dialogsInitialLoading,
+    pageSize: historyPageSize,
     loadError: dialogsLoadError,
     onRetry: reloadDialogs,
   };
@@ -2869,6 +2856,7 @@ function EmbeddableChatInner({
                             void loadMoreDialogs();
                           }}
                           isLoadingHistory={dialogsInitialLoading}
+                          pageSize={historyPageSize}
                           loadError={dialogsLoadError}
                           onRetry={reloadDialogs}
                         />
@@ -2929,6 +2917,7 @@ function EmbeddableChatInner({
                           void loadMoreDialogs();
                         }}
                         isLoadingHistory={dialogsInitialLoading}
+                        pageSize={historyPageSize}
                         loadError={dialogsLoadError}
                         onRetry={reloadDialogs}
                       />
@@ -2941,88 +2930,82 @@ function EmbeddableChatInner({
                           >
                             {hasConversation ? (
                               <div className="flex min-h-0 flex-1 flex-col">
-                                {messagesInitialLoading ? (
-                                  // Match the real list's `fullWidth` layout so swapping
-                                  // skeleton → bubbles doesn't shift the column. The panel
-                                  // wrapper above already pads (`p-[var(--spacing-system-m)]`),
-                                  // so the skeleton sits flush (no inner px/pb).
+                                {/* While the thread loads the list draws its own loading
+                                    state, in the SAME box (`fullWidth`, the panel wrapper
+                                    above already pads). In `previewMode` the chat lives in a
+                                    fixed-height host box (e.g. the Mingo hero demo): `fill`
+                                    top-anchors and clips the loading rows so they read as
+                                    "the whole panel is loading" and never scroll. */}
+                                <ChatMessageList
+                                  messages={messages}
+                                  isLoading={messagesInitialLoading}
+                                  fill={previewMode}
+                                  // v2 thread: names without the colon, 24px
+                                  // faces, 16px between messages (shared with fae v2).
+                                  appearance={appearance}
+                                  isTyping={chatLoading}
+                                  // The stage the turn reports while the user waits
+                                  // ("Searching 28 sources"); the generic phrase otherwise.
+                                  typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
+                                  // Sticky footer for approvals the host lifted out of the
+                                  // thread — see the prop's docblock.
+                                  pendingApprovals={pendingApprovals}
+                                  // Real drawer: the library's smart follow. Passive in-page
+                                  // demo (previewMode): deterministic hard pin instead — a
+                                  // scripted assistant-only stream from a cold mount never
+                                  // satisfies the library's "at bottom" gate, so the reply
+                                  // landed below the fold. `pinBottom` snaps to bottom on
+                                  // every frame; identical mechanism to the Fae demo box, so
+                                  // both surfaces behave 1:1.
+                                  autoScroll={!previewMode}
+                                  pinBottom={previewMode}
+                                  // Passive in-page demos (previewMode) let the surrounding
+                                  // page scroll over the thread; the real drawer keeps
+                                  // containment (deck slide-scroll fix).
+                                  overscrollContain={!previewMode}
+                                  assistantType="mingo"
+                                  assistantIcon={mingoAssistantIcon}
+                                  renderEntityCard={renderEntityCard}
+                                  resolveContextIcon={resolveContextIcon}
+                                  renderContextItem={renderContextItem}
+                                  renderMention={renderMention}
+                                  renderAfterMessage={renderMessageSources}
+                                  // Gated on `chatLoading` for the same reason the composer
+                                  // is: no second send while a turn is in flight. Passive
+                                  // demo hosts (previewMode) stay read-only.
+                                  onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
+                                  NavLinkAnchor={NavLinkAnchorViaRuntime}
+                                  // Real Mingo drawer: hide the message-list scrollbar
+                                  // (scroll stays functional). Scoped here via `className`
+                                  // instead of `ChatMessageList` itself, so other list
+                                  // consumers (host chat, tickets) keep their thin bar.
                                   //
-                                  // In `previewMode` the chat lives in a fixed-height host box
-                                  // (e.g. the Mingo hero demo). The default bottom-anchored
-                                  // skeleton overflows a short panel and grows its OWN
-                                  // scrollbar — ugly. `fill` top-anchors + clips overflow so
-                                  // it reads as "the whole panel is loading" and never scrolls.
-                                  <ChatMessageListSkeleton fullWidth fill={previewMode} className="flex-1" />
-                                ) : (
-                                  <ChatMessageList
-                                    messages={messages}
-                                    // v2 thread: names without the colon, 24px
-                                    // faces, 16px between messages (shared with fae v2).
-                                    appearance={appearance}
-                                    isTyping={chatLoading}
-                                    // The stage the turn reports while the user waits
-                                    // ("Searching 28 sources"); the generic phrase otherwise.
-                                    typingMessage={streamingProgress ? chatProgressLabel(streamingProgress) : undefined}
-                                    // Sticky footer for approvals the host lifted out of the
-                                    // thread — see the prop's docblock.
-                                    pendingApprovals={pendingApprovals}
-                                    // Real drawer: the library's smart follow. Passive in-page
-                                    // demo (previewMode): deterministic hard pin instead — a
-                                    // scripted assistant-only stream from a cold mount never
-                                    // satisfies the library's "at bottom" gate, so the reply
-                                    // landed below the fold. `pinBottom` snaps to bottom on
-                                    // every frame; identical mechanism to the Fae demo box, so
-                                    // both surfaces behave 1:1.
-                                    autoScroll={!previewMode}
-                                    pinBottom={previewMode}
-                                    // Passive in-page demos (previewMode) let the surrounding
-                                    // page scroll over the thread; the real drawer keeps
-                                    // containment (deck slide-scroll fix).
-                                    overscrollContain={!previewMode}
-                                    assistantType="mingo"
-                                    assistantIcon={mingoAssistantIcon}
-                                    renderEntityCard={renderEntityCard}
-                                    resolveContextIcon={resolveContextIcon}
-                                    renderContextItem={renderContextItem}
-                                    renderMention={renderMention}
-                                    renderAfterMessage={renderMessageSources}
-                                    // Gated on `chatLoading` for the same reason the composer
-                                    // is: no second send while a turn is in flight. Passive
-                                    // demo hosts (previewMode) stay read-only.
-                                    onAskSelect={chatLoading || previewMode ? undefined : handleAskSelect}
-                                    NavLinkAnchor={NavLinkAnchorViaRuntime}
-                                    // Real Mingo drawer: hide the message-list scrollbar
-                                    // (scroll stays functional). Scoped here via `className`
-                                    // instead of `ChatMessageList` itself, so other list
-                                    // consumers (host chat, tickets) keep their thin bar.
-                                    //
-                                    // `previewMode` (the passive in-page demo) instead:
-                                    //  • KEEP the default thin scrollbar — the "elevator" —
-                                    //    so the Mingo demo's scroll controls match the Fae
-                                    //    demo box (which renders the default ChatMessageList
-                                    //    scrollbar) 1:1.
-                                    //  • Re-enable pointer events on the scroller: previewMode
-                                    //    puts `pointer-events-none` on the whole panel (line
-                                    //    ~1981) so the demo doesn't trap clicks, but that also
-                                    //    killed wheel/touch scroll on the thread (the Mingo
-                                    //    embed couldn't scroll while the Fae box could). Only
-                                    //    the scroller re-enables; composer + chrome stay inert.
-                                    className={
-                                      previewMode
-                                        ? 'pointer-events-auto flex-1'
-                                        : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-                                    }
-                                    // No inner `px`/`pb`: the panel wrapper already pads with
-                                    // `p-[var(--spacing-system-m)]`. The default content class
-                                    // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
-                                    // double-inset the thread; `pb-0` overrides via twMerge.
-                                    contentClassName="max-w-none pb-0"
-                                    fullWidth
-                                    hasNextPage={hasMoreMessages}
-                                    isFetchingNextPage={isMessagesLoading}
-                                    onLoadMore={loadMoreMessages}
-                                  />
-                                )}
+                                  // `previewMode` (the passive in-page demo) instead:
+                                  //  • KEEP the default thin scrollbar — the "elevator" —
+                                  //    so the Mingo demo's scroll controls match the Fae
+                                  //    demo box (which renders the default ChatMessageList
+                                  //    scrollbar) 1:1.
+                                  //  • Re-enable pointer events on the scroller: previewMode
+                                  //    puts `pointer-events-none` on the whole panel (line
+                                  //    ~1981) so the demo doesn't trap clicks, but that also
+                                  //    killed wheel/touch scroll on the thread (the Mingo
+                                  //    embed couldn't scroll while the Fae box could). Only
+                                  //    the scroller re-enables; composer + chrome stay inert.
+                                  className={
+                                    previewMode
+                                      ? 'pointer-events-auto flex-1'
+                                      : 'flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+                                  }
+                                  // No inner `px`/`pb`: the panel wrapper already pads with
+                                  // `p-[var(--spacing-system-m)]`. The default content class
+                                  // adds `px-[var(--spacing-system-m)]` + `pb-…xs`, which
+                                  // double-inset the thread; `pb-0` overrides via twMerge.
+                                  contentClassName="max-w-none pb-0"
+                                  fullWidth
+                                  hasNextPage={hasMoreMessages}
+                                  isFetchingNextPage={isMessagesLoading}
+                                  onLoadMore={loadMoreMessages}
+                                />
                               </div>
                             ) : activeMode === 'mingo' ? (
                               /* Figma node 7532:222444 — default (Mingo-mode) empty state:
@@ -3033,6 +3016,7 @@ function EmbeddableChatInner({
                                 onStartGuideChat={
                                   effectiveModes.guide ? () => handleActiveModeChange('guide') : undefined
                                 }
+                                historyPageSize={historyPageSize}
                                 {...mingoWelcome}
                                 // History now lives in its own list view (the wide rail or
                                 // the narrow "Current Chats" list), so the welcome is always
@@ -3104,12 +3088,12 @@ function EmbeddableChatInner({
                                   <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
                                     {!commandsLoaded &&
                                       chipCommands.length === 0 &&
-                                      SKELETON_ROW_VARIANTS.map((variant, i) => (
-                                        <MingoOnboardingCardSkeleton
+                                      Array.from({ length: MINGO_ONBOARDING_SKELETON_ROWS }, (_, i) => (
+                                        <MingoOnboardingCard
                                           key={`chip-skeleton-${i}`}
-                                          titleWidth={variant.titleWidth}
-                                          slashWidth={variant.slashWidth}
-                                          descriptionLines={variant.descriptionLines}
+                                          loading
+                                          skeletonIndex={i}
+                                          title=""
                                         />
                                       ))}
                                     {chipCommands.map(cmd => {

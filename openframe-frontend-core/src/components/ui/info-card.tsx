@@ -50,16 +50,28 @@ interface InfoCardProps {
   className?: string;
   /** The shape drawn while the data is read (a page's loading state, where `data.items` is empty). */
   skeleton?: InfoCardSkeletonShape;
+  /** The data is still being read: the card draws its `skeleton` shape. A loading scope does the same while
+   *  `data.items` is empty. */
+  loading?: boolean;
 }
 
-/** What a loading InfoCard draws: its rows, and whether it carries a head, a progress bar and a footer. */
+/**
+ * What a loading InfoCard draws: its rows, and whether it carries a head, a progress bar and a footer. Static copy
+ * the caller already knows is passed as words and drawn for real; only the read values are bars.
+ */
 export interface InfoCardSkeletonShape {
-  /** Value rows drawn. Default {@link INFO_CARD_SKELETON_ROWS}. */
-  rows?: number;
-  /** A title line. Default `true`. */
-  title?: boolean;
-  /** A subtitle line. */
-  subtitle?: boolean;
+  /**
+   * The value rows. A number draws that many rows, each a label bar and a value bar. A list of labels draws one row
+   * per label, the label real and the value a bar (`null` or `''`: a row with no label, as a multi-value item's
+   * further values are drawn). Default {@link INFO_CARD_SKELETON_ROWS}.
+   */
+  rows?: number | Array<string | null>;
+  /** With a number of `rows`: the rows carry no label (only their value bars). Default `false`. */
+  unlabelledRows?: boolean;
+  /** The title line: `true` a bar, a string the title drawn for real, `false` none. Default `true`. */
+  title?: boolean | string;
+  /** The subtitle line: `true` a bar, a string the subtitle drawn for real. */
+  subtitle?: boolean | string;
   progress?: boolean;
   footer?: boolean;
 }
@@ -75,12 +87,16 @@ const HEAD_LINE_CLASS = 'flex items-center gap-[var(--spacing-system-xsf)] self-
 const ROWS_CLASS = 'flex w-full flex-col items-start gap-[var(--spacing-system-xs)] self-stretch';
 const VALUE_ROW_CLASS = 'flex h-6 w-full items-center gap-[var(--spacing-system-xs)] self-stretch';
 const DIVIDER_CLASS = 'h-px flex-1 bg-ods-divider';
+const TITLE_TEXT_CLASS = 'min-w-0 truncate text-ods-text-primary text-h4';
+const SUBTITLE_TEXT_CLASS = 'min-w-0 truncate text-ods-text-secondary text-h4';
+const ROW_LABEL_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const FOOTER_CLASS = 'mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]';
 
-export function InfoCard({ data, className = '', skeleton }: InfoCardProps) {
-  // In a page's loading state with no rows yet (they are read) the card is its skeleton.
+export function InfoCard({ data, className = '', skeleton, loading }: InfoCardProps) {
+  // ONE switch: in a page's loading state with no rows yet (they are read), or while the host reads the data, the
+  // card is its skeleton.
   const inScope = useLoadingScope();
-  if (inScope && data.items.length === 0) return <InfoCardSkeleton {...skeleton} className={className} />;
+  if (loading || (inScope && data.items.length === 0)) return <InfoCardSkeleton {...skeleton} className={className} />;
   return (
     <div className={cn(FRAME_CLASS, className)}>
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
@@ -91,7 +107,7 @@ export function InfoCard({ data, className = '', skeleton }: InfoCardProps) {
           <div className={HEAD_CLASS}>
             {data.title && (
               <div className={HEAD_LINE_CLASS}>
-                <span className="min-w-0 truncate text-ods-text-primary text-h4" title={data.title}>
+                <span className={TITLE_TEXT_CLASS} title={data.title}>
                   {data.title}
                 </span>
                 {data.icon}
@@ -99,7 +115,7 @@ export function InfoCard({ data, className = '', skeleton }: InfoCardProps) {
             )}
             {data.subtitle && (
               <div className={HEAD_LINE_CLASS}>
-                <span className="min-w-0 truncate text-ods-text-secondary text-h4" title={data.subtitle}>
+                <span className={SUBTITLE_TEXT_CLASS} title={data.subtitle}>
                   {data.subtitle}
                 </span>
                 {/* Icon lives with the title when present; otherwise it falls to the subtitle so
@@ -190,7 +206,7 @@ function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLab
 
   return (
     <div className={VALUE_ROW_CLASS}>
-      <span className="whitespace-nowrap text-ods-text-primary text-h4">{showLabel ? label : ''}</span>
+      <span className={ROW_LABEL_CLASS}>{showLabel ? label : ''}</span>
       <div className={DIVIDER_CLASS} />
       <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
         <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
@@ -216,32 +232,54 @@ function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLab
 }
 
 /**
- * An InfoCard while its data is read: the same frame and groups, the title and subtitle `text-h4` bars, each row
- * its label and value bars either side of the row's divider, the progress bar and the footer line boxes of their
- * own height.
+ * An InfoCard while its data is read: the same frame and groups, the title and subtitle drawn for real when the
+ * caller passes their words (`text-h4` bars otherwise), each row its label (real when passed, a bar when not, none
+ * when unlabelled) and a value bar either side of the row's divider, the progress bar and the footer line boxes of
+ * their own height.
  */
 export function InfoCardSkeleton({
   rows = INFO_CARD_SKELETON_ROWS,
+  unlabelledRows = false,
   title = true,
   subtitle = false,
   progress = false,
   footer = false,
   className = '',
 }: InfoCardSkeletonShape & { className?: string }) {
+  // Each row's label: a word drawn for real, `null` for no label, `undefined` for a label bar.
+  const rowLabels: Array<string | null | undefined> = Array.isArray(rows)
+    ? rows.map(label => label || null)
+    : Array.from({ length: rows }, () => (unlabelledRows ? null : undefined));
   return (
     <div className={cn(FRAME_CLASS, className)} aria-hidden>
       <div className={CONTENT_CLASS}>
         {(title || subtitle) && (
           <div className={HEAD_CLASS}>
-            {title && <TextLineSkeleton type="h4" className="w-1/2" />}
-            {subtitle && <TextLineSkeleton type="h4" className="w-1/3" />}
+            {typeof title === 'string' ? (
+              <div className={HEAD_LINE_CLASS}>
+                <span className={TITLE_TEXT_CLASS}>{title}</span>
+              </div>
+            ) : (
+              title && <TextLineSkeleton type="h4" className="w-1/2" />
+            )}
+            {typeof subtitle === 'string' ? (
+              <div className={HEAD_LINE_CLASS}>
+                <span className={SUBTITLE_TEXT_CLASS}>{subtitle}</span>
+              </div>
+            ) : (
+              subtitle && <TextLineSkeleton type="h4" className="w-1/3" />
+            )}
           </div>
         )}
-        {(rows > 0 || progress) && (
+        {(rowLabels.length > 0 || progress) && (
           <div className={ROWS_CLASS}>
-            {Array.from({ length: rows }, (_, index) => (
+            {rowLabels.map((label, index) => (
               <div key={index} className={VALUE_ROW_CLASS}>
-                <TextLineSkeleton type="h4" className="w-20" />
+                {label === undefined ? (
+                  <TextLineSkeleton type="h4" className="w-20" />
+                ) : (
+                  <span className={ROW_LABEL_CLASS}>{label ?? ''}</span>
+                )}
                 <div className={DIVIDER_CLASS} />
                 <TextLineSkeleton type="h4" className="w-24" />
               </div>

@@ -4,7 +4,8 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -49,6 +50,35 @@ const formatTokenCount = (count: number): string => {
 const hasAnyBreakdownRow = (breakdown?: ModelUsageBreakdown): breakdown is ModelUsageBreakdown =>
   !!breakdown && !!(breakdown.haikuRewriter || breakdown.haikuClassifier || breakdown.haikuSummarizer);
 
+export interface ModelDisplaySkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  /** Also render the right-aligned "tokens used" tail placeholder. The token
+   *  tail only appears once `contextWindow` is known, so the default skeleton
+   *  shows just the left part (provider icon + model name). */
+  showTokens?: boolean;
+}
+
+/**
+ * Loading placeholder for the {@link ModelDisplay} inline pill. Mirrors its
+ * layout (provider icon + model name) so the footer doesn't shift when the
+ * real model metadata resolves. The "tokens used" tail is opt-in via
+ * `showTokens`, matching ModelDisplay (which only renders it once the context
+ * window is known).
+ */
+const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkeletonProps>(
+  ({ className, showTokens = false, ...props }, ref) => (
+    <div ref={ref} aria-hidden className={cn('flex items-center gap-1 text-h6', className)} {...props}>
+      {/* provider icon */}
+      <UnifiedSkeleton className="h-5 w-4 shrink-0 rounded-sm" />
+      {/* model name */}
+      <TextLineSkeleton type="h6" className="w-24" />
+      {/* "X / Y tokens used" tail — only when tokens are expected */}
+      {showTokens && <TextLineSkeleton type="h6" className="ml-auto w-32" />}
+    </div>
+  ),
+);
+
+ModelDisplaySkeleton.displayName = 'ModelDisplaySkeleton';
+
 const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
   (
     {
@@ -62,15 +92,21 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       hitRatePct,
       inputTokens,
       outputTokens,
+      loading = false,
       ...props
     },
     ref,
   ) => {
+    // ONE switch: while the model metadata loads (or in the page's loading state) the row is its own skeleton.
+    const isLoading = useLoadingScope() || loading;
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
     // v2 spells the counts out ("372 / 50,000 tokens used"); classic keeps them short.
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
+
+    // The "tokens used" tail is drawn when the loaded row would draw it: once the context window is known.
+    if (isLoading) return <ModelDisplaySkeleton ref={ref} className={className} showTokens={contextWindow != null} />;
 
     // Inline pill: provider icon + model name + "X / Y tokens used".
     // The "tokens used" tail renders as soon as `contextWindow` is known
@@ -166,34 +202,5 @@ function BreakdownRow({
 }
 
 ModelDisplay.displayName = 'ModelDisplay';
-
-export interface ModelDisplaySkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Also render the right-aligned "tokens used" tail placeholder. The token
-   *  tail only appears once `contextWindow` is known, so the default skeleton
-   *  shows just the left part (provider icon + model name). */
-  showTokens?: boolean;
-}
-
-/**
- * Loading placeholder for the {@link ModelDisplay} inline pill. Mirrors its
- * layout (provider icon + model name) so the footer doesn't shift when the
- * real model metadata resolves. The "tokens used" tail is opt-in via
- * `showTokens`, matching ModelDisplay (which only renders it once the context
- * window is known).
- */
-const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkeletonProps>(
-  ({ className, showTokens = false, ...props }, ref) => (
-    <div ref={ref} aria-hidden className={cn('flex items-center gap-1 text-h6', className)} {...props}>
-      {/* provider icon */}
-      <UnifiedSkeleton className="h-5 w-4 shrink-0 rounded-sm" />
-      {/* model name */}
-      <UnifiedSkeleton className="h-5 w-24" />
-      {/* "X / Y tokens used" tail — only when tokens are expected */}
-      {showTokens && <UnifiedSkeleton className="ml-auto h-3 w-32" />}
-    </div>
-  ),
-);
-
-ModelDisplaySkeleton.displayName = 'ModelDisplaySkeleton';
 
 export { ModelDisplay, ModelDisplaySkeleton };

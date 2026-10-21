@@ -11,7 +11,9 @@ import { EyeClassicIcon } from '../icons-v2-generated/interface/eye-classic-icon
 import { EyeOffClassicIcon } from '../icons-v2-generated/interface/eye-off-classic-icon';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 import { TruncateText } from './truncate-text';
 
 export type ServiceCardRowAction = {
@@ -40,15 +42,29 @@ export interface ServiceCardProps {
   icon?: React.ReactNode;
   tag?: ServiceCardTag;
   rows: ServiceCardRow[];
+  /**
+   * The values are still being read: the frame, icon, title, subtitle, tag and each row's label are drawn for real
+   * (an empty title is a bar), and each row's value is a bar in the row's own value box, without its actions. A
+   * loading scope does the same.
+   */
+  loading?: boolean;
   className?: string;
 }
+
+/** A row's label column and its value box, read by the row and its skeleton (the same box). */
+const SERVICE_CARD_ROW_CLASS = 'flex min-w-0 items-center gap-3';
+const SERVICE_CARD_ROW_LABEL_CLASS = 'w-20 shrink-0 text-ods-text-primary text-h6 content-md:w-24';
+const SERVICE_CARD_VALUE_BOX_CLASS =
+  'flex h-12 min-w-0 flex-1 items-center justify-between rounded-md border border-ods-border bg-ods-bg px-3 content-md:px-4';
 
 function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean }) {
   if (isRevealed) return <span>{value}</span>;
   return <span>{'•'.repeat(Math.min(value.length, 12))}</span>;
 }
 
-export function ServiceCard({ title, subtitle, icon, tag, rows, className }: ServiceCardProps) {
+export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loadingProp, className }: ServiceCardProps) {
+  // ONE switch: in a page's loading state (or while the host reads the values) every value is a bar.
+  const loading = useLoadingScope() || !!loadingProp;
   const resolvedIcon = icon ?? (
     <OpenframeLogoIcon
       secondaryColor="var(--color-accent-primary)"
@@ -66,11 +82,19 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
             {resolvedIcon}
           </div>
           <div className="min-w-0">
-            <TruncateText variant="h3">{title}</TruncateText>
-            {subtitle && (
-              <TruncateText variant="h6" tone="secondary">
-                {subtitle}
-              </TruncateText>
+            {loading && !title ? (
+              <TextLineSkeleton type="h3" className="w-40 max-w-full" />
+            ) : (
+              <TruncateText variant="h3">{title}</TruncateText>
+            )}
+            {loading && subtitle === '' ? (
+              <TextLineSkeleton type="h6" className="w-56 max-w-full" />
+            ) : (
+              subtitle && (
+                <TruncateText variant="h6" tone="secondary">
+                  {subtitle}
+                </TruncateText>
+              )
             )}
           </div>
         </div>
@@ -83,9 +107,21 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, className }: Ser
 
       {/* Rows */}
       <div className="space-y-3">
-        {rows.map((row, idx) => (
-          <ServiceCardRowItem key={idx} row={row} />
-        ))}
+        {rows.map((row, idx) =>
+          loading ? <ServiceCardRowSkeleton key={idx} label={row.label} /> : <ServiceCardRowItem key={idx} row={row} />,
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A row while its value is read: the label real, the value a bar in the value box. */
+function ServiceCardRowSkeleton({ label }: { label?: string }) {
+  return (
+    <div data-loading-item className={SERVICE_CARD_ROW_CLASS}>
+      {label && <div className={SERVICE_CARD_ROW_LABEL_CLASS}>{label}</div>}
+      <div className={SERVICE_CARD_VALUE_BOX_CLASS}>
+        <TextLineSkeleton type="inherit" className="w-40 max-w-full" />
       </div>
     </div>
   );
@@ -114,14 +150,9 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
   };
 
   return (
-    <div className="flex min-w-0 items-center gap-3">
-      {row.label && <div className="w-20 shrink-0 text-ods-text-primary text-h6 content-md:w-24">{row.label}</div>}
-      <div
-        className={cn(
-          'flex h-12 min-w-0 flex-1 items-center justify-between rounded-md border border-ods-border bg-ods-bg px-3 content-md:px-4',
-          row.monospace ? 'font-mono' : '',
-        )}
-      >
+    <div data-loading-item className={SERVICE_CARD_ROW_CLASS}>
+      {row.label && <div className={SERVICE_CARD_ROW_LABEL_CLASS}>{row.label}</div>}
+      <div className={cn(SERVICE_CARD_VALUE_BOX_CLASS, row.monospace ? 'font-mono' : '')}>
         {/* No tooltip while a secret is masked — the old native `title` leaked the raw value on hover. */}
         <FloatingTooltip
           content={row.value}

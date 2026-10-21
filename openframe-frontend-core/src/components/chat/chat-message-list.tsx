@@ -131,6 +131,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       messages,
       dialogId,
       isLoading: isLoadingProp = false,
+      fill = false,
       isTyping = false,
       typingMessage,
       autoScroll = true,
@@ -941,6 +942,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           showAvatars={showAvatars}
           fullWidth={fullWidth}
           contentClassName={contentClassName}
+          fill={fill}
           messageCount={CHAT_MESSAGE_LIST_SKELETON_MESSAGES}
         />
       );

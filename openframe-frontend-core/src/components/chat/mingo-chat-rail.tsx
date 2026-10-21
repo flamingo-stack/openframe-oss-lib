@@ -19,13 +19,14 @@ import {
   UserIcon,
   UsersIcon,
 } from '../icons-v2-generated';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatListEmptyState } from './chat-list-empty-state';
-import { ChatListItem, ChatNavSidebar, type ChatNavSidebarItem } from './chat-nav-sidebar';
+import { ChatListItem, ChatListItemSkeleton, ChatNavSidebar, type ChatNavSidebarItem } from './chat-nav-sidebar';
+import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
 import type { MingoHistoryScope } from './mingo-history-rail';
 import type { DialogItem } from './types/component.types';
 
@@ -66,8 +67,10 @@ export interface MingoChatRailProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
-  /** The first page is still loading. */
+  /** The first page is still loading: the list draws one page of loading rows. */
   isLoadingHistory?: boolean;
+  /** The host's page size: how many rows the loading state draws. Default `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
   /** The list failed to load with nothing cached. */
   loadError?: boolean;
   onRetry?: () => void;
@@ -115,11 +118,14 @@ export function MingoChatRail({
   isLoadingMore = false,
   onLoadMore,
   isLoadingHistory = false,
+  pageSize = CHAT_HISTORY_PAGE_SIZE,
   loadError = false,
   onRetry,
   onExpand,
   className,
 }: MingoChatRailProps) {
+  // ONE switch: the first page loading (or the page's loading state) draws one page of the rows' own skeleton.
+  const loading = useLoadingScope() || isLoadingHistory;
   const [searchOpen, setSearchOpen] = useState(!!searchQuery?.trim());
   const hasSearch = !!searchQuery?.trim();
 
@@ -208,10 +214,8 @@ export function MingoChatRail({
         )}
       </div>
     );
-  } else if (isLoadingHistory) {
-    list = Array.from({ length: 6 }, (_, i) => (
-      <UnifiedSkeleton key={i} aria-hidden className="h-10 shrink-0 rounded-md" />
-    ));
+  } else if (loading) {
+    list = Array.from({ length: pageSize }, (_, i) => <ChatListItemSkeleton key={i} index={i} data-loading-item />);
   } else if (dialogs.length === 0 && !draftTitle) {
     list = hasSearch ? (
       <p className="px-[var(--spacing-system-xs)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h6">
@@ -323,7 +327,7 @@ function MingoChatRailRow({ dialog, active, status, onSelect, menuItems }: Mingo
   const title = dialog.title || 'Untitled Chat';
 
   return (
-    <div className="group/row relative shrink-0">
+    <div data-loading-item className="group/row relative shrink-0">
       <ChatListItem
         active={active}
         title={title}

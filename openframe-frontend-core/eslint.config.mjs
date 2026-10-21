@@ -215,6 +215,8 @@ export default defineConfig([
       // Every table row and skeleton row carries `data-loading-item`, the height gate's marker: an attribute on
       // aria-hidden or role-less row cards, which `screen` cannot count.
       'src/__tests__/data-table-loading-items.test.tsx',
+      // The same marker on the chat's conversation rows (loaded and loading), counted per list.
+      'src/components/chat/__tests__/chat-history-loading.test.tsx',
       // A header action's icon in the mobile "..." row: what is under test is the
       // re-tint wrapper around it, a role-less <span> whose class IS the contract
       // (an accent-tinted icon must not stay dark on the menu's dark row). No

@@ -8,9 +8,10 @@ import { CompassIcon, Arrow01DownIcon, AlertCircleIcon, Refresh01RightIcon } fro
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
-import { MingoChatHistorySkeleton } from './mingo-chat-history';
+import { MingoChatHistory } from './mingo-chat-history';
 import { QuickActionChipButton } from './quick-action-chip';
 import { QuickActionWall } from './quick-action-wall';
+import type { DialogItem } from './types/component.types';
 
 // =============================================================================
 // Types
@@ -72,6 +73,9 @@ export interface MingoWelcomeProps {
    *  flash the new-user layout before the list arrives. Ignored once
    *  `dialogHistory` is provided. */
   isLoadingHistory?: boolean;
+  /** The host's dialog page size: how many rows the history's loading state draws
+   *  (`isLoadingHistory`). Default `CHAT_HISTORY_PAGE_SIZE`. */
+  historyPageSize?: number;
   /** The dialog-list load FAILED (e.g. backend down) and there's nothing
    *  cached. Renders an error + retry block in place of the new-user empty
    *  state (which would otherwise misleadingly advertise Guide). Takes
@@ -104,6 +108,9 @@ const DEFAULT_PROMO: MingoWelcomePromo = {
 
 const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed';
 
+/** No dialogs yet: what the history's loading state is rendered with. */
+const NO_DIALOGS: ReadonlyArray<DialogItem> = [];
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -134,6 +141,7 @@ export function MingoWelcome({
   hasExistingChats = false,
   dialogHistory,
   isLoadingHistory = false,
+  historyPageSize,
   loadError = false,
   onRetry,
   onStartGuideChat,
@@ -234,7 +242,9 @@ export function MingoWelcome({
             )}
           </div>
         ) : isLoadingHistory ? (
-          <MingoChatHistorySkeleton />
+          // The history draws its own loading state (one page of rows) until the
+          // first page tells new and returning users apart.
+          <MingoChatHistory dialogs={NO_DIALOGS} loading pageSize={historyPageSize} />
         ) : (
           <>
             {/* Scrollable region — only the greeting + grid scroll; the notification

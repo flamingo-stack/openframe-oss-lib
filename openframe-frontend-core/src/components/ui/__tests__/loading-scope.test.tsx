@@ -10,10 +10,16 @@ import { ChatMessageList } from '../../chat/chat-message-list';
 import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from '../../chat/chat-message-skeleton';
 import { ChatTurn } from '../../chat/chat-turn';
 import { EntityAuthorCard } from '../../chat/entity-cards/entity-author-card';
+import { SsoJoinForm } from '../../features/auth/sso-join-form';
+import { DeviceSelector } from '../../features/devices/device-selector/device-selector';
 import { DevicesGrid } from '../../features/devices/devices-grid';
 import { DevicesList } from '../../features/devices/devices-list';
 import { LogsTableView } from '../../features/logs/logs-table-view';
 import { PlatformBadge } from '../../features/platform-badge';
+import {
+  POLICY_CONFIGURATION_PANEL_SKELETON_CATEGORIES,
+  PolicyConfigurationPanel,
+} from '../../features/policy-configuration-panel';
 import { PushButtonSelector } from '../../features/push-button-selector';
 import {
   TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS,
@@ -30,9 +36,15 @@ import { VendorIcon } from '../../vendor-icon';
 import { AvatarStack } from '../avatar-stack';
 import { BenefitList } from '../benefit-list';
 import { CheckboxBlock } from '../checkbox-block';
+import { CheckboxWithDescription } from '../checkbox-with-description';
+import { DashboardInfoCard } from '../dashboard-info-card';
+import { DeviceCard } from '../device-card';
+import { InfoCard, InfoCardSkeleton } from '../info-card';
 import { InfoSection } from '../info-section';
 import { LeaderRow } from '../leader-row';
 import { LoadingScope, LoadingWhen, useLoadingScope } from '../loading-scope';
+import { RADIO_GROUP_BLOCK_SKELETON_OPTIONS, RadioGroupBlock } from '../radio-group';
+import { ServiceCard } from '../service-card';
 import { StatusBadge } from '../status-badge';
 import { SuperUserBannerView } from '../super-user-banner-view';
 import { TabNavigation } from '../tab-navigation';
@@ -207,6 +219,83 @@ describe('a component in a scope draws its own skeleton', () => {
       ['Notify me', 'By email'],
     ],
     ['SuperUserBannerView', <SuperUserBannerView key="a" tenantName={READ} />, ['Super user access']],
+    [
+      'SsoJoinForm',
+      <SsoJoinForm
+        key="a"
+        name={READ}
+        email={READ}
+        organizationName={READ}
+        roles={[READ]}
+        agreedToTerms={false}
+        onAgreedToTermsChange={() => {}}
+        onSubmit={() => {}}
+        onBack={() => {}}
+      />,
+      ['One Last Step', "Confirm the account you're joining with.", 'Create Account', 'Back to Login'],
+    ],
+    [
+      'ServiceCard',
+      <ServiceCard
+        key="a"
+        title="Database"
+        rows={[
+          { label: 'Host', value: READ },
+          { label: 'Password', value: READ, isSecret: true },
+        ]}
+      />,
+      ['Database', 'Host', 'Password'],
+    ],
+    [
+      'PolicyConfigurationPanel',
+      <PolicyConfigurationPanel
+        key="a"
+        categories={[{ id: 'c', name: 'File system', policies: [{ id: 'p', name: READ } as never] }]}
+        editMode={false}
+        onPolicyPermissionChange={() => {}}
+        onCategoryPermissionChange={() => {}}
+      />,
+      ['File system'],
+    ],
+    [
+      'RadioGroupBlock',
+      <RadioGroupBlock
+        key="a"
+        value="b"
+        options={[
+          { value: 'a', label: 'All devices' },
+          { value: 'b', label: 'Selected devices', description: 'Pick them one by one' },
+        ]}
+      />,
+      ['All devices', 'Selected devices', 'Pick them one by one'],
+    ],
+    [
+      'CheckboxWithDescription',
+      <CheckboxWithDescription
+        key="a"
+        id="x"
+        checked
+        onCheckedChange={() => {}}
+        title="Auto update"
+        description="Install new versions"
+      />,
+      ['Auto update', 'Install new versions'],
+    ],
+    ['DeviceCard', <DeviceCard key="a" device={{ name: READ, organization: READ }} />, []],
+    [
+      'DashboardInfoCard',
+      <DashboardInfoCard key="a" title="" icon={<span>{READ}</span>} iconLoading value={READ} />,
+      [],
+    ],
+    [
+      'InfoCard',
+      <InfoCard
+        key="a"
+        data={{ items: [] }}
+        skeleton={{ title: 'Hardware', subtitle: 'Last scan', rows: ['CPU', null, 'Memory'] }}
+      />,
+      ['Hardware', 'Last scan', 'CPU', 'Memory'],
+    ],
     ['DevicesList', <DevicesList key="a" devices={[]} />, []],
     ['DevicesGrid', <DevicesGrid key="a" devices={[]} isLoading={false} />, []],
     ['LogsTableView', <LogsTableView key="a" logs={[]} filters={{}} onFilterChange={() => {}} />, ['Log ID']],
@@ -256,6 +345,69 @@ describe('a component in a scope draws its own skeleton', () => {
     expect(statusesView.querySelectorAll('[data-loading-item]')).toHaveLength(TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS);
   });
 
+  it('lists whose items are read draw their declared typical count, and the host may state its own', () => {
+    const panel = (count?: number) =>
+      inScope(
+        <PolicyConfigurationPanel
+          categories={[]}
+          editMode={false}
+          skeletonCount={count}
+          onPolicyPermissionChange={() => {}}
+          onCategoryPermissionChange={() => {}}
+        />,
+      ).container.querySelectorAll('[data-loading-item]');
+    expect(panel()).toHaveLength(POLICY_CONFIGURATION_PANEL_SKELETON_CATEGORIES);
+    expect(panel(2)).toHaveLength(2);
+    const { container: radios } = inScope(<RadioGroupBlock options={[]} />);
+    expect(radios.querySelectorAll('[data-loading-item]')).toHaveLength(RADIO_GROUP_BLOCK_SKELETON_OPTIONS);
+    const { container: radiosNamed } = inScope(<RadioGroupBlock options={[{ value: 'a', label: 'Daily' }]} />);
+    expect(radiosNamed.querySelectorAll('[data-loading-item]')).toHaveLength(1);
+    expect(radiosNamed.querySelector('[role="radio"]')).toBeNull();
+  });
+
+  it('the loading prop switches each component without a scope', () => {
+    const { container: card } = render(<ServiceCard title="API" rows={[{ label: 'Key', value: READ }]} loading />);
+    expect(card.querySelector(SURFACE)).not.toBeNull();
+    expect(card.textContent).not.toContain(READ);
+    const { container: device } = render(<DeviceCard device={{ name: READ }} loading data-loading-item="" />);
+    expect(device.querySelector('[data-loading-item]')).not.toBeNull();
+    expect(device.textContent).not.toContain(READ);
+    const { container: sso } = render(
+      <SsoJoinForm
+        name={READ}
+        organizationName={READ}
+        agreedToTerms={false}
+        onAgreedToTermsChange={() => {}}
+        onSubmit={() => {}}
+        onBack={() => {}}
+        identityLoading
+      />,
+    );
+    expect(sso.textContent).not.toContain(READ);
+    expect(sso.textContent).toContain('Create Account');
+    const { container: info } = render(<InfoCard data={{ items: [{ label: 'OS', value: READ }] }} loading />);
+    expect(info.textContent).not.toContain(READ);
+  });
+
+  it('a skeleton InfoCard draws unlabelled rows as value bars only', () => {
+    const { container } = render(<InfoCardSkeleton title={false} rows={2} unlabelledRows />);
+    expect(container.querySelectorAll(SURFACE)).toHaveLength(2);
+  });
+
+  it('a DashboardInfoCard whose title is read draws a title bar, its icon slot a skeleton', () => {
+    const { container } = inScope(
+      <DashboardInfoCard title={READ} titleLoading icon={<span>{READ}</span>} iconLoading value={READ} />,
+    );
+    expect(container.textContent).not.toContain(READ);
+  });
+
+  it('the device selector draws the rows the host states while loading', () => {
+    const { container } = render(
+      <DeviceSelector devices={[]} loading skeletonRows={5} showSelectionModeRadio={false} />,
+    );
+    expect(container.querySelectorAll('[data-loading-item]')).toHaveLength(5);
+  });
+
   it('an empty list in a scope never draws its empty state', () => {
     const { container: logsView } = inScope(<LogsTableView logs={[]} filters={{}} onFilterChange={() => {}} />);
     expect(logsView.textContent).not.toContain('No logs yet');
@@ -286,5 +438,36 @@ describe('a component in a scope draws its own skeleton', () => {
       />,
     );
     expect(chatView.querySelectorAll('[data-loading-item]')).toHaveLength(2);
+  });
+});
+
+describe('loading gaps the frontend asked for', () => {
+  it('ServiceCard draws a subtitle bar for a subtitle still being read', () => {
+    const { container } = render(<ServiceCard loading title="Fleet" subtitle="" rows={[]} />);
+    expect(container.textContent).toContain('Fleet');
+    expect(container.querySelectorAll(SURFACE).length).toBeGreaterThan(0);
+  });
+
+  it('DeviceCard keeps the details button box while loading', () => {
+    const { container } = render(
+      <DeviceCard
+        loading
+        device={{ name: READ }}
+        actions={{ detailsButton: { visible: true, component: <span /> } }}
+        detailsButtonSkeletonClassName="size-12"
+      />,
+    );
+    expect(container.querySelector('.size-12')).not.toBeNull();
+    expect(container.textContent).not.toContain(READ);
+  });
+
+  it('LoadingFallback takes the region element and class (a contents box keeps a flex parent)', () => {
+    const { container } = render(
+      <LoadingFallback as="section" className="contents">
+        <ScopeFlag />
+      </LoadingFallback>,
+    );
+    expect(container.querySelector('section.contents')).not.toBeNull();
+    expect(screen.getByTestId('flag').textContent).toBe('true');
   });
 });

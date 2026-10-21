@@ -3,7 +3,10 @@
 import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { type ComponentPropsWithoutRef, type ComponentRef, type ReactNode, forwardRef } from 'react';
 
+import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 const RadioGroup = forwardRef<
   ComponentRef<typeof RadioGroupPrimitive.Root>,
@@ -40,6 +43,17 @@ const RadioGroupItem = forwardRef<
 });
 RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName;
 
+/** A radio dot's box: read by the dot of every option and by its skeleton. */
+const RADIO_DOT_SIZE_CLASS = `${CONTROL_SIZE.selection} shrink-0 rounded-full`;
+/** An option's label line and description line (the type each is set in). */
+const RADIO_OPTION_LABEL_CLASS =
+  'font-[family-name:var(--font-h4-family)] text-[length:var(--font-size-h4-body)] font-[number:var(--font-h4-weight)] leading-[24px]';
+const RADIO_OPTION_DESCRIPTION_CLASS =
+  'font-[family-name:var(--font-h6-family)] text-[length:var(--font-size-h6-caption)] font-[number:var(--font-h6-weight)] leading-[20px]';
+
+/** How many option rows the block draws while loading when the host passes no options. */
+export const RADIO_GROUP_BLOCK_SKELETON_OPTIONS = 3;
+
 interface RadioGroupBlockOption {
   value: string;
   label: ReactNode;
@@ -70,13 +84,38 @@ interface RadioGroupBlockProps extends Omit<ComponentPropsWithoutRef<typeof Radi
   /** Error message displayed below the group (also triggers red borders) */
   error?: string;
   itemClassName?: string;
+  /**
+   * Which option is chosen is still being read: the options the host passes are drawn for real and inert, each dot
+   * a skeleton of the dot's own size. With no options, `skeletonCount` rows with a bar for each label. A loading
+   * scope does the same.
+   */
+  loading?: boolean;
+  /** How many option rows to draw while loading when there are no options (defaults to
+   *  `RADIO_GROUP_BLOCK_SKELETON_OPTIONS`). */
+  skeletonCount?: number;
 }
 
 const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>, RadioGroupBlockProps>(
   (
-    { className, options, variant = 'separated', orientation = 'vertical', error, itemClassName, disabled, ...props },
+    {
+      className,
+      options,
+      variant = 'separated',
+      orientation = 'vertical',
+      error,
+      itemClassName,
+      disabled,
+      loading: loadingProp,
+      skeletonCount = RADIO_GROUP_BLOCK_SKELETON_OPTIONS,
+      ...props
+    },
     ref,
   ) => {
+    // ONE switch: in a page's loading state (or while the host reads the choice) every dot is its skeleton.
+    const loading = useLoadingScope() || !!loadingProp;
+    // While loading with no options, rows of label bars stand for the options (`null`: a row with no option yet).
+    const rows: Array<RadioGroupBlockOption | null> =
+      loading && options.length === 0 ? Array.from({ length: skeletonCount }, () => null) : options;
     const isGrouped = variant === 'grouped';
     const isHorizontal = orientation === 'horizontal';
     return (
@@ -98,36 +137,44 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                 )
               : cn('grid gap-2', isHorizontal && 'auto-cols-fr grid-flow-col'),
           )}
-          disabled={disabled}
+          disabled={disabled || loading}
           {...props}
         >
-          {options.map((option, index) => {
-            const itemId = `${props.name ?? 'radio-block'}-${option.value}`;
-            const isDisabled = disabled || option.disabled;
-            const isLast = index === options.length - 1;
-            const hasFooter = option.footer != null;
+          {rows.map((option, index) => {
+            const optionKey = option ? option.value : `skeleton-${index}`;
+            const itemId = `${props.name ?? 'radio-block'}-${optionKey}`;
+            // Loading draws the options as they are, inert: not greyed as disabled, never hovered or chosen.
+            const isDisabled = !loading && (disabled || option?.disabled);
+            const interactive = !loading && !isDisabled;
+            const isLast = index === rows.length - 1;
+            const hasFooter = option?.footer != null;
             const row = (
               <>
-                <RadioGroupPrimitive.Item
-                  id={itemId}
-                  value={option.value}
-                  disabled={isDisabled}
-                  className={cn(
-                    'h-6 w-6 shrink-0 rounded-full border-2 bg-ods-card',
-                    error ? 'border-ods-error' : 'border-[var(--color-border-strong)]',
-                    'transition-colors duration-150',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-card',
-                    // Disabled: the EMPTY dot dims with the text; a selected one
-                    // keeps its accent so "on but locked" stays readable.
-                    'disabled:cursor-not-allowed',
-                    'disabled:data-[state=unchecked]:border-ods-border disabled:data-[state=unchecked]:bg-ods-bg',
-                    'data-[state=checked]:border-ods-accent',
-                  )}
-                >
-                  <RadioGroupPrimitive.Indicator className="flex h-full w-full items-center justify-center">
-                    <span className="block h-1/2 w-1/2 rounded-full bg-ods-accent" />
-                  </RadioGroupPrimitive.Indicator>
-                </RadioGroupPrimitive.Item>
+                {loading || !option ? (
+                  <UnifiedSkeleton variant="circular" className={RADIO_DOT_SIZE_CLASS} />
+                ) : (
+                  <RadioGroupPrimitive.Item
+                    id={itemId}
+                    value={option.value}
+                    disabled={isDisabled}
+                    className={cn(
+                      RADIO_DOT_SIZE_CLASS,
+                      'border-2 bg-ods-card',
+                      error ? 'border-ods-error' : 'border-[var(--color-border-strong)]',
+                      'transition-colors duration-150',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-card',
+                      // Disabled: the EMPTY dot dims with the text; a selected one
+                      // keeps its accent so "on but locked" stays readable.
+                      'disabled:cursor-not-allowed',
+                      'disabled:data-[state=unchecked]:border-ods-border disabled:data-[state=unchecked]:bg-ods-bg',
+                      'data-[state=checked]:border-ods-accent',
+                    )}
+                  >
+                    <RadioGroupPrimitive.Indicator className="flex h-full w-full items-center justify-center">
+                      <span className="block h-1/2 w-1/2 rounded-full bg-ods-accent" />
+                    </RadioGroupPrimitive.Indicator>
+                  </RadioGroupPrimitive.Item>
+                )}
                 <div
                   className={cn(
                     'flex min-w-0 flex-1 flex-col justify-center',
@@ -139,42 +186,36 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                   )}
                 >
                   <span
-                    className={cn(
-                      'font-[family-name:var(--font-h4-family)] text-[length:var(--font-size-h4-body)] font-[number:var(--font-h4-weight)] leading-[24px]',
-                      'select-none truncate text-ods-text-primary',
-                    )}
-                    title={typeof option.label === 'string' ? option.label : undefined}
+                    className={cn(RADIO_OPTION_LABEL_CLASS, 'select-none truncate text-ods-text-primary')}
+                    title={typeof option?.label === 'string' ? option.label : undefined}
                   >
-                    {option.label}
+                    {option ? option.label : <TextLineSkeleton as="span" type="inherit" className="w-32 max-w-full" />}
                   </span>
-                  {option.description && (
-                    <span
-                      className={cn(
-                        'font-[family-name:var(--font-h6-family)] text-[length:var(--font-size-h6-caption)] font-[number:var(--font-h6-weight)] leading-[20px]',
-                        'select-none text-ods-text-secondary',
-                      )}
-                    >
+                  {option?.description && (
+                    <span className={cn(RADIO_OPTION_DESCRIPTION_CLASS, 'select-none text-ods-text-secondary')}>
                       {option.description}
                     </span>
                   )}
                 </div>
-                {option.trailing && <div className="ml-auto flex shrink-0 items-center">{option.trailing}</div>}
+                {option?.trailing && <div className="ml-auto flex shrink-0 items-center">{option.trailing}</div>}
               </>
             );
             return (
               <label
-                key={option.value}
-                htmlFor={itemId}
+                key={optionKey}
+                htmlFor={loading ? undefined : itemId}
+                data-loading-item={loading || undefined}
                 aria-disabled={isDisabled || undefined}
                 className={cn(
                   'flex w-full items-center gap-3',
                   isHorizontal && 'min-w-0 flex-1',
                   'transition-colors duration-200',
-                  isDisabled ? 'cursor-not-allowed' : 'cursor-pointer',
+                  isDisabled && 'cursor-not-allowed',
+                  interactive && 'cursor-pointer',
                   // Hover / active move the BACKGROUND only, like Input and
                   // CheckboxBlock — the border stays put so an unselected row
                   // never flashes "selected" under the cursor.
-                  !isDisabled && 'hover:bg-ods-bg-hover active:bg-ods-bg-active',
+                  interactive && 'hover:bg-ods-bg-hover active:bg-ods-bg-active',
                   isGrouped
                     ? cn(
                         'bg-ods-card px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs,8px)]',
@@ -183,7 +224,7 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                       )
                     : cn(
                         'rounded-[6px] border bg-ods-card p-[var(--spacing-system-sf)]',
-                        !isDisabled &&
+                        interactive &&
                           'has-[[data-state=checked]]:bg-[var(--ods-system-greys-soft-grey)]/30 has-[[data-state=checked]]:border-ods-accent/40',
                         error ? 'border-ods-error' : 'border-ods-border',
                       ),
@@ -200,7 +241,7 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                 )}
               >
                 {hasFooter ? <div className="flex w-full items-center gap-[var(--spacing-system-sf)]">{row}</div> : row}
-                {option.footer}
+                {option?.footer}
               </label>
             );
           })}

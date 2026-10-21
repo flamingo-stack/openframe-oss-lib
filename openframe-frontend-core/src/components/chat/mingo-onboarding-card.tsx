@@ -3,6 +3,8 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
+import { MingoOnboardingCardSkeleton, mingoOnboardingSkeletonVariant } from './mingo-onboarding-card-skeleton';
 
 export interface MingoOnboardingCardAction {
   /** Stable React key. */
@@ -32,6 +34,11 @@ export interface MingoOnboardingCardProps {
    *  the card renders as a `<button>` with hover/focus affordances.
    *  Ignored when `actions` is non-empty. */
   onClick?: () => void;
+  /** The commands are still loading: the card draws its own skeleton. Inside a `LoadingScope` it does so whatever
+   *  this says. */
+  loading?: boolean;
+  /** The card's place in its list: picks the loading state's bar widths, so a list of loading cards is irregular. */
+  skeletonIndex?: number;
   /** Optional className appended to the root element. */
   className?: string;
 }
@@ -60,9 +67,21 @@ export function MingoOnboardingCard({
   description,
   actions,
   onClick,
+  loading = false,
+  skeletonIndex = 0,
   className,
 }: MingoOnboardingCardProps) {
   const hasActions = !!actions && actions.length > 0;
+  if (useLoadingScope() || loading) {
+    return (
+      <MingoOnboardingCardSkeleton
+        {...mingoOnboardingSkeletonVariant(skeletonIndex)}
+        // A card known to have no actions draws no chip row; while the commands load, the typical card has them.
+        chipWidths={actions && actions.length === 0 ? [] : undefined}
+        className={className}
+      />
+    );
+  }
   const isInteractive = !hasActions && !!onClick;
 
   const body = (

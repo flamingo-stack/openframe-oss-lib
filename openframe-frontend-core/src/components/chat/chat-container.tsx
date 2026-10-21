@@ -3,13 +3,12 @@ import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated';
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { LIVE_PULSE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar as Avatar } from '../ui/square-avatar';
 import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
 import { MspOrganizationCard } from './msp-organization-card';
-import { MspOrganizationCardSkeleton } from './msp-organization-card-skeleton';
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from './types';
 
 const ConnectionIndicator: FC<ConnectionIndicatorProps> = ({ status }) => {
@@ -113,11 +112,11 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                 {/* 64px round avatar placeholder — matches the `w-16 h-16`
                     rounded-full avatar / userIcon block below. */}
                 <UnifiedSkeleton className="h-16 w-16 shrink-0 rounded-full" />
-                <div className="flex flex-col gap-1">
-                  {/* Name line — sized to the `text-h3` name. */}
-                  <UnifiedSkeleton className="h-6 w-40" />
-                  {/* Server line — sized to the `text-h4` secondary row. */}
-                  <UnifiedSkeleton className="h-4 w-28" />
+                <div className="flex flex-col">
+                  {/* Name line — the `text-h3` name. */}
+                  <TextLineSkeleton type="h3" className="w-40" />
+                  {/* Server line — the `text-h4` secondary row. */}
+                  <TextLineSkeleton type="h4" className="w-28" />
                 </div>
               </div>
             ) : (
@@ -182,14 +181,12 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
           {!ticketInfo && (isMspLoading || mspOrganization) && (
             <>
               <div className="h-px bg-ods-border" />
-              {isMspLoading || !mspOrganization ? (
-                <MspOrganizationCardSkeleton className={cn('rounded-none ring-0', !bare && 'rounded-b-md')} />
-              ) : (
-                <MspOrganizationCard
-                  {...mspOrganization}
-                  className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization.className)}
-                />
-              )}
+              <MspOrganizationCard
+                name=""
+                {...mspOrganization}
+                loading={isMspLoading || !mspOrganization}
+                className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization?.className)}
+              />
             </>
           )}
           {ticketInfo && (

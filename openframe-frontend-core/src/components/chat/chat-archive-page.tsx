@@ -2,10 +2,11 @@
 
 import { Chevron02LeftIcon, BoxArchiveIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
-import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history';
+import { MingoChatHistory } from './mingo-chat-history';
 import type { DialogItem } from './types/component.types';
 
 interface ChatArchivePageBaseProps {
@@ -23,6 +24,9 @@ interface ChatArchivePageBaseProps {
   hasMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /** The archive's page size: how many rows the first-load loading state draws. Default
+   *  `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
 }
 
 /** Standalone (default): renders its own back/close header. `onBack` is
@@ -53,7 +57,17 @@ export type ChatArchivePageProps = ChatArchivePageStandaloneProps | ChatArchiveP
  * the list can slot into the split layout's left rail.
  */
 export function ChatArchivePage(props: ChatArchivePageProps) {
-  const { dialogs, onSelectDialog, isLoading = false, isFetching = false, hasMore = false, onLoadMore } = props;
+  const {
+    dialogs,
+    onSelectDialog,
+    isLoading = false,
+    isFetching = false,
+    hasMore = false,
+    onLoadMore,
+    pageSize,
+  } = props;
+  // A first page with nothing to show yet (or the page's loading state): the list draws its own loading state.
+  const firstLoad = useLoadingScope() || (isLoading && dialogs.length === 0);
 
   // A first, uncached load is in flight but the delayed skeleton hasn't
   // appeared yet (the 120ms window). Render nothing rather than flashing
@@ -101,19 +115,19 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
-        {dialogs.length > 0 ? (
+        {firstLoad || dialogs.length > 0 ? (
+          // The first load is the list's own loading state — the SAME grouped/
+          // bordered rows the active list draws, so the archive loads and lands
+          // without a layout shift.
           <MingoChatHistory
+            loading={firstLoad}
+            pageSize={pageSize}
             dialogs={dialogs}
             onSelectDialog={onSelectDialog}
             hasMore={hasMore}
             isLoadingMore={isLoading && dialogs.length > 0}
             onLoadMore={onLoadMore}
           />
-        ) : isLoading ? (
-          // First-load skeleton — the SAME grouped/bordered placeholder the
-          // active list uses, so the archive loads and lands without a layout
-          // shift or a mismatched flat-list skeleton.
-          <MingoChatHistorySkeleton />
         ) : suppressEmptyStateWhileFetching ? null : (
           // Empty state — mirrors the "Current Chats" rail empty state
           // (Figma 113:60939): centred 24px muted glyph + h4 title + h6 caption.

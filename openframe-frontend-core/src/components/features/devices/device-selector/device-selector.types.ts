@@ -71,6 +71,11 @@ export interface DeviceSelectorProps<T extends DeviceRow = DeviceRow> {
   /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
   loadingRegion?: boolean;
   /**
+   * How many rows the loading table draws: the host's page size when the list is paged or limited (infinite
+   * scroll's first page). Defaults to `DEVICE_SELECTOR_SKELETON_ROWS`.
+   */
+  skeletonRows?: number;
+  /**
    * Currently selected device keys. Optional so a skeleton can render the real
    * picker with nothing selected, the component falls back to an empty set and
    * a no-op change handler. Every consumer a user can act on passes both.

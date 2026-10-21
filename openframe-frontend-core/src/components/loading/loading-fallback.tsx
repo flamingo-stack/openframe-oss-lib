@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ElementType, ReactNode } from 'react';
 import { LoadingScope } from '../ui/loading-scope';
 import { LoadingRegion } from './loading-region';
 
@@ -11,10 +11,21 @@ import { LoadingRegion } from './loading-region';
  *
  *   <Suspense fallback={<LoadingFallback><Dashboard /></LoadingFallback>}><Dashboard /></Suspense>
  */
-export function LoadingFallback({ label = 'Loading the page', children }: { label?: string; children: ReactNode }) {
+export function LoadingFallback({
+  label = 'Loading the page',
+  as,
+  className,
+  children,
+}: {
+  label?: string;
+  /** The region's element (a `contents` box keeps a flex parent's layout, e.g. inside a modal). */
+  as?: ElementType;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <LoadingRegion label={label}>
-      <LoadingScope>{children}</LoadingScope>
+    <LoadingRegion label={label} as={as} className={className}>
+      <LoadingScope className={className}>{children}</LoadingScope>
     </LoadingRegion>
   );
 }

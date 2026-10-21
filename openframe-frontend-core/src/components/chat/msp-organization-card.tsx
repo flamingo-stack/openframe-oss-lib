@@ -5,7 +5,9 @@ import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { ExternalLinkIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
+import { MspOrganizationCardSkeleton } from './msp-organization-card-skeleton';
 
 export interface MspOrganizationCardProps {
   /** MSP/organization name. Woven into the default title: "Your IT is managed by {name}". */
@@ -29,6 +31,9 @@ export interface MspOrganizationCardProps {
    * "Your IT is managed by" over the name, no website line, no card chrome.
    */
   variant?: 'card' | 'footer';
+  /** The organization is still loading: the card draws its own skeleton (`card` variant). Inside a `LoadingScope` it
+   *  does so whatever this says. */
+  loading?: boolean;
   /** Appended to the root element. */
   className?: string;
 }
@@ -52,8 +57,11 @@ export function MspOrganizationCard({
   href,
   onOpenWebsite,
   variant = 'card',
+  loading = false,
   className,
 }: MspOrganizationCardProps) {
+  const isLoading = useLoadingScope() || loading;
+  if (isLoading && variant === 'card') return <MspOrganizationCardSkeleton className={className} />;
   const actionLabel = website ? `Open ${website}` : 'Open organization website';
 
   if (variant === 'footer') {

@@ -3,12 +3,19 @@ import type { MouseEvent } from 'react';
 import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { ChatSidebarSkeleton, DialogListItemSkeleton } from './chat-sidebar-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
+import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
 import type { ChatSidebarProps, DialogListItemProps } from './types';
+
+/** A dialog row's box, shared by the loaded row and its skeleton so both take the same space. */
+const DIALOG_LIST_ITEM_CLASS = 'flex items-center gap-4 overflow-clip px-4 py-3 border-b border-ods-border bg-ods-card';
 
 const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
   ({ className, dialog, isActive, onDialogSelect, onClick, ...props }, ref) => {
+    if (useLoadingScope()) return <DialogListItemSkeleton className={className} />;
+
     const handleClick = (e: MouseEvent<HTMLDivElement>) => {
       onDialogSelect?.(dialog.id);
       onClick?.(e);
@@ -24,11 +31,8 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
       <div
         ref={ref}
         className={cn(
-          'flex items-center gap-4 overflow-clip',
-          'px-4 py-3',
-          'cursor-pointer border-b border-ods-border',
-          'bg-ods-card',
-          'transition-colors hover:bg-ods-bg-hover',
+          DIALOG_LIST_ITEM_CLASS,
+          'cursor-pointer transition-colors hover:bg-ods-bg-hover',
           isActive && 'border-l-2 border-l-ods-accent bg-ods-bg-hover',
           className,
         )}
@@ -75,6 +79,21 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
 
 DialogListItem.displayName = 'DialogListItem';
 
+/** {@link DialogListItem}'s loading state: the same box, the title and time lines, and the chevron. */
+function DialogListItemSkeleton({ className, ...props }: { className?: string; 'data-loading-item'?: boolean }) {
+  return (
+    <div aria-hidden className={cn(DIALOG_LIST_ITEM_CLASS, className)} {...props}>
+      <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-1">
+        <TextLineSkeleton type="h6" className="w-full max-w-[200px]" />
+        <TextLineSkeleton type="h6" className="w-32" />
+      </div>
+      <div className="ml-2 flex-shrink-0">
+        <UnifiedSkeleton className="size-6 rounded" />
+      </div>
+    </div>
+  );
+}
+
 const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
   (
     {
@@ -89,17 +108,24 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
       hasNextPage,
       isFetchingNextPage,
       onLoadMore,
+      pageSize = CHAT_HISTORY_PAGE_SIZE,
       ...props
     },
     ref,
   ) => {
-    const showEmptyState = dialogs.length === 0 && !children;
+    // ONE switch: the first page with nothing to show yet (or the page's loading state) draws the sidebar with one
+    // page of skeleton rows; the shell and its static copy stay real.
+    const loading = useLoadingScope() || (!!isLoading && dialogs.length === 0 && !children);
+    const showEmptyState = !loading && dialogs.length === 0 && !children;
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
+    // Refreshed in an effect, not during render: the only reader is the IntersectionObserver callback.
     const onLoadMoreRef = useRef(onLoadMore);
-    onLoadMoreRef.current = onLoadMore;
     const isFetchingRef = useRef(isFetchingNextPage);
-    isFetchingRef.current = isFetchingNextPage;
+    useEffect(() => {
+      onLoadMoreRef.current = onLoadMore;
+      isFetchingRef.current = isFetchingNextPage;
+    });
 
     useEffect(() => {
       const scrollContainer = scrollContainerRef.current;
@@ -118,10 +144,6 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
       observer.observe(loadMoreElement);
       return () => observer.disconnect();
     }, [hasNextPage]);
-
-    if (isLoading && dialogs.length === 0 && !children) {
-      return <ChatSidebarSkeleton className={className} dialogCount={8} showNewChatButton={true} />;
-    }
 
     return (
       <div
@@ -153,6 +175,14 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
                 <p className="text-ods-text-secondary text-h6">Previous Mingo sessions will show here</p>
               </div>
             </div>
+          ) : loading ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <div className="flex flex-col">
+                {Array.from({ length: pageSize }, (_, index) => (
+                  <DialogListItemSkeleton key={index} data-loading-item />
+                ))}
+              </div>
+            </div>
           ) : children ? (
             /* Custom children content */
             <div className="flex-1 overflow-y-auto overscroll-contain">{children}</div>
@@ -163,22 +193,20 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
                 {dialogs.map(dialog => (
                   <DialogListItem
                     key={dialog.id}
+                    data-loading-item
                     dialog={dialog}
                     isActive={dialog.id === activeDialogId}
                     onDialogSelect={onDialogSelect}
                   />
                 ))}
 
-                {/* Infinite scroll loading indicator and intersection target */}
+                {/* Infinite scroll intersection target; the next page draws as one page of skeleton rows. */}
                 {hasNextPage && (
                   <div ref={loadMoreRef}>
-                    {isFetchingNextPage && (
-                      <>
-                        <DialogListItemSkeleton />
-                        <DialogListItemSkeleton />
-                        <DialogListItemSkeleton />
-                      </>
-                    )}
+                    {isFetchingNextPage &&
+                      Array.from({ length: pageSize }, (_, index) => (
+                        <DialogListItemSkeleton key={index} data-loading-item />
+                      ))}
                   </div>
                 )}
               </div>

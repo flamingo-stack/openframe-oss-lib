@@ -106,7 +106,20 @@ export interface DashboardInfoCardProps {
    * whose loaded state will carry one. Default `false`.
    */
   loadingShowsSubValue?: boolean;
+  /**
+   * While `loading`: the title is read too, so its line is a bar even when a `title` is passed (an empty `title`
+   * already draws the bar). `titleSlot` and `titleTag` are left as given. Default `false`.
+   */
+  titleLoading?: boolean;
+  /**
+   * While `loading`: the icon is read too (it depends on the figure), so the icon slot is a skeleton of the slot's
+   * own box, whether or not an `icon` is passed. Default `false`.
+   */
+  iconLoading?: boolean;
 }
+
+/** The icon slot's box (Figma "icon" variant): 32px on mobile, 56px from `md` up. Read by the slot and its skeleton. */
+const DASHBOARD_INFO_CARD_ICON_BOX_CLASS = 'size-8 shrink-0 rounded-sm content-md:size-14';
 
 export function DashboardInfoCard({
   title,
@@ -129,6 +142,8 @@ export function DashboardInfoCard({
   loading: loadingProp = false,
   loadingShowsPercentage = false,
   loadingShowsSubValue = false,
+  titleLoading = false,
+  iconLoading = false,
 }: DashboardInfoCardProps) {
   // In a page's loading state the figure is read: the card is its skeleton (`loading`).
   const inScope = useLoadingScope();
@@ -246,10 +261,19 @@ export function DashboardInfoCard({
     <>
       {/* Icon slot (Figma "icon" variant): 32px box / 16px content on mobile,
           56px box / 24px content from `md` up. */}
-      {icon && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary content-md:size-14">
-          <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
-        </div>
+      {loading && iconLoading ? (
+        <UnifiedSkeleton className={DASHBOARD_INFO_CARD_ICON_BOX_CLASS} />
+      ) : (
+        icon && (
+          <div
+            className={cn(
+              DASHBOARD_INFO_CARD_ICON_BOX_CLASS,
+              'flex items-center justify-center border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary',
+            )}
+          >
+            <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
+          </div>
+        )
       )}
 
       {/* Content section */}
@@ -258,7 +282,7 @@ export function DashboardInfoCard({
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
           {titleSlot ??
             // A title still being read (empty while loading) is a bar of its line, like no title.
-            (title !== undefined && !(loading && !title) ? (
+            (title !== undefined && !(loading && (!title || titleLoading)) ? (
               <p className="truncate text-ods-text-secondary text-h5">{title}</p>
             ) : (
               loading && (

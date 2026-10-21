@@ -83,9 +83,7 @@ export function MingoOnboardingCardSkeleton({
 export interface MingoOnboardingListSkeletonProps {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
-  /** Row count. Defaults to 6 — fills the typical empty-state
-   *  viewport so the loader doesn't pop in shorter than the resolved
-   *  list. */
+  /** Row count. Defaults to {@link MINGO_ONBOARDING_SKELETON_ROWS}. */
   rows?: number;
   /** Optional className appended to the rounded outer container. */
   className?: string;
@@ -123,7 +121,21 @@ const ROW_VARIANTS: ReadonlyArray<{
   { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
 ];
 
-export function MingoOnboardingListSkeleton({ region = true, rows = 6, className }: MingoOnboardingListSkeletonProps) {
+/** Slash-command cards the loading state draws: a typical list, since the commands list has no page size of its own. */
+export const MINGO_ONBOARDING_SKELETON_ROWS = ROW_VARIANTS.length;
+
+/** The bar widths of the loading card at `index` in its list (cycled, so the same list draws the same bars). */
+export function mingoOnboardingSkeletonVariant(
+  index: number,
+): Pick<MingoOnboardingCardSkeletonProps, 'titleWidth' | 'slashWidth' | 'descriptionLines'> {
+  return ROW_VARIANTS[index % ROW_VARIANTS.length];
+}
+
+export function MingoOnboardingListSkeleton({
+  region = true,
+  rows = MINGO_ONBOARDING_SKELETON_ROWS,
+  className,
+}: MingoOnboardingListSkeletonProps) {
   return (
     <LoadingRegion
       label="Loading slash commands"

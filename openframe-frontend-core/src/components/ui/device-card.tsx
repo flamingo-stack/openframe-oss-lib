@@ -7,6 +7,8 @@ import type { OSPlatformId } from '../../utils/os-platforms';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface';
+import { DeviceCardSkeleton } from '../loading/device-card-skeleton';
+import { useLoadingScope } from './loading-scope';
 import { Tag, type TagProps } from './tag';
 
 export interface Device {
@@ -49,6 +51,13 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
   };
   statusTag?: TagProps;
   onDeviceClick?: (device: Device) => void;
+  /**
+   * The device is still being read: the card draws its `DeviceCardSkeleton` (its "more" button kept when the card
+   * shows one, `data-loading-item` kept when the card carries it). A loading scope does the same.
+   */
+  loading?: boolean;
+  /** The details button's box while loading (the host sizes the button it passes in `actions.detailsButton`). */
+  detailsButtonSkeletonClassName?: string;
 }
 
 export function DeviceCard({
@@ -58,9 +67,22 @@ export function DeviceCard({
   },
   statusTag,
   onDeviceClick,
+  loading: loadingProp,
+  detailsButtonSkeletonClassName,
   className,
   ...props
 }: DeviceCardProps) {
+  // ONE switch: in a page's loading state (or while the host reads the device) the card is its skeleton.
+  if (useLoadingScope() || loadingProp) {
+    return (
+      <DeviceCardSkeleton
+        className={className}
+        moreButton={actions.moreButton?.visible !== false}
+        detailsButtonClassName={actions.detailsButton?.visible !== false ? detailsButtonSkeletonClassName : undefined}
+        listItem={'data-loading-item' in props}
+      />
+    );
+  }
   // "Last seen" is read as "your local time", the same way the devices table
   // column renders it: the viewer's zone and locale, never UTC.
   const formatLastSeen = (lastSeen?: string | Date) => {

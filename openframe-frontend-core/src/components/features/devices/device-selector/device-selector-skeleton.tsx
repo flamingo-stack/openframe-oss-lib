@@ -12,7 +12,7 @@ const NO_DEVICES: never[] = [];
  */
 type DeviceSelectorSkeletonProps = Pick<
   DeviceSelectorProps,
-  'showSelectionModeRadio' | 'singleSelect' | 'hideColumns'
+  'showSelectionModeRadio' | 'singleSelect' | 'hideColumns' | 'skeletonRows'
 > & {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;

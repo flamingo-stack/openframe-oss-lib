@@ -32,6 +32,8 @@ import type { DeviceSelectorProps, SubTab } from './device-selector.types';
 import { useDeviceSelector } from './use-device-selector';
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
+/** The rows the loading table draws when the host states no page size. */
+export const DEVICE_SELECTOR_SKELETON_ROWS = 8;
 const NOOP = () => {};
 const DEFAULT_GET_DEVICE_KEY = (d: DeviceRow): string | undefined => d.machineId || d.id;
 
@@ -95,6 +97,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   devices,
   loading,
   loadingRegion,
+  skeletonRows = DEVICE_SELECTOR_SKELETON_ROWS,
   selectedIds: selectedIdsProp,
   onSelectionChange: onSelectionChangeProp,
   getDeviceKey: getDeviceKeyProp,
@@ -710,7 +713,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
       <DataTable.Body
         loading={loading}
         loadingRegion={loadingRegion}
-        skeletonRows={8}
+        skeletonRows={skeletonRows}
         emptyMessage={
           isCriteria
             ? 'No devices match these criteria'

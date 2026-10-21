@@ -2,6 +2,8 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
 export interface ChatNavSidebarItem {
@@ -126,44 +128,88 @@ export interface ChatListItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   active?: boolean;
 }
 
+/** The row's box, shared by the loaded row and its skeleton so both take the same space. */
+const CHAT_LIST_ITEM_CLASS =
+  'flex w-full shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left';
+
 /**
  * One row of the `ChatNavSidebar` list (Figma `chat-list-item`): a one-line
  * title over a caption, an optional mark before the title and a status glyph
  * at the end. The selected row takes the accent's secondary fill, so a tenant
- * accent recolours it with the rest of the brand.
+ * accent recolours it with the rest of the brand. Inside a `LoadingScope` it
+ * draws its own skeleton ({@link ChatListItemSkeleton}).
  */
 const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
-  ({ className, title, subtitle, leading, trailing, active, ...props }, ref) => (
-    <button
-      ref={ref}
-      type="button"
-      aria-current={active ? 'true' : undefined}
-      className={cn(
-        'flex w-full shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-        active && 'bg-ods-accent-secondary',
-        className,
-      )}
-      {...props}
-    >
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
-          {leading && <span className="flex shrink-0 items-center [&_svg]:size-4">{leading}</span>}
-          <span className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}>
-            {title}
-          </span>
-        </span>
-        {subtitle != null && (
-          <span className={cn('truncate text-h6', active ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
-            {subtitle}
-          </span>
+  ({ className, title, subtitle, leading, trailing, active, ...props }, ref) => {
+    if (useLoadingScope()) {
+      return <ChatListItemSkeleton subtitle={subtitle != null} trailing={trailing != null} className={className} />;
+    }
+    return (
+      <button
+        ref={ref}
+        type="button"
+        aria-current={active ? 'true' : undefined}
+        className={cn(
+          CHAT_LIST_ITEM_CLASS,
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
+          active && 'bg-ods-accent-secondary',
+          className,
         )}
-      </span>
-      {trailing && <span className="flex shrink-0 items-center [&_svg]:size-6">{trailing}</span>}
-    </button>
-  ),
+        {...props}
+      >
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
+            {leading && <span className="flex shrink-0 items-center [&_svg]:size-4">{leading}</span>}
+            <span
+              className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
+            >
+              {title}
+            </span>
+          </span>
+          {subtitle != null && (
+            <span className={cn('truncate text-h6', active ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
+              {subtitle}
+            </span>
+          )}
+        </span>
+        {trailing && <span className="flex shrink-0 items-center [&_svg]:size-6">{trailing}</span>}
+      </button>
+    );
+  },
 );
 
 ChatListItem.displayName = 'ChatListItem';
 
-export { ChatNavSidebar, ChatListItem };
+/** Title widths the loading rows cycle through (`index`), so a list of them reads like a list of chats. */
+const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
+
+export interface ChatListItemSkeletonProps extends HTMLAttributes<HTMLDivElement> {
+  /** Draw the caption line (the loaded row has a `subtitle`). */
+  subtitle?: boolean;
+  /** Draw a short bar at the row's end (the loaded row has `trailing` text, e.g. a time). */
+  trailing?: boolean;
+  /** The row's place in its list: picks the title bar's width. */
+  index?: number;
+}
+
+/** {@link ChatListItem}'s loading state: the same box, a title bar, and the caption and trailing parts the loaded row
+ *  has. A list's loading state is a page of these (each marked `data-loading-item` by the list). */
+function ChatListItemSkeleton({
+  subtitle = false,
+  trailing = false,
+  index = 0,
+  className,
+  ...props
+}: ChatListItemSkeletonProps) {
+  return (
+    <div aria-hidden className={cn(CHAT_LIST_ITEM_CLASS, className)} {...props}>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length]} />
+        {subtitle && <TextLineSkeleton type="h6" className="w-1/3" />}
+      </span>
+      {trailing && <TextLineSkeleton type="h6" className="w-12 shrink-0" />}
+    </div>
+  );
+}
+
+export { ChatNavSidebar, ChatListItem, ChatListItemSkeleton };

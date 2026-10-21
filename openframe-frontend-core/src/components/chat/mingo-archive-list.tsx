@@ -3,17 +3,20 @@
 import { useEffect, useRef } from 'react';
 import { formatRelativeTime } from '../../utils/date-utils';
 import { BoxArchiveIcon } from '../icons-v2-generated';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatListEmptyState } from './chat-list-empty-state';
-import { ChatListItem } from './chat-nav-sidebar';
+import { ChatListItem, ChatListItemSkeleton } from './chat-nav-sidebar';
+import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
 import type { DialogItem } from './types/component.types';
 
 export interface MingoArchiveListProps {
   dialogs: ReadonlyArray<DialogItem>;
   onSelectDialog?: (id: string) => void;
-  /** The first page is loading. */
+  /** The first page is loading: the list draws one page of loading rows. */
   isLoading?: boolean;
+  /** The archive's page size: how many rows the loading state draws. Default `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
@@ -28,10 +31,14 @@ export function MingoArchiveList({
   dialogs,
   onSelectDialog,
   isLoading = false,
+  pageSize = CHAT_HISTORY_PAGE_SIZE,
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
 }: MingoArchiveListProps) {
+  // ONE switch: a first page with nothing to show yet (or the page's loading state) draws one page of the rows' own
+  // skeleton.
+  const loading = useLoadingScope() || (isLoading && dialogs.length === 0);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
   const isLoadingMoreRef = useRef(isLoadingMore);
@@ -62,11 +69,16 @@ export function MingoArchiveList({
         Archived Chats
       </p>
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xxs)] overflow-y-auto overscroll-contain pb-[var(--spacing-system-mf)]">
-        {dialogs.length > 0 ? (
+        {loading ? (
+          Array.from({ length: pageSize }, (_, i) => (
+            <ChatListItemSkeleton key={i} index={i} trailing data-loading-item />
+          ))
+        ) : dialogs.length > 0 ? (
           <>
             {dialogs.map(dialog => (
               <ChatListItem
                 key={dialog.id}
+                data-loading-item
                 title={dialog.title || 'Untitled Chat'}
                 onClick={() => onSelectDialog?.(dialog.id)}
                 trailing={
@@ -92,10 +104,6 @@ export function MingoArchiveList({
             ))}
             {hasMore && <div ref={sentinelRef} className="h-px shrink-0" aria-hidden />}
           </>
-        ) : isLoading ? (
-          Array.from({ length: 6 }, (_, i) => (
-            <UnifiedSkeleton key={i} aria-hidden className="h-10 shrink-0 rounded-md" />
-          ))
         ) : (
           <ChatListEmptyState
             icon={<BoxArchiveIcon size={24} />}
