@@ -87,6 +87,15 @@ export interface AppLayoutProps {
    */
   composerSheet?: ReactNode;
   /**
+   * The `composerDock` lies over the bottom of the page instead of taking its height:
+   * the page scrolls on under it (`<main>` is padded by the dock's height, so its end
+   * still clears it) and fades out under a gradient from transparent to the ground.
+   * Where the dock is transparent the page takes the pointer and the wheel; the host
+   * makes its own content take them back (`pointer-events-auto`). Off: the dock is a
+   * band of its own under the page.
+   */
+  composerDockFloats?: boolean;
+  /**
    * Paints the page column — the page and the `composerDock` under it — as one
    * surface: that surface's ground and the accent corner glow, so a chat page's
    * background runs under the composer to the bottom of the window (`'mingo'`,
@@ -147,6 +156,7 @@ export function AppLayout({
   sidePanel,
   composerDock,
   composerSheet,
+  composerDockFloats = false,
   pageSurface,
   desktopHeader = true,
   contentCorner,
@@ -164,6 +174,7 @@ export function AppLayout({
 
   const hasSidePanel = sidePanel !== undefined;
   const hasDock = composerDock !== undefined;
+  const dockFloats = hasDock && composerDockFloats;
   const hasCorner = contentCorner !== undefined;
   // The page column lays out by its own width: something narrows it (the
   // panel) or shares it with the page (the dock).
@@ -382,6 +393,8 @@ export function AppLayout({
                       contentOverlapped && 'isolate',
                       mainClassName,
                     )}
+                    // A floating dock lies over the page's end: the page runs on by its height.
+                    style={dockFloats ? { paddingBottom: dockHeight } : undefined}
                   >
                     <ContentAreaWidthContext.Provider value={contentAreaWidth}>
                       <ComposerDockHeightContext.Provider value={hasDock ? dockHeight : 0}>
@@ -412,7 +425,17 @@ export function AppLayout({
                     // Its own container + token scope: a container query cannot
                     // reach from <main> to a sibling. Same column width. With a
                     // sheet it rises over the sheet's scrim, which runs on under it.
-                    <div ref={setDockElement} className={cn('ods-content-area shrink-0', hasSheet && 'relative z-40')}>
+                    <div
+                      ref={setDockElement}
+                      className={cn(
+                        'ods-content-area shrink-0',
+                        hasSheet && 'relative z-40',
+                        // Over the page's end, fading it out; the page keeps the pointer
+                        // where the dock is transparent.
+                        dockFloats &&
+                          'pointer-events-none absolute inset-x-0 bottom-0 z-40 bg-[linear-gradient(to_bottom,transparent,var(--color-bg)_60%)]',
+                      )}
+                    >
                       <ContentAreaWidthContext.Provider value={contentAreaWidth}>
                         <div className="ods-content-scope">{composerDock}</div>
                       </ContentAreaWidthContext.Provider>

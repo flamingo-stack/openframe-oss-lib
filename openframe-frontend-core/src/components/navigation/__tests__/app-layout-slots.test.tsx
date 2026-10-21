@@ -25,7 +25,7 @@ const SIDE_PANEL: NonNullable<AppLayoutProps['sidePanel']> = {
 
 type SlotProps = Pick<
   AppLayoutProps,
-  'sidePanel' | 'composerDock' | 'composerSheet' | 'contentCorner' | 'desktopHeader'
+  'sidePanel' | 'composerDock' | 'composerSheet' | 'composerDockFloats' | 'contentCorner' | 'desktopHeader'
 >;
 
 function layout(props: SlotProps, children: ReactNode = <Page />) {
@@ -158,6 +158,26 @@ describe('AppLayout composerSheet', () => {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(600);
     render(layout({ composerDock: <p>dock</p>, composerSheet: <BreakpointProbe name="sheet" /> }));
     expect(screen.getByText('sheet mobile')).toBeInTheDocument();
+  });
+});
+
+describe('AppLayout floating composer dock', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('lies over the page, which runs on under it by its height and keeps the pointer around it', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+    render(layout({ composerDock: <p>dock</p>, composerDockFloats: true }));
+    expect(screen.getByRole('main')).toHaveStyle({ paddingBottom: '132px' });
+    expect(markup()).toMatch(
+      /<div class="[^"]*pointer-events-none absolute inset-x-0 bottom-0 z-40[^"]*"><div class="ods-content-scope"><p>dock<\/p>/,
+    );
+  });
+
+  it('is a band of its own under the page by default', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+    render(layout({ composerDock: <p>dock</p> }));
+    expect(screen.getByRole('main')).not.toHaveStyle({ paddingBottom: '132px' });
+    expect(markup()).toContain('<div class="ods-content-area shrink-0"><div class="ods-content-scope"><p>dock</p>');
   });
 });
 
