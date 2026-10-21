@@ -66,9 +66,13 @@ describe('MobileBurgerMenu grouped', () => {
       expect(screen.getByText('Chat history')).toBeInTheDocument();
 
       rerender(menu(false));
-      act(() => vi.advanceTimersByTime(299));
+      act(() => {
+        vi.advanceTimersByTime(299);
+      });
       expect(screen.getByText('Chat history')).toBeInTheDocument();
-      act(() => vi.advanceTimersByTime(1));
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
       expect(screen.queryByText('Chat history')).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
