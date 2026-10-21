@@ -14,18 +14,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Resolves the effective frontend feature flags by merging DB overrides on top
- * of the yml-configured defaults. For every requested flag:
- * <ol>
- *     <li>If the per-tenant {@link FeFeatureFlags} document contains the key,
- *         that value wins.</li>
- *     <li>Otherwise the value from {@link FeFeatureFlagProperties} is used.</li>
- * </ol>
- *
- * <p>The DB lookup is cached per tenant via Caffeine with a short TTL so the
- * GraphQL query stays cheap on hot paths.
- */
+// Per-tenant DB overrides win over yml defaults; cached briefly to keep hot-path GraphQL queries cheap.
 @Slf4j
 @Service
 @RequiredArgsConstructor

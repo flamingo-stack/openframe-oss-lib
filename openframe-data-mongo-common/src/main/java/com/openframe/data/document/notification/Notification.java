@@ -42,12 +42,10 @@ public class Notification implements TenantScoped {
     @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day notifications-history retention
     private Instant createdAt;
 
-    /**
-     * Optional source-event correlation key (e.g. an approval-request id) used to locate and
-     * update a previously-pushed notification in place. Null for one-shot notifications.
-     */
+    // Optional source-event correlation key used to locate and update a previously-pushed notification in place; null for one-shot notifications.
     @Indexed
     private String correlationId;
 
     private String tenantId;
 }
+

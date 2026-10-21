@@ -6,10 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/**
- * Relay {@code PageInfo} as returned by every cursor-paginated connection in the
- * merged GraphQL schema.
- */
+// Relay PageInfo as returned by every cursor-paginated connection in the
+// merged GraphQL schema.
 @Data
 @Builder
 @NoArgsConstructor
@@ -21,3 +19,4 @@ public class PageInfo {
     private String startCursor;
     private String endCursor;
 }
+

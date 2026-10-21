@@ -8,10 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-/**
- * Payload for the {@code createScript} mutation. Optional fields are omitted when
- * null so they don't override server defaults.
- */
+// Optional fields are omitted when null so they don't override server defaults.
 @Data
 @Builder
 @NoArgsConstructor

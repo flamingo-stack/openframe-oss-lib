@@ -28,17 +28,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-/**
- * MongoTemplate-backed implementation of {@link CustomScheduleScriptExecutionRepository}.
- *
- * <p>Header cursor pagination follows the same shape as {@code CustomScriptExecutionRepositoryImpl}:
- * cursor is a raw {@code ObjectId} hex; forward+DESC / backward+ASC compare {@code _id < cursor},
- * the other two want {@code >}. Default sort is {@code _id DESC} — one dispatch per {@code _id},
- * timestamp-embedded, so no separate {@code dispatchedAt} tiebreaker is needed.
- *
- * <p>The responded-devices aggregation runs over the LEAF collection ({@code script_executions})
- * — that's where per-(machine, script) state lives — and returns per-{@code executionId} counts.
- */
+// MongoTemplate-backed implementation of CustomScheduleScriptExecutionRepository.
 @Slf4j
 @Repository
 @RequiredArgsConstructor

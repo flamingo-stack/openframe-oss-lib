@@ -34,9 +34,6 @@ public class ApiKeyService {
     private static final int KEY_ID_LENGTH = 16;
     private static final int SECRET_LENGTH = 32;
 
-    /**
-     * Create a new API key for a user
-     */
     public CreateApiKeyResponse createApiKey(String userId, CreateApiKeyRequest request) {
         log.info("Creating API key '{}' for user: {}", request.name(), userId);
 
@@ -48,26 +45,17 @@ public class ApiKeyService {
         }
     }
 
-    /**
-     * Get all API keys for a user
-     */
     public List<ApiKeyResponse> getApiKeysForUser(String userId) {
         return apiKeyRepository.findByUserId(userId).stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
-    /**
-     * Get API key by ID for a specific user
-     */
     public ApiKeyResponse getApiKeyById(String keyId, String userId) {
         ApiKey apiKey = apiKeyRepository.findByIdAndUserIdOrElseThrow(keyId, userId);
         return mapToResponse(apiKey);
     }
 
-    /**
-     * Update API key
-     */
     public ApiKeyResponse updateApiKey(String keyId, String userId, UpdateApiKeyRequest request) {
         ApiKey apiKey = apiKeyRepository.findByIdAndUserIdOrElseThrow(keyId, userId);
 
@@ -89,9 +77,6 @@ public class ApiKeyService {
         return mapToResponse(apiKeyRepository.save(apiKey));
     }
 
-    /**
-     * Delete API key and its statistics
-     */
     public void deleteApiKey(String keyId, String userId) {
         ApiKey apiKey = apiKeyRepository.findByIdAndUserIdOrElseThrow(keyId, userId);
 
@@ -101,9 +86,6 @@ public class ApiKeyService {
         log.info("Deleted API key and its statistics: {}", keyId);
     }
 
-    /**
-     * Disable expired API keys TODO (scheduled task)
-     */
     public void disableExpiredKeys() {
         List<ApiKey> expiredKeys = apiKeyRepository.findExpiredKeys(Instant.now());
 
@@ -171,9 +153,6 @@ public class ApiKeyService {
                 .build();
     }
 
-    /**
-     * Regenerate API key (creates new key with same metadata but new secret)
-     */
     public CreateApiKeyResponse regenerateApiKey(String keyId, String userId) {
         log.info("Regenerating API key {} for user: {}", keyId, userId);
 
@@ -189,9 +168,6 @@ public class ApiKeyService {
         return buildAndSaveApiKey(userId, name, description, expiresAt);
     }
 
-    /**
-     * Build and save API key with generated credentials
-     */
     private CreateApiKeyResponse buildAndSaveApiKey(String userId, String name, String description, Instant expiresAt) {
         String keyId = generateKeyId();
         String secret = generateSecret();

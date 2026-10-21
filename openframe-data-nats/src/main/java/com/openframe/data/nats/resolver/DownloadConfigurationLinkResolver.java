@@ -42,10 +42,7 @@ public class DownloadConfigurationLinkResolver {
         return link;
     }
 
-    /**
-     * Resolved per call, not at construction: a provider's value may change at runtime
-     * (e.g. a tenant domain assigned after startup).
-     */
+    // Resolved per call, not at construction: a provider's value may change at runtime (e.g. a tenant domain assigned after startup).
     private String resolveAssetsBaseUrl() {
         if (assetsBaseUrlProvider != null) {
             String provided = stripTrailingSlashes(assetsBaseUrlProvider.getAssetsBaseUrl());

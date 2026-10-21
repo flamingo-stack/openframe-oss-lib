@@ -15,11 +15,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * Base class for Pinot-backed repositories. Centralises query execution,
- * ResultSet iteration, and error handling so concrete repositories focus
- * only on their domain-specific row mapping.
- */
 @Slf4j
 public abstract class AbstractPinotRepository {
 
@@ -29,11 +24,6 @@ public abstract class AbstractPinotRepository {
         this.pinotConnection = pinotConnection;
     }
 
-    /**
-     * Executes a query and maps each row with the supplied mapper.
-     * The mapper receives the ResultSet and returns a row-index → T function
-     * so callers can cache column lookups once per ResultSet.
-     */
     protected <T> List<T> executeQuery(String query, Function<ResultSet, Function<Integer, T>> mapper) {
         try {
             log.debug("Executing Pinot query: {}", query);
@@ -50,10 +40,6 @@ public abstract class AbstractPinotRepository {
         }
     }
 
-    /**
-     * Convenience: execute a query that selects one column and return its
-     * non-null, non-empty string values.
-     */
     protected List<String> executeSingleColumnQuery(String query) {
         return executeQuery(query, rs -> rowIndex -> {
             String value = rs.getString(rowIndex, PinotQueryBuilder.FIRST_COLUMN_INDEX);
@@ -63,10 +49,6 @@ public abstract class AbstractPinotRepository {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Convenience: execute a query with two columns (value, count) and return
-     * an ordered {@code Map<value, count>}. Null/empty keys are skipped.
-     */
     protected Map<String, Integer> executeKeyCountQuery(String query) {
         try {
             log.debug("Executing Pinot query: {}", query);
@@ -88,9 +70,6 @@ public abstract class AbstractPinotRepository {
         }
     }
 
-    /**
-     * Convenience: execute a COUNT(*) query and return the single integer result.
-     */
     protected int executeCountQuery(String query) {
         try {
             log.debug("Executing Pinot count query: {}", query);
@@ -107,11 +86,6 @@ public abstract class AbstractPinotRepository {
         }
     }
 
-    /**
-     * Build a column-name → index map for a ResultSet. Useful when the
-     * query selects many columns and the mapper wants name-based access
-     * instead of hardcoded indices.
-     */
     // A column selected by the query but absent from the ResultSet means the Pinot schema has not
     // caught up with the deployed code. Degrade that one field to null rather than failing the page.
     protected String readString(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap, String column) {

@@ -198,12 +198,7 @@ public class KnowledgeBaseService {
         return repository.save(folder);
     }
 
-    /**
-     * Hard-deletes a folder. If it has children, action determines their fate:
-     *   MOVE    — children re-parented to moveTargetFolderId
-     *   ARCHIVE — articles archived recursively, sub-folders hard-deleted
-     * action may be null only when the folder is empty.
-     */
+    // Hard-deletes the folder; if it has children, action decides whether they are moved or archived (null only when empty).
     @Transactional
     public void deleteFolder(String id, FolderChildrenAction action, String moveTargetFolderId) {
         log.info("Deleting folder {} (childrenAction={}, moveTarget={})", id, action, moveTargetFolderId);
@@ -257,19 +252,7 @@ public class KnowledgeBaseService {
         return saved;
     }
 
-    /**
-     * One save of an article: its own fields and status and, when the command carries them, its
-     * tags, assignments and attachments. A null field or list is left as it is; an empty list
-     * means none.
-     *
-     * These live in separate collections and nothing here rolls a failed save back, so the order
-     * is what keeps a failure from leaving the article half-saved:
-     * 1. everything that can be refused is checked before the first write;
-     * 2. tags, assignments and new attachments are written first — each is safe to repeat;
-     * 3. the article itself follows, text and status in one document write, so a failure up to
-     *    here leaves it exactly as it was and never publishes text with half its tags;
-     * 4. attachments are deleted last, because that cannot be undone.
-     */
+    // Tags/assignments/new attachments are saved before the article document, and attachments are deleted last, so a failure never leaves the article half-saved or loses an undeletable record.
     @Transactional
     public KnowledgeBaseItem updateArticle(String currentUserId, UpdateArticleCommand cmd) {
         log.info("Updating article {} by user {}", cmd.getId(), currentUserId);

@@ -179,23 +179,11 @@ public class FleetQueryResultEventDeserializer extends IntegratedToolEventDeseri
         return null;
     }
 
-    /**
-     * Get query name from cache using query_id
-     * 
-     * @param afterField JSON node with query result data
-     * @return Query name or null if not found
-     */
     private String getQueryName(JsonNode afterField) {
         Query queryInfo = getQueryInfo(afterField);
         return queryInfo != null ? queryInfo.getName() : null;
     }
 
-    /**
-     * Get full query information from cache using query_id
-     * 
-     * @param afterField JSON node with query result data
-     * @return Query object or null if not found
-     */
     private Query getQueryInfo(JsonNode afterField) {
         JsonNode queryIdNode = afterField.get("query_id");
         if (queryIdNode == null || queryIdNode.isNull()) {

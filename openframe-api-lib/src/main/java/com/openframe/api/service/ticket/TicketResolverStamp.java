@@ -10,10 +10,8 @@ import org.springframework.stereotype.Component;
 
 import static org.springframework.util.StringUtils.hasText;
 
-/**
- * Records who resolved a ticket. The AI assistant acts with the synthetic {@link #AI_AGENT_ID}
- * principal and resolves on the end user's behalf; anyone else is a technician.
- */
+// Records who resolved a ticket. The AI assistant acts with the synthetic AI_AGENT_ID
+// principal and resolves on the end user's behalf; anyone else is a technician.
 @Component
 @RequiredArgsConstructor
 public class TicketResolverStamp {
@@ -35,7 +33,7 @@ public class TicketResolverStamp {
         ticket.setResolvedByName(hasText(resolverName) ? resolverName : principal.getId());
     }
 
-    /** Profile name for admins (falls back to the token's display name), token display name otherwise. */
+    // Profile name for admins (falls back to the token's display name), token display name otherwise.
     public String resolveName(AuthPrincipal principal) {
         if (principal == null) {
             return null;

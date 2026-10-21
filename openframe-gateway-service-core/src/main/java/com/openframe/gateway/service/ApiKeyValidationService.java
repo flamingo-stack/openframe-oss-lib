@@ -9,17 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
-/**
- * Clean, focused service for API key validation only
- * 
- * Responsibilities:
- * - Parse and validate API key format
- * - Verify API key existence and status
- * - Authenticate API key secret
- * - Return validation results
- *
- * Statistics are handled by ApiKeyStatsDataService for better separation of concerns
- */
+// Focused only on API key parsing/validation; stats live in ApiKeyStatsDataService
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -32,12 +22,6 @@ public class ApiKeyValidationService {
     private static final String API_KEY_PREFIX = "ak_";
     private static final String SECRET_SEPARATOR = ".sk_";
     
-    /**
-     * Validate API key and update statistics
-     * 
-     * @param fullApiKey Full API key in format: ak_{keyId}.sk_{secret}
-     * @return Mono<ApiKeyValidationResult> containing validation result
-     */
     public Mono<ApiKeyValidationResult> validateApiKey(String fullApiKey, String tenantId) {
         log.debug("Validating API key format and credentials");
 
@@ -73,34 +57,19 @@ public class ApiKeyValidationService {
                 });
     }
     
-    /**
-     * Record successful request and update last used timestamp
-     * 
-     * @param keyId API key identifier
-     */
     public void recordSuccessfulRequest(String keyId, String tenantId) {
         log.debug("Recording successful request for API key: {}", keyId);
 
         apiKeyStatsService.incrementSuccessful(keyId, tenantId);
     }
 
-    /**
-     * Record failed request
-     *
-     * @param keyId API key identifier
-     */
     public void recordFailedRequest(String keyId, String tenantId) {
         log.debug("Recording failed request for API key: {}", keyId);
 
         apiKeyStatsService.incrementFailed(keyId, tenantId);
     }
     
-    /**
-     * Parse API key format: ak_{keyId}.sk_{secret}
-     * 
-     * @param fullApiKey Full API key string
-     * @return ParsedApiKey containing keyId, secret, and validation status
-     */
+    // Format: ak_{keyId}.sk_{secret}
     private ParsedApiKey parseApiKey(String fullApiKey) {
         if (fullApiKey == null || fullApiKey.trim().isEmpty()) {
             return ParsedApiKey.invalid("API key is required");
@@ -133,9 +102,6 @@ public class ApiKeyValidationService {
         return ParsedApiKey.valid(keyId, secret);
     }
 
-    /**
-     * Internal class for parsed API key components
-     */
     private record ParsedApiKey(boolean valid, String errorMessage, String keyId, String secret) {
 
         public static ParsedApiKey valid(String keyId, String secret) {
@@ -147,9 +113,6 @@ public class ApiKeyValidationService {
         }
     }
     
-    /**
-     * Result of API key validation
-     */
     @Getter
     public static class ApiKeyValidationResult {
         private final boolean valid;

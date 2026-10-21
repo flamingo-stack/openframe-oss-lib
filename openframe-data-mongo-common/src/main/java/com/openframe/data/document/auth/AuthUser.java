@@ -7,9 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import java.time.Instant;
-/**
- * User model for multi-tenant Authorization Server with domain-based tenancy
- */
+// User model for multi-tenant Authorization Server with domain-based tenancy
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -24,11 +22,9 @@ public class AuthUser extends User {
     private String loginProvider; // LOCAL, GOOGLE, etc.
     private String externalUserId;
     private Instant lastLogin;
-    /**
-     * Cached profile picture URL, set when the avatar Image is persisted (registration,
-     * SSO auto-provision, or invitation). Used by the auth-server to decide whether to push an
-     * SSO `picture` claim downstream on subsequent logins. Null means "no picture known yet".
-     */
+    // Cached profile picture URL, set when the avatar Image is persisted (registration,
+    // SSO auto-provision, or invitation). Used by the auth-server to decide whether to push an
+    // SSO `picture` claim downstream on subsequent logins. Null means "no picture known yet".
     private String imageUrl;
     public String getFullName() {
         if (super.getFirstName() != null && super.getLastName() != null) {
@@ -42,3 +38,4 @@ public class AuthUser extends User {
         }
     }
 }
+

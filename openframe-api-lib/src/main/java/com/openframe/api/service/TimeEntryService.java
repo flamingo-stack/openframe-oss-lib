@@ -290,10 +290,7 @@ public class TimeEntryService {
                 .build();
     }
 
-    /**
-     * Stats scoped by optional filter fields (employees, organizations, period).
-     * Null filter = tenant-wide today + all-time period stats.
-     */
+    // Null filter = tenant-wide today + all-time period stats.
     public EmployeeTimeStats getEmployeeTimeStats(TimeEntryFilterInput input) {
         TimeEntryFilterInput safe = input != null ? input : TimeEntryFilterInput.builder().build();
         List<String> userIds = safe.getEmployeeIds();

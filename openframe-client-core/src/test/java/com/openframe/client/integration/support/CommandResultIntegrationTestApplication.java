@@ -17,15 +17,13 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 
-/**
- * Minimal Spring context for the {@link CommandResultListener} integration test.
- *
- * <p>Deliberately avoids {@code @EnableAutoConfiguration} so that the Mongo /
- * Cassandra / Redis machinery pulled in transitively by {@code client-core}
- * does not try to connect. Only the beans on the command-result NATS→Kafka path
- * are wired; the Kafka producer boundary is a Mockito mock so the test needs a
- * NATS broker but not a Kafka broker.
- */
+// Minimal Spring context for the CommandResultListener integration test.
+//
+// Deliberately avoids @EnableAutoConfiguration so that the Mongo /
+// Cassandra / Redis machinery pulled in transitively by client-core
+// does not try to connect. Only the beans on the command-result NATS→Kafka path
+// are wired; the Kafka producer boundary is a Mockito mock so the test needs a
+// NATS broker but not a Kafka broker.
 @SpringBootConfiguration
 @Import({
         CommandResultListener.class,

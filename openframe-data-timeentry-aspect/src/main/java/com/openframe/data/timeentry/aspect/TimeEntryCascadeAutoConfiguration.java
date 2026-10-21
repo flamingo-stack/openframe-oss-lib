@@ -6,12 +6,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
-/**
- * Auto-configuration for TimeEntry cascade updates.
- * Registers cascade aspect and service beans when the feature is enabled.
- *
- * <p>Configuration property: {@code openframe.timeentry.cascade.enabled=true}</p>
- */
+// Registers cascade aspect and service beans; enabled via openframe.timeentry.cascade.enabled
 @AutoConfiguration
 @ConditionalOnProperty(name = "openframe.timeentry.cascade.enabled", havingValue = "true", matchIfMissing = true)
 public class TimeEntryCascadeAutoConfiguration {
