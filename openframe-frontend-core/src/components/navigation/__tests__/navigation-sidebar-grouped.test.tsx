@@ -232,7 +232,10 @@ describe('NavigationSidebar — controlled collapse', () => {
 
     expect(onCollapsedChange).toHaveBeenCalledWith(true);
     expect(screen.getByText('rail')).toBeInTheDocument();
-    expect(document.documentElement.style.getPropertyValue('--of-navigation-sidebar-width')).toBe('56px');
+    // On the rail itself: a custom property on <html> restyles the whole document.
+    const rail = screen.getByRole('complementary', { name: 'Main navigation sidebar' });
+    expect(rail.style.getPropertyValue('--of-navigation-sidebar-width')).toBe('56px');
+    expect(document.documentElement.style.getPropertyValue('--of-navigation-sidebar-width')).toBe('');
     // `useLocalStorage` may seed its initial value; the toggle never reaches it.
     expect(window.localStorage.getItem('of.navigationSidebar.minimized')).not.toBe('true');
   });

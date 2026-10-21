@@ -10,8 +10,10 @@ export type ContentBreakpoint = 'mobile' | 'tablet' | 'desktop';
 export const CONTENT_BREAKPOINTS = { md: LAYOUT_STEPS.md.content, lg: LAYOUT_STEPS.lg.content } as const;
 
 /**
- * Width of the enclosing content area (`AppLayout` with a side panel provides
- * it), or `null` outside one.
+ * Width of the enclosing content area (`AppLayout` with a side panel or a composer
+ * dock provides it), or `null` outside one. `AppLayout` moves it only when the area
+ * crosses a breakpoint, so it is a width in the area's current step, not a live
+ * measurement: read it through the hooks below.
  */
 export const ContentAreaWidthContext = createContext<number | null>(null);
 

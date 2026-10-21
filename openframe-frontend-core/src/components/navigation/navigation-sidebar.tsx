@@ -164,9 +164,23 @@ export interface NavigationSidebarProps {
    * false (overlay).
    */
   pushOnTablet?: boolean;
+  /**
+   * Animate the width where it moves the content (the desktop rail, the tablet
+   * slot with `pushOnTablet`). Default true. `AppLayout` turns it off while the
+   * page column is a size container (a side panel or a composer dock): each frame
+   * of the transition then re-evaluated the page's `content-*` container queries,
+   * ~25 ms of layout per frame on a large page in WebKit, so there the width snaps.
+   * The tablet overlay still slides: it floats over the content.
+   */
+  animateWidth?: boolean;
 }
 
-export function NavigationSidebar({ config, disabled = false, pushOnTablet = false }: NavigationSidebarProps) {
+export function NavigationSidebar({
+  config,
+  disabled = false,
+  pushOnTablet = false,
+  animateWidth = true,
+}: NavigationSidebarProps) {
   const isMdUp = useMdUp() ?? false;
   const isLgUp = useLgUp() ?? false;
 
@@ -429,8 +443,13 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
   // — put it in the markup instead and it becomes part of what React hydrates,
   // which is precisely what cannot agree across the server boundary. Afterwards
   // this is what a toggle moves.
+  //
+  // On the rail, not on `<html>` where the seed sits: the rail is its only reader,
+  // and an inherited custom property on the root made WebKit restyle the whole
+  // document on every toggle. Its own value overrides the inherited seed.
+  const asideRef = useRef<HTMLElement>(null);
   useIsomorphicLayoutEffect(() => {
-    document.documentElement.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
+    asideRef.current?.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
   }, [sidebarWidth]);
 
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
@@ -515,7 +534,7 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
               ? 'w-56'
               : 'w-[var(--of-navigation-sidebar-expanded-width)]'
             : 'w-14',
-          transitionsEnabled && widthTransition,
+          transitionsEnabled && animateWidth && widthTransition,
         )}
         style={expandedWidthStyle}
         aria-hidden="true"
@@ -536,8 +555,12 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
               ? SIDEBAR_TABLET_WIDTH.overlay
               : SIDEBAR_TABLET_WIDTH.customOverlay,
           transitionsEnabled && widthTransition,
+          // Snaps where its width moves the content: the desktop rail, and the
+          // tablet overlay too when it pushes (its slot above snaps with it).
+          !animateWidth && (pushOnTablet ? 'transition-none' : 'lg:transition-none'),
           config.className,
         )}
+        ref={asideRef}
         style={expandedWidthStyle}
         aria-label="Main navigation sidebar"
         {...{ [NAVIGATION_SIDEBAR_ATTRIBUTE]: '' }}

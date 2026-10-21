@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactNode } from 'react';
-import { ContentAreaWidthContext } from '../../hooks/ui/use-content-breakpoint';
+import type { ReactNode } from 'react';
+import { ContentAreaWidthContext, contentBreakpointFor } from '../../hooks/ui/use-content-breakpoint';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import type { NavigationSidebarConfig } from '../../types/navigation';
 import { cn } from '../../utils';
@@ -13,17 +13,11 @@ import {
   type AppLayoutDrawerCoordination,
   AppLayoutDrawerCoordinationContext,
   type AppLayoutDrawerHandle,
+  ComposerDockHeightContext,
 } from './app-layout-context';
 import { AppLayoutSidePanel, type AppLayoutSidePanelConfig, useAppLayoutSidePanel } from './app-layout-side-panel';
 import { MobileBurgerMenu, type MobileBurgerMenuProps } from './mobile-burger-menu';
 import { NavigationSidebar } from './navigation-sidebar';
-
-/**
- * The composer dock's height, on the page column while there is a dock: what a page's
- * window-pinned bottom bar rises by (`PageActions` on a phone), so it does not cover
- * the composer. Spelled out where it is read (Tailwind scans literal class names).
- */
-const COMPOSER_DOCK_HEIGHT_VAR = '--of-composer-dock-height';
 
 export interface AppLayoutProps {
   children: ReactNode;
@@ -182,7 +176,16 @@ export function AppLayout({
 
   useIsomorphicLayoutEffect(() => {
     if (!adaptive || !mainElement) return undefined;
-    const update = () => setContentWidth(mainElement.clientWidth);
+    // Every reader asks for the breakpoint (`useContentBreakpoint`), so only a
+    // crossing re-renders the layout: kept at the old width, the state bails out.
+    // Per pixel, the uncompiled layout and every breakpoint consumer re-rendered on
+    // each frame of a sidebar toggle, a window drag or a side-panel resize.
+    const update = () => {
+      const width = mainElement.clientWidth;
+      setContentWidth(previous =>
+        previous !== null && contentBreakpointFor(previous) === contentBreakpointFor(width) ? previous : width,
+      );
+    };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(mainElement);
@@ -192,7 +195,7 @@ export function AppLayout({
 
   // The sheet layer ends where the dock begins, and the dock grows with the
   // composer (a longer draft, a staged attachment): follow its height. The page
-  // reads it too (`--of-composer-dock-height`): a phone's bottom action bar
+  // reads it too (`ComposerDockHeightContext`): a phone's bottom action bar
   // (`PageActions`) is pinned to the window and would cover the composer.
   const hasSheet = hasDock && composerSheet != null && composerSheet !== false;
   useIsomorphicLayoutEffect(() => {
@@ -304,7 +307,12 @@ export function AppLayout({
             `relative` so the tablet sidebar (position:absolute) anchors to this
             row — below the topBar — instead of the viewport. */}
           <div className="relative flex min-h-0 flex-1">
-            <NavigationSidebar config={sidebarConfig} disabled={disabled} pushOnTablet={hasSidePanel} />
+            <NavigationSidebar
+              config={sidebarConfig}
+              disabled={disabled}
+              pushOnTablet={hasSidePanel}
+              animateWidth={!adaptive}
+            />
             {/* Mobile Burger Menu - opens below header */}
             <MobileBurgerMenu
               {...mobileBurgerMenuProps}
@@ -343,7 +351,6 @@ export function AppLayout({
                   the element types above the page, or React remounts it. */}
                 <div
                   data-surface={columnIsBox ? pageSurface : undefined}
-                  style={hasDock ? ({ [COMPOSER_DOCK_HEIGHT_VAR]: `${dockHeight}px` } as CSSProperties) : undefined}
                   className={
                     columnIsBox
                       ? cn(
@@ -377,9 +384,11 @@ export function AppLayout({
                     )}
                   >
                     <ContentAreaWidthContext.Provider value={contentAreaWidth}>
-                      {/* `display: contents` either way; it carries the content
-                        tokens only inside an adaptive area. */}
-                      <div className={adaptive ? 'ods-content-scope' : 'contents'}>{children}</div>
+                      <ComposerDockHeightContext.Provider value={hasDock ? dockHeight : 0}>
+                        {/* `display: contents` either way; it carries the content
+                          tokens only inside an adaptive area. */}
+                        <div className={adaptive ? 'ods-content-scope' : 'contents'}>{children}</div>
+                      </ComposerDockHeightContext.Provider>
                     </ContentAreaWidthContext.Provider>
                   </main>
                   {hasSheet && (

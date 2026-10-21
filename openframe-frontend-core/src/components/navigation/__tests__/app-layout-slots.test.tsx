@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { type ReactNode, useEffect } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useContentBreakpoint } from '../../../hooks/ui/use-content-breakpoint';
 import { NotificationsProvider } from '../../features/notifications/notifications-context';
+import { PageActions } from '../../ui/page-actions';
 import { AppLayout, type AppLayoutProps } from '../app-layout';
 import { NotificationsBellButton } from '../notifications-bell-button';
 
@@ -163,15 +164,72 @@ describe('AppLayout composerSheet', () => {
 describe('AppLayout composer dock height', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("publishes the dock's height to the page column, for a phone's pinned action bar", () => {
+  const actions = <PageActions variant="primary-buttons" actions={[{ label: 'Save', onClick: () => undefined }]} />;
+  /** The opening tag of the phone's window-pinned action bar (`PageActions` below md). */
+  const phoneActionBar = () => /<div[^>]*class="fixed bottom-0 left-0 right-0 z-50 md:hidden[^>]*>/.exec(markup())?.[0];
+  const inlineStyle = (tag?: string) => (tag ? /style="([^"]*)"/.exec(tag)?.[1] : undefined);
+
+  it("lifts a phone's pinned action bar over the dock", () => {
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
-    render(layout({ composerDock: <p>dock</p> }));
-    expect(markup()).toMatch(/style="--of-composer-dock-height: 132px;"[^>]*>(?:(?!<main).)*<main/s);
+    render(layout({ composerDock: <p>dock</p> }, actions));
+    expect(inlineStyle(phoneActionBar())).toBe('bottom: 132px;');
   });
 
-  it('publishes nothing without a dock', () => {
-    render(layout({ composerDock: undefined }));
+  it('puts no custom property over the page: a change there restyles every element of it', () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(132);
+    render(layout({ composerDock: <p>dock</p> }, actions));
     expect(markup()).not.toContain('--of-composer-dock-height');
+  });
+
+  it('leaves the bar at the bottom of the window without a dock', () => {
+    render(layout({ composerDock: undefined }, actions));
+    expect(phoneActionBar()).toBeDefined();
+    expect(inlineStyle(phoneActionBar())).toBeUndefined();
+  });
+});
+
+describe('AppLayout content width', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('re-renders breakpoint readers only when the content area crosses a step', () => {
+    const observers: Array<() => void> = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: () => void) {
+          observers.push(callback);
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    let width = 1200;
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => width);
+    const commits = { count: 0 };
+    function Reader() {
+      useEffect(() => {
+        commits.count += 1;
+      });
+      return <p>page {useContentBreakpoint() ?? 'unknown'}</p>;
+    }
+    const fireAll = () => {
+      for (const fire of observers) fire();
+    };
+    render(layout({ composerDock: <p>dock</p> }, <Reader />));
+    expect(screen.getByText('page desktop')).toBeInTheDocument();
+    const settled = commits.count;
+
+    // A sidebar toggle's frames: the width moves within the desktop step.
+    for (width = 1190; width >= 1030; width -= 40) act(fireAll);
+    expect(commits.count).toBe(settled);
+
+    width = 700;
+    act(fireAll);
+    expect(screen.getByText('page mobile')).toBeInTheDocument();
   });
 });
 
