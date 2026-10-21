@@ -168,7 +168,7 @@ async fn handle<H: CommandHandler>(
             error!(kind = H::KIND, dispatch_id = %dispatch_id, "Command failed: {}", reason)
         }
     }
-    // a restarting command records its sequence when the next start settles it done
+    // Restarting is left out: UpdateHandlerService records it once the next start settles it done
     if H::SEQUENCED && matches!(outcome, Outcome::Done | Outcome::RestartRequired) {
         context.delivery.record_applied(machine_id, &delivery).await;
     }
@@ -182,11 +182,14 @@ async fn handle<H: CommandHandler>(
         }
         outcome if H::REMOVES_AGENT => {
             let done = outcome == Outcome::Done;
-            context
+            let reported = context
                 .delivery
                 .settle_now(machine_id, delivery, outcome)
                 .await;
             if done {
+                if !reported {
+                    warn!(kind = H::KIND, dispatch_id = %dispatch_id, "Done could not be reported, removing the agent anyway; the backend closes the command on timeout");
+                }
                 listener.handler.remove_agent().await;
             }
         }
