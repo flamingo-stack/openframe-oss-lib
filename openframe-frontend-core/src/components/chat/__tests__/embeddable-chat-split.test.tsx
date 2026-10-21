@@ -193,6 +193,16 @@ describe('EmbeddableChat split: thread portalled into the page', () => {
     expect(page.innerHTML).toContain('mx-auto max-w-[760px]');
   });
 
+  it("loads the thread in the host's column, where its messages will land", () => {
+    const page = pageNode();
+    renderChat(createState({ messages: [], isMessagesLoading: true }), {
+      threadContainer: page,
+      threadContentClassName: 'mx-auto max-w-[760px]',
+    });
+    expect(within(page).getByText('Loading messages')).toBeInTheDocument();
+    expect(page.innerHTML).toContain('mx-auto max-w-[760px]');
+  });
+
   it('draws the page header: title, "· owner · day", ⋯ — nothing that closes, collapses or toggles a list', () => {
     const page = pageNode();
     renderChat(createState(), { threadContainer: page, onCollapse: vi.fn(), onExpand: vi.fn(), closable: true });

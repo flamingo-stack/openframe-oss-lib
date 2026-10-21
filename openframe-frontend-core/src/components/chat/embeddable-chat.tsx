@@ -2829,14 +2829,22 @@ function EmbeddableChatInner({
               // Match the real list's `fullWidth` layout so swapping
               // skeleton → bubbles doesn't shift the column. The panel
               // wrapper above already pads (`p-[var(--spacing-system-m)]`),
-              // so the skeleton sits flush (no inner px/pb).
+              // so the skeleton sits flush (no inner px/pb). In the split
+              // layout it takes the host's column too: without it a wide
+              // chat page drew the skeleton across the whole page while
+              // the messages land in a centred column.
               //
               // In `previewMode` the chat lives in a fixed-height host box
               // (e.g. the Mingo hero demo). The default bottom-anchored
               // skeleton overflows a short panel and grows its OWN
               // scrollbar — ugly. `fill` top-anchors + clips overflow so
               // it reads as "the whole panel is loading" and never scrolls.
-              <ChatMessageListSkeleton fullWidth fill={previewMode} className="flex-1" />
+              <ChatMessageListSkeleton
+                fullWidth
+                fill={previewMode}
+                className="flex-1"
+                contentClassName={splitMode ? threadContentClassName : undefined}
+              />
             ) : (
               <ChatMessageList
                 messages={messages}
