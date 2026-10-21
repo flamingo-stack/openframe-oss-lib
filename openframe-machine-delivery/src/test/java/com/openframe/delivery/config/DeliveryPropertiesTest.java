@@ -62,7 +62,7 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(RECONNECT_WINDOW);
         assertThat(resolved.getResultTimeoutSeconds()).isEqualTo(RESULT_TIMEOUT);
         assertThat(resolved.getTtlSeconds()).isEqualTo(TTL);
-        assertThat(resolved.getFastSweep()).isFalse();
+        assertThat(resolved.isFastSweep()).isFalse();
     }
 
     @Test

@@ -68,7 +68,7 @@ public class DeliveryProperties {
 
     private boolean isOnTheFastPass(DeliveryType type) {
         Policy policy = resolve(type);
-        return policy.getFastSweep();
+        return policy.isFastSweep();
     }
 
     @Getter
@@ -115,10 +115,9 @@ public class DeliveryProperties {
         @Positive
         private Long ttlSeconds;
 
-        // true = re-published by the sweep's fast pass (sweep.fast-interval) instead of waiting for the regular one:
-        // for a type a human waits on, whose ack-threshold is seconds
-        @NotNull
-        private Boolean fastSweep;
+        // false unless a type sets it: re-published by the sweep's fast pass (sweep.fast-interval) instead of waiting
+        // for the regular one, for a type a human waits on, whose ack-threshold is seconds
+        private boolean fastSweep;
     }
 
     // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
@@ -163,7 +162,7 @@ public class DeliveryProperties {
             merged.setReconnectWindowSeconds(requireNonNullElse(reconnectWindowSeconds, base.getReconnectWindowSeconds()));
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
-            merged.setFastSweep(requireNonNullElse(fastSweep, base.getFastSweep()));
+            merged.setFastSweep(requireNonNullElse(fastSweep, base.isFastSweep()));
             return merged;
         }
     }

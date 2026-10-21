@@ -54,7 +54,9 @@ class DeliveryPropertiesBindingTest {
         DeliveryProperties properties = bind(config);
 
         // verifications
+        Policy uninstall = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
         assertThat(properties.fastTypes()).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
+        assertThat(uninstall.isFastSweep()).isFalse();
     }
 
     @Test
@@ -87,7 +89,6 @@ class DeliveryPropertiesBindingTest {
         config.put(PREFIX + ".defaults.reconnect-window-seconds", "86400");
         config.put(PREFIX + ".defaults.result-timeout-seconds", "600");
         config.put(PREFIX + ".defaults.ttl-seconds", "604800");
-        config.put(PREFIX + ".defaults.fast-sweep", "false");
         return config;
     }
 }
