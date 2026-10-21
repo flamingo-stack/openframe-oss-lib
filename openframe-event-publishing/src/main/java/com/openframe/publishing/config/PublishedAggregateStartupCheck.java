@@ -5,13 +5,11 @@ import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.spec.PublishedAggregateSpecRegistry;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.SmartInitializingSingleton;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 
 // publish on for a type no spec covers would silently write nothing; refuse to start instead.
-@Component
 @RequiredArgsConstructor
 public class PublishedAggregateStartupCheck implements SmartInitializingSingleton {
 

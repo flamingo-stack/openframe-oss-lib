@@ -26,6 +26,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 // The real OrganizationRepository, its custom implementation and OrganizationSpec, with the outbox wired as in a service.
@@ -65,19 +67,22 @@ class OrganizationPublishingIT {
             assertThat(row.getAggregateId()).isEqualTo(saved.getId());
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
             assertThat(row.getVersion()).isZero();
-            assertThat(row.getPayload()).containsEntry("name", "Acme").containsEntry("organizationId", "org-1")
+            assertThat(row.getPayload()).containsEntry("tenantId", "tenant-1").containsEntry("deleted", false);
+            assertThat(eventOf(row)).containsEntry("name", "Acme").containsEntry("organizationId", "org-1")
                     .doesNotContainKeys("notes", "monthlyRevenue");
         });
     }
 
     @Test
-    void deletingAnOrganization_writesADeletedEvent() {
+    void deletingAnOrganization_writesADeleteEnvelopeAndATombstone() {
         Organization saved = organizationRepository.save(organization("Acme"));
 
         organizationRepository.delete(saved);
 
-        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OutboxEvent::isDeleted).singleElement()
-                .satisfies(row -> assertThat(row.getVersion()).isEqualTo(1L));
+        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OutboxEvent::isDeleted).hasSize(2)
+                .allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L))
+                .anySatisfy(row -> assertThat(row.getPayload()).containsEntry("deleted", true).containsEntry("event", null))
+                .anySatisfy(row -> assertThat(row.getPayload()).isNull());
     }
 
     @Test
@@ -89,7 +94,7 @@ class OrganizationPublishingIT {
 
         assertThat(mongoTemplate.findAll(OutboxEvent.class)).hasSize(2)
                 .anySatisfy(row -> {
-                    assertThat(row.getPayload()).containsEntry("status", "ARCHIVED");
+                    assertThat(eventOf(row)).containsEntry("status", "ARCHIVED");
                     assertThat(row.getVersion()).isEqualTo(1L);
                 });
     }
@@ -99,6 +104,11 @@ class OrganizationPublishingIT {
         organizationRepository.save(organization("Acme"));
 
         assertThat(organizationRepository.findOrganizationsWithFilters(null, "Acme")).hasSize(1);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> eventOf(OutboxEvent row) {
+        return (Map<String, Object>) row.getPayload().get("event");
     }
 
     private static Organization organization(String name) {

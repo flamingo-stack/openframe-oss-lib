@@ -9,7 +9,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,10 +25,8 @@ import static com.openframe.publishing.api.PublishedDocuments.ID_FIELD;
 
 // Runs a write and writes the outbox rows of the documents it changed, in one transaction. With publish off, only the write.
 @Slf4j
-@Component
 public class OutboxPublisher {
 
-    private static final int SCHEMA_VERSION = 1;
     private static final int DELETE_CHUNK_SIZE = 1_000;
     private static final TypeReference<Map<String, Object>> PAYLOAD_TYPE = new TypeReference<>() {
     };
@@ -76,15 +73,12 @@ public class OutboxPublisher {
         });
     }
 
-    // The documents are known before a write that returns none, such as delete(document).
+    // A delete of known documents that returns none, such as delete(document): only their ids are used, and the tenant and
+    // version are read from the database, so a hand-built entity without a tenant cannot give its envelope a wrong one.
     public <R> R publishDeleted(PublishedAggregateSpec<?, ?> spec, Supplier<? extends Collection<?>> stored, Supplier<R> write) {
-        log.debug("publishDeleted of {}: starting", spec.getType().getName());
-        return whenPublishing(spec, write, () -> {
-            Collection<?> deleted = stored.get();
-            R result = write.get();
-            insertDeletedRows(spec, deleted);
-            return result;
-        });
+        Collection<?> given = stored.get();
+        List<String> ids = given.stream().map(documents::idOf).toList();
+        return publishDeletedByIds(spec, ids, write);
     }
 
     // A delete by ids: a tombstone needs only the id, tenant and version, so only those fields are read before the write.
@@ -140,28 +134,46 @@ public class OutboxPublisher {
         return runner.run(writeWithRows::get);
     }
 
-    // The payload is the event as JSON, the way consumers read it: Jackson names, ISO dates.
+    // The payload is the envelope as JSON, the way consumers read it: Jackson names, ISO dates.
     private void insertChangedRows(PublishedAggregateSpec<?, ?> spec, Collection<?> changed) {
         List<OutboxEvent> rows = new ArrayList<>();
         for (Object document : changed) {
             PublishedEvent event = eventOf(spec, document);
-            Map<String, Object> payload = EVENT_MAPPER.convertValue(event, PAYLOAD_TYPE);
             long version = documents.versionOf(document);
-            OutboxEvent row = rowOf(spec, document).version(version).payload(payload).build();
+            OutboxEvent row = rowOf(spec, document).version(version).build();
+            Map<String, Object> payload = payloadOf(row, event);
+            row.setPayload(payload);
             rows.add(row);
         }
         insertRows(rows);
     }
 
-    // A tombstone, no payload: one above the stored version, so a consumer applies it after the document's last change.
+    // Two rows per delete, one above the stored version: the delete envelope, then a row Debezium turns into a tombstone.
     private void insertDeletedRows(PublishedAggregateSpec<?, ?> spec, Collection<?> deleted) {
         List<OutboxEvent> rows = new ArrayList<>();
         for (Object document : deleted) {
             long version = documents.versionOf(document) + 1;
-            OutboxEvent row = rowOf(spec, document).version(version).deleted(true).build();
-            rows.add(row);
+            OutboxEvent.OutboxEventBuilder deletedRow = rowOf(spec, document).version(version).deleted(true);
+            OutboxEvent deleteRow = deletedRow.build();
+            Map<String, Object> payload = payloadOf(deleteRow, null);
+            deleteRow.setPayload(payload);
+            OutboxEvent tombstoneRow = deletedRow.build();
+            rows.add(deleteRow);
+            rows.add(tombstoneRow);
         }
         insertRows(rows);
+    }
+
+    // Built from the row itself, so the envelope and the row's own fields cannot disagree.
+    private static Map<String, Object> payloadOf(OutboxEvent row, PublishedEvent event) {
+        PublishedRecord<PublishedEvent> envelope = PublishedRecord.builder()
+                .tenantId(row.getTenantId())
+                .version(row.getVersion())
+                .deleted(row.isDeleted())
+                .schemaVersion(row.getSchemaVersion())
+                .event(event)
+                .build();
+        return EVENT_MAPPER.convertValue(envelope, PAYLOAD_TYPE);
     }
 
     private void insertRows(List<OutboxEvent> rows) {
@@ -187,7 +199,7 @@ public class OutboxPublisher {
                 .aggregateType(aggregateType)
                 .aggregateId(id)
                 .tenantId(tenantId)
-                .schemaVersion(SCHEMA_VERSION)
+                .schemaVersion(PublishedRecord.CURRENT_SCHEMA_VERSION)
                 .occurredAt(now);
     }
 

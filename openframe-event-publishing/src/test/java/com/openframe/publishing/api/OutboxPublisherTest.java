@@ -28,8 +28,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -88,11 +88,25 @@ class OutboxPublisherTest {
     }
 
     @Test
+    void thePayloadIsTheEnvelope_withTheSameTenantVersionAndFlagsAsTheRow() {
+        publisher.publishChanged(spec, () -> widget("w-1", 2L));
+
+        verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        OutboxEvent row = onlyRow();
+        assertThat(row.getPayload())
+                .containsEntry("tenantId", row.getTenantId())
+                .containsEntry("deleted", false)
+                .containsEntry("schemaVersion", row.getSchemaVersion())
+                .containsKey("event");
+        assertThat(versionOf(row.getPayload())).isEqualTo(row.getVersion());
+    }
+
+    @Test
     void thePayloadIsTheEventAsJson_withJacksonNamesAndIsoDates() {
         publisher.publishChanged(new SampleSpec(), () -> widget("w-1", 0L));
 
         verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
-        assertThat(onlyRow().getPayload())
+        assertThat(eventOf(onlyRow().getPayload()))
                 .containsEntry("name", "Acme")
                 .containsEntry("isDefault", true)
                 .containsEntry("status", "ARCHIVED")
@@ -112,13 +126,20 @@ class OutboxPublisherTest {
     }
 
     @Test
-    void aDeletedDocument_writesADeletedRowOneAboveItsVersion() {
+    void aDeletedDocument_writesTheDeleteEnvelope_thenATombstoneRow_oneAboveItsVersion() {
         publisher.publishDeleted(spec, () -> widget("w-1", 4L));
 
         verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
-        assertThat(onlyRow().isDeleted()).isTrue();
-        assertThat(onlyRow().getVersion()).isEqualTo(5L);
-        assertThat(onlyRow().getPayload()).isNull();
+        List<OutboxEvent> written = List.copyOf(rows.getValue());
+        assertThat(written).hasSize(2).allSatisfy(row -> {
+            assertThat(row.getAggregateId()).isEqualTo("w-1");
+            assertThat(row.isDeleted()).isTrue();
+            assertThat(row.getVersion()).isEqualTo(5L);
+        });
+        Map<String, Object> envelope = written.getFirst().getPayload();
+        assertThat(envelope).containsEntry("deleted", true).containsEntry("event", null);
+        assertThat(versionOf(envelope)).isEqualTo(5L);
+        assertThat(written.get(1).getPayload()).isNull();
     }
 
     @Test
@@ -137,26 +158,34 @@ class OutboxPublisherTest {
         order.verify(mongoOperations).find(any(Query.class), eq(Widget.class));
         order.verify(write).run();
         order.verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
-        assertThat(onlyRow().getVersion()).isEqualTo(4L);
-        assertThat(onlyRow().isDeleted()).isTrue();
+        assertThat(rows.getValue()).hasSize(2).allSatisfy(row -> {
+            assertThat(row.getVersion()).isEqualTo(4L);
+            assertThat(row.isDeleted()).isTrue();
+        });
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void storedDocuments_areReadBeforeTheWrite() {
+    void knownDocuments_areReadAgainByIdBeforeTheWrite_soTheEnvelopeTakesTheStoredTenantAndVersion() {
+        Widget stored = widget("w-1", 3L);
+        Widget handBuilt = widget("w-1", 3L);
+        handBuilt.setTenantId(null);
+        when(mongoOperations.find(any(Query.class), eq(Widget.class))).thenReturn(List.of(stored));
         Runnable write = mock(Runnable.class);
-        Supplier<List<Widget>> stored = mock(Supplier.class);
-        when(stored.get()).thenReturn(List.of(widget("w-1", 0L)));
 
-        publisher.publishDeleted(spec, stored, () -> {
+        publisher.publishDeleted(spec, () -> List.of(handBuilt), () -> {
             write.run();
             return null;
         });
 
-        InOrder order = inOrder(stored, write, mongoOperations);
-        order.verify(stored).get();
+        InOrder order = inOrder(mongoOperations, write);
+        order.verify(mongoOperations).find(any(Query.class), eq(Widget.class));
         order.verify(write).run();
-        order.verify(mongoOperations).insert(anyCollection(), eq(OutboxEvent.class));
+        order.verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
+        assertThat(rows.getValue()).hasSize(2).allSatisfy(row -> {
+            assertThat(row.getTenantId()).isEqualTo(stored.getTenantId());
+            assertThat(row.getVersion()).isEqualTo(4L);
+        });
     }
 
     @Test
@@ -196,7 +225,7 @@ class OutboxPublisherTest {
     }
 
     @Test
-    void deleteAll_removesTheIdsItRead_inChunksOfAThousand_andWritesATombstoneForEach() {
+    void deleteAll_removesTheIdsItRead_inChunksOfAThousand_andWritesBothDeleteRowsForEach() {
         List<Widget> stored = IntStream.range(0, 1_001)
                 .mapToObj(index -> widget("w-" + index, 0L))
                 .toList();
@@ -208,7 +237,17 @@ class OutboxPublisherTest {
 
         verify(mongoOperations, times(2)).remove(any(Query.class), eq(Widget.class));
         verify(mongoOperations).insert(rows.capture(), eq(OutboxEvent.class));
-        assertThat(rows.getValue()).hasSize(1_001).allSatisfy(row -> assertThat(row.isDeleted()).isTrue());
+        assertThat(rows.getValue()).hasSize(2_002).allSatisfy(row -> assertThat(row.isDeleted()).isTrue());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> eventOf(Map<String, Object> payload) {
+        return (Map<String, Object>) payload.get("event");
+    }
+
+    private static long versionOf(Map<String, Object> payload) {
+        Number version = (Number) payload.get("version");
+        return version.longValue();
     }
 
     private OutboxEvent onlyRow() {

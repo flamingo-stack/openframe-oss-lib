@@ -4,7 +4,7 @@ Writes an outbox row for every change of a published Mongo document, in the same
 Debezium will later read the `outbox` collection and send each row to Kafka. Nothing reads the outbox yet.
 
 `openframe-data-mongo-sync` depends on this module, so every service with Mongo has it on the classpath.
-It does nothing until you switch it on.
+It does nothing until you enable it.
 
 Import only from `com.openframe.publishing.api`. The other packages are internal to the module.
 
@@ -17,7 +17,7 @@ service ──> OrganizationRepository.save(org)
             PublishingRepositoryInterceptor          inside the repository proxy
               │
               ▼
-            one Mongo transaction:  1. the write   2. one outbox row per written document
+            one Mongo transaction:  1. the write   2. its outbox rows (one per save, two per delete)
 ```
 
 - A repository becomes published by extending `PublishingMongoRepository<D, ID, S>`. `S` is the aggregate's spec,
@@ -36,7 +36,7 @@ openframe:
       enabled: false      # the whole module (default false); a change needs a pod restart
     topics:
       organizations:      # one key per PublishedAggregateType; an unknown key stops the service
-        publish: false    # per aggregate (default false); a config refresh changes it
+        publish: false    # per aggregate (default false); a change needs a pod restart
 ```
 
 | `publishing.enabled` | `publish` | Result |
@@ -97,24 +97,38 @@ Organization is the example; its files are in `openframe-data-mongo-sync`, next 
 
 6. Find every other write of that collection (custom repository methods, `MongoTemplate` calls, services) and
    publish each one with `OutboxPublisher`, or the change is silently not published.
-7. Add the config key, with `publish: false`, and switch it on per environment.
+7. Add the config key, with `publish: false`, and enable it per environment.
 
 ## What is published
 
 | Write | Outbox rows |
 |---|---|
-| `save`, `saveAll`, `insert` | One row per saved document, with the event as payload and the saved version. |
-| `delete(document)`, `deleteAll(documents)` | One tombstone per given document. |
-| `deleteById`, `deleteAllById` | Reads only `_id`, `version` and `tenantId` first, then one tombstone per document found. A `null` argument goes to Spring Data unchanged. |
-| `deleteAll()` | Removes through the template, which a tenant app scopes to its tenant (Spring Data's own `deleteAll()` is not scoped). With `publish` on: reads the ids, removes them in chunks of 1,000, one tombstone each. |
-| Derived deletes (`deleteByName`, `@Query(delete = true)`) | One tombstone per returned document. They must return the documents, not a count. |
+| `save`, `saveAll`, `insert` | One row per saved document: its payload is the envelope with the event, and the saved version. |
+| `delete(document)`, `deleteAll(documents)` | Reads only `_id`, `version` and `tenantId` of the given documents first, by their ids, then the two delete rows per document found. The tenant and version come from the database, not from the given entity. |
+| `deleteById`, `deleteAllById` | Reads only `_id`, `version` and `tenantId` first, then the two delete rows per document found. A `null` argument goes to Spring Data unchanged. |
+| `deleteAll()` | Removes through the template, which a tenant app scopes to its tenant (Spring Data's own `deleteAll()` is not scoped). With `publish` on: reads the ids, removes them in chunks of 1,000, the two delete rows each. |
+| Derived deletes (`deleteByName`, `@Query(delete = true)`) | The two delete rows per returned document. They must return the documents, not a count. |
 | Reads | Nothing. |
 
-A **tombstone** is a row with `deleted: true`, no payload, and a version one above the stored version, so a
-consumer applies it after the document's last change.
+Every payload is the envelope [`PublishedRecord`](src/main/java/com/openframe/publishing/api/PublishedRecord.java):
+`tenantId`, `version`, `deleted`, `schemaVersion` and `event` (the spec's public event, `null` on a delete). The envelope
+is built from the row's own fields, so the two never disagree.
 
-**One row per write.** The interceptor does not compare with the stored document, so a save that changes only an
-unpublished field still writes a row. Consumers apply events by version, so extra rows do no harm.
+A delete writes **two rows**. Both have `deleted: true` and a version one above the stored version, so a consumer
+applies them after the document's last change.
+
+- The first row is the delete envelope, with `event: null`.
+- The second row has `payload: null`. Debezium sends it as a Kafka tombstone, and compaction then removes the key from
+  the topic.
+
+The outbox connector needs two settings for this (stage 5):
+
+- `route.tombstone.on.empty.payload: true`. Debezium's default is `false`.
+- A value converter without schemas, for example `value.converter.schemas.enable: false`. The consumers read the plain
+  envelope; a value wrapped in a schema goes to their DLT.
+
+**Rows for every write.** The interceptor does not compare with the stored document, so a save that changes only an
+unpublished field still writes its row. Consumers apply events by version, so extra rows do no harm.
 
 ## Custom writes
 
@@ -126,7 +140,7 @@ lambda and runs it with its rows in one transaction:
 | `publishChanged(spec, write)` | A write that returns the new state: `findAndModify` with `returnNew`, `save`. |
 | `publishChangedByIds(spec, ids, write)` | A write that returns only a count, such as `updateMulti`: the documents are read again after it. |
 | `publishDeleted(spec, write)` | A write that returns what it removed: `findAndRemove`, `findAllAndRemove`. |
-| `publishDeleted(spec, stored, write)` | A delete that returns nothing, when the documents are known before it. |
+| `publishDeleted(spec, stored, write)` | A delete that returns nothing, when the documents are known before it. Their tenant and version are read again by id. |
 | `publishDeletedByIds(spec, ids, write)` | A delete by ids that returns nothing. |
 
 ```java
@@ -177,11 +191,11 @@ Collection `outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publis
 | `aggregateType` | The type name, for example `organizations`. |
 | `aggregateId` | The document's `_id`; the Kafka key, once Debezium sends the rows. |
 | `tenantId` | The document's tenant, if it has one. |
-| `version` | The saved version, or the stored version + 1 for a tombstone. |
-| `deleted` | `true` for a tombstone. |
+| `version` | The saved version, or the stored version + 1 for both delete rows. |
+| `deleted` | `true` for both delete rows. |
 | `schemaVersion` | `1`. |
 | `occurredAt` | When the row was written. |
-| `payload` | The event as JSON (Jackson names, ISO dates); empty for a tombstone. |
+| `payload` | The `PublishedRecord` envelope as JSON (Jackson names, ISO dates); `null` for the second delete row; the key is always written, because Debezium's router needs it. |
 
 `OutboxIndexInitializer` creates the TTL index `outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
 change the TTL later, write a migration that drops the index first; `createIndex` with other options fails at

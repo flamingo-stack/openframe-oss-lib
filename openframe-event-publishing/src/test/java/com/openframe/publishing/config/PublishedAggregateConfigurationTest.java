@@ -38,4 +38,31 @@ class PublishedAggregateConfigurationTest {
                     assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isTrue();
                 });
     }
+
+    @Test
+    void publishOff_orNotConfigured_isNotPublishing() {
+        runner.withBean(WidgetSpec.class)
+                .withPropertyValues("openframe.events.topics.organizations.publish=false")
+                .run(context -> {
+                    PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
+                    assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isFalse();
+                });
+        runner.run(context -> {
+            PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
+            assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isFalse();
+        });
+    }
+
+    @Test
+    void thePublishFlags_areCopiedAtStartup_soARebindOfThePropertiesDoesNotChangeThem() {
+        runner.withBean(WidgetSpec.class)
+                .withPropertyValues("openframe.events.topics.organizations.publish=false")
+                .run(context -> {
+                    EventsProperties properties = context.getBean(EventsProperties.class);
+                    properties.getTopics().get(PublishedAggregateType.ORGANIZATIONS).setPublish(true);
+
+                    PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
+                    assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isFalse();
+                });
+    }
 }

@@ -6,13 +6,11 @@ import org.springframework.context.SmartLifecycle;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.index.Index;
-import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 // Explicit like MongoIndexConfig: auto-index-creation is off by default, so @Indexed alone would create nothing.
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class OutboxIndexInitializer implements SmartLifecycle {
 

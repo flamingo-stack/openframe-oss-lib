@@ -14,7 +14,6 @@ import org.springframework.data.repository.core.EntityInformation;
 import org.springframework.data.repository.core.RepositoryInformation;
 import org.springframework.data.repository.core.support.RepositoryFactoryBeanSupport;
 import org.springframework.data.repository.core.support.RepositoryFactoryInformation;
-import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
@@ -37,7 +36,6 @@ import java.util.Set;
  * Writes outside the repository, such as a plain {@code MongoTemplate} call, are not checked and not published.
  */
 @Slf4j
-@Component
 @RequiredArgsConstructor
 public class PublishingRepositoryStartupCheck implements SmartInitializingSingleton {
 

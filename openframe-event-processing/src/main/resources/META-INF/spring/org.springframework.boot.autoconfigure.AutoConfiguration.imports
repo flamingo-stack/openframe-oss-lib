@@ -1,0 +1,2 @@
+com.openframe.processing.config.EventProcessingAutoConfiguration
+com.openframe.processing.config.EventProcessingKafkaAutoConfiguration

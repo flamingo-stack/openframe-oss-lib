@@ -1,18 +1,26 @@
 package com.openframe.publishing.config;
 
 import com.openframe.publishing.api.PublishedAggregateType;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
 
-@Component
-@RequiredArgsConstructor
+import java.util.Map;
+import java.util.Set;
+
+import static java.util.stream.Collectors.toUnmodifiableSet;
+
+// Copied at startup: a config refresh (the AI agent's ContextRefresher) must not switch publishing in one pod alone.
 public class PublishedAggregateTopics {
 
-    private final EventsProperties properties;
+    private final Set<PublishedAggregateType> publishing;
 
-    // Read on every call, not cached: a config refresh rebinds EventsProperties and the next write sees it.
+    public PublishedAggregateTopics(EventsProperties properties) {
+        Map<PublishedAggregateType, EventsProperties.Topic> topics = properties.getTopics();
+        this.publishing = topics.entrySet().stream()
+                .filter(entry -> entry.getValue().isPublish())
+                .map(Map.Entry::getKey)
+                .collect(toUnmodifiableSet());
+    }
+
     public boolean isPublishing(PublishedAggregateType type) {
-        EventsProperties.Topic topic = properties.getTopics().get(type);
-        return topic != null && topic.isPublish();
+        return publishing.contains(type);
     }
 }

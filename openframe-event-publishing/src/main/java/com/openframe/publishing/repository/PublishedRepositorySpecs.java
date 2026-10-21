@@ -5,10 +5,8 @@ import com.openframe.publishing.api.PublishingMongoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.core.ResolvableType;
-import org.springframework.stereotype.Component;
 
 // The spec a PublishingMongoRepository names in its third type argument, as the single bean of that class.
-@Component
 @RequiredArgsConstructor
 public class PublishedRepositorySpecs {
 
