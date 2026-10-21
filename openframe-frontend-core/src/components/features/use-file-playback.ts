@@ -300,6 +300,17 @@ export function useHoverPlayback(
     onLiveElement(() => {
       element.volume = SOUND_VOLUME;
     });
+    // A player drawn BY this hover (a bite card mounts its player on the first hover) is asked to play before its
+    // stream is attached, and attaching it aborts that play: the first hover on every card did nothing. Ask again
+    // the first time the element can play, while the hover lasts. A player that is already playing ignores it.
+    const playWhenReady = () => {
+      onLiveElement(() => element.removeEventListener?.('canplay', playWhenReady));
+      if (!hovered || element.paused === false) return;
+      if (hasUserInteracted()) void playWithSound(element, hostMutedRef.current, wanted);
+      else void playMuted(element, wanted);
+    };
+    onLiveElement(() => element.addEventListener?.('canplay', playWhenReady));
+    cleanups.push(() => onLiveElement(() => element.removeEventListener?.('canplay', playWhenReady)));
     if (hasUserInteracted()) {
       void playWithSound(element, hostMutedRef.current, wanted);
       return;
