@@ -77,7 +77,10 @@ function useMediaEvent(mediaRef: MediaRef, type: string, handler: () => void): v
 }
 
 /** How a `play()` ended: it plays, the autoplay policy refused it, or something else stopped it (a pause, a teardown). */
-type PlayOutcome = 'playing' | 'refused' | 'interrupted';
+/** How many times a hover asks again after its `play()` was aborted (each attempt waits for the element). */
+const INTERRUPTED_PLAY_RETRIES = 2;
+
+export type PlayOutcome = 'playing' | 'refused' | 'interrupted';
 
 async function play(element: MediaElement): Promise<PlayOutcome> {
   try {
@@ -100,10 +103,11 @@ type SoundOptions = Pick<
 export interface PlaybackSound {
   /** Playback runs muted because the browser refused sound: the unmute control shows. */
   mutedFallback: boolean;
-  /** Play with sound (or `muted`, a host's standing choice); refused, play muted. `wanted` says the play is still asked for. */
-  playWithSound: (element: MediaElement, muted: boolean, wanted?: () => boolean) => Promise<void>;
-  /** Play muted, and say so. `wanted` says the play is still asked for. */
-  playMuted: (element: MediaElement, wanted?: () => boolean) => Promise<void>;
+  /** Play with sound (or `muted`, a host's standing choice); refused, play muted. `wanted` says the play is still
+   *  asked for. Resolves with how the last `play()` ended. */
+  playWithSound: (element: MediaElement, muted: boolean, wanted?: () => boolean) => Promise<PlayOutcome>;
+  /** Play muted, and say so. `wanted` says the play is still asked for. Resolves with how the `play()` ended. */
+  playMuted: (element: MediaElement, wanted?: () => boolean) => Promise<PlayOutcome>;
   /** The muted fallback is over (sound is on, or playback stopped). */
   endMutedFallback: () => void;
   /** The unmute control's click: it is the gesture the autoplay policy wants, so sound always starts. */
@@ -125,7 +129,9 @@ export function usePlaybackSound(
     const started = play(element);
     setBlocked(false);
     setMutedFallback(true);
-    if ((await started) !== 'playing' && wanted()) setBlocked(true);
+    const outcome = await started;
+    if (outcome !== 'playing' && wanted()) setBlocked(true);
+    return outcome;
   }, []);
 
   const playWithSound = useCallback(
@@ -133,7 +139,9 @@ export function usePlaybackSound(
       onLiveElement(() => Object.assign(element, { muted }));
       // Only a refusal falls back to muted. A pause that interrupts the play (a
       // fast hover-out) must not start playback again behind the pointer.
-      if ((await play(element)) === 'refused' && wanted()) await playMuted(element, wanted);
+      const outcome = await play(element);
+      if (outcome === 'refused' && wanted()) return playMuted(element, wanted);
+      return outcome;
     },
     [playMuted],
   );
@@ -300,24 +308,24 @@ export function useHoverPlayback(
     onLiveElement(() => {
       element.volume = SOUND_VOLUME;
     });
-    // A player drawn BY this hover (a bite card mounts its player on the first hover) is asked to play before its
-    // stream is attached, and attaching it aborts that play: the first hover on every card did nothing. Ask again
-    // the first time the element can play, while the hover lasts. A player that is already playing ignores it.
-    const playWhenReady = () => {
-      onLiveElement(() => element.removeEventListener?.('canplay', playWhenReady));
-      if (!hovered || element.paused === false) return;
-      if (hasUserInteracted()) void playWithSound(element, hostMutedRef.current, wanted);
-      else void playMuted(element, wanted);
+    // A `play()` can be aborted by the element itself: a player drawn BY this hover (a bite card mounts its player
+    // on the first hover) is asked to play while its stream is still attaching, and attaching it aborts the play
+    // (AbortError, "interrupted by a new load request"). The first hover on every card did nothing. The play()
+    // promise is how the browser and Mux say a play did not happen; while the hover lasts, ask again: a `play()`
+    // on a loading element waits until it can play. A hover-out's own pause ends the hover, so it is never retried.
+    const attempt = (retriesLeft: number) => {
+      const played = hasUserInteracted()
+        ? playWithSound(element, hostMutedRef.current, wanted)
+        : playMuted(element, wanted);
+      void played.then(outcome => {
+        if (outcome === 'interrupted' && hovered && element.paused !== false && retriesLeft > 0)
+          attempt(retriesLeft - 1);
+      });
     };
-    onLiveElement(() => element.addEventListener?.('canplay', playWhenReady));
-    cleanups.push(() => onLiveElement(() => element.removeEventListener?.('canplay', playWhenReady)));
-    if (hasUserInteracted()) {
-      void playWithSound(element, hostMutedRef.current, wanted);
-      return;
-    }
-    // No gesture on the page yet, so sound would be refused: start muted with no
-    // refusal to wait for, and turn the sound on the moment the first gesture lands.
-    void playMuted(element, wanted);
+    attempt(INTERRUPTED_PLAY_RETRIES);
+    if (hasUserInteracted()) return;
+    // No gesture on the page yet, so sound would be refused: it started muted with no
+    // refusal to wait for, and the sound turns on the moment the first gesture lands.
     const onFirstGesture = () => {
       if (!hovered) return;
       onLiveElement(() => {

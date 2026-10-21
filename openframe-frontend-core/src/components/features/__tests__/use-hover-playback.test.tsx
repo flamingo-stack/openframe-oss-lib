@@ -1,74 +1,73 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { type MediaElement, type PlaybackSound, useHoverPlayback } from '../use-file-playback';
+import { type MediaElement, useHoverPlayback, usePlaybackSound } from '../use-file-playback';
 
-/** A media element whose listeners can be fired by hand, and whose first `play()` is aborted (its stream attaching). */
-function mediaElement() {
-  const listeners = new Map<string, Set<() => void>>();
-  const element: MediaElement & { fire: (type: string) => void } = {
-    paused: true,
-    play: vi.fn(),
-    pause: vi.fn(),
-    addEventListener: (type, listener) => {
-      if (!listeners.has(type)) listeners.set(type, new Set());
-      listeners.get(type)?.add(listener);
-    },
-    removeEventListener: (type, listener) => listeners.get(type)?.delete(listener),
-    fire: type => {
-      for (const listener of [...(listeners.get(type) ?? [])]) listener();
-    },
-  };
+/** The rejection a browser gives a `play()` that a source change (or a `pause()`) cut short. */
+const abortError = () =>
+  Object.assign(new Error('The play() request was interrupted by a new load request.'), {
+    name: 'AbortError',
+  });
+
+/** A media element whose first `play()` calls are aborted (its stream attaching) and later ones play. */
+function mediaElement(abortedPlays: number) {
+  let left = abortedPlays;
+  const element: MediaElement = { paused: true, pause: vi.fn() };
+  element.play = vi.fn(async () => {
+    if (left > 0) {
+      left -= 1;
+      throw abortError();
+    }
+    element.paused = false;
+  });
   return element;
 }
 
-function sound(): PlaybackSound {
-  return {
-    mutedFallback: false,
-    playWithSound: vi.fn(async (element: MediaElement) => {
-      await element.play?.();
-    }),
-    playMuted: vi.fn(async (element: MediaElement) => {
-      await element.play?.();
-    }),
-    endMutedFallback: vi.fn(),
-    unmute: vi.fn(),
-  };
+/** The hover hook on its real sound hook, hovered or not. */
+function renderHover(element: MediaElement, hovered = true) {
+  const ref = { current: element };
+  return renderHook(
+    ({ hover }) => {
+      const sound = usePlaybackSound(ref, {});
+      return useHoverPlayback(ref, sound, { playWhenHovered: hover });
+    },
+    { initialProps: { hover: hovered } },
+  );
 }
 
+/** Lets every pending `play()` promise and its follow-up settle. */
+const settle = () =>
+  act(async () => {
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+  });
+
 describe('useHoverPlayback', () => {
-  it('plays a player that mounts already hovered once it can play', () => {
-    const element = mediaElement();
-    const playback = sound();
-    renderHook(() => useHoverPlayback({ current: element }, playback, { playWhenHovered: true }));
-    const asked = vi.mocked(playback.playMuted).mock.calls.length + vi.mocked(playback.playWithSound).mock.calls.length;
-    expect(asked).toBe(1);
-
-    act(() => element.fire('canplay'));
-    const askedAgain =
-      vi.mocked(playback.playMuted).mock.calls.length + vi.mocked(playback.playWithSound).mock.calls.length;
-    expect(askedAgain).toBe(2);
+  it('plays a player whose first play() was aborted while its stream attached', async () => {
+    const element = mediaElement(1);
+    renderHover(element);
+    await settle();
+    expect(element.play).toHaveBeenCalledTimes(2);
+    expect(element.paused).toBe(false);
   });
 
-  it('does not play again once the hover has ended', () => {
-    const element = mediaElement();
-    const playback = sound();
-    const { rerender } = renderHook(
-      ({ hovered }) => useHoverPlayback({ current: element }, playback, { playWhenHovered: hovered }),
-      { initialProps: { hovered: true } },
-    );
-    rerender({ hovered: false });
-    act(() => element.fire('canplay'));
-    const asked = vi.mocked(playback.playMuted).mock.calls.length + vi.mocked(playback.playWithSound).mock.calls.length;
-    expect(asked).toBe(1);
+  it('asks a bounded number of times', async () => {
+    const element = mediaElement(10);
+    renderHover(element);
+    await settle();
+    expect(element.play).toHaveBeenCalledTimes(3);
   });
 
-  it('leaves a player that is already playing alone', () => {
-    const element = mediaElement();
-    const playback = sound();
-    renderHook(() => useHoverPlayback({ current: element }, playback, { playWhenHovered: true }));
-    element.paused = false;
-    act(() => element.fire('canplay'));
-    const asked = vi.mocked(playback.playMuted).mock.calls.length + vi.mocked(playback.playWithSound).mock.calls.length;
-    expect(asked).toBe(1);
+  it('does not ask again once the hover has ended', async () => {
+    const element = mediaElement(1);
+    const { rerender } = renderHover(element);
+    rerender({ hover: false });
+    await settle();
+    expect(element.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('asks once when the first play() plays', async () => {
+    const element = mediaElement(0);
+    renderHover(element);
+    await settle();
+    expect(element.play).toHaveBeenCalledTimes(1);
   });
 });
