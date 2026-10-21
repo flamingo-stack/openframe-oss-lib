@@ -29,6 +29,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,6 +38,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +54,8 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private SoftwareDispatchService softwareDispatchService;
     @Mock private MachineRepository machineRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private PackageUpdateEligibilityService packageUpdateEligibility;
+    @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
 
     private SoftwareInstallUpdateManagementService service;
 
@@ -62,7 +66,7 @@ class SoftwareInstallUpdateManagementServiceTest {
         MachinePlatformResolver platformResolver =
                 new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
-                platformResolver);
+                platformResolver, packageUpdateEligibility, packageUpdateDispatchService);
         // A real brew handler so we exercise real script-code + arg building.
         when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -74,14 +78,11 @@ class SoftwareInstallUpdateManagementServiceTest {
     }
 
     @Test
-    @DisplayName("install: each package dispatched with the right script + args; system script resolved once")
+    @DisplayName("install: each package dispatched with the right script + args; system script resolved once; one execution id per package")
     void install_dispatchesPerPackage() {
         allMacTargets();
         ScriptResponse installScript = systemScript("brew-install-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(installScript);
-        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL),
-                any(), any(), any()))
-                .thenReturn("exec-slack", "exec-wireshark");
 
         SoftwareManagementInput input = input(
                 pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK),
@@ -95,15 +96,15 @@ class SoftwareInstallUpdateManagementServiceTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> argsCaptor = ArgumentCaptor.forClass(List.class);
         verify(softwareDispatchService, times(2))
-                .dispatch(eq(installScript), eq(MACHINES), argsCaptor.capture(), eq(USER), eq(ExecutionSource.MANUAL),
-                        eq(PackageManagerType.BREW), any(), eq(SoftwareAction.INSTALL));
+                .dispatch(any(), eq(installScript), eq(MACHINES), argsCaptor.capture(), eq(USER),
+                        eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), any(), eq(SoftwareAction.INSTALL));
         assertThat(argsCaptor.getAllValues().get(0)).containsExactly("--cask", "slack");
         assertThat(argsCaptor.getAllValues().get(1)).containsExactly("wireshark");
 
         assertThat(results).extracting(SoftwareDispatchResult::getPackageName)
                 .containsExactly("slack", "wireshark");
         assertThat(results).extracting(SoftwareDispatchResult::getExecutionId)
-                .containsExactly("exec-slack", "exec-wireshark");
+                .doesNotContainNull().doesNotHaveDuplicates().hasSize(2);
         assertThat(results).allSatisfy(r ->
                 assertThat(r.getPackageManager()).isEqualTo(PackageManagerType.BREW));
     }
@@ -114,17 +115,15 @@ class SoftwareInstallUpdateManagementServiceTest {
         allMacTargets();
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
-        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.AI_ASSISTANT),
-                any(), any(), any()))
-                .thenReturn("exec-1");
 
         service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER,
                 ExecutionSource.AI_ASSISTANT);
 
         verify(scriptService).getSoftwareScript(SoftwareScriptCode.BREW_UPDATE);
-        verify(softwareDispatchService).dispatch(eq(updateScript), eq(MACHINES),
+        verify(softwareDispatchService).dispatch(any(), eq(updateScript), eq(MACHINES),
                 eq(List.of("--cask", "slack")), eq(USER), eq(ExecutionSource.AI_ASSISTANT),
                 eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.UPDATE));
+        verifyNoInteractions(packageUpdateDispatchService);
     }
 
     @Test
@@ -137,9 +136,6 @@ class SoftwareInstallUpdateManagementServiceTest {
         ScriptResponse winget = script("winget-install-id", OsType.WINDOWS);
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(brew);
         when(scriptService.getSoftwareScript(SoftwareScriptCode.WINGET_INSTALL)).thenReturn(winget);
-        when(softwareDispatchService.dispatch(any(), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL),
-                any(), any(), any()))
-                .thenReturn("exec-brew", "exec-winget");
 
         SoftwareManagementInput mixed = new SoftwareManagementInput();
         mixed.setMachineIds(List.of("m-mac", "m-win"));
@@ -149,9 +145,9 @@ class SoftwareInstallUpdateManagementServiceTest {
 
         service.install(mixed, USER, ExecutionSource.MANUAL);
 
-        verify(softwareDispatchService).dispatch(eq(brew), eq(List.of("m-mac")), anyList(), eq(USER),
+        verify(softwareDispatchService).dispatch(any(), eq(brew), eq(List.of("m-mac")), anyList(), eq(USER),
                 eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
-        verify(softwareDispatchService).dispatch(eq(winget), eq(List.of("m-win")), anyList(), eq(USER),
+        verify(softwareDispatchService).dispatch(any(), eq(winget), eq(List.of("m-win")), anyList(), eq(USER),
                 eq(ExecutionSource.MANUAL), eq(PackageManagerType.WINGET), eq("vscode"), eq(SoftwareAction.INSTALL));
     }
 
@@ -166,9 +162,6 @@ class SoftwareInstallUpdateManagementServiceTest {
         ScriptResponse winget = script("winget-install-id", OsType.WINDOWS);
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(brew);
         when(scriptService.getSoftwareScript(SoftwareScriptCode.WINGET_INSTALL)).thenReturn(winget);
-        when(softwareDispatchService.dispatch(eq(brew), anyList(), anyList(), eq(USER), eq(ExecutionSource.MANUAL),
-                any(), any(), any()))
-                .thenReturn("exec-brew");
 
         SoftwareManagementInput in = new SoftwareManagementInput();
         in.setMachineIds(List.of("m-mac"));
@@ -179,10 +172,35 @@ class SoftwareInstallUpdateManagementServiceTest {
         List<SoftwareDispatchResult> results = service.install(in, USER, ExecutionSource.MANUAL);
 
         assertThat(results).extracting(SoftwareDispatchResult::getPackageName).containsExactly("slack");
-        verify(softwareDispatchService).dispatch(eq(brew), eq(List.of("m-mac")), anyList(), eq(USER),
+        verify(softwareDispatchService).dispatch(any(), eq(brew), eq(List.of("m-mac")), anyList(), eq(USER),
                 eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
-        verify(softwareDispatchService, never()).dispatch(eq(winget), anyList(), anyList(), any(), any(),
+        verify(softwareDispatchService, never()).dispatch(any(), eq(winget), anyList(), anyList(), any(), any(),
                 any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("update: feature-enabled devices take the order path, the rest the script path, under one shared execution id")
+    void update_mixedFleet_splitsTargets_sharedExecutionId() {
+        allMacTargets();
+        ScriptResponse updateScript = systemScript("brew-update-id");
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
+        when(packageUpdateEligibility.eligibleMachines(any())).thenReturn(Set.of("m1"));   // m1 order, m2 legacy
+
+        service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL);
+
+        ArgumentCaptor<String> scriptExec = ArgumentCaptor.forClass(String.class);
+        verify(softwareDispatchService).dispatch(scriptExec.capture(), eq(updateScript), eq(List.of("m2")),
+                anyList(), eq(USER), eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"),
+                eq(SoftwareAction.UPDATE));
+
+        ArgumentCaptor<String> orderExec = ArgumentCaptor.forClass(String.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> orderTargets = ArgumentCaptor.forClass(List.class);
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(orderExec.capture(), eq(SoftwareAction.UPDATE),
+                any(), orderTargets.capture(), eq(USER));
+
+        assertThat(orderExec.getValue()).isEqualTo(scriptExec.getValue());   // one row on the screen
+        assertThat(orderTargets.getValue()).containsExactly("m1");
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {
