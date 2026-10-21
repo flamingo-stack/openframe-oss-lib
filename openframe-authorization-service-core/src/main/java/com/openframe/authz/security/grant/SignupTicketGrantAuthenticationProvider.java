@@ -2,7 +2,7 @@ package com.openframe.authz.security.grant;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SignupTicketService;
-import com.openframe.authz.service.sso.SignupTicketService.SignupTicketPayload;
+import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.AuthUserPrincipals;
 import com.openframe.data.document.auth.AuthUser;
@@ -71,17 +71,17 @@ public class SignupTicketGrantAuthenticationProvider extends AbstractTokenMintin
             throw error(OAuth2ErrorCodes.INVALID_REQUEST, "Tenant could not be resolved from the token endpoint path.");
         }
 
-        SignupTicketPayload ticket = signupTicketService.consume(request.getTicket())
+        PendingSignup pendingSignup = signupTicketService.consume(request.getTicket())
                 .orElseThrow(() -> error(OAuth2ErrorCodes.INVALID_GRANT, "Unknown or expired signup ticket."));
-        if (!ticket.bound()) {
+        if (!pendingSignup.bound()) {
             throw error(OAuth2ErrorCodes.INVALID_GRANT, "Signup ticket has not completed registration.");
         }
-        if (!tenantId.equals(ticket.tenantId())) {
-            log.warn("event=signup-ticket-tenant-mismatch pathTenant={} boundTenant={}", tenantId, ticket.tenantId());
+        if (!tenantId.equals(pendingSignup.tenantId())) {
+            log.warn("event=signup-ticket-tenant-mismatch pathTenant={} boundTenant={}", tenantId, pendingSignup.tenantId());
             throw error(OAuth2ErrorCodes.INVALID_GRANT, "Signup ticket does not belong to this tenant.");
         }
 
-        AuthUser user = userService.findActiveById(ticket.userId())
+        AuthUser user = userService.findActiveById(pendingSignup.userId())
                 .orElseThrow(() -> error(OAuth2ErrorCodes.INVALID_GRANT, "User is not active."));
 
         userService.touchLastLogin(user.getEmail(), tenantId);
