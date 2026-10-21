@@ -309,7 +309,7 @@ async fn registered_manager(dir: &tempfile::TempDir, base_url: String) -> TokenR
     );
     let config = AgentConfigurationService::new(dm.clone()).unwrap();
     config
-        .save_registration_data("machine".into(), "client".into(), "secret".into())
+        .save_registration_data("machine".into(), "client".into(), "secret".into(), None)
         .await
         .unwrap();
     let issued = Utc::now().timestamp() - 7200;

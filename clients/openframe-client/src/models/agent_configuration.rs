@@ -7,4 +7,6 @@ pub struct AgentConfiguration {
     pub client_secret: String,
     pub access_token: String,
     pub refresh_token: String,
+    #[serde(default)]
+    pub log_key: String,
 }

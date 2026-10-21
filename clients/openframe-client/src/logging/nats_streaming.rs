@@ -1,14 +1,16 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::platform::DirectoryManager;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::{
-    AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
+    AgentConfigurationService, InitialConfigurationService, InstalledToolsService, LogKeyService,
     MachineIdService, MACHINE_ID_HEADER,
 };
 
@@ -19,44 +21,75 @@ use super::log_source::{FileLogSource, LogSource, LogSourceKind, LogSourceRegist
 const BATCH_INTERVAL_SECS: u64 = 60;
 const MAX_LOGS_PER_BATCH: usize = 50;
 const RECONNECT_DELAY_SECS: u64 = 5;
-const INITIAL_KEY_CHECK_INTERVAL_SECS: u64 = 10;
+const KEY_CHECK_INTERVAL_SECS: u64 = 10;
 const SOURCE_DISCOVERY_INTERVAL_SECS: u64 = 30;
 const NATS_SUBJECT: &str = "agents.logs";
+
+/// Credential handed to the logs gateway: the log key, or the enrollment key on devices registered before log keys existed.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LogStreamKey {
+    Log(String),
+    Initial(String),
+}
+
+impl LogStreamKey {
+    fn header(&self) -> (&'static str, &str) {
+        match self {
+            Self::Log(key) => ("x-log-key", key),
+            Self::Initial(key) => ("x-initial-key", key),
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Log(_) => "log key",
+            Self::Initial(_) => "initial key",
+        }
+    }
+}
+
 pub struct NatsLogConnection {
     jetstream: Option<jetstream::Context>,
     server_host: String,
     tenant_domain: String,
-    initial_key: String,
+    key: LogStreamKey,
     machine_id: String,
+    // Raised by the event callback when the gateway rejects the key; the streaming loop then reconnects with a fresh one.
+    key_rejected: Arc<AtomicBool>,
 }
 
 impl NatsLogConnection {
     pub fn new(
         server_host: String,
         tenant_domain: String,
-        initial_key: String,
+        key: LogStreamKey,
         machine_id: String,
     ) -> Self {
         Self {
             jetstream: None,
             server_host,
             tenant_domain,
-            initial_key,
+            key,
             machine_id,
+            key_rejected: Arc::new(AtomicBool::new(false)),
         }
     }
 
     pub async fn connect(&mut self) -> Result<()> {
         let url = format!("wss://{}/ws/nats-logs", self.server_host);
         info!(
-            "NATS logs: connecting to {} (tenant={})",
-            url, self.tenant_domain
+            "NATS logs: connecting to {} (tenant={}, auth={})",
+            url,
+            self.tenant_domain,
+            self.key.kind()
         );
 
         let tenant_domain = self.tenant_domain.clone();
+        let key_rejected = self.key_rejected.clone();
+        let (key_header, key_value) = self.key.header();
         let client = async_nats::ConnectOptions::new()
             .custom_header("x-tenant-domain", &self.tenant_domain)
-            .custom_header("x-initial-key", &self.initial_key)
+            .custom_header(key_header, key_value)
             .custom_header(MACHINE_ID_HEADER, &self.machine_id)
             .retry_on_initial_connect()
             .reconnect_delay_callback(|attempt| {
@@ -66,6 +99,7 @@ impl NatsLogConnection {
             })
             .event_callback(move |event| {
                 let tenant = tenant_domain.clone();
+                let key_rejected = key_rejected.clone();
                 async move {
                     match event {
                         async_nats::Event::Connected => {
@@ -78,7 +112,11 @@ impl NatsLogConnection {
                             error!("NATS logs: server error: {} (tenant={})", err, tenant);
                         }
                         async_nats::Event::ClientError(err) => {
-                            error!("NATS logs: client error: {} (tenant={})", err, tenant);
+                            let text = err.to_string();
+                            if is_authorization_error(&text) {
+                                key_rejected.store(true, Ordering::Relaxed);
+                            }
+                            error!("NATS logs: client error: {} (tenant={})", text, tenant);
                         }
                         _ => {}
                     }
@@ -91,6 +129,10 @@ impl NatsLogConnection {
         self.jetstream = Some(jetstream::new(client));
         info!("NATS logs: initial connection established");
         Ok(())
+    }
+
+    pub fn key_rejected(&self) -> bool {
+        self.key_rejected.load(Ordering::Relaxed)
     }
 
     pub async fn publish(&self, payload: &LogBatchMessage) -> Result<()> {
@@ -115,6 +157,11 @@ impl NatsLogConnection {
     }
 }
 
+/// The gateway answers a rejected key with HTTP 401, which the NATS client reports as an authorization violation.
+fn is_authorization_error(client_error: &str) -> bool {
+    client_error.contains("authorization violation")
+}
+
 pub struct LogStreamingRunManager {
     server_host: String,
     tenant_domain: String,
@@ -123,6 +170,7 @@ pub struct LogStreamingRunManager {
     offset_file_path: PathBuf,
     initial_config_service: InitialConfigurationService,
     agent_config_service: AgentConfigurationService,
+    log_key_service: Arc<LogKeyService>,
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
     machine_id: String,
@@ -132,6 +180,7 @@ impl LogStreamingRunManager {
     pub fn new(
         initial_config_service: &InitialConfigurationService,
         agent_config_service: &AgentConfigurationService,
+        log_key_service: Arc<LogKeyService>,
         installed_tools_service: &InstalledToolsService,
         directory_manager: &DirectoryManager,
     ) -> Result<Self> {
@@ -155,6 +204,7 @@ impl LogStreamingRunManager {
             offset_file_path,
             initial_config_service: initial_config_service.clone(),
             agent_config_service: agent_config_service.clone(),
+            log_key_service,
             installed_tools_service: installed_tools_service.clone(),
             directory_manager: directory_manager.clone(),
             machine_id,
@@ -163,14 +213,8 @@ impl LogStreamingRunManager {
 
     pub async fn start(self) -> Result<()> {
         tokio::spawn(async move {
-            let initial_key = self.wait_for_initial_key().await;
-
-            let mut connection = NatsLogConnection::new(
-                self.server_host.clone(),
-                self.tenant_domain.clone(),
-                initial_key,
-                self.machine_id.clone(),
-            );
+            let key = self.wait_for_key().await;
+            let mut connection = self.build_connection(key);
 
             loop {
                 match connection.connect().await {
@@ -194,22 +238,12 @@ impl LogStreamingRunManager {
 
             spawn_source_discovery(
                 source_tx,
-                self.installed_tools_service,
-                self.directory_manager,
+                self.installed_tools_service.clone(),
+                self.directory_manager.clone(),
             );
 
-            log_streaming_loop(
-                registry,
-                source_rx,
-                rotation_manager,
-                connection,
-                self.hostname,
-                self.tenant_domain,
-                self.initial_config_service,
-                self.agent_config_service,
-                self.log_file_path,
-            )
-            .await;
+            self.stream(registry, source_rx, rotation_manager, connection)
+                .await;
         });
 
         Ok(())
@@ -228,16 +262,113 @@ impl LogStreamingRunManager {
         registry
     }
 
-    async fn wait_for_initial_key(&self) -> String {
+    fn build_connection(&self, key: LogStreamKey) -> NatsLogConnection {
+        NatsLogConnection::new(
+            self.server_host.clone(),
+            self.tenant_domain.clone(),
+            key,
+            self.machine_id.clone(),
+        )
+    }
+
+    /// The log key once the device holds one, else the enrollment key still on disk.
+    fn stored_key(&self) -> Option<LogStreamKey> {
+        if let Some(key) = self.log_key_service.stored_key() {
+            return Some(LogStreamKey::Log(key));
+        }
+        self.initial_config_service
+            .get_initial_key()
+            .ok()
+            .filter(|key| !key.is_empty())
+            .map(LogStreamKey::Initial)
+    }
+
+    async fn wait_for_key(&self) -> LogStreamKey {
         loop {
-            match self.initial_config_service.get_initial_key() {
-                Ok(key) if !key.is_empty() => {
-                    info!("NATS log streaming: initial key available, starting");
-                    return key;
+            if let Some(key) = self.stored_key() {
+                info!("NATS log streaming: {} available, starting", key.kind());
+                return key;
+            }
+            debug!("NATS log streaming: waiting for a key...");
+            tokio::time::sleep(Duration::from_secs(KEY_CHECK_INTERVAL_SECS)).await;
+        }
+    }
+
+    /// The gateway rejected the key: reconnect with a freshly fetched log key.
+    async fn reconnect_with_fresh_key(&self, connection: &mut NatsLogConnection) {
+        let key = match self.log_key_service.refresh().await {
+            Ok(key) => LogStreamKey::Log(key),
+            Err(e) => {
+                warn!(
+                    "NATS logs: key rejected, could not fetch a fresh one: {:#}",
+                    e
+                );
+                match self.stored_key() {
+                    Some(key) if key != connection.key => key,
+                    _ => return,
                 }
-                _ => {
-                    debug!("NATS log streaming: waiting for initial key...");
-                    tokio::time::sleep(Duration::from_secs(INITIAL_KEY_CHECK_INTERVAL_SECS)).await;
+            }
+        };
+
+        let mut fresh = self.build_connection(key);
+        match fresh.connect().await {
+            Ok(()) => *connection = fresh,
+            Err(e) => error!("NATS logs: failed to reconnect with a fresh key: {:#}", e),
+        }
+    }
+
+    async fn stream(
+        self,
+        mut registry: LogSourceRegistry,
+        mut source_rx: mpsc::Receiver<Box<dyn LogSource>>,
+        rotation_manager: LogRotationManager,
+        mut connection: NatsLogConnection,
+    ) {
+        let mut ticker = interval(Duration::from_secs(BATCH_INTERVAL_SECS));
+        let mut file_position: u64 = rotation_manager.load_offset();
+
+        loop {
+            ticker.tick().await;
+
+            // Drain any newly discovered sources
+            while let Ok(source) = source_rx.try_recv() {
+                registry.register(source);
+            }
+
+            if connection.key_rejected() {
+                self.reconnect_with_fresh_key(&mut connection).await;
+            }
+
+            let logs = registry.read_all(MAX_LOGS_PER_BATCH);
+
+            if logs.is_empty() {
+                rotation_manager.rotate_if_ready(&mut file_position);
+                continue;
+            }
+
+            let machine_id = self.agent_config_service.get_machine_id().ok();
+            let organization_id = self
+                .initial_config_service
+                .get_org_id()
+                .ok()
+                .filter(|id| !id.trim().is_empty());
+
+            let batch = LogBatchMessage {
+                machine_id,
+                hostname: self.hostname.clone(),
+                tenant_domain: self.tenant_domain.clone(),
+                organization_id,
+                logs,
+            };
+
+            if let Err(e) = connection.publish(&batch).await {
+                error!("Failed to publish log batch: {:#} - will retry", e);
+                registry.rollback_all();
+            } else {
+                registry.commit_all();
+                if let Ok(metadata) = std::fs::metadata(&self.log_file_path) {
+                    file_position = metadata.len();
+                    rotation_manager.save_offset(file_position);
                 }
             }
         }
@@ -294,66 +425,13 @@ async fn create_meshcentral_source(
     Some(Box::new(source))
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn log_streaming_loop(
-    mut registry: LogSourceRegistry,
-    mut source_rx: mpsc::Receiver<Box<dyn LogSource>>,
-    rotation_manager: LogRotationManager,
-    connection: NatsLogConnection,
-    hostname: String,
-    tenant_domain: String,
-    initial_config_service: InitialConfigurationService,
-    agent_config_service: AgentConfigurationService,
-    main_log_path: PathBuf,
-) {
-    let mut ticker = interval(Duration::from_secs(BATCH_INTERVAL_SECS));
-    let mut file_position: u64 = rotation_manager.load_offset();
-
-    loop {
-        ticker.tick().await;
-
-        // Drain any newly discovered sources
-        while let Ok(source) = source_rx.try_recv() {
-            registry.register(source);
-        }
-
-        let logs = registry.read_all(MAX_LOGS_PER_BATCH);
-
-        if logs.is_empty() {
-            rotation_manager.rotate_if_ready(&mut file_position);
-            continue;
-        }
-
-        let machine_id = agent_config_service.get_machine_id().ok();
-        let organization_id = initial_config_service
-            .get_org_id()
-            .ok()
-            .filter(|id| !id.trim().is_empty());
-
-        let batch = LogBatchMessage {
-            machine_id,
-            hostname: hostname.clone(),
-            tenant_domain: tenant_domain.clone(),
-            organization_id,
-            logs,
-        };
-
-        if let Err(e) = connection.publish(&batch).await {
-            error!("Failed to publish log batch: {:#} - will retry", e);
-            registry.rollback_all();
-        } else {
-            registry.commit_all();
-            if let Ok(metadata) = std::fs::metadata(&main_log_path) {
-                file_position = metadata.len();
-                rotation_manager.save_offset(file_position);
-            }
-        }
-    }
-}
-
 fn extract_tenant_domain(server_host: &str) -> String {
     server_host
         .strip_prefix("api.")
         .unwrap_or(server_host)
         .to_string()
 }
+
+#[cfg(test)]
+#[path = "nats_streaming_tests.rs"]
+mod tests;

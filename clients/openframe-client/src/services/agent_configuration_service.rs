@@ -33,16 +33,33 @@ impl AgentConfigurationService {
         machine_id: String,
         client_id: String,
         client_secret: String,
+        log_key: Option<String>,
     ) -> Result<()> {
         let _guard = self.write_lock.lock().await;
         let mut config = self.get()?;
         config.machine_id = machine_id;
         config.client_id = client_id;
         config.client_secret = client_secret;
+        if let Some(log_key) = log_key {
+            config.log_key = log_key;
+        }
 
         self.save(&config).await?;
 
         Ok(())
+    }
+
+    pub async fn save_log_key(&self, log_key: String) -> Result<()> {
+        let _guard = self.write_lock.lock().await;
+        let mut config = self.get()?;
+        config.log_key = log_key;
+
+        self.save(&config).await
+    }
+
+    pub fn get_log_key(&self) -> Result<String> {
+        let config = self.get()?;
+        Ok(config.log_key)
     }
 
     pub async fn update_tokens(&self, access_token: String, refresh_token: String) -> Result<()> {

@@ -103,7 +103,7 @@ use crate::services::{
     ToolRunManager, ToolUrlParamsResolver,
 };
 use crate::services::{
-    InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
+    LastKnownGoodService, LogKeyService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
 
@@ -205,7 +205,7 @@ pub struct Client {
     initial_configuration_service: InitialConfigurationService,
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
-    initial_key_service: Arc<InitialKeyService>,
+    log_key_service: Arc<LogKeyService>,
     remote_access_mode_service: Arc<RemoteAccessModeService>,
     deactivation_service: Arc<DeactivationService>,
 }
@@ -334,7 +334,7 @@ impl Client {
             config_service.clone(),
         );
 
-        let initial_key_service = Arc::new(InitialKeyService::new(
+        let log_key_service = Arc::new(LogKeyService::new(
             http_client.clone(),
             http_url.clone(),
             initial_configuration_service.clone(),
@@ -697,7 +697,7 @@ impl Client {
             initial_configuration_service,
             agent_configuration_service: config_service,
             installed_tools_service,
-            initial_key_service,
+            log_key_service,
             remote_access_mode_service,
             deactivation_service,
         })
@@ -732,11 +732,10 @@ impl Client {
             error!("Failed to record boot attempt: {:#}", e);
         }
 
-        self.initial_key_service.clone().start();
-
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
             &self.agent_configuration_service,
+            self.log_key_service.clone(),
             &self.installed_tools_service,
             &self.directory_manager,
         )?
@@ -746,6 +745,9 @@ impl Client {
 
         self.registration_processor.process().await?;
         self.auth_processor.process().await?;
+
+        // Needs the agent token, so only after authentication.
+        self.log_key_service.clone().start();
 
         self.token_refresh_run_manager.start();
 
