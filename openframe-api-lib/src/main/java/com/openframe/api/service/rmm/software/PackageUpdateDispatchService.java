@@ -1,17 +1,13 @@
 package com.openframe.api.service.rmm.software;
 
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
-import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
-import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
-import com.openframe.data.nats.packageupdate.PackageReference;
-import com.openframe.data.nats.packageupdate.UpdateMode;
-import com.openframe.data.nats.packageupdate.UpdateSource;
+import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -81,38 +77,11 @@ public class PackageUpdateDispatchService {
                         .build())
                 .toList());
 
-        PackageReference packageRef = packageReference(pkg);
-        UpdateSource wireSource = wireSource(source);
-        UpdateMode wireMode = mode == PackageUpdateMode.FORCE ? UpdateMode.FORCE : UpdateMode.WAIT;
-        Integer countdown = wireMode == UpdateMode.FORCE ? forceCountdownSeconds : null;
-
-        machineIds.forEach(machineId -> deliveryDispatcher.dispatch(PackageUpdateDeliverySeed.builder()
-                .machineId(machineId)
-                .requestId(executionId)
-                .source(wireSource)
-                .packageRef(packageRef)
-                .mode(wireMode)
-                .countdownSeconds(countdown)
-                .build()));
+        machineIds.forEach(machineId -> deliveryDispatcher.dispatch(PackageUpdateWire.seed(
+                machineId, executionId, source, pkg.getPackageManager(), pkg.getPackageName(),
+                pkg.getBrewPackageType(), mode, forceCountdownSeconds)));
 
         log.info("Package-update dispatched requestId={} action={} source={} mode={} machines={} package={}/{}",
                 executionId, action, source, mode, machineIds.size(), pkg.getPackageManager(), pkg.getPackageName());
-    }
-
-    private static PackageReference packageReference(SoftwarePackageInput pkg) {
-        PackageReference.PackageReferenceBuilder ref = PackageReference.builder()
-                .manager(pkg.getPackageManager());
-        if (pkg.getPackageManager() == PackageManagerType.BREW) {
-            return ref.kind(pkg.getBrewPackageType()).name(pkg.getPackageName()).build();
-        }
-        return ref.id(pkg.getPackageName()).build();
-    }
-
-    private static UpdateSource wireSource(PackageUpdateSource source) {
-        return switch (source) {
-            case AUTO -> UpdateSource.builder().kind(UpdateSource.Kind.AUTO).build();
-            case ADMIN -> UpdateSource.builder().kind(UpdateSource.Kind.MANUAL).origin(UpdateSource.Origin.ADMIN).build();
-            case USER -> UpdateSource.builder().kind(UpdateSource.Kind.MANUAL).origin(UpdateSource.Origin.USER).build();
-        };
     }
 }
