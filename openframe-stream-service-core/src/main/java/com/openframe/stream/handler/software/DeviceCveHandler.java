@@ -1,16 +1,12 @@
 package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.FleetOperatingSystem;
-import com.openframe.data.document.rmm.software.FleetOsVulnerability;
 import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
-import com.openframe.data.repository.rmm.software.FleetOsVulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -39,8 +35,6 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
     private final FleetHostResolver fleetHostResolver;
     private final FleetSoftwareCveRepository fleetSoftwareCveRepository;
     private final FleetSoftwareRepository fleetSoftwareRepository;
-    private final FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
-    private final FleetOperatingSystemRepository fleetOperatingSystemRepository;
     private final DeviceCveRepository deviceCveRepository;
     private final DeviceCveWriter deviceCveWriter;
     private final SoftwareProjector softwareProjector;
@@ -66,8 +60,6 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         }
         switch (type) {
             case FLEET_MDM_HOST_SOFTWARE_EVENT -> handleHostSoftware(payload);
-            case FLEET_MDM_HOST_OPERATING_SYSTEM_EVENT -> handleHostOperatingSystem(payload);
-            case FLEET_MDM_OS_VULNERABILITY_EVENT -> handleOsVulnerability(payload);
             case FLEET_MDM_SOFTWARE_CVE_EVENT -> handleSoftwareCve(payload);
             default -> { }
         }
@@ -114,43 +106,6 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
         cves.forEach(sc -> vulnerabilityProjector.project(host.tenantId(), sc.getCve()));
     }
 
-    // host_operating_system: one device's OS CVE set — cheap, projected inline.
-    private void handleHostOperatingSystem(DebeziumMessage.Payload<JsonNode> payload) {
-        boolean delete = isDelete(payload.getOperation());
-        JsonNode row = delete ? payload.getBefore() : payload.getAfter();
-        if (row == null) {
-            return;
-        }
-        Long hostId = longOrNull(row, "host_id");
-        Long osId = longOrNull(row, "os_id");
-        if (hostId == null) {
-            return;
-        }
-        FleetHostRef host = fleetHostResolver.resolve(String.valueOf(hostId));
-        if (host == null) {
-            log.debug("[software-cdc] device_cve(os): unresolved Fleet host {} — skipping (os {})", hostId, osId);
-            return;
-        }
-        // One OS per device, and it can change — clear the device's OS CVE rows and re-derive.
-        List<String> oldCves = deviceCveRepository.findByTenantIdAndMachineId(host.tenantId(), host.machineId()).stream()
-                .filter(dc -> dc.getSoftwareId() == null).map(DeviceCve::getCveId).filter(Objects::nonNull).toList();
-        deviceCveRepository.deleteByTenantIdAndMachineIdAndSoftwareIdIsNull(host.tenantId(), host.machineId());
-        oldCves.forEach(cve -> vulnerabilityProjector.project(host.tenantId(), cve));
-        if (delete || osId == null) {
-            return;
-        }
-        List<FleetOsVulnerability> cves = fleetOsVulnerabilityRepository.findByOsId(osId);
-        if (cves.isEmpty()) {
-            return;
-        }
-        String version = osVersion(osId);
-        for (FleetOsVulnerability ov : cves) {
-            deviceCveWriter.upsert(host.tenantId(), host.machineId(), hostId, ov.getCve(), null, null, version,
-                    ov.getResolvedInVersion());
-        }
-        cves.forEach(ov -> vulnerabilityProjector.project(host.tenantId(), ov.getCve()));
-    }
-
     private void handleSoftwareCve(DebeziumMessage.Payload<JsonNode> payload) {
         boolean delete = isDelete(payload.getOperation());
         JsonNode row = delete ? payload.getBefore() : payload.getAfter();
@@ -168,42 +123,6 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
             upsertCatalog(softwareId, cve, str(row, "resolved_in_version"));
         }
         cascadeSyncService.enqueueSoftwareCve(softwareId);
-    }
-
-    // operating_system_vulnerabilities: an OS CVE change touches every device on that OS — catalog inline, deferred.
-    private void handleOsVulnerability(DebeziumMessage.Payload<JsonNode> payload) {
-        boolean delete = isDelete(payload.getOperation());
-        JsonNode row = delete ? payload.getBefore() : payload.getAfter();
-        if (row == null) {
-            return;
-        }
-        Long osId = longOrNull(row, "operating_system_id");
-        String cve = str(row, "cve");
-        if (osId == null || cve == null || cve.isBlank()) {
-            return;
-        }
-        if (delete) {
-            fleetOsVulnerabilityRepository.deleteByOsIdAndCve(osId, cve);
-        } else {
-            upsertOsCatalog(osId, cve, str(row, "resolved_in_version"));
-        }
-        cascadeSyncService.enqueueOsVuln(osId);
-    }
-
-    private String osVersion(Long osId) {
-        return fleetOperatingSystemRepository.findByOsId(osId)
-                .map(FleetOperatingSystem::getVersion)
-                .orElse(null);
-    }
-
-    private void upsertOsCatalog(Long osId, String cve, String resolvedInVersion) {
-        FleetOsVulnerability entry = fleetOsVulnerabilityRepository.findByOsIdAndCve(osId, cve)
-                .orElseGet(FleetOsVulnerability::new);
-        entry.setOsId(osId);
-        entry.setCve(cve);
-        entry.setResolvedInVersion(resolvedInVersion);
-        entry.setUpdatedAt(Instant.now());
-        fleetOsVulnerabilityRepository.save(entry);
     }
 
     private void upsertCatalog(Long softwareId, String cve, String resolvedInVersion) {

@@ -5,8 +5,6 @@ import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
-import com.openframe.data.repository.rmm.software.FleetOsVulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
@@ -38,8 +36,6 @@ class DeviceCveHandlerTest {
     @Mock private FleetHostResolver fleetHostResolver;
     @Mock private FleetSoftwareCveRepository fleetSoftwareCveRepository;
     @Mock private FleetSoftwareRepository fleetSoftwareRepository;
-    @Mock private FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
-    @Mock private FleetOperatingSystemRepository fleetOperatingSystemRepository;
     @Mock private DeviceCveRepository deviceCveRepository;
     @Mock private DeviceCveWriter deviceCveWriter;
     @Mock private SoftwareProjector softwareProjector;
@@ -137,24 +133,5 @@ class DeviceCveHandlerTest {
                 row().put("software_id", 200).put("cve", "CVE-9"), null), null);
         verify(fleetSoftwareCveRepository).deleteBySoftwareIdAndCve(200L, "CVE-9");
         verify(cascadeSyncService).enqueueSoftwareCve(200L);
-    }
-
-    @Test
-    void osVulnerability_create_updatesCatalogAndEnqueuesCascade() {
-        ObjectNode after = row().put("operating_system_id", 7).put("cve", "CVE-OS").put("resolved_in_version", "14.6");
-        when(fleetOsVulnerabilityRepository.findByOsIdAndCve(7L, "CVE-OS")).thenReturn(java.util.Optional.empty());
-
-        handler.handle(msg(MessageType.FLEET_MDM_OS_VULNERABILITY_EVENT, "c", null, after), null);
-
-        verify(fleetOsVulnerabilityRepository).save(any());
-        verify(cascadeSyncService).enqueueOsVuln(7L);
-    }
-
-    @Test
-    void osVulnerability_delete_removesCatalogAndEnqueuesCascade() {
-        handler.handle(msg(MessageType.FLEET_MDM_OS_VULNERABILITY_EVENT, "d",
-                row().put("operating_system_id", 7).put("cve", "CVE-OS"), null), null);
-        verify(fleetOsVulnerabilityRepository).deleteByOsIdAndCve(7L, "CVE-OS");
-        verify(cascadeSyncService).enqueueOsVuln(7L);
     }
 }

@@ -44,12 +44,6 @@ public enum MessageType {
     FLEET_MDM_HOST_SOFTWARE_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.MONGO_DEVICE_SOFTWARE, Destination.MONGO_DEVICE_CVE), EventHandlerType.COMMON_TYPE),
     FLEET_MDM_SOFTWARE_CVE_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.MONGO_DEVICE_CVE), EventHandlerType.COMMON_TYPE),
-    FLEET_MDM_OPERATING_SYSTEMS_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.MONGO_OS_CATALOG), EventHandlerType.COMMON_TYPE),
-    FLEET_MDM_HOST_OPERATING_SYSTEM_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.MONGO_DEVICE_OS, Destination.MONGO_DEVICE_CVE), EventHandlerType.COMMON_TYPE),
-    FLEET_MDM_OS_VULNERABILITY_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
             List.of(Destination.MONGO_DEVICE_CVE), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;

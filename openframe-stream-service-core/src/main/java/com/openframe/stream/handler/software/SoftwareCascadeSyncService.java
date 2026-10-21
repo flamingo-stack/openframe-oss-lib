@@ -3,18 +3,12 @@ package com.openframe.stream.handler.software;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.software.CascadeSyncType;
 import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.DeviceOperatingSystem;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.FleetOperatingSystem;
-import com.openframe.data.document.rmm.software.FleetOsVulnerability;
 import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.document.rmm.software.SoftwareCascadeSync;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
-import com.openframe.data.repository.rmm.software.FleetOsVulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareCascadeSyncRepository;
@@ -43,9 +37,6 @@ public class SoftwareCascadeSyncService {
     private final FleetSoftwareRepository fleetSoftwareRepository;
     private final FleetSoftwareCveRepository fleetSoftwareCveRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final FleetOperatingSystemRepository fleetOperatingSystemRepository;
-    private final FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
-    private final DeviceOperatingSystemRepository deviceOperatingSystemRepository;
     private final SoftwareProjector softwareProjector;
     private final VulnerabilityProjector vulnerabilityProjector;
 
@@ -53,31 +44,21 @@ public class SoftwareCascadeSyncService {
     private int batchSize;
 
     public void enqueueSoftwareCve(Long softwareId) {
-        enqueue(CascadeSyncType.SOFTWARE_CVE, softwareId, null);
-    }
-
-    public void enqueueOsVuln(Long osId) {
-        enqueue(CascadeSyncType.OS_VULN, null, osId);
+        enqueue(CascadeSyncType.SOFTWARE_CVE, softwareId);
     }
 
     public void enqueueSoftwareDetails(Long softwareId) {
-        enqueue(CascadeSyncType.SOFTWARE_DETAILS, softwareId, null);
+        enqueue(CascadeSyncType.SOFTWARE_DETAILS, softwareId);
     }
 
-    public void enqueueOsDetails(Long osId) {
-        enqueue(CascadeSyncType.OS_DETAILS, null, osId);
-    }
-
-    private void enqueue(CascadeSyncType type, Long softwareId, Long osId) {
-        Long key = softwareId != null ? softwareId : osId;
-        if (key == null) {
+    private void enqueue(CascadeSyncType type, Long softwareId) {
+        if (softwareId == null) {
             return;
         }
         cascadeRepository.save(SoftwareCascadeSync.builder()
-                .id(SoftwareCascadeSync.idFor(type, key))
+                .id(SoftwareCascadeSync.idFor(type, softwareId))
                 .type(type)
                 .softwareId(softwareId)
-                .osId(osId)
                 .status(DeviceOnlineDispatchStatus.NEW)
                 .createdAt(Instant.now())
                 .build());
@@ -107,9 +88,7 @@ public class SoftwareCascadeSyncService {
         try {
             switch (item.getType()) {
                 case SOFTWARE_CVE -> executeSoftwareCve(item.getSoftwareId());
-                case OS_VULN -> executeOsVuln(item.getOsId());
                 case SOFTWARE_DETAILS -> executeSoftwareDetails(item.getSoftwareId());
-                case OS_DETAILS -> executeOsDetails(item.getOsId());
             }
             return true;
         } catch (RuntimeException e) {
@@ -154,38 +133,6 @@ public class SoftwareCascadeSyncService {
         }
     }
 
-    private void executeOsVuln(Long osId) {
-        if (osId == null) {
-            return;
-        }
-        List<FleetOsVulnerability> catalog = fleetOsVulnerabilityRepository.findByOsId(osId);
-        String version = fleetOperatingSystemRepository.findByOsId(osId)
-                .map(FleetOperatingSystem::getVersion).orElse(null);
-        Set<String> catalogCves = catalog.stream().map(FleetOsVulnerability::getCve).filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        Set<String> affectedTenants = new HashSet<>();
-        Set<String> touchedCves = new HashSet<>(catalogCves);
-        for (DeviceOperatingSystem device : deviceOperatingSystemRepository.findByOsId(osId)) {
-            for (FleetOsVulnerability ov : catalog) {
-                deviceCveWriter.upsert(device.getTenantId(), device.getMachineId(), device.getHostId(), ov.getCve(),
-                        null, null, device.getVersion() != null ? device.getVersion() : version,
-                        ov.getResolvedInVersion());
-            }
-            for (DeviceCve existing : deviceCveRepository
-                    .findByTenantIdAndMachineId(device.getTenantId(), device.getMachineId())) {
-                if (existing.getSoftwareId() == null && !catalogCves.contains(existing.getCveId())) {
-                    touchedCves.add(existing.getCveId());
-                    deviceCveRepository.delete(existing);
-                }
-            }
-            affectedTenants.add(device.getTenantId());
-        }
-        for (String tenant : affectedTenants) {
-            touchedCves.forEach(cve -> vulnerabilityProjector.project(tenant, cve));
-        }
-    }
-
     private void executeSoftwareDetails(Long softwareId) {
         if (softwareId == null) {
             return;
@@ -209,27 +156,5 @@ public class SoftwareCascadeSyncService {
         FanOut.saveInChunks(rows, deviceSoftwareRepository::saveAll);
         rows.stream().map(DeviceSoftware::getTenantId).filter(Objects::nonNull).distinct()
                 .forEach(tenant -> softwareProjector.project(tenant, software.getSoftwareTitleId()));
-    }
-
-    private void executeOsDetails(Long osId) {
-        if (osId == null) {
-            return;
-        }
-        FleetOperatingSystem os = fleetOperatingSystemRepository.findByOsId(osId).orElse(null);
-        if (os == null) {
-            return;
-        }
-        List<DeviceOperatingSystem> rows = deviceOperatingSystemRepository.findByOsId(osId);
-        if (rows.isEmpty()) {
-            return;
-        }
-        Instant now = Instant.now();
-        for (DeviceOperatingSystem row : rows) {
-            row.setName(os.getName());
-            row.setVersion(os.getVersion());
-            row.setPlatform(os.getPlatform());
-            row.setUpdatedAt(now);
-        }
-        FanOut.saveInChunks(rows, deviceOperatingSystemRepository::saveAll);
     }
 }

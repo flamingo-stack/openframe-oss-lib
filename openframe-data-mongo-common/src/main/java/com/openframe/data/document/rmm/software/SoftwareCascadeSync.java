@@ -26,8 +26,6 @@ public class SoftwareCascadeSync {
 
     private Long softwareId;
 
-    private Long osId;
-
     private DeviceOnlineDispatchStatus status;
 
     private Instant createdAt;

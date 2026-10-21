@@ -8,10 +8,7 @@ import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.document.rmm.software.SoftwareCascadeSync;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.DeviceOperatingSystemRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.FleetOperatingSystemRepository;
-import com.openframe.data.repository.rmm.software.FleetOsVulnerabilityRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
 import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareCascadeSyncRepository;
@@ -44,9 +41,6 @@ class SoftwareCascadeSyncServiceTest {
     @Mock private FleetSoftwareRepository fleetSoftwareRepository;
     @Mock private FleetSoftwareCveRepository fleetSoftwareCveRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
-    @Mock private FleetOperatingSystemRepository fleetOperatingSystemRepository;
-    @Mock private FleetOsVulnerabilityRepository fleetOsVulnerabilityRepository;
-    @Mock private DeviceOperatingSystemRepository deviceOperatingSystemRepository;
     @Mock private SoftwareProjector softwareProjector;
     @Mock private VulnerabilityProjector vulnerabilityProjector;
 
