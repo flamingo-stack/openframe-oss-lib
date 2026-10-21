@@ -383,6 +383,7 @@ export type { FaqHashTarget } from './faq-anchor';
 // pure + server-safe; the hub re-exports these from its config/util shims.
 export {
   CONTENT_REF_GROUPS,
+  GROUP_PAGE_SIZE,
   getContentRefLabel,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,
