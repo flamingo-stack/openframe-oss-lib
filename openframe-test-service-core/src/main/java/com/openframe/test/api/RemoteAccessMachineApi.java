@@ -13,6 +13,7 @@ public class RemoteAccessMachineApi {
 
     private static final String ACK = "clients/api/v1/remote-access/requests/{requestId}/ack";
     private static final String APPROVE = "clients/api/v1/remote-access/requests/{requestId}/approve";
+    private static final String DEVICE_MODE = "clients/api/v1/remote-access/device-mode";
 
     // PENDING -> DELIVERED; any other status is returned unchanged.
     public static Response ack(String agentToken, String machineId, String requestId) {
@@ -31,5 +32,13 @@ public class RemoteAccessMachineApi {
                 .body(Map.of("approve", approve))
                 .pathParam("requestId", requestId)
                 .post(APPROVE);
+    }
+
+    public static Response setDeviceMode(String agentToken, String machineId, String mode) {
+        return given(getUnAuthorizedSpec())
+                .header("Authorization", "Bearer " + agentToken)
+                .header(MACHINE_ID_HEADER, machineId)
+                .body(Map.of("mode", mode))
+                .put(DEVICE_MODE);
     }
 }
