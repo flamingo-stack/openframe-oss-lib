@@ -31,11 +31,11 @@ public class DeliverySweepScheduler {
         runPass(PASS_WATCHDOG, watchdogService::reapAcked);
     }
 
-    // rows with a deadline live seconds: their own clock and lock, no lock-at-least-for so the next tick is not skipped
+    // types acked in seconds: their own clock and lock, no lock-at-least-for so the next tick is not skipped
     @Scheduled(fixedDelayString = "${openframe.delivery.sweep.fast-interval}")
     @SchedulerLock(name = "deliveryFastSweep", lockAtMostFor = "${openframe.delivery.sweep.fast-lock-at-most-for}")
     public void fastTick() {
-        runPass(PASS_FAST_RETRY, sweepService::retryPendingWithDeadline);
+        runPass(PASS_FAST_RETRY, sweepService::retryPendingFast);
     }
 
     private void runPass(String pass, Runnable body) {

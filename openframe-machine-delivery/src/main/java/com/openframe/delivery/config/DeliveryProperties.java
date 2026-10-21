@@ -13,11 +13,15 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Set;
 
 import static java.lang.Boolean.FALSE;
 import static java.util.Objects.requireNonNullElse;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toSet;
 
 @Getter
 @Setter
@@ -54,6 +58,21 @@ public class DeliveryProperties {
             return defaults;
         }
         return override.mergeOver(defaults);
+    }
+
+    // a type acked faster than the sweep comes round is re-published by the sweep's fast pass, on its own clock
+    public Set<DeliveryType> fastTypes() {
+        return Arrays.stream(DeliveryType.values())
+                .filter(this::isEnabled)
+                .filter(this::isFasterThanTheSweep)
+                .collect(toSet());
+    }
+
+    private boolean isFasterThanTheSweep(DeliveryType type) {
+        Policy policy = resolve(type);
+        long ackThresholdSeconds = policy.getAckThresholdSeconds();
+        long ackThresholdMillis = SECONDS.toMillis(ackThresholdSeconds);
+        return ackThresholdMillis < sweep.getInterval();
     }
 
     @Getter
@@ -99,15 +118,6 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long ttlSeconds;
-
-        // null = retried until max-attempts. Set = seconds from dispatch after which the row fails DEADLINE, a late
-        // ack is refused and the sweep's fast pass re-publishes it meanwhile: for a request a human is waiting on
-        @Positive
-        private Long deadlineSeconds;
-
-        public boolean hasDeadline() {
-            return deadlineSeconds != null;
-        }
     }
 
     // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
@@ -141,7 +151,6 @@ public class DeliveryProperties {
         private Long reconnectWindowSeconds;
         private Long resultTimeoutSeconds;
         private Long ttlSeconds;
-        private Long deadlineSeconds;
 
         Policy mergeOver(Policy base) {
             Policy merged = new Policy();
@@ -152,7 +161,6 @@ public class DeliveryProperties {
             merged.setReconnectWindowSeconds(requireNonNullElse(reconnectWindowSeconds, base.getReconnectWindowSeconds()));
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
-            merged.setDeadlineSeconds(deadlineSeconds == null ? base.getDeadlineSeconds() : deadlineSeconds);
             return merged;
         }
     }

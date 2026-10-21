@@ -23,7 +23,7 @@ class DeliveryPropertiesBindingTest {
 
     private static final String PREFIX = "openframe.delivery";
     private static final long UNINSTALL_WINDOW = 2_592_000L;
-    private static final long APPROVAL_DEADLINE = 10L;
+    private static final long APPROVAL_ACK_THRESHOLD = 2L;
 
     @Test
     void bind_perTypeEntryWithTwoFields_bindsAndTakesTheRestFromDefaults() {
@@ -44,19 +44,18 @@ class DeliveryPropertiesBindingTest {
     }
 
     @Test
-    void bind_perTypeDeadline_boundAndAbsentForTheOthers() {
+    void bind_perTypeAckThresholdUnderTheSweepInterval_thatTypeOnTheFastPass() {
         // setup
         Map<String, String> config = fullDefaults();
-        config.put(PREFIX + ".types.REMOTE_ACCESS_REQUEST.deadline-seconds", String.valueOf(APPROVAL_DEADLINE));
+        config.put(PREFIX + ".enabled.REMOTE_ACCESS_REQUEST", "true");
+        config.put(PREFIX + ".enabled.CLIENT_UNINSTALL", "true");
+        config.put(PREFIX + ".types.REMOTE_ACCESS_REQUEST.ack-threshold-seconds", String.valueOf(APPROVAL_ACK_THRESHOLD));
 
         // execution
         DeliveryProperties properties = bind(config);
 
         // verifications
-        Policy approval = properties.resolve(DeliveryType.REMOTE_ACCESS_REQUEST);
-        Policy uninstall = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
-        assertThat(approval.getDeadlineSeconds()).isEqualTo(APPROVAL_DEADLINE);
-        assertThat(uninstall.hasDeadline()).isFalse();
+        assertThat(properties.fastTypes()).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
     }
 
     @Test

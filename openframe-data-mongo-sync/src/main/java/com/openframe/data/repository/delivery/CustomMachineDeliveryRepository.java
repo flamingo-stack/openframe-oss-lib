@@ -2,6 +2,7 @@ package com.openframe.data.repository.delivery;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 
 import java.time.Instant;
@@ -12,7 +13,7 @@ public interface CustomMachineDeliveryRepository {
 
     List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit);
 
-    List<MachineDelivery> findDueWithDeadline(DeliveryStatus status, Instant before, int limit);
+    List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit);
 
     boolean upsertPending(MachineDelivery delivery);
 
@@ -31,7 +32,5 @@ public interface CustomMachineDeliveryRepository {
 
     boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt);
     boolean markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure, String error, Instant finishedAt, Instant expiresAt);
-
-    boolean markFailedPastDeadline(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt);
 
 }

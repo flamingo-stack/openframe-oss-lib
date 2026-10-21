@@ -1,12 +1,10 @@
 package com.openframe.delivery.track;
 
-import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryTestPolicies;
-import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,12 +36,10 @@ class DeliveryTrackerTest {
     private static final String DISPATCH_ID = "d-1";
     private static final String ERROR = "download failed";
     private static final String REASON = "request revoked";
-    private static final String REJECTED_PAST_DEADLINE = "deadline";
     private static final DeliveryRef REF = new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TARGET_ID, DISPATCH_ID);
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryCloser closer;
-    @Mock private DeliveryMetrics metrics;
 
     @Captor private ArgumentCaptor<Instant> atCaptor;
     @Captor private ArgumentCaptor<Instant> untilCaptor;
@@ -52,7 +48,7 @@ class DeliveryTrackerTest {
 
     @BeforeEach
     void setUp() {
-        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer, metrics);
+        tracker = new DeliveryTracker(repository, DeliveryTestPolicies.properties(), closer);
     }
 
     @Test
@@ -66,37 +62,18 @@ class DeliveryTrackerTest {
         // verifications
         Instant ackedAt = atCaptor.getValue();
         assertThat(untilCaptor.getValue()).isEqualTo(ackedAt.plusSeconds(RESULT_TIMEOUT));
-        verify(repository, never()).markFailedPastDeadline(any(), any(), any(), any(), any());
-        verifyNoInteractions(metrics);
     }
 
     @Test
-    void acknowledge_ref_afterTheDeadline_rowFailedDeadlineAndTheAckCountedAsRejected() {
+    void acknowledge_ref_noUnackedRow_nothingElseTouched() {
         // setup
         when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(false);
-        when(repository.markFailedPastDeadline(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), atCaptor.capture(), untilCaptor.capture())).thenReturn(true);
 
         // execution
         tracker.acknowledge(REF, MACHINE_ID);
 
         // verifications
-        Instant failedAt = atCaptor.getValue();
-        assertThat(untilCaptor.getValue()).isEqualTo(failedAt.plusSeconds(TTL));
-        verify(metrics).recordFailed(DeliveryType.TOOL_INSTALLATION, DeliveryFailure.DEADLINE);
-        verify(metrics).recordResultRejected(REJECTED_PAST_DEADLINE);
-    }
-
-    @Test
-    void acknowledge_ref_noUnackedRow_nothingCounted() {
-        // setup
-        when(repository.markAcked(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(false);
-        when(repository.markFailedPastDeadline(eq(DELIVERY_ID), eq(DISPATCH_ID), eq(DeliveryStatus.UNACKED), any(Instant.class), any(Instant.class))).thenReturn(false);
-
-        // execution
-        tracker.acknowledge(REF, MACHINE_ID);
-
-        // verifications
-        verifyNoInteractions(metrics, closer);
+        verifyNoInteractions(closer);
     }
 
     @Test
@@ -122,7 +99,7 @@ class DeliveryTrackerTest {
 
         // verifications
         verify(repository, never()).markAcked(any(), any(), any(), any(), any());
-        verifyNoInteractions(metrics, closer);
+        verifyNoInteractions(closer);
     }
 
     @Test

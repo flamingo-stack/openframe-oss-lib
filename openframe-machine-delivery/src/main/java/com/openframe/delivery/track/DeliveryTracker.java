@@ -1,13 +1,11 @@
 package com.openframe.delivery.track;
 
-import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
-import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryRef;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,12 +19,9 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class DeliveryTracker {
 
-    private static final String REJECTED_PAST_DEADLINE = "deadline";
-
     private final MachineDeliveryRepository repository;
     private final DeliveryProperties properties;
     private final DeliveryCloser closer;
-    private final DeliveryMetrics metrics;
 
     // ref = the delivery block the agent copied back from the command; the row is looked up by that exact dispatch
     public void acknowledge(DeliveryRef ref, String machineId) {
@@ -41,18 +36,9 @@ public class DeliveryTracker {
         boolean acked = repository.markAcked(id, dispatchId, DeliveryStatus.UNACKED, now, resultDueAt);
         if (acked) {
             log.info("Delivery ACKED: type={} targetId={} machineId={} dispatchId={}", type, targetId, machineId, dispatchId);
-            return;
+        } else {
+            log.debug("Delivery ack ignored, no unacked row for this dispatch: id={} dispatchId={}", id, dispatchId);
         }
-        Instant expiresAt = expiresAt(type, now);
-        boolean pastDeadline = repository.markFailedPastDeadline(id, dispatchId, DeliveryStatus.UNACKED, now, expiresAt);
-        if (pastDeadline) {
-            metrics.recordFailed(type, DeliveryFailure.DEADLINE);
-            metrics.recordResultRejected(REJECTED_PAST_DEADLINE);
-            log.warn("Delivery ACKED after its deadline, row FAILED: type={} targetId={} machineId={} dispatchId={}",
-                    type, targetId, machineId, dispatchId);
-            return;
-        }
-        log.debug("Delivery ack ignored, no unacked row for this dispatch: id={} dispatchId={}", id, dispatchId);
     }
 
     // for a receiver that reports by key rather than by the delivery block: one request is one dispatch there

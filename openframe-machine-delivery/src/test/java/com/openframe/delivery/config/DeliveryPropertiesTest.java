@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Set;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.JITTER;
@@ -24,7 +25,7 @@ class DeliveryPropertiesTest {
 
     private static final double UNINSTALL_BACKOFF_MULTIPLIER = 2.0;
 
-    private static final long APPROVAL_DEADLINE = 10L;
+    private static final long APPROVAL_ACK_THRESHOLD = 2L;
 
     private DeliveryProperties properties;
 
@@ -84,32 +85,6 @@ class DeliveryPropertiesTest {
     }
 
     @Test
-    void resolve_typeWithoutOverride_noDeadline() {
-        // execution
-        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
-
-        // verifications
-        assertThat(resolved.hasDeadline()).isFalse();
-    }
-
-    @Test
-    void resolve_typeOverridesDeadline_overrideWinsOthersStayWithoutOne() {
-        // setup
-        PolicyOverride approval = new PolicyOverride();
-        approval.setDeadlineSeconds(APPROVAL_DEADLINE);
-        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
-
-        // execution
-        Policy resolved = properties.resolve(DeliveryType.REMOTE_ACCESS_REQUEST);
-        Policy other = properties.resolve(DeliveryType.TOOL_INSTALLATION);
-
-        // verifications
-        assertThat(resolved.hasDeadline()).isTrue();
-        assertThat(resolved.getDeadlineSeconds()).isEqualTo(APPROVAL_DEADLINE);
-        assertThat(other.hasDeadline()).isFalse();
-    }
-
-    @Test
     void resolve_typeOverridesOfflineBehavior_overrideWins() {
         // setup
         PolicyOverride scripts = new PolicyOverride();
@@ -122,6 +97,47 @@ class DeliveryPropertiesTest {
         // verifications
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
     }
+    @Test
+    void fastTypes_noTypeAckedFasterThanTheSweep_empty() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).isEmpty();
+    }
+
+    @Test
+    void fastTypes_enabledTypeAckedFasterThanTheSweep_thatTypeOnly() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setAckThresholdSeconds(APPROVAL_ACK_THRESHOLD);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+        properties.setEnabled(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, true, DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
+    }
+
+    @Test
+    void fastTypes_fastTypeSwitchedOff_empty() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setAckThresholdSeconds(APPROVAL_ACK_THRESHOLD);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).isEmpty();
+    }
+
     @Test
     void isEnabled_typeNotListed_false() {
         // setup

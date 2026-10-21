@@ -4,6 +4,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
@@ -27,6 +28,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_TYPE = "type";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
@@ -34,7 +36,6 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
-    private static final String FIELD_DEADLINE_AT = "deadlineAt";
     private static final String FIELD_ACKED_AT = "ackedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_EXPIRES_AT = "expiresAt";
@@ -47,20 +48,20 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         super(mongoTemplate);
     }
 
-    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
     @Override
     public List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit) {
         Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_DUE_AT).lt(before);
-        Query query = new Query(due)
-                .with(OLDEST_DUE_FIRST)
-                .limit(limit)
-                .withReadPreference(ReadPreference.primary());
-        return mongoTemplate.find(query, MachineDelivery.class);
+        return findDue(due, limit);
     }
 
     @Override
-    public List<MachineDelivery> findDueWithDeadline(DeliveryStatus status, Instant before, int limit) {
-        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_DEADLINE_AT).ne(null).and(FIELD_DUE_AT).lt(before);
+    public List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
+        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).in(types).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
+    private List<MachineDelivery> findDue(Criteria due, int limit) {
         Query query = new Query(due)
                 .with(OLDEST_DUE_FIRST)
                 .limit(limit)
@@ -80,9 +81,6 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .unset(FIELD_FINISHED_AT)
                 .unset(FIELD_FAILURE)
                 .unset(FIELD_ERROR);
-        if (!document.containsKey(FIELD_DEADLINE_AT)) {
-            update.unset(FIELD_DEADLINE_AT);
-        }
         document.forEach((field, value) -> setField(update, field, value));
         Query notOutranked = notOutranked(delivery);
         try {
@@ -127,33 +125,19 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         return updateOne(sameDispatch(id, from, dispatchedAt), update);
     }
 
-    // an ack after the deadline does not count: markFailedPastDeadline closes such a row instead
     @Override
     public boolean markAcked(String id, String dispatchId, Set<DeliveryStatus> from, Instant ackedAt, Instant dueAt) {
         Update update = new Update()
                 .set(FIELD_STATUS, DeliveryStatus.ACKED)
                 .set(FIELD_ACKED_AT, ackedAt)
                 .set(FIELD_DUE_AT, dueAt);
-        Criteria noDeadline = Criteria.where(FIELD_DEADLINE_AT).is(null);
-        Criteria deadlineAhead = Criteria.where(FIELD_DEADLINE_AT).gt(ackedAt);
-        Criteria beforeDeadline = thisDispatch(id, from, dispatchId).orOperator(noDeadline, deadlineAhead);
-        return updateOne(beforeDeadline, update);
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
-    // a row failed by its deadline stays failed: unlike EXHAUSTED or TIMEOUT, a late result is not the truth there
     @Override
     public boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.DONE, finishedAt, expiresAt);
-        Criteria notPastDeadline = thisDispatch(id, from, dispatchId).and(FIELD_FAILURE).ne(DeliveryFailure.DEADLINE);
-        return updateOne(notPastDeadline, update);
-    }
-
-    @Override
-    public boolean markFailedPastDeadline(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
-        Update update = closed(DeliveryStatus.FAILED, finishedAt, expiresAt)
-                .set(FIELD_FAILURE, DeliveryFailure.DEADLINE);
-        Criteria pastDeadline = thisDispatch(id, from, dispatchId).and(FIELD_DEADLINE_AT).lte(finishedAt);
-        return updateOne(pastDeadline, update);
+        return updateOne(thisDispatch(id, from, dispatchId), update);
     }
 
     @Override

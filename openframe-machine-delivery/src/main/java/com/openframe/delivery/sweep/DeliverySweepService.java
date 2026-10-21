@@ -53,11 +53,15 @@ public class DeliverySweepService {
         retry(due, now);
     }
 
-    // the fast pass: only rows with a deadline, which the main pass also sees but too seldom for them
-    public void retryPendingWithDeadline() {
+    // the fast pass: the rows of the types the regular pass comes round too seldom for; it still sees them too
+    public void retryPendingFast() {
+        Set<DeliveryType> fastTypes = properties.fastTypes();
+        if (fastTypes.isEmpty()) {
+            return;
+        }
         Instant now = Instant.now();
         int batchSize = properties.getSweep().getBatchSize();
-        List<MachineDelivery> due = repository.findDueWithDeadline(DeliveryStatus.PENDING, now, batchSize);
+        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, fastTypes, now, batchSize);
         retry(due, now);
     }
 
@@ -87,10 +91,6 @@ public class DeliverySweepService {
         DeviceStatus status = statuses.get(machineId);
         if (status != null && !registry.require(type).getDeliverableStatuses().contains(status)) {
             closer.cancel(delivery, DeliveryStatus.UNACKED, "machine in status " + status + " takes no " + type, now);
-            return;
-        }
-        if (isPastDeadline(delivery, now)) {
-            closer.fail(delivery, DeliveryFailure.DEADLINE, DeliveryStatus.UNACKED, now);
             return;
         }
         Policy policy = properties.resolve(type);
@@ -208,11 +208,6 @@ public class DeliverySweepService {
 
     private static boolean hasAttemptsLeft(MachineDelivery delivery, Policy policy) {
         return delivery.getAttempts() < policy.getMaxAttempts();
-    }
-
-    private static boolean isPastDeadline(MachineDelivery delivery, Instant now) {
-        Instant deadlineAt = delivery.getDeadlineAt();
-        return deadlineAt != null && !now.isBefore(deadlineAt);
     }
 
     private static boolean shouldSkipOffline(Policy policy) {
