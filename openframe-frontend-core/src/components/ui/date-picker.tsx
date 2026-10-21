@@ -662,6 +662,20 @@ const timeSelectTriggerStyles = cn(
 );
 
 // ============================================================================
+// Popover bounds (shared by every date popover in this file)
+// ============================================================================
+
+/**
+ * Keeps a date popover inside the window. Radix flips a popover to the other
+ * side only when it fits there whole and never shrinks it, so near the bottom
+ * of a short window (a list too short to scroll) the lower part, Apply
+ * included, ended up below the screen. The content is capped at the space
+ * Radix measures and scrolls inside instead.
+ */
+const DATE_POPOVER_COLLISION_PADDING = 16;
+const datePopoverBounds = 'max-h-[var(--radix-popover-content-available-height)]';
+
+// ============================================================================
 // DatePicker Component
 // ============================================================================
 
@@ -739,12 +753,15 @@ export function DatePicker(props: DatePickerProps) {
         <Popover.Content
           className={cn(
             'z-[9999]',
+            datePopoverBounds,
+            'overflow-y-auto',
             'animate-in fade-in-0 zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
             'data-[side=bottom]:slide-in-from-top-2',
             'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
+          collisionPadding={DATE_POPOVER_COLLISION_PADDING}
           align="start"
         >
           <DatePickerCalendar
@@ -923,12 +940,15 @@ export function DatePickerInput(props: DatePickerInputProps) {
           <Popover.Content
             className={cn(
               'z-[9999]',
+              datePopoverBounds,
+              'overflow-y-auto',
               'animate-in fade-in-0 zoom-in-95',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
               'data-[side=bottom]:slide-in-from-top-2',
               'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
+            collisionPadding={DATE_POPOVER_COLLISION_PADDING}
             align="start"
           >
             <DatePickerCalendar
@@ -1150,12 +1170,15 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
           <Popover.Content
             className={cn(
               'z-[9999]',
+              datePopoverBounds,
+              'overflow-y-auto',
               'animate-in fade-in-0 zoom-in-95',
               'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
               'data-[side=bottom]:slide-in-from-top-2',
               'data-[side=top]:slide-in-from-bottom-2',
             )}
             sideOffset={8}
+            collisionPadding={DATE_POPOVER_COLLISION_PADDING}
             align="start"
           >
             <DatePickerCalendar
@@ -1424,6 +1447,7 @@ export function DateFilterMenu({
         <Popover.Content
           className={cn(
             'z-[9999] w-80 max-w-[calc(100vw-2rem)]',
+            datePopoverBounds,
             'flex flex-col gap-4 rounded-[6px] border border-ods-border bg-ods-bg p-4',
             'animate-in fade-in-0 zoom-in-95',
             'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
@@ -1431,24 +1455,27 @@ export function DateFilterMenu({
             'data-[side=top]:slide-in-from-bottom-2',
           )}
           sideOffset={8}
+          collisionPadding={DATE_POPOVER_COLLISION_PADDING}
           align={align}
         >
-          {/* Sort + calendar (shared panel) */}
-          <DateFilterPanel
-            mode={mode}
-            sort={draftSort}
-            onSortChange={setDraftSort}
-            selected={draftSelected}
-            onSelect={setDraftSelected}
-            fromDate={fromDate}
-            toDate={toDate}
-            locale={locale}
-            ascLabel={ascLabel}
-            descLabel={descLabel}
-          />
+          {/* Sort + calendar (shared panel). Scrolls when the window is short, so the actions stay on screen. */}
+          <div className="min-h-0 overflow-y-auto">
+            <DateFilterPanel
+              mode={mode}
+              sort={draftSort}
+              onSortChange={setDraftSort}
+              selected={draftSelected}
+              onSelect={setDraftSelected}
+              fromDate={fromDate}
+              toDate={toDate}
+              locale={locale}
+              ascLabel={ascLabel}
+              descLabel={descLabel}
+            />
+          </div>
 
           {/* Actions */}
-          <div className="flex w-full items-stretch gap-4">
+          <div className="flex w-full shrink-0 items-stretch gap-4">
             <Button type="button" variant="outline" fullWidth onClick={hasChanges ? handleReset : handleClose}>
               {hasChanges ? 'Reset' : 'Close'}
             </Button>

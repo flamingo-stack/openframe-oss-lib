@@ -25,10 +25,8 @@ const ROW_HEADER_CLASS = 'flex w-full items-center gap-6 px-6 py-4 text-left con
 const QUESTION_CLASS = 'min-w-0 flex-1 break-words';
 const CHEVRON_CLASS = 'shrink-0 text-ods-text-primary';
 /**
- * Rows the accordion's skeleton draws when not told how many: one screen of closed rows, from the row's layout. A
- * closed row is `py-4` around one `text-h3` line from `content-md` (57px with its divider: 13 under a 900px desktop
- * viewport once the block's heading sits above them) and about one and a half lines on a phone (about 62px: 12 under
- * an 844px one). 12 fills the first screen at both widths without drawing a second.
+ * Rows the accordion's skeleton draws when not told how many: a typical count for a list of questions whose host
+ * states no count (a host that fetches with a count passes it, and the skeleton draws exactly that, at every width).
  */
 export const FAQ_ACCORDION_SKELETON_ROWS = 12;
 /**

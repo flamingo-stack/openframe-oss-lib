@@ -1,9 +1,9 @@
 /**
  * `whatToAsk`: the v2 list's "What to ask Mingo?" answered in the panel.
  *
- * With a conversation open the exchange is added at its end; with none a new
- * chat opens holding it, and the send from there keeps it in the dialog the
- * send creates. A chip sends its prompt in that chat, like a quick action.
+ * Every click opens a new chat holding the exchange - never the open
+ * conversation - and the send from there keeps it in the dialog the send
+ * creates. A chip sends its prompt in that new chat, like a quick action.
  * The ⋯ menu takes the host's extra items after the chat's own.
  */
 
@@ -154,16 +154,27 @@ describe('EmbeddableChat - whatToAsk', () => {
     vi.restoreAllMocks();
   });
 
-  it('adds the exchange at the end of the open conversation', () => {
+  it('opens a new chat with the exchange, not the open conversation', () => {
     renderHost({ initialDialogId: 'd-1' });
 
     fireEvent.click(whatToAsk());
 
-    const hello = screen.getByText('hello');
-    const question = screen.getByText('What can I ask you?');
-    expect(hello.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
     expect(screen.getByText('Describe the outcome you want.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Which devices went offline today?' })).toBeInTheDocument();
+    // The open conversation is left behind; the list marks the new chat.
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
+    const active = screen.getAllByRole('button').filter(button => button.getAttribute('aria-current') === 'true');
+    expect(active.map(button => button.textContent)).toEqual(['New Chat']);
+  });
+
+  it('replaces the new chat exchange with a fresh one on another click', () => {
+    renderHost();
+
+    fireEvent.click(whatToAsk());
+    fireEvent.click(whatToAsk());
+
+    expect(screen.getAllByText('What can I ask you?')).toHaveLength(1);
   });
 
   it('opens a new chat with the exchange when no conversation is open', () => {
@@ -178,9 +189,9 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
-  it('sends a picked prompt in the open chat and leaves the composer alone', () => {
+  it('sends a picked prompt in the new chat and leaves the composer alone', () => {
     const onSend = vi.fn();
-    renderHost({ initialDialogId: 'd-1', onSend });
+    renderHost({ onSend });
 
     fireEvent.click(whatToAsk());
     fireEvent.click(screen.getByRole('button', { name: 'Which devices went offline today?' }));
@@ -214,28 +225,7 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(active.map(button => button.textContent)).toEqual(['New Chat']);
   });
 
-  it('opens a new chat instead when the open one waits on an approval', () => {
-    const pendingApproval: UnifiedChatMessage = {
-      id: 'm-2',
-      role: 'assistant',
-      content: '',
-      segments: [
-        {
-          type: 'approval_request',
-          data: { requestId: 'r-1', command: 'restart spooler', explanation: 'Restart it', approvalType: 'COMMAND' },
-        },
-      ],
-      timestamp: new Date(1),
-    };
-    renderHost({ initialDialogId: 'd-1', openChat: [HELLO, pendingApproval] });
-
-    fireEvent.click(whatToAsk());
-
-    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
-    expect(screen.queryByText('hello')).not.toBeInTheDocument();
-  });
-
-  it('opens a new chat instead while a turn runs in the open one, and a chip there sends', () => {
+  it('opens a new chat while a turn runs in the open one, and a chip there sends', () => {
     const onSend = vi.fn();
     renderHost({ initialDialogId: 'd-1', busy: true, onSend });
 
@@ -285,9 +275,9 @@ describe('EmbeddableChat - whatToAsk', () => {
 
     act(() => handle.current?.showWhatToAsk());
 
-    const hello = screen.getByText('hello');
-    const question = screen.getByText('What can I ask you?');
-    expect(hello.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // A new chat holding the exchange, as the list's entry opens.
+    expect(screen.getByText('What can I ask you?')).toBeInTheDocument();
+    expect(screen.queryByText('hello')).not.toBeInTheDocument();
   });
 
   it("hands the host's entry to the host's own surface when it has one", () => {

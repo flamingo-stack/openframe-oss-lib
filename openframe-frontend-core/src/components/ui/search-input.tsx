@@ -26,8 +26,11 @@ import { Tag } from './tag';
 
 /** A result row's frame, read by the rows and by their loading state. */
 const SEARCH_RESULT_ROW_CLASS = 'flex min-h-10 items-center border-b border-ods-border px-3 last:border-b-0';
-/** Rows the results' loading state draws: the dropdown's 320px scroller holds eight 40px rows. */
-const SEARCH_RESULTS_FOLD = 8;
+/**
+ * Rows the results' loading state draws when its host states no `loadingRows`: a typical count. A host whose search
+ * answers a limited number of results passes that limit.
+ */
+const SEARCH_RESULTS_LOADING_ROWS = 8;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +71,8 @@ export interface SearchInputProps {
   results?: SearchResult[];
   /** Whether results are loading */
   isLoading?: boolean;
+  /** Result rows drawn while `isLoading`: the results the host's search answers (its limit). Default a typical count. */
+  loadingRows?: number;
   /** Called when a result row is selected.
    *
    *  `modifiers` carries the click event's modifier-key state when the
@@ -172,6 +177,7 @@ export function SearchInput({
   onSubmit,
   results = [],
   isLoading = false,
+  loadingRows = SEARCH_RESULTS_LOADING_ROWS,
   onResultSelect,
   debounceMs = 300,
   renderResult,
@@ -420,7 +426,7 @@ export function SearchInput({
       // The results while they are read: the dropdown's own rows, a title bar each.
       return (
         <LoadingRegion label="Loading results">
-          {Array.from({ length: SEARCH_RESULTS_FOLD }, (_, i) => (
+          {Array.from({ length: loadingRows }, (_, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
             <div key={i} className={SEARCH_RESULT_ROW_CLASS} aria-hidden>
               <TextLineSkeleton type="h6" className="w-2/3" />
