@@ -9,6 +9,7 @@ import { ChatFooter } from './chat-container';
 import { ChatContextMemoryBar } from './chat-context-memory-bar';
 import { ChatComposerPlusMenu, ChatContextChipStrip, ChatContextPicker } from './chat-context-picker';
 import { ChatInput } from './chat-input';
+import { MingoEdgeLight } from './mingo-edge-light';
 import { ModelDisplay } from './model-display';
 import type { ChatInputRef, ModelDisplayProps } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
@@ -94,6 +95,9 @@ export interface ChatComposerProps {
    *  Default `true`. `false` for a composer docked inside a layout that already
    *  owns that inset (a native shell's root), where it would be doubled. */
   safeAreaBottom?: boolean;
+  /** Mingo's AI edge light (`MingoEdgeLight`, the header launcher's) travelling
+   *  around the input card. Not on an archived chat. Default `false`. */
+  edgeLight?: boolean;
 }
 
 /**
@@ -137,6 +141,7 @@ export function ChatComposer({
   menuItems,
   footerActions,
   safeAreaBottom = true,
+  edgeLight = false,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
   const locked = lock != null;
@@ -234,6 +239,50 @@ export function ChatComposer({
     />
   );
 
+  const liveCard = contextEnabled ? (
+    // Unified card (Figma 1:6073 / 271:38656): the context-memory
+    // summary strip and the assigned-chip strip (both `bg-ods-bg`,
+    // `border-b`) stack flush above the input; the card owns the border
+    // / radius / focus ring. No `overflow-hidden` so the picker and the
+    // memory popover can float above the input (whichever strip comes
+    // first gets `rounded-t`).
+    // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
+    // border reacts ONLY to the composer editor — not the picker's search
+    // input or item buttons, which also live inside this card. The editor
+    // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
+    // target its data attribute rather than the element name.
+    <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
+      {/* Ambient navigation-history context — always the same items, so
+         it sits furthest from the textarea. Self-hides when empty. */}
+      <ChatContextMemoryBar
+        items={memory}
+        onRemove={onRemoveContextMemoryItem}
+        resolveIcon={resolveContextIcon}
+        disabled={sending || locked}
+        leading={contextLeading}
+        className="rounded-t-md"
+      />
+      {selected.length > 0 && (
+        <ChatContextChipStrip
+          items={selected}
+          onRemove={onRemoveContextItem}
+          resolveIcon={resolveContextIcon}
+          disabled={sending || locked}
+          className={cn(
+            'border-b border-ods-border bg-ods-bg p-2',
+            // Only the TOP strip rounds into the card corner.
+            memory.length === 0 && !contextLeading && 'rounded-t-md',
+          )}
+        />
+      )}
+      {/* Picker is rendered inside the `+` button (its `dropdown` prop)
+         so it anchors to the button, not this card. */}
+      {inputNode}
+    </div>
+  ) : (
+    inputNode
+  );
+
   return (
     <div
       className="flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)]"
@@ -251,48 +300,15 @@ export function ChatComposer({
               <BoxArchiveIcon size={24} className="shrink-0 text-ods-text-secondary" />
               <p className="truncate text-ods-text-secondary text-h4">Unarchive the chat to continue</p>
             </div>
-          ) : contextEnabled ? (
-            // Unified card (Figma 1:6073 / 271:38656): the context-memory
-            // summary strip and the assigned-chip strip (both `bg-ods-bg`,
-            // `border-b`) stack flush above the input; the card owns the border
-            // / radius / focus ring. No `overflow-hidden` so the picker and the
-            // memory popover can float above the input (whichever strip comes
-            // first gets `rounded-t`).
-            // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
-            // border reacts ONLY to the composer editor — not the picker's search
-            // input or item buttons, which also live inside this card. The editor
-            // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
-            // target its data attribute rather than the element name.
-            <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
-              {/* Ambient navigation-history context — always the same items, so
-                  it sits furthest from the textarea. Self-hides when empty. */}
-              <ChatContextMemoryBar
-                items={memory}
-                onRemove={onRemoveContextMemoryItem}
-                resolveIcon={resolveContextIcon}
-                disabled={sending || locked}
-                leading={contextLeading}
-                className="rounded-t-md"
-              />
-              {selected.length > 0 && (
-                <ChatContextChipStrip
-                  items={selected}
-                  onRemove={onRemoveContextItem}
-                  resolveIcon={resolveContextIcon}
-                  disabled={sending || locked}
-                  className={cn(
-                    'border-b border-ods-border bg-ods-bg p-2',
-                    // Only the TOP strip rounds into the card corner.
-                    memory.length === 0 && !contextLeading && 'rounded-t-md',
-                  )}
-                />
-              )}
-              {/* Picker is rendered inside the `+` button (its `dropdown` prop)
-                  so it anchors to the button, not this card. */}
-              {inputNode}
+          ) : edgeLight ? (
+            // On the card's border box: a wrapper the card fills, so the ring
+            // lies over the card's border.
+            <div className="relative">
+              {liveCard}
+              <MingoEdgeLight className="rounded-md" />
             </div>
           ) : (
-            inputNode
+            liveCard
           )}
         </ChatFooter>
       </div>

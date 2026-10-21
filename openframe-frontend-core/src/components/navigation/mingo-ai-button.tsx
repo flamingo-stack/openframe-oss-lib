@@ -7,6 +7,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import { AgentMark } from '../agent-mark';
+import { MingoEdgeLight } from '../chat/mingo-edge-light';
 import { ASK_AI_OPEN_EVENT } from '../chat/utils/ask-ai-events';
 import { Button } from '../ui/button';
 
@@ -160,9 +161,7 @@ export function MingoAiButton({
           (.mingo-edge-frame). NO opaque cover, so the launcher inherits
           whatever background sits behind it. Platform-tinted via the accent
           token. */}
-          <span aria-hidden="true" className="mingo-edge-frame pointer-events-none absolute inset-0 rounded-md">
-            <span className="mingo-edge" />
-          </span>
+          <MingoEdgeLight className="rounded-md" />
           {/* One-shot light-streak shimmer on hover, clipped to the outline. */}
           <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-md">
             <span

@@ -587,6 +587,9 @@ export interface EmbeddableChatProps {
   /** The composer's prompt. Default: "Enter your Request..." (v2) /
    *  "Ask a question..." (classic). Uploads in flight still say so instead. */
   composerPlaceholder?: string;
+  /** Mingo's AI edge light travelling around the composer's input card (the
+   *  header launcher's, `MingoEdgeLight`). Default `false`. */
+  composerEdgeLight?: boolean;
   /**
    * How "Rename Chat" in the chat header's ⋯ renames. `'modal'` (default): the
    * Rename Chat modal. `'inline'`: the title turns into a field with its text
@@ -1204,6 +1207,7 @@ function EmbeddableChatInner({
   composerFooterActions,
   composerContextLeading,
   composerPlaceholder,
+  composerEdgeLight = false,
   renameMode = 'modal',
   safeAreaBottom = true,
   onDialogCreated,
@@ -3060,6 +3064,7 @@ function EmbeddableChatInner({
       slashCommands={slashCommandsProp}
       previewText={quickActionPreview ?? composerPreviewText ?? undefined}
       safeAreaBottom={safeAreaBottom}
+      edgeLight={composerEdgeLight}
       showAttachmentButton={attachmentsEnabled && activeMode === 'guide'}
       attachmentsCount={stagedAttachments.length}
       onAddFiles={addAttachmentFiles}
