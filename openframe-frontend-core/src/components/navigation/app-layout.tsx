@@ -401,7 +401,10 @@ export function AppLayout({
                       style={{ bottom: dockHeight }}
                     >
                       <ContentAreaWidthContext.Provider value={contentAreaWidth}>
-                        <div className="ods-content-scope">{composerSheet}</div>
+                        {/* The sheet's scrim runs on under the dock, by its height. */}
+                        <ComposerDockHeightContext.Provider value={dockHeight}>
+                          <div className="ods-content-scope">{composerSheet}</div>
+                        </ComposerDockHeightContext.Provider>
                       </ContentAreaWidthContext.Provider>
                     </div>
                   )}

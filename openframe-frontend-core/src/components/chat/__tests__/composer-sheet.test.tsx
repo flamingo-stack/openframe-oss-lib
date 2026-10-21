@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ComposerDockHeightContext } from '../../navigation/app-layout-context';
 import { ChatContextMemoryBar } from '../chat-context-memory-bar';
 import { ComposerSheet, type ComposerSheetProps } from '../composer-sheet';
 import { MingoChatHeader } from '../mingo-chat-header';
@@ -59,6 +60,11 @@ describe('ComposerSheet', () => {
     expect(handle).toHaveAttribute('aria-valuemax', '780');
     expect(handle).toHaveAttribute('aria-valuenow', '780');
     vi.restoreAllMocks();
+  });
+
+  it('runs its scrim on under the composer dock, by the dock height AppLayout hands it', () => {
+    render(<ComposerDockHeightContext.Provider value={120}>{sheet()}</ComposerDockHeightContext.Provider>);
+    expect(screen.getByTestId('composer-sheet-scrim')).toHaveStyle({ bottom: '-120px' });
   });
 
   it('hands a scrim click to the host', () => {

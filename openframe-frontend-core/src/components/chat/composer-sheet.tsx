@@ -3,6 +3,7 @@
 import { type ReactNode, useRef, useState } from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
+import { useComposerDockHeight } from '../navigation/app-layout-context';
 import { PanelResizeHandle } from '../ui/panel-resize-handle';
 
 /** The sheet's floor: a header and a few lines of thread. */
@@ -93,6 +94,7 @@ export function ComposerSheet({
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
   const [layerHeight, setLayerHeight] = useState(0);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const dockHeight = useComposerDockHeight();
 
   useIsomorphicLayoutEffect(() => {
     if (!layer) return undefined;
@@ -120,9 +122,10 @@ export function ComposerSheet({
         aria-hidden
         data-testid="composer-sheet-scrim"
         // Down past the layer to the bottom of the column, behind the composer dock
-        // (`--of-composer-dock-height`, AppLayout): beside the composer the page reads
-        // dimmed too, not as a band of plain ground. The dock sits above it.
-        className="pointer-events-auto absolute inset-x-0 -bottom-[var(--of-composer-dock-height,0px)] top-0 bg-ods-overlay duration-200 animate-in fade-in-0"
+        // (its height from AppLayout, `ComposerDockHeightContext`): beside the composer
+        // the page reads dimmed too, not as a band of plain ground. The dock sits above it.
+        className="pointer-events-auto absolute inset-x-0 top-0 bg-ods-overlay duration-200 animate-in fade-in-0"
+        style={{ bottom: -dockHeight }}
         onClick={onDismiss}
       />
       {/* The sheet with the tab on it: the size the drag writes, and the dialog. The
