@@ -1250,9 +1250,14 @@ function EmbeddableChatInner({
   });
 
   // Suppress chat input auto-focus on touch devices (avoids popping the
-  // on-screen keyboard during the bottom-sheet open animation).
+  // on-screen keyboard during the bottom-sheet open animation), and in an inline
+  // host: a composer that is part of the layout mounts once, on whatever page the
+  // session starts on, so focusing it there takes the page's focus for no reason —
+  // and in WebKit a focused editor's caret alone keeps an idle page busy (about
+  // 3x its idle CPU, measured 2026-10-21). Opening a drawer is a request to type;
+  // a layout mounting is not.
   const [autoFocusInput] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || shell === 'inline') return false;
     return !window.matchMedia('(pointer: coarse)').matches;
   });
 
