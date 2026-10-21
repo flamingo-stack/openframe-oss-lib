@@ -110,8 +110,15 @@ Organization is the example; its files are in `openframe-data-mongo-sync`, next 
 | Derived deletes (`deleteByName`, `@Query(delete = true)`) | One tombstone per returned document. They must return the documents, not a count. |
 | Reads | Nothing. |
 
-A **tombstone** is a row with `deleted: true`, no payload, and a version one above the stored version, so a
-consumer applies it after the document's last change.
+A **tombstone** is a row with `deleted: true`, `payload: null`, and a version one above the stored version, so a
+consumer applies it after the document's last change. The `payload` key is always written, because Debezium's router
+needs it.
+
+The outbox connector needs two settings for this (stage 5):
+
+- `route.tombstone.on.empty.payload: true`, so the row is sent as a Kafka tombstone. Debezium's default is `false`.
+- A value converter without schemas, for example `value.converter.schemas.enable: false`. Consumers read the plain
+  JSON payload; a value wrapped in a schema cannot be read.
 
 **One row per write.** The interceptor does not compare with the stored document, so a save that changes only an
 unpublished field still writes a row. Consumers apply events by version, so extra rows do no harm.
@@ -181,7 +188,7 @@ Collection `outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publis
 | `deleted` | `true` for a tombstone. |
 | `schemaVersion` | `1`. |
 | `occurredAt` | When the row was written. |
-| `payload` | The event as JSON (Jackson names, ISO dates); empty for a tombstone. |
+| `payload` | The event as JSON (Jackson names, ISO dates); `null` for a tombstone, and the key is always written. |
 
 `OutboxIndexInitializer` creates the TTL index `outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
 change the TTL later, write a migration that drops the index first; `createIndex` with other options fails at

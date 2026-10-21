@@ -1,7 +1,7 @@
 package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.PublishedAggregateType;
-import com.openframe.publishing.config.EventsProperties;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.fixture.Widgets;
@@ -29,16 +29,19 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mongodb.MongoDBContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doReturn;
 
 // Real repository proxies with the publishing interceptor, in real Mongo transactions: each write commits or rolls back with its rows.
 @SpringBootTest(classes = PublishingRepositoryIT.TestApplication.class,
@@ -61,7 +64,7 @@ class PublishingRepositoryIT {
     @Autowired private PlainWidgetRepository plainWidgetRepository;
     @Autowired private CascadeLikeAspect cascadeLikeAspect;
     @Autowired private MongoTemplate mongoTemplate;
-    @Autowired private EventsProperties eventsProperties;
+    @MockitoSpyBean private PublishedAggregateTopics publishedAggregateTopics;
     @Autowired private OutboxIndexInitializer outboxIndexInitializer;
 
     @BeforeEach
@@ -70,7 +73,6 @@ class PublishingRepositoryIT {
         mongoTemplate.dropCollection(OutboxEvent.class);
         mongoTemplate.createCollection(Widget.class);
         mongoTemplate.createCollection(OutboxEvent.class);
-        eventsProperties.getTopics().get(PublishedAggregateType.ORGANIZATIONS).setPublish(true);
     }
 
     @Test
@@ -183,6 +185,17 @@ class PublishingRepositoryIT {
     }
 
     @Test
+    void theTombstoneRow_storesThePayloadKey_asNull_forDebeziumsRouter() {
+        Widget saved = widgetRepository.save(widget("Printer"));
+
+        widgetRepository.delete(saved);
+
+        List<org.bson.Document> rawRows = mongoTemplate.getCollection("outbox").find().into(new ArrayList<>());
+        List<org.bson.Document> rawTombstones = rawRows.stream().filter(row -> row.get("payload") == null).toList();
+        assertThat(rawTombstones).singleElement().satisfies(row -> assertThat(row).containsKey("payload"));
+    }
+
+    @Test
     void deleteAll_deletesEveryDocument_andWritesATombstoneForEach() {
         widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner")));
 
@@ -197,7 +210,7 @@ class PublishingRepositoryIT {
 
     @Test
     void deleteAll_withPublishOff_stillDeletes() {
-        eventsProperties.getTopics().get(PublishedAggregateType.ORGANIZATIONS).setPublish(false);
+        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
         widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner")));
 
         widgetRepository.deleteAll();
@@ -277,7 +290,7 @@ class PublishingRepositoryIT {
 
     @Test
     void publishOff_writesWithoutARow() {
-        eventsProperties.getTopics().get(PublishedAggregateType.ORGANIZATIONS).setPublish(false);
+        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
 
         Widget saved = widgetRepository.save(widget("Printer"));
         widgetRepository.renameOne(saved.getId(), "Scanner");
@@ -288,7 +301,7 @@ class PublishingRepositoryIT {
 
     @Test
     void publishOff_everyOtherWriteAndDelete_runsWithoutARow() {
-        eventsProperties.getTopics().get(PublishedAggregateType.ORGANIZATIONS).setPublish(false);
+        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
         List<Widget> saved = widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner"), widget("Router")));
         widgetRepository.insert(List.of(widget("Printer"), widget("Scanner"), widget("Router")));
 

@@ -9,7 +9,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -26,7 +25,6 @@ import static com.openframe.publishing.api.PublishedDocuments.ID_FIELD;
 
 // Runs a write and writes the outbox rows of the documents it changed, in one transaction. With publish off, only the write.
 @Slf4j
-@Component
 public class OutboxPublisher {
 
     private static final int SCHEMA_VERSION = 1;
