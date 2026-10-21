@@ -10,3 +10,7 @@ pub struct AgentRegistrationResponse {
     #[serde(default)]
     pub log_key: Option<String>,
 }
+
+#[cfg(test)]
+#[path = "agent_registration_response_tests.rs"]
+mod tests;

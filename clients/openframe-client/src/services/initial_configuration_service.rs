@@ -9,7 +9,7 @@ use crate::platform::directories::DirectoryManager;
 #[derive(Clone)]
 pub struct InitialConfigurationService {
     config_file_path: PathBuf,
-    // Serializes read-modify-write of the config so concurrent savers can't lose each other's fields.
+    // Serializes the read-modify-write clears so two of them can't lose each other's fields.
     write_lock: Arc<Mutex<()>>,
 }
 

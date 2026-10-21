@@ -51,7 +51,15 @@ async fn registration_with_a_log_key_replaces_the_stored_one() {
 
 #[tokio::test]
 async fn a_config_written_before_log_keys_reads_as_empty() {
-    let (_dir, service) = registered(None).await;
+    let dir = tempfile::tempdir().unwrap();
+    let dm = directories(&dir);
+    dm.ensure_directories().unwrap();
+    std::fs::write(
+        dm.secured_dir().join("agent_config.json"),
+        r#"{"machine_id":"machine","client_id":"client","client_secret":"secret","access_token":"","refresh_token":""}"#,
+    )
+    .unwrap();
+    let service = AgentConfigurationService::new(dm).unwrap();
 
     assert_eq!(service.get_log_key().unwrap(), "");
     service.save_log_key("fetched".into()).await.unwrap();

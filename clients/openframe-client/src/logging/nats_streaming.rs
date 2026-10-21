@@ -25,6 +25,7 @@ const SOURCE_DISCOVERY_INTERVAL_SECS: u64 = 30;
 const NATS_SUBJECT: &str = "agents.logs";
 
 /// Credential handed to the logs gateway: the log key, or the enrollment key on devices registered before log keys existed.
+#[derive(Debug, PartialEq)]
 pub enum LogStreamKey {
     Log(String),
     Initial(String),
@@ -258,16 +259,11 @@ impl LogStreamingRunManager {
         registry
     }
 
-    /// The log key once the device holds one, else the enrollment key still on disk.
     fn stored_key(&self) -> Option<LogStreamKey> {
-        if let Some(key) = self.log_key_service.stored_key() {
-            return Some(LogStreamKey::Log(key));
-        }
-        self.initial_config_service
-            .get_initial_key()
-            .ok()
-            .filter(|key| !key.is_empty())
-            .map(LogStreamKey::Initial)
+        choose_key(
+            self.log_key_service.stored_key(),
+            self.initial_config_service.get_initial_key().ok(),
+        )
     }
 
     async fn wait_for_key(&self) -> LogStreamKey {
@@ -387,6 +383,16 @@ async fn log_streaming_loop(
             }
         }
     }
+}
+
+/// The log key once the device holds one, else the enrollment key still on disk.
+fn choose_key(log_key: Option<String>, initial_key: Option<String>) -> Option<LogStreamKey> {
+    if let Some(key) = log_key.filter(|key| !key.is_empty()) {
+        return Some(LogStreamKey::Log(key));
+    }
+    initial_key
+        .filter(|key| !key.is_empty())
+        .map(LogStreamKey::Initial)
 }
 
 fn extract_tenant_domain(server_host: &str) -> String {

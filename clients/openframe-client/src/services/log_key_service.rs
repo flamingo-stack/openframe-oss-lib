@@ -10,9 +10,10 @@ use crate::services::backend_call_retry::{retry_until_settled, RetryTiming};
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::{AgentConfigurationService, InitialConfigurationService};
 
+const ERROR_BODY_CHARS: usize = 200;
 const RETRY_TIMING: RetryTiming = RetryTiming {
     initial: Duration::from_secs(30),
-    max: Duration::from_secs(600),
+    max: Duration::from_secs(3600),
 };
 
 #[derive(Deserialize)]
@@ -106,6 +107,7 @@ impl LogKeyService {
         if !response.status().is_success() {
             let status = response.status();
             let body = response.text().await.unwrap_or_default();
+            let body: String = body.chars().take(ERROR_BODY_CHARS).collect();
             anyhow::bail!("HTTP {} - {}", status, body);
         }
 
