@@ -90,7 +90,7 @@ export interface FaqSectionProps {
   ask?: false | FaqAskOptions;
   /**
    * The loading state's groups of questions, in order: THE one way to say what the skeleton draws (see
-   * `FaqSkeletonShape`). Absent: one group with no category heading, of `minResults` rows (else one screen of rows).
+   * `FaqSkeletonShape`). Absent: one group with no category heading, of `minResults` rows (else a typical count).
    */
   skeletonShape?: FaqSkeletonShape;
   /**
@@ -133,14 +133,17 @@ const CATEGORY_SECTION_CLASS = 'scroll-mt-24';
  * the host declared its FAQs categorised (`skeletonNav`): then every group it draws is named, loading and loaded.
  */
 const CATEGORY_HEADING_CLASS = cn(SECTION_HEADING_CLASS, 'pb-4');
-/** Questions the block's skeleton draws when the host states no count (`minResults`): one screen of the accordion's rows. */
+/**
+ * Questions the block's skeleton draws when the host states no count (`minResults`): the accordion's typical count. A
+ * host that fetches with `minResults` gets exactly that many rows.
+ */
 export const FAQ_SECTION_SKELETON_QUESTIONS = FAQ_ACCORDION_SKELETON_ROWS;
 
 /** One group of questions the FAQ's loading state draws. */
 export interface FaqSkeletonGroup {
   /** The group is a named category: drawn with its heading bar (and counted for the category nav). Default false. */
   heading?: boolean;
-  /** Question rows the group draws. Default `FAQ_SECTION_SKELETON_QUESTIONS`, one screen of rows. */
+  /** Question rows the group draws: the group's count. Default `FAQ_SECTION_SKELETON_QUESTIONS`, a typical count. */
   rows?: number;
 }
 
@@ -657,7 +660,7 @@ export interface FaqSectionSkeletonProps extends Pick<
   FaqSectionProps,
   'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'
 > {
-  /** The groups drawn, in order. Default one group with no heading, of one screen of rows. */
+  /** The groups drawn, in order. Default one group with no heading, of `FAQ_SECTION_SKELETON_QUESTIONS` rows. */
   shape?: FaqSkeletonShape;
   /** Draw the category nav's row (one line of pills) whatever `sections` is: the host's FAQs are categorised. */
   navRow?: boolean;

@@ -100,8 +100,11 @@ const DEFAULT_GALLERY_THUMB =
 const DEFAULT_FOOTER = 'flex justify-end border-t border-ods-border pt-[var(--spacing-system-lf)]';
 /** The hosts' avatars (32px each): beside the text from md, their own row under it on a phone. */
 const DEFAULT_HOSTS_ROW = 'flex flex-wrap gap-2 md:justify-end';
-/** The tags a card's skeleton draws when it shows a tag row (a row of read tags: a typical one). */
-const DEFAULT_TAGS_FOLD = 2;
+/**
+ * The tags a card's skeleton draws when it shows a tag row: a typical count. The loaded row draws every tag the item
+ * carries (no cap), so there is no limit to draw.
+ */
+const DEFAULT_SKELETON_TAGS = 2;
 /** The person's avatar in the editorial feature card, read by the card and its skeleton. */
 const EDITORIAL_PERSON_AVATAR = { variant: 'round', size: 'sm' } as const;
 
@@ -197,7 +200,7 @@ export function ProgramCardSkeleton({
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
-              {Array.from({ length: DEFAULT_TAGS_FOLD }, (_, i) => (
+              {Array.from({ length: DEFAULT_SKELETON_TAGS }, (_, i) => (
                 <TagSkeleton key={i} />
               ))}
             </div>
