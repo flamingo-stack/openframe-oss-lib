@@ -200,8 +200,11 @@ function CardForType({
   linkProps,
   extras,
   adminCampaignCard,
+  priority,
 }: {
   type: string;
+  /** The rail's first card: its image is fetched at once (see `RelatedCardContext.priority`). */
+  priority?: boolean;
   /** One fetched row, still unvalidated. Its shape is decided at RUNTIME by
    *  `type` (each group fetches from its own per-type list API), so it stays
    *  `unknown` right up to the registry entry for that type — which owns the
@@ -247,6 +250,7 @@ function CardForType({
     // a numeric title reached `buildOgPlaceholderUrl` as a number. `rowString`
     // makes the claim true.
     placeholderUrl: extras?.buildOgPlaceholderUrl?.(rowString(item, 'title') ?? '') ?? undefined,
+    priority,
     extras,
   });
 }
@@ -361,11 +365,14 @@ function ContentGroup({
   heading,
   onLoadingChange,
   seedRows,
+  leadsRail = false,
 }: {
   type: string;
   refs: ContentRef[];
   /** The rows of this group's FIRST page, read by the server (`initialRows`). */
   seedRows?: ReadonlyArray<unknown>;
+  /** The rail's first group: its first card's image is fetched at once. */
+  leadsRail?: boolean;
   columns: 2 | 3;
   buildUrl: (type: string, ids: string[]) => string | null;
   resolveHref: (ref: ContentRef) => { href: string | null; targetPlatform: string | null };
@@ -448,7 +455,7 @@ function ContentGroup({
   const itemById = new Map(items.map(it => [rowKey(it), it]));
 
   const cards = pageRefs
-    .map(contentRef => {
+    .map((contentRef, index) => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
       if (!item) return null;
@@ -471,6 +478,8 @@ function ContentGroup({
                 linkProps={linkProps}
                 extras={extras}
                 adminCampaignCard={adminCampaignCard}
+                // The rail's first card, on its first page: the top of the rail, often the page's largest paint.
+                priority={leadsRail && page === 1 && index === 0}
               />
             )}
           </LinkProvider>
@@ -787,7 +796,7 @@ export function RelatedContentSection({
   return (
     <LoadingRegion as="section" label="Loading related content" announce={loadingTypes.size > 0} className={RAIL_CLASS}>
       <h2 className={RAIL_TITLE_CLASS}>{accentSentenceMarks(title)}</h2>
-      {orderedTypes.map(type => (
+      {orderedTypes.map((type, groupIndex) => (
         <ContentGroup
           key={type}
           type={type}
@@ -801,6 +810,7 @@ export function RelatedContentSection({
           heading={<GroupHeading type={type} />}
           onLoadingChange={onGroupLoadingChange}
           seedRows={initialRows?.[type]}
+          leadsRail={groupIndex === 0}
         />
       ))}
     </LoadingRegion>
