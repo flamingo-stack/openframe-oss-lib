@@ -3,55 +3,12 @@ package com.openframe.core.validation.tool;
 import lombok.experimental.Accessors;
 
 import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
 import java.util.function.Predicate;
 
 /** Represents a shared argument validation predicate. */
 public sealed interface ToolArgumentCondition<T> {
 
     boolean isSatisfiedBy(T value);
-
-    @lombok.Value
-    @Accessors(fluent = true)
-    public static class All<T> implements ToolArgumentCondition<T> {
-
-        private final List<ToolArgumentCondition<T>> conditions;
-
-        public All(List<ToolArgumentCondition<T>> conditions) {
-            this.conditions = List.copyOf(conditions);
-        }
-
-        public boolean isSatisfiedBy(T value) {
-            return conditions.stream().allMatch(condition -> condition.isSatisfiedBy(value));
-        }
-    }
-
-    @lombok.Value
-    @Accessors(fluent = true)
-    public static class Any<T> implements ToolArgumentCondition<T> {
-
-        private final List<ToolArgumentCondition<T>> conditions;
-
-        public Any(List<ToolArgumentCondition<T>> conditions) {
-            this.conditions = List.copyOf(conditions);
-        }
-
-        public boolean isSatisfiedBy(T value) {
-            return conditions.stream().anyMatch(condition -> condition.isSatisfiedBy(value));
-        }
-    }
-
-    @lombok.Value
-    @Accessors(fluent = true)
-    public static class Not<T> implements ToolArgumentCondition<T> {
-
-        private final ToolArgumentCondition<T> condition;
-
-        public boolean isSatisfiedBy(T value) {
-            return !condition.isSatisfiedBy(value);
-        }
-    }
 
     @lombok.Value
     @Accessors(fluent = true)
@@ -115,10 +72,6 @@ public sealed interface ToolArgumentCondition<T> {
             return switch (kind) {
                 case NON_NULL -> value != null;
                 case HAS_TEXT, NOT_TRIM_EMPTY, NOT_TRIM_BLANK, PATTERN -> ToolArgumentValuePatterns.isMatchingValue(kind, operand, value);
-                case NON_EMPTY -> value instanceof Collection<?> collection && !collection.isEmpty();
-                case EQUALS -> Objects.equals(value, operand);
-                case POSITIVE -> value instanceof Number number && number.doubleValue() > 0;
-                case MULTIPLE_OF -> value instanceof Number number && number.longValue() % ((Number) operand).longValue() == 0;
             };
         }
     }

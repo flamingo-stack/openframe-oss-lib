@@ -13,23 +13,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ToolArgumentValueObjectTest {
 
     @Test
-    void compositeConditions_mutatedSource_retainsImmutableSnapshot() {
-        // setup
-        ToolArgumentCondition<String> required = hasText();
-        List<ToolArgumentCondition<String>> source = new ArrayList<>(List.of(required));
-        ToolArgumentCondition.All<String> all = new ToolArgumentCondition.All<>(source);
-        ToolArgumentCondition.Any<String> any = new ToolArgumentCondition.Any<>(source);
-
-        // execution
-        source.clear();
-
-        // verifications
-        assertThat(all.conditions()).containsExactly(required);
-        assertThat(any.conditions()).containsExactly(required);
-        assertThatThrownBy(() -> all.conditions().add(required)).isInstanceOf(UnsupportedOperationException.class).hasMessage((String) null);
-    }
-
-    @Test
     void contract_mutatedSource_preservesRulesAndStructuralEquality() {
         // setup
         ToolArgumentCondition<String> required = hasText();
