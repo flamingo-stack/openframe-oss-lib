@@ -14,6 +14,8 @@ pub struct AgentRegistrationRequest {
     pub os_type: String,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<DeviceTag>,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub binary_sha256: String,
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@ use tracing::{error, info, warn};
 
 use crate::clients::{RegistrationClient, RegistrationError};
 use crate::models::{AgentRegistrationRequest, AgentRegistrationResponse};
+use crate::platform::binary_checksum;
 use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
@@ -131,7 +132,7 @@ impl AgentRegistrationService {
         initial_key: &str,
         user_id: &str,
     ) -> Result<AgentRegistrationResponse> {
-        let request = self.build_registration_request(user_id)?;
+        let request = self.build_registration_request(user_id).await?;
         self.registration_client
             .register(initial_key, None, request)
             .await
@@ -146,7 +147,7 @@ impl AgentRegistrationService {
         machine_info: PersistedMachineInfo,
         user_id: &str,
     ) -> Result<AgentRegistrationResponse> {
-        let request = self.build_registration_request(user_id)?;
+        let request = self.build_registration_request(user_id).await?;
 
         match self
             .registration_client
@@ -164,7 +165,7 @@ impl AgentRegistrationService {
         }
     }
 
-    fn build_registration_request(&self, user_id: &str) -> Result<AgentRegistrationRequest> {
+    async fn build_registration_request(&self, user_id: &str) -> Result<AgentRegistrationRequest> {
         let hostname = self.device_data_fetcher.get_hostname().unwrap_or_default();
         if hostname.is_empty() {
             warn!("Could not resolve any hostname — registering with an empty one");
@@ -183,6 +184,7 @@ impl AgentRegistrationService {
             .initial_configuration_service
             .get_tags()
             .unwrap_or_default();
+        let binary_sha256 = binary_checksum::current_executable_sha256().await;
 
         let request = AgentRegistrationRequest {
             hostname,
@@ -191,6 +193,7 @@ impl AgentRegistrationService {
             user_id: user_id.to_string(),
             os_type,
             tags,
+            binary_sha256,
         };
 
         Ok(request)
