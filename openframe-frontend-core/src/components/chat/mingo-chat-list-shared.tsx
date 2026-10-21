@@ -2,13 +2,7 @@
 
 import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
 import { cn } from '../../utils/cn';
-import {
-  AlertCircleIcon,
-  DotsLoaderIcon,
-  MessageIndicatorIcon,
-  Refresh01RightIcon,
-  ShieldCheckIcon,
-} from '../icons-v2-generated';
+import { AlertCircleIcon, MessageIndicatorIcon, Refresh01RightIcon, ShieldCheckIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import type { DialogItem } from './types/component.types';
 
@@ -24,9 +18,25 @@ export type MingoHistoryScope = 'my' | 'all';
  */
 export type MingoDialogStatus = 'working' | 'unread' | 'approval';
 
+/**
+ * `DotsLoaderIcon` drawn as HTML boxes (`ods-dots-loader` in the ODS styles): same box,
+ * dots and motion. A chat row shows it for as long as a reply streams, on every page,
+ * and WebKit animates an SVG child on the main thread every frame — one row's icon kept
+ * ~12% of a core busy; HTML boxes ~3% (2026-10-21).
+ */
+function WorkingDots({ className }: { className?: string }) {
+  return (
+    <span className={cn('ods-dots-loader', className)}>
+      <span />
+      <span />
+      <span />
+    </span>
+  );
+}
+
 /** One glyph per status, for every Mingo chat list (the v2 rail, the sidebar section). */
 export const MINGO_DIALOG_STATUS_GLYPHS: Record<MingoDialogStatus, { icon: ReactNode; label: string }> = {
-  working: { icon: <DotsLoaderIcon className="text-ods-text-secondary" />, label: 'Mingo is working' },
+  working: { icon: <WorkingDots className="text-ods-text-secondary" />, label: 'Mingo is working' },
   unread: { icon: <MessageIndicatorIcon className="text-ods-accent" />, label: 'New reply' },
   approval: { icon: <ShieldCheckIcon className="text-ods-accent" />, label: 'Waiting for approval' },
 };
