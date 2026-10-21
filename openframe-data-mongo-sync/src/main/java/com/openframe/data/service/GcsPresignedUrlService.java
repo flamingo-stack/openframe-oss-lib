@@ -2,6 +2,7 @@ package com.openframe.data.service;
 
 import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
+import com.google.cloud.storage.CopyWriter;
 import com.google.cloud.storage.HttpMethod;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
@@ -118,7 +119,17 @@ public class GcsPresignedUrlService {
         BlobId targetId = BlobId.of(bucketName, withPrefix(destPath));
 
         Storage.CopyRequest copyRequest = Storage.CopyRequest.of(sourceId, targetId);
-        storage.copy(copyRequest);
+        CopyWriter copyWriter = storage.copy(copyRequest);
+        while (!copyWriter.isDone()) {
+            copyWriter.copyChunk();
+        }
+        copyWriter.getResult();
+
+        if (!storage.get(targetId).exists()) {
+            log.error("Copy verification failed, target does not exist: {} -> {}", sourceId.getName(), targetId.getName());
+            throw new IllegalStateException("Failed to copy file from " + sourceId.getName() + " to " + targetId.getName());
+        }
+
         storage.delete(sourceId);
 
         log.debug("File moved: {} -> {}", sourceId.getName(), targetId.getName());

@@ -243,7 +243,7 @@ const ChartTooltipContent = forwardRef<HTMLDivElement, ChartTooltipContentProps>
                       {nestLabel ? tooltipLabel : null}
                       <span className="text-muted-foreground">{itemConfig?.label || item.name}</span>
                     </div>
-                    {item.value && (
+                    {(item.value !== undefined && item.value !== null) && (
                       <span className="tabular-nums text-foreground text-code">{item.value.toLocaleString()}</span>
                     )}
                   </div>

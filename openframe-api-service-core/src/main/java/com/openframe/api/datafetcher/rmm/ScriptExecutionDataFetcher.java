@@ -40,21 +40,7 @@ import static com.openframe.graphql.relay.NodeType.SCRIPT_EXECUTION;
 import static com.openframe.graphql.relay.NodeType.SCRIPT_SCHEDULE;
 import static com.openframe.graphql.relay.NodeType.USER;
 
-/**
- * GraphQL resolver for the Execution History tab — the same handler backs both the
- * per-script variant ({@code scriptExecutions}) and the per-schedule variant
- * ({@code scheduleExecutions}), since {@link ExecutionOwnerScope} lets a single
- * service call cover both. Field resolvers on {@code ScriptExecution} live here too
- * so they aren't duplicated between the two views.
- *
- * <p>Tenant scoping is delegated to {@link ScriptExecutionService} via
- * {@code TenantIdProvider}.
- *
- * <p>{@code Execution.initiator} is resolved via the shared {@code userDataLoader},
- * batching User lookups across all rows in the page — same pattern as
- * {@code Script.author}. {@code Execution.scriptName} is resolved the same way via
- * {@code scriptDataLoader}, rather than being snapshotted onto the document.
- */
+// ExecutionOwnerScope lets this one handler back both scriptExecutions and scheduleExecutions queries.
 @DgsComponent
 @RequiredArgsConstructor
 @Slf4j

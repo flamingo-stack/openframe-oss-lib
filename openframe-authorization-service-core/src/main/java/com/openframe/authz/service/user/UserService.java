@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 import static com.openframe.data.document.user.UserStatus.ACTIVE;
@@ -52,7 +53,7 @@ public class UserService {
     public boolean hasActiveAccountInAnotherTenant(String email, String tenantId) {
         String normalized = email.trim().toLowerCase(Locale.ROOT);
         return userRepository.findAllByEmailAndStatus(normalized, ACTIVE).stream()
-                .anyMatch(u -> !u.getTenantId().equals(tenantId));
+                .anyMatch(u -> !Objects.equals(u.getTenantId(), tenantId));
     }
 
     public Optional<AuthUser> findActiveByEmail(String email) {

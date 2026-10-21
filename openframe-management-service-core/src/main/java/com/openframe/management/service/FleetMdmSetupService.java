@@ -35,7 +35,12 @@ public class FleetMdmSetupService {
         apiKey.setType(APIKeyType.BEARER_TOKEN);
         apiKey.setKeyName(FLEET_API_TOKEN_KEY_NAME);
 
-        tool.getCredentials().setApiKey(apiKey);
+        ToolCredentials credentials = tool.getCredentials();
+        if (credentials == null) {
+            credentials = new ToolCredentials();
+            tool.setCredentials(credentials);
+        }
+        credentials.setApiKey(apiKey);
         toolRepository.save(tool);
         log.info("Fleet API token saved to IntegratedTool '{}'", tool.getId());
     }

@@ -23,6 +23,7 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
 
     private static final String REJECTED_INCOMPLETE = "incomplete";
     private static final String REJECTED_MALFORMED = "malformed";
+    private static final String REJECTED_UNEXPECTED = "unexpected";
 
     private final ObjectMapper objectMapper;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
@@ -89,6 +90,10 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
             log.error("Delivery result rejected, malformed: subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
         } catch (Exception e) {
+            // Intentionally not acking: this is an unexpected/transient failure path, so the message
+            // is left for JetStream redelivery (subject to the consumer's max-deliver policy) rather
+            // than being dropped. The metric lets us distinguish this from poison/malformed rejections.
+            metrics.recordResultRejected(REJECTED_UNEXPECTED);
             log.error("Unexpected error processing delivery result: {}", payload, e);
         }
     }

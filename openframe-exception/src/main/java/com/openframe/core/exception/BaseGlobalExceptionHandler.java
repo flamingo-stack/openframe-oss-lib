@@ -114,7 +114,7 @@ public class BaseGlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleMissingRequestHeader(MissingRequestHeaderException ex) {
-        log.error("Missing required header: ", ex);
+        log.warn("Missing required header: {}", ex.getHeaderName());
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required header '" + ex.getHeaderName() + "' is missing");
     }
 
@@ -141,35 +141,36 @@ public class BaseGlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleIllegalArgument(IllegalArgumentException ex) {
-        log.error("Invalid request: ", ex);
+        log.warn("Invalid request: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleIllegalState(IllegalStateException ex) {
-        log.debug("Conflict: {}", ex.getMessage());
+        log.warn("Conflict: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
     public ErrorResponse handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
-        log.error("Method not supported: ", ex);
+        log.warn("Method not supported: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED, ex.getMessage());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
     public ErrorResponse handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
-        log.error("Media type not supported: ", ex);
+        log.warn("Media type not supported: {}", ex.getMessage());
         return ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE, ex.getMessage());
     }
 
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ErrorResponse> handleResponseStatusException(ResponseStatusException ex) {
         log.warn("Response status exception: {} - {}", ex.getStatusCode(), ex.getReason());
-        return ResponseEntity.status(ex.getStatusCode()).body(ErrorResponse.of(ErrorCode.INTERNAL_ERROR, ex.getReason()));
+        ErrorCode code = errorCodeFor(ex.getStatusCode());
+        return ResponseEntity.status(ex.getStatusCode()).body(ErrorResponse.of(code, ex.getReason()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

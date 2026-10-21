@@ -29,6 +29,7 @@ import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -105,22 +106,36 @@ public class ScheduleFireDispatcher {
                 machineIds.size(), schedule.getId(), schedule.getTenantId(), expiresAt);
     }
 
+    private static final int ARM_RECONNECT_RETRY_MAX_ATTEMPTS = 3;
+
     public void armReconnectRetry(ScheduleScript schedule, String machineId, Instant firstSeenAt, Instant expiresAt) {
-        DeviceFirstOnlineDispatch row = dispatchRepository
-                .findByTenantIdAndMachineIdAndScheduleId(schedule.getTenantId(), machineId, schedule.getId())
-                .orElseGet(() -> DeviceFirstOnlineDispatch.builder()
-                        .tenantId(schedule.getTenantId())
-                        .machineId(machineId)
-                        .scheduleId(schedule.getId())
-                        .build());
-        row.setStatus(DeviceOnlineDispatchStatus.NEW);
-        row.setFirstSeenAt(firstSeenAt);
-        row.setExpiresAt(expiresAt);
-        try {
-            dispatchRepository.save(row);
-        } catch (DuplicateKeyException raced) {
-            log.debug("reconnect-retry sentinel armed concurrently: machineId={} scheduleId={}",
-                    machineId, schedule.getId());
+        for (int attempt = 1; attempt <= ARM_RECONNECT_RETRY_MAX_ATTEMPTS; attempt++) {
+            DeviceFirstOnlineDispatch row = dispatchRepository
+                    .findByTenantIdAndMachineIdAndScheduleId(schedule.getTenantId(), machineId, schedule.getId())
+                    .orElseGet(() -> DeviceFirstOnlineDispatch.builder()
+                            .tenantId(schedule.getTenantId())
+                            .machineId(machineId)
+                            .scheduleId(schedule.getId())
+                            .build());
+            row.setStatus(DeviceOnlineDispatchStatus.NEW);
+            row.setFirstSeenAt(firstSeenAt);
+            row.setExpiresAt(expiresAt);
+            try {
+                dispatchRepository.save(row);
+                return;
+            } catch (DuplicateKeyException raced) {
+                log.debug("reconnect-retry sentinel armed concurrently: machineId={} scheduleId={}",
+                        machineId, schedule.getId());
+                return;
+            } catch (OptimisticLockingFailureException raced) {
+                if (attempt == ARM_RECONNECT_RETRY_MAX_ATTEMPTS) {
+                    log.warn("reconnect-retry sentinel update lost race after {} attempts: machineId={} scheduleId={}",
+                            attempt, machineId, schedule.getId());
+                    return;
+                }
+                log.debug("reconnect-retry sentinel update raced, retrying (attempt={}): machineId={} scheduleId={}",
+                        attempt, machineId, schedule.getId());
+            }
         }
     }
 

@@ -87,7 +87,9 @@ public class MachinePackageManagersListener extends AbstractJetStreamPushListene
             log.warn("Dropping malformed package-managers report subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
         } catch (Exception e) {
-            log.error("Unexpected error processing package-managers report: {}", payload, e);
+            log.error("Unexpected error processing package-managers report, requesting redelivery: {}", payload, e);
+            message.nak();
         }
     }
 }
+

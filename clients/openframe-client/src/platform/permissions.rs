@@ -190,7 +190,7 @@ impl PermissionUtils {
 
         #[cfg(target_os = "windows")]
         {
-            // TODO: implement proper admin check on Windows; returning false for now
+            // Checks elevation status via the is_elevated crate
             is_elevated::is_elevated()
         }
 
@@ -553,3 +553,4 @@ pub enum Capability {
 #[cfg(test)]
 #[path = "permissions_tests.rs"]
 mod tests;
+

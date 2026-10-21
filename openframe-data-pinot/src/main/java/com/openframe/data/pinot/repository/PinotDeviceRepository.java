@@ -45,9 +45,7 @@ public interface PinotDeviceRepository {
             List<String> tagKeyValues
     );
 
-    /**
-     * Get tag key filter options from the tags MV column.
-     */
+    // Tag keys come from the tags MV column, unlike the other filter options above
     Map<String, Integer> getTagKeyFilterOptions(
             String tenantId,
             List<String> statuses,

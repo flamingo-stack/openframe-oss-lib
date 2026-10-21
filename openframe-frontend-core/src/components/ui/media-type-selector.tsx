@@ -1,6 +1,6 @@
 'use client';
 
-import { Video, Image as ImageIcon, FileText, Archive, CheckSquare, BookOpen, FileType } from 'lucide-react';
+import { Video, Image as ImageIcon, FileText, Archive, CheckSquare, BookOpen, FileType } from '../icons-v2';
 import type { ReactNode } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
 

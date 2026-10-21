@@ -63,9 +63,18 @@ public class MachineTimezoneListener extends AbstractJetStreamPushListener {
     protected void handleMessage(Message message) {
         String payload = new String(message.getData(), StandardCharsets.UTF_8);
         String subject = message.getSubject();
+
+        MachineTimezoneMessage timezoneMessage;
+        try {
+            timezoneMessage = objectMapper.readValue(payload, MachineTimezoneMessage.class);
+        } catch (Exception e) {
+            log.error("Malformed timezone message payload, acking to avoid poison-message redelivery: {}", payload, e);
+            message.ack();
+            return;
+        }
+
         try {
             String machineId = machineIdExtractor.extract(subject);
-            MachineTimezoneMessage timezoneMessage = objectMapper.readValue(payload, MachineTimezoneMessage.class);
 
             String timezone = timezoneMessage.getTimezone();
             if (isBlank(timezone)) {
@@ -85,3 +94,4 @@ public class MachineTimezoneListener extends AbstractJetStreamPushListener {
         }
     }
 }
+

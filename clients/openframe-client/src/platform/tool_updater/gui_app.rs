@@ -9,6 +9,9 @@ use crate::platform::preferences_writer::{args_to_pairs, write as write_preferen
 use crate::platform::user_session::{get_console_user, launch_as_user};
 use crate::platform::DirectoryManager;
 
+const CONSOLE_USER_WAIT_TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(300);
+const CONSOLE_USER_POLL_INTERVAL: tokio::time::Duration = tokio::time::Duration::from_secs(5);
+
 pub struct GuiAppToolUpdater {
     deps: ToolUpdaterDeps,
 }
@@ -154,11 +157,16 @@ impl ToolUpdater for GuiAppToolUpdater {
             anyhow::bail!("Expected GuiApp installation type");
         };
 
+        let wait_start = tokio::time::Instant::now();
         let user = loop {
             if let Some(u) = get_console_user() {
                 break u;
             }
-            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            if wait_start.elapsed() >= CONSOLE_USER_WAIT_TIMEOUT {
+                error!(tool_id = %tool_agent_id, "No console user found after {:?}, giving up on GUI app restart", CONSOLE_USER_WAIT_TIMEOUT);
+                return Ok(());
+            }
+            tokio::time::sleep(CONSOLE_USER_POLL_INTERVAL).await;
         };
 
         if let Some(bid) = bundle_id {
@@ -240,3 +248,4 @@ impl ToolUpdater for GuiAppToolUpdater {
 #[cfg(test)]
 #[path = "gui_app_tests.rs"]
 mod tests;
+

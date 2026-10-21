@@ -34,12 +34,19 @@ public class ScheduleScriptExecutionService {
 
         log.info("Found {} due script schedule(s) — running", due.size());
         for (ScheduleScript schedule : due) {
+            boolean dispatched = false;
             try {
                 fireDispatcher.dispatch(schedule, now);
                 schedule.setLastRunAt(now);
+                dispatched = true;
             } catch (Exception e) {
-                log.error("Script schedule run failed scheduleId={} tenantId={} — advancing nextRunAt anyway",
+                log.error("Script schedule run failed scheduleId={} tenantId={} — dispatch did not succeed, nextRunAt will still advance to avoid a stuck schedule",
                         schedule.getId(), schedule.getTenantId(), e);
+            }
+            if (!dispatched) {
+                schedule.setLastRunFailed(true);
+            } else {
+                schedule.setLastRunFailed(false);
             }
             advanceAndSave(schedule, now);
         }
@@ -50,3 +57,4 @@ public class ScheduleScriptExecutionService {
         scheduleRepository.save(schedule);
     }
 }
+
