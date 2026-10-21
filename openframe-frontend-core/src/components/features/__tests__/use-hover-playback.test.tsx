@@ -12,12 +12,13 @@ const abortError = () =>
 function mediaElement(abortedPlays: number) {
   let left = abortedPlays;
   const element: MediaElement = { paused: true, pause: vi.fn() };
-  element.play = vi.fn(async () => {
+  element.play = vi.fn(() => {
     if (left > 0) {
       left -= 1;
-      throw abortError();
+      return Promise.reject(abortError());
     }
     element.paused = false;
+    return Promise.resolve();
   });
   return element;
 }
