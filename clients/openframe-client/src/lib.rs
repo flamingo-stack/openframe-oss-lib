@@ -803,11 +803,6 @@ impl Client {
             // Continue startup even if update handling fails - don't block the client
         }
 
-        // Commands cut short by the last stop are reported failed before any command listener takes new ones
-        if let Err(e) = self.result_store.recover_deliveries().await {
-            error!("Failed to recover interrupted commands: {:#}", e);
-        }
-
         self.feature_flags_listener.start().await?;
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {

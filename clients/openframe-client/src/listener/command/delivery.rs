@@ -31,6 +31,14 @@ impl Delivery {
         }
     }
 
+    pub(super) async fn recover(&self) {
+        match self.store.recover_deliveries().await {
+            Ok(0) => {}
+            Ok(_) => self.flush_notify.notify_one(),
+            Err(e) => error!("Failed to recover interrupted commands: {:#}", e),
+        }
+    }
+
     pub(super) async fn claim(
         &self,
         machine_id: &str,

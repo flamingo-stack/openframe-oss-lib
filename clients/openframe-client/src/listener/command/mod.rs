@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use serde::de::DeserializeOwned;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, OnceCell};
 use tokio::time::Duration;
 use tracing::{error, info};
 
@@ -99,6 +99,7 @@ pub struct CommandContext {
     config_service: AgentConfigurationService,
     restart: RestartGate,
     delivery: Delivery,
+    recovered: Arc<OnceCell<()>>,
 }
 
 impl CommandContext {
@@ -115,7 +116,13 @@ impl CommandContext {
             config_service,
             restart,
             delivery: Delivery::new(publisher, result_store, flush_notify),
+            recovered: Arc::new(OnceCell::new()),
         }
+    }
+
+    // commands cut short by the last stop are failed once, before any listener of this context subscribes
+    async fn recover_once(&self) {
+        self.recovered.get_or_init(|| self.delivery.recover()).await;
     }
 }
 
@@ -133,6 +140,7 @@ impl<H: CommandHandler> CommandListener<H> {
     pub async fn start(&self) -> Result<tokio::task::JoinHandle<()>> {
         let listener = self.clone();
         let handle = tokio::spawn(async move {
+            listener.context.recover_once().await;
             core_nats::report_restart_completion(&listener).await;
             loop {
                 info!(kind = H::KIND, "Starting command listener...");

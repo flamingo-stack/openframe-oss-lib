@@ -25,7 +25,7 @@ use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
-use crate::services::result_store::ResultStore;
+use crate::services::result_store::{DeliveryClaim, ResultStore};
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::{
@@ -206,11 +206,13 @@ impl Agent {
             .start()
             .await
             .unwrap();
+        // a probe id of its own, so a late answer to another listener's probe cannot pass for this one
+        let probe = format!("{PROBE}-{}", H::KIND);
         timeout(BOUND, async {
             loop {
-                self.send_to(H::subject(MACHINE), fake(PROBE, Some(0), "done"))
+                self.send_to(H::subject(MACHINE), fake(&probe, Some(0), "done"))
                     .await;
-                if timeout(Duration::from_millis(200), self.next_result(PROBE))
+                if timeout(Duration::from_millis(200), self.next_result(&probe))
                     .await
                     .is_ok()
                 {
@@ -870,4 +872,36 @@ async fn the_agent_is_removed_only_after_done_is_published() {
     agent.expect("u2", DeliveryResult::Failed).await;
     agent.expect_silence("u2").await;
     assert_eq!(handler.events_of("u2"), ["run:u2"]);
+}
+
+#[tokio::test]
+async fn a_command_cut_short_by_the_last_stop_is_failed_before_a_listener_subscribes() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let subject = format!("machine.{MACHINE}.delivery.result");
+    let cut = DeliveryRef {
+        delivery_type: "FAKE".to_string(),
+        target_id: "target".to_string(),
+        dispatch_id: "cut".to_string(),
+        sequence: None,
+    };
+    agent
+        .store
+        .delivery_claim(subject.clone(), cut.clone())
+        .await
+        .unwrap();
+
+    let handler = agent.launch_fake().await;
+
+    assert_eq!(
+        agent.store.delivery_claim(subject, cut).await.unwrap(),
+        DeliveryClaim::Resent
+    );
+    let failed = agent.expect("cut", DeliveryResult::Failed).await;
+    assert_eq!(
+        failed.error.as_deref(),
+        Some("interrupted by agent restart")
+    );
+    assert!(handler.runs().is_empty());
 }
