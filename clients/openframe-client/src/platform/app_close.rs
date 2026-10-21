@@ -1,7 +1,6 @@
 use tracing::warn;
 
-/// Windows: `CloseMainWindow` from the console user's session — the same message as the close
-/// button. A windowless (tray) app ignores it. Best effort: never fails the caller.
+/// Close-button message to each app from the console session; tray apps ignore it, best effort.
 #[cfg(target_os = "windows")]
 pub async fn ask_to_close(pids: &[u32]) {
     use crate::executor::{execute_script, Privilege, ScriptParams};

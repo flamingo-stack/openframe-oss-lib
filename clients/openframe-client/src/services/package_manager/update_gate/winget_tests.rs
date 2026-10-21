@@ -1,7 +1,6 @@
 use super::*;
 
-/// The identity script's output, captured on Windows 10 2026-10-15 for these ids;
-/// shortcuts trimmed to the ones under these packages, the profile path anonymised.
+/// Identity script output from Windows 10; shortcuts trimmed to these ids, profile path anonymised.
 const CAPTURED: &str = r#"{
   "shortcuts": [
     { "target": "C:\\Program Files\\DB Browser for SQLite\\DB Browser for SQLCipher.exe", "arguments": "" },

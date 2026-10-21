@@ -11,8 +11,7 @@ const INFO: &str = r#"HOMEBREW_NO_AUTO_UPDATE=1 "$BREW" info --json=v2 --cask "$
 
 const APPLICATIONS: &str = "/Applications";
 
-/// Artifact keys that put no app in place: command-line links and wrappers, fonts, man pages,
-/// completions, and the install and uninstall bookkeeping around them.
+/// Artifact keys that place no app: links, wrappers, fonts, man pages, completions, bookkeeping.
 const NO_APP_KEYS: &[&str] = &[
     "binary",
     "command_wrapper",
@@ -108,11 +107,7 @@ async fn run(names: &[String]) -> Result<Info, Undetermined> {
         .map_err(|e| Undetermined::Resolver(format!("unparseable output: {e}")))
 }
 
-/// The app's bundle is where brew put it (`target`, Homebrew 7), else `<applications>/<App>.app`.
-/// A cask without an app holds nothing when it only places files that do not run as an app;
-/// anything else it installs (a pkg, an installer script) is not known, so it is held.
-/// The main images are what sits directly in `<App>.app/Contents/MacOS`; nested helper
-/// bundles live elsewhere in the bundle and never match.
+/// The cask's app bundle and main images; NoApp for file-only casks, pkg and script casks unknown.
 fn identity(cask: &Cask, applications: &Path) -> Result<AppIdentity, Undetermined> {
     if cask.installed.is_none() {
         return Err(Undetermined::NotInstalled);
@@ -122,6 +117,7 @@ fn identity(cask: &Cask, applications: &Path) -> Result<AppIdentity, Undetermine
         .iter()
         .find(|artifact| artifact.contains_key("app"))
     else {
+        // File-only casks hold nothing; a pkg or an installer script is unknown, so it is held.
         let no_app = cask
             .artifacts
             .iter()
@@ -133,6 +129,7 @@ fn identity(cask: &Cask, applications: &Path) -> Result<AppIdentity, Undetermine
             Err(Undetermined::NoInstallLocation)
         };
     };
+    // Where brew put the bundle (target, Homebrew 7), else <applications>/<App>.app.
     let install_dir: PathBuf = match app.get("target").and_then(|target| target.as_str()) {
         Some(target) => PathBuf::from(target),
         None => applications.join(
@@ -142,6 +139,7 @@ fn identity(cask: &Cask, applications: &Path) -> Result<AppIdentity, Undetermine
         ),
     };
 
+    // Main images sit directly in Contents/MacOS; nested helper bundles never match.
     let mut names: Vec<String> = std::fs::read_dir(install_dir.join("Contents").join("MacOS"))
         .map(|entries| {
             entries

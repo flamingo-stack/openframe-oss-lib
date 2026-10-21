@@ -1,8 +1,6 @@
 use super::*;
 
-/// `brew info --json=v2 --cask` as Homebrew 7.0.9 printed it on macOS 26.2 (2026-10-16), with
-/// long lists trimmed. zoom is not installed on that machine; its `installed` is set by hand.
-/// fork's entry is the pre-`target` shape of older Homebrew.
+/// Homebrew 7.0.9 cask info, trimmed; zoom's installed field set by hand, fork pre-target shape.
 const CAPTURED: &str = r#"{"casks": [
  {"token": "klogg", "installed": "22.06.0.1289", "artifacts": [
    {"app": ["klogg.app"], "target": "/Applications/klogg.app"},
@@ -32,8 +30,7 @@ const CAPTURED: &str = r#"{"casks": [
  {"token": "fork", "installed": "2.59.2", "artifacts": [{"app": ["Fork.app"]}]}
 ]}"#;
 
-/// Where the identity puts the app, leaving out its main images: those come from whatever is
-/// installed on the machine running the test.
+/// The identity's app location without its main images, which depend on the test machine.
 fn located(identity: Result<AppIdentity, Undetermined>) -> Result<Option<PathBuf>, Undetermined> {
     identity.map(|identity| match identity {
         AppIdentity::NoApp => None,

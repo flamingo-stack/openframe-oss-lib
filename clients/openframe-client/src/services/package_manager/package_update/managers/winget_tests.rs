@@ -1,7 +1,6 @@
 use super::*;
 
-/// `OUTDATED_SCRIPT` output shape as captured on Windows 10 (ids 2026-10-16, versions added
-/// 2026-10-20); Rainmeter, with an inexact installed version, correctly absent.
+/// OUTDATED_SCRIPT output from Windows 10; Rainmeter is absent, its installed version is inexact.
 const CAPTURED: &str = r#"[{"id":"7zip.7zip","installed":"23.01","available":"24.09"},{"id":"ShareX.ShareX","installed":"16.1.0","available":"17.0.0"},{"id":"Git.Git","installed":"2.44.0","available":"2.47.1"},{"id":"SlackTechnologies.Slack","installed":"4.38.125","available":"4.41.105"}]
 "#;
 

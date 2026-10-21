@@ -2,9 +2,7 @@ use super::{AppIdentity, BlockReason, GateDecision, Holder, MainImages};
 use crate::platform::process_snapshot::RunningProcess;
 use std::path::Path;
 
-/// A process holds the package when it runs from under the install dir, is not a service,
-/// is a root instance (its parent runs another image), and — when main images are known —
-/// is one of them. Pure: no OS access.
+/// A holder runs under the install dir, is no service, is a root instance, is a main image if known.
 pub fn decide(identity: &AppIdentity, processes: &[RunningProcess]) -> GateDecision {
     let AppIdentity::App {
         install_dir,

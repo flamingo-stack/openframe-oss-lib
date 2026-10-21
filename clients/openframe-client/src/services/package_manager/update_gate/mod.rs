@@ -44,17 +44,6 @@ pub enum GateDecision {
     Blocked(BlockReason),
 }
 
-impl GateDecision {
-    pub fn holder_pids(&self) -> Vec<u32> {
-        match self {
-            GateDecision::Blocked(BlockReason::Running { holders }) => {
-                holders.iter().map(|h| h.pid).collect()
-            }
-            _ => Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BlockReason {
     Running {
@@ -78,14 +67,7 @@ pub enum Undetermined {
     Snapshot(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct GateResult {
-    pub package: PackageRef,
-    pub decision: GateDecision,
-}
-
-/// Identities resolved once — the expensive part — for answers taken later against a fresh
-/// process snapshot, so a verdict is current when an installer actually starts.
+/// Identities resolved once, the slow part; each verdict is taken later against a fresh snapshot.
 pub struct Prepared {
     identities: HashMap<PackageRef, Result<AppIdentity, Undetermined>>,
 }
@@ -127,18 +109,6 @@ pub async fn prepare(packages: &[PackageRef]) -> Prepared {
     Prepared {
         identities: packages.iter().cloned().zip(identities).collect(),
     }
-}
-
-pub async fn check(packages: &[PackageRef]) -> Vec<GateResult> {
-    let prepared = prepare(packages).await;
-    let processes = snapshot().await;
-    packages
-        .iter()
-        .map(|package| GateResult {
-            package: package.clone(),
-            decision: prepared.decide(package, &processes),
-        })
-        .collect()
 }
 
 async fn snapshot() -> Result<Vec<RunningProcess>, Undetermined> {

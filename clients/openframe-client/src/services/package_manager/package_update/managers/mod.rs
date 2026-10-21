@@ -6,6 +6,7 @@ mod winget;
 use crate::models::PackageRef;
 use crate::services::package_manager::ManagerId;
 
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
 const OUTDATED_TIMEOUT_SECS: u32 = 300;
 /// Also the longest a client self-update can wait for a running upgrade.
 pub(super) const UPGRADE_TIMEOUT_SECS: u32 = 900;

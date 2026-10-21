@@ -7,8 +7,7 @@ pub struct RunningProcess {
     pub image: PathBuf,
     /// `None` when the parent has exited or its image is not readable.
     pub parent_image: Option<PathBuf>,
-    /// Started by the service control manager. Always `false` off Windows: there every
-    /// app's parent is `launchd`, so the parent says nothing.
+    /// Started by the service control manager; always false off Windows, where parents tell nothing.
     pub is_service: bool,
 }
 

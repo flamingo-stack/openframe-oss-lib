@@ -606,9 +606,6 @@ impl Client {
             flush_notify.clone(),
         );
         let package_update = package_auto_update_enabled.then(|| {
-            for stale in ["package_policy.json", "package_update_state.json"] {
-                let _ = std::fs::remove_file(directory_manager.secured_dir().join(stale));
-            }
             let orders = Arc::new(OrderStore::load(
                 directory_manager.secured_dir().join("package_updates.json"),
             ));

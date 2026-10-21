@@ -240,8 +240,7 @@ fn identity(package: &Package, shortcuts: &[Shortcut]) -> Result<AppIdentity, Un
     })
 }
 
-/// The `.exe` a command line or an icon reference points at: `"C:\a b\x.exe" /S`,
-/// `C:\a\x.exe,0`. `msiexec` is not an app image.
+/// The .exe named by a command line or icon reference, quoted or with ,0; msiexec is no app.
 fn command_image(command: &str) -> Option<PathBuf> {
     let command = command.trim().trim_start_matches('"');
     let end = command.to_ascii_lowercase().find(".exe")? + ".exe".len();
@@ -249,8 +248,7 @@ fn command_image(command: &str) -> Option<PathBuf> {
     (file_name(&image)? != "msiexec.exe").then_some(image)
 }
 
-/// The main image a Start Menu shortcut launches, if it lies under `install_dir`.
-/// Squirrel shortcuts launch `Update.exe --processStart "App.exe"`.
+/// The shortcut's image under install_dir; for Squirrel, the --processStart argument of Update.exe.
 fn shortcut_image(shortcut: &Shortcut, install_dir: &Path) -> Option<String> {
     let target = Path::new(&shortcut.target);
     if !is_under(target, install_dir) {
@@ -276,8 +274,7 @@ fn file_name(path: &Path) -> Option<String> {
     Some(path.file_name()?.to_string_lossy().to_lowercase())
 }
 
-/// Rejects roots and shared locations: matching processes under them would block on
-/// unrelated apps.
+/// Rejects roots and shared locations, where matching processes would block on unrelated apps.
 fn is_app_dir(dir: &Path) -> bool {
     let lower = dir.to_string_lossy().to_ascii_lowercase();
     let lower = lower.trim_end_matches('\\');
