@@ -46,6 +46,7 @@ import { useNearViewport } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { VideoPlayBadge } from './video-center-badge';
 import type { FilePlayerProps } from './video-file-player';
@@ -167,8 +168,10 @@ function FilePlayer({
     return (
       <div className={cn('relative', props.className)} style={{ width: '100%', height: '100%' }}>
         <FilePlayerFallback poster={props.poster} className="absolute inset-0" priority={priority} />
-        <button
+        <Button
           type="button"
+          variant="glyph"
+          size="wrap"
           aria-label={title ? `Play: ${title}` : 'Play video'}
           onPointerEnter={loadFilePlayer}
           onFocus={loadFilePlayer}
@@ -177,13 +180,13 @@ function FilePlayer({
             loadFilePlayer();
             setPressed(true);
           }}
-          className="group absolute inset-0 m-0 flex cursor-pointer items-center justify-center border-0 bg-transparent p-0"
+          className="group absolute inset-0 rounded-none"
         >
           <VideoPlayBadge
             size="lg"
             className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
           />
-        </button>
+        </Button>
       </div>
     );
   }
