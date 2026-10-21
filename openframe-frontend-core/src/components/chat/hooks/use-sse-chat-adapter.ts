@@ -57,12 +57,14 @@ import { createSseFrameDecoder } from '../../../chat-protocol/decode';
 import type { ChatStreamEvent } from '../../../chat-protocol/events';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
 import type { ChatRef } from '../chat-ref.types';
 import { createChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatStreamReducerOptions } from '../stream/chat-stream-reducer';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
-import type { ChatSource, Message, MessageSegment } from '../types/message.types';
+import type { SlashCommandSummary } from '../types/component.types';
+import type { ChatSource, Message, MessageSegment, ScrollAnchor } from '../types/message.types';
 import type {
   ChatDialogCapabilities,
   FetchDialogsParams,
@@ -73,17 +75,11 @@ import type {
 import { createChatConversationStorage, pruneStaleChatConversationStorage } from '../utils/chat-conversation-storage';
 import { createChatConversationsApi } from '../utils/chat-conversations-api';
 import { buildDiscussPrompt } from '../utils/discuss-ref-prompt';
-import type { ScrollAnchor } from '../utils/scroll-anchor';
 import { sanitizeTitleForChat } from '../utils/slash-dispatch-utils';
 import type { WireCommandOverride } from '../utils/slash-dispatch-utils';
-import { defaultTableIdForDocumentType } from '../utils/source-icons';
 import { useChatHistoryHydration } from './use-chat-history-hydration';
 import { useManagedDialogList } from './use-managed-dialog-list';
-import { useSlashCommandRegistry, type SlashCommandSummary } from './use-slash-commands';
-
-// Canonical home of the per-turn meta row moved to the stream module in
-// Phase 3; re-exported here to keep the legacy import path stable.
-export type { ChatTurnMeta } from '../stream/chat-stream-reducer';
+import { useSlashCommandRegistry } from './use-slash-commands';
 
 // ─── Stable no-op references for the capabilities Guide mode never has ──
 // Plain module-scope constants so the adapter's return identity stays stable
@@ -121,11 +117,6 @@ const noopBumpMetaTick = (): void => {};
  *  hub-side platform-utils, not in lib). */
 export type DocSource = string;
 
-/** Re-export: `ChatSource` moved to `message.types` when the NATS transport
- *  started producing it too. Kept so existing `use-sse-chat-adapter` imports
- *  keep resolving. */
-export type { ChatSource };
-
 export interface DocChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -142,11 +133,6 @@ export interface DocChatMessage {
    *  NOT rendered in the chat UI. */
   hidden?: boolean;
 }
-
-// `StreamingPhase` is unified across transports — re-exported here to
-// preserve the legacy import path. Canonical home is now
-// `types/unified-chat-state.types.ts`.
-export type { StreamingPhase } from '../types/unified-chat-state.types';
 
 /**
  * Optional dependency-injection options for `useSseChatAdapter`.

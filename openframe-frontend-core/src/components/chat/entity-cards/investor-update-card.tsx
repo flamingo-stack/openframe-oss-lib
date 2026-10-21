@@ -11,24 +11,25 @@
 import { Calendar } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { formatInvestorUpdatePeriod, type InvestorUpdate } from '../types/entities/investor-update';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUBTITLE,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
-import { AdminContentCard } from './admin-content-card';
-import { CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
-import { EntityPortraitCard } from './entity-portrait-card';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
+import { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
+import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+
+/** The content-type chip a portrait investor update shows (a static label). */
+const INVESTOR_UPDATE_TYPE_LABEL = 'Investor Update';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -48,38 +49,46 @@ export interface InvestorUpdateCardProps {
   className?: string;
 }
 
-/** `portrait` shares the default skeleton shape (same zone boxes). */
-export function InvestorUpdateCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
-  if (size === 'sm') {
+/**
+ * An investor update card while it is read, one per density: `default` is the admin card's own skeleton (the card is
+ * an `AdminContentCard`), `portrait` the shared portrait skeleton with the static chip, `sm` the compact card's rows.
+ */
+export function InvestorUpdateCardSkeleton({
+  size = 'default',
+  showTypeBadge = true,
+  className,
+}: {
+  size?: 'default' | 'sm' | 'portrait';
+  /** `portrait`: the card shows the "Investor Update" chip. */
+  showTypeBadge?: boolean;
+  className?: string;
+}) {
+  if (size === 'portrait') {
     return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={`${COMPACT_CARD_TITLE_ROW} flex-nowrap gap-2`}>
-            <UnifiedSkeleton as="span" className="h-3.5 w-1/2 rounded" />
-            <UnifiedSkeleton as="span" className="h-4 w-8 shrink-0 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-1/3 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
-          </span>
-        </span>
-      </span>
+      <EntityPortraitCardSkeleton
+        typeLabel={showTypeBadge ? INVESTOR_UPDATE_TYPE_LABEL : undefined}
+        className={className}
+      />
     );
   }
-  return (
-    <div className={`h-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
-      <UnifiedSkeleton className="aspect-[1200/630]" />
-      <div className="space-y-3 p-4">
-        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
-        <UnifiedSkeleton className="h-3 w-full rounded" />
-        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
-        <UnifiedSkeleton className="h-4 w-1/3 rounded" />
+  if (size === 'default') {
+    return (
+      <div className={`block h-full ${className ?? ''}`}>
+        <AdminContentCardSkeleton actions={false} subtitleRow={false} />
       </div>
-    </div>
-  );
+    );
+  }
+  if (size === 'sm') {
+    return (
+      <CompactCardSkeleton
+        titleWidth="w-1/2"
+        titleBadges={['w-8']}
+        rows={[{ width: 'w-1/3' }, { width: 'w-11/12' }]}
+        className={className}
+      />
+    );
+  }
+  return null;
 }
 
 export function InvestorUpdateCard({
@@ -105,6 +114,9 @@ export function InvestorUpdateCard({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const coverImage = update.featured_image || placeholderUrl || null;
+  if (useLoadingScope()) {
+    return <InvestorUpdateCardSkeleton size={size} showTypeBadge={showTypeBadge} className={className} />;
+  }
 
   if (size === 'sm') {
     const periodText = formatInvestorUpdatePeriod(update.period_start, update.period_end);
@@ -164,7 +176,7 @@ export function InvestorUpdateCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel={showTypeBadge ? 'Investor Update' : undefined}
+        typeLabel={showTypeBadge ? INVESTOR_UPDATE_TYPE_LABEL : undefined}
         imageUrl={update.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={update.title ?? 'Investor update'}

@@ -4,6 +4,7 @@ import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState }
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { cn } from '../../utils/cn';
 import { PagePicture } from '../layout/page-picture';
+import { LoadingScope } from './loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 /** The widest content step: a product screen is drawn at this width and scaled to its frame. */
@@ -69,7 +70,8 @@ export function ProductScreenFrame({
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
   // Which layout the screen takes. `pending` until measured: the frame keeps its
-  // box and shows nothing, so the first paint is never the unscaled screen.
+  // box and the screen draws as its own loading state, so the first paint is
+  // never the unscaled real screen.
   // React holds only this (it changes at two widths); the scale itself changes
   // with every pixel of a resize, so it is written to a CSS variable on the
   // frame and never re-renders the screen.
@@ -115,14 +117,18 @@ export function ProductScreenFrame({
     >
       <PortalContainerContext.Provider value={portalHost}>
         <CollisionBoundaryContext.Provider value={frame}>
-          <div
-            inert
-            aria-hidden
-            className={cn('ods-content-area', mode === 'pending' && 'invisible')}
-            style={screenStyle}
-          >
+          <div inert aria-hidden className="ods-content-area" style={screenStyle}>
             <div className="ods-content-scope">
-              <PagePicture>{children}</PagePicture>
+              {/* Until measured (the server's HTML, a page without scripts) the screen is its own loading state: every
+                  component in it draws its skeleton, so the window shows the screen's shape instead of nothing, and
+                  the unscaled real screen is never painted. */}
+              {mode === 'pending' ? (
+                <LoadingScope bare>
+                  <PagePicture>{children}</PagePicture>
+                </LoadingScope>
+              ) : (
+                <PagePicture>{children}</PagePicture>
+              )}
             </div>
             <div ref={setPortalHost} style={{ display: 'contents' }} />
           </div>

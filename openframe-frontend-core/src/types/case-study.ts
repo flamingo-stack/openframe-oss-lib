@@ -2,12 +2,12 @@
 // Following the blog.ts pattern for consistency
 
 import type { BlogTag, TagAssoc } from './blog';
-import type { VideoTeaser, CustomerInterview } from './customer-interview';
+import type { CustomerInterview } from './customer-interview';
 import type { EntityPlatformAssoc } from './entity-platform';
 import type { PlatformRecord } from './platform';
 import type { MSP } from './stack';
 import type { UserProfile } from './user';
-import type { EntityQuote } from './video-processing';
+import type { VideoTeaser, EntityQuote } from './video-processing';
 
 /**
  * One headline number of a story ("50%" / "of routine tasks automated"). A

@@ -9,6 +9,7 @@ import { boxedPrimitivesPlugin } from './boxed-primitives.js';
 import { ignores } from './ignores.js';
 import { layoutVariantsPlugin } from './layout-variants.js';
 import { popupPortalPlugin } from './popup-portal.js';
+import { reExportsPlugin } from './re-exports.js';
 import { webviewPerformancePlugin } from './webview-performance.js';
 
 /** The rules this config ships itself, under one `flamingo/` namespace. */
@@ -19,6 +20,7 @@ export const flamingoPlugin = {
     ...layoutVariantsPlugin.rules,
     ...boxedPrimitivesPlugin.rules,
     ...popupPortalPlugin.rules,
+    ...reExportsPlugin.rules,
   },
 };
 

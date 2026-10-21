@@ -1,7 +1,7 @@
+import type { BlogTag, TagAssoc } from './blog';
 // Product Release Types
 // Following the blog.ts pattern for consistency
-
-import type { BlogTag, TagAssoc } from './blog';
+import type { DataSync } from './data-sync';
 import type { EntityAuthor } from './entity-author';
 import type { PlatformRecord } from './platform';
 import type { VideoTeaser, TranscriptWord, SpeakerMapping } from './video-processing';
@@ -245,6 +245,8 @@ export interface ProductReleaseFilters {
 export interface ProductReleaseListResponse {
   data: ProductRelease[];
   count: number;
+  /** Where the releases are mirrored from, when the host states it (the page's sync line). */
+  sync?: DataSync | null;
 }
 
 // GitHub Release interface (for wizard)

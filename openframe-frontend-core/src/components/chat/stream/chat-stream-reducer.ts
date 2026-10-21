@@ -50,7 +50,6 @@
  * approval segments.
  */
 
-import { escapeThinkingTags } from '../../../chat-protocol/decode';
 import { errorDetailsMessage } from '../../../chat-protocol/events';
 import {
   CHAT_OWNER_ADMIN,
@@ -60,6 +59,7 @@ import {
   type ParticipantEvent,
   type UsageEvent,
 } from '../../../chat-protocol/events';
+import { escapeThinkingTags } from '../../../chat-protocol/leading-frames';
 import type { ChatProgress } from '../../../chat-protocol/progress';
 import { mergeSourceMetadata, type SourceMetadata } from '../../../chat-protocol/source-metadata';
 import type {
@@ -72,6 +72,7 @@ import type {
   ToolExecutionSegment,
   ExecutingToolState,
 } from '../types';
+import type { ScrollAnchor } from '../types/message.types';
 import type { PendingApproval } from '../types/processing.types';
 import type {
   DialogTokenUsage,
@@ -85,7 +86,7 @@ import {
   createMessageSegmentAccumulator,
   type AccumulatorCallbacks,
 } from '../utils/message-segment-accumulator';
-import { parseScrollAnchor, type ScrollAnchor } from '../utils/scroll-anchor';
+import { parseScrollAnchor } from '../utils/scroll-anchor';
 import { getCommandText } from '../utils/tool-call-helpers';
 import {
   CONTENT_DEDUP_WINDOW,

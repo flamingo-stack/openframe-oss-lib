@@ -14,8 +14,6 @@ import type { TicketNote } from './ticket-note-card';
 import { TicketNotesSection } from './ticket-notes-section';
 import { TicketStatusTag, type TicketStatusTagOption } from './ticket-status-tag';
 
-export type { TicketAssigneeOption };
-
 export interface TicketInfoSectionProps {
   /** Organization name and image */
   organization?: {

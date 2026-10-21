@@ -13,8 +13,6 @@ import { TicketDetailSection } from '../../ui/ticket-detail-section';
 import { TruncateText } from '../../ui/truncate-text';
 import { KNOWLEDGE_BASE_STATUS_VARIANT, type KnowledgeBaseArticleStatus } from './knowledge-base-status';
 
-export type { KnowledgeBaseArticleStatus };
-
 export interface KnowledgeBaseArticleAuthor {
   /** Display name; null: "Unknown". */
   name: string | null;

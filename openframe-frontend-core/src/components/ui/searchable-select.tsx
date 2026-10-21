@@ -6,9 +6,23 @@ import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collisi
 import { cn } from '../../utils/cn';
 import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
 import { usePortalContainer } from './portal-container';
+
+/** An option's frame (a list row, or a tile in the grid), read by the options and by their loading state. */
+const SELECT_ROW_CLASS =
+  'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left';
+const SELECT_TILE_CLASS =
+  'flex min-w-0 flex-col items-center justify-center gap-[var(--spacing-system-xxs)] border-b border-r border-ods-border p-[var(--spacing-system-xs)]';
+/**
+ * Options the loading state draws (rows, or tiles in the grid layout) when its host states no `loadingRows`: a
+ * typical count. A host that reads its options with a limit passes that limit.
+ */
+const SELECT_LOADING_ROWS = 8;
+const SELECT_LOADING_TILES = 12;
 
 export interface SearchableSelectOption {
   value: string;
@@ -36,6 +50,8 @@ export interface SearchableSelectProps {
   emptyText?: string;
   loadingText?: string;
   isLoading?: boolean;
+  /** Options drawn while `isLoading`: the options the host reads (its limit). Default a typical count. */
+  loadingRows?: number;
   disabled?: boolean;
   /**
    * Custom trigger node (rendered via Popover.Trigger asChild). When omitted,
@@ -87,8 +103,9 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
     placeholder = 'Select...',
     searchPlaceholder = 'Search...',
     emptyText = 'No results found',
-    loadingText = 'Loading…',
+    loadingText = 'Loading options',
     isLoading = false,
+    loadingRows,
     disabled = false,
     trigger,
     id,
@@ -229,10 +246,24 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
               // bottom/right rule, so the grid needs no gap.
               isGrid ? 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))]' : 'py-[var(--spacing-system-xs)]',
             )}
-            role="listbox"
+            // A listbox owns options only: while they are read the box holds the loading region (a status and
+            // hidden rows), with no listbox role around it.
+            role={isLoading ? undefined : 'listbox'}
           >
             {isLoading ? (
-              <div className={statusClass}>{loadingText}</div>
+              // The options while they are read: the list's own rows (or tiles), a label bar each; `loadingText` is
+              // what a screen reader hears.
+              <LoadingRegion label={loadingText} className="contents">
+                {Array.from(
+                  { length: loadingRows ?? (isGrid ? SELECT_LOADING_TILES : SELECT_LOADING_ROWS) },
+                  (_, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+                    <div key={i} className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
+                      <TextLineSkeleton type={isGrid ? 'h6' : 'h4'} className={isGrid ? 'w-full' : 'w-2/3'} />
+                    </div>
+                  ),
+                )}
+              </LoadingRegion>
             ) : filtered.length === 0 ? (
               <div className={statusClass}>{emptyText}</div>
             ) : (
@@ -247,9 +278,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
                     onClick={() => handleSelect(opt.value)}
                     className={cn(
                       'transition-colors hover:bg-ods-bg-hover',
-                      isGrid
-                        ? 'flex min-w-0 flex-col items-center justify-center gap-[var(--spacing-system-xxs)] border-b border-r border-ods-border p-[var(--spacing-system-xs)]'
-                        : 'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
+                      isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS,
                       isSelected && 'bg-ods-bg-hover',
                     )}
                   >

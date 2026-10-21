@@ -6,13 +6,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { MessageSegment, ToolExecutionSegment } from '../../types';
-import type { UnifiedChatMessage } from '../../types/unified-chat-state.types';
 import {
   appendToTrailingAssistant,
   applyToolExecutionToMessages,
   upsertTrailingCompaction,
-} from '../use-nats-chat-adapter';
+} from '../../stream/message-mutations';
+import type { MessageSegment, ToolExecutionSegment } from '../../types';
+import type { UnifiedChatMessage } from '../../types/unified-chat-state.types';
 
 const assistant = (id: string, segments: MessageSegment[]): UnifiedChatMessage => ({
   id,

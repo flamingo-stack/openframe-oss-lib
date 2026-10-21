@@ -25,11 +25,14 @@
  */
 
 import Link from '../../../embed-shims/next-link';
+import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { type DeliveryItem, TASK_TYPE_LABELS, TASK_TYPE_TEXT_COLORS } from '../../../types/delivery';
 import { getStatusColorScheme } from '../../../utils';
 import { cn } from '../../../utils/cn';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack } from '../../ui/avatar-stack';
-import { StatusBadge } from '../../ui/status-badge';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { StatusBadge, StatusBadgeSkeleton } from '../../ui/status-badge';
 
 /** Same heuristic as DeliveryTable's local helper. Inlined so the row
  *  primitive owns its complete rendering contract. */
@@ -73,7 +76,21 @@ export interface DeliveryRowProps {
   className?: string;
 }
 
+/** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
+const ROW_INNER_CLASS =
+  'flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]';
+const ROW_TEXT_COLUMN_CLASS = 'flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]';
+const ROW_CAPTION_CLASS = 'text-ods-text-secondary text-h5';
+const ROW_TITLE_LINE_CLASS = `flex items-center text-h3 ${TEXT_LINES_MIN[1]}`;
+const ROW_SUBTITLE_LINE_CLASS = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
+const ROW_DESCRIPTION_LINE_CLASS = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
+const ROW_META_CLASS =
+  'flex w-full flex-shrink-0 flex-row items-center gap-2 self-stretch content-md:w-auto content-md:flex-col content-md:items-end content-md:self-start';
+const ROW_BASE_CLASS = 'block p-[12px] text-inherit no-underline transition-colors duration-150 content-md:p-[16px]';
+
 export function DeliveryRow({ item, href, target, caption, id, className }: DeliveryRowProps) {
+  // While the page is read the task is not known: the row is its skeleton.
+  if (useLoadingScope()) return <DeliveryRowSkeleton caption={caption} className={className} />;
   const taskType = item.taskType as keyof typeof TASK_TYPE_LABELS;
   const typeBadgeLabel = TASK_TYPE_LABELS[taskType] || 'TASK';
   const typeBadgeTextColor = TASK_TYPE_TEXT_COLORS[taskType] || '';
@@ -82,16 +99,16 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
   const subtitle = `ACTIVE ${relativeTime}${item.listNames.length > 0 ? `, ${item.listNames.join(', ')}` : ''}, ${item.id}`;
 
   const inner = (
-    <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
+    <div className={ROW_INNER_CLASS}>
       {/* Left: caption (optional) + title + subtitle + description */}
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
-        {caption && <p className="text-ods-text-secondary text-h5">{caption}</p>}
-        <div className="flex min-h-[24px] items-center content-md:min-h-[24px]">
+      <div className={ROW_TEXT_COLUMN_CLASS}>
+        {caption && <p className={ROW_CAPTION_CLASS}>{caption}</p>}
+        <div className={ROW_TITLE_LINE_CLASS}>
           <h3 className="line-clamp-2 flex-1 break-words tracking-[-0.36px] text-ods-text-primary text-h3 content-md:truncate">
             {item.title}
           </h3>
         </div>
-        <div className="flex min-h-[20px] items-center">
+        <div className={ROW_SUBTITLE_LINE_CLASS}>
           {/* Relative time is wall-clock-derived: on an SSR host the server and
               client render different strings a moment apart — text-only, so
               suppress instead of forcing a client-only render. */}
@@ -99,7 +116,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
             {subtitle}
           </p>
         </div>
-        <div className="flex min-h-[72px] items-center">
+        <div className={ROW_DESCRIPTION_LINE_CLASS}>
           <p className="line-clamp-3 break-words text-ods-text-secondary text-h4">
             {item.description || 'No description provided'}
           </p>
@@ -112,7 +129,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
           assignee owns the trailing slot of the meta row; a column of
           right-aligned orphans under the description reads as clutter
           on small screens). */}
-      <div className="flex w-full flex-shrink-0 flex-row items-center gap-2 self-stretch content-md:w-auto content-md:flex-col content-md:items-end content-md:self-start">
+      <div className={ROW_META_CLASS}>
         <StatusBadge
           text={item.status.toUpperCase()}
           colorScheme={statusBadgeScheme}
@@ -140,7 +157,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
   );
 
   const baseClass = cn(
-    'block p-[12px] text-inherit no-underline transition-colors duration-150 content-md:p-[16px]',
+    ROW_BASE_CLASS,
     // `scroll-mt-24` is paid for whether `id` is set or not (it's a
     // single Tailwind utility, no runtime cost). Keeping it
     // unconditional means a future caller adding `id` doesn't also
@@ -175,6 +192,35 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
   return (
     <div id={id} className={baseClass}>
       {inner}
+    </div>
+  );
+}
+
+/**
+ * A delivery row while its task is read: the same row, its caption for real, the title, subtitle and description
+ * as bars at their type steps, and the two badges as their skeletons.
+ */
+export function DeliveryRowSkeleton({ caption, className }: Pick<DeliveryRowProps, 'caption' | 'className'>) {
+  return (
+    <div className={cn(ROW_BASE_CLASS, 'scroll-mt-24', className)} aria-hidden>
+      <div className={ROW_INNER_CLASS}>
+        <div className={ROW_TEXT_COLUMN_CLASS}>
+          {caption && <p className={ROW_CAPTION_CLASS}>{caption}</p>}
+          <div className={ROW_TITLE_LINE_CLASS}>
+            <TextLineSkeleton type="h3" className="w-3/5" />
+          </div>
+          <div className={ROW_SUBTITLE_LINE_CLASS}>
+            <TextLineSkeleton type="h5" className="w-2/5" />
+          </div>
+          <div className={ROW_DESCRIPTION_LINE_CLASS}>
+            <TextLineSkeleton type="h4" lines={2} className="w-full" />
+          </div>
+        </div>
+        <div className={ROW_META_CLASS}>
+          <StatusBadgeSkeleton variant="card" />
+          <StatusBadgeSkeleton variant="card" />
+        </div>
+      </div>
     </div>
   );
 }

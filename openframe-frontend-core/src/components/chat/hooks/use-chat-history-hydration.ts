@@ -20,8 +20,8 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { isRecord, unwrapEnvelope } from '../../../chat-protocol/wire-narrow';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import type { Message } from '../types/message.types';
 import { AUTO_CONTINUATION_DIRECTIVE_PREFIX } from '../utils/auto-continuation-directive';
-import type { Message } from './use-chat';
 
 export interface UseChatHistoryHydrationArgs {
   /** Mirrors the adapter's `active` gate — an idle (Mingo-mode) mount never fetches. */

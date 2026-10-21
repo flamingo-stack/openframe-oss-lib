@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { MOBILE_NAV_SHEET_ID, MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
+import { MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
+import { MOBILE_NAV_SHEET_ID } from '../components/navigation/mobile-nav-sheet-id';
 import { SiteFooter } from '../components/navigation/site-footer';
 import { SiteHeader } from '../components/navigation/site-header';
 import { adminNav, simpleNav, siteNav } from '../stories/site-nav-fixtures';

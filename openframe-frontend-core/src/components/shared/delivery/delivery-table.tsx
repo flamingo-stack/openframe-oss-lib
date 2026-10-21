@@ -20,46 +20,29 @@
 import type { DeliveryItem } from '../../../types/delivery';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
-import { DeliveryRow } from './delivery-row';
+import { DeliveryRow, DeliveryRowSkeleton } from './delivery-row';
 
 interface DeliveryTableProps {
   items: DeliveryItem[];
   isLoading?: boolean;
 }
 
-/**
- * Skeleton loader for rows - matching responsive structure
- */
-function SkeletonRow() {
-  return (
-    <div className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]">
-      <div className="flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]">
-        {/* Left: Title, subtitle, and description skeleton */}
-        <div className="flex w-full min-w-0 flex-1 flex-col gap-[12px] content-md:w-auto content-md:gap-[16px]">
-          {/* Title skeleton - responsive */}
-          <div className="flex min-h-[24px] items-center">
-            <UnifiedSkeleton className="h-[20px] w-full rounded" />
-          </div>
-          {/* Subtitle skeleton - 1 line */}
-          <div className="flex min-h-[20px] items-center">
-            <UnifiedSkeleton className="h-[20px] w-1/2 rounded" />
-          </div>
-          {/* Description skeleton - 3 lines */}
-          <div className="flex min-h-[72px] items-center">
-            <div className="flex-1 space-y-1">
-              <UnifiedSkeleton className="h-[20px] w-full rounded" />
-              <UnifiedSkeleton className="h-[20px] w-full rounded" />
-              <UnifiedSkeleton className="h-[20px] w-2/3 rounded" />
-            </div>
-          </div>
-        </div>
+/** The card's frame and a row's separator, read by the table and by its skeleton. */
+const TABLE_FRAME_CLASS = `w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`;
+const ROW_SEPARATOR_CLASS = 'border-b border-ods-border last:border-b-0';
+/** How many rows the skeleton draws (the table's first fold). */
+export const DELIVERY_TABLE_SKELETON_ROWS = 5;
 
-        {/* Right: Badge skeleton - two stacked badges */}
-        <div className="flex flex-shrink-0 flex-col gap-2 self-start">
-          <UnifiedSkeleton className="h-[32px] w-[100px] rounded" />
-          <UnifiedSkeleton className="h-[32px] w-[120px] rounded" />
-        </div>
+/** The table while its tasks are read: the same card, `DELIVERY_TABLE_SKELETON_ROWS` row skeletons. */
+export function DeliveryTableSkeleton() {
+  return (
+    <div className={TABLE_FRAME_CLASS} aria-hidden>
+      <div className="w-full">
+        {Array.from({ length: DELIVERY_TABLE_SKELETON_ROWS }, (_, i) => (
+          <div key={i} className={ROW_SEPARATOR_CLASS}>
+            <DeliveryRowSkeleton />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -71,29 +54,19 @@ function SkeletonRow() {
  */
 export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) {
   // Show skeletons while loading
-  if (isLoading) {
-    return (
-      <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
-        <div className="w-full">
-          {[1, 2, 3, 4, 5].map(i => (
-            <SkeletonRow key={i} />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <DeliveryTableSkeleton />;
 
   // Empty state
   if (items.length === 0) {
     return (
-      <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS} p-[var(--spacing-system-xlf)] text-center`}>
+      <div className={`${TABLE_FRAME_CLASS} p-[var(--spacing-system-xlf)] text-center`}>
         <p className="text-ods-text-secondary text-h6">No tasks available</p>
       </div>
     );
   }
 
   return (
-    <div className={`w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`}>
+    <div className={TABLE_FRAME_CLASS}>
       <div className="w-full">
         {items.map(item => (
           // DOM id lives on DeliveryRow's own outer element (no wrapper
@@ -101,7 +74,7 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
           // → `#delivery-<external_id>`; `useScrollToHash` in
           // `delivery-lists.tsx` finds the row by id and scrolls. The
           // outer wrapper here ONLY exists for the row separators.
-          <div key={item.id} className="border-b border-ods-border last:border-b-0">
+          <div key={item.id} className={ROW_SEPARATOR_CLASS}>
             <DeliveryRow item={item} id={devSectionAnchorId('delivery', item.id)} />
           </div>
         ))}

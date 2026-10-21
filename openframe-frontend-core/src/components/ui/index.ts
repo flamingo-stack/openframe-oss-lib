@@ -65,6 +65,9 @@ export * from './badge';
 export * from './ai-generated-badge';
 export * from './fade-preview';
 export * from './layout-hold';
+export * from './skeleton-surface';
+export * from './input-styles';
+export * from './loading-scope';
 export * from './progress';
 export * from './release-changelog-section';
 export * from './stacked-rows-panel';
@@ -127,6 +130,8 @@ export * from './avatar-stack';
 export * from './people-cell';
 export * from './deleted-user-avatar';
 export * from './square-avatar';
+// THE sizes of the library's components (avatars, icons, tiles, media, text rows).
+export * from '../../styles/component-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';
@@ -181,7 +186,7 @@ export type {
 } from './query-report-table';
 
 // Pagination components
-export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
+export { CursorPagination, CursorPaginationSimple, CursorPaginationSkeleton } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 
 // DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
@@ -253,3 +258,18 @@ export * from './super-user-banner-view';
 export { RequiredMark } from './required-mark';
 export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';
+export type { DateRange } from 'react-day-picker';
+export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from '../layout/title-block';
+export type { TitleBlockProps, TitleSkeletonLines } from '../layout/title-block';
+export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
+export {
+  ORGANIZATION_CARD_RADIUS_CLASS,
+  ORGANIZATION_CARD_LAYOUT_CLASS,
+  ORGANIZATION_CARD_SURFACE_CLASS,
+  ORGANIZATION_CARD_HEADER_CLASS,
+  ORGANIZATION_CARD_TEXT_CLASS,
+  ORGANIZATION_CARD_DESCRIPTION_CLASS,
+  ORGANIZATION_CARD_FOOTER_CLASS,
+  ORGANIZATION_CARD_STATS_CLASS,
+  ORGANIZATION_CARD_STAT_CLASS,
+} from '../loading/organization-card-skeleton';

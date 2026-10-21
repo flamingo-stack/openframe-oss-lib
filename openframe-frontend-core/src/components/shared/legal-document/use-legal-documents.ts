@@ -14,6 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import { contentFetch } from '../../../utils/embed-content-fetch';
+import { useLoadingScope } from '../../ui/loading-scope';
 
 export interface LegalDocumentSummary {
   /** The identifier `useLegalDocs` and `<LegalDocumentPage>` take. */
@@ -81,7 +82,9 @@ export function toLegalDocumentSummaries(payload: unknown): LegalDocumentSummary
 
 export function useLegalDocuments(options: UseLegalDocumentsOptions = {}): UseLegalDocumentsReturn {
   const endpoint = options.apiEndpoint ?? '/api/legal';
-  const enabled = options.enabled ?? true;
+  // In a loading scope nothing is fetched.
+  const held = useLoadingScope();
+  const enabled = (options.enabled ?? true) && !held;
   const [state, setState] = useState<UseLegalDocumentsReturn>({ documents: [], isLoading: enabled, error: null });
 
   useEffect(() => {
