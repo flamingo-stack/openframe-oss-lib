@@ -13,7 +13,6 @@ use crate::services::update_cleanup_service::UpdateCleanupService;
 use crate::services::update_state_service::UpdateStateService;
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::sync::Notify;
 use tracing::{info, warn};
 
 const ERROR_INTERRUPTED_BEFORE_LAUNCH: &str =
@@ -28,11 +27,9 @@ pub struct UpdateHandlerService {
     installed_agent_publisher: InstalledAgentMessagePublisher,
     config_service: AgentConfigurationService,
     result_store: Arc<ResultStore>,
-    flush_notify: Arc<Notify>,
 }
 
 impl UpdateHandlerService {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         state_service: UpdateStateService,
         client_info_service: OpenFrameClientInfoService,
@@ -41,7 +38,6 @@ impl UpdateHandlerService {
         installed_agent_publisher: InstalledAgentMessagePublisher,
         config_service: AgentConfigurationService,
         result_store: Arc<ResultStore>,
-        flush_notify: Arc<Notify>,
     ) -> Self {
         Self {
             state_service,
@@ -51,7 +47,6 @@ impl UpdateHandlerService {
             installed_agent_publisher,
             config_service,
             result_store,
-            flush_notify,
         }
     }
 
@@ -281,7 +276,6 @@ impl UpdateHandlerService {
         if settled.is_empty() {
             return;
         }
-        self.flush_notify.notify_one();
         info!(
             settled = settled.len(),
             ?result,

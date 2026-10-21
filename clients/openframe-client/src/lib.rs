@@ -472,7 +472,6 @@ impl Client {
             installed_agent_message_publisher.clone(),
             config_service.clone(),
             result_store.clone(),
-            flush_notify.clone(),
         );
 
         // Initialize tool installation service

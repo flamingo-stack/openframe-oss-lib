@@ -168,6 +168,7 @@ async fn handle<H: CommandHandler>(
             error!(kind = H::KIND, dispatch_id = %dispatch_id, "Command failed: {}", reason)
         }
     }
+    // a restarting command records its sequence when the next start settles it done
     if H::SEQUENCED && matches!(outcome, Outcome::Done | Outcome::RestartRequired) {
         context.delivery.record_applied(machine_id, &delivery).await;
     }
