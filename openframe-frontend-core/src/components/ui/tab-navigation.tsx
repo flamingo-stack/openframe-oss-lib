@@ -673,7 +673,22 @@ export function TabNavigationSkeleton({
   );
 }
 
-export function TabNavigation({
+/**
+ * Only a URL-synced bar reads the URL. `useSearchParams()` in a component makes Next render the whole page in the
+ * browser when it is prerendered (or fail the build without a Suspense boundary), so a page whose tabs are plain
+ * controlled state (`urlSync` off, the default) must not call it: that is what kept every page with a tab strip
+ * (the flamingo homepage) from being served from a CDN (CU-17tkuw5xp4q). `urlSync` is fixed per bar; switching it
+ * remounts the bar.
+ */
+export function TabNavigation(props: TabNavigationProps) {
+  return props.urlSync ? <UrlSyncedTabNavigation {...props} /> : <TabNavigationBody {...props} searchParams={null} />;
+}
+
+function UrlSyncedTabNavigation(props: TabNavigationProps) {
+  return <TabNavigationBody {...props} searchParams={useSearchParams()} />;
+}
+
+function TabNavigationBody({
   activeTab: controlledActiveTab,
   onTabChange: controlledOnTabChange,
   tabs,
@@ -693,12 +708,12 @@ export function TabNavigation({
   skeletonAvatar,
   skeletonSublabel,
   children,
-}: TabNavigationProps) {
+  searchParams,
+}: TabNavigationProps & { searchParams: ReturnType<typeof useSearchParams> | null }) {
   const providedVariant = useContext(TabNavigationVariantContext);
   const variant = variantProp ?? providedVariant;
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // Determine URL sync settings
   const isUrlSyncEnabled = !!urlSync;

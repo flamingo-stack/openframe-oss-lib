@@ -25,7 +25,7 @@
 
 import type React from 'react';
 import Image from '../../embed-shims/next-image';
-import { AVATAR_SIZE } from '../../styles/component-sizes';
+import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import type { AuthorProfile } from '../../types/entity-author';
 import { cn } from '../../utils/cn';
 import { formatBioText } from '../../utils/format';
@@ -77,7 +77,15 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
           ) : (
             <div className="relative h-full w-full overflow-hidden rounded-full border border-ods-border bg-ods-bg-surface">
               {proxiedAvatar ? (
-                <Image src={proxiedAvatar} alt={author.fullName} fill className="object-cover" unoptimized />
+                <Image
+                  src={proxiedAvatar}
+                  alt={author.fullName}
+                  fill
+                  // The frame's size, so a host that resizes serves a 96 px picture, not the 2500 px original.
+                  sizes={`${AVATAR_SIZE_PX.profile}px`}
+                  className="object-cover"
+                  unoptimized
+                />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-ods-text-secondary text-h2">
                   {author.fullName.charAt(0).toUpperCase()}

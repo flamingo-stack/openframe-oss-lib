@@ -585,6 +585,11 @@ export interface RelatedCardContext {
   anchorAttrs: Pick<CardLinkAnchorProps, 'target' | 'rel'>;
   /** Branded OG fallback for cards whose row has no featured image. */
   placeholderUrl?: string;
+  /**
+   * The rail's first card: its image is likely the page's largest paint (an author page opens on it), so a card that
+   * can rank its image fetches it at once instead of lazily.
+   */
+  priority?: boolean;
   extras?: ChatCardDispatchExtras;
 }
 
@@ -647,6 +652,7 @@ function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRe
           href={ctx.href}
           targetPlatform={ctx.targetPlatform}
           placeholderUrl={ctx.placeholderUrl}
+          priority={ctx.priority}
           {...ctx.anchorAttrs}
         />
       );
@@ -686,6 +692,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
         href={ctx.href}
         targetPlatform={ctx.targetPlatform}
         placeholderUrl={ctx.placeholderUrl}
+        priority={ctx.priority}
         {...ctx.anchorAttrs}
       />
     ),

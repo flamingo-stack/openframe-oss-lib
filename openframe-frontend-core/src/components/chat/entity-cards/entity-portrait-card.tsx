@@ -85,6 +85,8 @@ export interface EntityPortraitCardProps {
   /** Typography override for the title (entity identity), zone box unchanged. */
   titleClassName?: string;
   person?: EntityPortraitPerson | null;
+  /** The card's picture is likely the page's largest paint: fetch it at once and ranked high, not lazily. */
+  priority?: boolean;
   className?: string;
   /** The record is still being read: the card draws its skeleton (the same three zones, the chip real). A loading
    *  scope does the same. */
@@ -102,6 +104,7 @@ export function EntityPortraitCard({
   title,
   titleClassName,
   person,
+  priority,
   className,
   loading: loadingProp,
 }: EntityPortraitCardProps) {
@@ -144,6 +147,7 @@ export function EntityPortraitCard({
               className={cn('h-full w-full', isWide === false ? 'object-contain' : 'object-cover')}
               sizes="(min-width: 800px) 400px, 100vw"
               fill
+              priority={priority}
               unoptimized
               onLoad={onMediaLoad}
               onError={onMediaError}

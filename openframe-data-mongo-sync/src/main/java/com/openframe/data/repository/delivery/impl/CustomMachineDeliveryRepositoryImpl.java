@@ -4,6 +4,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
@@ -18,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -27,6 +29,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_TYPE = "type";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
@@ -46,10 +49,34 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         super(mongoTemplate);
     }
 
-    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
     @Override
     public List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit) {
         Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    @Override
+    public List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
+        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).in(types).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    @Override
+    public List<MachineDelivery> findDueExcept(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
+        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).nin(types).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    // primary on purpose: a receiver that reports by key does so milliseconds after the row was written
+    @Override
+    public Optional<MachineDelivery> findByIdOnPrimary(String id) {
+        Query query = new Query(Criteria.where(FIELD_ID).is(id)).withReadPreference(ReadPreference.primary());
+        MachineDelivery row = mongoTemplate.findOne(query, MachineDelivery.class);
+        return Optional.ofNullable(row);
+    }
+
+    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
+    private List<MachineDelivery> findDue(Criteria due, int limit) {
         Query query = new Query(due)
                 .with(OLDEST_DUE_FIRST)
                 .limit(limit)

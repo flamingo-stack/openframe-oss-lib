@@ -1,6 +1,7 @@
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { mockPush, mockReplace, setMockSearchParams } from '../../../../vitest.setup';
+import { mockPush, mockReplace, mockSearchParams, setMockSearchParams } from '../../../../vitest.setup';
+import { registerNavigation } from '../../../embed-shims/next-navigation';
 import {
   TabNavigation,
   TabNavigationVariantProvider,
@@ -299,5 +300,23 @@ describe('TabNavigation with urlSync', () => {
       expect(strip().open.className).toContain('bg-gradient-to-b');
       expect(screen.getByRole('button', { name: 'Own Variant' }).className).not.toContain('bg-gradient-to-b');
     });
+  });
+});
+
+describe('which bars read the URL', () => {
+  // A bar that reads the URL makes Next render its whole page in the browser when the page is prerendered, so a
+  // page with a plain controlled tab strip could not be served from a CDN (CU-17tkuw5xp4q).
+  it('only a URL-synced bar calls useSearchParams', () => {
+    const read = vi.fn(() => mockSearchParams);
+    registerNavigation({ useSearchParams: read });
+    try {
+      const { unmount } = render(<TabNavigation tabs={TABS} activeTab="general" onTabChange={() => {}} />);
+      expect(read).not.toHaveBeenCalled();
+      unmount();
+      render(<TabNavigation tabs={TABS} urlSync />);
+      expect(read).toHaveBeenCalled();
+    } finally {
+      registerNavigation({ useSearchParams: () => mockSearchParams });
+    }
   });
 });

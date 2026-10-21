@@ -8,6 +8,7 @@ import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { ScrollShadow } from '../ui/scroll-fade';
 import { ASK_PROMPTS_DEFAULT_COUNT } from './hooks/use-ask-prompts';
 import { QuickActionChipButton, type QuickActionIconSpec } from './quick-action-chip';
+import { ASK_AI_TRIGGER_ATTRIBUTE } from './utils/ask-ai-events';
 
 /** One question a page offers: the chip shows `label` as written, the chat is sent `prompt`. */
 export interface AskPrompt {
@@ -106,7 +107,11 @@ function QuestionChips({
       {slot => {
         const prompt = loading ? undefined : prompts[slot];
         return (
-          <span data-loading-item className={slotClassName ?? CHIP_SLOT_CLASS}>
+          <span
+            data-loading-item
+            className={slotClassName ?? CHIP_SLOT_CLASS}
+            {...(prompt ? { [ASK_AI_TRIGGER_ATTRIBUTE]: '' } : {})}
+          >
             {(loading || prompt) && (
               <QuickActionChipButton
                 loading={loading}

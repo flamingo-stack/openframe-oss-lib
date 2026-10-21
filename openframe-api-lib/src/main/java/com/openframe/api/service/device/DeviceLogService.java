@@ -25,7 +25,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -54,16 +53,6 @@ import static java.util.stream.Collectors.toSet;
 @ConditionalOnProperty(name = "openframe.loki.enabled", havingValue = "true")
 public class DeviceLogService {
 
-    static final Duration DEFAULT_LOOKBACK = Duration.ofDays(7);
-    /**
-     * A whole tenant produces far more lines than one device, so an unbounded query defaults to a shorter window.
-     */
-    static final Duration DEFAULT_TENANT_LOOKBACK = Duration.ofDays(1);
-    static final Duration MAX_RANGE = Duration.ofDays(30);
-    static final int MAX_DEVICES = 50;
-    static final int MAX_ORGANIZATIONS = 50;
-    static final int MAX_SEARCH_LENGTH = 256;
-    static final int MAX_SEARCH_TERMS = 5;
     static final int DEFAULT_PAGE_SIZE = 100;
     static final int MAX_PAGE_SIZE = 500;
     // Loki's max_entries_limit_per_query on prod
@@ -71,7 +60,7 @@ public class DeviceLogService {
 
     private static final String AGENT_LOGS_JOB = "agent-logs";
     private static final String CASE_INSENSITIVE = "(?i)";
-    private static final long NANOS_PER_SECOND = 1_000_000_000L;
+    private static final DeviceLogArgumentContract ARGUMENT_CONTRACT = new DeviceLogArgumentContract();
 
     private final LokiClient lokiClient;
     private final DeviceService deviceService;
@@ -86,7 +75,6 @@ public class DeviceLogService {
     public GenericQueryResult<DeviceLogEntry> queryDeviceLogs(String machineId,
                                                               DeviceLogFilterCriteria filter,
                                                               CursorPaginationCriteria pagination) {
-        // singletonList, not List.of: a null id must reach validateDevices and come back as a 400, not an NPE
         return queryLogs(Collections.singletonList(machineId), filter, pagination);
     }
 
@@ -118,25 +106,21 @@ public class DeviceLogService {
                                                         List<String> organizationIds,
                                                         DeviceLogFilterCriteria filter,
                                                         CursorPaginationCriteria pagination) {
-        List<String> devices = validateDevices(machineIds);
-        List<String> organizations = validateOrganizations(organizationIds);
+        List<String> devices = ARGUMENT_CONTRACT.normalizeMachineIds(machineIds);
+        List<String> organizations = ARGUMENT_CONTRACT.normalizeOrganizationIds(organizationIds);
         verifyDevicesExist(devices);
         verifyOrganizationsExist(organizations);
 
         DeviceLogFilterCriteria criteria = filter != null ? filter : new DeviceLogFilterCriteria();
         CursorPaginationCriteria page = pagination != null ? pagination : new CursorPaginationCriteria();
-        DeviceLogCursor after = DeviceLogCursor.fromRaw(page.getCursor());
-        validateSearch(criteria);
-
-        Instant to = criteria.getTo() != null ? criteria.getTo() : Instant.now();
-        Duration lookback = devices.isEmpty() ? DEFAULT_TENANT_LOOKBACK : DEFAULT_LOOKBACK;
-        Instant from = criteria.getFrom() != null ? criteria.getFrom() : to.minus(lookback);
-        validateRange(from, to);
-
-        long startNanos = toNanos(from);
-        // Loki's end is exclusive: 1 ns past the inclusive upper bound, or the cursor's timestamp itself, whose lines
-        // the previous page returned in full
-        long endNanos = toNanos(to) + 1;
+        DeviceLogQueryArguments arguments = queryArguments(machineIds, organizationIds, criteria, page);
+        Instant now = Instant.now();
+        DeviceLogArgumentContract.PreparedQuery prepared = ARGUMENT_CONTRACT.prepare(arguments, now);
+        Instant from = prepared.from();
+        Long cursorNanos = prepared.cursorNanos();
+        DeviceLogCursor after = cursorNanos == null ? null : new DeviceLogCursor(cursorNanos);
+        long startNanos = prepared.startNanos();
+        long endNanos = prepared.endNanos();
         if (after != null) {
             if (after.timestampNanos() <= startNanos) {
                 return result(List.of(), false, true);
@@ -245,40 +229,14 @@ public class DeviceLogService {
         }
     }
 
-    /**
-     * A null list means every device of the tenant. A list that is present but holds no usable id is rejected instead:
-     * it is far more likely a client that failed to load its device picker than a deliberate tenant-wide query.
-     */
-    private static List<String> validateDevices(List<String> machineIds) {
-        if (machineIds == null) {
-            return List.of();
-        }
-        List<String> devices = machineIds.stream().filter(StringUtils::hasText).distinct().toList();
-        if (devices.isEmpty()) {
-            throw new IllegalArgumentException("machineIds must name at least one device; omit it to query every device");
-        }
-        if (devices.size() > MAX_DEVICES) {
-            throw new IllegalArgumentException("Cannot query more than " + MAX_DEVICES + " devices at once");
-        }
-        return devices;
-    }
-
-    /**
-     * Same rules as devices: null means no organization filter, a present list without a usable id is rejected.
-     */
-    private static List<String> validateOrganizations(List<String> organizationIds) {
-        if (organizationIds == null) {
-            return List.of();
-        }
-        List<String> organizations = organizationIds.stream().filter(StringUtils::hasText).distinct().toList();
-        if (organizations.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "organizationIds must name at least one organization; omit it to query every organization");
-        }
-        if (organizations.size() > MAX_ORGANIZATIONS) {
-            throw new IllegalArgumentException("Cannot query more than " + MAX_ORGANIZATIONS + " organizations at once");
-        }
-        return organizations;
+    private static DeviceLogQueryArguments queryArguments(List<String> machineIds, List<String> organizationIds,
+                                                          DeviceLogFilterCriteria criteria, CursorPaginationCriteria page) {
+        List<String> contains = criteria.getContains();
+        List<String> excludes = criteria.getExcludes();
+        Instant from = criteria.getFrom();
+        Instant to = criteria.getTo();
+        String cursor = page.getCursor();
+        return new DeviceLogQueryArguments(machineIds, organizationIds, contains, excludes, from, to, cursor);
     }
 
     /**
@@ -394,51 +352,6 @@ public class DeviceLogService {
         }
         int atLeastOneLine = Math.max(requested, 1);
         return Math.min(atLeastOneLine, MAX_PAGE_SIZE);
-    }
-
-    private static void validateSearch(DeviceLogFilterCriteria criteria) {
-        validateTerms(criteria.getContains(), "contains");
-        validateTerms(criteria.getExcludes(), "excludes");
-    }
-
-    /**
-     * Counts only the terms that reach the query: blank ones are skipped when the filters are built, so they do not
-     * use up the term budget either.
-     */
-    private static void validateTerms(List<String> terms, String field) {
-        if (terms == null) {
-            return;
-        }
-        int used = 0;
-        for (String term : terms) {
-            if (!StringUtils.hasText(term)) {
-                continue;
-            }
-            if (term.length() > MAX_SEARCH_LENGTH) {
-                throw new IllegalArgumentException(field + " terms cannot exceed " + MAX_SEARCH_LENGTH + " characters");
-            }
-            used++;
-        }
-        if (used > MAX_SEARCH_TERMS) {
-            throw new IllegalArgumentException(field + " cannot hold more than " + MAX_SEARCH_TERMS + " terms");
-        }
-    }
-
-    private static void validateRange(Instant from, Instant to) {
-        if (!from.isBefore(to)) {
-            throw new IllegalArgumentException("'from' must be before 'to'");
-        }
-        if (Duration.between(from, to).compareTo(MAX_RANGE) > 0) {
-            throw new IllegalArgumentException("Time range cannot exceed " + MAX_RANGE.toDays() + " days");
-        }
-    }
-
-    private static long toNanos(Instant instant) {
-        try {
-            return Math.addExact(Math.multiplyExact(instant.getEpochSecond(), NANOS_PER_SECOND), instant.getNano());
-        } catch (ArithmeticException e) {
-            throw new IllegalArgumentException("Timestamp out of range: " + instant);
-        }
     }
 
     private static Instant parseInstant(String value) {
