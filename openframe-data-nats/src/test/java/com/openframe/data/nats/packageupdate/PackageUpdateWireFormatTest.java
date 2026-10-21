@@ -113,7 +113,17 @@ class PackageUpdateWireFormatTest {
                 {"state":"FAILED","failed":{"reason":"SUPERSEDED","exitCode":1,"message":"replaced"}}""",
                 PackageUpdateStatusMessage.class);
         assertThat(failed.getFailed().getReason()).isEqualTo(PackageUpdateStatusMessage.Failed.Reason.SUPERSEDED);
-        assertThat(failed.getFailed().getExitCode()).isEqualTo(1);
+        assertThat(failed.getFailed().getExitCode()).isEqualTo(1L);
+    }
+
+    @Test
+    void status_failed_wingetHresultExitCode_parsesWithoutOverflow() {
+        PackageUpdateStatusMessage msg = mapper.readValue("""
+                {"state":"FAILED","failed":{"reason":"MANAGER_ERROR","exitCode":2316632081}}""",
+                PackageUpdateStatusMessage.class);
+
+        assertThat(msg.getState()).isEqualTo(PackageUpdateStatusMessage.State.FAILED);
+        assertThat(msg.getFailed().getExitCode()).isEqualTo(2316632081L);
     }
 
     @Test

@@ -102,7 +102,7 @@ public class PackageUpdateStatusMessage {
         @JsonFormat(with = JsonFormat.Feature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
         private Reason reason;
 
-        private Integer exitCode;
+        private Long exitCode;
         private String message;
 
         public enum Reason {

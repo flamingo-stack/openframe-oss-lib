@@ -53,7 +53,7 @@ public class PackageUpdateDeviceState implements TenantScoped {
 
     private String failedReason;
     private String failedMessage;
-    private Integer exitCode;
+    private Long exitCode;
 
     private String installedVersion;
     private String availableVersion;

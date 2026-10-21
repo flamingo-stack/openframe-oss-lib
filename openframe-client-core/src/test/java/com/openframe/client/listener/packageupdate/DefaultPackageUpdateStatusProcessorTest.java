@@ -79,7 +79,7 @@ class DefaultPackageUpdateStatusProcessorTest {
         PackageUpdateStatusMessage.Failed f = new PackageUpdateStatusMessage.Failed();
         f.setReason(reason);
         f.setMessage("boom");
-        f.setExitCode(1);
+        f.setExitCode(1L);
         e.setFailed(f);
         return e;
     }
