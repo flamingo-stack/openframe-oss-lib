@@ -44,4 +44,7 @@ public class AgentRegistrationRequest {
     // Tags to create and assign to the device at registration time
     @Valid
     private List<AgentRegistrationTagInput> tags;
+
+    // SHA-256 of the running agent executable; optional — older agents don't send it
+    private String binarySha256;
 } 
