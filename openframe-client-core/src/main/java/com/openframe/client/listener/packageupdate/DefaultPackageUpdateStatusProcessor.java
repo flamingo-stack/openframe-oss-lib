@@ -7,6 +7,9 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.State;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Waiting;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
@@ -22,11 +25,6 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusProcessor {
-
-    private static final String SUPERSEDED = "SUPERSEDED";
-    private static final String APP_RUNNING = "APP_RUNNING";
-    private static final String PROMPT = "PROMPT";
-    private static final String COUNTDOWN = "COUNTDOWN";
 
     private final MachineRepository machineRepository;
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
@@ -149,8 +147,8 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
         if (state.getDeadlineAt() != null || event.getAt() == null) {
             return;
         }
-        if (event.getState() == PackageUpdateStatusMessage.State.WAITING
-                && event.getWaiting() != null && APP_RUNNING.equals(name(event.getWaiting().getReason()))) {
+        if (event.getState() == State.WAITING && event.getWaiting() != null
+                && event.getWaiting().getReason() == Waiting.Reason.APP_RUNNING) {
             state.setDeadlineAt(event.getAt().plusSeconds(request.getDeadlineSeconds()));
         }
     }
@@ -162,15 +160,15 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
         }
         switch (event.getState()) {
             case WAITING -> {
-                String phase = event.getWaiting() == null ? null : name(event.getWaiting().getPhase());
-                if (PROMPT.equals(phase)) {
+                Waiting.Phase phase = event.getWaiting() == null ? null : event.getWaiting().getPhase();
+                if (phase == Waiting.Phase.PROMPT) {
                     bound.prompt(request, state);
-                } else if (COUNTDOWN.equals(phase)) {
+                } else if (phase == Waiting.Phase.COUNTDOWN) {
                     bound.countdown(request, state);
                 }
             }
             case FAILED -> {
-                if (SUPERSEDED.equals(state.getFailedReason())) {
+                if (event.getFailed() != null && event.getFailed().getReason() == Failed.Reason.SUPERSEDED) {
                     return;   // a newer request carries on; no card
                 }
                 if (request.getSource() == PackageUpdateSource.AUTO) {

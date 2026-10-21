@@ -16,10 +16,10 @@ public class PackageUpdateClockScheduler {
 
     private final PackageUpdateClockService clockService;
 
-    @Scheduled(fixedDelayString = "${openframe.rmm.software.package-update.deadline.interval:60000}")
+    @Scheduled(fixedDelayString = "${openframe.rmm.software.package-update.deadline.interval}")
     @SchedulerLock(name = "packageUpdateDeadlineForce",
-            lockAtMostFor = "${openframe.rmm.software.package-update.deadline.lock-at-most-for:2m}",
-            lockAtLeastFor = "${openframe.rmm.software.package-update.deadline.lock-at-least-for:10s}")
+            lockAtMostFor = "${openframe.rmm.software.package-update.deadline.lock-at-most-for}",
+            lockAtLeastFor = "${openframe.rmm.software.package-update.deadline.lock-at-least-for}")
     public void forceExpiredDeadlines() {
         try {
             clockService.forceExpiredDeadlines();
@@ -28,10 +28,10 @@ public class PackageUpdateClockScheduler {
         }
     }
 
-    @Scheduled(fixedDelayString = "${openframe.rmm.software.package-update.retry.interval:300000}")
+    @Scheduled(fixedDelayString = "${openframe.rmm.software.package-update.retry.interval}")
     @SchedulerLock(name = "packageUpdateAutoRetry",
-            lockAtMostFor = "${openframe.rmm.software.package-update.retry.lock-at-most-for:2m}",
-            lockAtLeastFor = "${openframe.rmm.software.package-update.retry.lock-at-least-for:10s}")
+            lockAtMostFor = "${openframe.rmm.software.package-update.retry.lock-at-most-for}",
+            lockAtLeastFor = "${openframe.rmm.software.package-update.retry.lock-at-least-for}")
     public void retryFailedAutoUpdates() {
         try {
             clockService.retryFailedAutoUpdates();

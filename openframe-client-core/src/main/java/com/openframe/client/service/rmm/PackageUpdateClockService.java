@@ -5,6 +5,7 @@ import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
 import com.openframe.data.nats.packageupdate.PackageUpdateWire;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
@@ -25,22 +26,20 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PackageUpdateClockService {
 
-    private static final String SUPERSEDED = "SUPERSEDED";
-
     private final DeliveryDispatcher deliveryDispatcher;
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
     private final PackageUpdateRequestRepository requestRepository;
 
-    @Value("${openframe.rmm.software.package-update.deadline.batch-size:500}")
+    @Value("${openframe.rmm.software.package-update.deadline.batch-size}")
     private int deadlineBatchSize;
 
-    @Value("${openframe.rmm.software.package-update.retry.batch-size:500}")
+    @Value("${openframe.rmm.software.package-update.retry.batch-size}")
     private int retryBatchSize;
 
-    @Value("${openframe.rmm.software.package-update.retry.max-attempts:3}")
+    @Value("${openframe.rmm.software.package-update.retry.max-attempts}")
     private int maxAttempts;
 
-    @Value("${openframe.rmm.software.package-update.retry.backoff-seconds:21600}")
+    @Value("${openframe.rmm.software.package-update.retry.backoff-seconds}")
     private long backoffSeconds;
 
     public void forceExpiredDeadlines() {
@@ -79,7 +78,8 @@ public class PackageUpdateClockService {
             }
             List<PackageUpdateDeviceState> toRetry = deviceStateRepository
                     .findByTenantIdAndRequestId(request.getTenantId(), request.getRequestId()).stream()
-                    .filter(s -> s.getStatus() == SoftwareActionStatus.FAILED && !SUPERSEDED.equals(s.getFailedReason()))
+                    .filter(s -> s.getStatus() == SoftwareActionStatus.FAILED
+                            && !Failed.Reason.SUPERSEDED.name().equals(s.getFailedReason()))
                     .toList();
             if (toRetry.isEmpty()) {
                 continue;
