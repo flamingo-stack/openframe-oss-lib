@@ -15,6 +15,7 @@ import { ToolBadge } from '../../platform/ToolBadge';
 import { Button } from '../../ui/button';
 import { type ColumnDef, DataTable, multiSelectFilterFn, type Row, useDataTable } from '../../ui/data-table';
 import { FilterModal } from '../../ui/filter-modal';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { NoData, type NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
@@ -85,6 +86,11 @@ export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> {
   guideButton?: LogsTableGuideButton;
   /** Columns left out (a narrow rendering). */
   hiddenColumns?: readonly LogsTableColumnId[];
+  /**
+   * How many logs one request loads (the host's page size). The loading body draws that many skeleton rows and the
+   * load-more footer one more page of them. Default: the table's own defaults (`DataTable.Body` / `InfiniteFooter`).
+   */
+  pageSize?: number;
 }
 
 const noop = () => {};
@@ -95,7 +101,7 @@ const noop = () => {};
  */
 export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   logs,
-  loading = false,
+  loading: loadingProp = false,
   facets,
   filters,
   onFilterChange,
@@ -116,7 +122,10 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   renderEmptyState,
   guideButton,
   hiddenColumns,
+  pageSize,
 }: LogsTableViewProps<T>) {
+  // ONE switch: in a page's loading state the table is loading (its body draws the row skeletons, never the empty state).
+  const loading = useLoadingScope() || loadingProp;
   const columns = useMemo<ColumnDef<T>[]>(() => {
     const multiSelect = multiSelectFor<T>();
     const all: ColumnDef<T>[] = [
@@ -361,7 +370,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
         )}
         <DataTable.Body
           loading={loading}
-          skeletonRows={10}
+          skeletonRows={pageSize}
           // Scoped tabs get the unified empty state (as every other device and
           // customer tab); the standalone page keeps its inline message.
           {...(scoped
@@ -384,7 +393,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={onLoadMore}
-          skeletonRows={2}
+          skeletonRows={pageSize}
         />
       </DataTable>
 
@@ -434,13 +443,15 @@ export interface LogsTableSkeletonProps {
   logIdHeader?: ReactNode;
   /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
   region?: boolean;
+  /** How many logs one request loads: the skeleton draws that many rows (see `LogsTableViewProps.pageSize`). */
+  pageSize?: number;
 }
 
 /**
  * Loading fallback of the logs table: an empty `DataTable` with the table's own
  * columns, so the header row and the column widths match the loaded table.
  */
-export function LogsTableSkeleton({ logIdHeader, region = true }: LogsTableSkeletonProps) {
+export function LogsTableSkeleton({ logIdHeader, region = true, pageSize }: LogsTableSkeletonProps) {
   const columns = useMemo<ColumnDef<unknown>[]>(() => {
     const multiSelect = multiSelectFor<unknown>();
     return [
@@ -505,7 +516,13 @@ export function LogsTableSkeleton({ logIdHeader, region = true }: LogsTableSkele
   return (
     <DataTable table={table}>
       <DataTable.Header stickyHeader stickyHeaderOffset="top-[96px]" />
-      <DataTable.Body loading={true} loadingRegion={region} skeletonRows={10} emptyMessage="" rowClassName="mb-1" />
+      <DataTable.Body
+        loading={true}
+        loadingRegion={region}
+        skeletonRows={pageSize}
+        emptyMessage=""
+        rowClassName="mb-1"
+      />
     </DataTable>
   );
 }

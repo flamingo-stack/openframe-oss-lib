@@ -12,6 +12,8 @@ interface ChatMessageSkeletonProps {
    *  reply). Pass 1 for surfaces whose real messages are single-line (e.g. the
    *  short scripted hero-demo turns), so the skeleton isn't ~3x too tall. */
   bodyLines?: number;
+  /** One message of a read thread (`data-loading-item`): set by the list skeleton, like the loaded rows. */
+  listItem?: boolean;
 }
 
 // Body-line width palette: full-width lines then a short trailing line, so any
@@ -32,10 +34,14 @@ export function ChatMessageSkeleton({
   showAvatar = true,
   isUser = false,
   bodyLines = 3,
+  listItem = false,
 }: ChatMessageSkeletonProps) {
   const lines = Math.max(1, bodyLines);
   return (
-    <div className={cn('relative py-[var(--spacing-system-s)]', className)}>
+    <div
+      className={cn('relative py-[var(--spacing-system-s)]', className)}
+      {...(listItem ? { 'data-loading-item': '' } : undefined)}
+    >
       <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
         {/* Name row — inline avatar (assistant only) + name + timestamp,
             matching ChatMessageEnhanced's inline-avatar header. Neutral
@@ -57,6 +63,9 @@ export function ChatMessageSkeleton({
     </div>
   );
 }
+
+/** Message rows a thread's skeleton draws: a typical thread, since a thread loads with no page size of its own. */
+export const CHAT_MESSAGE_LIST_SKELETON_MESSAGES = 6;
 
 interface ChatMessageListSkeletonProps {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
@@ -91,7 +100,7 @@ interface ChatMessageListSkeletonProps {
 export function ChatMessageListSkeleton({
   region = true,
   className,
-  messageCount = 6,
+  messageCount = CHAT_MESSAGE_LIST_SKELETON_MESSAGES,
   showAvatars = true,
   fullWidth = false,
   contentClassName,
@@ -132,6 +141,7 @@ export function ChatMessageListSkeleton({
               showAvatar={showAvatars}
               isUser={message.isUser}
               bodyLines={bodyLines}
+              listItem
             />
           ))}
         </div>

@@ -4,6 +4,7 @@ import type React from 'react';
 import { useRouter } from '../../../embed-shims/next-navigation';
 import { DeviceCardSkeleton, DeviceCardSkeletonGrid } from '../../loading/device-card-skeleton';
 import { DeviceCard } from '../../ui';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { getDeviceName } from './device-name';
 import { getDeviceOperatingSystem, getDeviceStatusConfig } from './device-status';
 import { useDevicesViewConfig } from './devices-view-config';
@@ -22,13 +23,15 @@ export interface DevicesGridProps<T extends DeviceRow = DeviceRow> {
 
 export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   devices,
-  isLoading,
+  isLoading: isLoadingProp,
   hasNextPage,
   isFetchingNextPage,
   sentinelRef,
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
   loadingRegion = true,
 }: DevicesGridProps<T>) {
+  // ONE switch: in a page's loading state (or while the host reads the devices) the grid is its skeleton.
+  const isLoading = useLoadingScope() || isLoadingProp;
   const router = useRouter();
   const { getDeviceHref } = useDevicesViewConfig();
 
@@ -76,10 +79,13 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                     },
                   }}
                   className="h-full"
+                  // One card of a read list: how many there are is the record's (the height gate counts them).
+                  data-loading-item
                 />
               );
             })}
-            {isFetchingNextPage && Array.from({ length: 4 }, (_, i) => <DeviceCardSkeleton key={`skeleton-${i}`} />)}
+            {isFetchingNextPage &&
+              Array.from({ length: 4 }, (_, i) => <DeviceCardSkeleton key={`skeleton-${i}`} listItem />)}
           </div>
           {hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
         </>

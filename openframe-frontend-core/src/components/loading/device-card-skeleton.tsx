@@ -14,6 +14,8 @@ export interface DeviceCardSkeletonProps {
    * (e.g. `'h-12 w-[88px]'`). Omit when the card has no details button.
    */
   detailsButtonClassName?: string;
+  /** One card of a read list (`data-loading-item`), like the loaded cards of `DevicesGrid`. */
+  listItem?: boolean;
 }
 
 /**
@@ -26,9 +28,15 @@ export interface DeviceCardSkeletonProps {
  *
  * The loaded card replaces it with no movement.
  */
-export function DeviceCardSkeleton({ className, moreButton = true, detailsButtonClassName }: DeviceCardSkeletonProps) {
+export function DeviceCardSkeleton({
+  className,
+  moreButton = true,
+  detailsButtonClassName,
+  listItem = false,
+}: DeviceCardSkeletonProps) {
   return (
     <div
+      {...(listItem ? { 'data-loading-item': '' } : undefined)}
       className={cn(
         'overflow-clip rounded-[6px] border border-ods-border bg-ods-card',
         'flex flex-col gap-4 p-4',
@@ -93,7 +101,7 @@ export function DeviceCardSkeletonGrid({
       className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2 content-lg:grid-cols-4', className)}
     >
       {Array.from({ length: count }, (_, index) => (
-        <DeviceCardSkeleton key={index} />
+        <DeviceCardSkeleton key={index} listItem />
       ))}
     </LoadingRegion>
   );

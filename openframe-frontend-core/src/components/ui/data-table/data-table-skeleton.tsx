@@ -63,6 +63,8 @@ export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeigh
           key={index}
           // Decoration: the table's own status line says it is loading.
           aria-hidden="true"
+          // One row of the read list it stands for, like the loaded `DataTableRow`.
+          data-loading-item
           className={cn(
             'relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
             // The slot height sits on the card, matching a real row.

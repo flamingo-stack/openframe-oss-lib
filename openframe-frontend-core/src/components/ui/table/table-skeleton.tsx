@@ -46,6 +46,8 @@ export function TableCardSkeleton({
         <div
           key={index}
           className={cn('relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card', className)}
+          // One row of the read list it stands for, like the loaded `TableRow`.
+          data-loading-item
         >
           {/* `TableRow`'s own row: the same frame, gap and height at every breakpoint, each column in its own cell
               width (the synthetic actions and chevron columns included), so a loaded row takes the skeleton's place. */}

@@ -13,10 +13,11 @@ import {
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
+import { useLoadingScope } from '../ui/loading-scope';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatMessageEnhanced } from './chat-message-enhanced';
-import { ChatMessageListSkeleton } from './chat-message-skeleton';
+import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES, ChatMessageListSkeleton } from './chat-message-skeleton';
 import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -129,7 +130,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       className,
       messages,
       dialogId,
-      isLoading = false,
+      isLoading: isLoadingProp = false,
       isTyping = false,
       typingMessage,
       autoScroll = true,
@@ -158,6 +159,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     },
     ref,
   ) => {
+    // ONE switch: in a page's loading state (or while the host reads the thread) the list is its skeleton. Every
+    // effect below keys on `isLoading`, so the switch is resolved before any of them.
+    const isLoading = useLoadingScope() || isLoadingProp;
+
     // ---- Library: useStickToBottom -----------------------------------
     // `resize: 'smooth'` — during streaming, content grows token-by-
     // token; library uses spring physics to follow the bottom for a
@@ -936,7 +941,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           showAvatars={showAvatars}
           fullWidth={fullWidth}
           contentClassName={contentClassName}
-          messageCount={6}
+          messageCount={CHAT_MESSAGE_LIST_SKELETON_MESSAGES}
         />
       );
     }
@@ -1058,6 +1063,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         refs={message.refs}
                         onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
                         NavLinkAnchor={NavLinkAnchor}
+                        // One message of a read thread (the height gate counts them); the wrapper carries it instead
+                        // when the row has content of its own below it.
+                        data-loading-item={ownedContent ? undefined : ''}
                       />
                     );
                     // Only wrap when there IS owned content: the bare row keeps
@@ -1065,7 +1073,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // thread without any stays byte-identical to before.
                     if (!ownedContent) return row;
                     return (
-                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1">
+                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1" data-loading-item>
                         {row}
                         {ownedContent}
                       </div>

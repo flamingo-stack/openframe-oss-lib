@@ -6,10 +6,19 @@ import { render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { CategoriesCart } from '../../categories-cart';
+import { ChatMessageList } from '../../chat/chat-message-list';
+import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from '../../chat/chat-message-skeleton';
 import { ChatTurn } from '../../chat/chat-turn';
 import { EntityAuthorCard } from '../../chat/entity-cards/entity-author-card';
+import { DevicesGrid } from '../../features/devices/devices-grid';
+import { DevicesList } from '../../features/devices/devices-list';
+import { LogsTableView } from '../../features/logs/logs-table-view';
 import { PlatformBadge } from '../../features/platform-badge';
 import { PushButtonSelector } from '../../features/push-button-selector';
+import {
+  TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS,
+  TicketStatusConfigList,
+} from '../../features/ticket-status-config-list/ticket-status-config-list';
 import { Video } from '../../features/video';
 import { VideoBitesStrip } from '../../features/video-bites-strip';
 import { LoadingFallback } from '../../loading/loading-fallback';
@@ -20,11 +29,15 @@ import { UserDisplay } from '../../user-display';
 import { VendorIcon } from '../../vendor-icon';
 import { AvatarStack } from '../avatar-stack';
 import { BenefitList } from '../benefit-list';
+import { CheckboxBlock } from '../checkbox-block';
+import { InfoSection } from '../info-section';
 import { LeaderRow } from '../leader-row';
 import { LoadingScope, LoadingWhen, useLoadingScope } from '../loading-scope';
 import { StatusBadge } from '../status-badge';
+import { SuperUserBannerView } from '../super-user-banner-view';
 import { TabNavigation } from '../tab-navigation';
 import { Tabs, TabsList, TabsTrigger } from '../tabs';
+import { TicketStatusConfigRow } from '../ticket-status-config-row';
 
 const READ = 'READ-DATA-WORD';
 const SURFACE = '.ods-skeleton';
@@ -154,6 +167,49 @@ describe('a component in a scope draws its own skeleton', () => {
     ],
     ['Video', <Video key="a" url="" layout="centered" />, []],
     ['VideoBitesStrip', <VideoBitesStrip key="a" bites={[]} title="Key moments" />, ['Key moments']],
+    [
+      'InfoSection',
+      <InfoSection
+        key="a"
+        title="Ticket Details"
+        rows={[
+          { id: 'a', label: 'Assignee', value: { text: READ } },
+          { id: 'b', label: 'Status', value: { type: 'custom', content: READ } },
+        ]}
+      />,
+      ['Ticket Details', 'Assignee', 'Status'],
+    ],
+    [
+      'ChatMessageList',
+      <ChatMessageList key="a" messages={[{ id: '1', role: 'user', content: READ, timestamp: new Date() }]} />,
+      [],
+    ],
+    [
+      'TicketStatusConfigRow',
+      <TicketStatusConfigRow
+        key="a"
+        variant="custom"
+        statusKey="x"
+        name={READ}
+        color="#ff0000"
+        onColorChange={() => {}}
+      />,
+      ['Status Name', 'Color'],
+    ],
+    [
+      'TicketStatusConfigList',
+      <TicketStatusConfigList key="a" items={[]} onReorder={() => {}} renderRow={() => READ} />,
+      ['Status Name'],
+    ],
+    [
+      'CheckboxBlock',
+      <CheckboxBlock key="a" label="Notify me" description="By email" checked />,
+      ['Notify me', 'By email'],
+    ],
+    ['SuperUserBannerView', <SuperUserBannerView key="a" tenantName={READ} />, ['Super user access']],
+    ['DevicesList', <DevicesList key="a" devices={[]} />, []],
+    ['DevicesGrid', <DevicesGrid key="a" devices={[]} isLoading={false} />, []],
+    ['LogsTableView', <LogsTableView key="a" logs={[]} filters={{}} onFilterChange={() => {}} />, ['Log ID']],
   ];
 
   it.each(cases)('%s: skeleton shapes, its static copy, and no read word', (_name, node, staticCopy) => {
@@ -189,5 +245,46 @@ describe('a component in a scope draws its own skeleton', () => {
     expect(bar?.className).toContain('text-transparent');
     expect(bar?.textContent).toBe('000');
     expect(container.textContent).toBe('Trusted by 000 MSPs');
+  });
+
+  it('a list in a scope draws its declared typical count, each item a `data-loading-item`', () => {
+    const { container: chatView } = inScope(<ChatMessageList messages={[]} />);
+    expect(chatView.querySelectorAll('[data-loading-item]')).toHaveLength(CHAT_MESSAGE_LIST_SKELETON_MESSAGES);
+    const { container: statusesView } = inScope(
+      <TicketStatusConfigList items={[]} onReorder={() => {}} renderRow={() => null} />,
+    );
+    expect(statusesView.querySelectorAll('[data-loading-item]')).toHaveLength(TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS);
+  });
+
+  it('an empty list in a scope never draws its empty state', () => {
+    const { container: logsView } = inScope(<LogsTableView logs={[]} filters={{}} onFilterChange={() => {}} />);
+    expect(logsView.textContent).not.toContain('No logs yet');
+    const { container: devicesView } = inScope(<DevicesList devices={[]} emptyState={{ title: 'No devices yet' }} />);
+    expect(devicesView.textContent).not.toContain('No devices yet');
+  });
+
+  it('the logs table draws one skeleton row per log of a page when the host states its page size', () => {
+    const { container } = inScope(<LogsTableView logs={[]} filters={{}} onFilterChange={() => {}} pageSize={7} />);
+    expect(container.querySelectorAll('[data-loading-item]')).toHaveLength(7);
+  });
+
+  it('the loaded forms carry the same item markers: status rows and chat messages', () => {
+    const { container: statusesView } = render(
+      <TicketStatusConfigList
+        items={[{ id: 'a' }, { id: 'b' }]}
+        onReorder={() => {}}
+        renderRow={item => <span>{item.id}</span>}
+      />,
+    );
+    expect(statusesView.querySelectorAll('[data-loading-item]')).toHaveLength(2);
+    const { container: chatView } = render(
+      <ChatMessageList
+        messages={[
+          { id: '1', role: 'user', content: 'Hi', timestamp: new Date() },
+          { id: '2', role: 'assistant', content: 'Hello', timestamp: new Date() },
+        ]}
+      />,
+    );
+    expect(chatView.querySelectorAll('[data-loading-item]')).toHaveLength(2);
   });
 });

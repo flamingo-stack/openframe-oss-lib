@@ -94,6 +94,8 @@ export function TableRow<T = TableRowData>({
         typeof className === 'function' ? className(item, index) : className,
       )}
       onClick={isLinkMode ? undefined : handleRowClick}
+      // A row of a read list: how many there are is the record's (the height gate counts them).
+      data-loading-item
     >
       {isLinkMode && href && (
         <Link href={href} prefetch={false} className="absolute inset-0" aria-label="View details" />

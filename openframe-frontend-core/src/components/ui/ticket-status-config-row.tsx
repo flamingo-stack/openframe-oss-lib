@@ -7,11 +7,13 @@ import type { SortableDragHandleProps } from '../features/sortable-list/use-sort
 import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon';
+import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
 import { Input } from './input';
 import { Label } from './label';
-import type { TagProps } from './tag';
+import { useLoadingScope } from './loading-scope';
+import { type TagProps, TagSkeleton } from './tag';
 import { TicketStatusTag } from './ticket-status-tag';
 import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
 
@@ -42,7 +44,17 @@ export interface TicketStatusConfigRowProps {
    * Rendered beside the delete button; the drag rail is hidden on touch anyway.
    */
   moveButtons?: ReactNode;
+  /**
+   * The status is still being read: the row keeps its layout and its labels, and every read part (the name, the
+   * color, the chip, the delete button) is a skeleton of its own size. A loading scope does the same.
+   */
+  loading?: boolean;
 }
+
+const noop = () => {};
+
+/** The delete button's box, read by the button and its skeleton. */
+const DELETE_BUTTON_SIZE_CLASS = 'size-11 content-md:size-12';
 
 export function TicketStatusConfigRow({
   variant,
@@ -60,7 +72,10 @@ export function TicketStatusConfigRow({
   dragHandleProps,
   isDragging,
   moveButtons,
+  loading: loadingProp,
 }: TicketStatusConfigRowProps) {
+  // ONE switch: in a page's loading state (or while the host reads the status) the read parts are skeletons.
+  const loading = useLoadingScope() || !!loadingProp;
   // Standalone system rows render outside any SortableList, so the row answers
   // "is there a drag rail at all?" itself — same media gate the list uses.
   const dragAndDropEnabled = useDragAndDropEnabled();
@@ -68,7 +83,8 @@ export function TicketStatusConfigRow({
   const isSystem = variant === 'system';
   const isCustomColor = !isSystem && presetKey === undefined;
   const previewColor = isSystem ? undefined : color;
-  const showColorPicker = !isSystem && onColorChange && color !== undefined;
+  // A row the host lets recolor has the Color column; while its color is read the column is a field skeleton.
+  const showColorPicker = !isSystem && !!onColorChange && (color !== undefined || loading);
   // Custom rows render as filled pills (no border); system rows take the
   // page-configured variant (outline/primary). text-h5 already uppercases.
   const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary');
@@ -78,7 +94,9 @@ export function TicketStatusConfigRow({
   // exactly its height: the h4 line + the label's mb-1.
   const fieldRowOffset = 'mt-[calc(var(--font-line-space-h4-body)+0.25rem)]';
 
-  const chip = (
+  const chip = loading ? (
+    <TagSkeleton />
+  ) : (
     <TicketStatusTag
       status={statusKey}
       label={name || ' '}
@@ -147,23 +165,31 @@ export function TicketStatusConfigRow({
           <Label variant="large" htmlFor={nameInputId}>
             Status Name
           </Label>
-          <Input
-            id={nameInputId}
-            value={name}
-            onChange={e => onNameChange?.(e.target.value)}
-            disabled={isSystem}
-            readOnly={isSystem}
-            maxLength={50}
-          />
+          {loading ? (
+            <InteractiveSkeleton.Input />
+          ) : (
+            <Input
+              id={nameInputId}
+              value={name}
+              onChange={e => onNameChange?.(e.target.value)}
+              disabled={isSystem}
+              readOnly={isSystem}
+              maxLength={50}
+            />
+          )}
         </div>
 
         {showColorPicker ? (
           <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] content-md:order-2 content-md:basis-0">
             <Label variant="large">Color</Label>
-            <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
+            {loading || !onColorChange || color === undefined ? (
+              <InteractiveSkeleton.Input />
+            ) : (
+              <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
+            )}
             {/* Custom hex: a second field row inside the Color column, directly
-                under the select (per design). */}
-            {isCustomColor && (
+                under the select (per design). Its presence is read data: not drawn while loading. */}
+            {!loading && onColorChange && color !== undefined && isCustomColor && (
               <div className="mt-[var(--spacing-system-xxs)] flex min-w-0">
                 <ColorPickerInput value={color} onChange={next => onColorChange({ color: next, preset: undefined })} />
               </div>
@@ -228,6 +254,8 @@ export function TicketStatusConfigRow({
                 </button>
               </TouchFriendlyTooltip>
             </div>
+          ) : loading ? (
+            <InteractiveSkeleton.Button size="icon" className={DELETE_BUTTON_SIZE_CLASS} />
           ) : (
             <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
               <span className="inline-flex">
@@ -238,7 +266,7 @@ export function TicketStatusConfigRow({
                   aria-label="Delete status"
                   disabled={deleteDisabled}
                   onClick={deleteDisabled ? undefined : onDelete}
-                  className={cn('size-11 content-md:size-12', deleteDisabled && 'pointer-events-none')}
+                  className={cn(DELETE_BUTTON_SIZE_CLASS, deleteDisabled && 'pointer-events-none')}
                 >
                   <TrashIcon className="text-ods-error" />
                 </Button>
@@ -249,4 +277,12 @@ export function TicketStatusConfigRow({
       </div>
     </div>
   );
+}
+
+/**
+ * A status row while it is read: the row itself in its loading form (labels real, every read part a skeleton).
+ * `variant` is the row's kind when the host knows it; a list that knows nothing yet draws `custom` rows.
+ */
+export function TicketStatusConfigRowSkeleton({ variant = 'custom' }: { variant?: 'system' | 'custom' }) {
+  return <TicketStatusConfigRow variant={variant} statusKey="" name="" onColorChange={noop} loading />;
 }

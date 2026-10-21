@@ -160,6 +160,7 @@ function DataTableRowImpl<T>({
         ref={containerRef as React.RefObject<HTMLAnchorElement>}
         className={containerClassName}
         onClick={handleClick}
+        data-loading-item
       >
         {cells}
       </Link>
@@ -171,6 +172,8 @@ function DataTableRowImpl<T>({
       ref={containerRef as React.RefObject<HTMLDivElement>}
       className={containerClassName}
       onClick={onClick ? handleClick : undefined}
+      // A row of a read list: how many there are is the record's (the height gate counts them).
+      data-loading-item
     >
       {isLinkMode && href ? (
         <Link
