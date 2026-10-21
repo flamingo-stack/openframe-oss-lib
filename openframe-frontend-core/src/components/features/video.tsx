@@ -207,7 +207,10 @@ export function Video(props: VideoProps): React.ReactElement | null {
 
   const effectiveKind = resolveKind(props, url);
 
-  if (props.lazy && !isNear) {
+  // Drawn when it comes near the screen, like it plays when it is on it: the player and hls.js are the largest
+  // script a page can load, so a video below the fold costs its poster until it is approached. `lazy={false}`
+  // mounts the player at once (a caller that drives playback itself before it is seen).
+  if ((props.lazy ?? true) && !isNear) {
     // Same box, poster only: the observer target IS the reserved space.
     return wrapWithLayout(
       <div

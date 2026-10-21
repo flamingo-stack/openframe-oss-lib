@@ -172,6 +172,7 @@ export interface VideoCommonProps {
    * Until then the box shows the poster (or nothing) — the caller's container
    * still owns the size, so nothing shifts when the player mounts. For grids
    * of players: a library of 20 clips costs 20 posters, not 20 players.
+   * Default `true` (every video is drawn on approach); `false` mounts it at once.
    */
   lazy?: boolean;
   /**

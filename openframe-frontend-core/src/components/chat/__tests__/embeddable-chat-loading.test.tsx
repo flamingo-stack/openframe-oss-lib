@@ -26,7 +26,18 @@ vi.mock('../embeddable-chat', async () => {
 });
 
 import { EmbeddableChat } from '../index';
-import { holdAskAiOpens } from '../utils/ask-ai-events';
+import { ASK_AI_TRIGGER_ATTRIBUTE, holdAskAiOpens } from '../utils/ask-ai-events';
+
+/** A pointer reaching an element that opens the chat: the visitor's intent. */
+function pointAtATrigger() {
+  const trigger = document.createElement('button');
+  trigger.setAttribute(ASK_AI_TRIGGER_ATTRIBUTE, '');
+  document.body.appendChild(trigger);
+  act(() => {
+    trigger.dispatchEvent(new Event('pointerover', { bubbles: true }));
+  });
+  trigger.remove();
+}
 
 describe('EmbeddableChat, loaded on its own', () => {
   beforeEach(() => {
@@ -36,9 +47,26 @@ describe('EmbeddableChat, loaded on its own', () => {
     vi.clearAllMocks();
   });
 
-  it('is the one chat: the barrel draws the chat itself, with the props it was given', async () => {
+  it('loads nothing until the visitor shows they want the chat', async () => {
     render(<EmbeddableChat baseRoute="/knowledge-base" />);
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByTestId('chat')).toBeNull();
+  });
+
+  it('is the one chat: on intent the barrel draws the chat itself, with the props it was given', async () => {
+    render(<EmbeddableChat baseRoute="/knowledge-base" />);
+    pointAtATrigger();
     expect((await screen.findByTestId('chat')).textContent).toBe('/knowledge-base');
+  });
+
+  it('loads at once when an open is sent', async () => {
+    render(<EmbeddableChat />);
+    act(() => {
+      window.dispatchEvent(new CustomEvent('ask-ai:open', { detail: { source: 'flamingo' } }));
+    });
+    expect(await screen.findByTestId('chat')).toBeTruthy();
   });
 
   it('delivers an open that was sent before the chat had loaded', async () => {
@@ -56,6 +84,7 @@ describe('EmbeddableChat, loaded on its own', () => {
 
   it('hears an open sent once it is listening exactly once', async () => {
     render(<EmbeddableChat />);
+    pointAtATrigger();
     await screen.findByTestId('chat');
     const detail = { source: 'flamingo' };
     act(() => {

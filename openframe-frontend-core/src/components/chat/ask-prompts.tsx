@@ -6,6 +6,7 @@ import { AgentMark } from '../agent-mark';
 import { MingoAiButton, openAskAi } from '../navigation/mingo-ai-button';
 import { ScrollShadow } from '../ui/scroll-fade';
 import { QuickActionChipButton, QuickActionChipSkeleton, type QuickActionIconSpec } from './quick-action-chip';
+import { ASK_AI_TRIGGER_ATTRIBUTE } from './utils/ask-ai-events';
 
 /** One question a page offers: the chip shows `label` as written, the chat is sent `prompt`. */
 export interface AskPrompt {
@@ -104,7 +105,11 @@ function QuestionChips({
       {Array.from({ length: count }, (_, slot) => {
         const prompt = loading ? undefined : prompts[slot];
         return (
-          <span key={prompt?.id ?? `slot-${slot}`} className={slotClassName ?? CHIP_SLOT_CLASS}>
+          <span
+            key={prompt?.id ?? `slot-${slot}`}
+            className={slotClassName ?? CHIP_SLOT_CLASS}
+            {...(prompt ? { [ASK_AI_TRIGGER_ATTRIBUTE]: '' } : {})}
+          >
             {loading ? (
               <QuickActionChipSkeleton
                 variant="question"
