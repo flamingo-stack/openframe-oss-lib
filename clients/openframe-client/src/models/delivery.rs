@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub const DELIVERY_RESULT_KIND: &str = "delivery.result";
+pub const CLIENT_UPDATE_DELIVERY_TYPE: &str = "CLIENT_UPDATE";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

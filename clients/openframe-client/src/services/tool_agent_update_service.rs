@@ -6,7 +6,7 @@ use crate::platform::{
     run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_ops::ToolOps;
+use crate::services::tool_ops::{ToolLock, ToolOps};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -86,6 +86,16 @@ impl ToolAgentUpdateService {
                 );
             }
         };
+        self.process_update_locked(message, tool_lock).await
+    }
+
+    pub async fn process_update_locked(
+        &self,
+        message: ToolAgentUpdateMessage,
+        tool_lock: ToolLock,
+    ) -> Result<()> {
+        let tool_agent_id = &message.tool_agent_id;
+        let new_version = &message.version;
 
         // Check if tool is installed
         let mut installed_tool = match self

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use futures::StreamExt;
 use serde_json::json;
@@ -7,10 +8,15 @@ use tempfile::TempDir;
 use tokio::sync::Notify;
 use tokio::time::{timeout, Duration};
 
-use super::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
+use super::{
+    Begin, CommandContext, CommandHandler, CommandListener, FeatureFlagsHandler, Outcome,
+    RestartGate,
+};
 use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
-use crate::models::{DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState};
+use crate::models::{
+    DeliveryRef, DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState,
+};
 use crate::platform::DirectoryManager;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
@@ -138,7 +144,7 @@ impl Agent {
         Some((agent, gate))
     }
 
-    async fn launch(&mut self) -> (RestartGate, Arc<FeatureFlagsService>) {
+    fn context(&self) -> (RestartGate, CommandContext) {
         let gate = RestartGate::new(
             ToolOps::default().busy_tools(),
             ExecutionService::new().running_scripts(),
@@ -152,6 +158,11 @@ impl Agent {
             self.store.clone(),
             self.flush.clone(),
         );
+        (gate, context)
+    }
+
+    async fn launch(&mut self) -> (RestartGate, Arc<FeatureFlagsService>) {
+        let (gate, context) = self.context();
         let service = Arc::new(FeatureFlagsService::load(
             self.flags_path.clone(),
             self.version.clone(),
@@ -185,12 +196,41 @@ impl Agent {
         .expect("the flags listener never answered");
     }
 
+    async fn launch_fake(&mut self) -> FakeHandler {
+        let handler = FakeHandler::default();
+        let (_gate, context) = self.context();
+        CommandListener::new(handler.clone(), context)
+            .start()
+            .await
+            .unwrap();
+        timeout(BOUND, async {
+            loop {
+                self.send_fake(fake(PROBE, Some(0), "done")).await;
+                if timeout(Duration::from_millis(200), self.next_result(PROBE))
+                    .await
+                    .is_ok()
+                {
+                    return;
+                }
+            }
+        })
+        .await
+        .expect("the fake listener never answered");
+        handler
+    }
+
     async fn send(&self, payload: serde_json::Value) {
+        self.send_to(format!("machine.{MACHINE}.feature-flags"), payload)
+            .await;
+    }
+
+    async fn send_fake(&self, payload: serde_json::Value) {
+        self.send_to(FakeHandler::subject(MACHINE), payload).await;
+    }
+
+    async fn send_to(&self, subject: String, payload: serde_json::Value) {
         self.tester
-            .publish(
-                format!("machine.{MACHINE}.feature-flags"),
-                serde_json::to_vec(&payload).unwrap().into(),
-            )
+            .publish(subject, serde_json::to_vec(&payload).unwrap().into())
             .await
             .unwrap();
         self.tester.flush().await.unwrap();
@@ -236,6 +276,16 @@ impl Agent {
             heard.is_err(),
             "unexpected result for {dispatch_id}: {heard:?}"
         );
+    }
+
+    async fn until_flushed(&self) {
+        timeout(BOUND, async {
+            while self.store.len().await.unwrap() > 0 {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("the outbox never drained");
     }
 
     fn persisted(&self) -> FeatureFlagsState {
@@ -549,4 +599,164 @@ async fn invalid_flag_entries_are_done_without_a_restart() {
     agent.expect("d23", DeliveryResult::Done).await;
     expect_no_restart(&gate).await;
     assert!(agent.persisted().flags.is_empty());
+}
+
+#[derive(Clone, Default)]
+struct FakeHandler {
+    busy: Arc<AtomicBool>,
+    runs: Arc<Mutex<Vec<String>>>,
+    release: Arc<Notify>,
+}
+
+#[derive(serde::Deserialize)]
+struct FakeCommand {
+    action: String,
+}
+
+impl FakeHandler {
+    fn runs(&self) -> Vec<String> {
+        self.runs.lock().unwrap().clone()
+    }
+}
+
+impl CommandHandler for FakeHandler {
+    type Command = FakeCommand;
+    type Guard = ();
+
+    const KIND: &'static str = "fake";
+    const SEQUENCED: bool = true;
+
+    fn subject(machine_id: &str) -> String {
+        format!("machine.{machine_id}.fake.v2")
+    }
+
+    fn begin(&self, _command: &FakeCommand) -> Begin<()> {
+        if self.busy.load(Ordering::Acquire) {
+            return Begin::Busy("busy");
+        }
+        Begin::Accepted(())
+    }
+
+    async fn run(
+        &self,
+        _machine_id: &str,
+        delivery: &DeliveryRef,
+        command: FakeCommand,
+        _guard: (),
+    ) -> Outcome {
+        self.runs.lock().unwrap().push(delivery.dispatch_id.clone());
+        match command.action.as_str() {
+            "fail" => Outcome::Failed("boom".to_string()),
+            "hold" => {
+                self.release.notified().await;
+                Outcome::Done
+            }
+            _ => Outcome::Done,
+        }
+    }
+}
+
+fn fake(dispatch_id: &str, sequence: Option<i64>, action: &str) -> serde_json::Value {
+    let mut delivery = json!({
+        "type": "FAKE",
+        "targetId": "target",
+        "dispatchId": dispatch_id,
+    });
+    if let Some(sequence) = sequence {
+        delivery["sequence"] = json!(sequence);
+    }
+    json!({ "delivery": delivery, "action": action })
+}
+
+#[tokio::test]
+async fn a_busy_command_gets_no_ack_and_runs_on_the_backend_retry() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    handler.busy.store(true, Ordering::Release);
+
+    agent.send_fake(fake("f1", Some(1), "done")).await;
+    agent.expect_silence("f1").await;
+
+    handler.busy.store(false, Ordering::Release);
+    agent.send_fake(fake("f1", Some(1), "done")).await;
+    agent.expect("f1", DeliveryResult::Acked).await;
+    agent.expect("f1", DeliveryResult::Done).await;
+    assert_eq!(handler.runs(), vec!["f1"]);
+}
+
+#[tokio::test]
+async fn a_repeated_dispatch_re_sends_the_result_without_running_again() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f2", Some(2), "fail")).await;
+    agent.expect("f2", DeliveryResult::Acked).await;
+    agent.expect("f2", DeliveryResult::Failed).await;
+    agent.until_flushed().await;
+
+    agent.send_fake(fake("f2", Some(2), "fail")).await;
+
+    let repeated = agent.expect("f2", DeliveryResult::Failed).await;
+    assert_eq!(repeated.error.as_deref(), Some("boom"));
+    assert_eq!(handler.runs(), vec!["f2"]);
+}
+
+#[tokio::test]
+async fn a_repeat_queued_behind_its_own_run_gets_the_result_without_running_again() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f3", Some(3), "hold")).await;
+    agent.expect("f3", DeliveryResult::Acked).await;
+
+    agent.send_fake(fake("f3", Some(3), "hold")).await;
+    handler.release.notify_one();
+
+    agent.expect("f3", DeliveryResult::Done).await;
+    while let Ok(repeat) = timeout(QUIET, agent.next_result("f3")).await {
+        assert_eq!(repeat.result, DeliveryResult::Done);
+    }
+    assert_eq!(handler.runs(), vec!["f3"]);
+}
+
+#[tokio::test]
+async fn a_stale_sequence_is_acked_and_done_without_running() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f4", Some(4), "done")).await;
+    agent.expect("f4", DeliveryResult::Acked).await;
+    agent.expect("f4", DeliveryResult::Done).await;
+
+    for (dispatch_id, sequence) in [("f5", 4), ("f6", 3)] {
+        agent
+            .send_fake(fake(dispatch_id, Some(sequence), "fail"))
+            .await;
+
+        agent.expect(dispatch_id, DeliveryResult::Acked).await;
+        agent.expect(dispatch_id, DeliveryResult::Done).await;
+    }
+    assert_eq!(handler.runs(), vec!["f4"]);
+}
+
+#[tokio::test]
+async fn a_failed_run_does_not_move_the_applied_sequence() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f7", Some(7), "fail")).await;
+    agent.expect("f7", DeliveryResult::Acked).await;
+    agent.expect("f7", DeliveryResult::Failed).await;
+
+    agent.send_fake(fake("f8", Some(7), "done")).await;
+
+    agent.expect("f8", DeliveryResult::Acked).await;
+    agent.expect("f8", DeliveryResult::Done).await;
+    assert_eq!(handler.runs(), vec!["f7", "f8"]);
 }

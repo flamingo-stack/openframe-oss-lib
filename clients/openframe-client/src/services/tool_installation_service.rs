@@ -10,7 +10,7 @@ use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_kill_service::ToolKillService;
-use crate::services::tool_ops::ToolOps;
+use crate::services::tool_ops::{ToolLock, ToolOps};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -90,10 +90,21 @@ impl ToolInstallationService {
         }
     }
 
-    #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
     pub async fn install(&self, tool_installation_message: ToolInstallationMessage) -> Result<()> {
-        let tool_agent_id = tool_installation_message.tool_agent_id.clone();
-        let _op = self.tool_ops.lock(&tool_agent_id).await.mark_busy();
+        let lock = self
+            .tool_ops
+            .lock(&tool_installation_message.tool_agent_id)
+            .await;
+        self.install_locked(tool_installation_message, lock).await
+    }
+
+    #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
+    pub async fn install_locked(
+        &self,
+        tool_installation_message: ToolInstallationMessage,
+        lock: ToolLock,
+    ) -> Result<()> {
+        let _op = lock.mark_busy();
         self.install_inner(tool_installation_message).await
     }
 

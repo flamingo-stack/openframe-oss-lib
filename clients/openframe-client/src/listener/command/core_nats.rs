@@ -4,8 +4,9 @@ use futures::StreamExt;
 use serde::Deserialize;
 use tracing::{error, info, warn};
 
-use super::{CommandHandler, CommandListener, Outcome};
+use super::{Begin, CommandHandler, CommandListener, Outcome};
 use crate::models::DeliveryRef;
+use crate::services::result_store::DeliveryClaim;
 
 #[derive(Deserialize)]
 struct Envelope {
@@ -109,22 +110,82 @@ async fn handle<H: CommandHandler>(
         }
     };
 
+    match context.delivery.claim(machine_id, &delivery).await {
+        Ok(DeliveryClaim::Claimed) => {}
+        Ok(DeliveryClaim::InFlight) => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Repeat of a command still running, dropping");
+            return;
+        }
+        Ok(DeliveryClaim::Resent) => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Repeat of a settled command, result re-sent");
+            return;
+        }
+        Err(e) => {
+            error!(kind = H::KIND, dispatch_id = %dispatch_id, "Failed to record the command, leaving it to the backend retry: {:#}", e);
+            return;
+        }
+    }
+
+    if H::SEQUENCED {
+        if let Some(applied) = context.delivery.stale(machine_id, &delivery).await {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, sequence = ?delivery.sequence, applied, "Stale sequence, a newer one is already applied");
+            context.delivery.acked(machine_id, &delivery).await;
+            context
+                .delivery
+                .settle(machine_id, delivery, Outcome::Done)
+                .await;
+            return;
+        }
+    }
+
+    let guard = match listener.handler.begin(&command) {
+        Begin::Accepted(guard) => guard,
+        Begin::Busy(reason) => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Not started ({}), leaving the command to the backend retry", reason);
+            context.delivery.release(&delivery).await;
+            return;
+        }
+    };
+
+    if H::RESTARTS_AGENT {
+        context.delivery.await_restart(&delivery).await;
+    }
     context.delivery.acked(machine_id, &delivery).await;
-    let outcome = listener.handler.run(machine_id, &delivery, command).await;
+    let outcome = listener
+        .handler
+        .run(machine_id, &delivery, command, guard)
+        .await;
     match &outcome {
         Outcome::Done => info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command done"),
         Outcome::RestartRequired => {
             info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command applied, restart required")
         }
+        Outcome::Restarting => {
+            info!(kind = H::KIND, dispatch_id = %dispatch_id, "Command restarts the agent, the next start reports it")
+        }
         Outcome::Failed(reason) => {
             error!(kind = H::KIND, dispatch_id = %dispatch_id, "Command failed: {}", reason)
         }
     }
-
-    if outcome != Outcome::RestartRequired {
-        context.delivery.settle(machine_id, delivery, outcome).await;
-        return;
+    if H::SEQUENCED && !matches!(outcome, Outcome::Failed(_)) {
+        context.delivery.record_applied(machine_id, &delivery).await;
     }
-    drop(admitted);
-    context.restart.drain_and_request().await;
+
+    match outcome {
+        Outcome::Restarting => {}
+        Outcome::RestartRequired => {
+            context.delivery.await_restart(&delivery).await;
+            drop(admitted);
+            context.restart.drain_and_request().await;
+        }
+        outcome if H::REMOVES_AGENT => {
+            context
+                .delivery
+                .settle_now(machine_id, delivery, outcome)
+                .await;
+        }
+        outcome => {
+            context.delivery.settle(machine_id, delivery, outcome).await;
+        }
+    }
 }

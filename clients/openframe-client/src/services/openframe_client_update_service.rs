@@ -21,6 +21,12 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+#[derive(Debug, PartialEq)]
+pub enum UpdateLaunch {
+    Launched,
+    Skipped,
+}
+
 /// Marks an update as in progress until dropped
 struct UpdateGuard(Arc<AtomicBool>);
 
@@ -74,7 +80,10 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    pub async fn process_update(&self, message: OpenFrameClientUpdateMessage) -> Result<()> {
+    pub async fn process_update(
+        &self,
+        message: OpenFrameClientUpdateMessage,
+    ) -> Result<UpdateLaunch> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
 
@@ -105,7 +114,7 @@ impl OpenFrameClientUpdateService {
         &self,
         message: OpenFrameClientUpdateMessage,
         guard: UpdateGuard,
-    ) -> Result<()> {
+    ) -> Result<UpdateLaunch> {
         let requested_version = message.version.trim();
 
         // 2. Validate version format
@@ -124,7 +133,7 @@ impl OpenFrameClientUpdateService {
                 canonical_version
             );
             self.tool_run_manager.clear_client_update_pending();
-            return Ok(());
+            return Ok(UpdateLaunch::Skipped);
         }
 
         if !ALLOW_DOWNGRADE {
@@ -149,7 +158,7 @@ impl OpenFrameClientUpdateService {
                             requested_version, anchor
                         );
                         self.tool_run_manager.clear_client_update_pending();
-                        return Ok(());
+                        return Ok(UpdateLaunch::Skipped);
                     }
                     Ok(_) => {}
                     Err(e) => warn!(
@@ -218,7 +227,7 @@ impl OpenFrameClientUpdateService {
             info!("Update failed, NATS will retry");
         }
 
-        update_result
+        update_result.map(|()| UpdateLaunch::Launched)
     }
 
     /// Execute the actual update process
