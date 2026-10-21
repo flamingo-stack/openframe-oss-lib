@@ -70,10 +70,11 @@ public class MeshControlFilteringWebSocketSessionDecorator implements WebSocketS
         if (!props.isEnabled()) {
             return true;
         }
-        // Only the JSON command channel is inspected. Binary frames on this path are protocol
-        // framing rather than commands, and blocking them would break the session rather than a
-        // command; PING/PONG are keepalive.
-        if (message.getType() != Type.TEXT) {
+        // BINARY is inspected as well as TEXT. MeshCentral does not look at the frame type: the
+        // control handler runs JSON.parse(msg.toString('utf8')) on whatever arrives (meshuser.js),
+        // so a command sent as a Blob from the browser console would otherwise walk straight past
+        // this filter. PING/PONG are keepalive and carry no command.
+        if (message.getType() != Type.TEXT && message.getType() != Type.BINARY) {
             return true;
         }
         String action;

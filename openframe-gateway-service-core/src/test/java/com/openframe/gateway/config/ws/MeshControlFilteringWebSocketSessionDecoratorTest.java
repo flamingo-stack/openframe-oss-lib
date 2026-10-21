@@ -61,7 +61,27 @@ class MeshControlFilteringWebSocketSessionDecoratorTest {
         assertThat(props.isControlPath("/ws/tools/meshcentral-server/control.ashx?user=a&pass=b")).isTrue();
         // The tunnels the file manager, desktop and terminal use must stay untouched.
         assertThat(props.isControlPath("/ws/tools/meshcentral-server/meshrelay.ashx")).isFalse();
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/devicefile.ashx")).isFalse();
+        // ipkvm.ashx routes with a wildcard and carries further segments.
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/ipkvm.ashx/1/2")).isFalse();
         assertThat(props.isControlPath("/ws/tools/agent/meshcentral-server/agent.ashx")).isFalse();
+        assertThat(props.isControlPath(null)).isFalse();
+    }
+
+    @Test
+    void controlPathMatchingFollowsExpressRoutingRatherThanTheLiteralSpelling() {
+        // MeshCentral routes with Express defaults: case insensitive, trailing slash optional, and
+        // on the decoded path. Each of these reaches the same control.ashx handler, so each has to
+        // be filtered; before the match was inverted and normalised they slipped past it.
+        MeshControlCommandProperties props = enforcing();
+
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/Control.ashx")).isTrue();
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/control.ashx/")).isTrue();
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/control%2Eashx")).isTrue();
+        // An endpoint nobody has listed is treated as a command channel, not waved through.
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/something-new.ashx")).isTrue();
+        // Outside the MeshCentral space the filter does not apply at all.
+        assertThat(props.isControlPath("/ws/nats")).isFalse();
     }
 
     @Test
@@ -80,6 +100,33 @@ class MeshControlFilteringWebSocketSessionDecoratorTest {
                 .containsExactly(json("ping"), json("changeuserpass"), json("serverconsole"));
     }
 
+    @Test
+    void dropsCommandsSentAsBinaryFrames() {
+        // MeshCentral's control handler does JSON.parse(msg.toString('utf8')) without looking at the
+        // frame type, so ws.send(new Blob([...])) from the browser console is a command. Relaying
+        // binary untouched would leave the allowlist open.
+        MeshControlCommandProperties props = enforcing();
+
+        assertThat(filterBinary(props, json("serverconsole"), json("changeuserpass"))).isEmpty();
+        assertThat(filterBinary(props, json("ping"))).containsExactly(json("ping"));
+    }
+
+    @Test
+    void relaysFramesThatAreNotJsonCommandsWhenNotEnforcing() {
+        // The observation phase must stay transparent: nothing is dropped, whatever arrives.
+        MeshControlCommandProperties props = enforcing();
+        props.setEnforce(false);
+
+        assertThat(filter(props, "not json at all")).containsExactly("not json at all");
+    }
+
+    @Test
+    void dropsCommandsWhoseActionIsNotAString() {
+        MeshControlCommandProperties props = enforcing();
+
+        assertThat(filter(props, "{\"action\":1}", "{\"action\":null}", "{\"action\":[\"ping\"]}")).isEmpty();
+    }
+
     private static MeshControlCommandProperties enforcing() {
         MeshControlCommandProperties props = new MeshControlCommandProperties();
         props.setEnabled(true);
@@ -91,9 +138,17 @@ class MeshControlFilteringWebSocketSessionDecoratorTest {
         return "{\"action\":\"" + action + "\"}";
     }
 
+    private static List<String> filterBinary(MeshControlCommandProperties props, String... payloads) {
+        return filter(props, WebSocketMessage.Type.BINARY, payloads);
+    }
+
     private static List<String> filter(MeshControlCommandProperties props, String... payloads) {
+        return filter(props, WebSocketMessage.Type.TEXT, payloads);
+    }
+
+    private static List<String> filter(MeshControlCommandProperties props, WebSocketMessage.Type type, String... payloads) {
         WebSocketSession delegate = mock(WebSocketSession.class);
-        when(delegate.receive()).thenReturn(Flux.fromArray(payloads).map(MeshControlFilteringWebSocketSessionDecoratorTest::textMessage));
+        when(delegate.receive()).thenReturn(Flux.fromArray(payloads).map(payload -> message(type, payload)));
 
         MeshControlFilteringWebSocketSessionDecorator decorator =
                 new MeshControlFilteringWebSocketSessionDecorator(delegate, "/ws/tools/meshcentral-server/control.ashx",
@@ -102,8 +157,7 @@ class MeshControlFilteringWebSocketSessionDecoratorTest {
         return decorator.receive().map(WebSocketMessage::getPayloadAsText).collectList().block();
     }
 
-    private static WebSocketMessage textMessage(String payload) {
-        return new WebSocketMessage(WebSocketMessage.Type.TEXT,
-                BUFFERS.wrap(payload.getBytes(StandardCharsets.UTF_8)));
+    private static WebSocketMessage message(WebSocketMessage.Type type, String payload) {
+        return new WebSocketMessage(type, BUFFERS.wrap(payload.getBytes(StandardCharsets.UTF_8)));
     }
 }
