@@ -21,6 +21,8 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -32,6 +34,8 @@ public class SoftwareInstallUpdateManagementService {
     private final ScriptService scriptService;
     private final SoftwareDispatchService softwareDispatchService;
     private final MachinePlatformResolver machinePlatformResolver;
+    private final PackageUpdateEligibilityService packageUpdateEligibility;
+    private final PackageUpdateDispatchService packageUpdateDispatchService;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -62,8 +66,19 @@ public class SoftwareInstallUpdateManagementService {
             }
 
             List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
-            String executionId = softwareDispatchService.dispatch(script, targets, args, initiatedBy, source,
-                    pkg.getPackageManager(), pkg.getPackageName(), action);
+
+            Set<String> orderTargets = packageUpdateEligibility.eligibleMachines(targets);
+            List<String> scriptTargets = targets.stream().filter(id -> !orderTargets.contains(id)).toList();
+            String executionId = UUID.randomUUID().toString();
+
+            if (!scriptTargets.isEmpty()) {
+                softwareDispatchService.dispatch(executionId, script, scriptTargets, args, initiatedBy, source,
+                        pkg.getPackageManager(), pkg.getPackageName(), action);
+            }
+            if (!orderTargets.isEmpty()) {
+                packageUpdateDispatchService.dispatchAdminUpdateNow(executionId, action, pkg,
+                        List.copyOf(orderTargets), initiatedBy);
+            }
 
             results.add(SoftwareDispatchResult.builder()
                     .packageManager(pkg.getPackageManager())
