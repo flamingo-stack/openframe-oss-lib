@@ -104,7 +104,7 @@ export function Table<T = TableRowData>({
   rowKey,
   loading: loadingProp = false,
   emptyMessage,
-  skeletonRows = TABLE_SKELETON_ROWS,
+  skeletonRows: skeletonRowsProp,
   minRows,
   emptyState,
   keepHeightWhenEmpty,
@@ -137,6 +137,9 @@ export function Table<T = TableRowData>({
   animateRowReorder,
   actionsColumnWidth,
 }: TableProps<T>) {
+  // A loading table draws ONE FULL PAGE of rows: the host's count, else its page pagination's page size, else a
+  // typical count for an unpaged table.
+  const skeletonRows = skeletonRowsProp ?? pagePagination?.pageSize ?? TABLE_SKELETON_ROWS;
   // In a page's loading state the table is loading: its header real, its rows the row skeletons.
   const loading = useLoadingScope() || loadingProp;
   // Opt-in row-reorder animation: framer-motion is loaded lazily (its own chunk)

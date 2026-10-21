@@ -17,10 +17,16 @@ export function roadmapGridClass(columns: 1 | 2, showLeftMargin: boolean): strin
   }`;
 }
 
+/**
+ * Cards the grid's skeleton draws when its host states no count: a typical count. The roadmap lists every item it
+ * holds (no page, no limit); a host that reads a known number of items passes it as `count`.
+ */
+export const ROADMAP_GRID_SKELETON_CARDS = 4;
+
 export interface RoadmapGridSkeletonProps {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
-  /** Number of skeleton cards to show. Default 4. */
+  /** Skeleton cards: the number of items the host reads. Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count. */
   count?: number;
   /** Show the desktop left margin (~120px) that aligns the grid with
    *  the page hero's title block. Default `true`. Related-content rails
@@ -32,14 +38,16 @@ export interface RoadmapGridSkeletonProps {
 
 export function RoadmapGridSkeleton({
   region = true,
-  count = 4,
+  count = ROADMAP_GRID_SKELETON_CARDS,
   showLeftMargin = true,
   columns = 2,
 }: RoadmapGridSkeletonProps) {
   return (
     <LoadingRegion label="Loading the roadmap" announce={region} className={roadmapGridClass(columns, showLeftMargin)}>
       {Array.from({ length: count }).map((_, i) => (
-        <RoadmapCardSkeleton key={i} />
+        <div key={i} className="min-w-0" data-loading-item>
+          <RoadmapCardSkeleton />
+        </div>
       ))}
     </LoadingRegion>
   );

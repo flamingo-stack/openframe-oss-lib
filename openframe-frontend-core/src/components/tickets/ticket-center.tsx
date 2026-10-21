@@ -24,7 +24,6 @@ import { RefreshCw } from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { toast as defaultToast } from '../../hooks/use-toast';
 import type { DataSync } from '../../types/data-sync';
-import { cn } from '../../utils/cn';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { ChatTicketItemSkeleton } from '../chat/entity-cards/chat-ticket-item';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
@@ -36,7 +35,7 @@ import { Card } from '../ui/card';
 import { DataSyncLine } from '../ui/data-attribution';
 import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { useTicketActions } from './hooks/use-ticket-actions';
-import { useTicketsList } from './hooks/use-tickets-list';
+import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import { TicketOpenForm, type TicketOpenFormProps } from './ticket-open-form';
 import { TicketRow } from './ticket-row';
 import type { AnyTicket, OptimisticTicket, TicketData } from './types';
@@ -46,11 +45,6 @@ import { isOptimistic } from './types';
 const TICKET_CENTER_CLASS = 'flex flex-col gap-6';
 const TICKET_LIST_BLOCK_CLASS = 'flex flex-col gap-2';
 const TICKET_ROW_FRAME_CLASS = 'border-b border-ods-border last:border-b-0';
-/**
- * Ticket rows the list's skeleton draws: what one screen shows under the open-ticket form (an 80px row; the form
- * leaves room for four on a 1440x900 desktop and, stacked, for two on a 390x844 phone).
- */
-const TICKET_LIST_FOLD = { phone: 2, wide: 4 } as const;
 
 export interface TicketCenterProps {
   /** Optional toast override (test-friendly). Defaults to the lib's
@@ -312,18 +306,15 @@ function TicketListHeader({
   );
 }
 
+/** The ticket list while it is read: ONE FULL PAGE of rows (the list reads `TICKETS_PAGE_SIZE` tickets), at every width. */
 function TicketListSkeleton() {
   return (
     <Card className="overflow-hidden">
-      {Array.from({ length: Math.max(TICKET_LIST_FOLD.phone, TICKET_LIST_FOLD.wide) }, (_, i) => (
+      {Array.from({ length: TICKETS_PAGE_SIZE }, (_, i) => (
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
           key={i}
-          className={cn(
-            TICKET_ROW_FRAME_CLASS,
-            i >= TICKET_LIST_FOLD.phone && 'hidden md:block',
-            i >= TICKET_LIST_FOLD.wide && 'md:hidden',
-          )}
+          className={TICKET_ROW_FRAME_CLASS}
         >
           <ChatTicketItemSkeleton />
         </div>

@@ -143,7 +143,7 @@ export function AiSection({
   skeletonRows,
 }: {
   practices: TrustCenterAiPractice[];
-  /** Rows the loading state draws (`TrustPanelRows`). Absent: the layout's fold. */
+  /** Rows the loading state draws (`TrustPanelRows`). Absent: a typical count. */
   skeletonRows?: TrustPanelRows;
 }) {
   if (useLoadingScope()) return <TrustPanelSkeleton panel="ai" rows={skeletonRows} />;
@@ -415,7 +415,7 @@ export function DocumentsSection({
   skeletonRows,
 }: {
   documents: TrustCenterDocument[];
-  /** Rows the loading state draws (`TrustPanelRows`). Absent: the layout's fold. */
+  /** Rows the loading state draws (`TrustPanelRows`). Absent: a typical count. */
   skeletonRows?: TrustPanelRows;
   /** Where a public document opens (`trustCenterDocumentUrl`); `null` → offer a request instead. */
   documentUrl: (document: TrustCenterDocument) => string | null;
@@ -554,7 +554,7 @@ export function SubprocessorsSection({
   skeletonRows,
 }: {
   subprocessors: TrustCenterSubprocessor[];
-  /** Rows the loading state draws (`TrustPanelRows`). Absent: the layout's fold. */
+  /** Rows the loading state draws (`TrustPanelRows`). Absent: a typical count. */
   skeletonRows?: TrustPanelRows;
 }) {
   if (useLoadingScope()) return <TrustPanelSkeleton panel="subprocessors" rows={skeletonRows} />;
@@ -634,17 +634,19 @@ export function ContactSection({ onContact }: { onContact: () => void }) {
 // ---------------------------------------------------------------------------
 
 /**
- * Rows a panel's skeleton draws, on a phone (below `content-md`) and from `content-md`: the rows of a panel one screen
- * holds below its section's heading (a row of a typical description is about 100px on a phone and 80px wide). The
- * panels list what the host's data lists, so the skeleton draws the layout's fold, never one record set's length; a
- * host whose list is curated passes its length (each section's `skeletonRows`, the page's `panelSkeletonRows`).
+ * Rows a panel's skeleton draws when its host states no count. A panel lists every record the host's data holds (no
+ * page, no limit), so this is a typical count, drawn at every width; a host whose list is curated passes its length
+ * (each section's `skeletonRows`, the page's `panelSkeletonRows`).
  */
-const TRUST_PANEL_FOLD = { phone: 4, wide: 5 } as const;
+const TRUST_PANEL_SKELETON_ROWS = 5;
 
 /** The panels whose rows `TrustPanelSkeleton` draws (Controls, Contact and the FAQ draw their own). */
 export type TrustCenterPanelId = 'compliance' | 'documents' | 'subprocessors' | 'ai';
 
-/** Rows a panel's skeleton draws: one count, or one per breakpoint. */
+/**
+ * Rows a panel's skeleton draws: one count, at every width. The `{ phone, wide }` form is kept for hosts that pass
+ * it and draws the larger of the two everywhere (a skeleton never hides rows per breakpoint).
+ */
 export type TrustPanelRows = number | { phone: number; wide: number };
 
 /**
@@ -663,9 +665,9 @@ const TRUST_PANEL_SHAPES: Record<
   ai: { mark: 'glyph', action: 'none', lines: { phone: 6, wide: 2 } },
 };
 
-function panelFold(rows: TrustPanelRows | undefined): { phone: number; wide: number } {
-  if (rows === undefined) return TRUST_PANEL_FOLD;
-  return typeof rows === 'number' ? { phone: rows, wide: rows } : rows;
+function panelRowCount(rows: TrustPanelRows | undefined): number {
+  if (rows === undefined) return TRUST_PANEL_SKELETON_ROWS;
+  return typeof rows === 'number' ? rows : Math.max(rows.phone, rows.wide);
 }
 
 /**
@@ -675,17 +677,8 @@ function panelFold(rows: TrustPanelRows | undefined): { phone: number; wide: num
  */
 function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?: TrustPanelRows }) {
   const shape = TRUST_PANEL_SHAPES[panel];
-  const fold = panelFold(rows);
-  const panelRows: PanelRow[] = Array.from({ length: Math.max(fold.phone, fold.wide) }, (_, index) => ({
+  const panelRows: PanelRow[] = Array.from({ length: panelRowCount(rows) }, (_, index) => ({
     id: `skeleton-${index}`,
-    // A row past a breakpoint's fold is not drawn there; the last row drawn on a phone drops its divider like the
-    // panel's last row (`last:` cannot see a hidden sibling).
-    className: cn(
-      index >= fold.phone && 'hidden content-md:flex',
-      index >= fold.wide && 'content-md:hidden',
-      fold.phone < fold.wide && index === fold.phone - 1 && 'content-max-md:border-b-0',
-      fold.wide < fold.phone && index === fold.wide - 1 && 'content-md:border-b-0',
-    ),
     columns: [
       {
         // The loaded rows' own cell (leading mark, `text-h4` value over a wrapping `text-h6` label): the panel lays

@@ -14,13 +14,13 @@ export const CATALOG_SECTION_COUNT_CLASS =
 export const CATALOG_LIST_CLASS = 'flex flex-col gap-4';
 
 /**
- * Catalog cards one screen shows under the search and the section pills (a 1440x900 desktop and a 390x844 phone
- * both fit three of the `catalog` card's height before the fold). The section count is the data's: the skeleton
- * draws ONE section of this fold, and every loaded section is a `data-loading-item`.
+ * Catalog cards the skeleton's section draws: a typical count, at every width. The catalog reads every guide (no
+ * page, no limit), so there is no page size to draw. The section count is the data's too: the skeleton draws ONE
+ * section, and every loaded section is a `data-loading-item`.
  */
-export const ONBOARDING_CATALOG_CARD_FOLD = 3;
+export const ONBOARDING_CATALOG_SKELETON_CARDS = 3;
 /**
- * The catalog's sections while the guides are read: ONE section of `ONBOARDING_CATALOG_CARD_FOLD` cards in the view's
+ * The catalog's sections while the guides are read: ONE section of `ONBOARDING_CATALOG_SKELETON_CARDS` cards in the view's
  * own classes (its heading and count bars). The view draws it itself (`useLoadingScope() || loading`): its search bar
  * is real and its section pills draw their own skeleton.
  */
@@ -35,7 +35,7 @@ export function OnboardingCatalogSectionsSkeleton() {
           </span>
         </h2>
         <ul className={CATALOG_LIST_CLASS}>
-          {Array.from({ length: ONBOARDING_CATALOG_CARD_FOLD }, (_, i) => (
+          {Array.from({ length: ONBOARDING_CATALOG_SKELETON_CARDS }, (_, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
             <li key={i}>
               <OnboardingGuideCardSkeleton size="catalog" />

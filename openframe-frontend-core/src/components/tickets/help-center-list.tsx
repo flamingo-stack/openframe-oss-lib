@@ -48,7 +48,7 @@ import { UnifiedPagination } from '../unified-pagination';
 import { HelpCenterCard } from './help-center-card';
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form';
 import { useTicketActions } from './hooks/use-ticket-actions';
-import { useTicketsList } from './hooks/use-tickets-list';
+import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
 import { isOptimistic } from './types';
 
@@ -105,7 +105,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
         shell={shell}
         preControls={<HelpCenterCreateFormSkeleton />}
       >
-        <DevCardRowSkeletonList />
+        <DevCardRowSkeletonList rows={TICKETS_PAGE_SIZE} />
       </DevSectionPage>
     );
   }
@@ -206,7 +206,7 @@ function HelpCenterListAuthed({
     [searchParams, router, pathname],
   );
 
-  const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
+  const { tickets, isLoading, isFetching, error, refetch, totalPages, pageSize } = useTicketsList({
     // `sessionEmail` is drilled in from the parent — see the same
     // pattern + race-cause rationale documented in
     // `HelpCenterCreateForm.sessionName/sessionEmail`. Calling
@@ -330,7 +330,7 @@ function HelpCenterListAuthed({
       {!error && (
         <div className="w-full">
           {isLoading ? (
-            <DevCardRowSkeletonList />
+            <DevCardRowSkeletonList rows={pageSize} />
           ) : !hasResults && isFetching ? (
             // Bridge state — background refetch in flight and the
             // optimistic placeholder was just removed by the mutation
