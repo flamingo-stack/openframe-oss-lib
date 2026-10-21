@@ -38,7 +38,7 @@ export function RemoteDesktopChatMessageRow({
   body,
 }: RemoteDesktopChatMessageRowProps) {
   return (
-    <div className={MESSAGE_ROW_CLASS}>
+    <div className={MESSAGE_ROW_CLASS} data-loading-item>
       <div className={MESSAGE_HEAD_CLASS}>
         {isTechnician && (
           <SquareAvatar variant="round" sizePx={24} src={avatarUrl} alt={authorName} className="shrink-0" />
@@ -59,7 +59,7 @@ export function RemoteDesktopChatMessageRow({
 /** A message row while the chat is read: the name and the time as bars on the name row, one line of the body. */
 export function RemoteDesktopChatMessageRowSkeleton() {
   return (
-    <div className={MESSAGE_ROW_CLASS} aria-hidden>
+    <div className={MESSAGE_ROW_CLASS} aria-hidden data-loading-item>
       <div className={MESSAGE_HEAD_CLASS}>
         <span className={MESSAGE_NAME_CLASS}>
           <TextLineSkeleton type="inherit" as="span" className="w-24" />
