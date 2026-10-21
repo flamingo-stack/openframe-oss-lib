@@ -44,6 +44,7 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDO
 import static com.openframe.delivery.config.DeliveryTestPolicies.SWEEP_INTERVAL_MILLIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -377,7 +378,23 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
-        verify(repository, never()).findDue(any(DeliveryStatus.class), any(Instant.class), any(Integer.class));
+        verify(repository, never()).findDueExcept(any(DeliveryStatus.class), anySet(), any(Instant.class), any(Integer.class));
+    }
+
+    @Test
+    void retryPending_typeWithFastSweep_leftToTheFastPass() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        stubDue();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).findDueExcept(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE));
     }
 
     @Test
@@ -417,7 +434,7 @@ class DeliverySweepServiceTest {
     }
 
     private void stubDue(MachineDelivery... rows) {
-        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
+        when(repository.findDueExcept(eq(DeliveryStatus.PENDING), anySet(), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
     private void stubMachineOnline() {

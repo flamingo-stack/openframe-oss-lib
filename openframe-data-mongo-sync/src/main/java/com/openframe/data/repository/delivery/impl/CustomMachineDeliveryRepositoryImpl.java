@@ -61,6 +61,12 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         return findDue(due, limit);
     }
 
+    @Override
+    public List<MachineDelivery> findDueExcept(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
+        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).nin(types).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
     // primary on purpose: a receiver that reports by key does so milliseconds after the row was written
     @Override
     public Optional<MachineDelivery> findByIdOnPrimary(String id) {

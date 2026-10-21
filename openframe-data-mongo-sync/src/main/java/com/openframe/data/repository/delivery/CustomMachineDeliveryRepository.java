@@ -16,6 +16,8 @@ public interface CustomMachineDeliveryRepository {
 
     List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit);
 
+    List<MachineDelivery> findDueExcept(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit);
+
     Optional<MachineDelivery> findByIdOnPrimary(String id);
 
     boolean upsertPending(MachineDelivery delivery);

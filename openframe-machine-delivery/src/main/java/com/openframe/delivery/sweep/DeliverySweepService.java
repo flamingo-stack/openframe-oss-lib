@@ -46,14 +46,15 @@ public class DeliverySweepService {
     private final DeliveryPayloadJson payloadJson;
     private final RetryBackoff retryBackoff;
 
+    // the regular pass leaves the types with fast-sweep to the fast pass: one publisher per row at a time
     public void retryPending() {
         Instant now = Instant.now();
         int batchSize = properties.getSweep().getBatchSize();
-        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, now, batchSize);
+        Set<DeliveryType> fastTypes = properties.fastTypes();
+        List<MachineDelivery> due = repository.findDueExcept(DeliveryStatus.PENDING, fastTypes, now, batchSize);
         retry(due, now);
     }
 
-    // the fast pass: the rows of the types whose policy asks for it; the regular pass still sees them too
     public void retryPendingFast() {
         Set<DeliveryType> fastTypes = properties.fastTypes();
         if (fastTypes.isEmpty()) {
