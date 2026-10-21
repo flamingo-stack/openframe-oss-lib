@@ -12,6 +12,7 @@ import {
   Ellipsis01Icon,
   Filter01Icon,
   MessagesIcon,
+  QuestionCircleIcon,
   SearchIcon,
   SearchXmarkIcon,
 } from '../icons-v2-generated';
@@ -198,6 +199,7 @@ export function MingoChatHistorySection({
   onSelectDialog,
   draftTitle,
   onOpenArchive,
+  onWhatToAsk,
   statusOf,
   onRequestRename,
   onRequestArchive,
@@ -244,16 +246,28 @@ export function MingoChatHistorySection({
     onRetry,
   };
 
-  const moreMenu: ActionsMenuItem[] = onOpenArchive
-    ? [
-        {
-          id: 'archive',
-          label: 'Chat archive',
-          icon: <MessagesIcon className={chatMenuIconClassName} />,
-          onClick: onOpenArchive,
-        },
-      ]
-    : [];
+  const moreMenu: ActionsMenuItem[] = [
+    ...(onOpenArchive
+      ? [
+          {
+            id: 'archive',
+            label: 'Chat archive',
+            icon: <MessagesIcon className={chatMenuIconClassName} />,
+            onClick: onOpenArchive,
+          },
+        ]
+      : []),
+    ...(onWhatToAsk
+      ? [
+          {
+            id: 'what-to-ask',
+            label: 'What to ask Mingo?',
+            icon: <QuestionCircleIcon className={chatMenuIconClassName} />,
+            onClick: onWhatToAsk,
+          },
+        ]
+      : []),
+  ];
 
   // The scope as a filter, not a control of its own: a choice of two (radio
   // items, the menu closes on a pick), the trigger lit while it is the wider

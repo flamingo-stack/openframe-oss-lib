@@ -150,6 +150,18 @@ describe('MingoChatRail variant="section"', () => {
     expect(onOpenArchive).toHaveBeenCalledTimes(1);
   });
 
+  it('offers "What to ask Mingo?" in the ⋯ menu, after the archive', () => {
+    const onWhatToAsk = vi.fn();
+    render(<MingoChatRail variant="section" dialogs={DIALOGS} onOpenArchive={vi.fn()} onWhatToAsk={onWhatToAsk} />);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More' }), { button: 0, pointerType: 'mouse' });
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      'Chat archive',
+      'What to ask Mingo?',
+    ]);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'What to ask Mingo?' }));
+    expect(onWhatToAsk).toHaveBeenCalledTimes(1);
+  });
+
   it('asks the host to open the search when controlled, and leaves the modal to it', () => {
     const onSearchOpenChange = vi.fn();
     const props = { variant: 'section' as const, dialogs: DIALOGS, onSearchOpenChange, onSearchChange: vi.fn() };

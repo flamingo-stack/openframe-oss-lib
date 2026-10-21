@@ -135,7 +135,7 @@ describe('AppLayout composerSheet', () => {
     render(layout({ composerDock: <p>dock</p>, composerSheet: <p>sheet</p> }));
     expect(within(screen.getByRole('main')).queryByText('sheet')).not.toBeInTheDocument();
     expect(markup()).toMatch(
-      /<\/main><div data-composer-sheet-layer="" class="ods-content-area pointer-events-none absolute inset-x-0 top-0 z-40" style="bottom: 0px;"><div class="ods-content-scope"><p>sheet<\/p><\/div><\/div><div class="ods-content-area shrink-0">/,
+      /<\/main><div data-composer-sheet-layer="" class="ods-content-area pointer-events-none absolute inset-x-0 top-0 z-40" style="bottom: 0px;"><div class="ods-content-scope"><p>sheet<\/p><\/div><\/div><div class="ods-content-area shrink-0 relative z-40">/,
     );
   });
 

@@ -407,8 +407,9 @@ export function AppLayout({
                   )}
                   {hasDock && (
                     // Its own container + token scope: a container query cannot
-                    // reach from <main> to a sibling. Same column width.
-                    <div ref={setDockElement} className="ods-content-area shrink-0">
+                    // reach from <main> to a sibling. Same column width. With a
+                    // sheet it rises over the sheet's scrim, which runs on under it.
+                    <div ref={setDockElement} className={cn('ods-content-area shrink-0', hasSheet && 'relative z-40')}>
                       <ContentAreaWidthContext.Provider value={contentAreaWidth}>
                         <div className="ods-content-scope">{composerDock}</div>
                       </ContentAreaWidthContext.Provider>

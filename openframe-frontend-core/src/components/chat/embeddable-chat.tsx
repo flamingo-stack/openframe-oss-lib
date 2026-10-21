@@ -1132,6 +1132,13 @@ export interface EmbeddableChatHandle {
    * from the `@` picker, and `text` follows them in the draft.
    */
   prefillDraft: (draft: ChatPrefillDraft) => void;
+  /**
+   * Same as the v2 list's "What to ask Mingo?", for a host that draws its own entry
+   * (a link beside its quick actions, an item in its own chat-history menu): the
+   * host's `onWhatToAsk` when it has one, else the `whatToAsk` exchange (at the end
+   * of the open conversation, or in a new chat), else a new chat. Leaves the archive.
+   */
+  showWhatToAsk: () => void;
 }
 
 export const EmbeddableChat = React.forwardRef<EmbeddableChatHandle, EmbeddableChatProps>(
@@ -1791,6 +1798,8 @@ function EmbeddableChatInner({
   // `sendPrompt` goes through a ref: what it sends with is declared further
   // down (`sendPromptRef.current` is set next to `handleSend`).
   const sendPromptRef = useRef<(text: string) => void>(() => {});
+  // The "What to ask?" entry as of the last render, for the handle (`showWhatToAsk`).
+  const whatToAskEntryRef = useRef<() => void>(() => {});
   const chatPanelHandle = useMemo<ChatPanelHandle>(
     () => ({
       closeChat: handleNavigationClose,
@@ -2612,6 +2621,7 @@ function EmbeddableChatInner({
         mentionKeysRef.current.clear();
         setPendingDraft({ text, mentions: mentions.slice(0, contextMaxItems) });
       },
+      showWhatToAsk: () => whatToAskEntryRef.current(),
     }),
     [resetToNewChat, contextMaxItems],
   );
@@ -2716,6 +2726,17 @@ function EmbeddableChatInner({
       if (archiveOpen) closeArchive();
       action();
     };
+  // The list's "What to ask Mingo?" entry, also the host's (`showWhatToAsk`). The
+  // suggestions a new chat opens on, unless the host has a surface of its own.
+  // From the archive list no chat is on screen, even though the one open before it
+  // is still the active dialog: that click opens a new chat.
+  const openWhatToAsk = () => {
+    const fromArchive = archiveOpen;
+    leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? () => requestWhatToAsk(fromArchive) : handleNewChat))();
+  };
+  useEffect(() => {
+    whatToAskEntryRef.current = openWhatToAsk;
+  });
   const mingoRailProps = {
     dialogs,
     // The archive takes the chat column: the open chat stays selected (closing
@@ -2729,13 +2750,7 @@ function EmbeddableChatInner({
     onNewChat: leaveArchiveThen(handleNewChat),
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
-    // The suggestions a new chat opens on, unless the host has a surface of its own.
-    // From the archive list no chat is on screen, even though the one open
-    // before it is still the active dialog: that click opens a new chat.
-    onWhatToAsk: () => {
-      const fromArchive = archiveOpen;
-      leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? () => requestWhatToAsk(fromArchive) : handleNewChat))();
-    },
+    onWhatToAsk: openWhatToAsk,
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,
     onRequestArchive: mingoCaps.canArchive ? setArchiveTarget : undefined,

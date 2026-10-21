@@ -57,6 +57,11 @@ export interface MingoChatListProps {
   /** Open the archive. The rail lists it as an action; the section puts
    *  "Chat archive" in its ⋯ menu. */
   onOpenArchive?: () => void;
+  /**
+   * "What to ask Mingo?": the suggestions a chat starts from. The rail draws it as an
+   * action under the logo, the section as an item of its ⋯ menu.
+   */
+  onWhatToAsk?: () => void;
   /** A row's status glyph. Unread replies are shown without it. */
   statusOf?: (dialog: DialogItem) => MingoDialogStatus | undefined;
   /** Row ⋯ menu actions — each item appears only when its handler is set. */

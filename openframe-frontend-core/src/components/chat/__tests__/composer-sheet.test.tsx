@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatContextMemoryBar } from '../chat-context-memory-bar';
 import { ComposerSheet, type ComposerSheetProps } from '../composer-sheet';
@@ -31,6 +31,34 @@ describe('ComposerSheet', () => {
     const dialog = screen.getByRole('dialog', { name: 'Mingo chat' });
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(screen.getByText('thread')).toBeInTheDocument();
+  });
+
+  it('is a card with its border and rounding on every side, its content from the top border', () => {
+    render(sheet());
+    const card = screen.getByTestId('composer-sheet-card');
+    expect(card).toHaveClass('rounded-md', 'border', 'overflow-hidden');
+    expect(card).not.toHaveClass('rounded-t-md', 'border-b-0', 'pt-3');
+    expect(within(card).getByText('thread')).toBeInTheDocument();
+  });
+
+  it('resizes from a tab standing on its top edge, and resets on a double click', () => {
+    const onResetHeight = vi.fn();
+    render(sheet({ onResetHeight }));
+    const tab = screen.getByTestId('composer-sheet-tab');
+    const handle = within(tab).getByRole('separator', { name: 'Resize the chat' });
+    expect(handle).toHaveClass('cursor-row-resize');
+    expect(within(screen.getByTestId('composer-sheet-card')).queryByRole('separator')).not.toBeInTheDocument();
+    fireEvent.doubleClick(handle);
+    expect(onResetHeight).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the tab inside the layer at its full height', () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(800);
+    render(sheet({ height: 2000 }));
+    const handle = screen.getByRole('separator', { name: 'Resize the chat' });
+    expect(handle).toHaveAttribute('aria-valuemax', '780');
+    expect(handle).toHaveAttribute('aria-valuenow', '780');
+    vi.restoreAllMocks();
   });
 
   it('hands a scrim click to the host', () => {

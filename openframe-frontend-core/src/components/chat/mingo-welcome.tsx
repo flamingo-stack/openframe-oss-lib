@@ -9,8 +9,8 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { MingoChatHistorySkeleton } from './mingo-chat-history';
+import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { QuickActionChipButton } from './quick-action-chip';
-import { QuickActionWall } from './quick-action-wall';
 
 // =============================================================================
 // Types
@@ -323,25 +323,11 @@ export function MingoWelcome({
                 />
               )}
               {quickActions && quickActions.length > 0 && (
-                <QuickActionWall
-                  chips={quickActions.map(action => ({
-                    id: action.id,
-                    label: action.label,
-                    icon: action.icon,
-                    variant: action.variant,
-                    onSelect: action.onClick,
-                    onHoverStart: () => onQuickActionHover?.(action),
-                    onHoverEnd: () => onQuickActionHoverEnd?.(),
-                  }))}
+                <MingoQuickActionWall
+                  quickActions={quickActions}
+                  onQuickActionHover={onQuickActionHover}
+                  onQuickActionHoverEnd={onQuickActionHoverEnd}
                   agentSlug={agentSlug}
-                  rows={4}
-                  pauseOnHover
-                  dragScroll
-                  fade={['left', 'right']}
-                  fadeSize={{ left: 32 }}
-                  fadeColor="var(--color-bg)"
-                  copyGap="var(--spacing-system-xxs)"
-                  className="max-h-44 shrink-0"
                 />
               )}
             </div>

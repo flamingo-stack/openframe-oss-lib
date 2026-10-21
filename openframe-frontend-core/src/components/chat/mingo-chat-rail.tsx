@@ -39,7 +39,7 @@ export interface MingoChatRailProps extends MingoChatListProps {
    * actions below (start a chat, the archive, "What to ask Mingo?") and the
    * list, at a fixed 296 px.
    * `'section'`: the chat history block of a host's main navigation sidebar
-   * (`MingoChatHistorySection`) — caption, Search, ⋯ (Chat archive), the scope,
+   * (`MingoChatHistorySection`) — caption, Search, ⋯ (Chat archive, What to ask Mingo?), the scope,
    * the chats grouped by day. No outer chrome or width of its own; it fills the
    * height it is given and scrolls inside. The rail-only props below are
    * ignored there.
@@ -49,8 +49,6 @@ export interface MingoChatRailProps extends MingoChatListProps {
   onNewChat?: () => void;
   /** Rail only: the archive is the view on screen. */
   archiveActive?: boolean;
-  /** Rail only — "What to ask Mingo?": the suggestions a new chat starts from. */
-  onWhatToAsk?: () => void;
   /** Rail only — the |← control beside the logo: widen the panel to the list and the chat. */
   onExpand?: () => void;
 }

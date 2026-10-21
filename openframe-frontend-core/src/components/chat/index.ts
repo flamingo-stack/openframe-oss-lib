@@ -33,6 +33,7 @@ export * from './ask-prompts';
 export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
+export * from './mingo-quick-action-wall';
 export * from './chat-ticket-list';
 export * from './chat-typing-indicator';
 export * from './tool-execution-display';

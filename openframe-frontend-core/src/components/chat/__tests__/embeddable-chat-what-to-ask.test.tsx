@@ -8,8 +8,8 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { useState } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { createRef, type Ref, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../utils/embed-authed-fetch', () => ({
@@ -17,7 +17,7 @@ vi.mock('../../../utils/embed-authed-fetch', () => ({
 }));
 
 import { type ChatRuntime, ChatRuntimeContext } from '../../../contexts/chat-runtime-context';
-import { EmbeddableChat } from '../embeddable-chat';
+import { EmbeddableChat, type EmbeddableChatHandle } from '../embeddable-chat';
 import type { WhatToAskContent } from '../hooks/use-what-to-ask';
 import type { UnifiedChatMessage, UnifiedChatState } from '../types/unified-chat-state.types';
 
@@ -51,6 +51,8 @@ function Host({
   openChat = [HELLO],
   busy = false,
   whatToAsk = WHAT_TO_ASK,
+  onWhatToAsk,
+  handleRef,
 }: {
   initialDialogId?: string | null;
   onReset?: () => void;
@@ -60,6 +62,9 @@ function Host({
   /** A turn is running in the open chat. */
   busy?: boolean;
   whatToAsk?: WhatToAskContent | (() => Promise<WhatToAskContent>);
+  /** The host's own "What to ask?" surface. */
+  onWhatToAsk?: () => void;
+  handleRef?: Ref<EmbeddableChatHandle>;
 }) {
   const [activeDialogId, setActiveDialogId] = useState<string | null>(initialDialogId);
   const [sent, setSent] = useState<UnifiedChatMessage[]>([]);
@@ -108,6 +113,7 @@ function Host({
   };
   return (
     <EmbeddableChat
+      ref={handleRef}
       shell="inline"
       appearance="v2"
       defaultOpen
@@ -119,6 +125,7 @@ function Host({
         fetchArchivedDialogs: () => Promise.resolve({ dialogs: [], nextCursor: null }),
       }}
       whatToAsk={whatToAsk}
+      onWhatToAsk={onWhatToAsk}
       chatMenuExtraItems={onReset ? [{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }] : undefined}
     />
   );
@@ -270,5 +277,27 @@ describe('EmbeddableChat - whatToAsk', () => {
     expect(items).toContain('Rename Chat');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Reset Onboarding' }));
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
+  it("answers the host's own entry (the handle) as the list's", () => {
+    const handle = createRef<EmbeddableChatHandle>();
+    renderHost({ initialDialogId: 'd-1', handleRef: handle });
+
+    act(() => handle.current?.showWhatToAsk());
+
+    const hello = screen.getByText('hello');
+    const question = screen.getByText('What can I ask you?');
+    expect(hello.compareDocumentPosition(question) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("hands the host's entry to the host's own surface when it has one", () => {
+    const handle = createRef<EmbeddableChatHandle>();
+    const onWhatToAsk = vi.fn();
+    renderHost({ initialDialogId: 'd-1', handleRef: handle, onWhatToAsk });
+
+    act(() => handle.current?.showWhatToAsk());
+
+    expect(onWhatToAsk).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('What can I ask you?')).not.toBeInTheDocument();
   });
 });
