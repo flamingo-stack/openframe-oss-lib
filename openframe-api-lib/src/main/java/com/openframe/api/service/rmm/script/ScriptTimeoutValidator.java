@@ -22,10 +22,18 @@ public class ScriptTimeoutValidator {
             log.debug("Rejected script timeout {} (must be positive)", timeoutSeconds);
             throw new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must be a positive number of seconds");
         }
+        validateMaximum(timeoutSeconds, "timeoutSeconds");
+    }
+
+    public void validateMaximum(Integer timeoutSeconds, String parameterName) {
+        if (timeoutSeconds == null) {
+            return;
+        }
         int maxTimeoutSeconds = properties.getMaxTimeoutSeconds();
         if (timeoutSeconds > maxTimeoutSeconds) {
             log.debug("Rejected script timeout {} (exceeds max {})", timeoutSeconds, maxTimeoutSeconds);
-            throw new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed " + maxTimeoutSeconds + " seconds");
+            throw new BadRequestException(ErrorCode.VALIDATION_ERROR,
+                    parameterName + " must not exceed " + maxTimeoutSeconds + " seconds");
         }
     }
 }
