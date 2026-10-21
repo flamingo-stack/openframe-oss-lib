@@ -1,7 +1,7 @@
 'use client';
 
 import { usePreventScroll } from '@react-aria/overlays';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusTrap } from '../../hooks/ui/use-focus-trap';
 import type {
   NavigationSidebarConfig,
@@ -24,6 +24,9 @@ const HEADER_HEIGHT = 56;
 
 /** The drawer always lays its slots out expanded. */
 const DRAWER_SLOT_STATE: NavigationSidebarSlotState = { minimized: false, inDrawer: true };
+
+/** The grouped drawer's slide (`duration-300`): how long a closing drawer is still on screen. */
+const DRAWER_SLIDE_MS = 300;
 
 export interface MobileBurgerMenuProps {
   /** Whether the menu is open */
@@ -94,6 +97,19 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
   );
   const [openGroupId, setOpenGroupId] = useOpenNavigationGroup(activeGroupId);
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
+
+  // The grouped drawer stays mounted (`md:hidden` from md up, off-screen below
+  // it), so its section slot — the Mingo chat history — is held only while the
+  // drawer is open or still sliding closed. Always mounted, it was a second copy
+  // of every history row on every page: React work on each list update, its DOM
+  // in every restyle, and its loaders animating unseen.
+  const [sectionMounted, setSectionMounted] = useState(isOpen);
+  if (isOpen && !sectionMounted) setSectionMounted(true);
+  useEffect(() => {
+    if (isOpen || !sectionMounted) return undefined;
+    const timer = setTimeout(() => setSectionMounted(false), DRAWER_SLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [isOpen, sectionMounted]);
   // A grouped row is a real anchor (the sidebar's row), so a plain click must
   // not ALSO let the browser follow it when the host routes through
   // `onNavigate`; a modified click is the browser's (new tab) and leaves the
@@ -301,7 +317,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
 
                   {/* In the flow at its full height, as in the sidebar: the drawer's
                       body scrolls the tree and the section as one. */}
-                  {hasNavigationSidebarSlot(sectionSlot) && (
+                  {sectionMounted && hasNavigationSidebarSlot(sectionSlot) && (
                     <div className="mt-[var(--spacing-system-xsf)] flex flex-col border-t border-ods-border pt-[var(--spacing-system-sf)]">
                       {renderNavigationSidebarSlot(sectionSlot, DRAWER_SLOT_STATE)}
                     </div>

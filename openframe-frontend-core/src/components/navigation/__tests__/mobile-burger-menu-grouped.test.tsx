@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { NavigationSidebarItem } from '../../../types/navigation';
 import { MobileBurgerMenu } from '../mobile-burger-menu';
@@ -46,6 +46,33 @@ describe('MobileBurgerMenu grouped', () => {
     expect(within(dialog).getByRole('link', { name: 'Devices' })).toHaveAttribute('aria-current', 'page');
     expect(within(dialog).getByText('Chat history')).toBeInTheDocument();
     expect(within(dialog).getByText('account row')).toBeInTheDocument();
+  });
+
+  it('holds the section slot only while open, and through the closing slide', () => {
+    vi.useFakeTimers();
+    try {
+      const menu = (isOpen: boolean) => (
+        <MobileBurgerMenu
+          isOpen={isOpen}
+          onClose={vi.fn()}
+          config={{ variant: 'grouped', items, currentPath: '/devices', sectionSlot: <p>Chat history</p> }}
+        />
+      );
+      const { rerender } = render(menu(false));
+      // Closed, the drawer is still mounted: a second copy of the history would be too.
+      expect(screen.queryByText('Chat history')).not.toBeInTheDocument();
+
+      rerender(menu(true));
+      expect(screen.getByText('Chat history')).toBeInTheDocument();
+
+      rerender(menu(false));
+      act(() => vi.advanceTimersByTime(299));
+      expect(screen.getByText('Chat history')).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByText('Chat history')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a parent only expands (the menu stays open); a child navigates and closes', () => {
