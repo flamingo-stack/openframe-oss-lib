@@ -4,13 +4,14 @@ import { useSyncExternalStore, type ReactNode } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
 import { LoadingRegion } from '../../loading/loading-region';
-import { useLoadingScope } from '../loading-scope';
+import { LoadingItems, useLoadingScope } from '../loading-scope';
 import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
 import { DataTableRow } from './data-table-row';
-import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState, ROW_STACK_CLASSES } from './data-table-skeleton';
+import { ROW_STACK_CLASSES } from './data-table-row-classes';
+import { PlaceholderRows, ReservedEmptyState } from './data-table-skeleton';
 import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableBodyProps<T = unknown> {
@@ -144,11 +145,18 @@ export function DataTableBody<T = unknown>({
         announce={loadingRegion && !inScope}
         className={cn(ROW_STACK_CLASSES, className)}
       >
-        <DataTableSkeleton
-          rows={skeletonRows}
-          className={skeletonRowClassName}
-          rowHeightClassName={rowHeightClassName}
-        />
+        <LoadingItems count={skeletonRows}>
+          {index => (
+            <DataTableRow
+              row={null}
+              loadingIndex={index}
+              compact={compact}
+              className={skeletonRowClassName}
+              rowHeightClassName={rowHeightClassName}
+              data-loading-item
+            />
+          )}
+        </LoadingItems>
       </LoadingRegion>
     );
   }
@@ -200,15 +208,23 @@ export function DataTableBody<T = unknown>({
             rowHeightClassName={rowHeightClassName}
             className={cls}
             subRow={renderSubRow?.(item)}
+            data-loading-item
           />
         );
       })}
       {loadMoreRows > 0 && (
-        <DataTableSkeleton
-          rows={loadMoreRows}
-          className={skeletonRowClassName}
-          rowHeightClassName={rowHeightClassName}
-        />
+        <LoadingItems count={loadMoreRows}>
+          {index => (
+            <DataTableRow
+              row={null}
+              loadingIndex={index}
+              compact={compact}
+              className={skeletonRowClassName}
+              rowHeightClassName={rowHeightClassName}
+              data-loading-item
+            />
+          )}
+        </LoadingItems>
       )}
       {padCount > 0 && <PlaceholderRows count={padCount} rowHeightClassName={rowHeightClassName} />}
     </div>

@@ -13,7 +13,8 @@ import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-ic
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from './floating-tooltip';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
+import { Tag } from './tag';
 import { TruncateText } from './truncate-text';
 
 export type ServiceCardRowAction = {
@@ -49,6 +50,8 @@ export interface ServiceCardProps {
    */
   loading?: boolean;
   className?: string;
+  /** `data-*` markers (`data-loading-item` on a read list's card), on the card's root in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
 /** A row's label column and its value box, read by the row and its skeleton (the same box). */
@@ -56,9 +59,6 @@ const SERVICE_CARD_ROW_CLASS = 'flex min-w-0 items-center gap-3';
 const SERVICE_CARD_ROW_LABEL_CLASS = 'w-20 shrink-0 text-ods-text-primary text-h6 content-md:w-24';
 const SERVICE_CARD_VALUE_BOX_CLASS =
   'flex h-12 min-w-0 flex-1 items-center justify-between rounded-md border border-ods-border bg-ods-bg px-3 content-md:px-4';
-/** The header's tag pill, loaded and loading. */
-const SERVICE_CARD_TAG_CLASS =
-  'self-start whitespace-nowrap rounded-full border border-ods-border bg-ods-bg px-3 py-1 font-semibold text-ods-text-primary text-h6';
 /** The value box's actions (reveal, copy, open), loaded and loading. */
 const SERVICE_CARD_ACTIONS_CLASS = 'flex flex-shrink-0 items-center gap-2 pl-3';
 const SERVICE_CARD_ACTION_CLASS = 'rounded p-2 text-ods-text-secondary';
@@ -73,7 +73,16 @@ function MaskedValue({ value, isRevealed }: { value: string; isRevealed: boolean
   return <span>{'•'.repeat(Math.min(value.length, 12))}</span>;
 }
 
-export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loadingProp, className }: ServiceCardProps) {
+export function ServiceCard({
+  title,
+  subtitle,
+  icon,
+  tag,
+  rows,
+  loading: loadingProp,
+  className,
+  ...props
+}: ServiceCardProps) {
   // ONE switch: in a page's loading state (or while the host reads the values) every value is a bar.
   const loading = useLoadingScope() || !!loadingProp;
   const resolvedIcon = icon ?? (
@@ -85,7 +94,7 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loading
   );
 
   return (
-    <div className={cn('rounded-lg border border-ods-border bg-ods-card p-6', className)}>
+    <div className={cn('rounded-lg border border-ods-border bg-ods-card p-6', className)} {...loadingItemProps(props)}>
       {/* Header */}
       <div className="mb-4 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
@@ -109,12 +118,8 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loading
             )}
           </div>
         </div>
-        {tag && (
-          // The tag is read with the values: the pill's own box, its label a bar while loading.
-          <div className={SERVICE_CARD_TAG_CLASS}>
-            {loading ? <TextLineSkeleton type="inherit" className="w-12" /> : tag.label}
-          </div>
-        )}
+        {/* The tag is read with the values: the lib `Tag`, which draws its own skeleton while loading. */}
+        {tag && <Tag label={tag.label} variant="outline" className="shrink-0 self-start" loading={loading} />}
       </div>
 
       {/* Rows */}

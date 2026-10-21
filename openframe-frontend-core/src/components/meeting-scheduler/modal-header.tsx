@@ -4,9 +4,10 @@ import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { SquareAvatar, AvatarStack, Button } from '../ui';
+import { Button } from '../ui';
 import { useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
+import { HostIdentity } from './host-identity';
 
 /** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
 const noop = () => {};
@@ -40,42 +41,7 @@ const ROW_CLASS = 'border-b border-ods-border p-[var(--spacing-system-m)]';
 const STRIP_CLASS = cn(ROW_CLASS, 'flex items-center justify-between gap-[var(--spacing-system-m)]');
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
 const TIMEZONE_ROW_CLASS = cn(ROW_CLASS, 'flex flex-col gap-[var(--spacing-system-xxs)]');
-/** The host list, one host's row and its text column, read by the header and by its skeleton. */
-const HOST_LIST_CLASS = 'flex min-w-0 flex-col gap-[var(--spacing-system-s)]';
-const HOST_ROW_CLASS = 'flex items-center gap-[var(--spacing-system-xs)]';
-const HOST_TEXT_CLASS = 'flex min-w-0 flex-col';
 const DURATION_LINE_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
-
-function HostIdentity({ hosts }: { hosts: MeetingHost[] }) {
-  if (hosts.length === 0) return null;
-  if (hosts.length > 3) {
-    return (
-      <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-        <AvatarStack people={hosts} max={4} size="lg" label="Hosts" />
-        <p className="text-ods-text-secondary text-h6">{hosts.length} hosts on this calendar</p>
-      </div>
-    );
-  }
-  return (
-    <div className={HOST_LIST_CLASS}>
-      {hosts.map(host => (
-        <div key={host.name} className={HOST_ROW_CLASS}>
-          <SquareAvatar
-            variant="round"
-            size="sm"
-            src={host.avatarUrl ?? undefined}
-            alt={host.name}
-            fallback={host.name}
-          />
-          <div className={HOST_TEXT_CLASS}>
-            <p className="truncate text-ods-text-primary text-h4">{host.name}</p>
-            {host.title && <p className="truncate text-ods-text-secondary text-h6">{host.title}</p>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function SchedulerModalHeader({
   hosts,
@@ -139,15 +105,7 @@ export function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTime
   return (
     <>
       <div className={STRIP_CLASS}>
-        <div className={HOST_LIST_CLASS}>
-          <div className={HOST_ROW_CLASS}>
-            <SquareAvatar loading variant="round" size="sm" />
-            <div className={HOST_TEXT_CLASS}>
-              <TextLineSkeleton type="h4" className="w-32" />
-              <TextLineSkeleton type="h6" className="w-24" />
-            </div>
-          </div>
-        </div>
+        <HostIdentity hosts={[]} loading />
         <TextLineSkeleton type="h6" className={cn(DURATION_LINE_CLASS, 'w-20')} />
       </div>
       {showTimezone && (

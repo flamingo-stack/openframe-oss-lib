@@ -28,7 +28,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
 import { HiddenTagsPopup } from './hidden-tags-popup';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 import { TruncateText } from './truncate-text';
 
@@ -699,12 +699,13 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                 // The options while they are read: the list's own rows, a label bar each (`loadingText` is what a
                 // screen reader hears).
                 <LoadingRegion label={loadingText}>
-                  {Array.from({ length: loadingRows }, (_, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-                    <div key={i} className={AUTOCOMPLETE_OPTION_ROW_CLASS} aria-hidden>
-                      <TextLineSkeleton type="inherit" className="w-2/3" />
-                    </div>
-                  ))}
+                  <LoadingItems count={loadingRows}>
+                    {() => (
+                      <div className={AUTOCOMPLETE_OPTION_ROW_CLASS} aria-hidden data-loading-item>
+                        <TextLineSkeleton type="inherit" className="w-2/3" />
+                      </div>
+                    )}
+                  </LoadingItems>
                 </LoadingRegion>
               ) : filteredOptions.length === 0 ? (
                 showCreateOption ? (
@@ -744,6 +745,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                   return (
                     <div
                       key={String(option.value)}
+                      data-loading-item
                       role="option"
                       aria-selected={isSelected}
                       className={cn(

@@ -15,9 +15,11 @@
  * in a `<div>` (static, like delivery) or `<button>` (clickable, like
  * tickets) and renders the row content via this component.
  *
- * Pair with `DevCardRowSkeletonList` for the loading state — the
- * skeleton mirrors the same min-heights so the in-flight UI doesn't
- * shift the layout when real data lands.
+ * The row draws its own loading state (a loading scope, or `loading`): its
+ * skeleton mirrors the same min-heights so the in-flight UI doesn't shift
+ * the layout when real data lands. A list draws its loading rows through
+ * its own row component (`HelpCenterCard ticket={null}`), never a list
+ * skeleton picked by the parent.
  *
  * NOTE: the ticket conversation row is NOT here — it renders the shared
  * `<ChatMessageRow>` (`components/chat/chat-message-row.tsx`), the SAME
@@ -27,9 +29,8 @@
 
 import type { ReactNode } from 'react';
 import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
-import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { LoadingItems, loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 
 export interface DevCardRowContentProps {
@@ -43,6 +44,8 @@ export interface DevCardRowContentProps {
   emptyDescription?: string;
   /** Right column — caller renders its own stacked badges. */
   rightBadges: ReactNode;
+  /** The record is still being read: the row draws its own skeleton. A loading scope does the same. */
+  loading?: boolean;
   /** The list's markers (`data-loading-item`), forwarded to the row's root in both forms. */
   [marker: `data-${string}`]: unknown;
 }
@@ -59,7 +62,7 @@ const ROW_BADGES_CLASS = 'flex flex-shrink-0 flex-col gap-2 self-start';
 export function DevCardRowContent(props: DevCardRowContentProps) {
   const { title, subtitle, description, emptyDescription = 'No description provided', rightBadges } = props;
   // While the page is read the record is not known: the row's content is its skeleton.
-  if (useLoadingScope()) return <DevCardRowContentSkeleton {...loadingItemProps(props)} />;
+  if (useLoadingScope() || props.loading) return <DevCardRowContentSkeleton {...loadingItemProps(props)} />;
   return (
     <div className={ROW_INNER_CLASS} {...loadingItemProps(props)}>
       <div className={ROW_TEXT_COLUMN_CLASS}>
@@ -82,7 +85,7 @@ export function DevCardRowContent(props: DevCardRowContentProps) {
 
 /** A row's content while its record is read: the title, subtitle and description as bars, the status badge every row carries.
  *  Its `data-*` props (the list's markers) are forwarded, like the loaded row's. */
-export function DevCardRowContentSkeleton(props: { [marker: `data-${string}`]: unknown }) {
+function DevCardRowContentSkeleton(props: { [marker: `data-${string}`]: unknown }) {
   return (
     <div className={ROW_INNER_CLASS} aria-hidden {...loadingItemProps(props)}>
       <div className={ROW_TEXT_COLUMN_CLASS}>
@@ -102,48 +105,5 @@ export function DevCardRowContentSkeleton(props: { [marker: `data-${string}`]: u
         <StatusBadge loading text="" variant="card" />
       </div>
     </div>
-  );
-}
-
-/**
- * Skeleton rendering for a single row — the bars mirror the same
- * min-heights as `DevCardRowContent` so the loading→loaded swap
- * doesn't reflow. Its `data-*` props (the list's `data-loading-item`) are forwarded.
- */
-export function DevCardRowSkeleton(props: { [marker: `data-${string}`]: unknown }) {
-  return (
-    <div
-      className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]"
-      {...loadingItemProps(props)}
-    >
-      <DevCardRowContentSkeleton />
-    </div>
-  );
-}
-
-/** Rows a list with no page size draws while it loads: a typical count. */
-const DEV_CARD_ROW_SKELETON_ROWS = 5;
-
-/**
- * The skeleton rows inside a bordered card: the loading state of every list shell. A list draws ONE FULL PAGE, so
- * a paged list passes its page size (the tickets list passes its own); `5` is the typical count for a list with none.
- */
-export function DevCardRowSkeletonList({
-  region = true,
-  rows = DEV_CARD_ROW_SKELETON_ROWS,
-}: {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-  /** Rows to draw: the list's page size. Default `5`. */
-  rows?: number;
-}) {
-  return (
-    <LoadingRegion
-      label="Loading"
-      announce={region}
-      className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card"
-    >
-      <LoadingItems count={rows}>{() => <DevCardRowSkeleton data-loading-item />}</LoadingItems>
-    </LoadingRegion>
   );
 }

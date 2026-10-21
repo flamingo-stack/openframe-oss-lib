@@ -5,13 +5,9 @@ import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { isOwnClick } from '../../../utils/own-click';
 import { Checkbox } from '../checkbox';
+import { ROW_HEIGHT_DESKTOP } from '../data-table/data-table-row-classes';
 import { TableCell } from './table-cell';
-import {
-  COMPACT_ROW_MIN_HEIGHT,
-  ROW_HEIGHT_DESKTOP,
-  TABLE_ROW_CELLS_CLASS,
-  TABLE_ROW_FRAME_CLASS,
-} from './table-skeleton';
+import { COMPACT_ROW_MIN_HEIGHT, TABLE_ROW_CELLS_CLASS, TABLE_ROW_FRAME_CLASS } from './table-skeleton';
 import type { TableRowData, TableRowProps } from './types';
 import { getHideClasses } from './utils';
 

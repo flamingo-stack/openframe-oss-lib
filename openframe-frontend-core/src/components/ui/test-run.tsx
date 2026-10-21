@@ -7,8 +7,9 @@ import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/format-date';
 import { Copy02Icon, SearchIcon } from '../icons-v2-generated';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { DataTable } from './data-table';
+import { DATA_TABLE_ROW_FRAME_CLASS, ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table/data-table-row-classes';
 import { useDataTable } from './data-table/use-data-table';
 import { LoadingItems, useLoadingScope } from './loading-scope';
 import { NoData } from './no-data';
@@ -39,8 +40,8 @@ const RESULT_COLUMN_MIN_WIDTH = 176;
 const TEST_RESULTS_SKELETON_COLUMNS = 6;
 
 /** Column-bar skeleton (header cells + one card row): fixed 160px columns on
-    every breakpoint, scrolling horizontally when they do not fit. Bars are
-    `UnifiedSkeleton`s, like the table skeletons. */
+    every breakpoint, scrolling horizontally when they do not fit. The row is the data table's own row card and shell
+    (`data-table-row-classes`); each bar a `TextLineSkeleton` of its text's type step. */
 export function TestResultsSkeleton({
   region = true,
 }: {
@@ -53,23 +54,21 @@ export function TestResultsSkeleton({
         {/* No gap between the header bars and the row card — the real table's
           header and body sit flush. */}
         <div className="flex w-max min-w-full flex-col">
-          <div className="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
+          <div className={cn('flex', ROW_SHELL_CLASSES)}>
             <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
               {() => (
-                <div data-loading-item className="flex h-12 w-[160px] shrink-0 items-center">
-                  <UnifiedSkeleton className="h-4 w-3/4 rounded-sm" />
+                <div className="flex h-12 w-[160px] shrink-0 items-center">
+                  <TextLineSkeleton type="h5" className="w-3/4" />
                 </div>
               )}
             </LoadingItems>
           </div>
-          <div className="overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
-            {/* Same INNER row heights as the DataTable (66/78px + the 1px card
-              border on each side = 68/80px total, per design). */}
-            <div className="flex h-[66px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] content-md:h-[78px]">
+          <div className={DATA_TABLE_ROW_FRAME_CLASS}>
+            <div className={cn('flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP)}>
               <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
                 {() => (
                   <div data-loading-item className="w-[160px] shrink-0">
-                    <UnifiedSkeleton className="h-5 w-3/4 rounded-sm" />
+                    <TextLineSkeleton type="h4" className="w-3/4" />
                   </div>
                 )}
               </LoadingItems>

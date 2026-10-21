@@ -6,6 +6,7 @@ import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
+import { useLoadingScope } from './loading-scope';
 
 /**
  * The plain textarea's box: its type step (which sets the line height its rows are counted in), padding, 1px border,
@@ -81,12 +82,19 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
   const reactId = useId();
   const fieldId = props.id ?? reactId;
 
+  // ONE switch: in a page's loading state the plain field draws its label for real and its box as `TextareaSkeleton`
+  // (sized by the caller's classes or its `rows`). The textarea stays mounted, hidden, so nothing re-registers when the
+  // scope ends.
+  const inScope = useLoadingScope();
+
   // Without any adornment we keep the historical layout: bare textarea, the
   // border/bg/hover all live on the textarea itself.
   if (!hasAdornment) {
     return (
       <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
+        {inScope && <TextareaSkeleton rows={props.rows} className={className} />}
         <textarea
+          hidden={inScope || props.hidden}
           className={cn(
             TEXTAREA_BOX_CLASS,
             'focus:border-ods-accent focus-visible:outline-none',
@@ -244,11 +252,13 @@ Textarea.displayName = 'Textarea';
  * take, never under its minimum. The border is transparent so the one skeleton surface fills the whole box. The label
  * is the host's: it is static copy and renders for real.
  */
-function TextareaSkeleton({ rows = TEXTAREA_DEFAULT_ROWS, className }: { rows?: number; className?: string }) {
+function TextareaSkeleton({ rows, className }: { rows?: number; className?: string }) {
+  // A field sized by its caller's classes (a growing message box) takes their height; else the height its rows take.
+  const sizedByClasses = rows === undefined && !!className;
   return (
     <UnifiedSkeleton
       className={cn(TEXTAREA_BOX_CLASS, 'border-transparent', className)}
-      style={{ height: textareaBoxHeight(rows) }}
+      style={sizedByClasses ? undefined : { height: textareaBoxHeight(rows ?? TEXTAREA_DEFAULT_ROWS) }}
     />
   );
 }

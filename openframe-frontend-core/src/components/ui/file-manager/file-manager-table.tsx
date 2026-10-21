@@ -5,12 +5,22 @@ import { cn } from '../../../utils/cn';
 import { Checkbox } from '../checkbox';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { FileManagerEmpty } from './file-manager-empty';
-import { FILE_MANAGER_CHECKBOX_BOX_CLASS, FileManagerTableRow } from './file-manager-table-row';
+import {
+  FILE_MANAGER_ACTIONS_CELL_BOX_CLASS,
+  FILE_MANAGER_CHECKBOX_BOX_CLASS,
+  FILE_MANAGER_CHECKBOX_CELL_CLASS,
+  FILE_MANAGER_MODIFIED_CELL_BOX_CLASS,
+  FILE_MANAGER_NAME_CELL_CLASS,
+  FILE_MANAGER_SIZE_CELL_BOX_CLASS,
+  FileManagerTableRow,
+} from './file-manager-table-row';
 import type { FileManagerTableProps } from './types';
 
 /** Rows a loading file list draws: a typical folder, since a folder listing has no page size (module export only,
  *  not public). */
-export const FILE_MANAGER_SKELETON_ROWS = 8;
+/** A header cell's label type. */
+const HEADER_LABEL_CLASS = 'text-ods-text-secondary text-h5';
+const FILE_MANAGER_SKELETON_ROWS = 8;
 
 export function FileManagerTable({
   files,
@@ -92,7 +102,11 @@ export function FileManagerTable({
           real checkbox, inert. */}
       <div className="flex h-12 items-center rounded-t-lg border-b border-ods-border bg-ods-bg-surface px-4">
         {showCheckboxes && (
-          <div className="mr-4" inert={loading || undefined} aria-hidden={loading || undefined}>
+          <div
+            className={FILE_MANAGER_CHECKBOX_CELL_CLASS}
+            inert={loading || undefined}
+            aria-hidden={loading || undefined}
+          >
             <Checkbox
               checked={allSelected || someSelected}
               onCheckedChange={handleSelectAll}
@@ -101,13 +115,13 @@ export function FileManagerTable({
           </div>
         )}
 
-        <div className="flex min-w-0 flex-1 items-center gap-3 text-ods-text-secondary text-h5">NAME</div>
+        <div className={cn(FILE_MANAGER_NAME_CELL_CLASS, HEADER_LABEL_CLASS)}>NAME</div>
 
-        <div className="w-24 shrink-0 pr-4 text-ods-text-secondary text-h5">SIZE</div>
+        <div className={cn(FILE_MANAGER_SIZE_CELL_BOX_CLASS, HEADER_LABEL_CLASS)}>SIZE</div>
 
-        <div className="w-36 shrink-0 pl-4 text-ods-text-secondary text-h5">EDITED</div>
+        <div className={cn(FILE_MANAGER_MODIFIED_CELL_BOX_CLASS, HEADER_LABEL_CLASS)}>EDITED</div>
 
-        <div className="flex w-48 shrink-0 justify-end pl-4">{/* Space for action buttons */}</div>
+        <div className={FILE_MANAGER_ACTIONS_CELL_BOX_CLASS}>{/* Space for action buttons */}</div>
       </div>
 
       <div className="flex-1 divide-y divide-ods-border overflow-auto rounded-b-lg">

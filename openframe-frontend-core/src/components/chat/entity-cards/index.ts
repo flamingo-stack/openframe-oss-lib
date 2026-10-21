@@ -118,7 +118,13 @@ export {
   type DataRoomDocCardProps,
   type DataRoomDocCardAnchorProps,
 } from './data-room-doc-card';
-export { ProgramCard, ProgramCardSkeleton, type ProgramCardProps } from './program-card';
+export {
+  PROGRAM_CARD_SKELETON_HOSTS,
+  PROGRAM_CARD_SKELETON_MEDIA,
+  ProgramCard,
+  ProgramCardSkeleton,
+  type ProgramCardProps,
+} from './program-card';
 export {
   CampaignCardAdmin,
   CampaignCardAdminSkeleton,

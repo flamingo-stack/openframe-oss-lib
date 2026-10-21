@@ -6,6 +6,7 @@ import { LoadingRegion } from './loading/loading-region';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { LogSeverityDot, LogSeverityDotSkeleton } from './log-severity-dot';
 import { ToolIcon } from './tool-icon';
+import { LoadingItems } from './ui/loading-scope';
 
 // UTC-pinned so the server and every client agree (React #418), through the one
 // renderer rather than hand-built `getUTC*` strings.
@@ -26,7 +27,7 @@ const LOGS_LIST_SKELETON_ROWS = 6;
 /** A log row while it is read: the severity dot's box, the title and the time as bars. */
 function LogCardSkeleton() {
   return (
-    <div className={LOG_ROW_CLASS} aria-hidden>
+    <div className={LOG_ROW_CLASS} aria-hidden data-loading-item>
       <LogSeverityDotSkeleton size="md" />
       <div className={LOG_ROW_TEXT_CLASS}>
         <TextLineSkeleton type="h6" className="w-3/4" />
@@ -45,7 +46,7 @@ const LogCard: FC<{
   onClick?: () => void;
 }> = ({ log, isLast, showConnector, onClick }) => {
   return (
-    <div className="relative">
+    <div className="relative" data-loading-item>
       <div
         className={cn(LOG_ROW_CLASS, 'cursor-pointer transition-colors hover:bg-ods-bg-hover/50')}
         onClick={onClick}
@@ -116,10 +117,7 @@ export const LogsList = forwardRef<HTMLDivElement, LogsListProps>(
       return (
         <div ref={ref} className={cn(LOG_FRAME_CLASS, getContainerClasses(), className)} style={getContainerStyles()}>
           <LoadingRegion label="Loading logs" className={LOG_SCROLL_CLASS}>
-            {Array.from({ length: skeletonRows }, (_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-              <LogCardSkeleton key={i} />
-            ))}
+            <LoadingItems count={skeletonRows}>{() => <LogCardSkeleton />}</LoadingItems>
           </LoadingRegion>
         </div>
       );

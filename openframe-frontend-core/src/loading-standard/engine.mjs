@@ -2,75 +2,100 @@
  * THE loading-standard rule engine: one AST reading (the TypeScript compiler API) of the loading standard, shipped in
  * the lib (`src/loading-standard/engine.mjs`, plain ESM so a host's script imports it by file path from its installed
  * copy) and used by the lib's own test (`src/__tests__/loading-standard.test.ts`) and by every host's gate
- * (openframe-frontend's `scripts/check-page-skeletons.mjs` and `scripts/check-skeleton-full-page.mjs`).
+ * (openframe-frontend's `scripts/lib/loading-gate.mjs`, run as `check-page-skeletons` / `check-skeleton-full-page`).
+ * THIS HEADER IS THE ONE STATEMENT OF THE RULES: a host's gate points here and restates none of them.
  *
  * Every rule reads COMPONENTS (a function body), never lines: imports, `as` renames, local aliases
- * (`const X = YSkeleton`), namespace imports and `createElement(Y)` resolve to the name they stand for, and a
- * condition is read as an expression however many lines it spans. A finding names its rule, its file and its line.
+ * (`const X = YSkeleton`), namespace imports and `createElement(Y)` resolve to the name they stand for, a condition is
+ * read as an expression however many lines it spans, and a value read through a local (`const busy = q.isLoading`,
+ * `const user = query.data`, `const HIDE = 'max-md:hidden'`) is read as what it holds. A finding names its rule, its
+ * file and its line.
+ *
+ * READ DATA is a value that is missing until a read answers: `data`, `xData`, `x.data` (and a field of them), anything
+ * a data hook returns (a `use*` hook that calls a query: `useQuery`, `useInfiniteQuery`, `useSWR`, Relay's readers,
+ * or a hook that calls one; a hook the indexed source does not declare counts as one), destructured or not, and a
+ * local aliasing any of these. A READ FLAG is a loading flag a hook returns (`isLoading`, `isPending`, `loading`, a
+ * `status === 'loading'`), never a context's (`use*Context`, which folds the scope itself).
  *
  * THE RULES (ids as reported; `RULES` below holds the one-line reason of each):
  *
  * ONE_SWITCH            `<YSkeleton>` (or an alias of it, or `createElement(YSkeleton)`, or `{YSkeleton}` handed to a
  *                       prop) rendered outside Y's module (the file declaring Y or YSkeleton), when Y switches itself
- *                       (its function calls the loading scope). Render `<Y />`: it draws its own skeleton. A `*Skeleton`
- *                       function may compose a child's skeleton, unless its module renders `<Y />` elsewhere (then the
- *                       skeleton renders `<Y />` too: one structure).
- * NO_SCOPE_SWITCH       The same render where Y never switches itself: Y should draw its own skeleton on the scope.
+ *                       (its function calls the loading scope); and a skeleton primitive drawn in the loading branch
+ *                       of `loading ? <Bars /> : <Y />` for such a Y. Render `<Y />`: it draws its own skeleton. A
+ *                       `*Skeleton` function may compose a child's skeleton, unless its module renders `<Y />` elsewhere
+ *                       (then the skeleton renders `<Y />` too: one structure).
+ * NO_SCOPE_SWITCH       The same where Y never switches itself (a component and its skeleton in one folder included),
+ *                       a `*Skeleton` with no component of its own (a skeleton primitive excepted), and a loading
+ *                       component not named `*Skeleton` (`<XLoading />`, `<XPlaceholder />`) rendered outside its
+ *                       module: Y should draw its own skeleton on the scope, and the parent render `<Y />`.
  * PROP_ONLY_SWITCH      A component that returns a skeleton on a boolean of its own (a prop, `props.x`, a local made
- *                       from them) and never calls the loading scope in THAT component: inside a scope it draws the
- *                       loaded form with no data. Its one switch is `useLoadingScope() || loading`. A boolean read from
- *                       a hook (a table's context, a query) is the hook's switch and not counted.
- * NOTHING_WHILE_LOADING `if (loading) return null`, `loading ? null : <X />`, `!loading ? <X /> : null`,
- *                       `{!loading && <X />}` in a component that does not switch, and the same keyed on read data that
- *                       is missing before the read answers (`!data`, `!data?.items`, `data ? <X /> : null`): the slot is
- *                       empty while it loads. Exempt once the read has answered in that component (a suspending read,
- *                       a loading branch or the scope above it), inside a list's per-item callback, a scope `return
- *                       null` whose loaded return is marked `data-loading-optional` or is a Relay reader
- *                       (`<XQuery />`), and a flag that is an ACTION's progress (handed to a `*Button`'s `loading` or
- *                       `disabled` in the same component). A local holding the scope (`const scoped =
- *                       useLoadingScope()`) is a loading flag.
- * SPINNER               `animate-spin` anywhere but on an action's progress icon (`Loader2`, `RefreshCw`), and a
- *                       progress icon keyed on a READ flag (`isLoading`, `isFetching`, a hook's `loading`) or returned
- *                       as a component's whole output.
+ *                       from them) or on a read flag of its own (`const { isLoading } = useQuery(…)`) and never calls
+ *                       the loading scope in THAT component: inside a scope it draws the loaded form with no data. Its
+ *                       one switch is `useLoadingScope() || loading`.
+ * NOTHING_WHILE_LOADING Nothing, or a blank box, drawn while loading: `if (loading) return null | false | <div />`,
+ *                       `loading ? null : <X />`, `!loading ? <X /> : null`, `{!loading && <X />}` (in a component that
+ *                       does not switch), `{loading || <X />}`, the same keyed on read data (`if (!tickets) return
+ *                       null`, `data ? <X /> : null`), and a `next/dynamic` import with no `loading:` fallback. Exempt
+ *                       once the read has answered in that component (a suspending read, a loading branch or the scope
+ *                       above it), inside a list's per-item callback, a scope `return null` whose loaded return is
+ *                       marked `data-loading-optional` or is a Relay reader (`<XQuery />`), a part that takes no room
+ *                       (a modal, a toast), and a flag that is an ACTION's progress (handed to a `*Button`'s `loading`
+ *                       or `disabled` in the same component). A local holding the scope is a loading flag.
+ * SPINNER               `animate-spin` (or `animate-[spin…`) anywhere but on an action's progress icon (`Loader2`,
+ *                       `RefreshCw`), and a progress icon keyed on a READ flag (through a local too) or returned as a
+ *                       component's whole output.
  * LOADER_COMPONENT      A loader as a loading state (`PageLoader`, `CompactPageLoader`, `ContentLoader`, `CardLoader`,
  *                       `DetailLoader`, `FormLoader`, `ListLoader`, `ChatCardLoader`, `OpenmspHeartbeatLoader`,
  *                       `Spinner`).
- * LOADING_TEXT          "Loading"/"Checking" as a text node, as a string rendered in JSX, as a placeholder, or as a
- *                       "Loading…" string (labels, `aria-label` and `title` are announcements, not text).
+ * LOADING_TEXT          Waiting copy as a loading state: a text node starting "Loading" / "Checking", a "Loading…",
+ *                       "loading…", "Fetching…", "Please wait…" (any case, `...` or `…`) string or text node, a
+ *                       "Loading" placeholder. Labels, `aria-label`, `title` and a status announcement are not text.
  * OWN_PULSE             A pulse or skeleton colour of one's own (`animate-pulse`, `animate-[pulse…`, `bg-ods-skeleton`,
- *                       `animation-duration`): one pulse, the lib's.
- * SUSPENSE_FALLBACK     A `Suspense` / `React.Suspense` with no fallback, or a fallback of `null`, `undefined`, an
- *                       empty fragment or an empty string.
+ *                       `animation-duration`, an inline `animation: 'pulse …'`): one pulse, the lib's.
+ * SUSPENSE_FALLBACK     A `Suspense` / `React.Suspense` with no fallback, or a `Suspense` / `LoadingSuspense` fallback
+ *                       of `null`, `undefined`, `false`, `''`, an empty fragment or a blank element (`<div />`), and a
+ *                       `LoadingFallback` drawing nothing.
  * HAND_PAIR             A hand-built `<Suspense fallback={<LoadingFallback>…}>` (use `LoadingSuspense`), or a hand
- *                       `<LoadingRegion>` around a `<LoadingScope>` (use `LoadingFallback`).
- * WHOLE_VIEW_SKELETON   A component declared `*PageSkeleton`, `*ScreenSkeleton`, `*DetailSkeleton`, `*ArticleSkeleton`,
- *                       `*ViewSkeleton`, `*HomeSkeleton`, `*DeckSkeleton`, `*EditorSkeleton`, `*CenterSkeleton`,
- *                       `*CatalogSkeleton`, `*FormSkeleton`, `*LayoutSkeleton` or `*LoadingLayout`, and any render of
- *                       `DetailPageSkeleton` (a declaration marked `@deprecated` is a kept alias and not counted).
+ *                       `<LoadingRegion>` around a `<LoadingScope>` / `<LoadingWhen>` (use `LoadingFallback`).
+ * WHOLE_VIEW_SKELETON   A component declared or rendered as `*PageSkeleton`, `*ScreenSkeleton`, `*DetailSkeleton`,
+ *                       `*ArticleSkeleton`, `*ViewSkeleton`, `*HomeSkeleton`, `*DeckSkeleton`, `*EditorSkeleton`,
+ *                       `*CenterSkeleton`, `*CatalogSkeleton`, `*FormSkeleton`, `*LayoutSkeleton`,
+ *                       `*DashboardSkeleton`, `*LoadingLayout` or `*(Page|Screen|View|Panel|Dashboard)Loading` (a
+ *                       declaration marked `@deprecated` is a kept alias: not counted, its renders are
+ *                       DEPRECATED_SKELETON's).
  * FOLD_PROP             A `fold` prop on any element (a skeleton draws its full count: `skeletonCount`).
  * DEPRECATED_SKELETON   A render of a skeleton the lib marks `@deprecated` (read from the lib's source).
  * RETIRED_API           The retired first-paint memory, stand-in data (`standIn`, `Hold*`) and `StreamedPage`'s
  *                       `skeleton` / `memory` / `remember` props.
  * TYPED_COUNT           A count typed at the place that draws it: a literal (after resolving a constant to its
- *                       initializer) on a skeleton count prop (`skeletonRows`, `skeletonCount`, `loadingRows`, any
- *                       `(skeleton|loading|placeholder)…(Rows|Count|Lines|Items)`, `count` on `LoadingItems`, `rows` /
- *                       `count` / `lines` on a `*Skeleton` element), the length of a list drawn while loading
- *                       (`Array.from({ length })`, `Array(n)`, `[...Array(n)]`, `[0, 1, 2].map`), a literal default of a
- *                       count prop (`skeletonRows = 8`, `rows = 6` in a `*Skeleton`), a `?? 10` fallback in a count,
- *                       and a module constant holding a literal-length list used while loading.
- * COUNT_SOURCE          A skeleton count (`skeletonRows`, `skeletonCount`, `LoadingItems count`, a loading list's length)
- *                       that names neither a page size, a limit, `first`, nor a declared `*_SKELETON_*` constant (a
- *                       pass-through of the same name is checked where its caller names it).
- * COUNT_CAP             A count capped: `Math.min(pageSize, FOLD | CONSTANT | 8)`, a ternary or comparison cap
- *                       (`PAGE_SIZE > 6 ? 6 : PAGE_SIZE`), or a count named `*FOLD*`, `*VISIBLE*` or `*SCREEN*`.
+ *                       initializer, both arms of a ternary included: `isMobile ? 3 : 10`) on a skeleton count prop
+ *                       (`skeletonRows`, `skeletonCount`, `loadingRows`, any `(skeleton|loading|placeholder)…(Rows|
+ *                       Count|Lines|Items)`, `count` on `LoadingItems`, `rows` / `count` / `lines` on a `*Skeleton`
+ *                       element) or on such a key of an object (`{ loadingRows: { primary: 7 } }`), the length of a
+ *                       list drawn while loading (`Array.from({ length })`, `Array(n)`, `[...Array(n)]`,
+ *                       `[0, 1, 2].map`), a literal default of a count prop, a `?? 10` fallback in a count, and a
+ *                       module constant holding a literal-length list used while loading. Text draws a typical LINE
+ *                       count (`*Lines`, `*Paragraphs`) only when each item is a skeleton line itself; a list of rows
+ *                       named `*LINES` is a list.
+ * COUNT_SOURCE          A skeleton count that names neither a page size, a limit, `first`, nor a declared
+ *                       `*_SKELETON_*` constant (a pass-through of the same name is checked where its caller names
+ *                       it), and a `*_SKELETON_*` count in a component whose list has a page size (`PAGE_SIZE`,
+ *                       `pageSize`, `perPage`): a paged list draws its page.
+ * COUNT_CAP             A count capped: `Math.min(pageSize, FOLD | CONSTANT | 8 | a local holding a number)`, a ternary
+ *                       or comparison cap (`PAGE_SIZE > 6 ? 6 : PAGE_SIZE`), or a count named `*FOLD*`, `*VISIBLE*` or
+ *                       `*SCREEN*` (`Math.min(PAGE_SIZE, rows.length)`, the last page, and a clamp are fine).
  * HIDDEN_ITEMS          A loading item hidden per breakpoint (`hidden md:block`, `max-md:hidden`, `md:hidden` on the
- *                       item's own element, conditional classes included) or a container hiding items past the Nth
- *                       (`[&>*:nth-child(n+N)]:hidden`) while loading.
- * ITEM_MARK             A loading list (`LoadingItems`, or a list whose count is a page size, limit or `*_SKELETON_*`
- *                       constant) whose items are not marked `data-loading-item` (or `loadingItemProps(…)`, `listItem`,
- *                       `listItems` on the item element, or inside the item's component, found through its import),
- *                       and the loaded list beside it (the other branch of the same condition). The cells of one row
- *                       (a count named `columns`, `cols`, `cells`) are not list items.
+ *                       item's own element, through a class constant or a conditional class too), a container hiding
+ *                       items past the Nth (`[&>*:nth-child(n+N)]:hidden`), and an item callback returning nothing past
+ *                       the Nth (`i < 4 ? <Row /> : null`) while loading.
+ * ITEM_MARK             A loading list (`LoadingItems`, a list whose count is a page size, limit or `*_SKELETON_*`
+ *                       constant, or a pass-through count prop drawn while loading) whose items are not marked
+ *                       `data-loading-item` (or `loadingItemProps(…)`, `listItem`, `listItems` on the item element, or
+ *                       on the element the item's component renders, read from its declaration through its import),
+ *                       and the loaded list beside it: the other branch of the same condition, or the list the
+ *                       component returns after `if (loading) return …`. The cells of one row (a count named `columns`,
+ *                       `cols`, `cells`) are not list items.
  * OPTIONAL_MARK         In a component that switches on the scope, a part left out while loading (`{!loading && <X />}`)
  *                       or keyed on a read field (`{record.note && <X />}`, `{record?.x ? <X /> : null}`) that does not
  *                       carry `data-loading-optional`. Not counted: an error / offline state, the loaded half of an
@@ -80,19 +105,25 @@
  *                       a link of a ternary chain, a part with no room in the page (a modal, a popover's content, an
  *                       `sr-only` / `role="status"` announcement), and a part where the loading form draws its OWN
  *                       version of the region (after an early `if (loading) return …`, in the loaded half of
- *                       `loading ? <A /> : <B />`, or the `else` of an `if` on the loading state): only a part of the
- *                       one structure both forms share can be left out. A component that reads the scope but draws no
- *                       loading form (no skeleton, no `loading` handed down, no branch on the flag) is not switching.
+ *                       `loading ? <A /> : <B />`, or the `else` of an `if` on the loading state). A component that
+ *                       reads the scope but draws no loading form is not switching.
+ * PAGE_CODE             A host's page code (`config.pageCode` says which files) draws no skeleton: a skeleton primitive,
+ *                       a `*Skeleton` declared or rendered (`components: false` allows rendering a component's exported
+ *                       skeleton), a route-level `loading.tsx`.
+ * OPT_OUT               An opt-out that is not the rule-scoped form, names a rule this gate does not run, gives no
+ *                       reason, or suppresses nothing.
  *
  * ALLOWED FORMS (no rule fires): a `next/dynamic` `loading: () => <YSkeleton />` fallback (inside the `dynamic(` call);
  * a registry entry's own `skeleton:` slot drawing the card its `render:` draws (`XChatCard` is X's card); an action's
  * progress icon; `return null` after a suspending read or a loading branch; error states; a ternary choosing between
  * two forms of one slot; pass-through counts; a safety-capped list drawing a declared `*_SKELETON_*` constant.
  *
- * OPT-OUT: `// loading-standard-ok: <why>` (any rule) or `// full-page-ok: <why>` (the count and mark rules) on the
- * finding's line or one of the two above it.
+ * OPT-OUT: ONE form, rule-scoped and single-line: `// loading-standard-ok(RULE_ID): <why>` (or the same inside
+ * `/* … *\/`), at the end of the finding's line or alone on the line directly above it. It lifts that one rule on
+ * that one line, and an opt-out that lifts nothing is itself a finding (OPT_OUT).
  *
- * CONFIG: `CONFIGS.lib` and `CONFIGS.frontend` hold each repository's rule set and exemptions, declared once here.
+ * CONFIG: `CONFIGS.lib` and `CONFIGS.frontend` hold each repository's rule set, reported trees, page code and
+ * exemptions, declared once here.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -125,41 +156,52 @@ export const RULES = {
   HIDDEN_ITEMS: 'loading items hidden per breakpoint (a skeleton draws its full count at every width)',
   ITEM_MARK: 'a loading list with no data-loading-item (or loadingItemProps) on its items',
   OPTIONAL_MARK: 'a part left out while loading has no data-loading-optional',
+  PAGE_CODE: 'page code draws no skeleton (render the components: each draws its own)',
+  OPT_OUT: 'an opt-out that is not `// loading-standard-ok(RULE_ID): <why>` or that lifts nothing',
 };
 
-export const PAGE_RULES = [
-  'ONE_SWITCH',
-  'NO_SCOPE_SWITCH',
-  'PROP_ONLY_SWITCH',
-  'NOTHING_WHILE_LOADING',
-  'SPINNER',
-  'LOADER_COMPONENT',
-  'LOADING_TEXT',
-  'OWN_PULSE',
-  'SUSPENSE_FALLBACK',
-  'HAND_PAIR',
-  'WHOLE_VIEW_SKELETON',
-  'FOLD_PROP',
-  'DEPRECATED_SKELETON',
-  'RETIRED_API',
-];
-export const COUNT_RULES = ['TYPED_COUNT', 'COUNT_SOURCE', 'COUNT_CAP', 'HIDDEN_ITEMS', 'ITEM_MARK', 'OPTIONAL_MARK'];
-const COUNT_RULE_SET = new Set(COUNT_RULES);
+const ALL_RULES = Object.keys(RULES);
+
+/** The files a host's PAGE CODE is (its route files, every file of a route folder, its screens, its `lib/`). */
+const ROUTE_FILE = /(?:^|\/)(?:page|layout|loading|template|not-found|error)\.tsx$/;
+const SCREEN_FILE = /-page(?:-ssr|-client)?\.tsx$/;
 
 /**
- * Each repository's rule set and exemptions. An exemption names the files (a RegExp over the path relative to the
- * tree's root) and the rules it lifts, and says why.
+ * Each repository's rule set and exemptions. `trees` are the folders reported (relative to the tree's root; all when
+ * absent). `pageCode(rel, isFile)` says whether a file is page code (`{ components }`: whether it may render a
+ * component's exported skeleton) or not (null); `isFile(rel)` asks whether a file exists in the tree. An exemption
+ * names the files (a RegExp over the path relative to the tree's root) and the rules it lifts, and says why.
  */
 export const CONFIGS = {
-  frontend: { rules: [...PAGE_RULES, ...COUNT_RULES], exempt: [] },
+  frontend: {
+    rules: ALL_RULES,
+    trees: ['app', 'components', 'lib', 'hooks'],
+    /**
+     * Every route file under `app/`, every other `.tsx` in a ROUTE FOLDER (a folder under `app/` holding a `page.tsx`
+     * or a `layout.tsx`), every screen file (`*-page.tsx`, `*-page-client.tsx`, `*-page-ssr.tsx`) and every `.tsx`
+     * under `lib/` (which may render a component's exported skeleton).
+     */
+    pageCode(rel, isFile) {
+      if (!rel.endsWith('.tsx')) return null;
+      if (rel.startsWith('lib/')) return { components: false };
+      if (SCREEN_FILE.test(rel) && (rel.startsWith('app/') || rel.startsWith('components/')))
+        return { components: true };
+      if (!rel.startsWith('app/')) return null;
+      const folder = dirname(rel);
+      if (ROUTE_FILE.test(rel) || isFile(join(folder, 'page.tsx')) || isFile(join(folder, 'layout.tsx')))
+        return { components: true };
+      return null;
+    },
+    exempt: [],
+  },
   lib: {
-    rules: [...PAGE_RULES, ...COUNT_RULES],
+    rules: ALL_RULES,
     exempt: [
       {
-        why: 'the deprecated whole-view re-exports older hosts still import (each renders the components in a scope)',
+        why: 'the deprecated whole-view skeletons kept for hosts on older releases: frozen, drawn from the primitives, used nowhere in the lib (each is marked @deprecated, so a host that renders one fails DEPRECATED_SKELETON)',
         files:
-          /(?:^|\/)(?:trust-center-page-skeleton|detail-page-skeleton|deprecated-layout-skeletons|margin-report-skeleton|category-vendor-selector-skeleton|settings-form-skeleton|msp-profile-form-skeleton|page-layout-skeleton)\.tsx$/,
-        rules: [...PAGE_RULES, ...COUNT_RULES],
+          /(?:^|\/)(?:detail-page-skeleton|deprecated-layout-skeletons|margin-report-skeleton|category-vendor-selector-skeleton|settings-form-skeleton|msp-profile-form-skeleton)\.tsx$/,
+        rules: ALL_RULES.filter(rule => rule !== 'OPT_OUT'),
       },
       {
         why: "the lib's own loading primitives: the one pulse, the scope, the fallback and the Suspense wrapper are built here",
@@ -168,9 +210,9 @@ export const CONFIGS = {
         rules: ['OWN_PULSE', 'HAND_PAIR', 'SUSPENSE_FALLBACK', 'NOTHING_WHILE_LOADING'],
       },
       {
-        why: 'the loaders themselves (declared, never used as a screen state in the lib)',
+        why: "the loaders themselves (declared, never a screen state in the lib), the Button's own action progress, and the chat registry's card loader (a card read by id, drawn by the card's own skeleton)",
         files:
-          /(?:^|\/)components\/(?:ui\/[\w-]*loader[\w-]*|loading\/openmsp-heartbeat|ui\/button\/button|chat\/entity-cards\/dispatch)\.tsx$/,
+          /(?:^|\/)components\/(?:ui\/(?:[\w-]+-)?loader|loading\/openmsp-heartbeat|ui\/button\/button|chat\/entity-cards\/dispatch)\.tsx$/,
         rules: ['LOADER_COMPONENT', 'SPINNER', 'OWN_PULSE'],
       },
     ],
@@ -183,12 +225,21 @@ export const CONFIGS = {
 
 const SCOPE_HOOK = 'useLoadingScope';
 const LOADING_FLAG = /^(?:loading|isLoading|isFetching|isPending|pending|isRefetching|isInitialLoading|isLoadingMore)$/;
-const READ_FLAG = /^(?:isLoading|isFetching|isRefetching|isInitialLoading|loading)$/;
+const READ_FLAG = /^(?:isLoading|isFetching|isRefetching|isInitialLoading|isPending|loading)$/;
 const READ_DATA = /^(?:data|[a-z]\w*Data)$/;
 const SWITCH_FLAG = /loading|pending|skeleton|busy|fetching|waiting/i;
 const LOCAL_HOOK = /(?:^|\.)(?:useMemo|useState|useCallback|useRef|useReducer|useDeferredValue|useId|useTransition)$/;
 const SUSPENDING_READ =
   /^(?:useLazyLoadQuery|usePreloadedQuery|useFragment|usePaginationFragment|useRefetchableFragment|useSuspenseQuery|useSuspenseQueries|use)$/;
+/** The read primitives a DATA HOOK calls (directly, or through another data hook). */
+const QUERY_HOOK =
+  /^(?:useQuery|useQueries|useInfiniteQuery|useSuspenseQuery|useSuspenseQueries|useSuspenseInfiniteQuery|useSWR|useSWRInfinite|useLazyLoadQuery|usePreloadedQuery|useFragment|usePaginationFragment|useRefetchableFragment|useQueryLoader)$/;
+/** Hooks that never return read data (routing, forms, layout, stores, contexts). */
+const NOT_DATA_HOOK =
+  /^(?:useRouter|usePathname|useSearchParams|useParams|useSelectedLayoutSegments?|useTranslation|useTheme|useMediaQuery|useIsMobile|useBreakpoint|useToast|useForm|useFormContext|useFormState|useWatch|useController|useFieldArray|useSelector|useDispatch|useMutation|useQueryClient|useRelayEnvironment|useLoadingScope|use\w*(?:Context|Store|State|Mutation|Ref|Callback|Effect|Handler|Toggle|Modal|Dialog)|use\w*(?:Flag|Gate|Feature)s?)$/;
+/** Fields of a hook's result that are not its data (flags, errors, actions). */
+const NOT_DATA_FIELD =
+  /^(?:error|errors|status|refetch|fetchNextPage|fetchMore|loadMore|reset|mutate|mutateAsync|hasNextPage|hasMore|set[A-Z]\w*|on[A-Z]\w*|is[A-Z]\w*|has[A-Z]\w*)$/;
 const PROGRESS_ICONS = new Set(['Loader2', 'RefreshCw']);
 const LOADERS = new Set([
   'PageLoader',
@@ -202,8 +253,16 @@ const LOADERS = new Set([
   'OpenmspHeartbeatLoader',
   'Spinner',
 ]);
+/** The lib's skeleton parts: what a `*Skeleton` (or a component's own loading branch) is built from. */
+const PRIMITIVE =
+  /^(?:UnifiedSkeleton|TextLineSkeleton|TextHold|LayoutHold|BadgeSkeleton|StatusBadgeSkeleton|TagSkeleton|CursorPaginationSkeleton|TextareaSkeleton|TagsInputSkeleton|ProgressBarSkeleton|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
+/** The lib's loading wrappers (not loading states of a component). */
+const LOADING_WRAPPER = /^Loading(?:Items|When|Fallback|Suspense|Scope|Region)$/;
 const WHOLE_VIEW =
-  /^[A-Z]\w*(?:(?:Page|Screen|Detail|Article|View|Home|Deck|Editor|Center|Catalog|Form|Layout)Skeleton|LoadingLayout)$/;
+  /^[A-Z]\w*(?:(?:Page|Screen|Detail|Article|View|Home|Deck|Editor|Center|Catalog|Form|Layout|Dashboard)Skeleton|LoadingLayout|(?:Page|Screen|View|Panel|Dashboard)Loading)$/;
+/** A loading component that is not named `*Skeleton` (`XLoading`; `XPlaceholder` when drawn while loading). */
+const LOADING_COMPONENT = /^[A-Z]\w*Loading$/;
+const PLACEHOLDER_COMPONENT = /^[A-Z]\w*Placeholder$/;
 const MEMORY = new Set([
   'pageFirstPaint',
   'firstPaintKvStore',
@@ -225,14 +284,26 @@ const STAND_IN = new Set([
   'HELD_CONTROL_CLASS',
 ]);
 const COUNT_ATTR = /^(?:skeletonRows|skeletonCount|(?:skeleton|loading|placeholder)\w*(?:Rows|Count|Lines|Items))$/i;
-const SOURCE_COUNT = /(?:PAGE_SIZE|LIMIT|(?:^|_)SKELETON_|^first$|pageSize|page_size|perPage|per_page|limit$|Limit$)/;
-const LIST_COUNT = /(?:PAGE_SIZE|LIMIT|(?:^|_)SKELETON_|pageSize|page_size|perPage|limit$|Limit$|^first$)/;
+/** A count that names where it comes from: a page size, a limit, `first` or a declared `*_SKELETON_*` constant. */
+const COUNT_SOURCE_NAME =
+  /(?:PAGE_SIZE|LIMIT|(?:^|_)SKELETON_|^first$|pageSize|page_size|perPage|per_page|limit$|Limit$)/;
+/** A page size (not a safety limit): a list that has one draws it, never a `*_SKELETON_*` count. */
+const PAGE_SIZE_NAME = /PAGE_SIZE|pageSize|page_size|perPage|per_page/;
+/** A count handed in by the caller that a skeleton draws as its items. */
+const PASSED_COUNT = /^(?:count|rows|items|rowCount|itemCount)$/;
 const CAP_NAME = /fold|visible|screen/i;
+/** A condition on the screen's width (`isMobile ? 3 : 10`). */
+const WIDTH_TEST = /mobile|desktop|tablet|breakpoint|width|viewport|isSmall|isLarge|narrow/i;
 const PAGE_ARG = /\b(?:page_?size|per_?page|cards_?per_?page|limit|[A-Z_]*_(?:PAGE_SIZE|LIMIT|MAX))\b/i;
 const CAP_ARG = /fold|screen|\b[A-Z][A-Z0-9_]{2,}\b|^\d+$/;
 const BREAKPOINT_HIDDEN =
   /(?:^|\s)(?:hidden\s+(?:[\w-]+:)+(?:block|flex|grid|inline|inline-flex|inline-block|table|table-row|table-cell|contents)|(?:[\w-]+:)+hidden)(?=\s|$)|(?:^|\s)(?:[\w-]+:)+(?:block|flex|grid|inline|inline-flex|table-row|table-cell|contents)\s+hidden(?=\s|$)/;
 const NTH_HIDDEN = /nth-child\([^)]*\)\]:hidden/;
+const SPIN_CLASS = /\banimate-spin\b|\banimate-\[spin/;
+const PULSE_CLASS = /\banimate-pulse\b|\banimate-\[pulse|animation-duration|\bbg-ods-skeleton\b/;
+/** Waiting copy: "Loading"/"Checking" text nodes, and any of these words ending in an ellipsis. */
+const WAIT_TEXT = /^(?:loading|checking)\b/i;
+const WAIT_ELLIPSIS = /^(?:loading|checking|fetching|please wait)\b.*(?:\.\.\.|…)\s*$/i;
 const FLAG_FIELD =
   /^(?:is|has|show|should|can|enable|hide|with|allow)(?=[A-Z]|$)|^(?:enabled|hidden|disabled|open|visible|selected|active|expanded|collapsed|checked|loading|length)$/;
 const CONFIG_FIELD = /^(?:icon|children|actions?|className|style|href|on[A-Z]\w*|render[A-Z]?\w*)$/;
@@ -240,9 +311,13 @@ const CONFIG_FIELD = /^(?:icon|children|actions?|className|style|href|on[A-Z]\w*
 const CONFIG_ROOT =
   /^(?:props|this|window|document|process|config|settings|options|actions|theme|styles?|classes|t|i18n|router|navigation|form|field|meta|labels|copy|\w+Props)$/i;
 const FAILURE = /error|offline|failed|failure/i;
-const OPT_OUT_ANY = 'loading-standard-ok:';
-const OPT_OUT_COUNT = 'full-page-ok:';
+/** The one opt-out form (see the header). */
+const OPT_OUT_MARK = /loading-standard-ok\(\s*([A-Z_]+)\s*\):(.*)$/;
+const OPT_OUT_ANY = /loading-standard-ok|full-page-ok/;
 const WRAPPER_CALL = /^(?:memo|forwardRef|observer|React\.memo|React\.forwardRef)$|^with[A-Z]/;
+/** The attributes that mark a list item for the height gate. */
+const ITEM_MARK_ATTR = /^(?:data-loading-item|listItem|listItems)$/;
+const OFF_SCREEN = /(?:Modal|Dialog|Drawer|Toast|Portal|Popover|Sheet|Tooltip|Status)$/;
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Files
@@ -252,7 +327,7 @@ const SKIPPED_DIRS = new Set(['node_modules', '__tests__', '__fixtures__', 'stor
 const TEST_FILE = /\.(?:test|stories|spec)\.tsx?$/;
 
 /** Every `.ts` / `.tsx` file under `dir`, without dependencies, dot folders, tests and stories. */
-export function* walkSourceFiles(dir) {
+function* walkSourceFiles(dir) {
   if (!existsSync(dir)) return;
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (SKIPPED_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;
@@ -300,7 +375,7 @@ function dottedName(node) {
 }
 
 /** The name a function-like node is known by (its declaration, the variable or property it is assigned to). */
-export function functionName(fn) {
+function functionName(fn) {
   if ((ts.isFunctionDeclaration(fn) || ts.isFunctionExpression(fn)) && fn.name) return fn.name.text;
   if (ts.isMethodDeclaration(fn) && ts.isIdentifier(fn.name)) return fn.name.text;
   let p = fn.parent;
@@ -400,6 +475,21 @@ function attributeExpression(attr) {
   return null;
 }
 
+/** The class strings of an expression, a constant it names read as the string it holds (`MOBILE_HIDE`). */
+function classStrings(expr, model, depth = 0) {
+  const out = stringsIn(expr);
+  const visit = n => {
+    if (ts.isIdentifier(n) && depth < 3) {
+      const decl = model.lookup(n.text, n);
+      if (decl?.kind === 'var' && decl.init && !decl.destructured)
+        out.push(...classStrings(decl.init, model, depth + 1));
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(expr);
+  return out;
+}
+
 /** Every string piece (literals, template parts) inside `node`. */
 function stringsIn(node) {
   const out = [];
@@ -417,14 +507,28 @@ function stringsIn(node) {
   return out;
 }
 
+/** What renders nothing: `null`, `undefined`, `false`, `''`, an empty fragment. */
 const isNullish = node => {
   const n = strip(node);
   if (!n) return false;
-  if (n.kind === ts.SyntaxKind.NullKeyword) return true;
+  if (n.kind === ts.SyntaxKind.NullKeyword || n.kind === ts.SyntaxKind.FalseKeyword) return true;
   if (ts.isIdentifier(n) && n.text === 'undefined') return true;
   if (ts.isJsxFragment(n) && n.children.every(c => ts.isJsxText(c) && !c.text.trim())) return true;
   if ((ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && !n.text.trim()) return true;
   return false;
+};
+
+/** Nothing, or a blank box: an HTML element with no children and nothing but layout attributes (`<div className="h-64" />`). */
+const isBlank = node => {
+  if (isNullish(node)) return true;
+  const n = strip(node);
+  if (!n || !(ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n))) return false;
+  const opening = openingOf(n);
+  if (!/^[a-z]/.test(opening.tagName.getText())) return false;
+  if (ts.isJsxElement(n) && n.children.some(c => !(ts.isJsxText(c) && !c.text.trim()))) return false;
+  return opening.attributes.properties.every(
+    a => ts.isJsxAttribute(a) && /^(?:className|style|key|aria-hidden|role)$/.test(a.name.getText()),
+  );
 };
 
 const isJsx = node => {
@@ -432,11 +536,37 @@ const isJsx = node => {
   return !!n && (ts.isJsxElement(n) || ts.isJsxSelfClosingElement(n) || ts.isJsxFragment(n));
 };
 
+/** The name node a node renders: a JSX tag, or the first argument of `createElement` / `jsx`. Else null. */
+function renderedTag(node) {
+  if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) return node.tagName;
+  if (
+    ts.isCallExpression(node) &&
+    node.arguments[0] &&
+    /(?:^|\.)(?:createElement|jsx|jsxs|jsxDEV)$/.test(dottedName(node.expression))
+  )
+    return node.arguments[0];
+  return null;
+}
+
+/** Whether a resolved tag is a skeleton (`XSkeleton`, `XSkeleton.Part`, `TextSkeleton.Body`). */
+const isSkeletonName = tag => /Skeleton(?:\.\w+)?$/.test(tag);
+
+/** Whether a node sits in a `next/dynamic` call's `loading:` slot (the allowed fallback form). */
+function inDynamicLoading(node) {
+  for (let p = node.parent; p; p = p.parent) {
+    if (!ts.isPropertyAssignment(p) || p.name.getText() !== 'loading' || !ts.isObjectLiteralExpression(p.parent))
+      continue;
+    const call = p.parent.parent;
+    if (call && ts.isCallExpression(call) && /(?:^|\.)dynamic$/.test(dottedName(call.expression))) return true;
+  }
+  return false;
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // One file: its bindings, and the names its JSX resolves to
 // ---------------------------------------------------------------------------------------------------------------------
 
-export class FileModel {
+class FileModel {
   constructor(project, path) {
     this.project = project;
     this.path = path;
@@ -527,11 +657,36 @@ export class FileModel {
     return this.sf.getLineAndCharacterOfPosition(node.getStart(this.sf)).line + 1;
   }
 
+  /**
+   * The file's opt-out markers (see the header): `{ line, rule, why, covers, used }`, `rule` null when the marker is
+   * not the rule-scoped form. A marker covers its own line, and the next one when it stands alone on its line.
+   */
+  get markers() {
+    if (!this._markers) {
+      this._markers = [];
+      this.lines.forEach((text, index) => {
+        if (!OPT_OUT_ANY.test(text)) return;
+        const mark = OPT_OUT_MARK.exec(text);
+        const alone = /^\s*(?:\/\/|\/\*|\{\s*\/\*)/.test(text);
+        const line = index + 1;
+        this._markers.push({
+          line,
+          rule: mark?.[1] || null,
+          why: mark ? mark[2].split('*/')[0].trim() : '',
+          covers: alone ? [line, line + 1] : [line],
+          used: false,
+        });
+      });
+    }
+    return this._markers;
+  }
+
+  /** Whether a marker lifts `rule` at `node`'s line (and records that it did). */
   optedOut(node, rule) {
     const line = this.line(node);
-    const window = this.lines.slice(Math.max(0, line - 3), line).join('\n');
-    if (window.includes(OPT_OUT_ANY)) return true;
-    return COUNT_RULE_SET.has(rule) && window.includes(OPT_OUT_COUNT);
+    const marker = this.markers.find(m => m.rule === rule && m.why && m.covers.includes(line));
+    if (marker) marker.used = true;
+    return !!marker;
   }
 }
 
@@ -576,9 +731,31 @@ export class Project {
         this.declaredIn.get(m[1]).add(path);
       }
     }
+    this.hooksDeclared = new Set();
+    for (const text of this.text.values()) {
+      for (const m of text.matchAll(/\b(?:function|const|let)\s+(use[A-Z][\w$]*)\b/g)) this.hooksDeclared.add(m[1]);
+    }
     this.switchCache = new Map();
-    this.scopeHooks = this.#scopeHooks();
+    this.marksCache = new Map();
+    this.scopeHooks = this.#hooksCalling(new Set([SCOPE_HOOK]), text => text.includes(SCOPE_HOOK));
+    this.dataHooks = this.#hooksCalling(
+      new Set(),
+      text => /\b(?:function|const|let)\s+use[A-Z]/.test(text),
+      QUERY_HOOK,
+    );
+    this.suspendingHooks = this.#hooksCalling(
+      new Set(),
+      text => /\b(?:useLazyLoadQuery|usePreloadedQuery|useSuspenseQuery|useSuspenseQueries)\b/.test(text),
+      SUSPENDING_READ,
+    );
     this.deprecated = this.#deprecatedSkeletons();
+  }
+
+  /** Whether a hook returns read data: it calls a query (directly or through a data hook), or is not declared here. */
+  isDataHook(name) {
+    if (!/^use[A-Z]/.test(name) || NOT_DATA_HOOK.test(name) || this.scopeHooks.has(name) || LOCAL_HOOK.test(name))
+      return false;
+    return QUERY_HOOK.test(name) || this.dataHooks.has(name) || !this.hooksDeclared.has(name);
   }
 
   parse(path) {
@@ -597,18 +774,19 @@ export class Project {
     return sf;
   }
 
-  /** Hooks that read the loading scope (`useLoadingScope` and every `use*` whose body calls one). */
-  #scopeHooks() {
-    const hooks = new Set([SCOPE_HOOK]);
-    const candidates = [...this.text].filter(([, text]) => text.includes(SCOPE_HOOK)).map(([path]) => path);
-    for (let round = 0; round < 3; round++) {
+  /**
+   * The `use*` hooks whose body calls one of `hooks` (or a callee matching `seed`), to a fixed point: the scope hooks
+   * (`useLoadingScope` and every hook calling it) and the data hooks (every hook calling a query).
+   */
+  #hooksCalling(hooks, candidate, seed = null) {
+    const paths = [...this.text].filter(([, text]) => candidate(text)).map(([path]) => path);
+    for (let round = 0; round < 4; round++) {
       const before = hooks.size;
-      for (const path of candidates) {
-        const sf = this.parse(path);
-        walk(sf, n => {
+      for (const path of paths) {
+        walk(this.parse(path), n => {
           if (!isFunctionLike(n)) return undefined;
           const name = functionName(n);
-          if (/^use[A-Z]/.test(name) && !hooks.has(name) && this.#callsHook(n, hooks)) hooks.add(name);
+          if (/^use[A-Z]/.test(name) && !hooks.has(name) && this.#callsHook(n, hooks, seed)) hooks.add(name);
           return undefined;
         });
       }
@@ -617,7 +795,7 @@ export class Project {
     return hooks;
   }
 
-  #callsHook(fn, hooks) {
+  #callsHook(fn, hooks, seed = null) {
     let found = false;
     const body = bodyOf(fn);
     if (!body) return false;
@@ -626,8 +804,8 @@ export class Project {
       if (n !== fn && isFunctionLike(n) && isComponentName(functionName(n))) return false;
       if (ts.isCallExpression(n)) {
         const callee = dottedName(n.expression).split('.').pop();
-        if (hooks.has(callee)) found = true;
-        if (callee === 'useContext' && /LoadingScope/.test(n.arguments[0]?.getText() ?? '')) found = true;
+        if (hooks.has(callee) || seed?.test(callee)) found = true;
+        if (!seed && callee === 'useContext' && /LoadingScope/.test(n.arguments[0]?.getText() ?? '')) found = true;
       }
       return undefined;
     });
@@ -744,21 +922,97 @@ export class Project {
     return delegated;
   }
 
-  /** Whether a component (resolved from `fromPath`) marks its items or parts with `pattern`. */
-  componentMarks(fromPath, local, pattern) {
+  /**
+   * Whether component `local` (as named in `fromPath`) carries the `kind` mark (`item`: `data-loading-item`,
+   * `loadingItemProps(…)`, `listItem(s)`; `optional`: `data-loading-optional`) on an element it renders, read from its
+   * declaration's AST through its import (a comment or a string that mentions the mark is not one).
+   */
+  componentMarks(fromPath, local, kind, depth = 0) {
+    const key = `${fromPath}\0${local}\0${kind}`;
+    if (this.marksCache.has(key)) return this.marksCache.get(key);
+    this.marksCache.set(key, false);
     const model = this.model(fromPath);
     const binding = model.binding(local);
+    let targets = [];
     if (binding?.kind === 'import') {
-      const file = binding.file;
-      if (file) return pattern.test(this.text.get(file) ?? '');
-      for (const path of this.declaredIn.get(binding.imported) ?? []) {
-        if (pattern.test(this.text.get(path) ?? '')) return true;
+      const files = binding.file ? [binding.file] : [...(this.declaredIn.get(binding.imported) ?? [])];
+      targets = files.map(path => [
+        path,
+        binding.imported === 'default' ? this.#defaultExport(path) : binding.imported,
+      ]);
+    } else targets = [[fromPath, local]];
+    const result = targets.some(([path, name]) => {
+      const decl = name && this.declarationIn(path, name);
+      if (!decl) return false;
+      const fn = decl.kind === 'function' ? decl.node : decl.init ? (functionInside(decl.init) ?? decl.init) : null;
+      if (!fn) return false;
+      const target = !isFunctionLike(fn) && decl.init ? aliasTarget(decl.init) : null;
+      if (target && depth < 3) return this.componentMarks(path, target, kind, depth + 1);
+      return this.#marksIn(fn, path, kind, depth);
+    });
+    this.marksCache.set(key, result);
+    return result;
+  }
+
+  #marksIn(node, path, kind, depth) {
+    const attr = kind === 'item' ? ITEM_MARK_ATTR : /^data-loading-optional$/;
+    let hit = false;
+    walk(node, n => {
+      if (hit) return false;
+      if (ts.isJsxAttribute(n) && attr.test(n.name.getText())) hit = true;
+      if (kind === 'item' && ts.isCallExpression(n) && /(?:^|\.)loadingItemProps$/.test(dottedName(n.expression)))
+        hit = true;
+      // An element it renders whose own component carries the mark (`<Row {...props} />` → Row's root).
+      const tag = renderedTag(n);
+      if (!hit && tag && depth < 3) {
+        const name = dottedName(tag);
+        if (isComponentName(name) && this.componentMarks(path, name.split('.')[0], kind, depth + 1)) hit = true;
       }
-      return false;
+      return undefined;
+    });
+    return hit;
+  }
+
+  /** Whether component `local` (as named in `fromPath`) renders nothing: every return of its declaration is nullish. */
+  rendersNothing(fromPath, local) {
+    const binding = this.model(fromPath).binding(local);
+    const targets =
+      binding?.kind === 'import'
+        ? (binding.file ? [binding.file] : [...(this.declaredIn.get(binding.imported) ?? [])]).map(path => [
+            path,
+            binding.imported === 'default' ? this.#defaultExport(path) : binding.imported,
+          ])
+        : [[fromPath, local]];
+    return targets.some(([path, name]) => {
+      const decl = name && this.declarationIn(path, name);
+      const fn = decl?.kind === 'function' ? decl.node : decl?.init ? functionInside(decl.init) : null;
+      if (!fn?.body) return false;
+      if (!ts.isBlock(fn.body)) return isNullish(fn.body);
+      let returns = 0;
+      let nothing = true;
+      walk(fn.body, n => {
+        if (isFunctionLike(n)) return false;
+        if (ts.isReturnStatement(n)) {
+          returns++;
+          if (n.expression && !isNullish(n.expression)) nothing = false;
+        }
+        return undefined;
+      });
+      return returns > 0 && nothing;
+    });
+  }
+
+  /** The name a module's default export is declared by, or null. */
+  #defaultExport(path) {
+    for (const st of this.parse(path).statements) {
+      if (
+        (ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st)) &&
+        st.modifiers?.some(m => m.kind === ts.SyntaxKind.DefaultKeyword)
+      )
+        return st.name?.text ?? null;
+      if (ts.isExportAssignment(st) && ts.isIdentifier(strip(st.expression))) return strip(st.expression).text;
     }
-    const decl = this.declarationIn(fromPath, local);
-    if (decl) return pattern.test(decl.node.getText());
-    return false;
+    return null;
   }
 
   model(path) {
@@ -874,6 +1128,9 @@ function isReadData(node, model, { hookOnly = false } = {}) {
   if (!n) return false;
   if (ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n)) {
     if (ts.isPropertyAccessExpression(n) && n.name.text === 'data') return true;
+    // A flag or an action of a hook's result (`test.showResults`, `q.isLoading`) is not its data.
+    if (ts.isPropertyAccessExpression(n) && (FLAG_FIELD.test(n.name.text) || NOT_DATA_FIELD.test(n.name.text)))
+      return false;
     return isReadData(n.expression, model, { hookOnly });
   }
   if (!ts.isIdentifier(n)) return false;
@@ -883,6 +1140,7 @@ function isReadData(node, model, { hookOnly = false } = {}) {
     decl.init &&
     ts.isCallExpression(strip(decl.init)) &&
     /^use[A-Z]/.test(dottedName(strip(decl.init).expression).split('.').pop());
+  if (decl?.kind === 'var' && decl.init && readOrigin(n.text, decl, model)) return true;
   if (!READ_DATA.test(n.text)) return false;
   const derived =
     decl?.kind === 'var' &&
@@ -891,6 +1149,40 @@ function isReadData(node, model, { hookOnly = false } = {}) {
   if (derived) return false;
   if (hookOnly) return fromHook || !decl;
   return n.text === 'data' || fromHook || !decl || decl.kind === 'param';
+}
+
+/**
+ * Whether a local holds READ DATA by where it comes from: what a data hook returns (`const { tickets } =
+ * useTickets()`, `const user = useUser()`; not a flag, an error or an action of it), or an alias of read data
+ * (`const user = query.data`).
+ */
+function readOrigin(name, decl, model, depth = 0) {
+  const init = strip(decl.init);
+  if (ts.isCallExpression(init)) {
+    const hook = dottedName(init.expression).split('.').pop();
+    if (!model.project.isDataHook(hook)) return false;
+    if (!decl.destructured) return true;
+    const el = bindingElement(decl.node.name, name);
+    const field = el ? (el.propertyName ?? el.name).getText() : name;
+    return !LOADING_FLAG.test(field) && !NOT_DATA_FIELD.test(field) && !el?.initializer && !el?.dotDotDotToken;
+  }
+  if (decl.destructured || depth > 3) return false;
+  return (
+    (ts.isPropertyAccessExpression(init) || ts.isElementAccessExpression(init) || ts.isIdentifier(init)) &&
+    isReadData(init, model)
+  );
+}
+
+/** The binding element that binds `name` in a destructuring pattern, or null. */
+function bindingElement(pattern, name) {
+  if (!ts.isObjectBindingPattern(pattern) && !ts.isArrayBindingPattern(pattern)) return null;
+  for (const el of pattern.elements) {
+    if (ts.isOmittedExpression(el)) continue;
+    if (ts.isIdentifier(el.name) && el.name.text === name) return el;
+    const inner = bindingElement(el.name, name);
+    if (inner) return inner;
+  }
+  return null;
 }
 
 /** True when the condition holds WHILE the read is pending (loading, or the data missing). */
@@ -929,6 +1221,14 @@ function falseWhileLoading(test, model, opts) {
   return false;
 }
 
+/** The operands of an `&&` chain (`a && b && c` -> [a, b, c]). */
+function conjuncts(node) {
+  const n = strip(node);
+  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+    return [...conjuncts(n.left), ...conjuncts(n.right)];
+  return [n];
+}
+
 /** Whether, inside `fn` and before `node`, the read has answered: a suspending read, a loading branch, the scope. */
 function answeredBefore(fn, node, model) {
   if (!fn?.body || !ts.isBlock(fn.body)) return false;
@@ -939,7 +1239,12 @@ function answeredBefore(fn, node, model) {
     if (n !== fn && isFunctionLike(n)) return false;
     if (ts.isCallExpression(n)) {
       const callee = dottedName(n.expression).split('.').pop();
-      if (SUSPENDING_READ.test(callee) || model.project.scopeHooks.has(callee)) answered = true;
+      if (
+        SUSPENDING_READ.test(callee) ||
+        model.project.suspendingHooks.has(callee) ||
+        model.project.scopeHooks.has(callee)
+      )
+        answered = true;
     }
     if (
       ts.isIfStatement(n) &&
@@ -1008,17 +1313,20 @@ function classifyCount(expr, model, { attr = '', depth = 0 } = {}) {
         : 'typed'
       : worst([n.left, n.right].map(b => classifyCount(b, model, { attr, depth: depth + 1 })));
   if (ts.isConditionalExpression(n)) {
-    // A cap: `PAGE_SIZE > 6 ? 6 : PAGE_SIZE`, or a literal against a page size. Two literals choose between two forms.
+    // A cap: `PAGE_SIZE > 6 ? 6 : PAGE_SIZE`, or a literal against a page size. Two literals (`isMobile ? 3 : 10`)
+    // are two typed counts.
     const branches = [n.whenTrue, n.whenFalse].map(strip);
     if (isComparison(n.condition)) return 'cap';
-    if (branches.some(b => ts.isNumericLiteral(b)) && branches.some(b => SOURCE_COUNT.test(leafName(b)))) return 'cap';
-    if (branches.every(b => ts.isNumericLiteral(b))) return 'ok';
+    if (branches.some(b => ts.isNumericLiteral(b)) && branches.some(b => COUNT_SOURCE_NAME.test(leafName(b))))
+      return 'cap';
+    // Two literals choose between two forms, unless the choice is the screen's width or the count a skeleton count.
+    if (branches.every(b => ts.isNumericLiteral(b)) && !attr && !WIDTH_TEST.test(n.condition.getText())) return 'ok';
     return worst([n.whenTrue, n.whenFalse].map(b => classifyCount(b, model, { attr, depth: depth + 1 })));
   }
-  if (ts.isCallExpression(n) && dottedName(n.expression) === 'Math.min') return isPageCap(n) ? 'cap' : 'ok';
+  if (ts.isCallExpression(n) && dottedName(n.expression) === 'Math.min') return isPageCap(n, model) ? 'cap' : 'ok';
   if (ts.isPropertyAccessExpression(n) && n.name.text === 'length') {
     const of = strip(n.expression);
-    if (!ts.isIdentifier(of) || SOURCE_COUNT.test(of.text)) return 'ok';
+    if (!ts.isIdentifier(of) || COUNT_SOURCE_NAME.test(of.text)) return 'ok';
     const ofDecl = model.lookup(of.text, of);
     return ofDecl?.kind === 'var' && ofDecl.init && isLiteralArray(ofDecl.init) ? 'unnamed' : 'ok';
   }
@@ -1035,18 +1343,18 @@ function classifyCount(expr, model, { attr = '', depth = 0 } = {}) {
       if (from?.kind === 'param') return 'ok';
     }
     if (!ts.isIdentifier(n))
-      return SOURCE_COUNT.test(name) || (attr && name === attr) ? 'ok' : decl?.kind === 'var' ? 'ok' : 'unnamed';
+      return COUNT_SOURCE_NAME.test(name) || (attr && name === attr) ? 'ok' : decl?.kind === 'var' ? 'ok' : 'unnamed';
     if (decl?.kind === 'var' && decl.init && !decl.destructured) {
       const init = strip(decl.init);
-      if (ts.isNumericLiteral(init)) return SOURCE_COUNT.test(name) ? 'ok' : 'typed';
+      if (ts.isNumericLiteral(init)) return COUNT_SOURCE_NAME.test(name) ? 'ok' : 'typed';
       const inner = classifyCount(init, model, { attr, depth: depth + 1 });
       // A declared page size, limit or `*_SKELETON_*` name is the source, whatever it is set from, unless it caps.
-      if (SOURCE_COUNT.test(name)) return inner === 'cap' ? 'cap' : 'ok';
+      if (COUNT_SOURCE_NAME.test(name)) return inner === 'cap' ? 'cap' : 'ok';
       return inner;
     }
-    if (SOURCE_COUNT.test(name)) return 'ok';
+    if (COUNT_SOURCE_NAME.test(name)) return 'ok';
     if (attr && name === attr) return 'ok';
-    if (decl?.kind === 'import') return SOURCE_COUNT.test(decl.imported) ? 'ok' : 'unnamed';
+    if (decl?.kind === 'import') return COUNT_SOURCE_NAME.test(decl.imported) ? 'ok' : 'unnamed';
     return 'unnamed';
   }
   return 'ok';
@@ -1082,11 +1390,24 @@ function isClamp(call) {
   return inner || outer;
 }
 
-function isPageCap(call) {
+/**
+ * `Math.min(pageSize, X)` where X is a fold, a constant, a number or a local holding one (`rowsShown = 6`); not the last
+ * page (`rows.length`, `total`).
+ */
+function isPageCap(call, model) {
   const args = call.arguments.map(a => a.getText().trim());
   const page = args.find(a => PAGE_ARG.test(a));
-  const simple = a => /^[\w$.]+$/.test(a) || /fold|screen/i.test(a);
-  return !!page && args.some(a => a !== page && simple(a) && CAP_ARG.test(a));
+  if (!page) return false;
+  return call.arguments.some((arg, i) => {
+    const text = args[i];
+    if (text === page) return false;
+    if ((/^[\w$.]+$/.test(text) || /fold|screen/i.test(text)) && CAP_ARG.test(text)) return true;
+    const n = strip(arg);
+    if (!ts.isIdentifier(n)) return false;
+    if (CAP_NAME.test(n.text)) return true;
+    const decl = model.lookup(n.text, n);
+    return decl?.kind === 'var' && !decl.destructured && !!decl.init && ts.isNumericLiteral(strip(decl.init));
+  });
 }
 
 /** The length expression and item callback of a list drawn N times, or null. */
@@ -1164,8 +1485,6 @@ function callbackItem(callback) {
   return rootElement(returnedExpression(cb));
 }
 
-const ITEM_MARK_ATTR = /^(?:data-loading-item|listItem|listItems)$/;
-
 /** Whether an item element is marked (on itself, by `loadingItemProps(…)`, or inside its component). */
 function itemMarked(el, model) {
   if (!el) return true; // nothing to read: not a list of elements
@@ -1181,38 +1500,51 @@ function itemMarked(el, model) {
   }
   const tag = dottedName(opening.tagName);
   if (!isComponentName(tag)) return false;
-  return model.project.componentMarks(
-    model.path,
-    tag.split('.')[0],
-    /data-loading-item|loadingItemProps\s*\(|\blistItems?\b/,
-  );
+  return model.project.componentMarks(model.path, tag.split('.')[0], 'item');
 }
 
-/** The `.map(cb)` item of the loaded branch beside a loading list (the other side of the same condition). */
+/** The first `.map(cb)` inside `node` (not inside a nested function), or null. */
+function firstMap(node) {
+  let found = null;
+  const visit = n => {
+    if (found) return;
+    if (
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      n.expression.name.text === 'map' &&
+      n.arguments[0] &&
+      isFunctionLike(strip(n.arguments[0]))
+    ) {
+      found = n;
+      return;
+    }
+    if (isFunctionLike(n)) return;
+    ts.forEachChild(n, visit);
+  };
+  visit(node);
+  return found;
+}
+
+/**
+ * The `.map(cb)` of the loaded list beside a loading list: the other branch of the same condition, or the list the
+ * component returns after `if (loading) return …` (or in its `else`).
+ */
 function loadedListBeside(listNode, model) {
   let child = listNode;
   for (let p = listNode.parent; p && !isFunctionLike(p); child = p, p = p.parent) {
     if (ts.isConditionalExpression(p) && (isLoadingFlag(p.condition, model) || isNegatedLoading(p.condition, model))) {
       const other = child === p.whenTrue ? p.whenFalse : child === p.whenFalse ? p.whenTrue : null;
-      if (!other) return null;
-      let found = null;
-      const visit = n => {
-        if (found) return;
-        if (
-          ts.isCallExpression(n) &&
-          ts.isPropertyAccessExpression(n.expression) &&
-          n.expression.name.text === 'map' &&
-          n.arguments[0] &&
-          isFunctionLike(strip(n.arguments[0]))
-        ) {
-          found = n;
-          return;
-        }
-        if (isFunctionLike(n)) return;
-        ts.forEachChild(n, visit);
-      };
-      visit(other);
-      return found;
+      return other ? firstMap(other) : null;
+    }
+    if (ts.isIfStatement(p) && child === p.thenStatement && isLoadingFlag(p.expression, model)) {
+      if (p.elseStatement) return firstMap(p.elseStatement);
+      const block = p.parent;
+      if (!ts.isBlock(block) || !containsReturn(p.thenStatement)) return null;
+      for (const st of block.statements.slice(block.statements.indexOf(p) + 1)) {
+        const found = ts.isReturnStatement(st) && st.expression ? firstMap(st.expression) : null;
+        if (found) return found;
+      }
+      return null;
     }
   }
   return null;
@@ -1223,29 +1555,32 @@ function loadedListBeside(listNode, model) {
 // ---------------------------------------------------------------------------------------------------------------------
 
 /**
- * Every finding of `rules` over the reported trees of `project`, as `{ rule, path, file, line, message }` (`file` is
- * relative to the finding's tree). `config.exempt` lifts rules from files.
+ * Every finding over the reported trees of `project`, as `{ rule, path, file, line, message }` (`file` is relative to
+ * the finding's tree), under a config (`CONFIGS.lib`, `CONFIGS.frontend`): `rules` run, `trees` reported, `pageCode`,
+ * `exempt` lifting rules from files, and `files` (absolute paths) narrowing the run.
  *
  * @param {Project} project
- * @param {{ rules?: string[], exempt?: Array<{ why?: string, files: RegExp, rules: string[] }>, files?: string[] }} [config]
+ * @param {{ rules?: string[], trees?: string[], pageCode?: Function, exempt?: Array<{ why?: string, files: RegExp, rules: string[] }>, files?: string[] }} [config]
  */
-export function analyzeProject(project, { rules = [...PAGE_RULES, ...COUNT_RULES], exempt = [], files } = {}) {
+export function analyzeProject(project, { rules = ALL_RULES, trees, pageCode, exempt = [], files } = {}) {
   const enabled = new Set(rules);
   const findings = [];
   const paths = files ?? [...project.text.keys()].filter(path => project.treeOf.get(path)?.report);
   for (const path of paths) {
     const tree = project.treeOf.get(path);
     const rel = tree ? relative(tree.dir, path) : path;
+    if (trees && !trees.some(dir => rel === dir || rel.startsWith(`${dir}/`))) continue;
     const lifted = new Set(exempt.filter(e => e.files.test(rel)).flatMap(e => e.rules));
     const active = new Set([...enabled].filter(r => !lifted.has(r)));
     if (!active.size) continue;
-    findings.push(...analyzeFile(project, path, active, rel));
+    const isFile = other => project.text.has(join(tree?.dir ?? '', other)) || existsSync(join(tree?.dir ?? '', other));
+    findings.push(...analyzeFile(project, path, active, rel, pageCode?.(rel, isFile) ?? null));
   }
   return findings;
 }
 
-/** Every finding in one file (see `analyzeProject`). */
-export function analyzeFile(project, path, active, rel = path) {
+/** Every finding in one file (see `analyzeProject`); `page` is the file's page-code setting, or null. */
+function analyzeFile(project, path, active, rel, page) {
   const model = project.model(path);
   const findings = [];
   const seen = new Set();
@@ -1263,30 +1598,65 @@ export function analyzeFile(project, path, active, rel = path) {
 
   // Registry slots and next/dynamic fallbacks (allowed forms).
   const exemptRender = (node, component) => {
+    if (inDynamicLoading(node)) return true;
     for (let p = node.parent; p; p = p.parent) {
-      if (!ts.isPropertyAssignment(p)) continue;
-      const key = p.name.getText();
-      if (key === 'loading' && ts.isObjectLiteralExpression(p.parent) && ts.isCallExpression(p.parent.parent)) {
-        if (/(?:^|\.)dynamic$/.test(dottedName(p.parent.parent.expression))) return true;
-      }
-      if (key === 'skeleton' && ts.isObjectLiteralExpression(p.parent)) {
-        const render = p.parent.properties.find(q => ts.isPropertyAssignment(q) && q.name.getText() === 'render');
-        if (render) {
-          const renders = new Set();
-          walk(render.initializer, n => {
-            if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n))
-              renders.add(model.resolveName(n.tagName).replace('Chat', ''));
-          });
-          if (renders.has(component)) return true;
-        }
-      }
+      if (!ts.isPropertyAssignment(p) || p.name.getText() !== 'skeleton' || !ts.isObjectLiteralExpression(p.parent))
+        continue;
+      const render = p.parent.properties.find(q => ts.isPropertyAssignment(q) && q.name.getText() === 'render');
+      if (!render) continue;
+      const renders = new Set();
+      walk(render.initializer, n => {
+        const tag = renderedTag(n);
+        if (tag) renders.add(model.resolveName(tag).replace('Chat', ''));
+      });
+      if (renders.has(component)) return true;
     }
     return false;
   };
 
-  /** A render of a component skeleton (`<YSkeleton>`, `createElement(YSkeleton)`, `{YSkeleton}` as a prop). */
+  /** Report a parent drawing the loading state of `component` (ONE_SWITCH when it switches itself). */
+  const parentPicks = (node, component, what) => {
+    oneSwitchSites.add(node);
+    if (project.componentSwitches(component))
+      report(
+        'ONE_SWITCH',
+        node,
+        `${what} outside ${component}'s module, which switches itself (render <${component} />: one switch per component)`,
+      );
+    else
+      report(
+        'NO_SCOPE_SWITCH',
+        node,
+        `${what} outside ${component}'s module, which never switches itself (${component} should draw its own skeleton on useLoadingScope(), and this place render <${component} />)`,
+      );
+  };
+
+  /**
+   * A render of a component skeleton (`<YSkeleton>`, `createElement(YSkeleton)`, `{YSkeleton}` as a prop), or of a
+   * loading component not named `*Skeleton` (`<XLoading />`, `<XPlaceholder />`).
+   */
   const skeletonRender = (node, nameNode) => {
     const name = model.resolveName(nameNode);
+    if (WHOLE_VIEW.test(name) && !project.deprecated.has(name)) {
+      if (!project.declaredIn.get(name)?.has(path))
+        report('WHOLE_VIEW_SKELETON', node, `<${name}> (a whole-view skeleton) rendered`);
+      return;
+    }
+    if (
+      (LOADING_COMPONENT.test(name) && !LOADING_WRAPPER.test(name)) ||
+      (PLACEHOLDER_COMPONENT.test(name) && inLoadingContext(node, model))
+    ) {
+      const declared = project.declaredIn.get(name);
+      if (declared?.size && !declared.has(path) && !exemptRender(node, name)) {
+        oneSwitchSites.add(node);
+        report(
+          'NO_SCOPE_SWITCH',
+          node,
+          `<${name}> picked as a loading state (the component it stands for should draw its own skeleton on useLoadingScope(), and this place render it)`,
+        );
+      }
+      return;
+    }
     if (!/^[A-Z]\w*Skeleton$/.test(name)) return;
     const component = name.slice(0, -'Skeleton'.length);
     // Deprecated lib skeletons.
@@ -1298,17 +1668,29 @@ export function analyzeFile(project, path, active, rel = path) {
       );
     if (name === 'DetailPageSkeleton')
       report('WHOLE_VIEW_SKELETON', node, 'DetailPageSkeleton (a whole-page skeleton)');
+    if (PRIMITIVE.test(name)) return;
     const modules = project.declaredIn.get(component);
-    if (!modules?.size) return;
-    const own = new Set([...(modules ?? []), ...(project.declaredIn.get(name) ?? [])]);
+    const skeletonFn = enclosingNames(node).find(n => /Skeleton$/.test(n));
+    if (!modules?.size) {
+      // A skeleton with no component of its own, chosen by a parent: a loading state drawn by the parent.
+      const own = project.declaredIn.get(name);
+      // A part of a component family (declared in the same folder) is the family's own.
+      const family = [...(own ?? [])].some(d => dirname(d) === dirname(path));
+      if (!skeletonFn && own?.size && !family && !project.deprecated.has(name) && !exemptRender(node, component)) {
+        oneSwitchSites.add(node);
+        report(
+          'NO_SCOPE_SWITCH',
+          node,
+          `<${name}> picked as a loading state with no component of its own (draw the component the skeleton stands for, in a loading scope)`,
+        );
+      }
+      return;
+    }
+    const own = new Set([...modules, ...(project.declaredIn.get(name) ?? [])]);
     if (own.has(path)) return;
     if (exemptRender(node, component)) return;
-    const switched = project.componentSwitches(component);
-    const names = enclosingNames(node);
-    const skeletonFn = names.find(n => /Skeleton$/.test(n));
     if (skeletonFn) {
-      const moduleRendersChild = rendersOutsideSkeletons(model, component);
-      if (moduleRendersChild && switched) {
+      if (rendersOutsideSkeletons(model, component) && project.componentSwitches(component)) {
         oneSwitchSites.add(node);
         report(
           'ONE_SWITCH',
@@ -1318,21 +1700,7 @@ export function analyzeFile(project, path, active, rel = path) {
       }
       return;
     }
-    oneSwitchSites.add(node);
-    // A component family's own parts (`DataTable.Body` drawing `DataTableSkeleton` from its folder) are one component.
-    if (!switched && [...(project.declaredIn.get(name) ?? [])].some(d => dirname(d) === dirname(path))) return;
-    if (switched)
-      report(
-        'ONE_SWITCH',
-        node,
-        `<${name}> rendered outside ${component}'s module, which switches itself (render <${component} />: one switch per component)`,
-      );
-    else
-      report(
-        'NO_SCOPE_SWITCH',
-        node,
-        `<${name}> rendered outside ${component}'s module, which never switches itself (${component} should draw its own skeleton on useLoadingScope(), and this place render <${component} />)`,
-      );
+    parentPicks(node, component, `<${name}> rendered`);
   };
 
   const components = [];
@@ -1393,14 +1761,37 @@ export function analyzeFile(project, path, active, rel = path) {
     }
     if (isTsx && ts.isJsxText(node)) {
       const text = node.text.trim();
-      if (/^(?:Loading|Checking)\b/.test(text) && !inAnnouncement(node))
-        report(
-          'LOADING_TEXT',
-          node,
-          /(\.\.\.|…)$/.test(text)
-            ? '"Loading…" text as a loading state (draw the component skeleton)'
-            : '"Loading" text as a loading state (draw the component skeleton)',
-        );
+      if ((WAIT_TEXT.test(text) || WAIT_ELLIPSIS.test(text)) && !inAnnouncement(node))
+        report('LOADING_TEXT', node, `"${text}" as a loading state (draw the component skeleton)`);
+    }
+    // An inline animation of one's own (`style={{ animation: 'pulse 2s infinite' }}`).
+    if (
+      ts.isPropertyAssignment(node) &&
+      /^(?:animation|animationName)$/.test(node.name.getText().replace(/['"]/g, '')) &&
+      stringsIn(node.initializer).some(s => /\b(?:pulse|spin)\b/.test(s))
+    )
+      report('OWN_PULSE', node, 'an inline pulse or spin animation of its own (use the lib skeletons)');
+    // A count typed in an object (`{ skeletonRows: 5, loadingRows: { primary: 7 } }`).
+    if (ts.isPropertyAssignment(node) && COUNT_ATTR.test(node.name.getText().replace(/['"]/g, ''))) {
+      const value = strip(node.initializer);
+      const values = ts.isObjectLiteralExpression(value)
+        ? value.properties.filter(ts.isPropertyAssignment).map(q => q.initializer)
+        : [value];
+      for (const v of values) {
+        const kind = classifyCount(v, model, { attr: node.name.getText() });
+        if (kind === 'typed')
+          report(
+            'TYPED_COUNT',
+            v,
+            `a typed skeleton count (${node.name.getText()}: ${v.getText()}); name the list's page size, limit or a *_SKELETON_* constant`,
+          );
+        else if (kind === 'cap')
+          report(
+            'COUNT_CAP',
+            v,
+            `a capped skeleton count (${node.name.getText()}: ${v.getText()}); a list's skeleton draws its full page`,
+          );
+      }
     }
 
     // --- JSX elements ------------------------------------------------------------------------------------------------
@@ -1410,12 +1801,13 @@ export function analyzeFile(project, path, active, rel = path) {
     // --- calls ---------------------------------------------------------------------------------------------------------
     if (ts.isCallExpression(node)) {
       const callee = dottedName(node.expression);
-      if (/(?:^|\.)(?:createElement|jsx|jsxs|jsxDEV)$/.test(callee) && node.arguments[0]) {
-        skeletonRender(node, node.arguments[0]);
-        const target = model.resolveName(node.arguments[0]);
-        if (LOADERS.has(target)) report('LOADER_COMPONENT', node, RULES.LOADER_COMPONENT);
+      const tag = renderedTag(node);
+      if (tag) {
+        skeletonRender(node, tag);
+        if (LOADERS.has(model.resolveName(tag))) report('LOADER_COMPONENT', node, RULES.LOADER_COMPONENT);
       }
-      if (callee === 'Math.min' && isPageCap(node) && !isClamp(node))
+      if (/(?:^|\.)dynamic$/.test(callee)) checkDynamic(node);
+      if (callee === 'Math.min' && isPageCap(node, model) && !isClamp(node))
         report(
           'COUNT_CAP',
           node,
@@ -1448,6 +1840,7 @@ export function analyzeFile(project, path, active, rel = path) {
     if (ts.isConditionalExpression(node)) checkTernaryNull(node);
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
       checkAndPart(node);
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.BarBarToken) checkOrPart(node);
 
     ts.forEachChild(node, visit);
   };
@@ -1503,26 +1896,24 @@ export function analyzeFile(project, path, active, rel = path) {
   }
 
   function checkString(node, text) {
-    if (/\banimate-pulse\b|animate-\[pulse|animation-duration|\bbg-ods-skeleton\b/.test(text))
+    if (PULSE_CLASS.test(text))
       report(
         'OWN_PULSE',
         node,
         'a pulse or skeleton colour of its own (use the lib skeletons, LIVE_PULSE_CLASS for live dots)',
       );
-    if (/\banimate-spin\b/.test(text)) checkSpin(node);
-    const attr = enclosingAttribute(node);
-    const attrName = attr?.name.getText() ?? '';
-    if (/^(?:Loading|Checking)\b/.test(text.trim())) {
-      if (attrName === 'placeholder')
-        report('LOADING_TEXT', node, '"Loading" as a placeholder (draw the field in a loading scope)');
-      else if (
-        !/^(?:label|aria-label|aria-valuetext|title|alt|statusLabel|loadingLabel)$/.test(attrName) &&
-        !isAnnouncement(node)
-      ) {
-        if (/(\.\.\.|…)\s*$/.test(text) && !inAnnouncement(node))
-          report('LOADING_TEXT', node, '"Loading…" text as a loading state (draw the component skeleton)');
-      }
-    }
+    if (SPIN_CLASS.test(text)) checkSpin(node);
+    const attrName = enclosingAttribute(node)?.name.getText() ?? '';
+    const trimmed = text.trim();
+    if (attrName === 'placeholder' && /^(?:loading|checking|fetching)\b/i.test(trimmed))
+      report('LOADING_TEXT', node, `"${trimmed}" as a placeholder (draw the field in a loading scope)`);
+    else if (
+      WAIT_ELLIPSIS.test(trimmed) &&
+      !/^(?:label|aria-label|aria-valuetext|title|alt|statusLabel|loadingLabel|placeholder)$/.test(attrName) &&
+      !isAnnouncement(node) &&
+      !inAnnouncement(node)
+    )
+      report('LOADING_TEXT', node, `"${trimmed}" as a loading state (draw the component skeleton)`);
     if (NTH_HIDDEN.test(text) && inLoadingContext(node, model))
       report(
         'HIDDEN_ITEMS',
@@ -1613,7 +2004,7 @@ export function analyzeFile(project, path, active, rel = path) {
   /** Whether a condition reads a READ flag (a hook's `loading`, `isLoading`, `isFetching`…), not an action's. */
   function readFlagIn(test, fn) {
     let hit = false;
-    const v = n => {
+    const v = (n, depth = 0) => {
       if (hit) return;
       if ((ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) && READ_FLAG.test(leafName(n))) {
         if (leafName(n) !== 'loading') hit = true;
@@ -1623,8 +2014,15 @@ export function analyzeFile(project, path, active, rel = path) {
         } else hit = true;
         if (hit) return;
       }
+      // A local holding a read flag (`const busy = q.isLoading`).
+      if (ts.isIdentifier(n) && depth < 3) {
+        const decl = model.lookup(n.text, n);
+        if (decl?.kind === 'var' && decl.init && !decl.destructured && !ts.isCallExpression(strip(decl.init)))
+          v(decl.init, depth + 1);
+        if (hit) return;
+      }
       if (ts.isBinaryExpression(n) && isLoadingFlag(n, model) && /===|==/.test(n.operatorToken.getText())) hit = true;
-      ts.forEachChild(n, v);
+      ts.forEachChild(n, c => v(c, depth));
     };
     v(test);
     return hit && !!fn;
@@ -1643,35 +2041,25 @@ export function analyzeFile(project, path, active, rel = path) {
           report('RETIRED_API', a, `StreamedPage \`${a.name.getText()}\` (it takes a placeholder)`);
       }
     }
-    if (leaf === 'Suspense') {
-      const fallback = attribute(opening, 'fallback');
-      const value = attributeExpression(fallback);
-      if (!fallback)
-        report('SUSPENSE_FALLBACK', opening, 'a Suspense with no fallback (use LoadingSuspense / LoadingFallback)');
-      else if (value && strip(value).kind === ts.SyntaxKind.NullKeyword)
-        report('SUSPENSE_FALLBACK', opening, 'a Suspense fallback of null (draw the component skeleton)');
-      else if (!value || isNullish(value))
-        report('SUSPENSE_FALLBACK', opening, 'an empty Suspense fallback (use LoadingSuspense / LoadingFallback)');
-      else {
-        const root = rootElement(value);
-        const rootOpening = root && openingOf(root);
-        if (rootOpening && model.resolveName(rootOpening.tagName) === 'LoadingFallback')
-          report('HAND_PAIR', opening, 'a hand Suspense + LoadingFallback pair (use LoadingSuspense)');
-      }
+    if (leaf === 'Suspense' || leaf === 'LoadingSuspense') checkFallback(opening, leaf);
+    if (leaf === 'LoadingFallback' && ts.isJsxOpeningElement(opening)) {
+      const children = opening.parent.children.filter(c => !(ts.isJsxText(c) && !c.text.trim()));
+      if (children.every(c => (ts.isJsxExpression(c) ? !c.expression || isBlank(c.expression) : isBlank(c))))
+        report('SUSPENSE_FALLBACK', opening, 'a LoadingFallback drawing nothing (render the view it stands for)');
     }
+    if (leaf === 'LoadingFallback' && ts.isJsxSelfClosingElement(opening) && !attribute(opening, 'children'))
+      report('SUSPENSE_FALLBACK', opening, 'a LoadingFallback drawing nothing (render the view it stands for)');
     if (leaf === 'LoadingRegion' && ts.isJsxOpeningElement(opening)) {
-      let inner = false;
+      let inner = '';
       walk(opening.parent, n => {
-        if (
-          (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) &&
-          model.resolveName(n.tagName) === 'LoadingScope'
-        )
-          inner = true;
+        const name = renderedTag(n) && model.resolveName(renderedTag(n));
+        if (name === 'LoadingScope' || name === 'LoadingWhen') inner = name;
       });
-      if (inner) report('HAND_PAIR', opening, 'a hand LoadingRegion + LoadingScope pair (use LoadingFallback)');
+      if (inner) report('HAND_PAIR', opening, `a hand LoadingRegion + ${inner} pair (use LoadingFallback)`);
     }
+    if (PRIMITIVE.test(tag)) checkPrimitiveInBranch(opening, tag);
     // Counts on loading elements.
-    const isSkeletonTag = /Skeleton$/.test(leaf) || /Skeleton\./.test(tag);
+    const skeletonTag = isSkeletonName(tag);
     for (const a of opening.attributes.properties) {
       if (!ts.isJsxAttribute(a)) continue;
       const name = a.name.getText();
@@ -1680,7 +2068,7 @@ export function analyzeFile(project, path, active, rel = path) {
       const counted =
         COUNT_ATTR.test(name) ||
         (leaf === 'LoadingItems' && name === 'count') ||
-        (isSkeletonTag && /^(?:rows|count)$/.test(name));
+        (skeletonTag && /^(?:rows|count)$/.test(name));
       if (!counted) continue;
       const kind = classifyCount(value, model, { attr: name });
       if (kind === 'typed')
@@ -1701,7 +2089,90 @@ export function analyzeFile(project, path, active, rel = path) {
           a,
           `${name}={${value.getText()}} does not name a page size, a limit or a *_SKELETON_* constant; name where the count comes from`,
         );
+      else if (pagedSkeletonCount(value, a)) reportPagedSkeletonCount(a, value);
     }
+  }
+
+  /** A `Suspense` / `LoadingSuspense` fallback that draws nothing (LoadingSuspense's own default is its children). */
+  function checkFallback(opening, leaf) {
+    const fallback = attribute(opening, 'fallback');
+    const value = attributeExpression(fallback);
+    if (!fallback) {
+      if (leaf === 'Suspense')
+        report('SUSPENSE_FALLBACK', opening, 'a Suspense with no fallback (use LoadingSuspense / LoadingFallback)');
+      return;
+    }
+    if (!value || isBlank(value)) {
+      report(
+        'SUSPENSE_FALLBACK',
+        value ?? fallback,
+        `a ${leaf} fallback that draws nothing (draw the view it waits on)`,
+      );
+      return;
+    }
+    const root = rootElement(value);
+    const rootOpening = root && openingOf(root);
+    if (leaf === 'Suspense' && rootOpening && model.resolveName(rootOpening.tagName) === 'LoadingFallback')
+      report('HAND_PAIR', opening, 'a hand Suspense + LoadingFallback pair (use LoadingSuspense)');
+  }
+
+  /**
+   * A skeleton primitive drawn in the loading branch of `loading ? <Bars /> : <Y />` where Y is a component: the parent
+   * draws Y's loading state (Y renders itself in the scope).
+   */
+  function checkPrimitiveInBranch(opening, tag) {
+    if (enclosingNames(opening).some(n => /Skeleton$/.test(n))) return;
+    const el = ts.isJsxOpeningElement(opening) ? opening.parent : opening;
+    let child = el;
+    let p = el.parent;
+    while (p && ts.isParenthesizedExpression(p)) [child, p] = [p, p.parent];
+    if (!p || !ts.isConditionalExpression(p) || child === p.condition) return;
+    const loadingTrue = isLoadingFlag(p.condition, model);
+    const loadingFalse = isNegatedLoading(p.condition, model);
+    const loadingHalf = loadingTrue ? p.whenTrue : loadingFalse ? p.whenFalse : null;
+    if (!loadingHalf || strip(loadingHalf) !== el) return;
+    const other = rootElement(loadingTrue ? p.whenFalse : p.whenTrue);
+    const otherOpening = other && openingOf(other);
+    if (!otherOpening) return;
+    const component = model.resolveName(otherOpening.tagName);
+    if (
+      !isComponentName(component) ||
+      component.includes('.') ||
+      isSkeletonName(component) ||
+      LOADING_WRAPPER.test(component)
+    )
+      return;
+    if (!project.componentSwitches(component) && !project.declaredIn.get(`${component}Skeleton`)?.size) return;
+    parentPicks(opening, component, `<${tag.split('.')[0]}> drawn in place of <${component}> while loading`);
+  }
+
+  /** Whether a `*_SKELETON_*` count is drawn by a component whose list has a page size (it draws the page). */
+  function pagedSkeletonCount(count, at) {
+    const name = leafName(count);
+    if (!/(?:^|_)SKELETON_/.test(name)) return false;
+    const fn = componentOf(at);
+    if (!fn?.body) return false;
+    // The component's own read is paged: a page size handed to one of its hooks (`useQuery({ … PAGE_SIZE … })`).
+    let paged = false;
+    walk(fn.body, n => {
+      if (paged || (isFunctionLike(n) && n !== fn)) return false;
+      if (ts.isCallExpression(n) && /^use[A-Z]/.test(dottedName(n.expression).split('.').pop()))
+        walk(n, m => {
+          if ((ts.isIdentifier(m) || ts.isPropertyAccessExpression(m)) && PAGE_SIZE_NAME.test(leafName(m)))
+            paged = true;
+          if (ts.isPropertyAssignment(m) && PAGE_SIZE_NAME.test(m.name.getText())) paged = true;
+        });
+      return undefined;
+    });
+    return paged;
+  }
+
+  function reportPagedSkeletonCount(at, count) {
+    report(
+      'COUNT_SOURCE',
+      at,
+      `${count.getText()} is a *_SKELETON_* count in a component whose list has a page size (a paged list draws its page size)`,
+    );
   }
 
   function checkAttribute(attr) {
@@ -1713,11 +2184,16 @@ export function analyzeFile(project, path, active, rel = path) {
   }
 
   function checkList({ count, callback, node, loadingItems, literalArray }) {
-    if (count && !literalArray && /lines?$|paragraphs?$/i.test(leafName(count))) return; // text: a typical line count
-    const loading = loadingItems || inLoadingContext(node, model);
+    const item = callbackItem(callback);
     const countName = count && !literalArray ? leafName(count) : '';
-    if (loading && count && !loadingItems) {
-      const kind = literalArray ? 'typed' : classifyCount(count, model, { attr: loadingItems ? 'count' : '' });
+    // Text: a typical line count, when each item is a skeleton line itself (a list of rows named `*LINES` is a list).
+    const textLines = /lines?$|paragraphs?$/i.test(countName);
+    if (textLines && (!item || lineItem(item))) return;
+    const loading = loadingItems || inLoadingContext(node, model);
+    // The cells of one row (`columns`, `cells`) are not list items: their count never changes the row's height.
+    const cells = /(?:col(?:umn)?s?|cells?)$/i.test(countName);
+    if (loading && count && !loadingItems && !cells) {
+      const kind = literalArray ? 'typed' : classifyCount(count, model);
       if (kind === 'typed')
         report(
           'TYPED_COUNT',
@@ -1726,27 +2202,17 @@ export function analyzeFile(project, path, active, rel = path) {
         );
       else if (kind === 'cap')
         report('COUNT_CAP', node, `a capped skeleton list (${count.getText()}); a list's skeleton draws its full page`);
-      else if (kind === 'unnamed' && !loadingItems)
+      else if (kind === 'unnamed')
         report(
           'COUNT_SOURCE',
           node,
           `a skeleton list of ${count.getText()} items; name the page size, limit or a *_SKELETON_* constant`,
         );
+      else if (pagedSkeletonCount(count, node)) reportPagedSkeletonCount(node, count);
     }
-    // The cells of one row (`columns`, `cells`) are not list items: their count never changes the row's height.
-    const cells = /(?:col(?:umn)?s?|cells?)$/i.test(countName);
-    const isList = !cells && (loadingItems || (countName && LIST_COUNT.test(countName) && !/LINES?$/i.test(countName)));
-    const item = callbackItem(callback);
-    if (loading && item) {
-      const opening = openingOf(item);
-      const cls = opening && attributeExpression(attribute(opening, 'className'));
-      if (cls && stringsIn(cls).some(s => BREAKPOINT_HIDDEN.test(s)))
-        report(
-          'HIDDEN_ITEMS',
-          cls,
-          'a loading item hidden per breakpoint (a skeleton draws its full count at every width)',
-        );
-    }
+    const passedCount = loading && (COUNT_ATTR.test(countName) || PASSED_COUNT.test(countName));
+    const isList = !cells && (loadingItems || textLines || passedCount || COUNT_SOURCE_NAME.test(countName));
+    if (loading) checkHiddenItems(callback, item);
     if (!isList) return;
     if (item && !itemMarked(item, model))
       report(
@@ -1760,6 +2226,51 @@ export function analyzeFile(project, path, active, rel = path) {
       if (loadedItem && !itemMarked(loadedItem, model))
         report('ITEM_MARK', loaded, 'the loaded list beside a skeleton list has no data-loading-item on its items');
     }
+  }
+
+  /** Whether a list item is one skeleton line (a primitive, or an element holding only one). */
+  function lineItem(item) {
+    const opening = openingOf(item);
+    if (!opening) return false;
+    if (PRIMITIVE.test(model.resolveName(opening.tagName))) return true;
+    if (!ts.isJsxElement(item)) return false;
+    const children = item.children.filter(c => !(ts.isJsxText(c) && !c.text.trim()));
+    return (
+      children.length === 1 &&
+      (ts.isJsxElement(children[0]) || ts.isJsxSelfClosingElement(children[0])) &&
+      PRIMITIVE.test(model.resolveName(openingOf(children[0]).tagName)) &&
+      !/^(?:li|tr)$/.test(opening.tagName.getText())
+    );
+  }
+
+  /** Loading items hidden per breakpoint (their class, through a constant too), or returned as nothing past the Nth. */
+  function checkHiddenItems(callback, item) {
+    const opening = item && openingOf(item);
+    const cls = opening && attributeExpression(attribute(opening, 'className'));
+    if (cls && classStrings(cls, model).some(s => BREAKPOINT_HIDDEN.test(s)))
+      report(
+        'HIDDEN_ITEMS',
+        cls,
+        'a loading item hidden per breakpoint (a skeleton draws its full count at every width)',
+      );
+    const cb = strip(callback);
+    if (!cb || !isFunctionLike(cb)) return;
+    const index = cb.parameters.map(param => param.name.getText());
+    const returned = strip(returnedExpression(cb));
+    if (!returned) return;
+    const cond = ts.isConditionalExpression(returned)
+      ? (isNullish(returned.whenTrue) || isNullish(returned.whenFalse)) && returned.condition
+      : ts.isBinaryExpression(returned) && returned.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+        ? returned.left
+        : null;
+    if (!cond) return;
+    const byIndex = n => isComparison(n) && index.some(i => new RegExp(`\\b${i}\\b`).test(n.getText()));
+    let hidden = byIndex(cond);
+    walk(cond, n => {
+      if (byIndex(n)) hidden = true;
+    });
+    if (hidden)
+      report('HIDDEN_ITEMS', cond, 'loading items past the Nth drawn as nothing (a skeleton draws its full count)');
   }
 
   // ---- nothing while loading --------------------------------------------------------------------------------------
@@ -1778,11 +2289,13 @@ export function analyzeFile(project, path, active, rel = path) {
       : ts.isBlock(then) && then.statements.length === 1 && ts.isReturnStatement(then.statements[0])
         ? then.statements[0]
         : null;
-    if (!ret || !(ret.expression && isNullish(ret.expression))) return;
+    if (!ret || !(ret.expression && isBlank(ret.expression))) return;
     const fn = componentScope(stmt);
     if (!fn) return;
     const test = stmt.expression;
     if (isScopeCall(test) && (delegatesToReader(fn) || returnsOptional(fn))) return;
+    // A part some records lack (its loaded return marked `data-loading-optional`): absent while loading too.
+    if (!mentionsLoading(test) && returnsOptional(fn)) return;
     if (isLoadingFlag(test, model) || (heldWhileLoading(test, model) && mentionsLoading(test))) {
       report('NOTHING_WHILE_LOADING', stmt, 'nothing drawn while loading (render the component in a loading scope)');
       return;
@@ -1944,6 +2457,35 @@ export function analyzeFile(project, path, active, rel = path) {
     );
   }
 
+  /** `{loading || <X />}`: while loading the slot renders the flag (nothing). */
+  function checkOrPart(bin) {
+    if (!isJsx(bin.right)) return;
+    let p = bin.parent;
+    while (p && ts.isParenthesizedExpression(p)) p = p.parent;
+    if (!p || !(isJsxChild(p) || ts.isReturnStatement(p) || ts.isArrowFunction(p))) return;
+    if (!heldWhileLoading(bin.left, model) || offScreen(bin.right)) return;
+    report('NOTHING_WHILE_LOADING', bin, 'nothing drawn while loading (`loading || <X />` renders the flag)');
+  }
+
+  /** A `next/dynamic` import with no `loading:` fallback: its slot is empty while the chunk loads. */
+  function checkDynamic(call) {
+    const options = strip(call.arguments[1]);
+    const hasLoading =
+      options &&
+      ts.isObjectLiteralExpression(options) &&
+      options.properties.some(q => q.name?.getText() === 'loading' || ts.isSpreadAssignment(q));
+    if (hasLoading || (options && !ts.isObjectLiteralExpression(options))) return;
+    let p = call.parent;
+    while (p && (ts.isParenthesizedExpression(p) || ts.isAsExpression(p) || ts.isCallExpression(p))) p = p.parent;
+    const name = p && ts.isVariableDeclaration(p) && ts.isIdentifier(p.name) ? p.name.text : '';
+    if (OFF_SCREEN.test(name)) return;
+    report(
+      'NOTHING_WHILE_LOADING',
+      call,
+      `a next/dynamic import${name ? ` (${name})` : ''} with no loading: fallback (draw its skeleton while the chunk loads)`,
+    );
+  }
+
   function checkAndPart(bin) {
     if (!isJsx(bin.right)) return;
     let p = bin.parent;
@@ -1954,17 +2496,21 @@ export function analyzeFile(project, path, active, rel = path) {
     if (!scopeNode) return;
     const test = bin.left;
     if (FAILURE.test(test.getText()) || emptyState(test, bin.right)) return;
+    // A part drawn WHILE something loads (`isLoadingMore && !isLoading && <Card loading />`) is a loading form.
+    if (conjuncts(test).some(c => isLoadingFlag(c, model))) return;
     const switching = switchingComponent(bin);
     const negLoading = isNegatedLoadingIn(test);
     const readKey = !negLoading && readFieldKey(test);
     if (!negLoading && !readKey) {
       // A read keyed on hook data, in a component that does not switch.
+      // Every operand must be the read (an operand of the user's own state or a prop gates the part on that instead).
       if (
         !switching &&
         fn &&
-        falseWhileLoading(test, model, { hookOnly: true }) &&
+        conjuncts(test).every(c => falseWhileLoading(c, model, { hookOnly: true })) &&
         !answeredBefore(fn, bin, model) &&
-        !optionalHandled(bin, bin.right)
+        !optionalHandled(bin, bin.right) &&
+        !offScreen(bin.right)
       )
         report(
           'NOTHING_WHILE_LOADING',
@@ -1989,7 +2535,8 @@ export function analyzeFile(project, path, active, rel = path) {
     const el = rootElement(element);
     const opening = el && openingOf(el);
     if (!opening) return false;
-    if (/(?:Modal|Dialog|Drawer|Toast|Portal|Popover|Sheet|Tooltip|Status)$/.test(dottedName(opening.tagName)))
+    if (OFF_SCREEN.test(dottedName(opening.tagName))) return true;
+    if (isComponentName(dottedName(opening.tagName)) && project.rendersNothing(model.path, dottedName(opening.tagName)))
       return true;
     // A visually hidden announcement (`sr-only`, `role="status"`) takes no room either.
     const role = attributeExpression(attribute(opening, 'role'));
@@ -2025,7 +2572,7 @@ export function analyzeFile(project, path, active, rel = path) {
     if (
       opening &&
       isComponentName(dottedName(opening.tagName)) &&
-      model.project.componentMarks(model.path, dottedName(opening.tagName).split('.')[0], /data-loading-optional/)
+      model.project.componentMarks(model.path, dottedName(opening.tagName).split('.')[0], 'optional')
     )
       return true;
     // Inside a list's per-item callback (`items.map(item => item.x && …)`).
@@ -2107,11 +2654,7 @@ export function analyzeFile(project, path, active, rel = path) {
       if (hit) return false;
       if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
         const tag = model.resolveName(n.tagName);
-        if (
-          /Skeleton(?:\.\w+)?$/.test(tag) ||
-          /^(?:LoadingItems|LoadingWhen|LoadingFallback|LoadingSuspense)$/.test(tag)
-        )
-          hit = true;
+        if (isSkeletonName(tag) || /^Loading(?:Items|When|Fallback|Suspense)$/.test(tag)) hit = true;
         if (n.attributes.properties.some(a => ts.isJsxAttribute(a) && /^(?:loading|isLoading)$/.test(a.name.getText())))
           hit = true;
       }
@@ -2183,10 +2726,51 @@ export function analyzeFile(project, path, active, rel = path) {
       if (!test || !branch) return undefined;
       const skeleton = skeletonOutput(branch);
       if (!skeleton || oneSwitchSites.has(skeleton)) return undefined;
-      if (!propDerived(test, fn) || !readsFlag(test, fn)) return undefined;
-      report('PROP_ONLY_SWITCH', n, 'a switch on the loading prop alone (switch on useLoadingScope() || loading)');
+      if (propDerived(test, fn) && readsFlag(test, fn))
+        report('PROP_ONLY_SWITCH', n, 'a switch on the loading prop alone (switch on useLoadingScope() || loading)');
+      else if (ownReadFlag(test, fn))
+        report(
+          'PROP_ONLY_SWITCH',
+          n,
+          'a switch on its own read flag alone (switch on useLoadingScope() || isLoading: inside a scope it draws the loaded form with no data)',
+        );
       return undefined;
     });
+  }
+
+  /** Whether a condition reads a READ FLAG the component's own hook returns (not a context's, not the scope). */
+  function ownReadFlag(test, fn, depth = 0) {
+    let hit = false;
+    const fromHook = init => {
+      const call = strip(init);
+      if (!ts.isCallExpression(call)) return false;
+      const hook = dottedName(call.expression).split('.').pop();
+      return (
+        /^use[A-Z]/.test(hook) && !/Context$/.test(hook) && !project.scopeHooks.has(hook) && !LOCAL_HOOK.test(hook)
+      );
+    };
+    const v = n => {
+      if (hit || isFunctionLike(n)) return;
+      const root = chainRoot(n);
+      if ((ts.isIdentifier(n) || ts.isPropertyAccessExpression(n)) && root) {
+        const decl = model.lookup(root.text, root);
+        if (decl?.kind === 'var' && decl.init && nearestFunction(decl.node) === fn) {
+          if (READ_FLAG.test(leafName(n)) && fromHook(decl.init)) hit = true;
+          else if (ts.isIdentifier(n) && !decl.destructured && depth < 3 && ownReadFlag(decl.init, fn, depth + 1))
+            hit = true;
+        }
+        if (hit) return;
+      }
+      if (ts.isBinaryExpression(n) && isLoadingFlag(n, model) && /===|==/.test(n.operatorToken.getText())) {
+        const side = [n.left, n.right].map(strip).find(x => !ts.isStringLiteral(x));
+        const sideRoot = side && chainRoot(side);
+        const decl = sideRoot && model.lookup(sideRoot.text, sideRoot);
+        if (decl?.kind === 'var' && decl.init && fromHook(decl.init)) hit = true;
+      }
+      ts.forEachChild(n, v);
+    };
+    v(test);
+    return hit;
   }
 
   function isSkeletonOutput(node) {
@@ -2205,8 +2789,7 @@ export function analyzeFile(project, path, active, rel = path) {
     const el = rootElement(expr);
     const opening = el && openingOf(el);
     if (!opening) return null;
-    const tag = model.resolveName(opening.tagName);
-    return /Skeleton$/.test(tag.split('.').pop()) || /Skeleton\./.test(tag) ? opening : null;
+    return isSkeletonName(model.resolveName(opening.tagName)) ? opening : null;
   }
 
   /** Whether a condition reads a boolean flag (a loading-like name, or a parameter typed `boolean`), not data presence. */
@@ -2278,6 +2861,49 @@ export function analyzeFile(project, path, active, rel = path) {
     return ok && ids > 0;
   }
 
+  // ---- page code (a host's route files and screens; see `CONFIGS.frontend.pageCode`) ---------------------------------
+  if (page) checkPageCode(page);
+
+  function checkPageCode({ components: componentSkeletons }) {
+    if (/(?:^|\/)loading\.tsx$/.test(rel) && rel.startsWith('app/'))
+      report('PAGE_CODE', model.sf, 'a route-level loading.tsx (the page draws itself in a loading scope)');
+    walk(model.sf, n => {
+      const tag = renderedTag(n);
+      if (tag) {
+        const name = model.resolveName(tag);
+        if (PRIMITIVE.test(name) || PRIMITIVE.test(dottedName(tag)))
+          report('PAGE_CODE', n, `${name.split('.')[0]} (a skeleton primitive in page code)`);
+        else if (componentSkeletons && isSkeletonName(name) && !inDynamicLoading(n))
+          report('PAGE_CODE', n, `<${name}> rendered by page code (render the component: it draws its own skeleton)`);
+      }
+      if ((ts.isFunctionDeclaration(n) || ts.isVariableDeclaration(n)) && n.name && ts.isIdentifier(n.name)) {
+        const fnLike =
+          ts.isFunctionDeclaration(n) || (n.initializer && (functionInside(n.initializer) || isJsx(n.initializer)));
+        if (fnLike && /^[A-Z]\w*Skeleton$/.test(n.name.text))
+          report('PAGE_CODE', n.name, `${n.name.text} (a component declared as a skeleton)`);
+      }
+      return undefined;
+    });
+  }
+
+  // ---- opt-outs: only the rule-scoped form, and only one that lifts something ---------------------------------------
+  if (active.has('OPT_OUT')) {
+    for (const marker of model.markers) {
+      const problem = !marker.rule
+        ? 'an opt-out with no rule (write `// loading-standard-ok(RULE_ID): <why>`)'
+        : !RULES[marker.rule] || marker.rule === 'OPT_OUT'
+          ? `an opt-out naming no rule of the engine (${marker.rule})`
+          : !marker.why
+            ? `an opt-out of ${marker.rule} with no reason`
+            : !active.has(marker.rule)
+              ? `an opt-out of ${marker.rule}, which does not run on this file (delete it)`
+              : !marker.used
+                ? `an opt-out of ${marker.rule} that lifts nothing (delete it)`
+                : null;
+      if (problem) findings.push({ rule: 'OPT_OUT', path, file: rel, line: marker.line, message: problem });
+    }
+  }
+
   return findings;
 }
 
@@ -2286,62 +2912,12 @@ function rendersOutsideSkeletons(model, component) {
   let hit = false;
   walk(model.sf, n => {
     if (hit) return false;
-    if ((ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) && model.resolveName(n.tagName) === component) {
-      if (!enclosingNames(n).some(name => /Skeleton$/.test(name))) hit = true;
-    }
+    const tag = renderedTag(n);
+    if (tag && model.resolveName(tag) === component && !enclosingNames(n).some(name => /Skeleton$/.test(name)))
+      hit = true;
     return undefined;
   });
   return hit;
-}
-
-/**
- * PAGE CODE draws no skeleton (a host's rule for its route files and screens): a skeleton primitive or any
- * `*Skeleton` rendered (`<XSkeleton>`, `XSkeleton.Part`, `TextHold`, `LayoutHold`, `createElement(XSkeleton)`), a
- * component declared `*Skeleton`, an own pulse. `components: false` checks only primitives and declarations (a
- * `lib/` helper may render a component's exported skeleton). A `next/dynamic` `loading:` fallback stays allowed.
- */
-export function pageCodeFindings(project, path, rel = path, { components = true } = {}) {
-  const model = project.model(path);
-  const findings = [];
-  const PRIMITIVE =
-    /^(?:UnifiedSkeleton|TextLineSkeleton|TextHold|LayoutHold)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
-  const push = (node, message) => {
-    if (model.optedOut(node, 'PAGE_CODE')) return;
-    findings.push({ rule: 'PAGE_CODE', path, file: rel, line: model.line(node), message });
-  };
-  const inDynamicLoading = node => {
-    for (let p = node.parent; p; p = p.parent) {
-      if (ts.isPropertyAssignment(p) && p.name.getText() === 'loading' && ts.isObjectLiteralExpression(p.parent)) {
-        const call = p.parent.parent;
-        if (call && ts.isCallExpression(call) && /(?:^|\.)dynamic$/.test(dottedName(call.expression))) return true;
-      }
-    }
-    return false;
-  };
-  const rendered = (node, nameNode) => {
-    const name = model.resolveName(nameNode);
-    const raw = dottedName(nameNode);
-    if (PRIMITIVE.test(name) || PRIMITIVE.test(raw)) {
-      push(node, `${name.split('.')[0]} (a skeleton primitive in page code)`);
-      return;
-    }
-    if (components && /Skeleton(?:\.\w+)?$/.test(name) && !inDynamicLoading(node))
-      push(node, `<${name}> rendered by page code (render the component: it draws its own skeleton)`);
-  };
-  walk(model.sf, n => {
-    if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) rendered(n, n.tagName);
-    if (ts.isCallExpression(n) && /(?:^|\.)createElement$/.test(dottedName(n.expression)) && n.arguments[0])
-      rendered(n, n.arguments[0]);
-    if ((ts.isFunctionDeclaration(n) || ts.isVariableDeclaration(n)) && n.name && ts.isIdentifier(n.name)) {
-      const fnLike =
-        ts.isFunctionDeclaration(n) || (n.initializer && (functionInside(n.initializer) || isJsx(n.initializer)));
-      if (fnLike && /^[A-Z]\w*Skeleton$/.test(n.name.text))
-        push(n.name, `${n.name.text} (a component declared as a skeleton)`);
-    }
-    if ((ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && /\banimate-pulse\b/.test(n.text))
-      push(n, 'animate-pulse (a skeleton drawn by page code)');
-  });
-  return findings;
 }
 
 /** `path:line: message` lines, sorted by path then line. */

@@ -8,7 +8,8 @@ export { TableDescriptionCell } from './table-description-cell';
 export { TableEmptyState } from './table-empty-state';
 export { TableHeader } from './table-header';
 export { TableRow } from './table-row';
-export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, TableCardSkeleton } from './table-skeleton';
+export { TableCardSkeleton } from './table-skeleton';
+export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE } from '../data-table/data-table-row-classes';
 export { TableTimestampCell } from './table-timestamp-cell';
 export { getHideClasses, isHiddenOnMobile } from './utils';
 

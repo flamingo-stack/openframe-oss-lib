@@ -2,44 +2,10 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
-import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { LoadingItems } from '../loading-scope';
-import { useDataTableContext } from './data-table';
-import { DATA_TABLE_SKELETON_ROWS, getHideClasses } from './utils';
-
-/**
- * Consistent INNER row heights. The row card wraps these in a 1px border on
- * each side, so the outer block lands on the designed 68px / 80px total —
- * hence the 66/78 values here.
- */
-export const ROW_HEIGHT_DESKTOP = 'h-[66px] content-md:h-[78px]';
-export const ROW_HEIGHT_MOBILE = 'h-[66px]';
-
-/**
- * The row shell's inset and column gap.
- *
- * Shared by the real row (`data-table-row`), the skeleton rows below and the
- * pad rows in `data-table-body`, because a difference between them is a visible
- * shift on load — and there WAS one: all three placeholders used
- * `--spacing-system-sf` (12px) in their mobile variant while the real row uses
- * `--spacing-system-mf` (16px) at every width, so a loading table sat 4px closer
- * to the card edge than the loaded one and its content nudged over when data
- * arrived. Kept as a constant rather than three copies so that cannot drift again.
- */
-export const ROW_SHELL_CLASSES = 'items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]';
-
-/**
- * The column every row slot stacks in, and the gap between two of them.
- *
- * One constant for the same reason as `ROW_SHELL_CLASSES`: the body's rows, its
- * loading skeleton and the infinite footer's fallback skeleton all stack here,
- * and the footer used to stack in nothing at all — its placeholder rows were
- * bare children of the table root, touching each other.
- */
-/** A row's card (its frame and surface): read by `DataTableRow` and by the loading rows below, so both are one box. */
-export const DATA_TABLE_ROW_FRAME_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-card';
-
-export const ROW_STACK_CLASSES = 'flex w-full flex-col gap-[var(--spacing-system-xsf)]';
+import { DataTableRow } from './data-table-row';
+import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-row-classes';
+import { DATA_TABLE_SKELETON_ROWS } from './utils';
 
 export interface DataTableSkeletonProps {
   rows?: number;
@@ -53,79 +19,33 @@ export interface DataTableSkeletonProps {
    * on a phone and lost on a desktop. See `DataTableBodyProps.rowHeightClassName`.
    */
   rowHeightClassName?: string;
+  /** Dense rows, as the loaded table's `compact` rows. */
+  compact?: boolean;
 }
 
+/**
+ * @deprecated Render `<DataTable.Body loading />` (or the table in a loading scope): the body draws its loading rows,
+ * each a `DataTableRow` drawing itself (`row={null}`). This renders exactly that, `rows` of them.
+ */
 export function DataTableSkeleton({
   rows = DATA_TABLE_SKELETON_ROWS,
   className,
   rowClassName,
   rowHeightClassName,
+  compact,
 }: DataTableSkeletonProps) {
-  const table = useDataTableContext();
-  const columns = table.getVisibleFlatColumns();
-  const firstColumnId = columns[0]?.id;
-
   return (
     <LoadingItems count={rows}>
       {index => (
-        <div
-          // Decoration: the table's own status line says it is loading.
-          aria-hidden="true"
-          // One row of the read list it stands for, like the loaded `DataTableRow`.
+        <DataTableRow
+          row={null}
+          loadingIndex={index}
+          compact={compact}
+          rowHeightClassName={rowHeightClassName}
+          className={className}
+          cellsClassName={rowClassName}
           data-loading-item
-          className={cn(
-            DATA_TABLE_ROW_FRAME_CLASS,
-            // The slot height sits on the card, matching a real row.
-            rowHeightClassName,
-            className,
-          )}
-        >
-          <div
-            className={cn(
-              'hidden py-0 content-md:flex',
-              ROW_SHELL_CLASSES,
-              rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP,
-              rowClassName,
-            )}
-          >
-            {columns.map(column => {
-              const meta = column.columnDef.meta;
-              return (
-                <div
-                  key={column.id}
-                  className={cn(
-                    'flex shrink-0 flex-col justify-center',
-                    meta?.width || 'flex-1',
-                    // Same responsive hiding the real header and row apply.
-                    // Without it a `hideAt` column was drawn in the skeleton and
-                    // absent from the loaded table, so below that breakpoint the
-                    // remaining columns were sized against a different total and
-                    // the whole row re-laid-out the moment data arrived.
-                    getHideClasses(meta?.hideAt),
-                  )}
-                >
-                  {/* A cell's text (the row's primary face), and on the first column every other row a second,
-                      secondary line (a description or an id under it). */}
-                  <TextLineSkeleton type="h4" className="w-3/4" />
-                  {index % 2 === 0 && column.id === firstColumnId && <TextLineSkeleton type="h6" className="w-1/2" />}
-                </div>
-              );
-            })}
-          </div>
-          <div
-            className={cn(
-              'flex justify-start py-0 content-md:hidden',
-              ROW_SHELL_CLASSES,
-              rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE,
-              rowClassName,
-            )}
-          >
-            <div className="flex min-w-0 flex-1 flex-col justify-center py-[var(--spacing-system-sf)]">
-              <TextLineSkeleton type="h4" className="w-3/4" />
-              <TextLineSkeleton type="h6" className="w-1/2" />
-            </div>
-          </div>
-        </div>
+        />
       )}
     </LoadingItems>
   );
@@ -199,10 +119,10 @@ export function PlaceholderRows({
   innerHeightClassName?: string;
 }) {
   return (
-    <>
-      {Array.from({ length: count }).map((_, i) => (
+    // loading-standard-ok(ITEM_MARK): pad slots that reserve a short page's height in the LOADED table, not items
+    <LoadingItems count={count}>
+      {() => (
         <div
-          key={`placeholder-${i}`}
           // `border-transparent`, not no border: a real row card draws a 1px
           // border on each side, so its outer block is the inner height PLUS 2.
           // A pad row without one is 2px shorter than the row it stands in for
@@ -233,7 +153,7 @@ export function PlaceholderRows({
             )}
           />
         </div>
-      ))}
-    </>
+      )}
+    </LoadingItems>
   );
 }

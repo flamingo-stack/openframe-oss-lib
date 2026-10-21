@@ -3,13 +3,11 @@
 import { cn } from '../../../utils/cn';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { CHECKBOX_BOX_CLASS } from '../checkbox';
+import { ROW_HEIGHT_DESKTOP } from '../data-table/data-table-row-classes';
 import { LoadingItems } from '../loading-scope';
 import type { TableCardSkeletonProps } from './types';
 import { getHideClasses, TABLE_ACTIONS_COLUMN_KEY, TABLE_CHEVRON_COLUMN_KEY } from './utils';
 
-// INNER row heights: the bordered row card adds 1px top + bottom, so the
-// outer block totals the designed 68px / 80px.
-const ROW_HEIGHT_DESKTOP = 'h-[66px] content-md:h-[78px]';
 /**
  * A `compact` row's floor. Compact rows are content-sized (`py-2`), but every
  * row in one table renders the same cell shapes, so pinning a minimum makes the
@@ -19,7 +17,6 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] content-md:h-[78px]';
  * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
 const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
-const ROW_HEIGHT_MOBILE = 'h-[66px]';
 /** A row's card (its frame and surface): read by `TableRow` and by its loading rows below, so both are one box. */
 export const TABLE_ROW_FRAME_CLASS = 'relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card';
 /** The cells' row inside the card (inset and column gap), in both forms. */
@@ -105,4 +102,4 @@ export function TableCardSkeleton({
 }
 
 /** @deprecated */
-export { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE };
+export { COMPACT_ROW_MIN_HEIGHT };

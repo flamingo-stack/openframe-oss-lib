@@ -38,7 +38,8 @@ export { BlogCardGridSkeleton, SlackCommunitySkeleton } from './deprecated-layou
 // export it here, otherwise server components that import this index will
 // break due to client-only code.
 
-export { LoadingRegion, type LoadingRegionProps, LoadingStatus } from './loading-region';
+export { LoadingRegion, type LoadingRegionProps } from './loading-region';
+export { LoadingStatus } from '../ui/loading-scope';
 export { LoadingFallback, LoadingSuspense } from './loading-fallback';
 
 export { MarginReportSkeleton } from './margin-report-skeleton';

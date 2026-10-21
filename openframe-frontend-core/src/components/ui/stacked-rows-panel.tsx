@@ -32,9 +32,11 @@ export interface PanelColumn {
   key: string;
   /** Custom cell content (tag, avatar + text, button…). Takes precedence over `value`/`label`. */
   content?: ReactNode;
-  /** Primary value rendered in the ODS h4 style when `content` is not set. */
+  /** Primary value rendered in the ODS h4 style when `content` is not set. `null` is a value still being read: in a
+   *  loading scope the cell draws it as an `h4` bar (outside one, nothing). */
   value?: ReactNode;
-  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. */
+  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. `null` is a label
+   *  still being read: in a loading scope the cell draws it as an `h6` bar (outside one, nothing). */
   label?: ReactNode;
   /** Let the value AND label WRAP instead of truncating to one line (full names, full sentences). */
   wrap?: boolean;
@@ -120,14 +122,23 @@ const CARD_CLASS = 'flex flex-col overflow-clip rounded-md border border-ods-bor
 const TITLED_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
 const TITLE_CLASS = 'uppercase text-ods-text-secondary text-h5';
 const DEFAULT_WIDTH_CLASS = 'flex-[1_0_0] min-w-0';
+/** A cell's value and label while they are read: one bar each, the same in a loading row and in a loaded row whose
+ *  value or label is still `null`. */
+const CELL_VALUE_BAR_CLASS = 'w-1/2';
+const CELL_LABEL_BAR_CLASS = 'w-3/4';
 
 function CellValue({ column }: { column: PanelColumn }) {
+  // A `null` value or label in a loading scope is read data not here yet: the cell draws its bar in the text's own
+  // box (the value's `h4`, the label's `h6`), so the row keeps its loaded height.
+  const loading = useLoadingScope();
+  const valueBar = loading && column.value === null;
+  const labelBar = loading && column.label === null;
   const valueNode = (
     <div
       className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-primary text-h4')}
       title={typeof column.value === 'string' ? column.value : undefined}
     >
-      {column.value}
+      {valueBar ? <TextLineSkeleton type="inherit" as="span" className={CELL_VALUE_BAR_CLASS} /> : column.value}
     </div>
   );
 
@@ -148,7 +159,11 @@ function CellValue({ column }: { column: PanelColumn }) {
           valueNode
         )}
       </div>
-      {column.label ? (
+      {labelBar ? (
+        <p className="text-h6">
+          <TextLineSkeleton type="inherit" as="span" className={CELL_LABEL_BAR_CLASS} />
+        </p>
+      ) : column.label ? (
         <p className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-secondary text-h6')}>
           {column.label}
         </p>
@@ -211,8 +226,8 @@ function PanelRowView({
         <LoadingItems count={loading.columns}>
           {() => (
             <div className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
-              <TextLineSkeleton type="h4" className="w-1/2" />
-              {loading.labels && <TextLineSkeleton type="h6" className="w-3/4" />}
+              <TextLineSkeleton type="h4" className={CELL_VALUE_BAR_CLASS} />
+              {loading.labels && <TextLineSkeleton type="h6" className={CELL_LABEL_BAR_CLASS} />}
             </div>
           )}
         </LoadingItems>

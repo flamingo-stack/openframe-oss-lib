@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import {
   ExecutionDeviceCell,
@@ -77,6 +78,9 @@ export function ScriptExecutionsTable({
   rightSlot,
   skeletonRows,
 }: ScriptExecutionsTableProps) {
+  // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
+  // rows alike.
+  const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptExecutionTableRow>[]>(() => {
     const renderers: Record<string, (row: ScriptExecutionTableRow) => ReactNode> = {
       [EXECUTION_COLUMNS.executionId.id]: row => (
@@ -126,13 +130,13 @@ export function ScriptExecutionsTable({
   });
 
   const rowHref = useCallback((row: ScriptExecutionTableRow) => row.href, []);
-  const showHeader = withHeader && (isLoading || rows.length > 0);
+  const showHeader = withHeader && (loading || rows.length > 0);
 
   return (
     <DataTable table={table}>
       {showHeader && <DataTable.Header rightSlot={rightSlot} />}
       <DataTable.Body
-        loading={isLoading}
+        loading={loading}
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         rowClassName="mb-1"

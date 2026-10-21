@@ -8,21 +8,22 @@ interface CategoryCardSkeletonProps {
   className?: string;
 }
 
-/** Vendor icons the loading card's icon row draws: the row the loaded card shows. */
-const CATEGORY_CARD_SKELETON_ICONS = 10;
+/** Vendor icons a typical card shows: the loading card draws that many, and a card given no icons that many empty tiles. */
+export const CATEGORY_CARD_SKELETON_ICONS = 10;
+/** The card's boxes, read by `CategoryCard` and by this skeleton, so both are one box. */
+export const CATEGORY_CARD_FRAME_CLASS =
+  'box-border flex min-w-0 flex-col rounded-[12px] border border-ods-border bg-ods-card p-8';
+export const CATEGORY_CARD_ICON_ROW_CLASS = 'mb-8 flex items-center justify-center gap-6';
+export const CATEGORY_CARD_ICON_TILE_CLASS = 'h-10 w-10 flex-shrink-0';
+export const CATEGORY_CARD_ACTION_BOX_CLASS = 'h-12 w-12 rounded-[6px]';
 
 export function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
   return (
-    <article
-      className={cn(
-        'box-border flex min-w-0 flex-col rounded-[12px] border border-ods-border bg-ods-card p-8',
-        className,
-      )}
-    >
+    <article className={cn(CATEGORY_CARD_FRAME_CLASS, className)}>
       {/* Icons row */}
-      <div className="mb-8 flex items-center justify-center gap-6">
+      <div className={CATEGORY_CARD_ICON_ROW_CLASS}>
         <LoadingItems count={CATEGORY_CARD_SKELETON_ICONS}>
-          {() => <UnifiedSkeleton data-loading-item variant="circular" className="h-10 w-10 flex-shrink-0" />}
+          {() => <UnifiedSkeleton data-loading-item variant="circular" className={CATEGORY_CARD_ICON_TILE_CLASS} />}
         </LoadingItems>
       </div>
 
@@ -35,7 +36,7 @@ export function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
 
       {/* Arrow button placeholder */}
       <div className="mt-4 flex justify-end">
-        <UnifiedSkeleton className="h-12 w-12 rounded-[6px]" />
+        <UnifiedSkeleton className={CATEGORY_CARD_ACTION_BOX_CLASS} />
       </div>
     </article>
   );

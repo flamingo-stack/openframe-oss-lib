@@ -5,9 +5,10 @@ import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
-import { SquareAvatar, AvatarStack, Button } from '../ui';
+import { Button } from '../ui';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
+import { HostIdentity } from './host-identity';
 
 /** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
 const noop = () => {};
@@ -109,9 +110,6 @@ const BACK_BUTTON_CLASS = 'py-0';
  *  section headers. */
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
 
-/** One host's row and its text column, read by the panel and by its skeleton. */
-const HOST_ROW_CLASS = 'flex items-center gap-[var(--spacing-system-xs)]';
-const HOST_TEXT_CLASS = 'flex min-w-0 flex-col';
 /** The static duration line beside the host. */
 const DURATION_LINE_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
 /** The "Duration" field and its chips row. */
@@ -162,13 +160,7 @@ export function ContextPanelSkeleton({
       <div className={STRIP_BODY}>
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
-            <div className={HOST_ROW_CLASS}>
-              <SquareAvatar loading variant="round" size="sm" />
-              <div className={HOST_TEXT_CLASS}>
-                <TextLineSkeleton type="h4" className="w-32" />
-                <TextLineSkeleton type="h6" className="w-24" />
-              </div>
-            </div>
+            <HostIdentity hosts={[]} loading />
             {durations <= 1 && <TextLineSkeleton type="h6" className="w-20 shrink-0" />}
           </div>
           {title && <TextLineSkeleton type="h3" className="w-3/5" />}
@@ -243,34 +235,7 @@ export function SchedulerContextPanel({
       <div className={STRIP_BODY}>
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
-            {/* Host identity: full rows up to 3 hosts; larger teams (round-robin
-                links can carry many members) collapse to a stacked-avatar cluster
-                + count so the panel can never overflow. */}
-            {hosts.length > 0 && hosts.length <= 3 && (
-              <div className="flex flex-col gap-[var(--spacing-system-s)]">
-                {hosts.map(host => (
-                  <div key={host.name} className={HOST_ROW_CLASS}>
-                    <SquareAvatar
-                      variant="round"
-                      size="sm"
-                      src={host.avatarUrl ?? undefined}
-                      alt={host.name}
-                      fallback={host.name}
-                    />
-                    <div className={HOST_TEXT_CLASS}>
-                      <p className="truncate text-ods-text-primary text-h4">{host.name}</p>
-                      {host.title && <p className="truncate text-ods-text-secondary text-h6">{host.title}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {hosts.length > 3 && (
-              <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-                <AvatarStack people={hosts} max={4} size="lg" label="Hosts" />
-                <p className="text-ods-text-secondary text-h6">{hosts.length} hosts on this calendar</p>
-              </div>
-            )}
+            <HostIdentity hosts={hosts} />
 
             {locked || durationsMs.length <= 1
               ? // Post-selection, or a link that offers one length: a static line,

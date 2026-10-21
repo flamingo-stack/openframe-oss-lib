@@ -50,7 +50,13 @@ export {
 
 export { useDataTableContext } from './data-table';
 export { useDataTable } from './use-data-table';
-export { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-skeleton';
+export {
+  DATA_TABLE_ROW_FRAME_CLASS,
+  ROW_HEIGHT_DESKTOP,
+  ROW_HEIGHT_MOBILE,
+  ROW_SHELL_CLASSES,
+  ROW_STACK_CLASSES,
+} from './data-table-row-classes';
 export { alignJustify, getHideClasses, multiSelectFilterFn } from './utils';
 
 export type { DataTableFilterOption, TailwindBreakpoint } from './types';

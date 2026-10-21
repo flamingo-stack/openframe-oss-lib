@@ -16,7 +16,6 @@ interface LoadingLayoutProps {
  * Blog Card Grid Skeleton - Always displays exactly 4 blog card skeletons
  * Used for consistent blog page layout with predictable height
  */
-// loading-standard-ok: deprecated re-export kept for external consumers
 export function BlogCardGridSkeleton({ className, region = true }: LoadingLayoutProps) {
   return (
     <div className={cn('space-y-6', className)}>
@@ -32,7 +31,6 @@ export function BlogCardGridSkeleton({ className, region = true }: LoadingLayout
  * Slack Community Section Skeleton
  * Matches SlackCommunity component structure with title, channel list, and chat interface
  */
-// loading-standard-ok: deprecated re-export kept for external consumers
 export function SlackCommunitySkeleton({ region = true }: { region?: boolean } = {}) {
   return (
     <LoadingRegion

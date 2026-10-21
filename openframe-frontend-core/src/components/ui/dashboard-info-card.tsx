@@ -98,7 +98,8 @@ export interface DashboardInfoCardProps {
   /**
    * While `loading`: hold the percentage's box (plain "(NN%)" text, or a `Tag` when
    * `percentageDisplay` / `progressVariant` would draw one), because the loaded card will show
-   * a percentage. Default `false`.
+   * a percentage. Default: `showProgress` or a percentage drawn as a tag (`percentageDisplay="tag"`, or a
+   * `warning`/`error` `progressVariant`), the cards that show one.
    */
   loadingShowsPercentage?: boolean;
   /**
@@ -140,7 +141,7 @@ export function DashboardInfoCard({
   subValue,
   caption,
   loading: loadingProp = false,
-  loadingShowsPercentage = false,
+  loadingShowsPercentage: loadingShowsPercentageProp,
   loadingShowsSubValue = false,
   titleLoading = false,
   iconLoading = false,
@@ -155,6 +156,8 @@ export function DashboardInfoCard({
   const percentageAsTag =
     percentageDisplay === 'tag' ||
     (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
+  // A card that draws a progress ring or a percentage tag shows a percentage once loaded: its box is held by default.
+  const loadingShowsPercentage = loadingShowsPercentageProp ?? (showProgress || percentageAsTag);
 
   const renderPercentage = () => {
     if (loading) {

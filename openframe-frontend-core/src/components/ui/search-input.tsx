@@ -22,6 +22,7 @@ import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-c
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { HiddenTagsPopup } from './hidden-tags-popup';
+import { LoadingItems } from './loading-scope';
 import { Tag } from './tag';
 
 /** A result row's frame, read by the rows and by their loading state. */
@@ -404,6 +405,7 @@ export function SearchInput({
     return (
       <div
         key={result.id}
+        data-loading-item
         role="option"
         aria-selected={isHighlighted}
         className={cn(
@@ -426,12 +428,13 @@ export function SearchInput({
       // The results while they are read: the dropdown's own rows, a title bar each.
       return (
         <LoadingRegion label="Loading results">
-          {Array.from({ length: loadingRows }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-            <div key={i} className={SEARCH_RESULT_ROW_CLASS} aria-hidden>
-              <TextLineSkeleton type="h6" className="w-2/3" />
-            </div>
-          ))}
+          <LoadingItems count={loadingRows}>
+            {() => (
+              <div className={SEARCH_RESULT_ROW_CLASS} aria-hidden data-loading-item>
+                <TextLineSkeleton type="h6" className="w-2/3" />
+              </div>
+            )}
+          </LoadingItems>
         </LoadingRegion>
       );
     }

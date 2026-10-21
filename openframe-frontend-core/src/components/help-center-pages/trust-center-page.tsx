@@ -409,7 +409,6 @@ export function TrustCenterPage({
  * it does). Kept so hosts on an older release keep compiling; nothing in the lib uses it. `region` is ignored: the
  * page announces its own loading state.
  */
-// loading-standard-ok: deprecated re-export kept for external consumers
 export function TrustCenterPageSkeleton({
   region: _region,
   ...chrome

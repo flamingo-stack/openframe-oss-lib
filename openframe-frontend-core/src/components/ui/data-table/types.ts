@@ -70,5 +70,11 @@ declare module '@tanstack/react-table' {
      * header to fit one in.
      */
     hint?: ReactNode;
+    /**
+     * The header's text is still being read (it names whose data the table shows): the header draws an `h5` bar in
+     * its label's own box, so the header row and the column keep their size. A flag, not an empty header: `''` is a
+     * column with no label.
+     */
+    headerLoading?: boolean;
   }
 }

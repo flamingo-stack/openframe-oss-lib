@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { LoadingRegion } from './loading-region';
 import { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
 
@@ -18,6 +19,8 @@ interface CardSkeletonProps {
   showMetadata?: boolean;
   /** Optional tailwind classes to override the card container background & border */
   containerClassName?: string;
+  /** `data-*` markers (`data-loading-item` on a grid's cards), on the card's root. */
+  [key: `data-${string}`]: unknown;
 }
 
 /**
@@ -54,7 +57,7 @@ export function CardSkeleton({
         variant === 'vendor' && 'flex h-full flex-col',
         className,
       )}
-      {...props}
+      {...loadingItemProps(props)}
     >
       {cardContent[variant]}
     </div>
@@ -254,9 +257,9 @@ export function CardSkeletonGrid({
         className,
       )}
     >
-      {Array.from({ length: count }, (_, index) => (
-        <CardSkeleton key={index} variant={variant} containerClassName={containerClassName} {...props} />
-      ))}
+      <LoadingItems count={count}>
+        {() => <CardSkeleton variant={variant} containerClassName={containerClassName} {...props} data-loading-item />}
+      </LoadingItems>
     </LoadingRegion>
   );
 }

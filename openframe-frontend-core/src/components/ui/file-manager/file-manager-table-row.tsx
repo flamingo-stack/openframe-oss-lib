@@ -21,9 +21,15 @@ const ROW_ICON_BUTTON_CLASS = 'h-8 w-8 p-0';
 /** The file icon's box (`FileIcon` at `md`), and the bar that stands for it while loading. */
 const ROW_FILE_ICON_CLASS = 'h-5 w-5';
 /** The cells after the name, in both forms. */
-const SIZE_CELL_CLASS = 'w-24 shrink-0 pr-4 text-ods-text-secondary text-h6';
-const MODIFIED_CELL_CLASS = 'w-36 shrink-0 pl-4 text-ods-text-secondary text-h6';
-const ACTIONS_CELL_CLASS = 'flex w-48 shrink-0 items-center justify-end gap-1 pl-4';
+/** Each column's box (width, inset), read by the rows (both forms) and by the table's header, so they line up. */
+export const FILE_MANAGER_CHECKBOX_CELL_CLASS = 'mr-4';
+export const FILE_MANAGER_NAME_CELL_CLASS = 'flex min-w-0 flex-1 items-center gap-3';
+export const FILE_MANAGER_SIZE_CELL_BOX_CLASS = 'w-24 shrink-0 pr-4';
+export const FILE_MANAGER_MODIFIED_CELL_BOX_CLASS = 'w-36 shrink-0 pl-4';
+export const FILE_MANAGER_ACTIONS_CELL_BOX_CLASS = 'flex w-48 shrink-0 justify-end pl-4';
+const SIZE_CELL_CLASS = cn(FILE_MANAGER_SIZE_CELL_BOX_CLASS, 'text-ods-text-secondary text-h6');
+const MODIFIED_CELL_CLASS = cn(FILE_MANAGER_MODIFIED_CELL_BOX_CLASS, 'text-ods-text-secondary text-h6');
+const ACTIONS_CELL_CLASS = cn(FILE_MANAGER_ACTIONS_CELL_BOX_CLASS, 'items-center gap-1');
 
 export function FileManagerTableRow(props: FileManagerTableRowProps) {
   const {
@@ -89,7 +95,7 @@ export function FileManagerTableRow(props: FileManagerTableRowProps) {
       {...loadingItemProps(props)}
     >
       {showCheckbox && (
-        <div className="mr-4" data-no-row-click>
+        <div className={FILE_MANAGER_CHECKBOX_CELL_CLASS} data-no-row-click>
           <Checkbox
             checked={isSelected}
             onCheckedChange={handleCheckboxChange}
@@ -98,7 +104,7 @@ export function FileManagerTableRow(props: FileManagerTableRowProps) {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className={FILE_MANAGER_NAME_CELL_CLASS}>
         <FileIcon type={file.type} extension={fileExtension} size="md" />
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-ods-text-primary text-h6" title={file.name}>
@@ -180,12 +186,12 @@ function FileManagerTableRowSkeleton({
   return (
     <div aria-hidden="true" inert className={cn(FILE_MANAGER_ROW_FRAME_CLASS, className)} {...markers}>
       {showCheckbox && (
-        <div className="mr-4">
+        <div className={FILE_MANAGER_CHECKBOX_CELL_CLASS}>
           <Checkbox loading boxClassName={FILE_MANAGER_CHECKBOX_BOX_CLASS} />
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className={FILE_MANAGER_NAME_CELL_CLASS}>
         <UnifiedSkeleton className={cn(ROW_FILE_ICON_CLASS, 'shrink-0 rounded')} />
         <div className="flex min-w-0 flex-col">
           <TextLineSkeleton type="h6" className="w-32" />

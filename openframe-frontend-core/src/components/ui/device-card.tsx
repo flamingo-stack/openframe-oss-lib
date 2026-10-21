@@ -12,21 +12,23 @@ import { useLoadingScope } from './loading-scope';
 import { Tag, type TagProps } from './tag';
 
 /** The card's frame. */
-export const DEVICE_CARD_FRAME_CLASS =
+const DEVICE_CARD_FRAME_CLASS =
   'flex flex-col gap-4 overflow-clip rounded-[6px] border border-ods-border bg-ods-card p-4';
 /** The card's first row: the device icon, the name stack, the buttons. */
-export const DEVICE_CARD_HEAD_ROW_CLASS = 'flex w-full items-center gap-4';
+const DEVICE_CARD_HEAD_ROW_CLASS = 'flex w-full items-center gap-4';
 /** The name stack: the OS icon and name line over the organization line. */
-export const DEVICE_CARD_NAME_STACK_CLASS = 'flex min-w-0 flex-1 flex-col justify-center';
+const DEVICE_CARD_NAME_STACK_CLASS = 'flex min-w-0 flex-1 flex-col justify-center';
 /** The OS icon and the name, one `text-h4` line. */
-export const DEVICE_CARD_NAME_LINE_CLASS = 'flex items-center gap-1 text-h4';
+const DEVICE_CARD_NAME_LINE_CLASS = 'flex items-center gap-1 text-h4';
 /** The card's status row: the status tag and the "Last Seen:" line. */
-export const DEVICE_CARD_STATUS_ROW_CLASS = 'flex w-full items-center gap-2';
+const DEVICE_CARD_STATUS_ROW_CLASS = 'flex w-full items-center gap-2';
 /** The bordered box of the device-type icon. */
-export const DEVICE_CARD_ICON_BOX_CLASS =
+const DEVICE_CARD_ICON_BOX_CLASS =
   'flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-2';
 /** The bordered "more" button. */
-export const DEVICE_CARD_MORE_BUTTON_CLASS =
+/** The tags row, loaded and loading. */
+const DEVICE_CARD_TAGS_ROW_CLASS = 'flex w-full flex-wrap items-center gap-2';
+const DEVICE_CARD_MORE_BUTTON_CLASS =
   'flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-3';
 
 export interface Device {
@@ -212,13 +214,21 @@ export function DeviceCard({
         </div>
       )}
 
-      {/* Tags section: only some devices carry tags, so the row is record-dependent (not drawn while loading). */}
-      {!loading && device.tags && device.tags.length > 0 && (
-        <div className="flex w-full flex-wrap items-center gap-2" data-loading-optional>
-          {device.tags.map((tag, index) => (
-            <Tag key={index} variant="outline" label={tag} />
-          ))}
+      {/* Tags section: the card sits in a grid's first screen, so its row is drawn while loading too (one tag, a
+          typical device's), never left to land later. A device with no tags draws no row once loaded. */}
+      {loading ? (
+        <div className={DEVICE_CARD_TAGS_ROW_CLASS}>
+          <Tag loading label="" variant="outline" data-loading-item />
         </div>
+      ) : (
+        device.tags &&
+        device.tags.length > 0 && (
+          <div className={DEVICE_CARD_TAGS_ROW_CLASS}>
+            {device.tags.map((tag, index) => (
+              <Tag key={index} variant="outline" label={tag} data-loading-item />
+            ))}
+          </div>
+        )
       )}
     </div>
   );

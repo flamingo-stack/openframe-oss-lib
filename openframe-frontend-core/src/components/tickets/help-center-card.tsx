@@ -22,12 +22,48 @@ import { scrollElementIntoView } from '../../utils/scroll-into-view';
 import { getStatusColorScheme } from '../chat/utils/agent-status-message';
 import { DevCardRowContent } from '../shared/dev-section/dev-card-row';
 import { StatusBadge, type StatusBadgeProps } from '../ui';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { TicketDetailDrawer, type TicketDetailDrawerProps } from './ticket-detail-drawer';
 import { useOptionalTicketLive } from './ticket-live-provider';
 import type { AnyTicket } from './types';
 import { isOptimistic } from './types';
 
-export interface HelpCenterCardProps {
+/** A row whose ticket is still read (a list's loading form): only its DOM id and the list's markers. */
+export interface HelpCenterCardLoadingProps {
+  ticket: null;
+  id?: string;
+  /** The list's markers (`data-loading-item`), on the row's root. */
+  [key: `data-${string}`]: unknown;
+}
+
+/** The row's root and its summary's padding, loaded and loading (one box). */
+const HELP_CENTER_ROW_CLASS = 'border-b border-ods-border last:border-b-0';
+const HELP_CENTER_SUMMARY_PAD_CLASS = 'w-full p-[12px] content-md:p-[16px]';
+
+export type HelpCenterCardProps = HelpCenterCardLoadedProps | HelpCenterCardLoadingProps;
+
+/**
+ * One Help Center row, loaded and loading. ONE switch: in a loading scope, or with `ticket={null}` (the list's loading
+ * form), it is its own {@link HelpCenterCardSkeleton}; the list never picks it.
+ */
+export function HelpCenterCard(props: HelpCenterCardProps) {
+  const inScope = useLoadingScope();
+  if (inScope || props.ticket === null) return <HelpCenterCardSkeleton id={props.id} {...loadingItemProps(props)} />;
+  return <HelpCenterCardLoaded {...props} />;
+}
+
+/** A row while its ticket is read: the row's own box, its summary the shared row content's skeleton. */
+function HelpCenterCardSkeleton({ id, ...props }: { id?: string; [key: `data-${string}`]: unknown }) {
+  return (
+    <div id={id} className={HELP_CENTER_ROW_CLASS} aria-hidden {...loadingItemProps(props)}>
+      <div className={HELP_CENTER_SUMMARY_PAD_CLASS}>
+        <DevCardRowContent loading title="" subtitle="" description="" rightBadges={null} />
+      </div>
+    </div>
+  );
+}
+
+export interface HelpCenterCardLoadedProps {
   ticket: AnyTicket;
   expanded: boolean;
   onToggle: (id: string) => void;
@@ -47,9 +83,11 @@ export interface HelpCenterCardProps {
    *  offset is already baked in via `STICKY_HEADER_OFFSET_PX` so the row
    *  lands BELOW the chrome regardless of whether `id` is set. */
   id?: string;
+  /** The list's markers (`data-loading-item`), on the row's root. */
+  [key: `data-${string}`]: unknown;
 }
 
-export function HelpCenterCard({
+function HelpCenterCardLoaded({
   ticket,
   expanded,
   onToggle,
@@ -62,7 +100,8 @@ export function HelpCenterCard({
   replyError,
   onClearReplyError,
   id,
-}: HelpCenterCardProps) {
+  ...props
+}: HelpCenterCardLoadedProps) {
   const optimistic = isOptimistic(ticket);
   const rawStatus = (ticket.status ?? 'OPEN').toUpperCase();
   const priority = (ticket.priority ?? '').toUpperCase();
@@ -156,9 +195,9 @@ export function HelpCenterCard({
       ref={rowRef}
       id={id}
       style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
-      className={`border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
+      className={`${HELP_CENTER_ROW_CLASS} ${optimistic ? 'opacity-60' : ''}`}
       aria-busy={optimistic || undefined}
-      data-loading-item
+      {...loadingItemProps(props)}
     >
       <button
         type="button"
@@ -166,7 +205,7 @@ export function HelpCenterCard({
         disabled={!isExpandable}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-controls={isExpanded ? `help-center-drawer-${ticket.id}` : undefined}
-        className="w-full p-[12px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent disabled:cursor-default content-md:p-[16px]"
+        className={`${HELP_CENTER_SUMMARY_PAD_CLASS} text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent disabled:cursor-default`}
       >
         <DevCardRowContent
           title={title}

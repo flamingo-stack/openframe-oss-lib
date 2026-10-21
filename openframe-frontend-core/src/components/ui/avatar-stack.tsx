@@ -2,7 +2,7 @@
 
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { SquareAvatar } from './square-avatar';
 
 /**
@@ -96,16 +96,17 @@ export function AvatarStackSkeleton({
       className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
       style={slotsWidthStyle(size, slots)}
     >
-      {Array.from({ length: count }, (_, i) => (
-        <UnifiedSkeleton
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton faces never reorder
-          key={i}
-          variant="circular"
-          className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
-          width={SIZE_PX[size]}
-          height={SIZE_PX[size]}
-        />
-      ))}
+      <LoadingItems count={count}>
+        {i => (
+          <UnifiedSkeleton
+            data-loading-item
+            variant="circular"
+            className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
+            width={SIZE_PX[size]}
+            height={SIZE_PX[size]}
+          />
+        )}
+      </LoadingItems>
     </div>
   );
 }
@@ -143,6 +144,7 @@ export function AvatarStack({
       {visible.map((person, i) => (
         <SquareAvatar
           key={person.key ?? `${person.name}-${i}`}
+          data-loading-item
           variant="round"
           size={size}
           src={person.avatarUrl ?? undefined}

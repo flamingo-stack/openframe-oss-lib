@@ -1,8 +1,7 @@
 'use client';
 
 import { type ElementType, type ReactNode, Suspense } from 'react';
-import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
-import { LoadingStatus } from './loading-region';
+import { AnnouncedLoadingScope } from '../ui/loading-scope';
 
 /**
  * A Suspense fallback drawn by the components themselves: the SAME component the boundary waits on, rendered in a
@@ -32,14 +31,10 @@ export function LoadingFallback({
   className?: string;
   children: ReactNode;
 }) {
-  const inScope = useLoadingScope();
   return (
-    <>
-      {status && !inScope && <LoadingStatus label={label} />}
-      <LoadingScope as={as} className={className}>
-        {children}
-      </LoadingScope>
-    </>
+    <AnnouncedLoadingScope label={label} status={status} as={as} className={className}>
+      {children}
+    </AnnouncedLoadingScope>
   );
 }
 

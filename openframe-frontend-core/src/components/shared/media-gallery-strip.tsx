@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
 import { Video } from '../features/video';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ImageGalleryModal } from '../ui/image-gallery-modal';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 export interface MediaGalleryStripItem {
   media_type: string;
@@ -69,6 +69,7 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
             return (
               <button
                 key={mediaItem.id || index}
+                data-loading-item
                 type="button"
                 className={`${tileClass} cursor-pointer hover:opacity-80`}
                 aria-label={`Open ${mediaItem.title || `media ${index + 1}`} in gallery`}
@@ -90,7 +91,7 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
             );
           }
           return (
-            <div key={mediaItem.id || index} className={tileClass}>
+            <div key={mediaItem.id || index} className={tileClass} data-loading-item>
               <Video url={mediaItem.media_url} layout="native" />
             </div>
           );
@@ -119,10 +120,9 @@ export function MediaGalleryStripSkeleton({
 }) {
   return (
     <div className={cn(STRIP_CLASS, 'overflow-hidden', className)} aria-hidden>
-      {Array.from({ length: count }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tiles never reorder
-        <UnifiedSkeleton key={i} className={TILE_SIZE_CLASS} />
-      ))}
+      <LoadingItems count={count}>
+        {() => <UnifiedSkeleton className={TILE_SIZE_CLASS} data-loading-item />}
+      </LoadingItems>
     </div>
   );
 }

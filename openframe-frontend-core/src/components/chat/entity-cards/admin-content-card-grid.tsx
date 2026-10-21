@@ -16,8 +16,12 @@ const GRID_CELL_CLASS = 'h-full';
  * The grid's default card in its loading form: `AdminContentCard` itself, drawn in the reserved rows with its actions
  * row, so the card draws its own skeleton (one switch per component).
  */
-function AdminContentCardPlaceholder({ className }: { className?: string }) {
-  return <AdminContentCard loading reserveRows title="" actions className={className} />;
+const DEFAULT_LOADING_CARD = <AdminContentCard loading reserveRows title="" actions />;
+
+/** The card a loading cell draws: the host's card with `loading`, else the deprecated `Skeleton`, else the default. */
+function loadingCardOf(loadingCard: ReactNode, Skeleton: ComponentType<{ className?: string }> | undefined): ReactNode {
+  if (loadingCard !== undefined) return loadingCard;
+  return Skeleton ? <Skeleton /> : DEFAULT_LOADING_CARD;
 }
 
 export interface AdminContentCardGridSkeletonProps {
@@ -27,10 +31,9 @@ export interface AdminContentCardGridSkeletonProps {
    * states none.
    */
   count?: number;
-  /**
-   * The card in its loading form (a component that renders the grid's card with `loading`). Default `AdminContentCard`
-   * in its own loading form.
-   */
+  /** The grid's card rendered with `loading` (it draws its own loading form). Default `AdminContentCard` loading. */
+  loadingCard?: ReactNode;
+  /** @deprecated Pass `loadingCard`: the host's card rendered with `loading`, never a separate skeleton component. */
   Skeleton?: ComponentType<{ className?: string }>;
   className?: string;
   /** What is loading, read once by a screen reader. Default "Loading". */
@@ -50,7 +53,8 @@ const ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS = 12;
  */
 export function AdminContentCardGridSkeleton({
   count = ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS,
-  Skeleton = AdminContentCardPlaceholder,
+  loadingCard,
+  Skeleton,
   className,
   label = 'Loading',
   region = true,
@@ -60,7 +64,7 @@ export function AdminContentCardGridSkeleton({
       <LoadingItems count={count}>
         {() => (
           <div className={GRID_CELL_CLASS} data-loading-item>
-            <Skeleton />
+            {loadingCardOf(loadingCard, Skeleton)}
           </div>
         )}
       </LoadingItems>
@@ -79,10 +83,11 @@ export interface AdminContentCardGridProps<T> {
   /** Rendered when `items` is empty, floated top-aligned over a full page of reserved slots. */
   empty: ReactNode;
   /**
-   * The card in its loading form, used for loading and for the reserved (invisible) slots. Default `AdminContentCard`'s
-   * own loading form; a grid of another card (e.g. `HowIWorkCard`) passes that card rendered with `loading`, so the
-   * heights match.
+   * The grid's card rendered with `loading` (e.g. `<HowIWorkCard loading />`), drawn in every cell while loading and
+   * in the reserved (invisible) slots, so the heights match. Default `AdminContentCard`'s own loading form.
    */
+  loadingCard?: ReactNode;
+  /** @deprecated Pass `loadingCard`: the host's card rendered with `loading`, never a separate skeleton component. */
   Skeleton?: ComponentType<{ className?: string }>;
   className?: string;
   /** What is loading, read once by a screen reader while `loading`. Default "Loading". */
@@ -111,7 +116,8 @@ export function AdminContentCardGrid<T>({
   itemKey,
   renderCard,
   empty,
-  Skeleton = AdminContentCardPlaceholder,
+  loadingCard,
+  Skeleton,
   className,
   loadingLabel,
   loadingRegion,
@@ -123,16 +129,21 @@ export function AdminContentCardGrid<T>({
     return (
       <AdminContentCardGridSkeleton
         count={pageSize}
-        Skeleton={Skeleton}
+        loadingCard={loadingCardOf(loadingCard, Skeleton)}
         className={className}
         label={loadingLabel}
         region={loadingRegion}
       />
     );
 
-  const slots = Array.from({ length: Math.max(0, pageSize - items.length) }, (_, i) => (
-    <Skeleton key={`slot-${i}`} className="invisible" />
-  ));
+  // Reserved slots up to a full page: the loading card, invisible.
+  const slots = (
+    // loading-standard-ok(ITEM_MARK): invisible pad slots that hold a short page's height, not items of the list
+    <LoadingItems count={Math.max(0, pageSize - items.length)}>
+      {() => <div className={cn(GRID_CELL_CLASS, 'invisible')}>{loadingCardOf(loadingCard, Skeleton)}</div>}
+    </LoadingItems>
+  );
+  const hasSlots = items.length < pageSize;
 
   if (items.length === 0) {
     return (
@@ -152,7 +163,7 @@ export function AdminContentCardGrid<T>({
           {renderCard(item)}
         </div>
       ))}
-      {slots.length > 0 && (
+      {hasSlots && (
         <div aria-hidden className="contents">
           {slots}
         </div>

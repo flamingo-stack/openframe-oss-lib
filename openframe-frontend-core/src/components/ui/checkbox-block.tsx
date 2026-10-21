@@ -3,7 +3,9 @@
 import type * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Checkbox } from './checkbox';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { RequiredMark } from './required-mark';
 
 interface CheckboxBlockProps {
@@ -11,7 +13,8 @@ interface CheckboxBlockProps {
   checked?: boolean;
   defaultChecked?: boolean;
   onCheckedChange?: (checked: boolean) => void;
-  /** Primary label (supports rich text / ReactNode for inline links) */
+  /** Primary label (supports rich text / ReactNode for inline links). `null` is a label still being read: while the
+   *  block loads it draws an `h4` bar in the label's own line. */
   label: ReactNode;
   /** Optional secondary description below the label (supports rich text / ReactNode) */
   description?: ReactNode;
@@ -35,7 +38,12 @@ interface CheckboxBlockProps {
    */
   loading?: boolean;
   className?: string;
+  /** `data-*` markers (`data-loading-item` on a read list's block), on the block's root in both forms. */
+  [key: `data-${string}`]: unknown;
 }
+
+/** The label's bar while a `null` label is read. */
+const CHECKBOX_BLOCK_LABEL_BAR_CLASS = 'w-40 max-w-full';
 
 /** The block's box over the checkbox's own (`CHECKBOX_BOX_CLASS`): grown at `md`. `Checkbox` reads it for the box and
  *  for its skeleton. */
@@ -57,11 +65,14 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
       error,
       loading: loadingProp,
       className,
+      ...props
     },
     ref,
   ) => {
+    // ONE switch for the block's own read part: the box is its skeleton through `Checkbox`; a `null` label is a bar.
+    const loading = useLoadingScope() || !!loadingProp;
     return (
-      <div className={cn('relative flex w-full flex-col', className)}>
+      <div className={cn('relative flex w-full flex-col', className)} {...loadingItemProps(props)}>
         <label
           htmlFor={id}
           // Same marker every field exposes — it is how a form finds (and scrolls
@@ -132,7 +143,11 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
                 truncateLabel ? 'block truncate' : 'break-words',
               )}
             >
-              {label}
+              {loading && label === null ? (
+                <TextLineSkeleton type="inherit" as="span" className={CHECKBOX_BLOCK_LABEL_BAR_CLASS} />
+              ) : (
+                label
+              )}
               {required && <RequiredMark />}
             </span>
             {description && (

@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { cn } from '../../../utils/cn';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip';
+import { queryReportHeaderClass } from './query-report-table-row';
 import type { QueryReportTableHeaderProps } from './types';
 
 export function QueryReportTableHeader({
@@ -14,7 +15,7 @@ export function QueryReportTableHeader({
   const isCompact = variant === 'compact';
 
   return (
-    <div className={cn('flex items-center gap-4 px-4', isCompact ? 'border-b border-ods-border py-2' : '', className)}>
+    <div className={cn(queryReportHeaderClass(isCompact), className)}>
       {columns.map(column => (
         <TruncatedHeaderCell key={column} value={column} width={columnWidth} />
       ))}

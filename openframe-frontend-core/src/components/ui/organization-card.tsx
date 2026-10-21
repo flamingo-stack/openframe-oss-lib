@@ -17,7 +17,7 @@ import {
   ORGANIZATION_CARD_STAT_CLASS,
 } from '../loading/organization-card-skeleton';
 import { EntityImage } from './entity-image';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 
 export interface Organization {
   id: string;
@@ -56,6 +56,8 @@ export interface OrganizationCardProps {
   }>;
   customFooter?: React.ReactNode;
   deviceCount?: number;
+  /** `data-*` markers (`data-loading-item` on a grid's cards), on the card's outermost element in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
 export function OrganizationCard({
@@ -68,7 +70,9 @@ export function OrganizationCard({
   footerStats,
   customFooter,
   deviceCount,
+  ...props
 }: OrganizationCardProps) {
+  const markers = loadingItemProps(props);
   // In a page's loading state the organization is read: the card is its skeleton.
   if (useLoadingScope()) {
     return (
@@ -76,6 +80,7 @@ export function OrganizationCard({
         className={className}
         showDescription={Boolean(organization.description)}
         showFooter={Boolean(customFooter || footerStats)}
+        {...markers}
       />
     );
   }
@@ -95,6 +100,7 @@ export function OrganizationCard({
         href && 'cursor-pointer hover:border-ods-border-hover hover:bg-ods-card-hover',
         className,
       )}
+      {...(href ? {} : markers)}
     >
       {/* Device count (top-right) */}
       {deviceCount !== undefined && (
@@ -170,7 +176,7 @@ export function OrganizationCard({
 
   if (href) {
     return (
-      <Link href={href} className="block text-inherit no-underline">
+      <Link href={href} className="block text-inherit no-underline" {...markers}>
         {card}
       </Link>
     );

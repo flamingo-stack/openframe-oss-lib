@@ -31,9 +31,11 @@ import {
   MessagesIcon,
   UserCheckIcon,
 } from '../../icons-v2-generated';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar';
+import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
-import { Tag } from '../../ui/tag';
+import { Tag, TagSkeleton } from '../../ui/tag';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { BoardTicketApproval } from './board-ticket-approval';
 import { useBoardLift, useDropAim } from './drop-aim';
@@ -290,7 +292,9 @@ export function TicketCardView({ className, style, ...bodyProps }: TicketCardVie
 // =============================================================================
 
 export interface TicketCardProps {
-  ticket: BoardTicket;
+  /** The ticket. `null` is a card still being read (a lane's loading form): the card draws its own skeleton, as it
+   *  does in a loading scope. */
+  ticket: BoardTicket | null;
   columnId: string;
   columnColor?: string;
   href?: string;
@@ -304,6 +308,8 @@ export interface TicketCardProps {
   renderAssignSlot?: (ticket: BoardTicket) => ReactNode;
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
+  /** `data-*` markers (`data-loading-item` on a lane's cards), on the card's root in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
 /** Memoized: a drag moves one card, but it re-renders the column lists around
@@ -311,7 +317,7 @@ export interface TicketCardProps {
  *  must pass stable `renderAssignSlot` / `onApprove` / `onReject` (useCallback)
  *  for this to bite — an inline arrow re-renders every card on every keystroke
  *  anywhere in the page. */
-export const TicketCard = memo(function TicketCardImpl({
+const TicketCardImpl = memo(function TicketCardDraggable({
   ticket,
   columnId,
   columnColor,
@@ -322,7 +328,8 @@ export const TicketCard = memo(function TicketCardImpl({
   renderAssignSlot,
   onApprove,
   onReject,
-}: TicketCardProps) {
+  ...props
+}: TicketCardProps & { ticket: BoardTicket }) {
   const ref = useRef<HTMLDivElement>(null);
   // Read at drag start rather than captured: the registration below is keyed on
   // the ticket's id, so capturing the object would hand a renamed or re-tagged
@@ -498,6 +505,7 @@ export const TicketCard = memo(function TicketCardImpl({
     // Read by the lane's scroll anchor to keep the list still when tickets are
     // inserted above the viewport — see `use-lane-scroll-anchor.ts`.
     [TICKET_ID_ATTRIBUTE]: ticket.id,
+    ...loadingItemProps(props),
   };
 
   const innerWrapperClass = 'relative z-10 flex flex-col gap-[var(--spacing-system-sf)]';
@@ -581,6 +589,16 @@ export const TicketCard = memo(function TicketCardImpl({
   );
 });
 
+/**
+ * The board card, loaded and loading. ONE switch: in a loading scope, or with no ticket yet (`ticket={null}`), it is
+ * its own {@link TicketCardSkeleton}; otherwise the draggable card. The lane never picks the skeleton.
+ */
+export const TicketCard = memo(function TicketCardSwitch({ ticket, ...props }: TicketCardProps) {
+  const loading = useLoadingScope() || ticket === null;
+  if (loading) return <TicketCardSkeleton {...loadingItemProps(props)} />;
+  return <TicketCardImpl ticket={ticket} {...props} />;
+});
+
 function TicketTagRow({ tags }: { tags: string[] }) {
   const visible = tags.slice(0, MAX_VISIBLE_TAGS);
   const hidden = tags.length - visible.length;
@@ -591,6 +609,35 @@ function TicketTagRow({ tags }: { tags: string[] }) {
         <Tag key={tag} variant="outline" label={tag} />
       ))}
       {hidden > 0 && <Tag variant="outline" label={`+${hidden}`} />}
+    </div>
+  );
+}
+
+/**
+ * A board card while it is read: the card's own shell, its title and device lines as bars of their own type steps,
+ * the priority and assignee marks, and a typical tag row. The board card draws it itself (`ticket={null}` or a
+ * loading scope).
+ */
+export function TicketCardSkeleton({ className, ...props }: { className?: string; [key: `data-${string}`]: unknown }) {
+  return (
+    <div aria-hidden className={cn(TICKET_CARD_SHELL, className)} {...loadingItemProps(props)}>
+      <div className="flex items-start gap-[var(--spacing-system-sf)]">
+        <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-zero)]">
+          <TextLineSkeleton type="h3" className="w-3/4" />
+          <div className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)] text-h6">
+            <UnifiedSkeleton className="size-4 shrink-0 rounded-sm" />
+            <TextLineSkeleton type="inherit" className="w-1/2" />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
+          <UnifiedSkeleton className="size-4 rounded-sm" />
+          <UnifiedSkeleton className="size-8 rounded-full" />
+        </div>
+      </div>
+      <div className="flex h-8 items-start gap-[var(--spacing-system-xxs)]">
+        <TagSkeleton />
+        <TagSkeleton />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,16 @@
 'use client';
 
 import type React from 'react';
+import { cn } from '../utils/cn';
+import {
+  CATEGORY_CARD_ACTION_BOX_CLASS,
+  CATEGORY_CARD_FRAME_CLASS,
+  CATEGORY_CARD_ICON_ROW_CLASS,
+  CATEGORY_CARD_ICON_TILE_CLASS,
+  CATEGORY_CARD_SKELETON_ICONS,
+  CategoryCardSkeleton,
+} from './loading/category-card-skeleton';
+import { LoadingItems, useLoadingScope } from './ui/loading-scope';
 
 interface CategoryCardProps {
   name: string;
@@ -11,14 +21,32 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ name, description, categoryCount, productCount, icons = [] }: CategoryCardProps) {
+  // ONE switch: in a page's loading state the category is read: the card is its skeleton.
+  if (useLoadingScope()) return <CategoryCardSkeleton />;
   return (
-    <article className="box-border flex min-w-0 flex-col rounded-[12px] border border-ods-border bg-ods-card p-8">
-      <div className="mb-8 flex items-center justify-center gap-6">
-        {(icons.length > 0 ? icons : Array(10).fill(null)).map((icon, i) => (
-          <div key={i} className="flex h-10 w-10 items-center justify-center rounded bg-ods-border">
-            {icon}
-          </div>
-        ))}
+    <article className={CATEGORY_CARD_FRAME_CLASS}>
+      <div className={CATEGORY_CARD_ICON_ROW_CLASS}>
+        {icons.length > 0 ? (
+          icons.map((icon, i) => (
+            <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: the host's icons carry no identity of their own
+              key={i}
+              data-loading-item
+              className={cn(CATEGORY_CARD_ICON_TILE_CLASS, 'flex items-center justify-center rounded bg-ods-border')}
+            >
+              {icon}
+            </div>
+          ))
+        ) : (
+          <LoadingItems count={CATEGORY_CARD_SKELETON_ICONS}>
+            {() => (
+              <div
+                data-loading-item
+                className={cn(CATEGORY_CARD_ICON_TILE_CLASS, 'flex items-center justify-center rounded bg-ods-border')}
+              />
+            )}
+          </LoadingItems>
+        )}
       </div>
       <div className="flex flex-1 flex-col">
         <h2 className="mb-2 text-left text-ods-text-primary text-h2">{name}</h2>
@@ -28,7 +56,10 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
         <div className="flex flex-row items-start">
           <p className="flex-1 text-left text-ods-text-primary text-h6">{description}</p>
           <button
-            className="ml-4 flex h-12 w-12 items-center justify-center rounded-[6px] border border-ods-border bg-transparent transition-colors hover:bg-ods-accent"
+            className={cn(
+              CATEGORY_CARD_ACTION_BOX_CLASS,
+              'ml-4 flex items-center justify-center border border-ods-border bg-transparent transition-colors hover:bg-ods-accent',
+            )}
             style={{ minWidth: 48, minHeight: 48 }}
             aria-label={`View ${name}`}
           >

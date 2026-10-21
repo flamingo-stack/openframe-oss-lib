@@ -1,5 +1,6 @@
 import { cn } from '../../utils/cn';
 import { EntityImageSkeleton } from '../ui/entity-image';
+import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { LoadingRegion } from './loading-region';
 import { MediaSkeleton, TextLineSkeleton } from './unified-skeleton';
 
@@ -33,6 +34,8 @@ export interface OrganizationCardSkeletonProps {
 
   /** Optional tailwind classes to override the card container background & border */
   containerClassName?: string;
+  /** `data-*` markers (`data-loading-item` on a grid's cards), on the card's root. */
+  [key: `data-${string}`]: unknown;
 }
 
 /** The two footer stats a loading card draws (a value and its label each). */
@@ -48,6 +51,7 @@ export function OrganizationCardSkeleton({
   containerClassName,
   showFooter = true,
   showDescription = true,
+  ...props
 }: OrganizationCardSkeletonProps) {
   return (
     <div
@@ -58,6 +62,7 @@ export function OrganizationCardSkeleton({
         className,
       )}
       aria-hidden
+      {...loadingItemProps(props)}
     >
       <div className={ORGANIZATION_CARD_HEADER_CLASS}>
         <EntityImageSkeleton />
@@ -120,14 +125,16 @@ export function OrganizationCardSkeletonGrid({
       announce={region}
       className={cn('grid grid-cols-1 gap-4 content-md:grid-cols-2 content-md:gap-6 content-lg:grid-cols-3', className)}
     >
-      {Array.from({ length: count }, (_, index) => (
-        <OrganizationCardSkeleton
-          key={index}
-          containerClassName={containerClassName}
-          showFooter={showFooter}
-          showDescription={showDescription}
-        />
-      ))}
+      <LoadingItems count={count}>
+        {() => (
+          <OrganizationCardSkeleton
+            containerClassName={containerClassName}
+            showFooter={showFooter}
+            showDescription={showDescription}
+            data-loading-item
+          />
+        )}
+      </LoadingItems>
     </LoadingRegion>
   );
 }

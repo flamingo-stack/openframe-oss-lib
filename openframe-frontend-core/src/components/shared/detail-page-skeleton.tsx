@@ -31,7 +31,6 @@ const METADATA_COLUMNS_CLASS: Record<number, string> = {
 /**
  * @deprecated Render the detail page itself inside a `LoadingScope` (e.g. `ArticleDetailLayout` with its sections): each part draws its own skeleton. Kept so hosts on an older release keep compiling; nothing in the lib uses it.
  */
-// loading-standard-ok: deprecated re-export kept for external consumers
 export function DetailPageSkeleton({
   metadataColumns = 4,
   showImageGallery = true,

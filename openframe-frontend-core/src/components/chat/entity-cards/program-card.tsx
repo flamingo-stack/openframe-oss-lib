@@ -105,6 +105,11 @@ const DEFAULT_HOSTS_ROW = 'flex flex-wrap gap-2 md:justify-end';
  * carries (no cap), so there is no limit to draw.
  */
 const DEFAULT_SKELETON_TAGS = 2;
+/** Host avatars a loading card draws for a type whose cards show hosts (`cardShowsHosts`): a typical one. */
+export const PROGRAM_CARD_SKELETON_HOSTS = 1;
+/** Gallery thumbnails a loading card draws for a type whose cards show a gallery (`cardShowsGallery`): the row's
+ *  first fold (the row scrolls past it). */
+export const PROGRAM_CARD_SKELETON_MEDIA = 4;
 /** The person's avatar in the editorial feature card, read by the card and its skeleton. */
 const EDITORIAL_PERSON_AVATAR = { variant: 'round', size: 'sm' } as const;
 
@@ -292,7 +297,7 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
   return [];
 }
 
-function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
+function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; title: string; optional?: boolean }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const openImageModal = (index: number, event?: React.MouseEvent) => {
@@ -306,7 +311,7 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
   };
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" data-loading-optional={optional || undefined}>
         <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
           {images.map((mediaItem, index) => (
             <div
@@ -485,13 +490,14 @@ export function ProgramCard<T extends BaseProgramItem>({
     aspect: size === 'sm' || size === 'row' ? 'square' : 'wide',
   });
   if (useLoadingScope()) {
+    // What a loading card draws is decided by the type's CONFIG (never by the placeholder record, whose rows are
+    // empty): the hosts and gallery rows its cards always show; a tag row is a record's optional part, not drawn.
     return (
       <ProgramCardSkeleton
         size={size}
         eyebrow={!!eyebrow}
-        media={media.filter(m => isImageMedia(m)).length}
-        tags={tags.length > 0}
-        hosts={getHosts(item.hosts).length}
+        media={config.cardShowsGallery ? PROGRAM_CARD_SKELETON_MEDIA : 0}
+        hosts={config.cardShowsHosts ? PROGRAM_CARD_SKELETON_HOSTS : 0}
         typeLabel={size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
         actionLabel={programActionLabel(config.labels.singular)}
         className={className}
@@ -695,7 +701,8 @@ export function ProgramCard<T extends BaseProgramItem>({
         <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
 
         {tags.length > 0 && (
-          <div className={DEFAULT_TAG_ROW}>
+          // Only some records carry tags: the loading card leaves the row out.
+          <div className={DEFAULT_TAG_ROW} data-loading-optional>
             {tags.map(tag => (
               <Tag key={tag} as="span" label={tag} variant="outline" data-loading-item />
             ))}
@@ -730,7 +737,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     return (
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cardFrameClass}>
         {cardHeader}
-        {images.length > 0 && <MediaGallery images={images} title={item.title} />}
+        {images.length > 0 && <MediaGallery images={images} title={item.title} optional={!config.cardShowsGallery} />}
         <div className={DEFAULT_FOOTER}>
           <span
             className="inline-flex items-center gap-2 rounded-md border border-ods-border px-4 py-2 text-ods-text-primary text-h4"
@@ -749,7 +756,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       <Link href={href} target={target} rel={rel} className="block">
         {cardHeader}
       </Link>
-      {images.length > 0 && <MediaGallery images={images} title={item.title} />}
+      {images.length > 0 && <MediaGallery images={images} title={item.title} optional={!config.cardShowsGallery} />}
       <div className={DEFAULT_FOOTER}>
         <ProgramActionButton label={actionLabel} href={href} newTab={target === '_blank'} />
       </div>

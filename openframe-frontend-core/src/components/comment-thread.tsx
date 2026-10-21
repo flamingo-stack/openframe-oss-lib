@@ -84,6 +84,8 @@ export function CommentThread({
         leadWith={leadWith}
         showTitle={showTitle}
         reply={Boolean(onReply)}
+        deletable={Boolean(onDelete)}
+        footerSlots={Boolean(renderActions || renderBadges)}
       />
     );
   }
@@ -192,6 +194,9 @@ function CommentThreadRow({
   );
 }
 
+/** A loading row's delete handler: the button is drawn inert while the comments are read, so it is never called. */
+const HOLD_DELETE = () => undefined;
+
 /**
  * A thread while it is read: `count` comment rows, each `CommentCard loading` in the thread's own list, with the
  * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
@@ -202,6 +207,8 @@ export function CommentThreadSkeleton({
   leadWith = 'commenter',
   showTitle = true,
   reply = false,
+  deletable = false,
+  footerSlots = false,
 }: {
   count?: number;
   leadWith?: 'vendor' | 'commenter';
@@ -209,17 +216,36 @@ export function CommentThreadSkeleton({
   showTitle?: boolean;
   /** The thread takes replies (`CommentThread`'s `onReply`): each root's footer carries its Reply button. */
   reply?: boolean;
+  /** The thread deletes comments (`CommentThread`'s `onDelete`): each row holds its delete button, inert. */
+  deletable?: boolean;
+  /** The thread's roots carry badges or actions (`renderBadges` / `renderActions`): the footer row is drawn, their
+   *  read content one bar. */
+  footerSlots?: boolean;
 }) {
-  const footer = reply ? (
-    <span className={COMMENT_THREAD_ACTIONS}>
-      <ReplyButton />
-    </span>
-  ) : undefined;
+  const footer =
+    reply || footerSlots ? (
+      <>
+        {footerSlots && <TextLineSkeleton type="h6" className="w-20" />}
+        {reply && (
+          <span className={COMMENT_THREAD_ACTIONS}>
+            <ReplyButton />
+          </span>
+        )}
+      </>
+    ) : undefined;
   return (
     <div className={COMMENT_THREAD_LIST} aria-hidden="true" inert>
       <LoadingItems count={count}>
         {() => (
-          <CommentCard loading fullBody data-loading-item leadWith={leadWith} titleRow={showTitle} footer={footer} />
+          <CommentCard
+            loading
+            fullBody
+            data-loading-item
+            leadWith={leadWith}
+            titleRow={showTitle}
+            footer={footer}
+            onDeleteComment={deletable ? HOLD_DELETE : undefined}
+          />
         )}
       </LoadingItems>
     </div>

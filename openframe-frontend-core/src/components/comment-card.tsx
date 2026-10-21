@@ -138,7 +138,8 @@ export function CommentCard({
         <CommentCardSkeleton
           leadWith={leadWith}
           showTitle={comment ? !!comment.title : titleRow}
-          showDelete={!!comment && canUserDeleteComment(comment) && !!onDeleteComment}
+          // A host that may delete draws the delete button; with no comment yet who may is unknown, so it is held.
+          showDelete={!!onDeleteComment && (!comment || canUserDeleteComment(comment))}
           compact={compact}
           fullBody={fullBody}
           footer={loading ? footer : undefined}

@@ -4,7 +4,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 export interface PathsDisplayProps {
   /**
@@ -126,7 +126,7 @@ export function PathsDisplay({
       {description && <div className={PATHS_DESCRIPTION_CLASS}>{description}</div>}
       <div className={PATHS_FRAME_CLASS}>
         {paths.map(path => (
-          <div key={path} className={PATHS_ROW_CLASS}>
+          <div key={path} className={PATHS_ROW_CLASS} data-loading-item>
             {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
             <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h4">{path}</span>
             {showCopyButtons && onCopyPath && (
@@ -169,19 +169,21 @@ export function PathsDisplaySkeleton({
       {title && <div className={PATHS_TITLE_CLASS}>{title}</div>}
       {description && <div className={PATHS_DESCRIPTION_CLASS}>{description}</div>}
       <div className={PATHS_FRAME_CLASS}>
-        {Array.from({ length: rows }, (_, i) => (
-          <div key={i} className={PATHS_ROW_CLASS}>
-            {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
-            <div className="min-w-0 flex-1">
-              <TextLineSkeleton type="h4" className={PATH_SKELETON_WIDTHS[i % PATH_SKELETON_WIDTHS.length]} />
+        <LoadingItems count={rows}>
+          {i => (
+            <div className={PATHS_ROW_CLASS} data-loading-item>
+              {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
+              <div className="min-w-0 flex-1">
+                <TextLineSkeleton type="h4" className={PATH_SKELETON_WIDTHS[i % PATH_SKELETON_WIDTHS.length]} />
+              </div>
+              {showCopyButtons && (
+                <span className={PATHS_COPY_BUTTON_CLASS}>
+                  <Copy02Icon className={copyIconSize} />
+                </span>
+              )}
             </div>
-            {showCopyButtons && (
-              <span className={PATHS_COPY_BUTTON_CLASS}>
-                <Copy02Icon className={copyIconSize} />
-              </span>
-            )}
-          </div>
-        ))}
+          )}
+        </LoadingItems>
       </div>
     </div>
   );

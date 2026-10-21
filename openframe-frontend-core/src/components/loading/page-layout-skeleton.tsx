@@ -174,15 +174,18 @@ export function ResultsHeaderSkeleton({ className }: PageLayoutSkeletonProps) {
   );
 }
 
+/** Vendor cards a vendor grid pages by: the grid draws one full page of them while it loads. */
+const VENDOR_GRID_PAGE_SIZE = 12;
+
 /**
- * Vendor Grid Skeleton - Always displays exactly 12 vendor card skeletons
+ * Vendor Grid Skeleton - one full page of vendor card skeletons (`VENDOR_GRID_PAGE_SIZE`)
  * Used for consistent vendor page layout with predictable height
  */
 export function VendorGridSkeleton({ className, region = true }: LoadingLayoutProps) {
   return (
     <div className={cn('space-y-6', className)}>
       <CardSkeletonGrid
-        count={12}
+        count={VENDOR_GRID_PAGE_SIZE}
         variant="vendor"
         region={region}
         className="grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-3"

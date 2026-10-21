@@ -7,7 +7,7 @@ import { cn } from '../../utils/cn';
 import { CheckIcon } from '../icons-v2-generated';
 import { Copy01Icon } from '../icons-v2-generated/documents';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { ProgressBar } from './progress-bar';
 
 export interface InfoCardFooterData {
@@ -57,6 +57,8 @@ interface InfoCardProps {
   /** The data is still being read: the card keeps its ONE structure in its `skeleton` shape, its copy real and every
    *  read value a bar. A loading scope does the same while `data.items` is empty. */
   loading?: boolean;
+  /** `data-*` markers (`data-loading-item` on a read list's card), on the card's root in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
 /**
@@ -99,7 +101,7 @@ const SUBTITLE_TEXT_CLASS = 'min-w-0 truncate text-ods-text-secondary text-h4';
 const ROW_LABEL_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const FOOTER_CLASS = 'mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]';
 
-export function InfoCard({ data, className = '', skeleton, loading: loadingProp }: InfoCardProps) {
+export function InfoCard({ data, className = '', skeleton, loading: loadingProp, ...props }: InfoCardProps) {
   // ONE switch: in a page's loading state with no rows yet (they are read), or while the host reads the data, the
   // card keeps its structure in its `skeleton` shape: what the shape leaves out is taken from `data`.
   const inScope = useLoadingScope();
@@ -144,7 +146,7 @@ export function InfoCard({ data, className = '', skeleton, loading: loadingProp 
   const footer = loading ? shape.footer : (data.footer ?? false);
 
   return (
-    <div className={cn(FRAME_CLASS, className)} aria-hidden={loading || undefined}>
+    <div className={cn(FRAME_CLASS, className)} aria-hidden={loading || undefined} {...loadingItemProps(props)}>
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
           `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
           "Info-card" design. With no title/subtitle, the body is the only group. */}

@@ -2,9 +2,26 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { cn } from '../../../utils/cn';
+import {
+  DATA_TABLE_ROW_FRAME_CLASS,
+  ROW_HEIGHT_DESKTOP,
+  ROW_SHELL_CLASSES,
+} from '../data-table/data-table-row-classes';
 import { loadingItemProps } from '../loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip';
 import type { QueryReportTableRowProps } from './types';
+
+/**
+ * The report's row boxes, loaded and loading, from the data table's row class set (`data-table-row-classes`): the
+ * default row is the data table's card, shell and height; a compact row a divided 56px line in the same shell.
+ */
+export const queryReportRowFrameClass = (compact: boolean) =>
+  compact ? 'border-b border-ods-border' : cn('relative', DATA_TABLE_ROW_FRAME_CLASS);
+export const queryReportRowCellsClass = (compact: boolean) =>
+  cn('flex', ROW_SHELL_CLASSES, compact ? 'h-[56px]' : ROW_HEIGHT_DESKTOP);
+/** The header's row: the rows' shell, so each header cell sits over its column. */
+export const queryReportHeaderClass = (compact: boolean) =>
+  cn('flex', ROW_SHELL_CLASSES, compact && 'border-b border-ods-border py-2');
 
 export function QueryReportTableRow({
   row,
@@ -20,14 +37,9 @@ export function QueryReportTableRow({
     <div
       // A list's markers (`data-loading-item`) ride on the row, as on its loading form's rows.
       {...loadingItemProps(props)}
-      className={cn(
-        isCompact
-          ? 'border-b border-ods-border'
-          : 'relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card',
-        className,
-      )}
+      className={cn(queryReportRowFrameClass(isCompact), className)}
     >
-      <div className={cn('flex items-center gap-4 px-4', isCompact ? 'h-[56px]' : 'h-[80px]')}>
+      <div className={queryReportRowCellsClass(isCompact)}>
         {columns.map(column => {
           const value = row[column];
           const displayValue = value === null || value === undefined ? '-' : String(value);

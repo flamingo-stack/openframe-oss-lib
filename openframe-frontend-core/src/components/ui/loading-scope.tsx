@@ -66,11 +66,77 @@ export function useLoadingScope(): boolean {
  *
  *   <LoadingWhen loading={!health}><StatusBadge text={label} variant="button" /></LoadingWhen>
  */
-export function LoadingWhen({ loading, children }: { loading: boolean; children: ReactNode }) {
+export function LoadingWhen({
+  loading,
+  label,
+  as,
+  className,
+  children,
+}: {
+  loading: boolean;
+  /**
+   * The read is announced: with a label the component draws ONE region element (`as`, `className`), always mounted,
+   * and a polite status reads the label while `loading` (silent inside an outer scope, which has said it), the same
+   * region `LoadingFallback` draws. Without one it stays bare: no element of its own.
+   */
+  label?: string;
+  /** The region's element when `label` is given (a `contents` box keeps a flex parent's layout). */
+  as?: ElementType;
+  className?: string;
+  children: ReactNode;
+}) {
+  if (label === undefined) {
+    return (
+      <LoadingScope bare active={loading}>
+        {children}
+      </LoadingScope>
+    );
+  }
   return (
-    <LoadingScope bare active={loading}>
+    <AnnouncedLoadingScope label={label} active={loading} as={as} className={className}>
       {children}
-    </LoadingScope>
+    </AnnouncedLoadingScope>
+  );
+}
+
+/**
+ * THE announced loading region: a `LoadingScope` element (busy, inert, hidden from assistive technology while on)
+ * with the one polite status beside it, outside the hidden region so it is still read, left out inside an outer scope
+ * and while the scope is off. `LoadingFallback` (always on) and a labelled `LoadingWhen` (switched by its read) draw
+ * it. `status={false}`: no announcement (an inline part).
+ */
+export function AnnouncedLoadingScope({
+  label,
+  status = true,
+  active = true,
+  as,
+  className,
+  children,
+}: {
+  label: string;
+  status?: boolean;
+  active?: boolean;
+  as?: ElementType;
+  className?: string;
+  children: ReactNode;
+}) {
+  const outer = useLoadingScope();
+  return (
+    <>
+      {status && active && !outer && <LoadingStatus label={label} />}
+      <LoadingScope active={active} as={as} className={className}>
+        {children}
+      </LoadingScope>
+    </>
+  );
+}
+
+/** The one polite status a loading state is read as (visually hidden): the region's, and a fallback's beside its hidden content. */
+export function LoadingStatus({ label }: { label: string }) {
+  return (
+    <span role="status" aria-live="polite" className="sr-only">
+      {label}
+    </span>
   );
 }
 

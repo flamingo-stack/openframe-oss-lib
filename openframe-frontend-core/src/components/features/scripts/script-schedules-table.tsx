@@ -2,6 +2,7 @@
 
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { TruncateText } from '../../ui/truncate-text';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
 import { ScheduleDateTimeCell, ScriptNameCell } from './script-cells';
@@ -55,6 +56,9 @@ export function ScriptSchedulesTable({
   rightSlot,
   skeletonRows,
 }: ScriptSchedulesTableProps) {
+  // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
+  // rows alike.
+  const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptScheduleTableRow>[]>(() => {
     const cell = (layout: ScriptsTableColumnLayout, render: (row: ScriptScheduleTableRow) => ReactNode) => ({
       id: layout.id,
@@ -94,7 +98,7 @@ export function ScriptSchedulesTable({
   });
 
   const rowHref = useCallback((row: ScriptScheduleTableRow) => row.href, []);
-  const showHeader = isLoading || rows.length > 0;
+  const showHeader = loading || rows.length > 0;
 
   return (
     <DataTable table={table}>
@@ -102,7 +106,7 @@ export function ScriptSchedulesTable({
         <DataTable.Header stickyHeader={stickyHeader} stickyHeaderOffset={stickyHeaderOffset} rightSlot={rightSlot} />
       )}
       <DataTable.Body
-        loading={isLoading}
+        loading={loading}
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         rowClassName="mb-1"

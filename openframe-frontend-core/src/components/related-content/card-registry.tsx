@@ -61,7 +61,12 @@ import { HowIWorkCard, HowIWorkCardSkeleton, type HowIWorkCardData } from '../ch
 import { InvestorUpdateCard, InvestorUpdateCardSkeleton } from '../chat/entity-cards/investor-update-card';
 import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
 import { buildProductReleaseCardProps } from '../chat/entity-cards/product-release-card-defaults';
-import { ProgramCard, ProgramCardSkeleton } from '../chat/entity-cards/program-card';
+import {
+  PROGRAM_CARD_SKELETON_HOSTS,
+  PROGRAM_CARD_SKELETON_MEDIA,
+  ProgramCard,
+  ProgramCardSkeleton,
+} from '../chat/entity-cards/program-card';
 import { RoadmapCard, RoadmapCardSkeleton } from '../chat/entity-cards/roadmap-card';
 import {
   WhatIShippedCard,
@@ -616,19 +621,16 @@ function cardEntry<Row>(definition: {
  *  which host-supplied `ProgramConfig` they render with. A group whose config
  *  the host didn't supply renders nothing (the skeleton still reserves its
  *  height, so a rail that never resolves collapses instead of flickering). */
-/** Gallery thumbnails an event card's skeleton draws: the gallery row's first fold (the row scrolls past it). */
-const EVENT_CARD_SKELETON_MEDIA = 4;
 
 function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRegistryEntry {
   return cardEntry({
-    // An event's list API serves its gallery (the loaded card draws its photo row), the other programs' none.
-    // Hosts are drawn only for a type whose cards show them (its config's `cardShowsHosts`): elsewhere a record may
-    // have none.
+    // The gallery and hosts rows are drawn only for a type whose cards show them (its config's `cardShowsGallery`,
+    // `cardShowsHosts`), as `ProgramCard` decides in a scope: elsewhere a record may have none.
     skeleton: (size, extras) => (
       <ProgramCardSkeleton
         size={size === 'sm' ? 'sm' : 'default'}
-        media={configKey === 'event' ? EVENT_CARD_SKELETON_MEDIA : 0}
-        hosts={extras?.programConfigs?.[configKey]?.cardShowsHosts ? 1 : 0}
+        media={extras?.programConfigs?.[configKey]?.cardShowsGallery ? PROGRAM_CARD_SKELETON_MEDIA : 0}
+        hosts={extras?.programConfigs?.[configKey]?.cardShowsHosts ? PROGRAM_CARD_SKELETON_HOSTS : 0}
       />
     ),
     decode: decodeProgramRow,

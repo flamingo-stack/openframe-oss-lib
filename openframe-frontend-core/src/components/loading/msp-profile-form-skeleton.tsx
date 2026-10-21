@@ -28,7 +28,6 @@ interface SkeletonProps {
  *
  * @deprecated Render the form itself inside a `LoadingScope`: its fields draw their own skeletons. Kept so hosts on an older release keep compiling; nothing in the lib uses it.
  */
-// loading-standard-ok: deprecated re-export kept for external consumers
 export function MspProfileFormSkeleton({ region = true, className, fields = 4 }: SkeletonProps) {
   return (
     <LoadingRegion

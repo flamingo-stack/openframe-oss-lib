@@ -5,6 +5,7 @@ import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { Button } from '../../ui/button';
 import { type ColumnDef, DataTable, type Row, type SortingState, useDataTable } from '../../ui/data-table';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { MoreActionsMenu } from '../../ui/more-actions-menu';
 import type { NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
@@ -73,12 +74,15 @@ export function PoliciesTable({
   onLoadMore,
   isLoadingMore = false,
 }: PoliciesTableProps) {
+  // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header, the reserved columns and
+  // the body's skeleton rows alike.
+  const loading = useLoadingScope() || isLoading;
   const [sorting, setSorting] = useState<SortingState>([]);
 
   // Reserve the actions column while loading so the column count stays stable across
   // skeleton, loading and loaded (otherwise it appears once rows arrive and shifts every
   // column, the "jitter"). Loaded rows in every caller carry actions.
-  const hasActions = useMemo(() => isLoading || rows.some(r => r.actions && r.actions.length > 0), [isLoading, rows]);
+  const hasActions = useMemo(() => loading || rows.some(r => r.actions && r.actions.length > 0), [loading, rows]);
 
   const columns = useMemo<ColumnDef<PolicyTableRow>[]>(() => {
     const cols: ColumnDef<PolicyTableRow>[] = [
@@ -201,7 +205,7 @@ export function PoliciesTable({
 
   // Hide the column header on the empty state: only show it while loading (skeleton rows)
   // or when there are real rows.
-  const showHeader = isLoading || rows.length > 0;
+  const showHeader = loading || rows.length > 0;
 
   return (
     <DataTable table={table}>
@@ -215,7 +219,7 @@ export function PoliciesTable({
         />
       )}
       <DataTable.Body
-        loading={isLoading}
+        loading={loading}
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         emptyState={emptyState}

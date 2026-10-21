@@ -51,12 +51,19 @@ const RADIO_OPTION_LABEL_CLASS =
 const RADIO_OPTION_DESCRIPTION_CLASS =
   'font-[family-name:var(--font-h6-family)] text-[length:var(--font-size-h6-caption)] font-[number:var(--font-h6-weight)] leading-[20px]';
 
+/** An option's label and caption bars while they are read (a `null` label or caption, or an option not here yet). */
+const RADIO_OPTION_LABEL_BAR_CLASS = 'w-32 max-w-full';
+const RADIO_OPTION_DESCRIPTION_BAR_CLASS = 'w-48 max-w-full';
+
 /** How many option rows the block draws while loading when the host passes no options. */
 export const RADIO_GROUP_BLOCK_SKELETON_OPTIONS = 3;
 
 interface RadioGroupBlockOption {
   value: string;
+  /** The option's label. `null` is a label still read: in a scope or while `loading` it is an `h4` bar. */
   label: ReactNode;
+  /** The option's caption. `null` is a caption still read: in a scope or while `loading` it is an `h6` bar
+   *  (`undefined`: the option has no caption). */
   description?: ReactNode;
   disabled?: boolean;
   /** Optional trailing slot rendered at the end of the row (e.g. a discount tag) */
@@ -189,12 +196,22 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
                     className={cn(RADIO_OPTION_LABEL_CLASS, 'select-none truncate text-ods-text-primary')}
                     title={typeof option?.label === 'string' ? option.label : undefined}
                   >
-                    {option ? option.label : <TextLineSkeleton as="span" type="inherit" className="w-32 max-w-full" />}
+                    {option && !(loading && option.label === null) ? (
+                      option.label
+                    ) : (
+                      <TextLineSkeleton as="span" type="inherit" className={RADIO_OPTION_LABEL_BAR_CLASS} />
+                    )}
                   </span>
-                  {option?.description && (
-                    <span className={cn(RADIO_OPTION_DESCRIPTION_CLASS, 'select-none text-ods-text-secondary')}>
-                      {option.description}
+                  {loading && option?.description === null ? (
+                    <span className={RADIO_OPTION_DESCRIPTION_CLASS}>
+                      <TextLineSkeleton as="span" type="inherit" className={RADIO_OPTION_DESCRIPTION_BAR_CLASS} />
                     </span>
+                  ) : (
+                    option?.description && (
+                      <span className={cn(RADIO_OPTION_DESCRIPTION_CLASS, 'select-none text-ods-text-secondary')}>
+                        {option.description}
+                      </span>
+                    )
                   )}
                 </div>
                 {option?.trailing && <div className="ml-auto flex shrink-0 items-center">{option.trailing}</div>}

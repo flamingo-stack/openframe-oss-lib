@@ -161,7 +161,7 @@ const TURN_SEPARATOR_RE = /[\s]{1,16}---[\s]{1,16}/g;
 // Slack-channel feed framing — ported from the hub's live community feed
 // (`components/slack/chat-interface.tsx`: `:62` bounded card, `:83` padding +
 // `overflow-y-auto`, `:85` `gap-4 md:gap-6` message column). Single source
-// within the ticket feed; the delivery `DevCardRowSkeletonList` keeps its own
+// within the ticket feed; the Help Center rows keep their own
 // (separate, untouched) frame literal. `max-h` is responsive (vs Slack's fixed
 // height).
 const TICKET_FEED_FRAME = 'bg-ods-card border border-ods-border rounded-[6px] overflow-y-auto w-full';

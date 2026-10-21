@@ -35,7 +35,7 @@ import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { useLoadingScope } from '../loading-scope';
+import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
@@ -507,16 +507,19 @@ export function MarkdownEngineSkeleton({
             </div>
           ) : null}
           {sections ? (
-            Array.from({ length: sections }, (_, section) => (
-              <div key={section}>
-                <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
-                  <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
-                </h2>
-                {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
-                  <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
-                ))}
-              </div>
-            ))
+            // loading-standard-ok(ITEM_MARK): a document's sections are its markdown text; the loaded body has no items to mark
+            <LoadingItems count={sections}>
+              {() => (
+                <div>
+                  <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
+                    <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
+                  </h2>
+                  {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
+                    <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
+                  ))}
+                </div>
+              )}
+            </LoadingItems>
           ) : (
             <ParagraphBar lines={lines} className={paragraphClass} />
           )}

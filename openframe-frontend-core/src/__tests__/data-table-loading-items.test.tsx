@@ -31,6 +31,9 @@ function Table({ data, loading = false, minRows }: { data: Row[]; loading?: bool
 }
 
 const ITEM = '[data-loading-item]';
+/** The outermost items (a card's own nested list, such as its tags, forms a group of its own). */
+const topItems = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll(ITEM)).filter(el => !el.parentElement?.closest(ITEM));
 
 describe('DataTable rows are loading items', () => {
   it('a loading table draws one full page of skeleton rows, each an item', () => {
@@ -54,12 +57,12 @@ describe('DataTable rows are loading items', () => {
 describe('the devices grid draws its host page', () => {
   it('a loading grid draws one card per row of the page size, each an item', () => {
     const { container } = render(<DevicesGrid devices={[]} isLoading pageSize={7} />);
-    expect(container.querySelectorAll(ITEM).length).toBe(7);
+    expect(topItems(container).length).toBe(7);
   });
 
   it('with no page size it draws its declared default', () => {
     const { container } = render(<DevicesGrid devices={[]} isLoading />);
-    expect(container.querySelectorAll(ITEM).length).toBe(DEVICES_GRID_SKELETON_CARDS);
+    expect(topItems(container).length).toBe(DEVICES_GRID_SKELETON_CARDS);
   });
 });
 

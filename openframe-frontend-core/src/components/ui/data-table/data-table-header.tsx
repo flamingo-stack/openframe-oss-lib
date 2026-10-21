@@ -4,6 +4,7 @@ import { flexRender, type Header } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-generated';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { InfoHint } from '../info-hint';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
@@ -321,8 +322,19 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
 export const DATA_TABLE_HEADER_LABEL_CLASS =
   'min-w-0 text-balance uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
 
+/** A header label's bar while its text is read (`meta.headerLoading`). */
+const DATA_TABLE_HEADER_LABEL_BAR_CLASS = 'w-40 max-w-full';
+
 function HeaderLabel({ header }: { header: AnyHeader }) {
   const headerDef = header.column.columnDef.header;
+  // The label is read data (whose list the table is): its bar in the label's own box and type step.
+  if (header.column.columnDef.meta?.headerLoading) {
+    return (
+      <span className={DATA_TABLE_HEADER_LABEL_CLASS}>
+        <TextLineSkeleton type="inherit" as="span" className={DATA_TABLE_HEADER_LABEL_BAR_CLASS} />
+      </span>
+    );
+  }
   if (headerDef === undefined) return null;
   if (typeof headerDef === 'string') {
     return <span className={DATA_TABLE_HEADER_LABEL_CLASS}>{headerDef}</span>;

@@ -2,10 +2,9 @@
 
 import type React from 'react';
 import { useRouter } from '../../../embed-shims/next-navigation';
-import { DEVICES_GRID_CLASS } from '../../loading/device-card-skeleton';
 import { LoadingRegion } from '../../loading/loading-region';
 import { DeviceCard } from '../../ui';
-import { useLoadingScope } from '../../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { getDeviceName } from './device-name';
 import { getDeviceOperatingSystem, getDeviceStatusConfig } from './device-status';
 import { useDevicesViewConfig } from './devices-view-config';
@@ -27,6 +26,9 @@ export interface DevicesGridProps<T extends DeviceRow = DeviceRow> {
   pageSize?: number;
 }
 
+/** The devices grid: one column, two from `content-md`, three from `content-lg` (its cards and its next page). */
+const DEVICES_GRID_CLASS = 'grid grid-cols-1 gap-4 content-md:grid-cols-2 content-lg:grid-cols-3';
+
 /** The cards a loading grid draws when the host states no page size. */
 export const DEVICES_GRID_SKELETON_CARDS = 12;
 
@@ -35,17 +37,13 @@ const GRID_CARD_ACTIONS = { moreButton: { visible: false } };
 
 /** A page of the grid's own cards while they are read (the first page and the next one alike), each a list item. */
 function DeviceCardLoadingPage({ count }: { count: number }) {
-  return Array.from({ length: count }, (_, i) => (
-    // Static placeholder cards: the index IS the identity.
-    <DeviceCard
-      key={i}
-      loading
-      device={{ name: '' }}
-      actions={GRID_CARD_ACTIONS}
-      className="h-full"
-      data-loading-item
-    />
-  ));
+  return (
+    <LoadingItems count={count}>
+      {() => (
+        <DeviceCard loading device={{ name: '' }} actions={GRID_CARD_ACTIONS} className="h-full" data-loading-item />
+      )}
+    </LoadingItems>
+  );
 }
 
 export function DevicesGrid<T extends DeviceRow = DeviceRow>({

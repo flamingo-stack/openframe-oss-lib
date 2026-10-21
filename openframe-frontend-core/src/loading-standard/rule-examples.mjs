@@ -2,8 +2,8 @@
  * One failing and one passing example per rule of the loading-standard engine (`engine.mjs`), as small source trees
  * (paths relative to a `src/` folder). The lib's test and every host's gate test run them through their own entry
  * point, so a rule that stops failing what it names (or starts failing the form the standard asks for) is caught on
- * both sides. `rule` is the engine's rule id; `PAGE_CODE` is the page-code check (`pageCodeFindings`) a host runs on
- * its route files.
+ * both sides. `rule` is the engine's rule id (`PAGE_CODE` runs on the files a config's `pageCode` names: the
+ * frontend's route files under `app/`).
  */
 
 const CHILD = `import { useLoadingScope } from '@flamingo-stack/openframe-frontend-core';
@@ -46,16 +46,15 @@ export function Parent({ isLoading }: { isLoading: boolean }) {
   {
     rule: 'NO_SCOPE_SWITCH',
     fail: {
-      'components/badge/badge.tsx':
-        'export function Badge() { return <b />; }\nexport function BadgeSkeleton() { return <i />; }\n',
+      'components/pill/pill.tsx':
+        'export function Pill() { return <b />; }\nexport function PillSkeleton() { return <i />; }\n',
       'components/card/card.tsx':
-        "import { BadgeSkeleton } from '../badge/badge';\nexport function Card() { return createElement(BadgeSkeleton); }\n",
+        "import { PillSkeleton } from '../pill/pill';\nexport function Card() { return createElement(PillSkeleton); }\n",
     },
     pass: {
-      'components/badge/badge.tsx':
-        'export function Badge() { return <b />; }\nexport function BadgeSkeleton() { return <i />; }\n',
-      'components/card/card.tsx':
-        "import { Badge } from '../badge/badge';\nexport function Card() { return <Badge />; }\n",
+      'components/pill/pill.tsx':
+        'export function Pill() { return <b />; }\nexport function PillSkeleton() { return <i />; }\n',
+      'components/card/card.tsx': "import { Pill } from '../pill/pill';\nexport function Card() { return <Pill />; }\n",
     },
   },
   {
@@ -449,6 +448,27 @@ export function Banner({ announcement }: any) {
 export function Header({ ticket }: any) {
   const inScope = useLoadingScope();
   return <h2 aria-busy={inScope}>{ticket.meta && <span>{ticket.meta}</span>}</h2>;
+}
+`,
+    },
+  },
+  {
+    rule: 'OPT_OUT',
+    fail: {
+      'components/opt.tsx': `export function A() {
+  // loading-standard-ok: no rule named
+  return <b />;
+}
+export function B() {
+  // loading-standard-ok(SPINNER): lifts nothing on the next line
+  return <b />;
+}
+`,
+    },
+    pass: {
+      'components/opt.tsx': `export function A() {
+  // loading-standard-ok(SPINNER): an upload's own progress mark
+  return <div className="animate-spin" />;
 }
 `,
     },

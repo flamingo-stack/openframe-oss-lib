@@ -1,47 +1,34 @@
 /**
  * The loading standard over the lib's own source, through THE rule engine (`src/loading-standard/engine.mjs`, the
- * same module every host's gate imports from its installed copy). It replaces the line-based `one-switch.test.ts` and
- * `skeleton-counts.test.ts`: every rule now reads components through the TypeScript AST (aliases, `as` renames,
- * `createElement`, multi-line conditions), and the lib's own exemptions (the deprecated whole-view re-exports, the
- * loading primitives, the loaders themselves) are declared once, in the engine's `CONFIGS.lib`.
+ * module every host's gate imports from its installed copy; its header states every rule). The lib's exemptions are
+ * declared once, in the engine's `CONFIGS.lib`.
  *
- * Three checks: every rule fails its failing example and passes its passing one (`rule-examples.mjs`, shared with the
- * hosts' gate tests); every shape the round-5 reviewers proved a line-based gate missed fails; and the lib's `src/`
+ * Four checks: every rule fails its failing example and passes its passing one (`rule-examples.mjs`, shared with the
+ * hosts' gate tests); every shape the round-5 and round-6 reviewers proved a gate missed fails
+ * (`fixtures/loading-standard-review.mjs`); an opt-out lifts only the rule it names on its line; and the lib's `src/`
  * breaks no rule.
  */
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import {
-  analyzeProject,
-  CONFIGS,
-  formatFindings,
-  pageCodeFindings,
-  Project,
-  RULES,
-} from '../loading-standard/engine.mjs';
+import { analyzeProject, CONFIGS, formatFindings, Project, RULES } from '../loading-standard/engine.mjs';
 import { RULE_EXAMPLES } from '../loading-standard/rule-examples.mjs';
-import { REVIEW_FIXTURES } from './fixtures/loading-standard-review.mjs';
+import { REVIEW_FIXTURES, REVIEW_FIXTURES_R6 } from './fixtures/loading-standard-review.mjs';
 
 const SRC = join(__dirname, '..');
 const VIRTUAL = '/virtual/src';
 
 type Finding = { rule: string; file: string; line: number; message: string };
 
-/** Every finding of a virtual source tree (paths relative to its `src/`). */
+/** Every finding of a virtual source tree (paths relative to its `src/`), under the frontend config (page code too). */
 function findingsOf(files: Record<string, string>): Finding[] {
   const sources = new Map(Object.entries(files).map(([rel, text]) => [`${VIRTUAL}/${rel}`, text]));
   const project = new Project({ trees: [{ dir: VIRTUAL, report: true, sources }] });
-  const findings: Finding[] = analyzeProject(project);
-  for (const path of sources.keys()) {
-    if (relative(VIRTUAL, path).startsWith('app/'))
-      findings.push(...pageCodeFindings(project, path, relative(VIRTUAL, path)));
-  }
-  return findings;
+  return analyzeProject(project, CONFIGS.frontend);
 }
 
 describe('loading-standard engine: one failing and one passing example per rule', () => {
   it('has an example for every rule', () => {
-    expect(RULE_EXAMPLES.map(e => e.rule).sort()).toEqual([...Object.keys(RULES), 'PAGE_CODE'].sort());
+    expect(RULE_EXAMPLES.map(e => e.rule).sort()).toEqual(Object.keys(RULES).sort());
   });
 
   it.each(RULE_EXAMPLES.map(example => [example.rule, example] as const))('%s', (rule, example) => {
@@ -93,13 +80,40 @@ describe('loading-standard engine: the round-5 review fixtures', () => {
       ].sort(),
     );
   });
+});
 
-  it('honours the opt-out markers', () => {
+describe('loading-standard engine: the round-6 review fixtures', () => {
+  const found = findingsOf(REVIEW_FIXTURES_R6);
+  const helpers = new Set([
+    'components/r6/b20-comment-mark.tsx',
+    'components/r6/b31-family.tsx',
+    'components/r6/chart.tsx',
+  ]);
+
+  it.each(Object.keys(REVIEW_FIXTURES_R6).filter(file => !helpers.has(file)))('fails %s', file => {
+    expect(found.filter(f => f.file === file)).not.toEqual([]);
+  });
+
+  it('reports nothing on the helpers', () => {
+    expect(found.filter(f => helpers.has(f.file))).toEqual([]);
+  });
+});
+
+describe('loading-standard engine: opt-outs', () => {
+  it('lifts only the rule it names, on its own line or the line under it', () => {
     const findings = findingsOf({
       'components/x.tsx':
-        'export function X() {\n  // loading-standard-ok: an action in progress\n  return <div className="animate-spin" />;\n}\nexport function Y() {\n  // full-page-ok: fixed by design\n  return <Table skeletonRows={3} />;\n}\n',
+        'export function X() {\n  // loading-standard-ok(SPINNER): an action in progress\n  return <div className="animate-spin" />;\n}\nexport function Y() {\n  return <div className="animate-spin animate-pulse" />; // loading-standard-ok(OWN_PULSE): a live dot\n}\n',
     });
-    expect(findings).toEqual([]);
+    expect(findings.map(f => `${f.line} ${f.rule}`)).toEqual(['6 SPINNER']);
+  });
+
+  it('fails a marker with no rule, a reason or anything to lift, and lifts nothing two lines down', () => {
+    const findings = findingsOf({
+      'components/x.tsx':
+        'export function X() {\n  // loading-standard-ok(SPINNER):\n  // loading-standard-ok(SPINNER): too far\n  const a = 1;\n  return <div className="animate-spin" />;\n}\n',
+    });
+    expect(findings.map(f => `${f.line} ${f.rule}`).sort()).toEqual(['2 OPT_OUT', '3 OPT_OUT', '5 SPINNER']);
   });
 });
 

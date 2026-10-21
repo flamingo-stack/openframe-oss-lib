@@ -3,6 +3,7 @@
 import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { LoadingItems } from './loading-scope';
 
 /** Body lines the detail placeholder draws: a typical paragraph. */
 const CONTENT_LOADER_SKELETON_LINES = 3;
@@ -52,12 +53,14 @@ export function ContentLoader({
       {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
       <div className="rounded-lg border border-ods-border bg-ods-card p-6">
         <div className="mb-6 grid grid-cols-1 gap-6 content-md:grid-cols-4">
-          {Array.from({ length: items }).map((_, i) => (
-            <div key={i}>
-              <UnifiedSkeleton className="mb-2 h-4 w-20 rounded" />
-              <UnifiedSkeleton className="h-6 w-32 rounded" />
-            </div>
-          ))}
+          <LoadingItems count={items}>
+            {() => (
+              <div data-loading-item>
+                <UnifiedSkeleton className="mb-2 h-4 w-20 rounded" />
+                <UnifiedSkeleton className="h-6 w-32 rounded" />
+              </div>
+            )}
+          </LoadingItems>
         </div>
         <div className="border-t border-ods-border pt-4">
           <UnifiedSkeleton className="h-4 w-64 rounded" />
@@ -71,12 +74,14 @@ export function ContentLoader({
       {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
       <div className="rounded-lg bg-ods-card p-6">
         <div className="space-y-4">
-          {Array.from({ length: items }).map((_, i) => (
-            <div key={i}>
-              <UnifiedSkeleton className="mb-2 h-4 w-32 rounded" />
-              <UnifiedSkeleton className="h-10 rounded" />
-            </div>
-          ))}
+          <LoadingItems count={items}>
+            {() => (
+              <div data-loading-item>
+                <UnifiedSkeleton className="mb-2 h-4 w-32 rounded" />
+                <UnifiedSkeleton className="h-10 rounded" />
+              </div>
+            )}
+          </LoadingItems>
         </div>
       </div>
     </div>
@@ -90,17 +95,17 @@ export function ContentLoader({
           <div className="content-lg:col-span-2">
             <UnifiedSkeleton className="mb-4 h-64 rounded" />
             <div className="space-y-2">
-              {Array.from({ length: CONTENT_LOADER_SKELETON_LINES }).map((_, i) => (
-                <UnifiedSkeleton key={i} className="h-4 rounded" />
-              ))}
+              <LoadingItems count={CONTENT_LOADER_SKELETON_LINES}>
+                {() => <UnifiedSkeleton className="h-4 rounded" />}
+              </LoadingItems>
             </div>
           </div>
           <div>
             <UnifiedSkeleton className="mb-4 h-32 rounded" />
             <div className="space-y-2">
-              {Array.from({ length: items }).map((_, i) => (
-                <UnifiedSkeleton key={i} className="h-3 rounded" />
-              ))}
+              <LoadingItems count={items}>
+                {() => <UnifiedSkeleton className="h-3 rounded" data-loading-item />}
+              </LoadingItems>
             </div>
           </div>
         </div>
@@ -111,18 +116,20 @@ export function ContentLoader({
   const renderListSkeleton = () => (
     <div className="space-y-3">
       {showTitle && <UnifiedSkeleton className="mb-6 h-8 w-64 rounded" />}
-      {Array.from({ length: items }).map((_, i) => (
-        <div key={i} className="rounded-lg border border-ods-border bg-ods-card p-4">
-          <div className="flex items-center gap-4">
-            <UnifiedSkeleton className="h-12 w-12 rounded" />
-            <div className="flex-1">
-              <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
-              <UnifiedSkeleton className="h-3 w-1/2 rounded" />
+      <LoadingItems count={items}>
+        {() => (
+          <div className="rounded-lg border border-ods-border bg-ods-card p-4" data-loading-item>
+            <div className="flex items-center gap-4">
+              <UnifiedSkeleton className="h-12 w-12 rounded" />
+              <div className="flex-1">
+                <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
+                <UnifiedSkeleton className="h-3 w-1/2 rounded" />
+              </div>
+              <UnifiedSkeleton className="h-8 w-20 rounded" />
             </div>
-            <UnifiedSkeleton className="h-8 w-20 rounded" />
           </div>
-        </div>
-      ))}
+        )}
+      </LoadingItems>
     </div>
   );
 

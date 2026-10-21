@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { useDeferredError } from '../../../hooks/ui/use-deferred-error';
 import { cn } from '../../../utils/cn';
 import { accentSentenceMarks } from '../../layout/page-heading';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { CheckboxBlock } from '../../ui/checkbox-block';
 import { Input } from '../../ui/input';
@@ -12,6 +13,9 @@ import { LabeledDivider } from './labeled-divider';
 import type { AuthSsoProvider } from './sso-providers';
 import { SsoProviderButtons } from './sso-providers';
 import { TermsAgreementLabel } from './terms-agreement-label';
+
+/** The sub-heading's bar while a `null` sub-heading is read. */
+const CREATE_ORGANIZATION_SUBTITLE_BAR_CLASS = 'w-80 max-w-full';
 
 export interface CreateOrganizationFormProps {
   /**
@@ -55,7 +59,8 @@ export interface CreateOrganizationFormProps {
   emailReadOnlyLabel?: string;
   /** Overrides the default heading. */
   title?: string;
-  /** Overrides the default sub-heading. */
+  /** Overrides the default sub-heading. `null` is a sub-heading still being read (who is signing in): the form draws
+   *  it as an `h4` bar in its own line until the host passes the text. */
   subtitle?: ReactNode;
   /** Suffix rendered inside the domain input, e.g. ".openframe.ai" */
   domainSuffix?: string;
@@ -182,7 +187,13 @@ export function CreateOrganizationForm({
       {/* Header */}
       <div className="flex flex-col">
         <h1 className="tracking-[-0.64px] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>
-        <p className="text-ods-text-secondary text-h4">{subtitle}</p>
+        <p className="text-ods-text-secondary text-h4">
+          {subtitle === null ? (
+            <TextLineSkeleton type="inherit" as="span" className={CREATE_ORGANIZATION_SUBTITLE_BAR_CLASS} />
+          ) : (
+            subtitle
+          )}
+        </p>
       </div>
 
       {/* Email + Organization Name — single column on every breakpoint */}

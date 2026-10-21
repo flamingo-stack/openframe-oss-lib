@@ -17,7 +17,7 @@ import {
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 export interface TabItem {
@@ -205,6 +205,8 @@ interface TabBarProps {
   tabAlign: 'center' | 'start';
   progressTransitionMs: number;
   variant: TabNavigationVariant;
+  /** The tabs are read data (not `staticLabels`): each tab carries `data-loading-item`, as its skeleton's tabs do. */
+  itemMarks: boolean;
 }
 
 /**
@@ -231,6 +233,7 @@ const TabBar = memo(function TabBarImpl({
   tabAlign,
   progressTransitionMs,
   variant,
+  itemMarks,
 }: TabBarProps) {
   const isAdmin = variant === 'admin';
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -464,6 +467,7 @@ const TabBar = memo(function TabBarImpl({
             <button
               key={tab.id}
               ref={isActive ? activeTabRef : undefined}
+              data-loading-item={itemMarks || undefined}
               type="button"
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
@@ -632,30 +636,31 @@ export function TabNavigationSkeleton({
   return (
     <div className={cn(STRIP_FRAME_CLASS, className)} aria-hidden>
       <div className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}>
-        {Array.from({ length: count }, (_, i) => (
-          <div
-            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tabs never reorder
-            key={i}
-            className={cn(
-              TAB_CLASS,
-              tabAlignClass(tabAlign),
-              stretchTabs && TAB_STRETCH_CLASS,
-              avatar && TAB_AVATAR_GAP_CLASS,
-            )}
-          >
-            {avatar && (
-              <UnifiedSkeleton variant="circular" width={TAB_AVATAR_PX} height={TAB_AVATAR_PX} className="shrink-0" />
-            )}
-            {sublabel ? (
-              <span className={TAB_SUBLABEL_WRAP_CLASS}>
-                <TextLineSkeleton as="span" type="h4" className="w-20" />
-                <TextLineSkeleton as="span" type="h6" className="w-28" />
-              </span>
-            ) : (
-              <TextLineSkeleton type="h4" className="w-20" />
-            )}
-          </div>
-        ))}
+        <LoadingItems count={count}>
+          {() => (
+            <div
+              data-loading-item
+              className={cn(
+                TAB_CLASS,
+                tabAlignClass(tabAlign),
+                stretchTabs && TAB_STRETCH_CLASS,
+                avatar && TAB_AVATAR_GAP_CLASS,
+              )}
+            >
+              {avatar && (
+                <UnifiedSkeleton variant="circular" width={TAB_AVATAR_PX} height={TAB_AVATAR_PX} className="shrink-0" />
+              )}
+              {sublabel ? (
+                <span className={TAB_SUBLABEL_WRAP_CLASS}>
+                  <TextLineSkeleton as="span" type="h4" className="w-20" />
+                  <TextLineSkeleton as="span" type="h6" className="w-28" />
+                </span>
+              ) : (
+                <TextLineSkeleton type="h4" className="w-20" />
+              )}
+            </div>
+          )}
+        </LoadingItems>
       </div>
       <div className={cn(STRIP_BORDER_CLASS, 'bg-ods-border')} />
     </div>
@@ -860,6 +865,7 @@ export function TabNavigation({
             tabAlign={tabAlign}
             progressTransitionMs={progressTransitionMs}
             variant={variant}
+            itemMarks={false}
           />
         </div>
       ) : loading ? (
@@ -885,6 +891,7 @@ export function TabNavigation({
           tabAlign={tabAlign}
           progressTransitionMs={progressTransitionMs}
           variant={variant}
+          itemMarks={!staticLabels}
         />
       )}
 

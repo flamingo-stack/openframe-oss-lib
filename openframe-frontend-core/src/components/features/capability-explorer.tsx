@@ -101,6 +101,12 @@ export interface CapabilityExplorerProps {
   className?: string;
 }
 
+/** Boxes the loaded explorer and its skeleton both draw (one box in both forms). */
+const PANEL_BODY_CLASS =
+  'flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7';
+const PANEL_INTRO_CLASS = 'flex min-w-0 flex-col overflow-hidden';
+const HIGHLIGHT_ROW_CLASS = 'flex min-w-0 items-center gap-2.5';
+const CARD_HEAD_ROW_CLASS = 'flex min-w-0 items-center gap-3';
 /**
  * Heights are constants so the panel never moves between jobs and the
  * skeleton is the loaded box: every text is clamped to fit them.
@@ -140,7 +146,7 @@ function Highlights({ items, className }: { items: readonly string[]; className?
   return (
     <ul className={cn('grid grid-cols-1 gap-2', className)}>
       {items.slice(0, HIGHLIGHTS_LIMIT).map(text => (
-        <li key={text} data-loading-item className="flex min-w-0 items-center gap-2.5">
+        <li key={text} data-loading-item className={HIGHLIGHT_ROW_CLASS}>
           <CheckIcon size={HIGHLIGHT_ICON_PX} className="shrink-0 text-ods-flamingo-cyan" />
           <TruncateText variant="h6" triggerClassName="flex-1">
             {text}
@@ -291,7 +297,7 @@ export function CapabilityExplorerSkeleton({
             {() => (
               <SnapCarouselSlide className={CARD_SLIDE_CLASS} readItem>
                 <div className={cn(CARD_CLASS, CARD_HEIGHT_CLASS)}>
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className={CARD_HEAD_ROW_CLASS}>
                     <JobHeadSkeleton />
                   </div>
                   <div className="min-h-[3lh] text-h6">
@@ -326,9 +332,9 @@ export function CapabilityExplorerSkeleton({
             )}
           </LoadingItems>
         </div>
-        <div className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7">
+        <div className={PANEL_BODY_CLASS}>
           <div className={cn('grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,380px)] gap-8', PANEL_TOP_HEIGHT_CLASS)}>
-            <div className="flex min-w-0 flex-col overflow-hidden">
+            <div className={PANEL_INTRO_CLASS}>
               <div className="mb-2">
                 <TextLineSkeleton type="h2" className="w-64" />
               </div>
@@ -339,7 +345,7 @@ export function CapabilityExplorerSkeleton({
               <div className="mt-auto grid grid-cols-1 gap-2">
                 <LoadingItems count={HIGHLIGHTS_LIMIT}>
                   {i => (
-                    <div data-loading-item className="flex min-w-0 items-center gap-2.5">
+                    <div data-loading-item className={HIGHLIGHT_ROW_CLASS}>
                       <MediaSkeleton.Icon size="sm" className="shrink-0" />
                       <TextLineSkeleton type="h6" className={i === 1 ? 'w-56' : 'w-48'} />
                     </div>
@@ -412,7 +418,7 @@ export function CapabilityExplorer({
         readItems
         renderItem={item => (
           <article className={cn(CARD_CLASS, CARD_HEIGHT_CLASS)}>
-            <div className="flex min-w-0 items-center gap-3">
+            <div className={CARD_HEAD_ROW_CLASS}>
               {item.iconName && (
                 <span className={cn(JOB_ICON_TILE_CLASS, 'text-ods-flamingo-cyan')}>
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
@@ -548,12 +554,7 @@ export function CapabilityExplorer({
         })}
       </div>
 
-      <div
-        id={panelId}
-        role="tabpanel"
-        aria-labelledby={capabilityTabId(active.id)}
-        className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7"
-      >
+      <div id={panelId} role="tabpanel" aria-labelledby={capabilityTabId(active.id)} className={PANEL_BODY_CLASS}>
         <div
           className={cn(
             'grid shrink-0 gap-8',
@@ -562,7 +563,7 @@ export function CapabilityExplorer({
             PANEL_TOP_HEIGHT_CLASS,
           )}
         >
-          <div className="flex min-w-0 flex-col overflow-hidden">
+          <div className={PANEL_INTRO_CLASS}>
             <TruncateText lines={2} variant="h2" className="mb-2">
               {active.title}
             </TruncateText>
