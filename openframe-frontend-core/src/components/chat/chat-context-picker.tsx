@@ -20,7 +20,7 @@
  */
 
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
-import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
@@ -29,7 +29,7 @@ import { SearchIcon } from '../icons-v2-generated/interface/search-icon';
 import { Upload02Icon } from '../icons-v2-generated/interface/upload-02-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
-import { LoadingFallback } from '../loading/loading-fallback';
+import { LoadingSuspense } from '../loading/loading-fallback';
 import {
   CONTEXT_BACK_CLASS,
   CONTEXT_STATE_CLASS,
@@ -384,12 +384,11 @@ export function ChatContextPicker({
                   </div>
                 )}
               >
-                <Suspense
+                <LoadingSuspense
+                  label="Loading items"
+                  // The SAME list the host renders, in a scope: it draws one page of its own skeleton rows.
                   fallback={
-                    // The SAME list the host renders, in a scope: it draws one page of its own skeleton rows.
-                    <LoadingFallback label="Loading items">
-                      <ContextItemsList items={[]} selectedKeys={NO_SELECTED_KEYS} onToggle={NOOP} atLimit={false} />
-                    </LoadingFallback>
+                    <ContextItemsList items={[]} selectedKeys={NO_SELECTED_KEYS} onToggle={NOOP} atLimit={false} />
                   }
                 >
                   {config.renderItems({
@@ -399,7 +398,7 @@ export function ChatContextPicker({
                     onToggle: onToggleItem,
                     atLimit,
                   })}
-                </Suspense>
+                </LoadingSuspense>
               </ContextErrorBoundary>
             )}
           </QueryErrorResetBoundary>

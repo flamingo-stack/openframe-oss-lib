@@ -7,6 +7,7 @@ import { cn } from '../utils/cn';
 import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
 import { UnifiedSkeleton } from './loading/unified-skeleton';
+import { useLoadingScope } from './ui/loading-scope';
 
 /** The agents the product ships. A mark is drawn for any agent slug the server has an identity for. */
 export type AgentName = 'fae' | 'mingo';
@@ -65,6 +66,9 @@ export interface AgentAvatarProps {
   /** The avatar's width and height, in pixels. */
   size: number;
   className?: string;
+  /** The record that names the agent is still read: the avatar draws its skeleton (its own round frame). In a loading
+   *  scope it does the same: its picture is the agent's identity icon, read from the server. */
+  loading?: boolean;
 }
 
 /**
@@ -77,7 +81,10 @@ export interface AgentAvatarProps {
 /** The avatar's round frame, read by the avatar and by its skeleton, so the two are one box. */
 const AGENT_AVATAR_FRAME_CLASS = 'inline-flex shrink-0 overflow-hidden rounded-full';
 
-export function AgentAvatar({ agent, size, className }: AgentAvatarProps) {
+export function AgentAvatar({ agent, size, className, loading = false }: AgentAvatarProps) {
+  // ONE switch: in a page's loading state, or while the record that names the agent is read, the avatar is its
+  // skeleton, in its box.
+  if (useLoadingScope() || loading) return <AgentAvatarSkeleton size={size} className={className} />;
   return (
     <span className={cn(AGENT_AVATAR_FRAME_CLASS, className)} style={{ width: size, height: size }}>
       <AgentMark agent={agent} className="h-full w-full" />

@@ -202,20 +202,24 @@ export function ProgramCardSkeleton({
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
               <LoadingItems count={DEFAULT_SKELETON_TAGS}>
-                {() => <Tag loading as="span" label="" variant="outline" />}
+                {() => <Tag loading as="span" label="" variant="outline" data-loading-item />}
               </LoadingItems>
             </div>
           )}
         </div>
         {hosts > 0 && (
           <div className={DEFAULT_HOSTS_ROW}>
-            <LoadingItems count={hosts}>{() => <SquareAvatar loading variant="round" size="sm" />}</LoadingItems>
+            <LoadingItems count={hosts}>
+              {() => <SquareAvatar loading variant="round" size="sm" data-loading-item />}
+            </LoadingItems>
           </div>
         )}
       </div>
       {media > 0 && (
         <div className={DEFAULT_GALLERY_ROW}>
-          <LoadingItems count={media}>{() => <UnifiedSkeleton className={DEFAULT_GALLERY_THUMB} />}</LoadingItems>
+          <LoadingItems count={media}>
+            {() => <UnifiedSkeleton className={DEFAULT_GALLERY_THUMB} data-loading-item />}
+          </LoadingItems>
         </div>
       )}
       <div className={DEFAULT_FOOTER}>
@@ -309,6 +313,7 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
               key={mediaItem.id}
               className={cn(DEFAULT_GALLERY_THUMB, 'group/thumb cursor-pointer')}
               onClick={e => openImageModal(index, e)}
+              data-loading-item
             >
               <Image
                 src={mediaItem.media_url}
@@ -436,7 +441,12 @@ function ProgramEditorialCard({
               />
               <span className="truncate text-h6">
                 <span className="text-ods-text-primary">{profile.name}</span>
-                {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
+                {profile.subtitle && (
+                  <span data-loading-optional className="text-ods-text-secondary">
+                    {' '}
+                    · {profile.subtitle}
+                  </span>
+                )}
               </span>
             </>
           )}
@@ -687,7 +697,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         {tags.length > 0 && (
           <div className={DEFAULT_TAG_ROW}>
             {tags.map(tag => (
-              <Tag key={tag} as="span" label={tag} variant="outline" />
+              <Tag key={tag} as="span" label={tag} variant="outline" data-loading-item />
             ))}
           </div>
         )}
@@ -705,6 +715,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               alt={host.name}
               fallback={host.name.charAt(0).toUpperCase()}
               size="sm"
+              data-loading-item
             />
           ))}
         </div>

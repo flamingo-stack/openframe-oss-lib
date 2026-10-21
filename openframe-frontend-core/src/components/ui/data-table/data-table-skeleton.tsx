@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { LoadingItems } from '../loading-scope';
 import { useDataTableContext } from './data-table';
 import { DATA_TABLE_SKELETON_ROWS, getHideClasses } from './utils';
 
@@ -35,6 +36,9 @@ export const ROW_SHELL_CLASSES = 'items-center gap-[var(--spacing-system-mf)] px
  * and the footer used to stack in nothing at all — its placeholder rows were
  * bare children of the table root, touching each other.
  */
+/** A row's card (its frame and surface): read by `DataTableRow` and by the loading rows below, so both are one box. */
+export const DATA_TABLE_ROW_FRAME_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-card';
+
 export const ROW_STACK_CLASSES = 'flex w-full flex-col gap-[var(--spacing-system-xsf)]';
 
 export interface DataTableSkeletonProps {
@@ -62,16 +66,15 @@ export function DataTableSkeleton({
   const firstColumnId = columns[0]?.id;
 
   return (
-    <>
-      {Array.from({ length: rows }).map((_, index) => (
+    <LoadingItems count={rows}>
+      {index => (
         <div
-          key={index}
           // Decoration: the table's own status line says it is loading.
           aria-hidden="true"
           // One row of the read list it stands for, like the loaded `DataTableRow`.
           data-loading-item
           className={cn(
-            'relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
+            DATA_TABLE_ROW_FRAME_CLASS,
             // The slot height sits on the card, matching a real row.
             rowHeightClassName,
             className,
@@ -123,8 +126,8 @@ export function DataTableSkeleton({
             </div>
           </div>
         </div>
-      ))}
-    </>
+      )}
+    </LoadingItems>
   );
 }
 

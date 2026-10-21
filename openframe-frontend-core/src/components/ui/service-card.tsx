@@ -132,7 +132,8 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loading
  * a bar in the column); the value is a bar in the value box (in the row's own face) while it is read; the actions are
  * the row's own, drawn for real, disabled while the value is read.
  */
-function ServiceCardRowItem({ row, loading }: { row: ServiceCardRow; loading: boolean }) {
+function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow; loading: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   const [revealed, setRevealed] = useState(false);
   const { copy, copied } = useCopyToClipboard();
   const { ref: valueRef, isTruncated: valueTruncated } = useIsTruncated<HTMLDivElement>(row.value);

@@ -212,9 +212,9 @@ export function DeviceCard({
         </div>
       )}
 
-      {/* Tags section */}
+      {/* Tags section: only some devices carry tags, so the row is record-dependent (not drawn while loading). */}
       {!loading && device.tags && device.tags.length > 0 && (
-        <div className="flex w-full flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2" data-loading-optional>
           {device.tags.map((tag, index) => (
             <Tag key={index} variant="outline" label={tag} />
           ))}

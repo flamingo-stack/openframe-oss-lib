@@ -11,6 +11,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { LoadingScope } from '../../../ui/loading-scope';
 import { AdminContentCard } from '../admin-content-card';
 import { AdminContentCardGrid, AdminContentCardGridSkeleton } from '../admin-content-card-grid';
 
@@ -49,6 +50,17 @@ describe('AdminContentCardGrid', () => {
     render(<AdminContentCardGrid {...base} items={[]} loading={false} />);
     expect(screen.getByText('Nothing here')).toBeTruthy();
     expect(invisible()).toHaveLength(6);
+  });
+
+  it('draws its loading form inside a loading scope', () => {
+    render(
+      <LoadingScope>
+        <AdminContentCardGrid {...base} items={rows(2)} loading={false} />
+      </LoadingScope>,
+    );
+    expect(screen.queryByText('Row 1')).toBeNull();
+    expect(skeletons()).toHaveLength(6);
+    expect(invisible()).toHaveLength(0);
   });
 
   it('reserves nothing on a full page', () => {

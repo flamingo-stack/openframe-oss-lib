@@ -10,6 +10,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
+import { LoadingItems } from './loading-scope';
 import { usePortalContainer } from './portal-container';
 
 /** An option's frame (a list row, or a tile in the grid), read by the options and by their loading state. */
@@ -21,8 +22,8 @@ const SELECT_TILE_CLASS =
  * Options the loading state draws (rows, or tiles in the grid layout) when its host states no `loadingRows`: a
  * typical count. A host that reads its options with a limit passes that limit.
  */
-const SELECT_LOADING_ROWS = 8;
-const SELECT_LOADING_TILES = 12;
+const SELECT_SKELETON_ROWS = 8;
+const SELECT_SKELETON_TILES = 12;
 
 export interface SearchableSelectOption {
   value: string;
@@ -255,15 +256,13 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
               // The options while they are read: the list's own rows (or tiles), a label bar each; `loadingText` is
               // what a screen reader hears.
               <LoadingRegion label={loadingText} className="contents">
-                {Array.from(
-                  { length: loadingRows ?? (isGrid ? SELECT_LOADING_TILES : SELECT_LOADING_ROWS) },
-                  (_, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-                    <div key={i} className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
+                <LoadingItems count={loadingRows ?? (isGrid ? SELECT_SKELETON_TILES : SELECT_SKELETON_ROWS)}>
+                  {() => (
+                    <div data-loading-item className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
                       <TextLineSkeleton type={isGrid ? 'h6' : 'h4'} className={isGrid ? 'w-full' : 'w-2/3'} />
                     </div>
-                  ),
-                )}
+                  )}
+                </LoadingItems>
               </LoadingRegion>
             ) : filtered.length === 0 ? (
               <div className={statusClass}>{emptyText}</div>
@@ -273,6 +272,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
                 return (
                   <button
                     key={opt.value}
+                    data-loading-item
                     type="button"
                     role="option"
                     aria-selected={isSelected}

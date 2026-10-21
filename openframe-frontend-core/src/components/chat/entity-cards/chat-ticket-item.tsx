@@ -126,6 +126,7 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             avoid crowding the row when both badges are present. */}
         {ticket?.linkedTaskLabel && (
           <Tag
+            data-loading-optional
             label={ticket.linkedTaskLabel}
             variant="outline"
             icon={<WrenchIcon size={14} color="var(--color-text-secondary)" />}

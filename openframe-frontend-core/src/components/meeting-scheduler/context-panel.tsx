@@ -6,9 +6,11 @@ import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar, AvatarStack, Button } from '../ui';
-import { AutocompleteSkeleton } from '../ui/autocomplete';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
+
+/** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
+const noop = () => {};
 
 /**
  * ContextPanel — the "who / what / how long" side of the scheduler card
@@ -176,7 +178,7 @@ export function ContextPanelSkeleton({
               <p className={FIELD_LABEL_CLASS}>Duration</p>
               <div className={DURATION_CHIPS_CLASS}>
                 <LoadingItems count={durations}>
-                  {() => <InteractiveSkeleton.Button size="small-legacy" className="w-16" />}
+                  {() => <InteractiveSkeleton.Button data-loading-item size="small-legacy" className="w-16" />}
                 </LoadingItems>
               </div>
             </div>
@@ -185,7 +187,7 @@ export function ContextPanelSkeleton({
         {timezone !== 'hidden' && (
           <div className={cn(STRIP_ASIDE, timezone === 'wide' && TIMEZONE_WIDE_ONLY_CLASS)}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
-            <AutocompleteSkeleton />
+            <TimezoneSelect value={null} loading onChange={noop} />
           </div>
         )}
       </div>
@@ -291,6 +293,7 @@ export function SchedulerContextPanel({
                 {durationsMs.map(ms => (
                   <Button
                     key={ms}
+                    data-loading-item
                     variant={selectedDurationMs === ms ? undefined : 'outline'}
                     size="small-legacy"
                     disabled={disabled}

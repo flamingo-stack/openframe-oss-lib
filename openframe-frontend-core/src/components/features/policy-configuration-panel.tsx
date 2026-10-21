@@ -172,9 +172,11 @@ const CategorySection: FC<{
   onToggle,
   onBulkLevelChange,
   onPolicyPermissionChange,
-  loading = false,
+  loading: loadingGiven = false,
   ...props
 }) => {
+  // ONE switch: a page's loading scope, or the panel's read.
+  const loading = useLoadingScope() || loadingGiven;
   const isExpanded = isExpandedProp && !loading;
   const { innerRef, containerStyle } = useCollapsible({ expanded: isExpanded, durationMs: 300 });
   const handleBulkChange = (level: ApprovalLevel | undefined) => onBulkLevelChange(category.id, level);
@@ -251,33 +253,32 @@ const CategorySection: FC<{
         />
       </div>
 
-      {/* Policies List (none while they are read) */}
-      {!loading && (
-        <div
-          style={{
-            ...containerStyle,
-            transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
-            // visibility drops collapsed content from the tab order and a11y
-            // tree; its discrete transition delays hiding until the fade ends.
-            visibility: isExpanded ? 'visible' : 'hidden',
-          }}
-          className={isExpanded ? 'opacity-100' : 'opacity-0'}
-        >
-          <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
-            <div className="overflow-hidden rounded-md border border-ods-border">
-              {category.policies.map(policy => (
-                <PolicyRow
-                  key={policy.id}
-                  policy={policy}
-                  categoryId={category.id}
-                  editMode={editMode}
-                  onPermissionChange={onPolicyPermissionChange}
-                />
-              ))}
-            </div>
+      {/* Policies List: collapsed while the policies are read (`isExpanded` is false), so it takes no height. */}
+      <div
+        style={{
+          ...containerStyle,
+          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
+          // visibility drops collapsed content from the tab order and a11y
+          // tree; its discrete transition delays hiding until the fade ends.
+          visibility: isExpanded ? 'visible' : 'hidden',
+        }}
+        className={isExpanded ? 'opacity-100' : 'opacity-0'}
+      >
+        <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
+          <div className="overflow-hidden rounded-md border border-ods-border">
+            {/* No rows while the policies are read: nothing read is drawn, even collapsed. */}
+            {(loading ? [] : category.policies).map(policy => (
+              <PolicyRow
+                key={policy.id}
+                policy={policy}
+                categoryId={category.id}
+                editMode={editMode}
+                onPermissionChange={onPolicyPermissionChange}
+              />
+            ))}
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 };

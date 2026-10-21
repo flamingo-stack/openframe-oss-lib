@@ -25,15 +25,14 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { toast as defaultToast } from '../../hooks/use-toast';
 import type { DataSync } from '../../types/data-sync';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
-import { ChatTicketItem } from '../chat/entity-cards/chat-ticket-item';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
 import { usePageDataSync } from '../layout/page-data-sync';
-import { LoadingRegion } from '../loading/loading-region';
+import { LoadingFallback } from '../loading/loading-fallback';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { DataSyncLine } from '../ui/data-attribution';
-import { LoadingItems, LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { useTicketActions } from './hooks/use-ticket-actions';
 import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import { TicketOpenForm, type TicketOpenFormProps } from './ticket-open-form';
@@ -44,7 +43,6 @@ import { isOptimistic } from './types';
 /** The center's layout. */
 const TICKET_CENTER_CLASS = 'flex flex-col gap-6';
 const TICKET_LIST_BLOCK_CLASS = 'flex flex-col gap-2';
-const TICKET_ROW_FRAME_CLASS = 'border-b border-ods-border last:border-b-0';
 
 export interface TicketCenterProps {
   /** Optional toast override (test-friendly). Defaults to the lib's
@@ -153,6 +151,7 @@ function TicketCenterAuthed({
       renderRow={ticket => (
         <TicketRow
           key={ticket.id}
+          data-loading-item
           id={devSectionAnchorId('ticket', ticket.external_id)}
           ticket={ticket}
           expanded={expandedTicketId === ticket.id}
@@ -182,20 +181,18 @@ function TicketCenterPending({
   // The page states the sync under its title: the list's header then draws no line, loading or loaded.
   const syncInPage = usePageDataSync(null, true);
   return (
-    <LoadingRegion label="Loading tickets" announce={region}>
-      <LoadingScope>
-        <TicketCenterView
-          tickets={[]}
-          loading
-          formInert
-          sync={syncInPage ? undefined : null}
-          onSubmit={() => Promise.resolve(false)}
-          isSubmitting={false}
-          supportSystemDown={false}
-          renderRow={() => null}
-        />
-      </LoadingScope>
-    </LoadingRegion>
+    <LoadingFallback label="Loading tickets" status={region}>
+      <TicketCenterView
+        tickets={[]}
+        loading
+        formInert
+        sync={syncInPage ? undefined : null}
+        onSubmit={() => Promise.resolve(false)}
+        isSubmitting={false}
+        supportSystemDown={false}
+        renderRow={() => null}
+      />
+    </LoadingFallback>
   );
 }
 
@@ -310,13 +307,7 @@ function TicketListHeader({
 function TicketListSkeleton() {
   return (
     <Card className="overflow-hidden">
-      <LoadingItems count={TICKETS_PAGE_SIZE}>
-        {() => (
-          <div className={TICKET_ROW_FRAME_CLASS}>
-            <ChatTicketItem loading />
-          </div>
-        )}
-      </LoadingItems>
+      <LoadingItems count={TICKETS_PAGE_SIZE}>{() => <TicketRow loading data-loading-item />}</LoadingItems>
     </Card>
   );
 }

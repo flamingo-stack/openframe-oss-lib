@@ -25,7 +25,7 @@ import { useEffect, useRef } from 'react';
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { LoadingRegion } from '../loading/loading-region';
 import { formatRelativeTime } from './../../utils/date-utils';
-import { ChatMessageRow, ChatMessageRowSkeleton } from './../chat/chat-message-row';
+import { ChatMessageRow } from './../chat/chat-message-row';
 import { useChatIdentity } from './../chat/hooks/use-chat-identity';
 import type { ChatAttachment } from './../chat/utils/chat-attachment-markdown';
 import { EmptyState } from './../empty-state';
@@ -300,7 +300,9 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     return (
       <div className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
         <LoadingRegion label="Loading messages" className={TICKET_FEED_INNER}>
-          <LoadingItems count={TICKET_FEED_SKELETON_ROWS}>{() => <ChatMessageRowSkeleton />}</LoadingItems>
+          <LoadingItems count={TICKET_FEED_SKELETON_ROWS}>
+            {() => <ChatMessageRow loading displayName="" body="" data-loading-item />}
+          </LoadingItems>
         </LoadingRegion>
       </div>
     );
@@ -345,6 +347,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           return (
             <ChatMessageRow
               key={`body-${i}-${turn.slice(0, 24)}`}
+              data-loading-item
               displayName={customerName}
               avatarUrl={customerAvatar}
               body={text}
@@ -442,6 +445,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
           return (
             <ChatMessageRow
               key={eng.id}
+              data-loading-item
               displayName={author}
               avatarUrl={avatarSrc}
               timeLabel={eng.createdAt ? formatRelativeTime(eng.createdAt) : null}

@@ -54,7 +54,7 @@ import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection, type FaqSectionProps, type FaqSkeletonShape } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { LoadingRegion } from '../loading/loading-region';
+import { LoadingFallback } from '../loading/loading-fallback';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { DataAttribution } from '../ui/data-attribution';
 import { DownloadButton } from '../ui/download-button';
@@ -305,9 +305,9 @@ export function TrustCenterPage({
   // layout: `contents`), announced once unless a host's scope already did.
   const inLoadingScope = (node: ReactNode, label: string): ReactNode =>
     loading ? (
-      <LoadingRegion label={label} announce={!scoped} className="contents">
-        <LoadingScope className="contents">{node}</LoadingScope>
-      </LoadingRegion>
+      <LoadingFallback label={label} className="contents">
+        {node}
+      </LoadingFallback>
     ) : (
       node
     );

@@ -13,6 +13,7 @@ import {
   PageLayout,
   TabSelector,
 } from '../../ui';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
 import { DevicesGrid } from './devices-grid';
 import { DevicesGridFilters } from './devices-grid-filters';
@@ -137,7 +138,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   onViewModeChange,
   actions,
   devices,
-  loading = false,
+  loading: loadingGiven = false,
   loadingRegion = true,
   isNarrowing = false,
   totalCount,
@@ -160,6 +161,9 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   gridSentinelRef,
   pageSize,
 }: DevicesPanelViewProps<T>) {
+  // One switch: a page's loading scope, or the host's request.
+  const scoped = useLoadingScope();
+  const loading = scoped || loadingGiven;
   const gridColumns =
     filterColumns ?? getDeviceFilterColumns(deviceFilters).filter(column => !hideFilters?.includes(column.key));
 
@@ -243,7 +247,8 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
       contentClassName="flex flex-col"
     >
       {headerSlot}
-      {loading && loadingRegion && (
+      {/* Inside a page's loading scope the page has announced it already. */}
+      {loading && loadingRegion && !scoped && (
         <span role="status" className="sr-only">
           Loading devices
         </span>

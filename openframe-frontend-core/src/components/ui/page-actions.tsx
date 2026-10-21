@@ -7,6 +7,7 @@ import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
+import { useLoadingScope } from './loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
@@ -277,8 +278,9 @@ export function PageActions({
   menuActions,
   selector,
   className,
-  loading,
+  loading: loadingProp,
 }: PageActionsProps) {
+  const loading = useLoadingScope() || loadingProp;
   if (variant === 'icon-buttons') {
     return (
       <IconButtonsVariant
@@ -311,7 +313,7 @@ function IconButtonsVariant({
   menuActions,
   selector,
   className,
-  loading,
+  loading: loadingProp,
 }: {
   actions: PageActionButton[];
   menuActions?: ActionsMenuGroup[];
@@ -319,6 +321,7 @@ function IconButtonsVariant({
   className?: string;
   loading?: boolean;
 }) {
+  const loading = useLoadingScope() || loadingProp;
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
 
@@ -369,12 +372,13 @@ function IconButtonsVariant({
 function PrimaryButtonsVariant({
   actions,
   className,
-  loading,
+  loading: loadingProp,
 }: {
   actions: PageActionButton[];
   className?: string;
   loading?: boolean;
 }) {
+  const loading = useLoadingScope() || loadingProp;
   // Sort: outline first, accent last (rightmost on desktop).
   const sortedActions = [...actions].sort((a, b) => {
     if (a.variant === 'accent' && b.variant !== 'accent') return 1;
@@ -415,7 +419,7 @@ function MenuPrimaryVariant({
   menuActions,
   selector,
   className,
-  loading,
+  loading: loadingProp,
 }: {
   actions: PageActionButton[];
   menuActions: ActionsMenuGroup[];
@@ -423,6 +427,7 @@ function MenuPrimaryVariant({
   className?: string;
   loading?: boolean;
 }) {
+  const loading = useLoadingScope() || loadingProp;
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = menuActions.some(g => g.items.length > 0);
 
@@ -462,7 +467,8 @@ function MenuPrimaryVariant({
  * icon-only) actions stay buttons, the other labelled ones fold into one "..."
  * menu — unless that menu would hold a single action, which stays a button.
  */
-function CompactPrimaryActions({ actions, loading }: { actions: PageActionButton[]; loading?: boolean }) {
+function CompactPrimaryActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   const foldable = actions.filter(action => action.variant !== 'accent' && !!action.label);
   const fold = foldable.length > 1;
   const inline = fold ? actions.filter(action => !foldable.includes(action)) : actions;
@@ -478,7 +484,8 @@ function CompactPrimaryActions({ actions, loading }: { actions: PageActionButton
   );
 }
 
-function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]; loading?: boolean }) {
+function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   return (
     <div
       className={cn(

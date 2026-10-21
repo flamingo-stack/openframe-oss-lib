@@ -131,7 +131,7 @@ export interface RoadmapGridProps {
    * Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count for a roadmap that lists everything it holds.
    */
   skeletonCount?: number;
-  /** @deprecated Use `skeletonCount`. */
+  /** @deprecated Ignored: the skeleton draws `skeletonCount` (a list draws its full count, never a fold). */
   fold?: number;
 }
 
@@ -226,9 +226,7 @@ export function RoadmapGrid({
   quartersToKeepClosed = 2,
   isLoading = false,
   skeletonCount,
-  fold,
 }: RoadmapGridProps) {
-  const skeletonCards = skeletonCount ?? fold;
   // ── Voting (shared across all quarters) ──
   const { getVote, toggleVote } = useRoadmapVoting(votingOptions);
   const inScope = useLoadingScope();
@@ -323,9 +321,9 @@ export function RoadmapGrid({
   // empty state. The page's loading region announces a scope's; a host's own read announces itself.
   if (inScope || isLoading) {
     return groupByQuarter ? (
-      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} count={skeletonCards} />
+      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} count={skeletonCount} />
     ) : (
-      <RoadmapGridSkeleton region={!inScope} count={skeletonCards} showLeftMargin={showLeftMargin} columns={columns} />
+      <RoadmapGridSkeleton region={!inScope} count={skeletonCount} showLeftMargin={showLeftMargin} columns={columns} />
     );
   }
 

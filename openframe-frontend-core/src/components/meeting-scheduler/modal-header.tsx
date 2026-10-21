@@ -5,9 +5,11 @@ import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar, AvatarStack, Button } from '../ui';
-import { AutocompleteSkeleton } from '../ui/autocomplete';
 import { useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
+
+/** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
+const noop = () => {};
 
 /**
  * The head of the scheduler's MODAL layout: the host strip (who, and how long
@@ -151,7 +153,7 @@ export function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTime
       {showTimezone && (
         <div className={TIMEZONE_ROW_CLASS}>
           <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          <AutocompleteSkeleton />
+          <TimezoneSelect value={null} loading onChange={noop} />
         </div>
       )}
     </>

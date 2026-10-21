@@ -8,6 +8,7 @@ import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
+import { useLoadingScope } from '../ui/loading-scope';
 import { tagVariants, type TagProps } from '../ui/tag';
 
 // =============================================================================
@@ -91,6 +92,11 @@ export interface MingoInfoCardProps {
    * affordances. The "⋯" button keeps its own independent click target.
    */
   onClick?: () => void;
+  /**
+   * Draws the card's loading form (its `MingoInfoCardSkeleton`): a card whose record is still being read. Inside a
+   * loading scope the card draws it too.
+   */
+  loading?: boolean;
   /** Appended to the root element. */
   className?: string;
 }
@@ -184,10 +190,13 @@ export function MingoInfoCard({
   menuAriaLabel = 'More actions',
   anchorProps,
   onClick,
+  loading: loadingProp = false,
   className,
 }: MingoInfoCardProps) {
+  const loading = useLoadingScope() || loadingProp;
   const hasMedia = !!imageSrc || !!icon;
   const action = useContext(MingoInfoCardActionContext);
+  if (loading) return <MingoInfoCardSkeleton className={className} />;
   const hasMenu = !action && !!menuGroups && menuGroups.length > 0;
   const isAnchor = !!anchorProps;
   const isInteractive = isAnchor || !!onClick;

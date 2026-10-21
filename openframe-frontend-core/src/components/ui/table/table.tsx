@@ -5,7 +5,7 @@ import { cn } from '../../../utils/cn';
 import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
-import { CursorPagination, CursorPaginationSkeleton } from '../cursor-pagination';
+import { CursorPagination } from '../cursor-pagination';
 import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
 import { DATA_TABLE_NEXT_PAGE_SKELETON_ROWS } from '../data-table/utils';
 import { useLoadingScope } from '../loading-scope';
@@ -369,33 +369,20 @@ export function Table<T = TableRowData>({
         )}
       </div>
 
-      {/* Pagination - only show when there's data and infinite scroll is not active */}
-      {!infiniteScroll && cursorPagination && data.length > 0 && (
+      {/* Pagination - shown when there's data, and while the first page is read (the pager draws its own skeleton:
+          the count line a bar, its buttons real and inert); never with infinite scroll. */}
+      {!infiniteScroll && cursorPagination && (data.length > 0 || loading) && (
         <CursorPagination
           hasNextPage={cursorPagination.hasNextPage}
           hasPreviousPage={cursorPagination.hasPreviousPage}
           isFirstPage={cursorPagination.isFirstPage}
           startCursor={cursorPagination.startCursor}
           endCursor={cursorPagination.endCursor}
-          currentCount={cursorPagination.currentCount ?? data.length}
+          currentCount={data.length > 0 ? (cursorPagination.currentCount ?? data.length) : 0}
           totalCount={cursorPagination.totalCount}
           itemName={cursorPagination.itemName}
           loading={loading}
           onNext={cursorPagination.onNext}
-          onPrevious={cursorPagination.onPrevious}
-          onReset={cursorPagination.onReset}
-          showInfo={cursorPagination.showInfo ?? true}
-          compact={cursorPagination.compact}
-          resetButtonLabel={cursorPagination.resetButtonLabel}
-          resetButtonIcon={cursorPagination.resetButtonIcon}
-          className={cn('mt-2 border-t border-ods-border pt-3', paginationClassName)}
-        />
-      )}
-
-      {/* While the first page is read: the pager's skeleton in its place (its buttons real and inert). */}
-      {!infiniteScroll && cursorPagination && loading && data.length === 0 && (
-        <CursorPaginationSkeleton
-          hasPreviousPage={cursorPagination.hasPreviousPage}
           onPrevious={cursorPagination.onPrevious}
           onReset={cursorPagination.onReset}
           showInfo={cursorPagination.showInfo ?? true}

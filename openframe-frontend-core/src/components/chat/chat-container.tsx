@@ -200,6 +200,7 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                   >
                     {ticketInfo.title}
                   </span>
+                  {/* loading-standard-ok: the host hands `ticketInfo` in, the same in both forms (no read of this component decides it) */}
                   {ticketInfo.meta && (
                     <div
                       className="truncate text-ods-text-secondary text-h6"

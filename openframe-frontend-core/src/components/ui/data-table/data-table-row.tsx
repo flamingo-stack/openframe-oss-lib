@@ -6,7 +6,7 @@ import { memo, useCallback, useRef, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { isOwnClick } from '../../../utils/own-click';
-import { ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table-skeleton';
+import { DATA_TABLE_ROW_FRAME_CLASS, ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table-skeleton';
 import { alignJustify, getHideClasses } from './utils';
 
 export interface DataTableRowProps<T> {
@@ -99,7 +99,8 @@ function DataTableRowImpl<T>({
   );
 
   const containerClassName = cn(
-    'overflow-hidden rounded-md border border-ods-border bg-ods-card text-inherit no-underline',
+    DATA_TABLE_ROW_FRAME_CLASS,
+    'text-inherit no-underline',
     // A row fades in when it MOUNTS — so a loaded page eases in over the
     // skeleton it replaces instead of snapping, and rows that were already on
     // screen (keyed by id) do not replay it. Opacity only: nothing that moves

@@ -77,8 +77,10 @@ const ENTRY_DESCRIPTION_CLASS =
 /** FadePreview's toggle row: a `size="compact"` link Button (h-6, at every width) under a `mf` gap. */
 const COMPACT_BUTTON_HEIGHT_CLASS = 'h-6';
 const PREVIEW_TOGGLE_SKELETON_CLASS = cn('mt-[var(--spacing-system-mf)] w-28', COMPACT_BUTTON_HEIGHT_CLASS);
-/** Entries a skeleton draws when it is not told how many (the first fold of a section). */
+/** Entries a skeleton draws when it is not told how many: a section's entries are the data's, a typical one. */
 const CHANGELOG_SKELETON_ENTRIES = 1;
+/** Entries the preview-first mode draws: the preview is the section's first entry. */
+const CHANGELOG_PREVIEW_SKELETON_ENTRIES = 1;
 
 export function ReleaseChangelogSection({
   title,
@@ -211,7 +213,7 @@ function ChangelogEntryList({
 export interface ReleaseChangelogSectionSkeletonProps {
   /** The section's heading (static copy: drawn for real). */
   title: string;
-  /** Entries drawn when not `previewFirst` (the first fold). Default 1. */
+  /** Entries drawn when not `previewFirst` (a typical count when not given). Default 1. */
   count?: number;
   isBreaking?: boolean;
   hideTitle?: boolean;
@@ -248,7 +250,7 @@ export function ReleaseChangelogSectionSkeleton({
   );
   const inPreviewMode = previewFirst && !collapsible;
   const showEntries = !collapsible || !defaultCollapsed;
-  const list = <ChangelogEntryListSkeleton count={inPreviewMode ? 1 : count} />;
+  const list = <ChangelogEntryListSkeleton count={inPreviewMode ? CHANGELOG_PREVIEW_SKELETON_ENTRIES : count} />;
   return (
     <div className={cn(SECTION_CLASS, className)} aria-hidden>
       {!hideTitle &&

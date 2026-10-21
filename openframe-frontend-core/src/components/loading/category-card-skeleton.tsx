@@ -1,4 +1,7 @@
+'use client';
+
 import { cn } from '../../utils/cn';
+import { LoadingItems } from '../ui/loading-scope';
 import { UnifiedSkeleton, TextSkeleton } from './unified-skeleton';
 
 interface CategoryCardSkeletonProps {
@@ -18,9 +21,9 @@ export function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
     >
       {/* Icons row */}
       <div className="mb-8 flex items-center justify-center gap-6">
-        {Array.from({ length: CATEGORY_CARD_SKELETON_ICONS }).map((_, i) => (
-          <UnifiedSkeleton key={i} variant="circular" className="h-10 w-10 flex-shrink-0" />
-        ))}
+        <LoadingItems count={CATEGORY_CARD_SKELETON_ICONS}>
+          {() => <UnifiedSkeleton data-loading-item variant="circular" className="h-10 w-10 flex-shrink-0" />}
+        </LoadingItems>
       </div>
 
       {/* Text block */}

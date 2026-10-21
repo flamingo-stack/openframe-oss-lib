@@ -90,7 +90,7 @@ import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
-import { MingoInfoCard, MingoInfoCardSkeleton, type MingoInfoCardStatus } from '../mingo-info-card';
+import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card';
 import { SourceActionButton } from '../source-action-button';
 import type { PrReviewState, GitHubActivityKind } from '../types/entities/github-activity';
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
@@ -893,11 +893,6 @@ function CampaignChatCard({
   );
 }
 
-/** `CampaignChatCard` while its campaign is fetched: the info card it draws (`MingoInfoCard`), as its skeleton. */
-function CampaignChatCardSkeleton() {
-  return <MingoInfoCardSkeleton />;
-}
-
 /**
  * Shared `MingoInfoCard` shell for fetch-mode entity cards. `cover` renders as
  * the 40px image when present; otherwise `fallbackIcon` shows. Anchor + menu +
@@ -1376,7 +1371,7 @@ function refHydratedEntry(
     contentRefType: docType,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
   };
 }
@@ -1560,7 +1555,7 @@ function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     bareInline: true,
     contentRefType: docType,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <GlyphChatCard
         chatRef={fetchedEmployeeEntryDisplayRef(item, chatRef)}
@@ -1700,7 +1695,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: 'faq',
     noComposedHref: true,
     fallbackHref: (item: ChatCardItem) => (item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null),
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1715,7 +1710,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
     noComposedHref: true,
     fallbackHref: () => TRUST_CENTER_PAGE_PATH,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1786,7 +1781,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     bareInline: true,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1867,7 +1862,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
-    skeleton: () => <CampaignChatCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     // No public viewer — synthesize the hub-internal admin URL post-fetch
     // so the wrapper + isNewTab computation see the actual destination.
     fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),

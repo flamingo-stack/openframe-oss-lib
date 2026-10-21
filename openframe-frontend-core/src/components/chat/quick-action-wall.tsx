@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { cn } from '../../utils/cn';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import {
   MarqueeWall,
   MarqueeWallFades,
@@ -11,7 +11,7 @@ import {
   type MarqueeWallProps,
 } from '../ui/marquee-wall';
 import {
-  QuickActionChipSkeleton,
+  QuickActionChipButton,
   QuickActionChipFromData,
   type QuickActionThemeSpec,
   type QuickActionChip,
@@ -140,8 +140,8 @@ export interface QuickActionWallProps {
    * the cap at `rows`. Optional — decorative/marketing walls omit it.
    */
   agentSlug?: string;
-  /** Draw skeleton chips instead of `chips` (the shared
-   *  {@link QuickActionChipSkeleton} — 1:1 geometry with loaded chips).
+  /** Draw the chips' own loading form instead of `chips` (`QuickActionChipButton loading`, 1:1 geometry with loaded
+   *  chips), `skeletonCount` of them.
    *  Callers own the policy (`loading` flag vs skeleton-when-empty). */
   loading?: boolean;
   skeletonCount?: number;
@@ -247,14 +247,22 @@ export function QuickActionWall({
     ).flat();
   }, [chips, padTarget]);
 
-  const renderSkeletons = (count: number, offset = 0) =>
-    Array.from({ length: count }, (_, i) => (
-      <QuickActionChipSkeleton
-        key={i}
-        lozenge={lozenges}
-        labelCh={WALL_SKELETON_LABEL_CH[(offset + i) % WALL_SKELETON_LABEL_CH.length]}
-      />
-    ));
+  // The chips while the wall is read: each chip's own loading form (it switches itself), `icon` reserving its slot
+  // because most wall chips carry one, labels cycled through the declared width spread.
+  const renderSkeletons = (count: number, offset = 0) => (
+    <LoadingItems count={count}>
+      {i => (
+        <QuickActionChipButton
+          loading
+          label=""
+          icon
+          lozenge={lozenges}
+          labelCh={WALL_SKELETON_LABEL_CH[(offset + i) % WALL_SKELETON_LABEL_CH.length]}
+          data-loading-item
+        />
+      )}
+    </LoadingItems>
+  );
 
   const renderChipNodes = (list: ReadonlyArray<QuickActionChip>) =>
     list.map(chip => (
@@ -265,6 +273,7 @@ export function QuickActionWall({
         defaultLozenge={lozenges}
         interactive={!!chip.onSelect}
         className="max-w-full"
+        data-loading-item
       />
     ));
 

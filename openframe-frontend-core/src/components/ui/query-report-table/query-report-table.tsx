@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn';
 import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon';
 import { Button } from '../button';
 import { DataTableEmpty } from '../data-table/data-table-empty';
+import { useLoadingScope } from '../loading-scope';
 import { QueryReportTableHeader } from './query-report-table-header';
 import { QueryReportTableRow } from './query-report-table-row';
 import { QueryReportTableSkeleton } from './query-report-table-skeleton';
@@ -18,7 +19,7 @@ const QUERY_REPORT_TABLE_SKELETON_ROWS = 8;
 export function QueryReportTable({
   title,
   data,
-  loading = false,
+  loading: loadingProp = false,
   loadingRegion = true,
   skeletonRows = QUERY_REPORT_TABLE_SKELETON_ROWS,
   skeletonColumns = 6,
@@ -34,6 +35,7 @@ export function QueryReportTable({
   className,
   tableClassName,
 }: QueryReportTableProps) {
+  const loading = useLoadingScope() || loadingProp;
   const isCompact = variant === 'compact';
   const columns = useMemo(() => deriveColumns(data, columnOrder), [data, columnOrder]);
 
@@ -82,8 +84,9 @@ export function QueryReportTable({
         </div>
       )}
 
-      {/* Loading state */}
-      {loading && (
+      {/* One slot, three forms: loading (the rows' skeleton), empty (the same mapping `DataTable.Body` makes:
+          `emptyState` wins; `emptyMessage` is its title), and the table. */}
+      {loading ? (
         <QueryReportTableSkeleton
           rows={skeletonRows}
           columns={skeletonColumns}
@@ -91,22 +94,15 @@ export function QueryReportTable({
           variant={variant}
           region={loadingRegion}
         />
-      )}
-
-      {/* Empty state */}
-      {/* Empty state: the same mapping `DataTable.Body` makes (`emptyState` wins; `emptyMessage` is its title) */}
-      {!loading &&
-        data.length === 0 &&
-        (emptyState ? (
+      ) : data.length === 0 ? (
+        emptyState ? (
           <DataTableEmpty {...emptyState} />
         ) : emptyMessage != null ? (
           <DataTableEmpty title={emptyMessage} description={undefined} />
         ) : (
           <DataTableEmpty />
-        ))}
-
-      {/* Table content */}
-      {!loading && data.length > 0 && (
+        )
+      ) : (
         <div className="flex flex-col">
           {/* Custom scrollbar track — hidden in compact mode */}
           {!isCompact && thumbRatio > 0 && (
@@ -141,6 +137,7 @@ export function QueryReportTable({
                   {data.map((row, index) => (
                     <QueryReportTableRow
                       key={index}
+                      data-loading-item
                       row={row}
                       columns={columns}
                       columnWidth={columnWidth}

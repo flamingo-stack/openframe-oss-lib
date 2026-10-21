@@ -9,8 +9,8 @@ import { Button } from './ui/button';
 import { LoadingItems, useLoadingScope } from './ui/loading-scope';
 
 /**
- * The comment cards a thread's skeleton draws: its first fold (about three root cards fill a section's screen). Never
- * the number of comments held: in a loading scope those are not read.
+ * The comment cards a thread draws while it is read: a typical count (a thread with comments usually holds a few root
+ * comments; it has no page size). Never the number of comments held: in a loading scope those are not read.
  */
 export const COMMENT_THREAD_SKELETON_COUNT = 3;
 // The thread's and the block's boxes, read by them AND their skeletons.
@@ -46,6 +46,12 @@ export interface CommentThreadProps {
   /** Which header each ROOT card leads with; replies always lead with the commenter. */
   leadWith?: 'vendor' | 'commenter';
   onViewProduct?: (vendorSlug: string) => void;
+  /**
+   * Whether the thread's comments carry a title line (titled vendor reviews), for the rows the thread draws while it
+   * is read; a design-doc or prompt thread's comments have none. Loaded cards draw a title when their comment has one.
+   * Default true.
+   */
+  showTitle?: boolean;
 }
 
 /**
@@ -69,9 +75,17 @@ export function CommentThread({
   pending = false,
   leadWith,
   onViewProduct,
+  showTitle = true,
 }: CommentThreadProps) {
   if (useLoadingScope()) {
-    return <CommentThreadSkeleton count={COMMENT_THREAD_SKELETON_COUNT} leadWith={leadWith} reply={Boolean(onReply)} />;
+    return (
+      <CommentThreadSkeleton
+        count={COMMENT_THREAD_SKELETON_COUNT}
+        leadWith={leadWith}
+        showTitle={showTitle}
+        reply={Boolean(onReply)}
+      />
+    );
   }
   if (comments.length === 0) {
     return emptyLabel ? <p className="text-ods-text-secondary text-h6">{emptyLabel}</p> : null;
@@ -115,7 +129,7 @@ function CommentThreadRow({
   pending,
   leadWith,
   onViewProduct,
-}: Omit<CommentThreadProps, 'comments' | 'emptyLabel'> & { comment: ThreadComment }) {
+}: Omit<CommentThreadProps, 'comments' | 'emptyLabel' | 'showTitle'> & { comment: ThreadComment }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const replies = comment.replies ?? [];
   const actions = renderActions?.(comment);
@@ -204,7 +218,9 @@ export function CommentThreadSkeleton({
   return (
     <div className={COMMENT_THREAD_LIST} aria-hidden="true" inert>
       <LoadingItems count={count}>
-        {() => <CommentCard loading data-loading-item leadWith={leadWith} titleRow={showTitle} footer={footer} />}
+        {() => (
+          <CommentCard loading fullBody data-loading-item leadWith={leadWith} titleRow={showTitle} footer={footer} />
+        )}
       </LoadingItems>
     </div>
   );

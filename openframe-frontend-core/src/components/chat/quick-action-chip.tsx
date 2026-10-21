@@ -4,6 +4,7 @@ import { type ReactNode, isValidElement } from 'react';
 import { cn } from '../../utils/cn';
 import { EntityIcon, type EntityIconValue } from '../icon-display';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { Tag } from '../ui/tag';
 
 // =============================================================================
@@ -181,6 +182,13 @@ export interface QuickActionChipButtonProps {
    *  strips, table cells). Default `true`. */
   interactive?: boolean;
   className?: string;
+  /** The chip's label is still being read: the chip draws its {@link QuickActionChipSkeleton} (same box). In a loading
+   *  scope it does the same. */
+  loading?: boolean;
+  /** While loading, the label placeholder's width in `ch` (see {@link QuickActionChipSkeletonProps.labelCh}). */
+  labelCh?: number;
+  /** The list's markers (`data-loading-item`), forwarded in both forms. */
+  [marker: `data-${string}`]: unknown;
 }
 
 // =============================================================================
@@ -200,6 +208,8 @@ export interface QuickActionChipSkeletonProps {
   /** `'question'`: the placeholder of a `variant="question"` chip (its height and padding). */
   variant?: 'outline' | 'question';
   className?: string;
+  /** The list's markers (`data-loading-item`), forwarded like the loaded chip's. */
+  [marker: `data-${string}`]: unknown;
 }
 
 /**
@@ -217,10 +227,12 @@ export function QuickActionChipSkeleton({
   size = 'default',
   variant = 'outline',
   className,
+  ...props
 }: QuickActionChipSkeletonProps) {
   const question = variant === 'question';
   return (
     <Tag
+      {...loadingItemProps(props)}
       variant="outline"
       size={question ? 'sentence' : size}
       className={cn(question && 'max-w-full', className)}
@@ -272,7 +284,25 @@ export function QuickActionChipButton({
   onHoverEnd,
   interactive = true,
   className,
+  loading: loadingProp = false,
+  labelCh,
+  ...props
 }: QuickActionChipButtonProps) {
+  // ONE switch: in a page's loading state, or while the host reads the label, the chip is its skeleton (same box).
+  const loading = useLoadingScope() || loadingProp;
+  const markers = loadingItemProps(props);
+  if (loading)
+    return (
+      <QuickActionChipSkeleton
+        {...markers}
+        labelCh={labelCh}
+        icon={icon != null}
+        lozenge={!!lozenge}
+        size={size}
+        variant={variant === 'question' ? 'question' : 'outline'}
+        className={className}
+      />
+    );
   // The theme's accent only fills the gap — an icon spec's own accent
   // (admin-configured per-action color) always wins.
   const themedIcon = theme && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: theme.accent } : icon;
@@ -289,10 +319,20 @@ export function QuickActionChipButton({
       : variant;
   const tagSize = question ? 'sentence' : size;
   if (!interactive) {
-    return <Tag variant={tagVariant} size={tagSize} icon={resolvedIcon} label={resolvedLabel} className={className} />;
+    return (
+      <Tag
+        {...markers}
+        variant={tagVariant}
+        size={tagSize}
+        icon={resolvedIcon}
+        label={resolvedLabel}
+        className={className}
+      />
+    );
   }
   return (
     <button
+      {...markers}
       type="button"
       onClick={onSelect}
       onMouseEnter={onHoverStart}
@@ -370,15 +410,19 @@ export function QuickActionChipFromData({
   defaultLozenge,
   interactive = true,
   className,
+  ...props
 }: {
   chip: QuickActionChip;
   defaultTheme?: QuickActionThemeSpec;
   defaultLozenge?: boolean;
   interactive?: boolean;
   className?: string;
+  /** The list's markers (`data-loading-item`), forwarded to the chip. */
+  [marker: `data-${string}`]: unknown;
 }) {
   return (
     <QuickActionChipButton
+      {...loadingItemProps(props)}
       label={chip.label}
       icon={chip.icon}
       theme={chip.theme ?? defaultTheme}

@@ -189,7 +189,10 @@ export function EntityPortraitCard({
                   </div>
                 )}
                 {person.iconOverlayUrl && (
-                  <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg">
+                  <div
+                    data-loading-optional
+                    className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg"
+                  >
                     <Image
                       src={person.iconOverlayUrl}
                       alt=""

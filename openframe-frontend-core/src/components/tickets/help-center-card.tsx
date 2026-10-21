@@ -123,7 +123,9 @@ export function HelpCenterCard({
   const rightBadges = (
     <>
       {unreadCount > 0 && (
+        // Only rows with unread replies carry it; the row's loading form draws the status badge alone.
         <StatusBadge
+          data-loading-optional
           text={`${unreadCount} NEW`}
           colorScheme="warning"
           variant="card"
@@ -137,7 +139,9 @@ export function HelpCenterCard({
         className="border border-ods-border"
       />
       {priority && (
+        // Not every ticket states a priority; the row's loading form draws the status badge alone.
         <StatusBadge
+          data-loading-optional
           text={priority}
           colorScheme={mapPriorityScheme(priority)}
           variant="card"
@@ -154,6 +158,7 @@ export function HelpCenterCard({
       style={{ scrollMarginTop: STICKY_HEADER_OFFSET_PX }}
       className={`border-b border-ods-border last:border-b-0 ${optimistic ? 'opacity-60' : ''}`}
       aria-busy={optimistic || undefined}
+      data-loading-item
     >
       <button
         type="button"

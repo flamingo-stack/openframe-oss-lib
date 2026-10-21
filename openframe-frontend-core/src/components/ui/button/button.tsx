@@ -5,6 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
+import { loadingItemProps } from '../loading-scope';
 import {
   BUTTON_SIZE_CLASS,
   buttonSurfaceClasses,
@@ -321,6 +322,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           // The click still reaches the caller (a download is what analytics counts).
           onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
           aria-label={props['aria-label']}
+          {...loadingItemProps(props)}
         >
           {splitContent}
         </Link>
@@ -355,6 +357,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           tabIndex={isDisabled ? -1 : undefined}
           className={cn(shellClasses, isDisabled && 'pointer-events-none')}
           onClick={splitAnchor.onClick}
+          // A list's markers (`data-loading-item`) survive on an anchor too.
+          {...loadingItemProps(props)}
         >
           {splitContent}
         </Link>

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { cn } from '../../../utils/cn';
+import { loadingItemProps } from '../loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip';
 import type { QueryReportTableRowProps } from './types';
 
@@ -11,11 +12,14 @@ export function QueryReportTableRow({
   columnWidth,
   variant = 'default',
   className,
+  ...props
 }: QueryReportTableRowProps) {
   const isCompact = variant === 'compact';
 
   return (
     <div
+      // A list's markers (`data-loading-item`) ride on the row, as on its loading form's rows.
+      {...loadingItemProps(props)}
       className={cn(
         isCompact
           ? 'border-b border-ods-border'

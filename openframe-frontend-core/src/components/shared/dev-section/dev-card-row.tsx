@@ -29,7 +29,7 @@ import type { ReactNode } from 'react';
 import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { useLoadingScope } from '../../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 
 export interface DevCardRowContentProps {
@@ -43,6 +43,8 @@ export interface DevCardRowContentProps {
   emptyDescription?: string;
   /** Right column — caller renders its own stacked badges. */
   rightBadges: ReactNode;
+  /** The list's markers (`data-loading-item`), forwarded to the row's root in both forms. */
+  [marker: `data-${string}`]: unknown;
 }
 
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
@@ -54,17 +56,12 @@ const ROW_SUBTITLE_LINE_CLASS = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`
 const ROW_DESCRIPTION_LINE_CLASS = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
 const ROW_BADGES_CLASS = 'flex flex-shrink-0 flex-col gap-2 self-start';
 
-export function DevCardRowContent({
-  title,
-  subtitle,
-  description,
-  emptyDescription = 'No description provided',
-  rightBadges,
-}: DevCardRowContentProps) {
+export function DevCardRowContent(props: DevCardRowContentProps) {
+  const { title, subtitle, description, emptyDescription = 'No description provided', rightBadges } = props;
   // While the page is read the record is not known: the row's content is its skeleton.
-  if (useLoadingScope()) return <DevCardRowContentSkeleton />;
+  if (useLoadingScope()) return <DevCardRowContentSkeleton {...loadingItemProps(props)} />;
   return (
-    <div className={ROW_INNER_CLASS}>
+    <div className={ROW_INNER_CLASS} {...loadingItemProps(props)}>
       <div className={ROW_TEXT_COLUMN_CLASS}>
         <div className={ROW_TITLE_LINE_CLASS}>
           <h3 className="line-clamp-2 flex-1 break-words tracking-[-0.36px] text-ods-text-primary text-h3 content-md:truncate">
@@ -83,10 +80,11 @@ export function DevCardRowContent({
   );
 }
 
-/** A row's content while its record is read: the title, subtitle and description as bars, two badge skeletons. */
-export function DevCardRowContentSkeleton() {
+/** A row's content while its record is read: the title, subtitle and description as bars, the status badge every row carries.
+ *  Its `data-*` props (the list's markers) are forwarded, like the loaded row's. */
+export function DevCardRowContentSkeleton(props: { [marker: `data-${string}`]: unknown }) {
   return (
-    <div className={ROW_INNER_CLASS} aria-hidden>
+    <div className={ROW_INNER_CLASS} aria-hidden {...loadingItemProps(props)}>
       <div className={ROW_TEXT_COLUMN_CLASS}>
         <div className={ROW_TITLE_LINE_CLASS}>
           <TextLineSkeleton type="h3" className="w-full" />
@@ -99,7 +97,8 @@ export function DevCardRowContentSkeleton() {
         </div>
       </div>
       <div className={ROW_BADGES_CLASS}>
-        <StatusBadge loading text="" variant="card" />
+        {/* The one badge every row carries (a ticket's status); the others (NEW, priority) are optional, so not
+            drawn. The badges are a row's fixed parts, not a list. */}
         <StatusBadge loading text="" variant="card" />
       </div>
     </div>
@@ -109,11 +108,14 @@ export function DevCardRowContentSkeleton() {
 /**
  * Skeleton rendering for a single row — the bars mirror the same
  * min-heights as `DevCardRowContent` so the loading→loaded swap
- * doesn't reflow.
+ * doesn't reflow. Its `data-*` props (the list's `data-loading-item`) are forwarded.
  */
-export function DevCardRowSkeleton() {
+export function DevCardRowSkeleton(props: { [marker: `data-${string}`]: unknown }) {
   return (
-    <div className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]">
+    <div
+      className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]"
+      {...loadingItemProps(props)}
+    >
       <DevCardRowContentSkeleton />
     </div>
   );
@@ -141,9 +143,7 @@ export function DevCardRowSkeletonList({
       announce={region}
       className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card"
     >
-      {Array.from({ length: rows }, (_, i) => (
-        <DevCardRowSkeleton key={i} />
-      ))}
+      <LoadingItems count={rows}>{() => <DevCardRowSkeleton data-loading-item />}</LoadingItems>
     </LoadingRegion>
   );
 }

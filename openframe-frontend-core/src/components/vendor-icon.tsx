@@ -5,7 +5,7 @@ import { cn } from '../utils/cn';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 import { UnifiedSkeleton } from './loading/unified-skeleton';
-import { useLoadingScope } from './ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from './ui/loading-scope';
 
 interface VendorIconProps {
   vendor: VendorWithMedia & {
@@ -61,9 +61,21 @@ const backgroundClasses = {
   white: 'bg-white border border-[#E5E5E5]',
 };
 
-/** A vendor's logo while it is read: the tile's own box. */
-export function VendorIconSkeleton({ size = 'md', className }: { size?: VendorIconProps['size']; className?: string }) {
-  return <UnifiedSkeleton className={cn(sizeClasses[size], 'flex-shrink-0 rounded-lg', className)} />;
+/** A vendor's logo while it is read: the tile's own box. Carries the icon's `data-*` markers (`loadingItemProps`). */
+export function VendorIconSkeleton({
+  size = 'md',
+  className,
+  ...props
+}: {
+  size?: VendorIconProps['size'];
+  className?: string;
+}) {
+  return (
+    <UnifiedSkeleton
+      className={cn(sizeClasses[size], 'flex-shrink-0 rounded-lg', className)}
+      {...loadingItemProps(props)}
+    />
+  );
 }
 
 /**
@@ -77,6 +89,7 @@ export function VendorIcon({
   showBackground = true,
   backgroundStyle = 'dark',
   loading: loadingProp,
+  ...props
 }: VendorIconProps) {
   const loading = useLoadingScope() || !!loadingProp;
   const logoUrl = getVendorLogo(vendor);
@@ -91,10 +104,12 @@ export function VendorIcon({
     className,
   );
 
-  if (loading) return <VendorIconSkeleton size={size} className={className} />;
+  // A list's markers (`data-loading-item`) ride on the icon in both forms.
+  const markers = loadingItemProps(props);
+  if (loading) return <VendorIconSkeleton size={size} className={className} {...markers} />;
 
   return (
-    <div className={containerClasses}>
+    <div className={containerClasses} {...markers}>
       {logoUrl ? (
         <Image
           src={logoSrc}

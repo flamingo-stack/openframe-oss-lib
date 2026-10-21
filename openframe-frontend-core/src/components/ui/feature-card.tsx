@@ -81,6 +81,10 @@ export interface FeatureCardGridSkeletonShape {
   contentType?: 'h4' | 'h6';
 }
 
+/** Items a loading grid draws when it is told neither a count nor its columns: one row of the grid's default three
+ *  columns (`FeatureCardGridView`'s `columns`). */
+const FEATURE_CARD_GRID_SKELETON_ITEMS = 3;
+
 const GRID_COLUMNS = {
   2: 'grid-cols-1 content-md:grid-cols-2',
   3: 'grid-cols-1 content-md:grid-cols-3',
@@ -341,12 +345,15 @@ export function FeatureCardGridSkeleton({
   contentType = 'h4',
   ...grid
 }: Omit<FeatureCardGridProps, 'items' | 'loading' | 'skeleton'> & FeatureCardGridSkeletonShape) {
-  const items: FeatureCardItem[] = Array.from({ length: count ?? grid.columns ?? 3 }, (_, index) => ({
-    title: '',
-    eyebrow: eyebrow ? String(index + 1).padStart(2, '0') : undefined,
-    subtitle: subtitle ? '-' : undefined,
-    media: media ? <UnifiedSkeleton className={media} /> : undefined,
-    content: contentLines ? <TextLineSkeleton type={contentType} lines={contentLines} className="w-full" /> : null,
-  }));
+  const items: FeatureCardItem[] = Array.from(
+    { length: count ?? grid.columns ?? FEATURE_CARD_GRID_SKELETON_ITEMS },
+    (_, index) => ({
+      title: '',
+      eyebrow: eyebrow ? String(index + 1).padStart(2, '0') : undefined,
+      subtitle: subtitle ? '-' : undefined,
+      media: media ? <UnifiedSkeleton className={media} /> : undefined,
+      content: contentLines ? <TextLineSkeleton type={contentType} lines={contentLines} className="w-full" /> : null,
+    }),
+  );
   return <FeatureCardGridView {...grid} items={items} loading loadingKeepsEyebrow={eyebrow === 'index'} />;
 }

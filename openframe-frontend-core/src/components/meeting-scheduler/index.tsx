@@ -285,7 +285,7 @@ export const MEETING_SCHEDULER_H = 'content-md:h-[34.375rem] content-lg:h-[23.75
  * question the HubSpot link declares is on the page instead of scrolling inside
  * a card cut off mid-consent. What keeps that from jumping is the form's own
  * footprint discipline: the SSR seed renders the real form on first paint, and
- * the cold-start `BookingFormSkeleton` draws the same rows through the same grid.
+ * the cold-start `BookingForm` (its own loading form) draws the same rows through the same grid.
  *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
@@ -1206,7 +1206,6 @@ export function HubSpotMeetingScheduler({
 // package exports `./components/meeting-scheduler`, not the file beneath it).
 export {
   BookingForm,
-  BookingFormSkeleton,
   formFieldOptionLabel,
   type BookingFormProps,
   type BookingFieldRow,

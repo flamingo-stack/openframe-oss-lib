@@ -64,7 +64,13 @@ export function CategoriesCart({
           <div className={ICON_ROW_CLASS}>
             {/* A category with no vendors leaves the strip empty: it keeps its height, and draws no stand-in icons. */}
             {vendors.map(vendor => (
-              <VendorIcon key={vendor.id} vendor={vendor} size={VENDOR_ICON_SIZE} className={VENDOR_ICON_CLASS} />
+              <VendorIcon
+                key={vendor.id}
+                data-loading-item
+                vendor={vendor}
+                size={VENDOR_ICON_SIZE}
+                className={VENDOR_ICON_CLASS}
+              />
             ))}
           </div>
           <StripFades />
@@ -116,7 +122,15 @@ export function CategoriesCartSkeleton({
         <div className={ICON_STRIP_CLASS}>
           <div className={ICON_ROW_CLASS}>
             <LoadingItems count={vendors}>
-              {() => <VendorIcon loading vendor={EMPTY_VENDOR} size={VENDOR_ICON_SIZE} className="rounded" />}
+              {() => (
+                <VendorIcon
+                  data-loading-item
+                  loading
+                  vendor={EMPTY_VENDOR}
+                  size={VENDOR_ICON_SIZE}
+                  className="rounded"
+                />
+              )}
             </LoadingItems>
           </div>
           <StripFades />

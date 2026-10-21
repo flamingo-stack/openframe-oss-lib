@@ -138,9 +138,9 @@ export function OrganizationCard({
         </div>
       </div>
 
-      {/* Description */}
+      {/* Description: only some organizations have one (the loading card leaves it out) */}
       {organization.description && (
-        <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS}>
+        <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS} data-loading-optional>
           <p className="line-clamp-2 text-ods-text-primary text-h4" title={organization.description}>
             {organization.description}
           </p>

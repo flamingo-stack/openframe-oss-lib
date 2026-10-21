@@ -64,16 +64,30 @@ export function TicketStatusConfigList<T extends { id: string }>({
   const loading = useLoadingScope() || !!loadingProp;
   if (loading && items.length === 0) {
     return (
-      <div className={cn(LIST_CLASS, className)} aria-hidden>
-        <LoadingItems count={skeletonRows}>
-          {() => (
-            // The row's own loading form, in the frame a sortable row has. A list that knows nothing yet draws
-            // `custom` rows (the kind a host can recolor, so the Color column is drawn).
-            <div data-loading-item>
-              <TicketStatusConfigRow variant="custom" statusKey="" name="" onColorChange={noop} loading />
-            </div>
-          )}
-        </LoadingItems>
+      // The SAME sortable list and rows, inert: the reorder controls a row has (the grip, or the touch move pair) are
+      // drawn for real, and nothing in it can be dragged or pressed while it loads.
+      <div inert aria-hidden className="contents">
+        <SortableList onReorder={noop} className={cn(LIST_CLASS, className)}>
+          <LoadingItems count={skeletonRows}>
+            {index => (
+              <SortableRow index={index} count={skeletonRows}>
+                {args => (
+                  // The row's own loading form. A list that knows nothing yet draws `custom` rows (the kind a host can
+                  // recolor, so the Color column is drawn).
+                  <TicketStatusConfigRow
+                    variant="custom"
+                    statusKey=""
+                    name=""
+                    onColorChange={noop}
+                    dragHandleProps={args.dragHandleProps}
+                    moveButtons={args.moveButtons}
+                    loading
+                  />
+                )}
+              </SortableRow>
+            )}
+          </LoadingItems>
+        </SortableList>
       </div>
     );
   }

@@ -3,6 +3,7 @@
 import { cn } from '../../../utils/cn';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { CHECKBOX_BOX_CLASS } from '../checkbox';
+import { LoadingItems } from '../loading-scope';
 import type { TableCardSkeletonProps } from './types';
 import { getHideClasses, TABLE_ACTIONS_COLUMN_KEY, TABLE_CHEVRON_COLUMN_KEY } from './utils';
 
@@ -19,6 +20,10 @@ const ROW_HEIGHT_DESKTOP = 'h-[66px] content-md:h-[78px]';
  */
 const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
 const ROW_HEIGHT_MOBILE = 'h-[66px]';
+/** A row's card (its frame and surface): read by `TableRow` and by its loading rows below, so both are one box. */
+export const TABLE_ROW_FRAME_CLASS = 'relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card';
+/** The cells' row inside the card (inset and column gap), in both forms. */
+export const TABLE_ROW_CELLS_CLASS = 'relative flex items-center gap-4 px-4';
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 /**
@@ -41,11 +46,10 @@ export function TableCardSkeleton({
   // may be a narrow leading action/icon column. Falls back to the first column.
   const primaryKey = (columns.find(c => /flex-(1|\[)/.test(c.width || '')) ?? columns[0])?.key;
   return (
-    <>
-      {Array.from({ length: rows }).map((_, index) => (
+    <LoadingItems count={rows}>
+      {index => (
         <div
-          key={index}
-          className={cn('relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card', className)}
+          className={cn(TABLE_ROW_FRAME_CLASS, className)}
           // One row of the read list it stands for, like the loaded `TableRow`.
           data-loading-item
         >
@@ -53,7 +57,7 @@ export function TableCardSkeleton({
               width (the synthetic actions and chevron columns included), so a loaded row takes the skeleton's place. */}
           <div
             className={cn(
-              'relative flex items-center gap-4 px-4',
+              TABLE_ROW_CELLS_CLASS,
               compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
               rowClassName,
             )}
@@ -95,8 +99,8 @@ export function TableCardSkeleton({
             })}
           </div>
         </div>
-      ))}
-    </>
+      )}
+    </LoadingItems>
   );
 }
 

@@ -157,7 +157,7 @@ export function CustomerInterviewCard({
             />
           ) : null}
           {interview.main_video_url ? (
-            <span className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <span data-loading-optional className="absolute inset-0 flex items-center justify-center bg-black/30">
               <Video className="h-4 w-4 text-ods-text-on-dark" />
             </span>
           ) : null}
@@ -221,7 +221,7 @@ export function CustomerInterviewCard({
                 onError={hideOnError}
               />
               {interview.main_video_url && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <div data-loading-optional className="absolute inset-0 flex items-center justify-center bg-black/40">
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent/90">
                     <Video className="h-8 w-8 text-ods-text-on-accent" />
                   </div>
@@ -265,7 +265,10 @@ export function CustomerInterviewCard({
                 </div>
               )}
               {interview.msp?.icon_url && (
-                <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg">
+                <div
+                  data-loading-optional
+                  className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg"
+                >
                   <Image
                     src={interview.msp.icon_url}
                     alt={interview.msp.name || 'MSP'}
@@ -280,7 +283,12 @@ export function CustomerInterviewCard({
             <div className={INTERVIEW_CARD_PERSON_TEXT}>
               <p className="truncate text-ods-text-primary text-h6">
                 {interview.user?.full_name || 'Anonymous'}
-                {interview.msp?.name && <span className="text-ods-text-secondary"> • {interview.msp.name}</span>}
+                {interview.msp?.name && (
+                  <span data-loading-optional className="text-ods-text-secondary">
+                    {' '}
+                    • {interview.msp.name}
+                  </span>
+                )}
               </p>
               <p className="truncate text-ods-text-secondary text-h6">{interview.user?.job_title || ' '}</p>
             </div>

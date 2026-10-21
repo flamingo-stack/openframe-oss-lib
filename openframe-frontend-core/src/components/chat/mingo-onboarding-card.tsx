@@ -53,7 +53,7 @@ const CARD_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-o
 const CARD_ACTIONS_CLASS = 'mt-[var(--spacing-system-xs)] flex flex-wrap items-center gap-[var(--spacing-system-xxs)]';
 
 /** Action chips a loading card draws while it knows none of its actions: the typical `Recent / Search / Find` row. */
-const TYPICAL_ACTION_CHIPS = 3;
+const MINGO_ONBOARDING_CARD_SKELETON_ACTIONS = 3;
 
 /**
  * Per-card loading shapes, cycled by index so a list of loading cards is irregular and the same list draws the same
@@ -111,6 +111,7 @@ export function MingoOnboardingCard({
     ? actions.map(action => (
         <Button
           key={action.id}
+          data-loading-item
           type="button"
           variant="outline"
           size="small"
@@ -165,8 +166,8 @@ export function MingoOnboardingCard({
       {loading && actions === undefined ? (
         // The commands are not read yet: the typical card's three action chips.
         <div className={CARD_ACTIONS_CLASS}>
-          <LoadingItems count={TYPICAL_ACTION_CHIPS}>
-            {() => <InteractiveSkeleton.Button size="small" className="w-16" />}
+          <LoadingItems count={MINGO_ONBOARDING_CARD_SKELETON_ACTIONS}>
+            {() => <InteractiveSkeleton.Button data-loading-item size="small" className="w-16" />}
           </LoadingItems>
         </div>
       ) : hasActions ? (

@@ -270,8 +270,17 @@ interface InfoCardValueRowProps {
 }
 
 /** One `label —— value` row, loaded and loading (the card decides: its rows are its own read data). */
-function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel, loading }: InfoCardValueRowProps) {
+function InfoCardValueRow({
+  label,
+  value,
+  showLabel,
+  copyable,
+  icon,
+  copyAriaLabel,
+  loading: loadingProp,
+}: InfoCardValueRowProps) {
   const { copy, copied } = useCopyToClipboard();
+  const loading = useLoadingScope() || loadingProp;
 
   return (
     <div className={VALUE_ROW_CLASS}>

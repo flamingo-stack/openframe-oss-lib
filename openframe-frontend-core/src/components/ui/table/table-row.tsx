@@ -6,7 +6,12 @@ import { cn } from '../../../utils/cn';
 import { isOwnClick } from '../../../utils/own-click';
 import { Checkbox } from '../checkbox';
 import { TableCell } from './table-cell';
-import { COMPACT_ROW_MIN_HEIGHT, ROW_HEIGHT_DESKTOP } from './table-skeleton';
+import {
+  COMPACT_ROW_MIN_HEIGHT,
+  ROW_HEIGHT_DESKTOP,
+  TABLE_ROW_CELLS_CLASS,
+  TABLE_ROW_FRAME_CLASS,
+} from './table-skeleton';
 import type { TableRowData, TableRowProps } from './types';
 import { getHideClasses } from './utils';
 
@@ -89,7 +94,7 @@ export function TableRow<T = TableRowData>({
     <Row
       {...motionProps}
       className={cn(
-        'relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card',
+        TABLE_ROW_FRAME_CLASS,
         (onClick || isLinkMode) && 'cursor-pointer transition-colors hover:bg-ods-bg-active',
         typeof className === 'function' ? className(item, index) : className,
       )}
@@ -102,7 +107,7 @@ export function TableRow<T = TableRowData>({
       )}
       <div
         className={cn(
-          'relative flex items-center gap-4 px-4',
+          TABLE_ROW_CELLS_CLASS,
           // `compact` rows are content-sized, but every row in a table shows
           // the same cell shapes, so a MIN height makes the body's height a
           // function of the row COUNT alone. That is what lets a host reserve

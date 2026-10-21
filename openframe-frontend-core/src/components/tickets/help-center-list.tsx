@@ -46,7 +46,7 @@ import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row';
 import { Button } from '../ui';
 import { UnifiedPagination } from '../unified-pagination';
 import { HelpCenterCard } from './help-center-card';
-import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form';
+import { HelpCenterCreateForm } from './help-center-create-form';
 import { useTicketActions } from './hooks/use-ticket-actions';
 import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
@@ -103,7 +103,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
         backButton={backButton}
         title={title}
         shell={shell}
-        preControls={<HelpCenterCreateFormSkeleton />}
+        preControls={<HelpCenterCreateForm loading />}
       >
         <DevCardRowSkeletonList rows={TICKETS_PAGE_SIZE} />
       </DevSectionPage>

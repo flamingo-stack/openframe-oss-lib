@@ -396,7 +396,11 @@ export function RoadmapCard({
             ) : null;
           })()}
           {item.targetVersion && (
-            <StatusBadge gen={generationTierFromLabel(item.targetVersion)} text={item.targetVersion} />
+            <StatusBadge
+              data-loading-optional
+              gen={generationTierFromLabel(item.targetVersion)}
+              text={item.targetVersion}
+            />
           )}
         </div>
       </div>

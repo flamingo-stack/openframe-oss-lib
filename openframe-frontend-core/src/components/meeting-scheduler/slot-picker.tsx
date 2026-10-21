@@ -7,7 +7,7 @@ import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from 
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button, DatePickerCalendar } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -379,10 +379,10 @@ export function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayo
         {/* Enough to fill the visible scroll box at any column count — the
             grid's track count follows the card width, so no fixed number
             lands flush and a partial last row is the honest shape anyway. */}
-        {Array.from({ length: SLOT_PICKER_SKELETON_CHIPS }, (_, i) => (
-          // h-11 content-md:h-12 — the loaded chip's own default-size height.
-          <UnifiedSkeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
-        ))}
+        <LoadingItems count={SLOT_PICKER_SKELETON_CHIPS}>
+          {/* h-11 content-md:h-12 — the loaded chip's own default-size height. */}
+          {() => <UnifiedSkeleton data-loading-item className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />}
+        </LoadingItems>
       </div>
     </>
   );
@@ -485,6 +485,7 @@ export function SlotPicker({
                       if (isSubmitting) return;
                       onSelectSlot(ms);
                     }}
+                    data-loading-item
                     className={CHIP_CLASS}
                   >
                     {timeLabelInZone(ms, timezone)}

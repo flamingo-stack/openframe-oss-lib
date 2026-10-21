@@ -30,11 +30,11 @@ import { cn } from '../../utils/cn';
 import { resolveContentHref } from '../../utils/content-href';
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
-import { LoadingRegion } from '../loading/loading-region';
+import { LoadingFallback } from '../loading/loading-fallback';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
 import { LoadError } from '../ui/error-state';
 import { FilterPillRow } from '../ui/filter-pill-row';
-import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import { useLoadingScope } from '../ui/loading-scope';
 import {
   CATALOG_CONTROLS_CLASS,
   CATALOG_LIST_CLASS,
@@ -224,11 +224,7 @@ export function OnboardingGuidesCatalogView({
   // The first read (no data yet): the SAME view in a loading scope. A later section toggle that returns ZERO guides
   // keeps the page's controls and dims the grid (`dimmed`).
   if (!loading) return view;
-  return (
-    <LoadingRegion label="Loading onboarding guides" announce={!scoped}>
-      <LoadingScope>{view}</LoadingScope>
-    </LoadingRegion>
-  );
+  return <LoadingFallback label="Loading onboarding guides">{view}</LoadingFallback>;
 }
 
 /** The catalog's sections: their own skeleton while the guides are read (`useLoadingScope() || loading`). */
@@ -271,7 +267,9 @@ function OnboardingCatalogSections({
               read top-to-bottom; a grid would visually reorder them. */}
           <ul className={CATALOG_LIST_CLASS}>
             {sec.guides.map(guide => (
-              <li key={guide.id}>{renderCard(guide)}</li>
+              <li key={guide.id} data-loading-item>
+                {renderCard(guide)}
+              </li>
             ))}
           </ul>
         </section>

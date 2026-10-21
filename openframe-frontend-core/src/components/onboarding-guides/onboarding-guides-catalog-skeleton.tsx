@@ -2,6 +2,7 @@
 
 import { OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { LoadingItems } from '../ui/loading-scope';
 
 /** The catalog's layout, read by the loaded view and by its sections' skeleton, so the skeleton is the view's size. */
 export const CATALOG_VIEW_CLASS = 'flex w-full flex-col gap-10';
@@ -35,12 +36,13 @@ export function OnboardingCatalogSectionsSkeleton() {
           </span>
         </h2>
         <ul className={CATALOG_LIST_CLASS}>
-          {Array.from({ length: ONBOARDING_CATALOG_SKELETON_CARDS }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-            <li key={i}>
-              <OnboardingGuideCardSkeleton size="catalog" />
-            </li>
-          ))}
+          <LoadingItems count={ONBOARDING_CATALOG_SKELETON_CARDS}>
+            {() => (
+              <li data-loading-item>
+                <OnboardingGuideCardSkeleton size="catalog" />
+              </li>
+            )}
+          </LoadingItems>
         </ul>
       </section>
     </div>

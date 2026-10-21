@@ -157,8 +157,9 @@ describe('round 2: chat rows are their loaded twins', () => {
   it('slash-command cards carry data-loading-item in both forms', () => {
     const loading = render(<MingoOnboardingCard loading data-loading-item title="" />).container;
     const loaded = render(<MingoOnboardingCard data-loading-item title="Roadmap" actions={[]} />).container;
-    expect(loading.querySelectorAll('[data-loading-item]')).toHaveLength(1);
-    expect(loaded.querySelectorAll('[data-loading-item]')).toHaveLength(1);
+    // The card's own frame is the list item (its typical action chips, a nested list, carry their own markers).
+    expect(loading.firstElementChild?.hasAttribute('data-loading-item')).toBe(true);
+    expect(loaded.firstElementChild?.hasAttribute('data-loading-item')).toBe(true);
   });
 
   it('the ticket list switches on the scope and marks its rows', () => {

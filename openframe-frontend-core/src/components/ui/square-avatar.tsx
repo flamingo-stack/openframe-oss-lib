@@ -7,7 +7,7 @@ import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -65,7 +65,15 @@ const SquareAvatar = memo(
       const held = inScope || !!loading;
       const authedSrc = useAuthedImageSrc(held ? undefined : src);
       if (held) {
-        return <SquareAvatarSkeleton size={size} sizePx={sizePx} variant={variant} className={className} />;
+        return (
+          <SquareAvatarSkeleton
+            size={size}
+            sizePx={sizePx}
+            variant={variant}
+            className={className}
+            {...loadingItemProps(props)}
+          />
+        );
       }
       const resolvedSrc = authedSrc;
       const sizeClasses = AVATAR_SIZE;
@@ -146,9 +154,14 @@ export function SquareAvatarSkeleton({
   sizePx,
   variant = 'square',
   className,
-}: Pick<SquareAvatarProps, 'size' | 'sizePx' | 'variant' | 'className'>) {
+  ...props
+}: Pick<SquareAvatarProps, 'size' | 'sizePx' | 'variant' | 'className'> & {
+  /** The avatar's markers (`data-loading-item`), forwarded like the loaded avatar's. */
+  [marker: `data-${string}`]: unknown;
+}) {
   return (
     <UnifiedSkeleton
+      {...loadingItemProps(props)}
       className={cn(
         'shrink-0',
         sizePx === undefined && AVATAR_SIZE[size],

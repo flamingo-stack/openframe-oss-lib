@@ -2,7 +2,7 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
@@ -136,6 +136,9 @@ export interface ChatListItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
  *  chat list's loading rows. */
 export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
 
+/** The trailing glyph's 24px box at the row's end, loaded and loading. */
+const TRAILING_CLASS = 'flex shrink-0 items-center [&_svg]:size-6';
+
 /** The row's box, loaded and loading. */
 const CHAT_LIST_ITEM_CLASS =
   'flex w-full shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left';
@@ -145,7 +148,8 @@ const CHAT_LIST_ITEM_CLASS =
  * title over a caption, an optional mark before the title and a status glyph
  * at the end. The selected row takes the accent's secondary fill, so a tenant
  * accent recolours it with the rest of the brand. ONE switch (`useLoadingScope() || loading`): while the chat is read
- * the SAME row (an inert `div`) draws its title, caption and trailing text as bars; the `leading` mark stays.
+ * the SAME row (an inert `div`) draws its title and caption as bars and its trailing glyph as an icon box; the `leading`
+ * mark stays.
  */
 const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
   (
@@ -178,8 +182,13 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
             ))}
         </span>
         {loading
-          ? trailing != null && <TextLineSkeleton type="h6" className="w-12 shrink-0" />
-          : trailing && <span className="flex shrink-0 items-center [&_svg]:size-6">{trailing}</span>}
+          ? trailing != null && (
+              // The status glyph's 24px box (`MediaSkeleton.Icon` md), the loaded glyph's size.
+              <span className={TRAILING_CLASS}>
+                <MediaSkeleton.Icon size="md" />
+              </span>
+            )
+          : trailing && <span className={TRAILING_CLASS}>{trailing}</span>}
       </>
     );
     if (loading) {

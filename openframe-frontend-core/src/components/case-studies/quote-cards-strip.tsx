@@ -68,7 +68,7 @@ export interface QuoteCardsStripProps {
    * `QUOTE_STRIP_SKELETON_CARDS`, a typical count for a host that states none.
    */
   skeletonCount?: number;
-  /** @deprecated Use `skeletonCount`. */
+  /** @deprecated Ignored: the skeleton draws `skeletonCount` (a list draws its full count, never a fold). */
   fold?: number;
   className?: string;
 }
@@ -98,12 +98,10 @@ function QuoteCardsStripSkeleton({ count, className }: { count: number; classNam
  * keeps the click but stays out of the a11y tree. While its quotes are read (a page's loading scope with none handed
  * over, or `loading`) it is its own skeleton; read and empty, it renders nothing.
  */
-export function QuoteCardsStrip({ quotes, loading = false, skeletonCount, fold, className }: QuoteCardsStripProps) {
+export function QuoteCardsStrip({ quotes, loading = false, skeletonCount, className }: QuoteCardsStripProps) {
   const scoped = useLoadingScope();
   if ((scoped && quotes.length === 0) || loading) {
-    return (
-      <QuoteCardsStripSkeleton count={skeletonCount ?? fold ?? QUOTE_STRIP_SKELETON_CARDS} className={className} />
-    );
+    return <QuoteCardsStripSkeleton count={skeletonCount ?? QUOTE_STRIP_SKELETON_CARDS} className={className} />;
   }
   if (quotes.length === 0) return null;
   return (

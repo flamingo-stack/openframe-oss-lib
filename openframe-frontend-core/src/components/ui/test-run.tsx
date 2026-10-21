@@ -10,6 +10,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { DataTable } from './data-table';
 import { useDataTable } from './data-table/use-data-table';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { NoData } from './no-data';
 import type { QueryResultRow } from './query-report-table';
 import { ScrollShadow } from './scroll-fade';
@@ -33,7 +34,9 @@ export function formatTestRunDuration(ms: number): string {
 }
 
 const RESULT_COLUMN_MIN_WIDTH = 176;
-const SKELETON_COLUMNS = 6;
+/** A result set's columns are read with its rows and have no fixed count: a loading run draws a typical six (the count
+ * this skeleton has always drawn), as header bars and as its one row's cells. */
+const TEST_RESULTS_SKELETON_COLUMNS = 6;
 
 /** Column-bar skeleton (header cells + one card row): fixed 160px columns on
     every breakpoint, scrolling horizontally when they do not fit. Bars are
@@ -51,21 +54,25 @@ export function TestResultsSkeleton({
           header and body sit flush. */}
         <div className="flex w-max min-w-full flex-col">
           <div className="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
-            {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
-              <div key={`skeleton-header-${i}`} className="flex h-12 w-[160px] shrink-0 items-center">
-                <UnifiedSkeleton className="h-4 w-3/4 rounded-sm" />
-              </div>
-            ))}
+            <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
+              {() => (
+                <div data-loading-item className="flex h-12 w-[160px] shrink-0 items-center">
+                  <UnifiedSkeleton className="h-4 w-3/4 rounded-sm" />
+                </div>
+              )}
+            </LoadingItems>
           </div>
           <div className="overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
             {/* Same INNER row heights as the DataTable (66/78px + the 1px card
               border on each side = 68/80px total, per design). */}
             <div className="flex h-[66px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] content-md:h-[78px]">
-              {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
-                <div key={`skeleton-cell-${i}`} className="w-[160px] shrink-0">
-                  <UnifiedSkeleton className="h-5 w-3/4 rounded-sm" />
-                </div>
-              ))}
+              <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
+                {() => (
+                  <div data-loading-item className="w-[160px] shrink-0">
+                    <UnifiedSkeleton className="h-5 w-3/4 rounded-sm" />
+                  </div>
+                )}
+              </LoadingItems>
             </div>
           </div>
         </div>
@@ -80,7 +87,8 @@ export function TestResultsSkeleton({
  * from the keys of the returned rows; wide result sets scroll horizontally.
  * Unlike the default tables, headers stay visible on every breakpoint.
  */
-export function TestResultsTable({ rows, loading }: { rows: QueryResultRow[]; loading: boolean }) {
+export function TestResultsTable({ rows, loading: loadingProp }: { rows: QueryResultRow[]; loading: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   const columnKeys = useMemo(() => (rows.length > 0 ? Object.keys(rows[0]) : []), [rows]);
 
   const columns = useMemo<ColumnDef<QueryResultRow>[]>(() => {

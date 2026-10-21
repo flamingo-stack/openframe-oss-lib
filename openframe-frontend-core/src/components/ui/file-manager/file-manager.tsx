@@ -3,7 +3,9 @@
 import { useMemo } from 'react';
 import { cn } from '../../../utils/cn';
 import { SearchIcon } from '../../icons-v2-generated/interface/search-icon';
+import { LoadingRegion } from '../../loading/loading-region';
 import { Input } from '../input';
+import { useLoadingScope } from '../loading-scope';
 import { FileManagerActionBar } from './file-manager-action-bar';
 import { FileManagerBreadcrumb } from './file-manager-breadcrumb';
 import { FileManagerTable } from './file-manager-table';
@@ -14,7 +16,8 @@ export function FileManager({
   currentPath,
   selectedFiles,
   searchQuery,
-  loading = false,
+  loading: loadingProp = false,
+  region = true,
   isSearching,
   showCheckboxes = true,
   showSearch = true,
@@ -32,6 +35,10 @@ export function FileManager({
   onFolderOpen,
   className,
 }: FileManagerProps) {
+  // ONE switch: in a loading scope or while the host reads the folder, the file manager draws its loading state. The
+  // breadcrumb, the actions and the search are static controls: drawn for real, inert.
+  const loading = useLoadingScope() || loadingProp;
+  const inertWhileLoading = { inert: loading || undefined, 'aria-hidden': loading || undefined };
   const breadcrumbItems = useMemo((): BreadcrumbItem[] => {
     const items: BreadcrumbItem[] = [];
 
@@ -127,9 +134,14 @@ export function FileManager({
   };
 
   return (
-    <div className={cn('flex h-full flex-col bg-ods-bg', className)}>
+    // One tree in both forms (nothing remounts when the folder answers); the region says it is loading, once.
+    <LoadingRegion
+      label="Loading files"
+      announce={loading && region}
+      className={cn('flex h-full flex-col bg-ods-bg', className)}
+    >
       <div className="flex min-h-0 flex-1 flex-col space-y-6 py-2">
-        <div className="mb-4 flex flex-col justify-between gap-4 content-md:flex-row">
+        <div className="mb-4 flex flex-col justify-between gap-4 content-md:flex-row" {...inertWhileLoading}>
           <FileManagerBreadcrumb items={breadcrumbItems} onItemClick={handleBreadcrumbClick} />
 
           {showActions && (
@@ -155,6 +167,7 @@ export function FileManager({
             disabled={disableSearch}
             startAdornment={<SearchIcon />}
             pending={isSearching}
+            {...inertWhileLoading}
           />
         )}
 
@@ -174,6 +187,6 @@ export function FileManager({
           />
         </div>
       </div>
-    </div>
+    </LoadingRegion>
   );
 }

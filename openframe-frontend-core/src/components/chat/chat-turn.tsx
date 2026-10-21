@@ -17,9 +17,11 @@ export interface ChatTurnProps {
   /** What was said. A string is drawn as the message text; a node is drawn as given. */
   children?: ReactNode;
   className?: string;
+  /** Draw the turn's loading form outside a loading scope too (`useLoadingScope() || loading`). */
+  loading?: boolean;
   /**
    * The loading state a loading scope draws, the turn's own skeleton: the picture's size in px (none without it),
-   * the message's line count (1 by default) and whether a time is shown.
+   * the message's line count (1 by default) or its own loading form (`body`), and whether a time and a meta are shown.
    */
   skeleton?: Omit<ChatTurnSkeletonProps, 'nameSize' | 'className'>;
 }
@@ -55,9 +57,11 @@ export function ChatTurn({
   time,
   children,
   className,
+  loading: loadingProp,
   skeleton,
 }: ChatTurnProps) {
-  if (useLoadingScope()) {
+  const loading = useLoadingScope() || loadingProp;
+  if (loading) {
     return (
       <ChatTurnSkeleton
         nameSize={nameSize}
@@ -65,7 +69,9 @@ export function ChatTurn({
         time={skeleton?.time ?? time != null}
         meta={skeleton?.meta ?? !!meta}
         lines={skeleton?.lines}
+        body={skeleton?.body}
         avatarPx={skeleton?.avatarPx}
+        avatarShape={skeleton?.avatarShape}
         className={className}
       />
     );
@@ -95,6 +101,11 @@ export interface ChatTurnSkeletonProps {
   nameSize?: 'default' | 'quiet';
   /** How many lines the message takes. */
   lines?: 1 | 2 | 3;
+  /**
+   * The message's own loading form, drawn in place of the line bars (a card whose message is a block of its own:
+   * a quote at its line count, an outcome row with its check).
+   */
+  body?: ReactNode;
   /** Whether the name row carries a time at its far end. */
   time?: boolean;
   /** Whether the name carries a meta line; a string is static copy, drawn for real. */
@@ -133,6 +144,7 @@ export function ChatTurnSkeleton({
   avatarShape = 'round',
   nameSize = 'default',
   lines = 1,
+  body,
   time = false,
   meta = false,
   className,
@@ -142,16 +154,7 @@ export function ChatTurnSkeleton({
       {avatarPx ? <SquareAvatar loading sizePx={avatarPx} variant={avatarShape} /> : null}
       <div className={TURN_BODY_CLASS}>
         <ChatTurnNameSkeleton nameSize={nameSize} meta={meta} time={time} />
-        <div>
-          {Array.from({ length: lines }, (_, i) => (
-            <TextLineSkeleton
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton lines never reorder
-              key={i}
-              type="h4"
-              className={i === lines - 1 && lines > 1 ? 'w-2/3' : 'w-full'}
-            />
-          ))}
-        </div>
+        {body ?? <TextLineSkeleton lines={lines} type="h4" />}
       </div>
     </div>
   );

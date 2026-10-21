@@ -30,12 +30,13 @@ import { ContactForm } from '../contact';
 import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Input, Label } from '../ui';
+import { useLoadingScope } from '../ui/loading-scope';
 import { RequiredMark } from '../ui/required-mark';
 import type { UseTicketActionsReturn } from './hooks/use-ticket-actions';
 
 const SUBJECT_MAX_CHARS = 200;
 
-export interface HelpCenterCreateFormProps {
+interface HelpCenterCreateFormLoadedProps {
   /** The full actions bag from `useTicketActions` — we read
    *  `submitTicket` from it. Passing the whole bag (rather than just
    *  the one method) keeps the wiring shape consistent with other
@@ -58,7 +59,16 @@ export interface HelpCenterCreateFormProps {
    *  is down. Wired from the parent's
    *  `useTicketActions.onSupportSystemDown` flag. */
   supportSystemDown?: boolean;
+  /** Not loading: the form. */
+  loading?: false;
 }
+
+/**
+ * The form's props. `loading: true` (the session identity is still being read): the form draws its own loading state
+ * (as in a page's loading scope), at the loaded form's size, and the other props may be left out.
+ */
+export type HelpCenterCreateFormProps =
+  HelpCenterCreateFormLoadedProps | ({ loading: true } & Partial<Omit<HelpCenterCreateFormLoadedProps, 'loading'>>);
 
 /**
  * Loading placeholder that mirrors `<HelpCenterCreateForm>`'s outer
@@ -93,7 +103,7 @@ export interface HelpCenterCreateFormProps {
  * the spacing rule fires identically — without them the whole stack
  * shifts up 24px on every page load.
  */
-export function HelpCenterCreateFormSkeleton({
+function HelpCenterCreateFormPending({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
@@ -172,12 +182,24 @@ export function HelpCenterCreateFormSkeleton({
   );
 }
 
-export function HelpCenterCreateForm({
+/**
+ * The ticket form. ONE switch: in a page's loading scope, or while the session identity is read (`loading`), it is its
+ * own loading state; else the form.
+ */
+export function HelpCenterCreateForm(props: HelpCenterCreateFormProps) {
+  const scoped = useLoadingScope();
+  // Inside a page's loading scope the page has announced it already.
+  if (props.loading) return <HelpCenterCreateFormPending region={!scoped} />;
+  if (scoped) return <HelpCenterCreateFormPending region={false} />;
+  return <HelpCenterCreateFormBody {...props} />;
+}
+
+function HelpCenterCreateFormBody({
   actions,
   sessionName,
   sessionEmail,
   supportSystemDown = false,
-}: HelpCenterCreateFormProps) {
+}: HelpCenterCreateFormLoadedProps) {
   const [subject, setSubject] = useState('');
   const [subjectError, setSubjectError] = useState<string | null>(null);
 
