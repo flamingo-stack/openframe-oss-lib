@@ -96,33 +96,16 @@ async fn failures_are_retried_until_the_key_arrives() {
 }
 
 #[tokio::test]
-async fn refresh_replaces_the_stored_key() {
-    let server = mock_server_with_body(&[200], r#"{"key":"rotated"}"#).await;
-    let fx = fixture(server.url.clone(), "stale").await;
-
-    assert_eq!(fx.service.refresh().await.unwrap(), "rotated");
-
-    assert_eq!(server.requests().len(), 1);
-    assert_eq!(fx.agent.get_log_key().unwrap(), "rotated");
-    assert_eq!(fx.service.stored_key().unwrap(), "rotated");
-}
-
-#[tokio::test]
-async fn failed_refresh_keeps_the_stored_key() {
-    let server = mock_server_with_body(&[500], "").await;
-    let fx = fixture(server.url.clone(), "stale").await;
-
-    assert!(fx.service.refresh().await.is_err());
-
-    assert_eq!(fx.agent.get_log_key().unwrap(), "stale");
-}
-
-#[tokio::test]
-async fn an_empty_key_is_rejected() {
+async fn an_empty_key_is_not_saved() {
     let server = mock_server_with_body(&[200], r#"{"key":""}"#).await;
-    let fx = fixture(server.url.clone(), "stale").await;
+    let fx = fixture(server.url.clone(), "").await;
 
-    assert!(fx.service.refresh().await.is_err());
+    let handle = fx.service.clone().start().unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
 
-    assert_eq!(fx.agent.get_log_key().unwrap(), "stale");
+    assert!(!handle.is_finished());
+    assert!(server.requests().len() >= 2);
+    assert_eq!(fx.agent.get_log_key().unwrap(), "");
+    assert_eq!(fx.initial.get_initial_key().unwrap(), "enroll");
+    handle.abort();
 }

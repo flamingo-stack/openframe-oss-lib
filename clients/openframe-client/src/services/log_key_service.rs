@@ -67,13 +67,6 @@ impl LogKeyService {
         }))
     }
 
-    /// Fetches a fresh log key once, after the logs gateway rejected the stored one.
-    pub async fn refresh(&self) -> Result<String> {
-        let key = self.fetch_log_key().await?;
-        self.store(key.clone()).await?;
-        Ok(key)
-    }
-
     pub fn stored_key(&self) -> Option<String> {
         self.agent_config_service
             .get_log_key()
