@@ -2,7 +2,8 @@
 
 import type React from 'react';
 import { useRouter } from '../../../embed-shims/next-navigation';
-import { DeviceCardSkeleton, DeviceCardSkeletonGrid } from '../../loading/device-card-skeleton';
+import { DEVICES_GRID_CLASS } from '../../loading/device-card-skeleton';
+import { LoadingRegion } from '../../loading/loading-region';
 import { DeviceCard } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { getDeviceName } from './device-name';
@@ -29,6 +30,9 @@ export interface DevicesGridProps<T extends DeviceRow = DeviceRow> {
 /** The cards a loading grid draws when the host states no page size. */
 export const DEVICES_GRID_SKELETON_CARDS = 12;
 
+/** The grid's cards carry no "more" button (the card opens the device), loaded and loading alike. */
+const GRID_CARD_ACTIONS = { moreButton: { visible: false } };
+
 export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   devices,
   isLoading: isLoadingProp,
@@ -52,14 +56,26 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   return (
     <div className="space-y-4">
       {isLoading && devices.length === 0 ? (
-        <DeviceCardSkeletonGrid count={pageSize} region={loadingRegion} />
+        // A full page of the grid's own cards, each its own skeleton (no "more" button, as the loaded cards).
+        <LoadingRegion label="Loading devices" announce={loadingRegion} className={DEVICES_GRID_CLASS}>
+          {Array.from({ length: pageSize }, (_, i) => (
+            <DeviceCard
+              key={`skeleton-${i}`}
+              loading
+              device={{ name: '' }}
+              actions={GRID_CARD_ACTIONS}
+              className="h-full"
+              data-loading-item
+            />
+          ))}
+        </LoadingRegion>
       ) : devices.length === 0 ? (
         <div className="flex h-64 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card">
           <p className="text-ods-text-secondary">{emptyMessage}</p>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 content-md:grid-cols-2 content-lg:grid-cols-3">
+          <div className={DEVICES_GRID_CLASS}>
             {devices.map(device => {
               const statusConfig = getDeviceStatusConfig(device.status);
               return (
@@ -82,11 +98,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                       : undefined
                   }
                   onDeviceClick={() => handleDeviceClick(device)}
-                  actions={{
-                    moreButton: {
-                      visible: false,
-                    },
-                  }}
+                  actions={GRID_CARD_ACTIONS}
                   className="h-full"
                   // One card of a read list: how many there are is the record's (the height gate counts them).
                   data-loading-item
@@ -94,7 +106,16 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
               );
             })}
             {isFetchingNextPage &&
-              Array.from({ length: pageSize }, (_, i) => <DeviceCardSkeleton key={`skeleton-${i}`} listItem />)}
+              Array.from({ length: pageSize }, (_, i) => (
+                <DeviceCard
+                  key={`skeleton-${i}`}
+                  loading
+                  device={{ name: '' }}
+                  actions={GRID_CARD_ACTIONS}
+                  className="h-full"
+                  data-loading-item
+                />
+              ))}
           </div>
           {hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
         </>

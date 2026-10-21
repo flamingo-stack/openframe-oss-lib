@@ -48,7 +48,11 @@ export interface InfoCardData {
 interface InfoCardProps {
   data: InfoCardData;
   className?: string;
-  /** The shape drawn while the data is read (a page's loading state, where `data.items` is empty). */
+  /**
+   * The shape drawn while the data is read (a page's loading state, where `data.items` is empty). What it leaves out
+   * is taken from `data`: its title and subtitle drawn for real (none without them), its icon, its progress bar and
+   * its footer.
+   */
   skeleton?: InfoCardSkeletonShape;
   /** The data is still being read: the card draws its `skeleton` shape. A loading scope does the same while
    *  `data.items` is empty. */
@@ -73,7 +77,10 @@ export interface InfoCardSkeletonShape {
   /** The subtitle line: `true` a bar, a string the subtitle drawn for real. */
   subtitle?: boolean | string;
   progress?: boolean;
-  footer?: boolean;
+  /** The footer: `true` a bar, the footer's own data drawn for real, `false` none. */
+  footer?: boolean | InfoCardFooterData;
+  /** The head's icon, static, drawn for real beside the title (or the subtitle when there is no title). */
+  icon?: React.ReactNode;
 }
 
 /** Rows a loading card draws when its caller names no count. */
@@ -96,7 +103,19 @@ export function InfoCard({ data, className = '', skeleton, loading }: InfoCardPr
   // ONE switch: in a page's loading state with no rows yet (they are read), or while the host reads the data, the
   // card is its skeleton.
   const inScope = useLoadingScope();
-  if (loading || (inScope && data.items.length === 0)) return <InfoCardSkeleton {...skeleton} className={className} />;
+  if (loading || (inScope && data.items.length === 0)) {
+    return (
+      <InfoCardSkeleton
+        title={data.title || false}
+        subtitle={data.subtitle || false}
+        icon={data.icon}
+        progress={!!data.progress}
+        footer={data.footer ?? false}
+        {...skeleton}
+        className={className}
+      />
+    );
+  }
   return (
     <div className={cn(FRAME_CLASS, className)}>
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
@@ -244,6 +263,7 @@ export function InfoCardSkeleton({
   subtitle = false,
   progress = false,
   footer = false,
+  icon,
   className = '',
 }: InfoCardSkeletonShape & { className?: string }) {
   // Each row's label: a word drawn for real, `null` for no label, `undefined` for a label bar.
@@ -255,19 +275,25 @@ export function InfoCardSkeleton({
       <div className={CONTENT_CLASS}>
         {(title || subtitle) && (
           <div className={HEAD_CLASS}>
-            {typeof title === 'string' ? (
+            {title && (
               <div className={HEAD_LINE_CLASS}>
-                <span className={TITLE_TEXT_CLASS}>{title}</span>
+                {typeof title === 'string' ? (
+                  <span className={TITLE_TEXT_CLASS}>{title}</span>
+                ) : (
+                  <TextLineSkeleton type="h4" className="w-1/2" />
+                )}
+                {icon}
               </div>
-            ) : (
-              title && <TextLineSkeleton type="h4" className="w-1/2" />
             )}
-            {typeof subtitle === 'string' ? (
+            {subtitle && (
               <div className={HEAD_LINE_CLASS}>
-                <span className={SUBTITLE_TEXT_CLASS}>{subtitle}</span>
+                {typeof subtitle === 'string' ? (
+                  <span className={SUBTITLE_TEXT_CLASS}>{subtitle}</span>
+                ) : (
+                  <TextLineSkeleton type="h4" className="w-1/3" />
+                )}
+                {!title && icon}
               </div>
-            ) : (
-              subtitle && <TextLineSkeleton type="h4" className="w-1/3" />
             )}
           </div>
         )}
@@ -288,10 +314,14 @@ export function InfoCardSkeleton({
           </div>
         )}
       </div>
-      {footer && (
-        <div className={FOOTER_CLASS}>
-          <TextLineSkeleton type="h4" className="w-1/2" />
-        </div>
+      {typeof footer === 'object' ? (
+        <InfoCardFooter footer={footer} />
+      ) : (
+        footer && (
+          <div className={FOOTER_CLASS}>
+            <TextLineSkeleton type="h4" className="w-1/2" />
+          </div>
+        )
       )}
     </div>
   );

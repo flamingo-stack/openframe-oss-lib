@@ -39,6 +39,9 @@ export interface TenantsTableViewProps {
   now?: Date;
 }
 
+/** The rows a loading tenants table draws when the host states none (a typical page of tenants). */
+export const TENANTS_TABLE_SKELETON_ROWS = 20;
+
 /** The tenants list: tenant, customer, access state and a way into each tenant's details. */
 export function TenantsTableView({
   rows,
@@ -47,7 +50,7 @@ export function TenantsTableView({
   isPending = false,
   totalCount,
   stickyHeaderOffset,
-  skeletonRows = 20,
+  skeletonRows = TENANTS_TABLE_SKELETON_ROWS,
   hasNextPage = false,
   isFetchingNextPage = false,
   onLoadMore,
@@ -133,7 +136,6 @@ export function TenantsTableView({
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={onLoadMore}
-            skeletonRows={2}
           />
         )}
       </DataTable>

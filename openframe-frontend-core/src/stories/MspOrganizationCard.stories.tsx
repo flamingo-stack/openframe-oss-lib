@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { MspOrganizationCard } from '../components/chat/msp-organization-card';
-import { MspOrganizationCardSkeleton } from '../components/chat/msp-organization-card-skeleton';
+import { MspOrganizationCard, MspOrganizationCardSkeleton } from '../components/chat/msp-organization-card';
 
 /**
  * MSP Organization card for the AI Assistant welcome screen.

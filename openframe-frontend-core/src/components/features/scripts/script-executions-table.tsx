@@ -75,7 +75,7 @@ export function ScriptExecutionsTable({
   emptyMessage = 'No executions found.',
   showHeader: withHeader = true,
   rightSlot,
-  skeletonRows = 10,
+  skeletonRows,
 }: ScriptExecutionsTableProps) {
   const columns = useMemo<ColumnDef<ScriptExecutionTableRow>[]>(() => {
     const renderers: Record<string, (row: ScriptExecutionTableRow) => ReactNode> = {

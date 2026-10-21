@@ -53,7 +53,7 @@ export function ScriptSchedulesTable({
   stickyHeader = false,
   stickyHeaderOffset,
   rightSlot,
-  skeletonRows = 10,
+  skeletonRows,
 }: ScriptSchedulesTableProps) {
   const columns = useMemo<ColumnDef<ScriptScheduleTableRow>[]>(() => {
     const cell = (layout: ScriptsTableColumnLayout, render: (row: ScriptScheduleTableRow) => ReactNode) => ({

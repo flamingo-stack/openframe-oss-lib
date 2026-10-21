@@ -8,7 +8,7 @@ import { Button } from '../../ui/button';
 import { CheckboxBlock } from '../../ui/checkbox-block';
 import { LoadingWhen, useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
-import { Tag } from '../../ui/tag';
+import { Tag, TagSkeleton } from '../../ui/tag';
 import { TermsAgreementLabel } from './terms-agreement-label';
 
 export interface SsoJoinFormProps {
@@ -57,6 +57,9 @@ export interface SsoJoinFormProps {
  * and would ignore anything edited here; the row exists so the person can see WHICH account and
  * WHICH organization they are about to be joined with - and walk away if it is the wrong one.
  */
+/** The identity row's role tags, loaded and loading. */
+const ROLES_CLASS = 'flex shrink-0 items-center gap-[var(--spacing-system-xs)]';
+
 export function SsoJoinForm({
   name,
   email,
@@ -123,12 +126,21 @@ export function SsoJoinForm({
             </>
           )}
         </div>
-        {!readingIdentity && roles.length > 0 && (
-          <div className="flex shrink-0 items-center gap-[var(--spacing-system-xs)]">
-            {roles.map(role => (
-              <Tag key={role} variant="grey" label={role} />
+        {readingIdentity ? (
+          // The roles are read with the identity: one tag per known role, else the typical one.
+          <div className={ROLES_CLASS}>
+            {Array.from({ length: Math.max(roles.length, 1) }, (_, i) => (
+              <TagSkeleton key={i} />
             ))}
           </div>
+        ) : (
+          roles.length > 0 && (
+            <div className={ROLES_CLASS}>
+              {roles.map(role => (
+                <Tag key={role} variant="grey" label={role} />
+              ))}
+            </div>
+          )
         )}
       </div>
 

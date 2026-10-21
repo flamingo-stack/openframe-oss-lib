@@ -72,7 +72,7 @@ export interface DeviceSelectorProps<T extends DeviceRow = DeviceRow> {
   loadingRegion?: boolean;
   /**
    * How many rows the loading table draws: the host's page size when the list is paged or limited (infinite
-   * scroll's first page). Defaults to `DEVICE_SELECTOR_SKELETON_ROWS`.
+   * scroll's first page). Omitted, the table's own page size, else the table's default.
    */
   skeletonRows?: number;
   /**

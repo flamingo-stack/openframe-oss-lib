@@ -7,6 +7,7 @@ import { Pagination } from '../../pagination';
 import { Button } from '../button';
 import { CursorPagination, CursorPaginationSkeleton } from '../cursor-pagination';
 import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
+import { DATA_TABLE_NEXT_PAGE_SKELETON_ROWS } from '../data-table/utils';
 import { useLoadingScope } from '../loading-scope';
 import { TableEmptyState } from './table-empty-state';
 import { TableHeader } from './table-header';
@@ -342,7 +343,10 @@ export function Table<T = TableRowData>({
             })()}
             {/* Infinite scroll: skeleton rows */}
             {infiniteScroll?.isFetchingNextPage && (
-              <TableCardSkeleton {...skeletonShape} rows={infiniteScroll.skeletonRows ?? 3} />
+              <TableCardSkeleton
+                {...skeletonShape}
+                rows={infiniteScroll.skeletonRows ?? DATA_TABLE_NEXT_PAGE_SKELETON_ROWS}
+              />
             )}
             {/* Infinite scroll: sentinel element */}
             {infiniteScroll?.hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}

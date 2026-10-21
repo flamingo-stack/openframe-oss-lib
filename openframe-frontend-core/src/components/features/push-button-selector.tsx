@@ -86,6 +86,9 @@ interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
 }
 
 /** The selector's layout, read by the selector and by its skeleton, so the skeleton is the selector's size. */
+/** The option rows a loading selector draws when the host states none (a typical short list of options). */
+export const PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS = 3;
+
 const SELECTOR_STACK_CLASS = 'space-y-4';
 const SELECTOR_TITLE_CLASS = 'text-ods-text-primary text-h5';
 const SELECTOR_HELP_CLASS = 'text-ods-text-secondary text-h6';
@@ -227,7 +230,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
   optional = false,
   isLoading = false,
   error = null,
-  skeletonCount = 3,
+  skeletonCount = PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS,
   optionDescriptions = true,
   sections,
   search,
@@ -272,6 +275,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
 
   const searchInput = search ? (
     <Input
+      userValue
       value={search.value}
       onChange={e => search.onChange(e.target.value)}
       placeholder={search.placeholder}

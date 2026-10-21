@@ -140,6 +140,9 @@ export interface DevicesListProps<T extends DeviceRow = DeviceRow> {
 
 const NOOP = () => {};
 
+/** The rows a loading list draws when the host states none (a typical page of devices). */
+export const DEVICES_LIST_SKELETON_ROWS = 8;
+
 /**
  * The devices list, search + tag chips + column funnels over the shared devices
  * table, identical on every surface that shows devices.
@@ -177,7 +180,7 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   rowActions,
   emptyState,
   narrowedEmptyState,
-  skeletonRows = 8,
+  skeletonRows = DEVICES_LIST_SKELETON_ROWS,
   infiniteScroll,
   stickyToolbar = true,
   stickyHeaderOffset,

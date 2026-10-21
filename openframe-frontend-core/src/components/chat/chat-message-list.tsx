@@ -944,6 +944,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           contentClassName={contentClassName}
           fill={fill}
           messageCount={CHAT_MESSAGE_LIST_SKELETON_MESSAGES}
+          appearance={appearance}
         />
       );
     }

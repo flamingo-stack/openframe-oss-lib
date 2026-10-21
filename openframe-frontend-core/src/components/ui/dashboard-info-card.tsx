@@ -8,7 +8,7 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress';
 import { FloatingTooltip } from './floating-tooltip';
 import { useLoadingScope } from './loading-scope';
-import { Tag } from './tag';
+import { Tag, TagSkeleton } from './tag';
 
 /**
  * How the percentage is rendered next to the value:
@@ -161,7 +161,7 @@ export function DashboardInfoCard({
       if (!loadingShowsPercentage) return null;
       // The box the loaded percentage takes: a `Tag` (h-8) or one `text-h4` line.
       return percentageAsTag ? (
-        <UnifiedSkeleton className="h-8 w-12 shrink-0 rounded-md" />
+        <TagSkeleton className="w-12" />
       ) : (
         <p className="text-h4">
           <TextLineSkeleton type="inherit" as="span" className="w-12" />

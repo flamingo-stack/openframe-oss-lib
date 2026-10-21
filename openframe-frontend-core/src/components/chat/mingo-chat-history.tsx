@@ -12,6 +12,7 @@ import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { SquareAvatar } from '../ui/square-avatar';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatListEmptyState } from './chat-list-empty-state';
+import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
 import type { DialogItem } from './types/component.types';
 
 /**
@@ -263,8 +264,6 @@ function MingoChatHistoryRow({
 // =============================================================================
 
 /** Title widths the loading rows cycle through, so the page reads like a list of chats. */
-const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
-
 /**
  * The history's loading state, shaped like the loaded list: a group label over a bordered box of `h-12` rows, one
  * page of them (`rows`, the host's page size), each a title bar (no unread badge: a badge is read data most rows do

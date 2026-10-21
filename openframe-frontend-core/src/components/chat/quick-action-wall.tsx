@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { useLoadingScope } from '../ui/loading-scope';
 import {
   MarqueeWall,
   MarqueeWallFades,
@@ -25,6 +26,10 @@ import {
  *  wall overflows typical caps at any viewport width (same fill + fade as
  *  the loaded state — zero height jump when data lands). */
 export const WALL_SKELETON_LABEL_CH = [17, 24, 14, 20, 15, 25, 12, 21, 16, 19, 13, 23];
+
+/** Skeleton chips a loading wall draws when its host names none: a wall has no page size, and 24 overflow the
+ *  typical caps at any width (the loaded wall's fill and fade). */
+export const QUICK_ACTION_WALL_SKELETON_CHIPS = 24;
 
 /** Deterministic index-alternating merge — the mixed "one stream" pile
  *  (deck slide 3's IT+SEC blend and its Storybook mirror). Input order
@@ -186,12 +191,14 @@ export function QuickActionWall({
   minChips,
   rows,
   agentSlug,
-  loading = false,
-  skeletonCount = 24,
+  loading: loadingProp = false,
+  skeletonCount = QUICK_ACTION_WALL_SKELETON_CHIPS,
   className,
   contentClassName,
   sync,
 }: QuickActionWallProps) {
+  // ONE switch: in a page's loading state (or while the host reads the chips) the wall draws skeleton chips.
+  const loading = useLoadingScope() || loadingProp;
   // Adapt the per-row pad target to the actual geometry (brick mode only): a
   // narrow chat composer needs only a handful of repeats to overflow, a wide
   // wall needs many, and a tiny chip needs more repeats than a wide one. We

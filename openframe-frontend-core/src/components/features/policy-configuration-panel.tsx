@@ -11,7 +11,7 @@ import type {
 } from '../../types/permissions';
 import { cn } from '../../utils/cn';
 import { useCollapsible } from '../chat/hooks/use-collapsible';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -256,13 +256,10 @@ const CategorySectionSkeleton: FC<{ category?: Pick<PermissionCategory, 'name' |
   editMode,
 }) => (
   <div data-loading-item className={CATEGORY_HEADER_CLASS}>
-    {category?.icon ? (
-      <div className={ICON_TILE_CLASS}>
-        <div className="text-ods-text-secondary">{category.icon}</div>
-      </div>
-    ) : (
-      <UnifiedSkeleton className={ICON_TILE_SIZE_CLASS} />
-    )}
+    {/* The icon is static (the host's, else the default shield, as the loaded header draws it). */}
+    <div className={ICON_TILE_CLASS}>
+      <div className="text-ods-text-secondary">{category?.icon ?? <Shield className="h-4 w-4" />}</div>
+    </div>
     <div className={CATEGORY_TEXT_CLASS}>
       {category?.name ? (
         <p className="truncate text-ods-text-primary text-h4">{category.name}</p>

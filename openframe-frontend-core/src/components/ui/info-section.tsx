@@ -3,10 +3,11 @@
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { AssigneeDropdown, type AssigneeDropdownProps } from './assignee-dropdown';
 import { useLoadingScope } from './loading-scope';
-import { SquareAvatar } from './square-avatar';
+import { SquareAvatar, SquareAvatarSkeleton } from './square-avatar';
+import { TagSkeleton } from './tag';
 import { TicketStatusTag, type TicketStatusTagProps } from './ticket-status-tag';
 
 /** A plain-text value, optionally with a trailing image (avatar), leading icon, or click action. */
@@ -142,13 +143,30 @@ const INFO_SECTION_VALUE_CLASS = 'flex min-w-0 items-center gap-[var(--spacing-s
  * arbitrary node.
  *
  * Loading (`loading`, or a `LoadingScope`): the caption and the labels are the page's copy and are drawn for real;
- * every value is a bar (`InfoSectionSkeleton`).
+ * every value is its control's skeleton (a tag for a status, the picker's box for an assignee, a text line).
  */
 export function InfoSection({ title, rows, loading: loadingProp, className }: InfoSectionProps) {
   const loading = useLoadingScope() || !!loadingProp;
-  if (loading) return <InfoSectionSkeleton title={title} labels={rows.map(row => row.label)} className={className} />;
+  return <InfoSectionCard title={title} rows={rows} loading={loading} className={className} />;
+}
+
+/**
+ * The card's ONE structure, loaded and loading: the caption, then a row per entry, its label and leader line drawn
+ * for real, the value its control or, while loading, that control's skeleton in the same value box.
+ */
+function InfoSectionCard({
+  title,
+  rows,
+  loading,
+  className,
+}: {
+  title?: string;
+  rows: Array<{ id: string; label: string; value?: InfoSectionValue }>;
+  loading: boolean;
+  className?: string;
+}) {
   return (
-    <div className={cn(INFO_SECTION_ROOT_CLASS, className)}>
+    <div className={cn(INFO_SECTION_ROOT_CLASS, className)} aria-hidden={loading || undefined}>
       {title && <p className={INFO_SECTION_TITLE_CLASS}>{title}</p>}
       <div className={INFO_SECTION_CARD_CLASS}>
         {rows.map(row => (
@@ -156,7 +174,7 @@ export function InfoSection({ title, rows, loading: loadingProp, className }: In
             <span className={INFO_SECTION_LABEL_CLASS}>{row.label}</span>
             <div className={INFO_SECTION_LINE_CLASS} />
             <div className={INFO_SECTION_VALUE_CLASS}>
-              <RowValue value={row.value} />
+              {loading || !row.value ? <RowValueSkeleton value={row.value} /> : <RowValue value={row.value} />}
             </div>
           </div>
         ))}
@@ -165,34 +183,47 @@ export function InfoSection({ title, rows, loading: loadingProp, className }: In
   );
 }
 
+/** One row's value while it is read, in the shape of the control the row holds. */
+function RowValueSkeleton({ value }: { value?: InfoSectionValue }) {
+  switch (value?.type) {
+    case 'status':
+      return <TagSkeleton />;
+    case 'assignee':
+      // The compact picker's trigger is the assignee's avatar; the default picker is a field.
+      return (value.variant ?? 'compact') === 'compact' ? (
+        <SquareAvatarSkeleton size="sm" variant="round" />
+      ) : (
+        <InteractiveSkeleton.Input className="w-48" />
+      );
+    default:
+      return <TextLineSkeleton as="span" type="h4" className="inline-flex w-24" />;
+  }
+}
+
 /**
  * The card while its values are read: the caption and each row's label drawn for real (static copy), the leader
- * line for real, and one `text-h4` line bar where the value goes, in the same row box as a loaded value.
+ * line for real, and the value in the shape of its control (a tag for a status, the picker's box for an assignee, a
+ * `text-h4` line for text), in the same row box as a loaded value.
  */
 export function InfoSectionSkeleton({
   title,
   labels,
+  values,
   className,
 }: {
   title?: string;
   /** The rows' labels: the page's copy, one row each. */
   labels: string[];
+  /** The rows' values (by index), for the shape of each value's skeleton; a text line without them. */
+  values?: Array<InfoSectionValue | undefined>;
   className?: string;
 }) {
   return (
-    <div className={cn(INFO_SECTION_ROOT_CLASS, className)} aria-hidden>
-      {title && <p className={INFO_SECTION_TITLE_CLASS}>{title}</p>}
-      <div className={INFO_SECTION_CARD_CLASS}>
-        {labels.map((label, index) => (
-          <div key={`${label}-${index}`} className={INFO_SECTION_ROW_CLASS}>
-            <span className={INFO_SECTION_LABEL_CLASS}>{label}</span>
-            <div className={INFO_SECTION_LINE_CLASS} />
-            <div className={INFO_SECTION_VALUE_CLASS}>
-              <TextLineSkeleton as="span" type="h4" className="inline-flex w-24" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <InfoSectionCard
+      title={title}
+      rows={labels.map((label, index) => ({ id: `${label}-${index}`, label, value: values?.[index] }))}
+      loading
+      className={className}
+    />
   );
 }

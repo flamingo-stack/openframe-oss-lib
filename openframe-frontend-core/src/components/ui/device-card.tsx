@@ -7,7 +7,12 @@ import type { OSPlatformId } from '../../utils/os-platforms';
 import { OSTypeIcon } from '../features/os-type-badge';
 import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface';
-import { DeviceCardSkeleton } from '../loading/device-card-skeleton';
+import {
+  DEVICE_CARD_FRAME_CLASS,
+  DEVICE_CARD_ICON_BOX_CLASS,
+  DEVICE_CARD_MORE_BUTTON_CLASS,
+  DeviceCardSkeleton,
+} from '../loading/device-card-skeleton';
 import { useLoadingScope } from './loading-scope';
 import { Tag, type TagProps } from './tag';
 
@@ -56,7 +61,11 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
    * shows one, `data-loading-item` kept when the card carries it). A loading scope does the same.
    */
   loading?: boolean;
-  /** The details button's box while loading (the host sizes the button it passes in `actions.detailsButton`). */
+  /**
+   * The details button's box while loading, overriding the default-size button box the card draws for it.
+   * @deprecated The card holds its details button as a button's box by itself; pass this only for a button of
+   * another size.
+   */
   detailsButtonSkeletonClassName?: string;
 }
 
@@ -78,6 +87,7 @@ export function DeviceCard({
       <DeviceCardSkeleton
         className={className}
         moreButton={actions.moreButton?.visible !== false}
+        detailsButton={actions.detailsButton?.visible !== false && !!actions.detailsButton?.component}
         detailsButtonClassName={actions.detailsButton?.visible !== false ? detailsButtonSkeletonClassName : undefined}
         listItem={'data-loading-item' in props}
       />
@@ -94,18 +104,13 @@ export function DeviceCard({
   return (
     <div
       onClick={onDeviceClick ? () => onDeviceClick(device) : undefined}
-      className={cn(
-        'overflow-clip rounded-[6px] border border-ods-border bg-ods-card',
-        'flex flex-col gap-4 p-4',
-        onDeviceClick && 'cursor-pointer',
-        className,
-      )}
+      className={cn(DEVICE_CARD_FRAME_CLASS, onDeviceClick && 'cursor-pointer', className)}
       {...props}
     >
       {/* Row 1: Device icon | OS icon + Name + Organization | More button | Details button | Custom actions */}
       <div className="flex w-full items-center gap-4">
         {/* Device type icon */}
-        <div className="flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border p-2">
+        <div className={DEVICE_CARD_ICON_BOX_CLASS}>
           <MonitorIcon className="text-ods-text-secondary" size={16} />
         </div>
 
@@ -133,7 +138,7 @@ export function DeviceCard({
         {/* More button */}
         {actions.moreButton?.visible !== false && (
           <div
-            className="flex shrink-0 cursor-pointer items-center justify-center rounded-[6px] border border-ods-border p-3 transition-colors hover:bg-ods-bg-hover"
+            className={cn(DEVICE_CARD_MORE_BUTTON_CLASS, 'cursor-pointer transition-colors hover:bg-ods-bg-hover')}
             onClick={e => {
               e.stopPropagation();
               actions.moreButton?.onClick?.();

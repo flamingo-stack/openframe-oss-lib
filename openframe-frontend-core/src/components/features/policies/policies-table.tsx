@@ -68,7 +68,7 @@ export function PoliciesTable({
   stickyHeader = false,
   stickyHeaderOffset,
   rightSlot,
-  skeletonRows = 10,
+  skeletonRows,
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
@@ -223,12 +223,7 @@ export function PoliciesTable({
         rowHref={rowHref}
       />
       {hasMore && onLoadMore && (
-        <DataTable.InfiniteFooter
-          hasNextPage
-          isFetchingNextPage={isLoadingMore}
-          onLoadMore={onLoadMore}
-          skeletonRows={2}
-        />
+        <DataTable.InfiniteFooter hasNextPage isFetchingNextPage={isLoadingMore} onLoadMore={onLoadMore} />
       )}
     </DataTable>
   );

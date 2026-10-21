@@ -111,6 +111,9 @@ export const multiSelectFilterFn: FilterFn<unknown> = (row, columnId, filterValu
 /** Skeleton rows of a table that knows no page size: a typical count for an UNPAGED table. */
 export const DATA_TABLE_SKELETON_ROWS = 10;
 
+/** The rows a next page's skeleton draws when neither the host nor the table states a page size. */
+export const DATA_TABLE_NEXT_PAGE_SKELETON_ROWS = 3;
+
 /**
  * The page size a host gave its table (`state.pagination.pageSize`, else `initialState.pagination.pageSize`), or
  * undefined when it gave none. Read from the OPTIONS, never `getState()`: TanStack fills in a page size of 10 for a

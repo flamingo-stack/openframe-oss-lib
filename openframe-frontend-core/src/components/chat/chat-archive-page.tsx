@@ -14,11 +14,9 @@ interface ChatArchivePageBaseProps {
   dialogs: ReadonlyArray<DialogItem>;
   /** Open an archived dialog. */
   onSelectDialog: (id: string) => void;
-  /** The delayed skeleton is visible (a slow first page is loading). */
+  /** A page is loading (the first: the list draws its loading state; a later one: its next-page rows). */
   isLoading?: boolean;
-  /** A first-page load is in flight but the delayed skeleton hasn't appeared
-   *  yet — keeps the empty state suppressed so it never flashes before the
-   *  skeleton/data arrives. */
+  /** A first-page load is in flight: the list draws its loading state, so the empty state never flashes. */
   isFetching?: boolean;
   /** Whether another page of archived dialogs remains. */
   hasMore?: boolean;
@@ -66,18 +64,9 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
     onLoadMore,
     pageSize,
   } = props;
-  // A first page with nothing to show yet (or the page's loading state): the list draws its own loading state.
-  const firstLoad = useLoadingScope() || (isLoading && dialogs.length === 0);
-
-  // A first, uncached load is in flight but the delayed skeleton hasn't
-  // appeared yet (the 120ms window). Render nothing rather than flashing
-  // the empty state before the skeleton / data arrives.
-  //
-  // Hoisted out of the ternary on 2026-08-24: Prettier joins `//` comments
-  // that sit inside a nested ternary onto one line, in reverse order, and
-  // reattaches them to the following branch. The explanation is worth more
-  // than the inline position.
-  const suppressEmptyStateWhileFetching = isFetching;
+  // ONE switch: a first page with nothing to show yet (in flight at all, or the page's loading state) is the list's
+  // own loading state, never a blank.
+  const firstLoad = useLoadingScope() || ((isLoading || isFetching) && dialogs.length === 0);
   return (
     <>
       {/* Mobile (<md): the shared mobile header — back to the list + a ⋯ menu
@@ -128,7 +117,7 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
             isLoadingMore={isLoading && dialogs.length > 0}
             onLoadMore={onLoadMore}
           />
-        ) : suppressEmptyStateWhileFetching ? null : (
+        ) : (
           // Empty state — mirrors the "Current Chats" rail empty state
           // (Figma 113:60939): centred 24px muted glyph + h4 title + h6 caption.
           <ChatListEmptyState

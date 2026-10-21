@@ -7,6 +7,7 @@ import { cn } from '../../utils/cn';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 
 /** The tag's frame: read by `tagVariants` and by `TagSkeleton`. */
 const TAG_FRAME_CLASS = 'inline-flex items-center justify-center rounded-md';
@@ -105,6 +106,9 @@ export interface TagProps
    * `<a>` — don't combine `as="span"` + `onClose` inside an anchor.
    */
   as?: 'div' | 'span';
+  /** The label is still being read: the tag draws its `TagSkeleton` (the tag's own frame and size). A loading scope
+   *  does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -150,8 +154,11 @@ function Tag({
   labelClassName,
   disabled,
   as: Comp = 'div',
+  loading,
   ...props
 }: TagProps) {
+  // ONE switch: in a page's loading state (or while the host reads the label) the tag is its skeleton, in its box.
+  if (useLoadingScope() || !!loading) return <TagSkeleton size={size ?? 'default'} className={className} />;
   return (
     <Comp
       className={cn(tagVariants({ variant, size }), disabled && disabledTagClasses, className)}

@@ -204,7 +204,8 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
               <label
                 key={optionKey}
                 htmlFor={loading ? undefined : itemId}
-                data-loading-item={loading || undefined}
+                // One option of the list, in the loaded and the loading form alike (the gate compares the two).
+                data-loading-item=""
                 aria-disabled={isDisabled || undefined}
                 className={cn(
                   'flex w-full items-center gap-3',

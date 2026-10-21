@@ -12,12 +12,15 @@ import { QueryReportTableSkeleton } from './query-report-table-skeleton';
 import type { QueryReportTableProps } from './types';
 import { deriveColumns, exportToCSV } from './utils';
 
+/** The rows a loading report draws when the host states none: a typical report, since a report has no page size. */
+export const QUERY_REPORT_TABLE_SKELETON_ROWS = 8;
+
 export function QueryReportTable({
   title,
   data,
   loading = false,
   loadingRegion = true,
-  skeletonRows = 8,
+  skeletonRows = QUERY_REPORT_TABLE_SKELETON_ROWS,
   skeletonColumns = 6,
   emptyMessage,
   columnWidth = 160,

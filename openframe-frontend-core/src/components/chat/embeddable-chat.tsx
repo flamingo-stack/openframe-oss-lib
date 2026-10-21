@@ -97,8 +97,7 @@ import { MingoChatHeader } from './mingo-chat-header';
 import { ChatDialogModals } from './mingo-chat-modals';
 import { MingoChatRail, type MingoDialogStatus } from './mingo-chat-rail';
 import { MingoHistoryRail } from './mingo-history-rail';
-import { MingoOnboardingCard } from './mingo-onboarding-card';
-import { MINGO_ONBOARDING_SKELETON_ROWS } from './mingo-onboarding-card-skeleton';
+import { MINGO_ONBOARDING_SKELETON_ROWS, MingoOnboardingCard } from './mingo-onboarding-card';
 import { MingoWelcome, type MingoWelcomeProps } from './mingo-welcome';
 import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
@@ -3092,6 +3091,7 @@ function EmbeddableChatInner({
                                         <MingoOnboardingCard
                                           key={`chip-skeleton-${i}`}
                                           loading
+                                          listItem
                                           skeletonIndex={i}
                                           title=""
                                         />
@@ -3113,6 +3113,7 @@ function EmbeddableChatInner({
                                           slashCommand={`/${cmdId}`}
                                           description={cmd.description}
                                           actions={cardActions}
+                                          listItem
                                         />
                                       );
                                     })}

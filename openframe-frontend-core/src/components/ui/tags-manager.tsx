@@ -287,6 +287,7 @@ export function TagsManager({
                           className="flex items-center gap-1 border-b border-ods-border px-2 py-1 last:border-b-0"
                         >
                           <Input
+                            userValue
                             ref={editInputRef}
                             value={editingName}
                             onChange={e => setEditingName(e.target.value)}

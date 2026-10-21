@@ -3,11 +3,13 @@
 import { cn } from '../../../utils/cn';
 import { formatTime } from '../../../utils/format-date';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { SquareAvatar } from '../../ui/square-avatar';
+import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
 
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
 const MESSAGE_ROW_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-xxs)]';
 const MESSAGE_HEAD_CLASS = 'flex items-center gap-[var(--spacing-system-xxs)]';
+/** The technician's avatar, in px. */
+const TECHNICIAN_AVATAR_PX = 24;
 const MESSAGE_NAME_CLASS = 'min-w-0 flex-1 truncate text-h4 [font-family:var(--font-family-heading)]';
 
 export interface RemoteDesktopChatMessageRowProps {
@@ -41,7 +43,13 @@ export function RemoteDesktopChatMessageRow({
     <div className={MESSAGE_ROW_CLASS} data-loading-item>
       <div className={MESSAGE_HEAD_CLASS}>
         {isTechnician && (
-          <SquareAvatar variant="round" sizePx={24} src={avatarUrl} alt={authorName} className="shrink-0" />
+          <SquareAvatar
+            variant="round"
+            sizePx={TECHNICIAN_AVATAR_PX}
+            src={avatarUrl}
+            alt={authorName}
+            className="shrink-0"
+          />
         )}
         <span className={cn(MESSAGE_NAME_CLASS, isTechnician ? 'text-ods-accent' : 'text-ods-text-secondary')}>
           {authorName}
@@ -56,11 +64,15 @@ export function RemoteDesktopChatMessageRow({
   );
 }
 
-/** A message row while the chat is read: the name and the time as bars on the name row, one line of the body. */
-export function RemoteDesktopChatMessageRowSkeleton() {
+/**
+ * A message row while the chat is read: the technician's avatar box on a technician's row, the name and the time as
+ * bars on the name row, one line of the body.
+ */
+export function RemoteDesktopChatMessageRowSkeleton({ isTechnician = false }: { isTechnician?: boolean }) {
   return (
     <div className={MESSAGE_ROW_CLASS} aria-hidden data-loading-item>
       <div className={MESSAGE_HEAD_CLASS}>
+        {isTechnician && <SquareAvatarSkeleton variant="round" sizePx={TECHNICIAN_AVATAR_PX} />}
         <span className={MESSAGE_NAME_CLASS}>
           <TextLineSkeleton type="inherit" as="span" className="w-24" />
         </span>

@@ -113,7 +113,8 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   gridSentinelRef?: RefObject<HTMLDivElement | null>;
   /**
    * The host query's page size: a loading table or grid draws one full page, and the next page's skeleton the same.
-   * Omitted, the table draws 10 rows and the grid its default.
+   * Omitted, the table falls back to its own page size (`DataTable.Body`, `InfiniteFooter`) and the grid to its
+   * declared default.
    */
   pageSize?: number;
 }
@@ -171,7 +172,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           isLoading={loading}
           loadingRegion={false}
           emptyMessage={loading ? '' : emptyMessage}
-          skeletonRows={pageSize ?? 10}
+          skeletonRows={pageSize}
           stickyHeaderOffset="top-[96px]"
           deviceFilters={deviceFilters}
           // Loading: the facets have not answered, which is not "this list has
@@ -191,7 +192,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
                 onLoadMore={onLoadMore}
-                skeletonRows={pageSize ?? 2}
+                skeletonRows={pageSize}
               />
             )
           }

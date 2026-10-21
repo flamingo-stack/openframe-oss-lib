@@ -51,12 +51,17 @@ export function LoadingRegion({
   // `announce` that flips at runtime does not remount the content (and drop its state and focus).
   return (
     <Tag aria-busy={announce ? 'true' : undefined} className={className} {...props}>
-      {announce && status && (
-        <span role="status" aria-live="polite" className="sr-only">
-          {label}
-        </span>
-      )}
+      {announce && status && <LoadingStatus label={label} />}
       {children}
     </Tag>
+  );
+}
+
+/** The one polite status a loading state is read as (visually hidden): the region's, and a fallback's beside its hidden content. */
+export function LoadingStatus({ label }: { label: string }) {
+  return (
+    <span role="status" aria-live="polite" className="sr-only">
+      {label}
+    </span>
   );
 }

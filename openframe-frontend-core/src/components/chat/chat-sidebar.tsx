@@ -3,7 +3,7 @@ import type { MouseEvent } from 'react';
 import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
@@ -88,7 +88,7 @@ function DialogListItemSkeleton({ className, ...props }: { className?: string; '
         <TextLineSkeleton type="h6" className="w-32" />
       </div>
       <div className="ml-2 flex-shrink-0">
-        <UnifiedSkeleton className="size-6 rounded" />
+        <Chevron02RightIcon className="size-6 text-ods-text-secondary" />
       </div>
     </div>
   );

@@ -6,7 +6,9 @@ import { type ComponentPropsWithoutRef, type ComponentRef, type ElementRef, forw
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
+import { useLoadingScope } from './loading-scope';
 import { usePortalContainer } from './portal-container';
 
 const Select = SelectPrimitive.Root;
@@ -29,6 +31,9 @@ const SelectTrigger = forwardRef<
   // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
   const errorSlot = 'error' in allProps;
   const isInvalid = invalid || !!error;
+  // ONE switch: in a page's loading state the trigger draws its box, its label and chevron for real, and its value
+  // (or placeholder) as a bar.
+  const inScope = useLoadingScope();
 
   const trigger = (
     <SelectPrimitive.Trigger
@@ -63,7 +68,7 @@ const SelectTrigger = forwardRef<
       )}
       {...props}
     >
-      {children}
+      {inScope ? <TextLineSkeleton type="h4" className="w-1/2 min-w-0 flex-1" /> : children}
       <SelectPrimitive.Icon asChild>
         <Chevron02DownIcon
           className={cn(

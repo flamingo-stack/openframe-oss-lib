@@ -41,14 +41,18 @@ import { DashboardInfoCard } from '../dashboard-info-card';
 import { DeviceCard } from '../device-card';
 import { InfoCard, InfoCardSkeleton } from '../info-card';
 import { InfoSection } from '../info-section';
+import { Input } from '../input';
 import { LeaderRow } from '../leader-row';
 import { LoadingScope, LoadingWhen, useLoadingScope } from '../loading-scope';
 import { RADIO_GROUP_BLOCK_SKELETON_OPTIONS, RadioGroupBlock } from '../radio-group';
+import { Select, SelectTrigger, SelectValue } from '../select';
 import { ServiceCard } from '../service-card';
 import { StatusBadge } from '../status-badge';
 import { SuperUserBannerView } from '../super-user-banner-view';
+import { Switch } from '../switch';
 import { TabNavigation } from '../tab-navigation';
 import { Tabs, TabsList, TabsTrigger } from '../tabs';
+import { Tag } from '../tag';
 import { TicketStatusConfigRow } from '../ticket-status-config-row';
 
 const READ = 'READ-DATA-WORD';
@@ -469,5 +473,151 @@ describe('loading gaps the frontend asked for', () => {
     );
     expect(container.querySelector('section.contents')).not.toBeNull();
     expect(screen.getByTestId('flag').textContent).toBe('true');
+  });
+
+  it('LoadingFallback is ONE element: the region holds the children in a bare scope, inert and hidden', () => {
+    const { container } = render(
+      <LoadingFallback as="section" className="p-4">
+        <span data-testid="child" />
+      </LoadingFallback>,
+    );
+    const region = container.querySelector('section') as HTMLElement;
+    expect(container.querySelectorAll('.p-4')).toHaveLength(1);
+    // The child sits directly in the region: no wrapper of the scope's own.
+    expect(screen.getByTestId('child').parentElement).toBe(region);
+    expect(region.hasAttribute('inert')).toBe(true);
+    expect(region.getAttribute('aria-hidden')).toBe('true');
+    // The status is outside the hidden region, so it is still read; inside an outer scope there is none.
+    expect(region.contains(screen.getByRole('status'))).toBe(false);
+  });
+
+  it('LoadingFallback inside a scope announces nothing', () => {
+    render(
+      <LoadingScope>
+        <LoadingFallback>
+          <ScopeFlag />
+        </LoadingFallback>
+      </LoadingScope>,
+    );
+    expect(screen.queryAllByRole('status')).toHaveLength(0);
+  });
+});
+
+describe('round 2: components draw their loaded twin', () => {
+  it('InfoCard takes its skeleton shape from its data: the title real, no title bar without one, the footer', () => {
+    const titled = render(
+      <InfoCard loading data={{ title: 'Hardware', items: [], footer: { text: 'Verified' } }} />,
+    ).container;
+    expect(titled.textContent).toContain('Hardware');
+    expect(titled.textContent).toContain('Verified');
+    const untitled = render(<InfoCard loading data={{ items: [] }} skeleton={{ rows: 0 }} />).container;
+    expect(untitled.querySelectorAll(SURFACE)).toHaveLength(0);
+  });
+
+  it("InfoSection draws each value as its control's skeleton (a status is a tag)", () => {
+    const { container } = render(
+      <InfoSection
+        loading
+        rows={[{ id: 's', label: 'Status', value: { type: 'status', status: 'ACTIVE', label: READ } }]}
+      />,
+    );
+    expect(container.textContent).toContain('Status');
+    expect(container.textContent).not.toContain(READ);
+    expect(container.querySelector('.ods-skeleton.h-8')).not.toBeNull();
+  });
+
+  it("ServiceCard keeps the row's static actions and face, and no list markers", () => {
+    const { container } = render(
+      <ServiceCard
+        loading
+        title="Fleet"
+        tag={{ label: READ }}
+        rows={[{ label: 'URL', value: READ, href: 'x', monospace: true }]}
+      />,
+    );
+    expect(container.textContent).not.toContain(READ);
+    expect(container.querySelectorAll('button[disabled]')).toHaveLength(2);
+    expect(container.querySelector('.font-mono')).not.toBeNull();
+    expect(container.querySelectorAll('[data-loading-item]')).toHaveLength(0);
+  });
+
+  it('ServiceCard draws a label bar for a row whose label is still read', () => {
+    const { container } = render(<ServiceCard loading title="Fleet" rows={[{ value: '' }]} />);
+    expect(container.querySelector('.w-20 .ods-skeleton')).not.toBeNull();
+  });
+
+  it('DeviceCard draws a button box for its details button by itself', () => {
+    const { container } = render(
+      <DeviceCard
+        loading
+        device={{ name: READ }}
+        actions={{ detailsButton: { visible: true, component: <span /> } }}
+      />,
+    );
+    expect(container.querySelector('.ods-skeleton.h-11')).not.toBeNull();
+  });
+
+  it('Switch and Tag switch on the scope', () => {
+    const { container } = render(
+      <LoadingScope>
+        <Switch checked />
+        <Tag label={READ} />
+      </LoadingScope>,
+    );
+    expect(container.querySelector('button[role="switch"]')).toBeNull();
+    expect(container.textContent).not.toContain(READ);
+    expect(container.querySelectorAll(SURFACE)).toHaveLength(2);
+  });
+
+  it('Input and SelectTrigger draw their box and label, the value a bar, in a scope', () => {
+    const { container } = render(
+      <LoadingScope>
+        <Input label="Name" placeholder="Type a name" defaultValue={READ} />
+        <Select value="a">
+          <SelectTrigger label="Kind">
+            <SelectValue placeholder="Pick one" />
+          </SelectTrigger>
+        </Select>
+      </LoadingScope>,
+    );
+    expect(container.textContent).toContain('Name');
+    expect(container.textContent).toContain('Kind');
+    expect(container.textContent).not.toContain('Pick one');
+    expect((container.querySelector('input') as HTMLInputElement).hidden).toBe(true);
+    expect(container.querySelectorAll(SURFACE).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('SsoJoinForm draws the role tags as skeletons while the identity is read', () => {
+    const { container } = render(
+      <SsoJoinForm
+        identityLoading
+        organizationName=""
+        agreedToTerms={false}
+        roles={['Admin']}
+        onAgreedToTermsChange={() => {}}
+        onBack={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(container.textContent).not.toContain('Admin');
+  });
+
+  it('a plain Input draws a bar in a scope; a userValue Input keeps its placeholder', () => {
+    const { container } = render(
+      <LoadingScope>
+        <Input placeholder="Full name" />
+        <Input userValue placeholder="Search devices" />
+      </LoadingScope>,
+    );
+    const [plain, typed] = Array.from(container.querySelectorAll('input'));
+    expect(plain?.hidden).toBe(true);
+    expect(typed?.hidden).toBe(false);
+    expect(typed?.getAttribute('placeholder')).toBe('Search devices');
+    expect(container.querySelectorAll(SURFACE)).toHaveLength(1);
+  });
+
+  it('a loading Tag keeps the host layout classes', () => {
+    const { container } = render(<Tag loading label={READ} className="max-w-full shrink-0" />);
+    expect(container.querySelector('.ods-skeleton.shrink-0.max-w-full')).not.toBeNull();
   });
 });

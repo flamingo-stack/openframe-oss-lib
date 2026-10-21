@@ -69,9 +69,16 @@ const TICKET_ROW_CHEVRON = `flex ${TILE_SIZE.xl} shrink-0 items-center justify-c
  * A ticket row while it is read: the title as a `text-h3` line and the reference line as a `text-h6` line, the status
  * tag's box, and the chevron box with its icon (static) drawn for real.
  */
-export function ChatTicketItemSkeleton({ className }: { className?: string }) {
+export function ChatTicketItemSkeleton({
+  className,
+  listItem = false,
+}: {
+  className?: string;
+  /** One row of a read list (`data-loading-item`), like the loaded rows. */
+  listItem?: boolean;
+}) {
   return (
-    <div aria-hidden className={cn(TICKET_ROW, className)}>
+    <div aria-hidden className={cn(TICKET_ROW, className)} {...(listItem ? { 'data-loading-item': '' } : undefined)}>
       <div className={TICKET_ROW_TEXT}>
         <TextLineSkeleton type="h3" className="w-1/2" />
         <TextLineSkeleton type="h6" className="w-1/3" />
@@ -88,7 +95,9 @@ export function ChatTicketItemSkeleton({ className }: { className?: string }) {
 const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
   ({ className, ticket, onClick, isLoading = false, ...props }, ref) => {
     const scoped = useLoadingScope();
-    if (isLoading || scoped) return <ChatTicketItemSkeleton className={className} />;
+    if (isLoading || scoped) {
+      return <ChatTicketItemSkeleton className={className} listItem={'data-loading-item' in props} />;
+    }
 
     if (!ticket) return null;
 

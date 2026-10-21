@@ -8,6 +8,9 @@ import { FileManagerEmpty } from './file-manager-empty';
 import { FileManagerTableRow } from './file-manager-table-row';
 import type { FileManagerTableProps } from './types';
 
+/** The rows a loading file list draws: a typical folder, since a folder listing has no page size. */
+export const FILE_MANAGER_SKELETON_ROWS = 8;
+
 export function FileManagerTable({
   files,
   selectedFiles,
@@ -73,7 +76,7 @@ export function FileManagerTable({
   };
 
   if (loading) {
-    const skeletonRows = 8;
+    const skeletonRows = FILE_MANAGER_SKELETON_ROWS;
 
     return (
       <div className={cn('flex flex-col rounded-lg border border-ods-border bg-ods-bg', className)}>

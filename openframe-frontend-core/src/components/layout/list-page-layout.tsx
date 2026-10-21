@@ -163,6 +163,7 @@ export function ListPageLayout({
           )}
         >
           <Input
+            userValue
             placeholder={searchPlaceholder}
             onChange={e => setLocalSearchValue(e.target.value)}
             value={localSearchValue}

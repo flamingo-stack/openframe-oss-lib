@@ -7,7 +7,7 @@ import { Button } from '../button';
 import { useOptionalDataTableContext } from './data-table';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
 import { DataTableSkeleton, ROW_STACK_CLASSES } from './data-table-skeleton';
-import { dataTablePageSize } from './utils';
+import { DATA_TABLE_NEXT_PAGE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableInfiniteFooterProps {
   hasNextPage: boolean;
@@ -111,7 +111,8 @@ export function DataTableInfiniteFooter({
   });
 
   const table = useOptionalDataTableContext();
-  const skeletonRows = skeletonRowsProp ?? (table ? dataTablePageSize(table) : undefined) ?? 3;
+  const skeletonRows =
+    skeletonRowsProp ?? (table ? dataTablePageSize(table) : undefined) ?? DATA_TABLE_NEXT_PAGE_SKELETON_ROWS;
 
   const loadMore = useDataTableLoadMoreStore();
   const bodyDrawsRows = useSyncExternalStore(loadMore.subscribe, loadMore.getHasRowsBody, getNoBody);

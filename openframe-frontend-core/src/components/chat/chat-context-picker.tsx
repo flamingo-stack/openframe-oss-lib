@@ -29,12 +29,12 @@ import { SearchIcon } from '../icons-v2-generated/interface/search-icon';
 import { Upload02Icon } from '../icons-v2-generated/interface/upload-02-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
-import { LoadingRegion } from '../loading/loading-region';
+import { LoadingFallback } from '../loading/loading-fallback';
 import {
   CONTEXT_BACK_CLASS,
   CONTEXT_STATE_CLASS,
   ContextErrorBoundary,
-  ContextItemsSkeleton,
+  ContextItemsList,
   ContextMenuRow,
 } from './context-items-list';
 import type { ChatContextEntityType, ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
@@ -42,8 +42,9 @@ import type { ChatContextEntityType, ChatContextItem, ChatContextPickerConfig } 
 /** Default ceiling on selected context items (Figma spec). */
 export const CHAT_CONTEXT_ITEMS_DEFAULT_MAX = 10;
 
-/** Skeleton row count for the items Suspense fallback. */
-const ITEMS_SKELETON_ROWS = 10;
+/** The items list the Suspense fallback draws in a loading scope: no items yet, nothing selectable. */
+const NO_SELECTED_KEYS: Set<string> = new Set();
+const NOOP = () => {};
 
 /** Debounce (ms) before the typed query is handed to `renderItems`. */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -385,9 +386,10 @@ export function ChatContextPicker({
               >
                 <Suspense
                   fallback={
-                    <LoadingRegion label="Loading items" className="max-h-[340px] overflow-hidden">
-                      <ContextItemsSkeleton count={ITEMS_SKELETON_ROWS} />
-                    </LoadingRegion>
+                    // The SAME list the host renders, in a scope: it draws one page of its own skeleton rows.
+                    <LoadingFallback label="Loading items">
+                      <ContextItemsList items={[]} selectedKeys={NO_SELECTED_KEYS} onToggle={NOOP} atLimit={false} />
+                    </LoadingFallback>
                   }
                 >
                   {config.renderItems({

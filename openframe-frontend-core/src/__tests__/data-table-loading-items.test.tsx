@@ -62,3 +62,24 @@ describe('the devices grid draws its host page', () => {
     expect(container.querySelectorAll(ITEM).length).toBe(DEVICES_GRID_SKELETON_CARDS);
   });
 });
+
+describe('the devices grid is one grid, loaded and loading', () => {
+  it('the loading grid and the loaded grid share the grid class, and loading cards hide the "more" button', () => {
+    const loading = render(<DevicesGrid devices={[]} isLoading pageSize={2} />).container;
+    const loaded = render(
+      <DevicesGrid devices={[{ id: 'a', machineId: 'a', hostname: 'Host' } as never]} isLoading={false} />,
+    ).container;
+    const gridOf = (c: HTMLElement) => c.querySelector('[data-loading-item]')?.parentElement?.className;
+    expect(gridOf(loading)).toBe(gridOf(loaded));
+    expect(gridOf(loading)).toContain('content-lg:grid-cols-3');
+    // The "more" button's bordered p-3 box: the grid's cards carry none, loading or loaded.
+    expect(loading.querySelector('.p-3')).toBeNull();
+  });
+});
+
+describe('a skeleton count is declared, never typed', () => {
+  it('the paged table body falls back to the table page size when the host passes none', () => {
+    const { container } = render(<Table data={[]} loading />);
+    expect(container.querySelectorAll(ITEM).length).toBe(5);
+  });
+});

@@ -181,7 +181,9 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
 ChatListItem.displayName = 'ChatListItem';
 
 /** Title widths the loading rows cycle through (`index`), so a list of them reads like a list of chats. */
-const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
+/** A loading chat row's title widths, cycled by index: a believable spread, the same on every load. Shared by every
+ *  chat list's loading rows. */
+export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
 
 export interface ChatListItemSkeletonProps extends HTMLAttributes<HTMLDivElement> {
   /** Draw the caption line (the loaded row has a `subtitle`). */

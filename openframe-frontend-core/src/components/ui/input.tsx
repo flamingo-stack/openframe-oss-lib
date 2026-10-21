@@ -3,8 +3,10 @@
 import { Loader2 } from 'lucide-react';
 import { type InputHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
 import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
+import { useLoadingScope } from './loading-scope';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** When true, renders error border & ring */
@@ -22,8 +24,12 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey).
       Only "error" and "warning" mark the field invalid (colored border). */
   errorVariant?: 'error' | 'warning' | 'success' | 'muted';
-  /** When true, shows a loading spinner as end adornment */
+  /** When true, shows a loading spinner as end adornment (an action in progress, e.g. a check of what was typed).
+   *  The field's own loading state is a loading scope's: the label and adornments drawn for real, the value a bar
+   *  in the field's box. */
   loading?: boolean;
+  /** The value is typed by the person (a search or filter box), never read: drawn as is in a loading scope. */
+  userValue?: boolean;
 }
 
 const invalidBorderClasses = {
@@ -43,6 +49,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
     error,
     errorVariant = 'error',
     loading = false,
+    userValue = false,
     ...props
   } = allProps;
   // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
@@ -50,6 +57,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
   // success/muted are informational — they never paint the invalid border
   const variantIsInvalid = errorVariant === 'error' || errorVariant === 'warning';
   const isInvalid = invalid || (!!error && variantIsInvalid);
+  // ONE switch: in a page's loading state the field draws its box, its label and adornments for real, and its value
+  // as a bar (the placeholder hidden). The input stays mounted, hidden, so nothing re-registers when the scope ends.
+  const inScope = useLoadingScope() && !userValue;
 
   // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
   if (type === 'range') {
@@ -129,8 +139,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
           {startAdornment}
         </span>
       )}
+      {inScope && <TextLineSkeleton type="h4" className="w-1/2 min-w-0 flex-1" />}
       <input
         type={type}
+        hidden={inScope || props.hidden}
         className={cn(
           // Layout
           'min-w-0 flex-1 border-none bg-transparent outline-none',

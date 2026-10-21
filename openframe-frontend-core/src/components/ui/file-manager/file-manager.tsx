@@ -148,6 +148,7 @@ export function FileManager({
 
         {showSearch && (
           <Input
+            userValue
             value={searchQuery}
             onChange={e => onSearch?.(e.target.value)}
             placeholder="Search..."

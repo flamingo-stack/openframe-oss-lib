@@ -43,7 +43,7 @@ export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 // export it here, otherwise server components that import this index will
 // break due to client-only code.
 
-export { LoadingRegion, type LoadingRegionProps } from './loading-region';
+export { LoadingRegion, type LoadingRegionProps, LoadingStatus } from './loading-region';
 export { LoadingFallback } from './loading-fallback';
 
 export { MarginReportSkeleton } from './margin-report-skeleton';

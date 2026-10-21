@@ -144,7 +144,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   loadingRegion,
   emptyState,
   emptyMessage = 'No devices found.',
-  skeletonRows = 10,
+  skeletonRows,
   stickyHeaderOffset,
   footerSlot,
   deviceFilters,

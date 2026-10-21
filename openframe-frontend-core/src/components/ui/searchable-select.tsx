@@ -228,6 +228,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
         >
           <div className="shrink-0 border-b border-ods-border">
             <Input
+              userValue
               autoFocus
               value={search}
               onChange={e => setSearch(e.target.value)}

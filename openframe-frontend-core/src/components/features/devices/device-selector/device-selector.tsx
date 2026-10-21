@@ -16,6 +16,7 @@ import {
   TruncateText,
   useDataTable,
 } from '../../../ui';
+import { useLoadingScope } from '../../../ui/loading-scope';
 import { OSTypeBadge } from '../../os-type-badge';
 import { formatLastOnline } from '../device-last-online';
 import { getDeviceName } from '../device-name';
@@ -32,8 +33,6 @@ import type { DeviceSelectorProps, SubTab } from './device-selector.types';
 import { useDeviceSelector } from './use-device-selector';
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
-/** The rows the loading table draws when the host states no page size. */
-export const DEVICE_SELECTOR_SKELETON_ROWS = 8;
 const NOOP = () => {};
 const DEFAULT_GET_DEVICE_KEY = (d: DeviceRow): string | undefined => d.machineId || d.id;
 
@@ -95,9 +94,9 @@ function CustomerCell({ device }: { device: DeviceRow }) {
  */
 export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   devices,
-  loading,
+  loading: loadingProp,
   loadingRegion,
-  skeletonRows = DEVICE_SELECTOR_SKELETON_ROWS,
+  skeletonRows,
   selectedIds: selectedIdsProp,
   onSelectionChange: onSelectionChangeProp,
   getDeviceKey: getDeviceKeyProp,
@@ -116,6 +115,9 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   onSelectionModeChange,
   criteriaContent,
 }: DeviceSelectorProps<T>) {
+  // ONE switch: in a page's loading state (or while the host reads the devices) the header, its row count and the
+  // table draw as their loading state.
+  const loading = useLoadingScope() || loadingProp;
   const selectedIds = (selectedIdsProp ?? EMPTY_SET) as Set<string>;
   const onSelectionChange = onSelectionChangeProp ?? NOOP;
   const getDeviceKey = getDeviceKeyProp ?? DEFAULT_GET_DEVICE_KEY;

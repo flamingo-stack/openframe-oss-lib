@@ -3,10 +3,11 @@ import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated';
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { LIVE_PULSE_CLASS } from '../ui/skeleton-surface';
-import { SquareAvatar as Avatar } from '../ui/square-avatar';
+import { SquareAvatar as Avatar, SquareAvatarSkeleton } from '../ui/square-avatar';
 import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
 import { MspOrganizationCard } from './msp-organization-card';
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from './types';
@@ -77,11 +78,13 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
       isMspLoading = false,
       fullWidth = false,
       bare = false,
-      isLoading = false,
+      isLoading: isLoadingProp = false,
       ...props
     },
     ref,
   ) => {
+    // ONE switch: in a page's loading state (or while the host reads the identity) the identity is its skeleton.
+    const isLoading = useLoadingScope() || isLoadingProp;
     const cardClasses = bare ? '' : 'rounded-md bg-ods-card border border-ods-border';
     return (
       <div
@@ -109,9 +112,8 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             {isLoading ? (
               <div className="flex items-center gap-3">
-                {/* 64px round avatar placeholder — matches the `w-16 h-16`
-                    rounded-full avatar / userIcon block below. */}
-                <UnifiedSkeleton className="h-16 w-16 shrink-0 rounded-full" />
+                {/* The avatar's own box: `xl` (64px), round, as the avatar / userIcon block below. */}
+                <SquareAvatarSkeleton size="xl" variant="round" />
                 <div className="flex flex-col">
                   {/* Name line — the `text-h3` name. */}
                   <TextLineSkeleton type="h3" className="w-40" />

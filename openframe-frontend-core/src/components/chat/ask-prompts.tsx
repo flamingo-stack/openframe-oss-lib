@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { MingoAiButton, openAskAi } from '../navigation/mingo-ai-button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollShadow } from '../ui/scroll-fade';
 import { QuickActionChipButton, QuickActionChipSkeleton, type QuickActionIconSpec } from './quick-action-chip';
 
@@ -144,7 +145,7 @@ function QuestionChips({
 export function AskPrompts({
   prompts,
   count: countProp,
-  loading = false,
+  loading: loadingProp = false,
   align = 'start',
   source,
   label,
@@ -154,6 +155,8 @@ export function AskPrompts({
   fadeColor,
   className,
 }: AskPromptsProps) {
+  // ONE switch: in a page's loading state (or while the host reads the questions) the slots hold chip skeletons.
+  const loading = useLoadingScope() || loadingProp;
   const count = slotCount(countProp, loading, prompts);
   if (!loading && prompts.length === 0) return null;
   const end = align === 'end';
@@ -199,7 +202,7 @@ export function AskCard({
   description,
   prompts,
   count: countProp,
-  loading = false,
+  loading: loadingProp = false,
   source,
   label,
   icon,
@@ -208,6 +211,8 @@ export function AskCard({
   shortcutHint = true,
   className,
 }: AskCardProps) {
+  // ONE switch: in a page's loading state (or while the host reads the questions) the slots hold chip skeletons.
+  const loading = useLoadingScope() || loadingProp;
   const count = slotCount(countProp, loading, prompts);
   return (
     <div
