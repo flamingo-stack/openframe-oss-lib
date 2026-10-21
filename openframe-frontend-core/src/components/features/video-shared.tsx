@@ -164,7 +164,7 @@ export interface VideoCommonProps {
   priority?: boolean;
   /** Tailwind classes applied to the underlying player root. */
   className?: string;
-  /** Accessible label (used as YT facade title; ignored for file branch). */
+  /** Accessible label: the play button of either facade (YouTube, or a file video that waits for a click). */
   title?: string;
   /**
    * Mount the player only once its box comes near the viewport (shared

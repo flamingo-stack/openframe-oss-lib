@@ -112,7 +112,59 @@ function FilePlayerFallback({ poster, className }: { poster?: string | null; cla
   );
 }
 
-function FilePlayer(props: FilePlayerProps): React.ReactElement {
+/**
+ * A video nobody has asked to play yet starts as its poster and a play button, the way a YouTube video does
+ * (`YouTubeFacade`): the player and hls.js are the largest script a page can load, and on a page whose video waits for
+ * a click (a session, an episode, a release) loading them up front cost every visitor a long main-thread task before
+ * anyone pressed play (CU-17tkuw5xp4q). A pointer, focus or touch on the button starts the download, so the player is
+ * usually there by the click, and the click plays it with sound. A video that plays by itself (autoplay, hover
+ * playback, a resumed position, chrome-less) or whose host drives it through a handle mounts its player as before.
+ */
+function waitsForPlay(props: FilePlayerProps): boolean {
+  return (
+    !props.autoPlay &&
+    !props.autoPlayUnmuted &&
+    !props.playOnHover &&
+    props.playWhenHovered === undefined &&
+    props.startTime === undefined &&
+    !props.playerHandleRef &&
+    !props.chromeless
+  );
+}
+
+function FilePlayer({ title, ...props }: FilePlayerProps & { title?: string }): React.ReactElement {
+  // Decided once: a video that started as a facade stays the player once pressed, whatever its props do later.
+  const [facade] = useState(() => waitsForPlay(props));
+  const [pressed, setPressed] = useState(false);
+  if (facade && !pressed) {
+    return (
+      <div className={cn('relative', props.className)} style={{ width: '100%', height: '100%' }}>
+        <FilePlayerFallback poster={props.poster} className="absolute inset-0" />
+        <button
+          type="button"
+          aria-label={title ? `Play: ${title}` : 'Play video'}
+          onPointerEnter={loadFilePlayer}
+          onFocus={loadFilePlayer}
+          onTouchStart={loadFilePlayer}
+          onClick={() => {
+            loadFilePlayer();
+            setPressed(true);
+          }}
+          className="group absolute inset-0 m-0 flex cursor-pointer items-center justify-center border-0 bg-transparent p-0"
+        >
+          <VideoPlayBadge
+            size="lg"
+            className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
+          />
+        </button>
+      </div>
+    );
+  }
+  // Pressed: the click is the visitor's gesture, so the player starts with sound (muted if the browser refuses).
+  return <LoadedFilePlayer {...props} {...(facade ? { autoPlayUnmuted: true } : {})} />;
+}
+
+function LoadedFilePlayer(props: FilePlayerProps): React.ReactElement {
   // The player's component when its module has arrived (a loaded module, drawn through `createElement`).
   const arrived = useSyncExternalStore(subscribeToFilePlayer, loadedFilePlayer, noFilePlayer);
   if (arrived) return createElement(arrived, props);
@@ -249,6 +301,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
       <FilePlayer
         url={url}
         poster={props.poster}
+        title={props.title}
         muted={props.muted}
         {...pickFilePlayback(props)}
         className={props.className}
