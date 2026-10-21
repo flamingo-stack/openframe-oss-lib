@@ -259,6 +259,11 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   eyebrow?: string;
   /** `default` density: the item's tags, drawn under the description. */
   tags?: string[];
+  /**
+   * The card is the first thing a list draws, so its cover is likely the page's largest paint: fetch it at once and
+   * ranked high, instead of lazily (the default for every other card).
+   */
+  priority?: boolean;
   className?: string;
 }
 
@@ -355,6 +360,7 @@ function ProgramEditorialCard({
   typeMeta,
   profile,
   playable,
+  priority,
   className,
 }: {
   feature: boolean;
@@ -369,6 +375,7 @@ function ProgramEditorialCard({
   typeMeta: string | null | undefined;
   profile: ReturnType<typeof programItemToStripProfile>;
   playable: boolean;
+  priority?: boolean;
   className?: string;
 }) {
   // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
@@ -392,7 +399,9 @@ function ProgramEditorialCard({
     return (
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
-          {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
+          {cover && (
+            <Image src={cover} alt="" fill sizes="120px" className="object-cover" priority={priority} unoptimized />
+          )}
           {playable && cover && <CardHoverPlay size="md" />}
         </span>
         <span className={EDITORIAL_ROW_TEXT}>
@@ -417,6 +426,7 @@ function ProgramEditorialCard({
             fill
             sizes="(min-width: 1024px) 640px, 100vw"
             className="object-contain"
+            priority={priority}
             unoptimized
           />
         )}
@@ -464,6 +474,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   wholeCardClickable = false,
   eyebrow,
   tags = [],
+  priority,
   className,
 }: ProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
@@ -529,6 +540,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         imageAlt={item.title}
         title={item.title}
         titleClassName="font-['Azeret_Mono'] font-semibold text-lg leading-6"
+        priority={priority}
         person={
           profile
             ? { name: profile.name, avatarUrl: profile.avatarUrl, subtitle: profile.subtitle || dateMeta }
@@ -554,6 +566,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         typeMeta={compactTypeMetaValue}
         profile={programItemToStripProfile(item)}
         playable={isPlayable}
+        priority={priority}
         className={className}
       />
     );
@@ -570,7 +583,15 @@ export function ProgramCard<T extends BaseProgramItem>({
       <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
-            <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
+            <Image
+              src={compactCover}
+              alt={item.title}
+              fill
+              sizes="56px"
+              className="object-contain"
+              priority={priority}
+              unoptimized
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-ods-accent">
               {config.type === 'podcast' ? (
@@ -659,6 +680,7 @@ export function ProgramCard<T extends BaseProgramItem>({
             fill
             sizes="(min-width: 1280px) 400px, (min-width: 768px) 320px, 100vw"
             className="object-cover"
+            priority={priority}
             unoptimized
           />
           {isPlayable && <CardHoverPlay size="md" />}
