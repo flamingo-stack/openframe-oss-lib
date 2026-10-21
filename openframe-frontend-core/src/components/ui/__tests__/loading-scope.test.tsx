@@ -1,8 +1,9 @@
+import { render, screen } from '@testing-library/react';
 /**
  * The loading contract: in a `LoadingScope` a component draws its own `<Name>Skeleton` — its static copy for real,
  * every read part a skeleton shape, never a read word and never nothing.
  */
-import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { CategoriesCart } from '../../categories-cart';
 import { ChatTurn } from '../../chat/chat-turn';
@@ -11,6 +12,7 @@ import { PlatformBadge } from '../../features/platform-badge';
 import { PushButtonSelector } from '../../features/push-button-selector';
 import { Video } from '../../features/video';
 import { VideoBitesStrip } from '../../features/video-bites-strip';
+import { LoadingFallback } from '../../loading/loading-fallback';
 import { MetricValue } from '../../metric-value';
 import { MSPDisplay } from '../../msp-display';
 import { ToolBadge } from '../../platform/ToolBadge';
@@ -19,7 +21,7 @@ import { VendorIcon } from '../../vendor-icon';
 import { AvatarStack } from '../avatar-stack';
 import { BenefitList } from '../benefit-list';
 import { LeaderRow } from '../leader-row';
-import { LoadingScope, useLoadingScope } from '../loading-scope';
+import { LoadingScope, LoadingWhen, useLoadingScope } from '../loading-scope';
 import { StatusBadge } from '../status-badge';
 import { TabNavigation } from '../tab-navigation';
 import { Tabs, TabsList, TabsTrigger } from '../tabs';
@@ -47,6 +49,51 @@ describe('LoadingScope', () => {
     );
     const flags = screen.getAllByTestId('flag');
     expect(flags.map(flag => flag.textContent)).toEqual(['false', 'true']);
+  });
+
+  it('LoadingWhen switches its children without remounting them, and never cancels an outer scope', () => {
+    const mounts: number[] = [];
+    function Counted() {
+      const [id] = useState(() => mounts.push(mounts.length) && mounts.length);
+      return (
+        <span data-testid="flag" data-id={id}>
+          {String(useLoadingScope())}
+        </span>
+      );
+    }
+    const view = render(
+      <LoadingWhen loading>
+        <Counted />
+      </LoadingWhen>,
+    );
+    expect(screen.getByTestId('flag').textContent).toBe('true');
+    view.rerender(
+      <LoadingWhen loading={false}>
+        <Counted />
+      </LoadingWhen>,
+    );
+    expect(screen.getByTestId('flag').textContent).toBe('false');
+    expect(mounts).toHaveLength(1);
+    view.unmount();
+    render(
+      <LoadingScope>
+        <LoadingWhen loading={false}>
+          <ScopeFlag />
+        </LoadingWhen>
+      </LoadingScope>,
+    );
+    expect(screen.getByTestId('flag').textContent).toBe('true');
+  });
+
+  it('LoadingFallback draws its child in a scope and announces it once', () => {
+    render(
+      <LoadingFallback label="Loading devices">
+        <ScopeFlag />
+      </LoadingFallback>,
+    );
+    expect(screen.getByTestId('flag').textContent).toBe('true');
+    expect(screen.getAllByRole('status')).toHaveLength(1);
+    expect(screen.getByRole('status').textContent).toBe('Loading devices');
   });
 });
 

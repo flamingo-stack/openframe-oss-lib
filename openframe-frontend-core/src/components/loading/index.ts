@@ -44,6 +44,7 @@ export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 // break due to client-only code.
 
 export { LoadingRegion, type LoadingRegionProps } from './loading-region';
+export { LoadingFallback } from './loading-fallback';
 
 export { MarginReportSkeleton } from './margin-report-skeleton';
 

@@ -52,3 +52,20 @@ export function LoadingScope({
 export function useLoadingScope(): boolean {
   return useContext(LoadingScopeContext);
 }
+
+/**
+ * A component whose data a client read has not answered yet, drawn by the component itself: its children in a bare
+ * loading scope (no element of its own, so the markup does not change), where each draws its own skeleton, else as
+ * they are. The scope is always rendered and only switched (`active`), so the children are never remounted when the
+ * read answers, and an outer loading scope still holds. The parent renders the component either way and never picks
+ * its `<Name>Skeleton` (one switch per component):
+ *
+ *   <LoadingWhen loading={!health}><StatusBadge text={label} variant="button" /></LoadingWhen>
+ */
+export function LoadingWhen({ loading, children }: { loading: boolean; children: ReactNode }) {
+  return (
+    <LoadingScope bare active={loading}>
+      {children}
+    </LoadingScope>
+  );
+}
