@@ -23,7 +23,6 @@ class DeliveryPropertiesBindingTest {
 
     private static final String PREFIX = "openframe.delivery";
     private static final long UNINSTALL_WINDOW = 2_592_000L;
-    private static final long APPROVAL_ACK_THRESHOLD = 2L;
 
     @Test
     void bind_perTypeEntryWithTwoFields_bindsAndTakesTheRestFromDefaults() {
@@ -44,12 +43,12 @@ class DeliveryPropertiesBindingTest {
     }
 
     @Test
-    void bind_perTypeAckThresholdUnderTheSweepInterval_thatTypeOnTheFastPass() {
+    void bind_perTypeFastSweep_thatTypeOnTheFastPass() {
         // setup
         Map<String, String> config = fullDefaults();
         config.put(PREFIX + ".enabled.REMOTE_ACCESS_REQUEST", "true");
         config.put(PREFIX + ".enabled.CLIENT_UNINSTALL", "true");
-        config.put(PREFIX + ".types.REMOTE_ACCESS_REQUEST.ack-threshold-seconds", String.valueOf(APPROVAL_ACK_THRESHOLD));
+        config.put(PREFIX + ".types.REMOTE_ACCESS_REQUEST.fast-sweep", "true");
 
         // execution
         DeliveryProperties properties = bind(config);
@@ -88,6 +87,7 @@ class DeliveryPropertiesBindingTest {
         config.put(PREFIX + ".defaults.reconnect-window-seconds", "86400");
         config.put(PREFIX + ".defaults.result-timeout-seconds", "600");
         config.put(PREFIX + ".defaults.ttl-seconds", "604800");
+        config.put(PREFIX + ".defaults.fast-sweep", "false");
         return config;
     }
 }

@@ -53,7 +53,7 @@ public class DeliverySweepService {
         retry(due, now);
     }
 
-    // the fast pass: the rows of the types the regular pass comes round too seldom for; it still sees them too
+    // the fast pass: the rows of the types whose policy asks for it; the regular pass still sees them too
     public void retryPendingFast() {
         Set<DeliveryType> fastTypes = properties.fastTypes();
         if (fastTypes.isEmpty()) {

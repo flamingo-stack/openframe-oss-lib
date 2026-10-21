@@ -20,7 +20,6 @@ import java.util.Set;
 
 import static java.lang.Boolean.FALSE;
 import static java.util.Objects.requireNonNullElse;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toSet;
 
 @Getter
@@ -60,19 +59,16 @@ public class DeliveryProperties {
         return override.mergeOver(defaults);
     }
 
-    // a type acked faster than the sweep comes round is re-published by the sweep's fast pass, on its own clock
     public Set<DeliveryType> fastTypes() {
         return Arrays.stream(DeliveryType.values())
                 .filter(this::isEnabled)
-                .filter(this::isFasterThanTheSweep)
+                .filter(this::isOnTheFastPass)
                 .collect(toSet());
     }
 
-    private boolean isFasterThanTheSweep(DeliveryType type) {
+    private boolean isOnTheFastPass(DeliveryType type) {
         Policy policy = resolve(type);
-        long ackThresholdSeconds = policy.getAckThresholdSeconds();
-        long ackThresholdMillis = SECONDS.toMillis(ackThresholdSeconds);
-        return ackThresholdMillis < sweep.getInterval();
+        return policy.getFastSweep();
     }
 
     @Getter
@@ -118,6 +114,11 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long ttlSeconds;
+
+        // true = re-published by the sweep's fast pass (sweep.fast-interval) instead of waiting for the regular one:
+        // for a type a human waits on, whose ack-threshold is seconds
+        @NotNull
+        private Boolean fastSweep;
     }
 
     // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
@@ -151,6 +152,7 @@ public class DeliveryProperties {
         private Long reconnectWindowSeconds;
         private Long resultTimeoutSeconds;
         private Long ttlSeconds;
+        private Boolean fastSweep;
 
         Policy mergeOver(Policy base) {
             Policy merged = new Policy();
@@ -161,6 +163,7 @@ public class DeliveryProperties {
             merged.setReconnectWindowSeconds(requireNonNullElse(reconnectWindowSeconds, base.getReconnectWindowSeconds()));
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
+            merged.setFastSweep(requireNonNullElse(fastSweep, base.getFastSweep()));
             return merged;
         }
     }

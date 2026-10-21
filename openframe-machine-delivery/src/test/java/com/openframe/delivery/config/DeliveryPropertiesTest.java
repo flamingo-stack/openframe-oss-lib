@@ -25,8 +25,6 @@ class DeliveryPropertiesTest {
 
     private static final double UNINSTALL_BACKOFF_MULTIPLIER = 2.0;
 
-    private static final long APPROVAL_ACK_THRESHOLD = 2L;
-
     private DeliveryProperties properties;
 
     @BeforeEach
@@ -64,6 +62,7 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(RECONNECT_WINDOW);
         assertThat(resolved.getResultTimeoutSeconds()).isEqualTo(RESULT_TIMEOUT);
         assertThat(resolved.getTtlSeconds()).isEqualTo(TTL);
+        assertThat(resolved.getFastSweep()).isFalse();
     }
 
     @Test
@@ -98,7 +97,7 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
     }
     @Test
-    void fastTypes_noTypeAckedFasterThanTheSweep_empty() {
+    void fastTypes_noTypeAskingForTheFastPass_empty() {
         // setup
         properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
 
@@ -110,10 +109,10 @@ class DeliveryPropertiesTest {
     }
 
     @Test
-    void fastTypes_enabledTypeAckedFasterThanTheSweep_thatTypeOnly() {
+    void fastTypes_enabledTypeWithFastSweep_thatTypeOnly() {
         // setup
         PolicyOverride approval = new PolicyOverride();
-        approval.setAckThresholdSeconds(APPROVAL_ACK_THRESHOLD);
+        approval.setFastSweep(true);
         properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
         properties.setEnabled(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, true, DeliveryType.TOOL_INSTALLATION, true));
 
@@ -128,7 +127,7 @@ class DeliveryPropertiesTest {
     void fastTypes_fastTypeSwitchedOff_empty() {
         // setup
         PolicyOverride approval = new PolicyOverride();
-        approval.setAckThresholdSeconds(APPROVAL_ACK_THRESHOLD);
+        approval.setFastSweep(true);
         properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
 
         // execution

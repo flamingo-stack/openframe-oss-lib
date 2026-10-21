@@ -64,7 +64,6 @@ class DeliverySweepServiceTest {
     private static final String CORRUPT_JSON = "not-json";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long TEN_SECONDS = 10L;
-    private static final long FAST_ACK_THRESHOLD = 2L;
     private static final long FIRST_RETRY_DELAY = (long) (ACK_THRESHOLD * BACKOFF_MULTIPLIER);
     private static final long CLOCK_SLACK_SECONDS = 5L;
     private static final int MANY_ATTEMPTS_ALLOWED = 10;
@@ -362,10 +361,10 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPendingFast_typeAckedFasterThanTheSweep_itsDueRowsRepublished() {
+    void retryPendingFast_typeWithFastSweep_itsDueRowsRepublished() {
         // setup
         PolicyOverride fast = new PolicyOverride();
-        fast.setAckThresholdSeconds(FAST_ACK_THRESHOLD);
+        fast.setFastSweep(true);
         properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
         properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
         when(repository.findDue(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(delivery));
@@ -382,7 +381,7 @@ class DeliverySweepServiceTest {
     }
 
     @Test
-    void retryPendingFast_noTypeAckedFasterThanTheSweep_nothingQueried() {
+    void retryPendingFast_noTypeWithFastSweep_nothingQueried() {
         // execution
         service.retryPendingFast();
 

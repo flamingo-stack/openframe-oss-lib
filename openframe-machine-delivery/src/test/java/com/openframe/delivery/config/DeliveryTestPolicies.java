@@ -34,6 +34,7 @@ public final class DeliveryTestPolicies {
         defaults.setReconnectWindowSeconds(RECONNECT_WINDOW);
         defaults.setResultTimeoutSeconds(RESULT_TIMEOUT);
         defaults.setTtlSeconds(TTL);
+        defaults.setFastSweep(false);
         Sweep sweep = new Sweep();
         sweep.setInterval(SWEEP_INTERVAL_MILLIS);
         sweep.setBatchSize(BATCH_SIZE);
