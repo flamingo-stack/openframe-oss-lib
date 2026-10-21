@@ -43,6 +43,23 @@ class DeliveryPropertiesBindingTest {
     }
 
     @Test
+    void bind_perTypeFastSweep_thatTypeOnTheFastPass() {
+        // setup
+        Map<String, String> config = fullDefaults();
+        config.put(PREFIX + ".enabled.REMOTE_ACCESS_REQUEST", "true");
+        config.put(PREFIX + ".enabled.CLIENT_UNINSTALL", "true");
+        config.put(PREFIX + ".types.REMOTE_ACCESS_REQUEST.fast-sweep", "true");
+
+        // execution
+        DeliveryProperties properties = bind(config);
+
+        // verifications
+        Policy uninstall = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+        assertThat(properties.fastTypes()).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
+        assertThat(uninstall.isFastSweep()).isFalse();
+    }
+
+    @Test
     void bind_defaultsMissingAField_rejected() {
         // setup
         Map<String, String> config = fullDefaults();
