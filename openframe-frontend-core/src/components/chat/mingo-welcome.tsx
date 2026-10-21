@@ -7,6 +7,7 @@ import { AgentMark } from '../agent-mark';
 import { CompassIcon, Arrow01DownIcon, AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { MingoChatHistory } from './mingo-chat-history';
 import { QuickActionChipButton } from './quick-action-chip';
@@ -151,6 +152,8 @@ export function MingoWelcome({
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
   // Mingo" (design node 113:69208). A host `title` override still wins.
   const heading = title ?? "Hey, I'm Mingo";
+  // ONE switch: in a page's loading state, or while the first history page is read, the history draws its loading rows.
+  const historyLoading = useLoadingScope() || isLoadingHistory;
 
   // `promo` omitted → fall back to the OpenFrame default, but only when guide
   // mode exists to advertise (otherwise the notification points nowhere).
@@ -208,7 +211,7 @@ export function MingoWelcome({
   // history skeleton both clutters the loading frame and pre-judges the user as
   // new. They return once a resolved state (history, or the new-user greeting)
   // renders. `dialogHistory` always wins — a returning user keeps the chips.
-  const showPinnedRegion = !!dialogHistory || (!isLoadingHistory && !loadError);
+  const showPinnedRegion = !!dialogHistory || (!historyLoading && !loadError);
 
   return (
     <div
@@ -241,7 +244,7 @@ export function MingoWelcome({
               </Button>
             )}
           </div>
-        ) : isLoadingHistory ? (
+        ) : historyLoading ? (
           // The history draws its own loading state (one page of rows) until the
           // first page tells new and returning users apart.
           <MingoChatHistory dialogs={NO_DIALOGS} loading pageSize={historyPageSize} />

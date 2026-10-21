@@ -7,7 +7,7 @@ import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
-import { useLoadingScope } from './loading-scope';
+import { InertWhileLoading, useLoadingScope } from './loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
@@ -133,9 +133,9 @@ interface RenderOptions {
 function renderActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
   if (opts.inert) {
     return (
-      <span inert aria-hidden className={cn('inline-flex', opts.fullWidth && 'flex-1')}>
+      <InertWhileLoading className={cn('inline-flex', opts.fullWidth && 'flex-1')}>
         {renderRawActionButton(action, opts)}
-      </span>
+      </InertWhileLoading>
     );
   }
   const button = renderRawActionButton(action, opts);

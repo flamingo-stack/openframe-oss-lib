@@ -19,6 +19,9 @@ import {
 import { EntityImage } from './entity-image';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 
+/** What the description box shows for an organization with no description. */
+const ORGANIZATION_CARD_EMPTY_MARK = '—';
+
 export interface Organization {
   id: string;
   organizationId?: string;
@@ -76,12 +79,7 @@ export function OrganizationCard({
   // In a page's loading state the organization is read: the card is its skeleton.
   if (useLoadingScope()) {
     return (
-      <OrganizationCardSkeleton
-        className={className}
-        showDescription={Boolean(organization.description)}
-        showFooter={Boolean(customFooter || footerStats)}
-        {...markers}
-      />
+      <OrganizationCardSkeleton className={className} showFooter={Boolean(customFooter || footerStats)} {...markers} />
     );
   }
   const handleActionClick = (e: React.MouseEvent) => {
@@ -144,14 +142,17 @@ export function OrganizationCard({
         </div>
       </div>
 
-      {/* Description: only some organizations have one (the loading card leaves it out) */}
-      {organization.description && (
-        <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS} data-loading-optional>
+      {/* Description: most organizations have one, so its box is always drawn (the loading card draws it too); an
+          organization with none shows the empty mark. */}
+      <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS}>
+        {organization.description ? (
           <p className="line-clamp-2 text-ods-text-primary text-h4" title={organization.description}>
             {organization.description}
           </p>
-        </div>
-      )}
+        ) : (
+          <p className="text-ods-text-secondary text-h4">{ORGANIZATION_CARD_EMPTY_MARK}</p>
+        )}
+      </div>
 
       {/* Footer */}
       {customFooter ? (

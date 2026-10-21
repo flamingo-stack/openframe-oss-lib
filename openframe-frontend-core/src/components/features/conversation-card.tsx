@@ -11,7 +11,7 @@ import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { BUTTON_ICON_SM_SIZE, Button } from '../ui/button/button';
-import { useLoadingScope } from '../ui/loading-scope';
+import { InertWhileLoading, useLoadingScope } from '../ui/loading-scope';
 import { Tag } from '../ui/tag';
 
 /**
@@ -320,9 +320,9 @@ export function ConversationCardSkeleton({
   return (
     <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
       {selection && (
-        <span inert aria-hidden className="contents">
+        <InertWhileLoading className="contents">
           <SelectionToggle pressed={selection.pressed} />
-        </span>
+        </InertWhileLoading>
       )}
       <ChatTurn
         loading

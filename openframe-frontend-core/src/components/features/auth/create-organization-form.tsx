@@ -7,6 +7,7 @@ import { accentSentenceMarks } from '../../layout/page-heading';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { CheckboxBlock } from '../../ui/checkbox-block';
+import { FieldWrapper } from '../../ui/field-wrapper';
 import { Input } from '../../ui/input';
 import { AccountDetailsFields } from './account-details-fields';
 import { LabeledDivider } from './labeled-divider';
@@ -16,6 +17,8 @@ import { TermsAgreementLabel } from './terms-agreement-label';
 
 /** The sub-heading's bar while a `null` sub-heading is read. */
 const CREATE_ORGANIZATION_SUBTITLE_BAR_CLASS = 'w-80 max-w-full';
+/** The read-only email's label while it is read (who signed in): an `h6` bar where the label sits. */
+const CREATE_ORGANIZATION_EMAIL_LABEL_BAR_CLASS = 'mb-1 w-40 max-w-full';
 
 export interface CreateOrganizationFormProps {
   /**
@@ -55,8 +58,9 @@ export interface CreateOrganizationFormProps {
    * session. `onEmailChange` is not called in this mode.
    */
   emailReadOnly?: boolean;
-  /** Label above the read-only email, e.g. "Signed in with Google". Ignored unless `emailReadOnly`. */
-  emailReadOnlyLabel?: string;
+  /** Label above the read-only email, e.g. "Signed in with Google". Ignored unless `emailReadOnly`. `null` is a label
+   *  still being read (the sign-in method): the field draws it as an `h6` bar in the label's place. */
+  emailReadOnlyLabel?: string | null;
   /** Overrides the default heading. */
   title?: string;
   /** Overrides the default sub-heading. `null` is a sub-heading still being read (who is signing in): the form draws
@@ -197,8 +201,14 @@ export function CreateOrganizationForm({
       </div>
 
       {/* Email + Organization Name — single column on every breakpoint */}
-      {email === undefined ? null : emailReadOnly ? (
-        <Input type="email" label={emailReadOnlyLabel} value={email} readOnly disabled />
+      {email === undefined ? null : emailReadOnly && emailReadOnlyLabel === null ? (
+        // An empty label keeps the field's own frame (`FieldWrapper` draws no label for it); the bar stands for it.
+        <FieldWrapper label="">
+          <TextLineSkeleton type="h6" className={CREATE_ORGANIZATION_EMAIL_LABEL_BAR_CLASS} />
+          <Input type="email" value={email} readOnly disabled />
+        </FieldWrapper>
+      ) : emailReadOnly ? (
+        <Input type="email" label={emailReadOnlyLabel ?? undefined} value={email} readOnly disabled />
       ) : (
         <Input
           type="email"

@@ -3,7 +3,7 @@
 import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { loadingItemProps } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { useChatAppearance } from './chat-appearance-context';
 import {
@@ -149,14 +149,6 @@ export function ChatMessageListSkeleton({
   appearance,
   namedOthers = false,
 }: ChatMessageListSkeletonProps) {
-  // A typical thread: the viewer's own turn, then (where the thread has one) another person's named reply, then the
-  // agent.
-  const messages = Array.from({ length: messageCount }, (_, index) => ({
-    id: index,
-    isUser: index % 3 === 0,
-    isNamedOther: namedOthers && index % 3 === 1,
-  }));
-
   return (
     <LoadingRegion label="Loading messages" announce={region} className="relative flex min-h-0 flex-1 flex-col">
       <div
@@ -176,19 +168,25 @@ export function ChatMessageListSkeleton({
           {/* Bottom-anchor the rows like the real list — unless FILL mode wants
               them top-anchored + clipped to cover the whole panel. */}
           {!fill && <div className="flex-1" />}
-          {messages.map(message => (
-            <ChatMessageSkeleton
-              key={message.id}
-              showAvatar={showAvatars}
-              isUser={message.isUser}
-              showName={message.isNamedOther}
-              // The user's own turns are short: one line in the bubble, unless the surface states its line count.
-              bodyLines={message.isUser ? (bodyLines ?? 1) : bodyLines}
-              appearance={appearance}
-              // One message of a read thread, like the loaded rows.
-              data-loading-item
-            />
-          ))}
+          {/* A typical thread: the viewer's own turn, then (where the thread has one) another person's named reply,
+              then the agent. */}
+          <LoadingItems count={messageCount}>
+            {index => {
+              const isUser = index % 3 === 0;
+              return (
+                <ChatMessageSkeleton
+                  showAvatar={showAvatars}
+                  isUser={isUser}
+                  showName={namedOthers && index % 3 === 1}
+                  // The user's own turns are short: one line in the bubble, unless the surface states its line count.
+                  bodyLines={isUser ? (bodyLines ?? 1) : bodyLines}
+                  appearance={appearance}
+                  // One message of a read thread, like the loaded rows.
+                  data-loading-item
+                />
+              );
+            }}
+          </LoadingItems>
         </div>
       </div>
     </LoadingRegion>

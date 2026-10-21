@@ -6,12 +6,11 @@ import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui';
-import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
 import { HostIdentity } from './host-identity';
 
 /** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
-const noop = () => {};
 
 /**
  * ContextPanel — the "who / what / how long" side of the scheduler card
@@ -179,7 +178,7 @@ export function ContextPanelSkeleton({
         {timezone !== 'hidden' && (
           <div className={cn(STRIP_ASIDE, timezone === 'wide' && TIMEZONE_WIDE_ONLY_CLASS)}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
-            <TimezoneSelect value={null} loading onChange={noop} />
+            <TimezoneSelect value={null} loading onChange={LOADING_NOOP} />
           </div>
         )}
       </div>

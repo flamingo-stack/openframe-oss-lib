@@ -51,7 +51,7 @@ import {
   ToggleGroupItem,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
 
 /**
@@ -1052,7 +1052,7 @@ function BookingFormPending({
         <CheckboxBlock
           id={consentId}
           checked={false}
-          onCheckedChange={() => {}}
+          onCheckedChange={LOADING_NOOP}
           required
           label={
             consent === true ? <TextLineSkeleton type="inherit" as="span" className="w-64 max-w-full" /> : consent.label

@@ -30,6 +30,7 @@ import { Upload02Icon } from '../icons-v2-generated/interface/upload-02-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingSuspense } from '../loading/loading-fallback';
+import { LOADING_NOOP } from '../ui/loading-scope';
 import {
   CONTEXT_BACK_CLASS,
   CONTEXT_STATE_CLASS,
@@ -44,7 +45,6 @@ export const CHAT_CONTEXT_ITEMS_DEFAULT_MAX = 10;
 
 /** The items list the Suspense fallback draws in a loading scope: no items yet, nothing selectable. */
 const NO_SELECTED_KEYS: Set<string> = new Set();
-const NOOP = () => {};
 
 /** Debounce (ms) before the typed query is handed to `renderItems`. */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -388,7 +388,12 @@ export function ChatContextPicker({
                   label="Loading items"
                   // The SAME list the host renders, in a scope: it draws one page of its own skeleton rows.
                   fallback={
-                    <ContextItemsList items={[]} selectedKeys={NO_SELECTED_KEYS} onToggle={NOOP} atLimit={false} />
+                    <ContextItemsList
+                      items={[]}
+                      selectedKeys={NO_SELECTED_KEYS}
+                      onToggle={LOADING_NOOP}
+                      atLimit={false}
+                    />
                   }
                 >
                   {config.renderItems({

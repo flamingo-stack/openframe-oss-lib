@@ -75,12 +75,12 @@ const overlapClass = (size: AvatarStackSize) => (size === 'xs' ? '-ml-2' : '-ml-
 const slotsWidthStyle = (size: AvatarStackSize, slots?: number) =>
   slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined;
 
-/** Faces a stack draws while its people are read: a typical stack. */
-const AVATAR_STACK_SKELETON_FACES = 3;
+/** Faces a stack shows when the host states no `max`, and so the faces it draws while its people are read. */
+const AVATAR_STACK_MAX_FACES = 3;
 
 /** A stack while its people are read: `count` overlapped circles of the faces' size. */
 export function AvatarStackSkeleton({
-  count = AVATAR_STACK_SKELETON_FACES,
+  count = AVATAR_STACK_MAX_FACES,
   size = 'md',
   slots,
   className,
@@ -113,7 +113,7 @@ export function AvatarStackSkeleton({
 
 export function AvatarStack({
   people,
-  max = 3,
+  max = AVATAR_STACK_MAX_FACES,
   slots,
   total,
   size = 'md',

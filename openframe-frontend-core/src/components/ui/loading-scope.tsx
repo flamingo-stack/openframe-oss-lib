@@ -131,6 +131,35 @@ export function AnnouncedLoadingScope({
   );
 }
 
+/**
+ * A static control (a button, a menu trigger, a toggle: copy the component owns, never read data) drawn for real while
+ * its subject is read: wrapped inert and hidden from assistive technology, so it cannot act on data that is not there
+ * yet. THE one wrapper for it. The wrapper is always rendered and only switched (`loading`), so the control is never
+ * remounted when the read answers. `className` is the wrapper's box (default `inline-flex shrink-0`, the size of the
+ * control; `contents` keeps a flex parent's layout).
+ *
+ *   <InertWhileLoading loading={loading}><Button onClick={onOpen}>Open</Button></InertWhileLoading>
+ */
+export function InertWhileLoading({
+  loading = true,
+  className = 'inline-flex shrink-0',
+  children,
+}: {
+  loading?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span inert={loading || undefined} aria-hidden={loading || undefined} className={className}>
+      {children}
+    </span>
+  );
+}
+
+/** The handler a control drawn inert while its subject is read is given: it is never called (the control is inert).
+ *  THE one such handler, so a loading form never declares its own no-op. */
+export const LOADING_NOOP = (): void => undefined;
+
 /** The one polite status a loading state is read as (visually hidden): the region's, and a fallback's beside its hidden content. */
 export function LoadingStatus({ label }: { label: string }) {
   return (

@@ -17,7 +17,7 @@ import {
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { LoadingItems, useLoadingScope } from './loading-scope';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 export interface TabItem {
@@ -144,6 +144,12 @@ interface TabNavigationProps {
   loading?: boolean;
   /** Tabs the skeleton draws: the tabs the host reads. Default `tabs.length`. */
   skeletonCount?: number;
+  /** The skeleton's tabs lead with an avatar (the host's read tabs carry one). Default: whether any tab in `tabs` has
+   *  one, which a host that has not read its tabs yet (empty `tabs`) cannot answer: it states it here. */
+  skeletonAvatar?: boolean;
+  /** The skeleton's tabs carry a second line (the host's read tabs carry a `sublabel`). Default: whether any tab in
+   *  `tabs` has one; a host with no tabs yet states it here. */
+  skeletonSublabel?: boolean;
 
   /**
    * Render prop for the tab BODY. Receives the tab to render and, additively,
@@ -684,6 +690,8 @@ export function TabNavigation({
   staticLabels = false,
   loading: loadingProp,
   skeletonCount,
+  skeletonAvatar,
+  skeletonSublabel,
   children,
 }: TabNavigationProps) {
   const providedVariant = useContext(TabNavigationVariantContext);
@@ -856,7 +864,7 @@ export function TabNavigation({
           <TabBar
             tabs={tabs}
             activeTab={activeTab}
-            onTabChange={() => undefined}
+            onTabChange={LOADING_NOOP}
             className={className}
             shadowClassName={shadowClassName}
             showLeftGradient={showLeftGradient}
@@ -871,8 +879,8 @@ export function TabNavigation({
       ) : loading ? (
         <TabNavigationSkeleton
           count={skeletonCount ?? tabs.length}
-          avatar={tabs.some(tab => Boolean(tab.avatar))}
-          sublabel={tabs.some(tab => Boolean(tab.sublabel))}
+          avatar={skeletonAvatar ?? tabs.some(tab => Boolean(tab.avatar))}
+          sublabel={skeletonSublabel ?? tabs.some(tab => Boolean(tab.sublabel))}
           stretchTabs={stretchTabs}
           tabAlign={tabAlign}
           variant={variant}

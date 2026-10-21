@@ -6,15 +6,17 @@ import { cn } from '../../../utils/cn';
 import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon';
 import { Button } from '../button';
 import { DataTableEmpty } from '../data-table/data-table-empty';
-import { useLoadingScope } from '../loading-scope';
+import { InertWhileLoading, useLoadingScope } from '../loading-scope';
 import { QueryReportTableHeader } from './query-report-table-header';
-import { QueryReportTableRow } from './query-report-table-row';
+import { QueryReportTableRow, queryReportRowsClass } from './query-report-table-row';
 import { QueryReportTableSkeleton } from './query-report-table-skeleton';
 import type { QueryReportTableProps } from './types';
 import { deriveColumns, exportToCSV } from './utils';
 
 /** The rows a loading report draws when the host states none: a typical report, since a report has no page size. */
 const QUERY_REPORT_TABLE_SKELETON_ROWS = 8;
+/** The columns a loading report draws when the host states none: a typical result (the columns are the data's). */
+const QUERY_REPORT_TABLE_SKELETON_COLUMNS = 6;
 
 export function QueryReportTable({
   title,
@@ -22,7 +24,7 @@ export function QueryReportTable({
   loading: loadingProp = false,
   loadingRegion = true,
   skeletonRows = QUERY_REPORT_TABLE_SKELETON_ROWS,
-  skeletonColumns = 6,
+  skeletonColumns = QUERY_REPORT_TABLE_SKELETON_COLUMNS,
   emptyMessage,
   emptyState,
   columnWidth = 160,
@@ -37,6 +39,7 @@ export function QueryReportTable({
 }: QueryReportTableProps) {
   const loading = useLoadingScope() || loadingProp;
   const isCompact = variant === 'compact';
+  const showExportButton = showExport && (loading || data.length > 0);
   const columns = useMemo(() => deriveColumns(data, columnOrder), [data, columnOrder]);
 
   const handleExport = () => {
@@ -64,21 +67,24 @@ export function QueryReportTable({
 
   return (
     <div className={cn('flex w-full flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-l)]', className)}>
-      {/* Title bar — hidden in compact mode and when empty */}
-      {!isCompact && (title || headerActions || (showExport && data.length > 0)) && (
+      {/* Title bar — hidden in compact mode and when there is nothing to show in it. Export is drawn while the rows
+          are read too (real and inert: they will hold data), so the bar does not appear when they land. */}
+      {!isCompact && (title || headerActions || showExportButton) && (
         <div className="flex items-end justify-between pt-[var(--spacing-system-l)]">
           <h2 className="text-ods-text-primary text-h2">{title}</h2>
           <div className="flex items-center gap-[var(--spacing-system-s)]">
             {headerActions}
-            {showExport && data.length > 0 && (
-              <Button
-                className="bg-ods-card content-max-md:hidden"
-                variant="outline"
-                leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
-                onClick={handleExport}
-              >
-                Export CSV
-              </Button>
+            {showExportButton && (
+              <InertWhileLoading loading={loading} className="inline-flex shrink-0 content-max-md:hidden">
+                <Button
+                  className="bg-ods-card"
+                  variant="outline"
+                  leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
+                  onClick={handleExport}
+                >
+                  Export CSV
+                </Button>
+              </InertWhileLoading>
             )}
           </div>
         </div>
@@ -133,7 +139,7 @@ export function QueryReportTable({
             <div ref={scrollRef} className={cn('overflow-x-auto', tableClassName)} onScroll={onScroll}>
               <div style={{ minWidth: tableMinWidth }}>
                 <QueryReportTableHeader columns={columns} columnWidth={columnWidth} variant={variant} />
-                <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]')}>
+                <div className={queryReportRowsClass(isCompact)}>
                   {data.map((row, index) => (
                     <QueryReportTableRow
                       key={index}

@@ -66,7 +66,8 @@
  *                       DEPRECATED_SKELETON's).
  * FOLD_PROP             A `fold` prop on any element (a skeleton draws its full count: `skeletonCount`).
  * DEPRECATED_SKELETON   A render of a skeleton the lib marks `@deprecated` (read from the lib's source).
- * RETIRED_API           The retired first-paint memory, stand-in data (`standIn`, `Hold*`) and `StreamedPage`'s
+ * RETIRED_API           The retired first-paint memory, stand-in data (`standIn`, `Hold`, any `Hold*` name such as
+ *                       `HoldText`; the primitives `TextHold` / `LayoutHold` are not) and `StreamedPage`'s
  *                       `skeleton` / `memory` / `remember` props.
  * TYPED_COUNT           A count typed at the place that draws it: a literal (after resolving a constant to its
  *                       initializer, both arms of a ternary included: `isMobile ? 3 : 10`) on a skeleton count prop
@@ -74,14 +75,23 @@
  *                       Count|Lines|Items)`, `count` on `LoadingItems`, `rows` / `count` / `lines` on a `*Skeleton`
  *                       element) or on such a key of an object (`{ loadingRows: { primary: 7 } }`), the length of a
  *                       list drawn while loading (`Array.from({ length })`, `Array(n)`, `[...Array(n)]`,
- *                       `[0, 1, 2].map`), a literal default of a count prop, a `?? 10` fallback in a count, and a
- *                       module constant holding a literal-length list used while loading. Text draws a typical LINE
+ *                       `[0, 1, 2].map`, `[1, 2, 3, 4].map`), a field of a local object holding a literal
+ *                       (`const settings = { rows: 4 }` -> `settings.rows`), a literal default (other than 0) of ANY
+ *                       parameter or prop whose value reaches a skeleton count in its function (`skeletonRows = 8`,
+ *                       `{ size = 6 }` drawn as `<LoadingItems count={size}>`), a `?? 10` fallback in a count, and a
+ *                       module constant holding a literal-length list (`Array.from({ length: 4 })`, `[1, 2, 3, 4]`)
+ *                       used while loading. Text draws a typical LINE
  *                       count (`*Lines`, `*Paragraphs`) only when each item is a skeleton line itself; a list of rows
  *                       named `*LINES` is a list.
  * COUNT_SOURCE          A skeleton count that names neither a page size, a limit, `first`, nor a declared
- *                       `*_SKELETON_*` constant (a pass-through of the same name is checked where its caller names
- *                       it), and a `*_SKELETON_*` count in a component whose list has a page size (`PAGE_SIZE`,
- *                       `pageSize`, `perPage`): a paged list draws its page.
+ *                       `*_SKELETON_*` constant: a count computed by a call (`rowsFor(w)`), read from a response
+ *                       (`data?.total ?? 0`), or added to a list's length (`rows.length + 2`). Not counted: a count the
+ *                       caller passes (a prop, or a field of one; checked where its caller names it), a skeleton-count
+ *                       field of a value (`scroll.skeletonRows`, checked where its key is set), a named count scaled
+ *                       or split (`PAGE_SIZE * 2`, `rows - 1`), the rest of a page (`pageSize - items.length`), the
+ *                       length of a list, and a value that is no number (`rows={[{ width }]}`). Also a `*_SKELETON_*`
+ *                       count in a component whose list has a page size (`PAGE_SIZE`, `pageSize`, `perPage`): a paged
+ *                       list draws its page.
  * COUNT_CAP             A count capped: `Math.min(pageSize, FOLD | CONSTANT | 8 | a local holding a number)`, a ternary
  *                       or comparison cap (`PAGE_SIZE > 6 ? 6 : PAGE_SIZE`), or a count named `*FOLD*`, `*VISIBLE*` or
  *                       `*SCREEN*` (`Math.min(PAGE_SIZE, rows.length)`, the last page, and a clamp are fine).
@@ -257,7 +267,7 @@ const LOADERS = new Set([
 const PRIMITIVE =
   /^(?:UnifiedSkeleton|TextLineSkeleton|TextHold|LayoutHold|BadgeSkeleton|StatusBadgeSkeleton|TagSkeleton|CursorPaginationSkeleton|TextareaSkeleton|TagsInputSkeleton|ProgressBarSkeleton|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
 /** The lib's loading wrappers (not loading states of a component). */
-const LOADING_WRAPPER = /^Loading(?:Items|When|Fallback|Suspense|Scope|Region)$/;
+const LOADING_WRAPPER = /^(?:Loading(?:Items|When|Fallback|Suspense|Scope|Region)|InertWhileLoading)$/;
 const WHOLE_VIEW =
   /^[A-Z]\w*(?:(?:Page|Screen|Detail|Article|View|Home|Deck|Editor|Center|Catalog|Form|Layout|Dashboard)Skeleton|LoadingLayout|(?:Page|Screen|View|Panel|Dashboard)Loading)$/;
 /** A loading component that is not named `*Skeleton` (`XLoading`; `XPlaceholder` when drawn while loading). */
@@ -272,30 +282,44 @@ const MEMORY = new Set([
   'lastKnownHomeLayout',
   'rememberHomeLayout',
 ]);
-const STAND_IN = new Set([
-  'standIn',
-  'isStandIn',
-  'STAND_IN_MARK',
-  'HoldStandIn',
-  'HoldText',
-  'HoldWords',
-  'HoldBox',
-  'useHolds',
-  'HELD_CONTROL_CLASS',
-]);
+const STAND_IN = new Set(['standIn', 'isStandIn', 'STAND_IN_MARK', 'useHolds', 'HELD_CONTROL_CLASS']);
+/** The retired stand-in family (`Hold`, `HoldText`, `HoldStandIn`, …); the primitives `TextHold` / `LayoutHold` are not. */
+const HOLD_NAME = /^Hold(?:[A-Z]\w*)?$/;
+const isRetiredName = name => MEMORY.has(name) || STAND_IN.has(name) || HOLD_NAME.test(name);
 const COUNT_ATTR = /^(?:skeletonRows|skeletonCount|(?:skeleton|loading|placeholder)\w*(?:Rows|Count|Lines|Items))$/i;
-/** A count that names where it comes from: a page size, a limit, `first` or a declared `*_SKELETON_*` constant. */
-const COUNT_SOURCE_NAME =
-  /(?:PAGE_SIZE|LIMIT|(?:^|_)SKELETON_|^first$|pageSize|page_size|perPage|per_page|limit$|Limit$)/;
+/**
+ * THE count vocabulary, declared once: where a list's count comes from (its PAGE: a page size or a limit) and what caps
+ * it (a fold, a screen, what is visible). Every count rule reads these two lists.
+ */
+const PAGE_SOURCE = {
+  pageSize: ['PAGE_SIZE', 'PER_PAGE', 'pageSize', 'PageSize', 'page_size', 'perPage', 'PerPage', 'per_page'],
+  /** A limit: `LIMIT` anywhere in a constant, `limit` / `Limit` ending a name. */
+  limit: ['LIMIT', 'limit$', 'Limit$'],
+};
+const CAP_WORDS = ['fold', 'visible', 'screen'];
 /** A page size (not a safety limit): a list that has one draws it, never a `*_SKELETON_*` count. */
-const PAGE_SIZE_NAME = /PAGE_SIZE|pageSize|page_size|perPage|per_page/;
+const PAGE_SIZE_NAME = new RegExp(PAGE_SOURCE.pageSize.join('|'));
+/** A count that names where it comes from: a page size, a limit, `first` or a declared `*_SKELETON_*` constant. */
+const COUNT_SOURCE_NAME = new RegExp(
+  [...PAGE_SOURCE.pageSize, ...PAGE_SOURCE.limit, '(?:^|_)SKELETON_', '^first$'].join('|'),
+);
+/** An argument of `Math.min` that is the page (a page size, a limit, a `*_MAX` constant), in any spelling. */
+const PAGE_ARG = new RegExp(
+  [...PAGE_SOURCE.pageSize, ...PAGE_SOURCE.limit.map(w => w.replace('$', '\\b')), '[A-Z_]*_MAX\\b'].join('|'),
+  'i',
+);
+/** A count named for what it caps to (`ROW_FOLD`, `visibleRows`, `SCREEN_ROWS`). */
+const CAP_NAME = new RegExp(CAP_WORDS.join('|'), 'i');
+/** An argument of `Math.min` beside the page that caps it: a cap name, a constant or a number. */
+const isCapArg = text => CAP_NAME.test(text) || /\b[A-Z][A-Z0-9_]{2,}\b|^\d+$/.test(text);
+/** The cells of one row (`columns`, `cells`): their count never changes the row's height. */
+const isCellCount = name => /(?:col(?:umn)?s?|cells?)$/i.test(name);
+/** A text's line count (`lines`, `paragraphs`): a typical count of the text it stands for, not a list. */
+const isTextLineCount = name => /lines?$|paragraphs?$/i.test(name);
 /** A count handed in by the caller that a skeleton draws as its items. */
 const PASSED_COUNT = /^(?:count|rows|items|rowCount|itemCount)$/;
-const CAP_NAME = /fold|visible|screen/i;
 /** A condition on the screen's width (`isMobile ? 3 : 10`). */
 const WIDTH_TEST = /mobile|desktop|tablet|breakpoint|width|viewport|isSmall|isLarge|narrow/i;
-const PAGE_ARG = /\b(?:page_?size|per_?page|cards_?per_?page|limit|[A-Z_]*_(?:PAGE_SIZE|LIMIT|MAX))\b/i;
-const CAP_ARG = /fold|screen|\b[A-Z][A-Z0-9_]{2,}\b|^\d+$/;
 const BREAKPOINT_HIDDEN =
   /(?:^|\s)(?:hidden\s+(?:[\w-]+:)+(?:block|flex|grid|inline|inline-flex|inline-block|table|table-row|table-cell|contents)|(?:[\w-]+:)+hidden)(?=\s|$)|(?:^|\s)(?:[\w-]+:)+(?:block|flex|grid|inline|inline-flex|table-row|table-cell|contents)\s+hidden(?=\s|$)/;
 const NTH_HIDDEN = /nth-child\([^)]*\)\]:hidden/;
@@ -550,6 +574,17 @@ function renderedTag(node) {
 
 /** Whether a resolved tag is a skeleton (`XSkeleton`, `XSkeleton.Part`, `TextSkeleton.Body`). */
 const isSkeletonName = tag => /Skeleton(?:\.\w+)?$/.test(tag);
+/** Whether an attribute of an element is a skeleton count: a `*Rows`/`*Count` skeleton prop, `LoadingItems`' `count`, a `*Skeleton`'s `rows` / `count`. */
+const isCountAttribute = (tag, name) =>
+  COUNT_ATTR.test(name) ||
+  (tag.split('.').pop() === 'LoadingItems' && name === 'count') ||
+  (isSkeletonName(tag) && /^(?:rows|count)$/.test(name));
+/** Whether a function (or a name) is a skeleton's: `XSkeleton`, `renderRowSkeleton`. */
+const isSkeletonFunctionName = name => /Skeleton$/.test(name);
+/** Whether a name is a component skeleton's (`XSkeleton`, capitalised), the component being `X`. */
+const isComponentSkeletonName = name => isComponentName(name) && name !== 'Skeleton' && isSkeletonFunctionName(name);
+/** Whether a call is `next/dynamic`'s (`dynamic(…)`, `x.dynamic(…)`). */
+const isDynamicCall = node => ts.isCallExpression(node) && /(?:^|\.)dynamic$/.test(dottedName(node.expression));
 
 /** Whether a node sits in a `next/dynamic` call's `loading:` slot (the allowed fallback form). */
 function inDynamicLoading(node) {
@@ -557,7 +592,7 @@ function inDynamicLoading(node) {
     if (!ts.isPropertyAssignment(p) || p.name.getText() !== 'loading' || !ts.isObjectLiteralExpression(p.parent))
       continue;
     const call = p.parent.parent;
-    if (call && ts.isCallExpression(call) && /(?:^|\.)dynamic$/.test(dottedName(call.expression))) return true;
+    if (call && isDynamicCall(call)) return true;
   }
   return false;
 }
@@ -1286,7 +1321,7 @@ function inLoadingContext(node, model) {
     }
     if (ts.isIfStatement(p) && child === p.thenStatement && isLoadingFlag(p.expression, model)) return true;
     if (ts.isJsxElement(p) && model.resolveName(p.openingElement.tagName) === 'LoadingItems') return true;
-    if (isFunctionLike(p) && /Skeleton$/.test(functionName(p))) return true;
+    if (isFunctionLike(p) && isSkeletonFunctionName(functionName(p))) return true;
   }
   return false;
 }
@@ -1298,20 +1333,54 @@ function inLoadingContext(node, model) {
 const COUNT_ORDER = ['ok', 'unnamed', 'typed', 'cap'];
 const worst = list => list.reduce((a, b) => (COUNT_ORDER.indexOf(b) > COUNT_ORDER.indexOf(a) ? b : a), 'ok');
 
+const ARITHMETIC = new Set([
+  ts.SyntaxKind.PlusToken,
+  ts.SyntaxKind.MinusToken,
+  ts.SyntaxKind.AsteriskToken,
+  ts.SyntaxKind.SlashToken,
+  ts.SyntaxKind.PercentToken,
+]);
+
+const EQUALITY = new Set([
+  ts.SyntaxKind.EqualsEqualsToken,
+  ts.SyntaxKind.EqualsEqualsEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsToken,
+  ts.SyntaxKind.ExclamationEqualsEqualsToken,
+]);
+
 /**
- * What a count expression is: 'typed' (a literal), 'cap' (a capped count), 'unnamed' (names no source), or 'ok'.
- * Identifiers resolve to their initializer.
+ * What a count expression is: 'typed' (a literal), 'cap' (a capped count), 'ok' (a page size, a limit, `first` or a
+ * `*_SKELETON_*` name; a caller's count passed through; the length of a list), else 'unnamed': a count that names no
+ * source (a call, `rows.length + 2`, a read's `data?.total`). Locals resolve to their initializer, and a field of a local
+ * object (`settings.rows`) to its value there.
  */
 function classifyCount(expr, model, { attr = '', depth = 0 } = {}) {
   const n = strip(expr);
   if (!n || depth > 5) return 'ok';
+  const next = e => classifyCount(e, model, { attr, depth: depth + 1 });
   if (ts.isNumericLiteral(n)) return 'typed';
-  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)
+  // Not a number at all: a list of row shapes (`rows={[{ width }]}`), a flag (`count={n !== undefined}`), nothing.
+  if (!isNumberShaped(n)) return 'ok';
+  if (
+    ts.isBinaryExpression(n) &&
+    (n.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken || n.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+  )
     return ts.isNumericLiteral(strip(n.right))
       ? strip(n.right).text === '0'
-        ? classifyCount(n.left, model, { attr, depth: depth + 1 })
+        ? next(n.left)
         : 'typed'
-      : worst([n.left, n.right].map(b => classifyCount(b, model, { attr, depth: depth + 1 })));
+      : worst([n.left, n.right].filter(b => !isNullish(b)).map(next));
+  // Arithmetic on a count: a named count or a caller's count scaled or split (`PAGE_SIZE * 2`, `rows - 1`) is that
+  // count; anything else is unnamed (`rows.length + 2` draws two typed rows while the list is empty).
+  if (ts.isBinaryExpression(n) && ARITHMETIC.has(n.operatorToken.kind)) {
+    const operands = [n.left, n.right].map(strip);
+    const counts = operands.filter(o => !ts.isNumericLiteral(o));
+    if (counts.length && counts.every(o => namesCount(o, model) && next(o) === 'ok')) return 'ok';
+    // What is left of a named count (`pageSize - items.length`: the rest of the page) is that count.
+    if (n.operatorToken.kind === ts.SyntaxKind.MinusToken && namesCount(n.left, model) && next(n.left) === 'ok')
+      return 'ok';
+    return worst([...counts.map(next), 'unnamed']);
+  }
   if (ts.isConditionalExpression(n)) {
     // A cap: `PAGE_SIZE > 6 ? 6 : PAGE_SIZE`, or a literal against a page size. Two literals (`isMobile ? 3 : 10`)
     // are two typed counts.
@@ -1321,9 +1390,16 @@ function classifyCount(expr, model, { attr = '', depth = 0 } = {}) {
       return 'cap';
     // Two literals choose between two forms, unless the choice is the screen's width or the count a skeleton count.
     if (branches.every(b => ts.isNumericLiteral(b)) && !attr && !WIDTH_TEST.test(n.condition.getText())) return 'ok';
-    return worst([n.whenTrue, n.whenFalse].map(b => classifyCount(b, model, { attr, depth: depth + 1 })));
+    return worst([n.whenTrue, n.whenFalse].map(next));
   }
-  if (ts.isCallExpression(n) && dottedName(n.expression) === 'Math.min') return isPageCap(n, model) ? 'cap' : 'ok';
+  if (ts.isCallExpression(n)) {
+    const callee = dottedName(n.expression);
+    if (callee === 'Math.min' && isPageCap(n, model)) return 'cap';
+    // `Math.min(PAGE_SIZE, rows.length)` (the last page), a clamp: named when one of its arguments is.
+    if (callee === 'Math.min' || callee === 'Math.max')
+      return n.arguments.some(a => next(a) === 'ok') ? 'ok' : 'unnamed';
+    return COUNT_SOURCE_NAME.test(callee.split('.').pop() ?? '') ? 'ok' : 'unnamed';
+  }
   if (ts.isPropertyAccessExpression(n) && n.name.text === 'length') {
     const of = strip(n.expression);
     if (!ts.isIdentifier(of) || COUNT_SOURCE_NAME.test(of.text)) return 'ok';
@@ -1342,22 +1418,80 @@ function classifyCount(expr, model, { attr = '', depth = 0 } = {}) {
       const from = model.lookup(strip(decl.init).text, decl.init);
       if (from?.kind === 'param') return 'ok';
     }
-    if (!ts.isIdentifier(n))
-      return COUNT_SOURCE_NAME.test(name) || (attr && name === attr) ? 'ok' : decl?.kind === 'var' ? 'ok' : 'unnamed';
-    if (decl?.kind === 'var' && decl.init && !decl.destructured) {
-      const init = strip(decl.init);
-      if (ts.isNumericLiteral(init)) return COUNT_SOURCE_NAME.test(name) ? 'ok' : 'typed';
-      const inner = classifyCount(init, model, { attr, depth: depth + 1 });
+    const local = decl?.kind === 'var' && !!decl.init && !decl.destructured;
+    if (COUNT_SOURCE_NAME.test(name)) {
       // A declared page size, limit or `*_SKELETON_*` name is the source, whatever it is set from, unless it caps.
-      if (COUNT_SOURCE_NAME.test(name)) return inner === 'cap' ? 'cap' : 'ok';
-      return inner;
+      return local && ts.isIdentifier(n) && next(decl.init) === 'cap' ? 'cap' : 'ok';
     }
-    if (COUNT_SOURCE_NAME.test(name)) return 'ok';
-    if (attr && name === attr) return 'ok';
+    // The same name as the count it fills (`skeletonRows={skeletonRows}`), not set here: a pass-through.
+    if (attr && name === attr && !local) return 'ok';
+    if (local) {
+      if (ts.isIdentifier(n)) return next(decl.init);
+      // A field of a local object (`const settings = { rows: 4 }` -> `settings.rows`) is its value there.
+      const value = objectField(decl.init, propertyPath(n));
+      if (value) return next(value);
+    }
+    // A skeleton-count field of something read (`scroll.skeletonRows`): checked where its key is set.
+    if (ts.isPropertyAccessExpression(n) && COUNT_ATTR.test(name)) return 'ok';
     if (decl?.kind === 'import') return COUNT_SOURCE_NAME.test(decl.imported) ? 'ok' : 'unnamed';
     return 'unnamed';
   }
-  return 'ok';
+  return 'unnamed';
+}
+
+/** Whether an expression can be a number (not a literal list, object, string, boolean, comparison or `!x`). */
+function isNumberShaped(node) {
+  if (
+    ts.isArrayLiteralExpression(node) ||
+    ts.isObjectLiteralExpression(node) ||
+    ts.isStringLiteralLike(node) ||
+    ts.isTemplateExpression(node) ||
+    ts.isTypeOfExpression(node) ||
+    node.kind === ts.SyntaxKind.TrueKeyword ||
+    node.kind === ts.SyntaxKind.FalseKeyword ||
+    (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.ExclamationToken)
+  )
+    return false;
+  return !(ts.isBinaryExpression(node) && (isComparison(node) || EQUALITY.has(node.operatorToken.kind)));
+}
+
+/** Whether an operand of count arithmetic is a count itself: a caller's (a prop) or one named as a source. */
+function namesCount(node, model) {
+  const n = strip(node);
+  if (ts.isBinaryExpression(n) && ARITHMETIC.has(n.operatorToken.kind)) return true;
+  if (!ts.isIdentifier(n) && !ts.isPropertyAccessExpression(n)) return false;
+  // The length of a list (`rows.length`) is what is read, empty while loading: not a count to scale.
+  if (leafName(n) === 'length') return false;
+  if (COUNT_SOURCE_NAME.test(leafName(n))) return true;
+  const root = chainRoot(n);
+  return !!root && model.lookup(root.text, root)?.kind === 'param';
+}
+
+/** The field names of a property access below its root (`a.b.c` -> `['b', 'c']`). */
+function propertyPath(node) {
+  const path = [];
+  let n = strip(node);
+  while (n && ts.isPropertyAccessExpression(n)) {
+    path.unshift(n.name.text);
+    n = strip(n.expression);
+  }
+  return path;
+}
+
+/** The value of `path` in an object literal (`{ a: { b: 4 } }`, `['a', 'b']` -> `4`), or null. */
+function objectField(init, path) {
+  let value = strip(init);
+  for (const key of path) {
+    if (!value || !ts.isObjectLiteralExpression(value)) return null;
+    const prop = value.properties.find(
+      q =>
+        (ts.isPropertyAssignment(q) || ts.isShorthandPropertyAssignment(q)) &&
+        q.name.getText().replace(/['"]/g, '') === key,
+    );
+    if (!prop) return null;
+    value = strip(ts.isPropertyAssignment(prop) ? prop.initializer : prop.name);
+  }
+  return value;
 }
 
 function isLiteralArray(init) {
@@ -1401,7 +1535,7 @@ function isPageCap(call, model) {
   return call.arguments.some((arg, i) => {
     const text = args[i];
     if (text === page) return false;
-    if ((/^[\w$.]+$/.test(text) || /fold|screen/i.test(text)) && CAP_ARG.test(text)) return true;
+    if ((/^[\w$.]+$/.test(text) || CAP_NAME.test(text)) && isCapArg(text)) return true;
     const n = strip(arg);
     if (!ts.isIdentifier(n)) return false;
     if (CAP_NAME.test(n.text)) return true;
@@ -1452,9 +1586,15 @@ function listOf(node, model) {
   return null;
 }
 
-/** `[0, 1, 2]`: a list of indexes standing for N items (not a table of widths or line counts). */
+/** `[0, 1, 2]` / `[1, 2, 3, 4]`: a list of indexes standing for N items (not a table of widths or line counts). */
 function isIndexList(node) {
-  return node.elements.length > 1 && node.elements.every((e, i) => ts.isNumericLiteral(e) && Number(e.text) === i);
+  const first = node.elements[0];
+  const base = first && ts.isNumericLiteral(first) ? Number(first.text) : NaN;
+  return (
+    node.elements.length > 1 &&
+    (base === 0 || base === 1) &&
+    node.elements.every((e, i) => ts.isNumericLiteral(e) && Number(e.text) === base + i)
+  );
 }
 
 /** `[...Array(n)]` -> the array literal (whose `.map` draws the items). */
@@ -1657,7 +1797,7 @@ function analyzeFile(project, path, active, rel, page) {
       }
       return;
     }
-    if (!/^[A-Z]\w*Skeleton$/.test(name)) return;
+    if (!isComponentSkeletonName(name)) return;
     const component = name.slice(0, -'Skeleton'.length);
     // Deprecated lib skeletons.
     if (project.deprecated.has(name) && !project.declaredIn.get(name)?.has(path))
@@ -1670,7 +1810,7 @@ function analyzeFile(project, path, active, rel, page) {
       report('WHOLE_VIEW_SKELETON', node, 'DetailPageSkeleton (a whole-page skeleton)');
     if (PRIMITIVE.test(name)) return;
     const modules = project.declaredIn.get(component);
-    const skeletonFn = enclosingNames(node).find(n => /Skeleton$/.test(n));
+    const skeletonFn = enclosingNames(node).find(isSkeletonFunctionName);
     if (!modules?.size) {
       // A skeleton with no component of its own, chosen by a parent: a loading state drawn by the parent.
       const own = project.declaredIn.get(name);
@@ -1720,9 +1860,9 @@ function analyzeFile(project, path, active, rel, page) {
     }
     if (isFunctionLike(node)) {
       const name = functionName(node);
-      if (isComponentName(name) && !/Skeleton$/.test(name)) components.push(node);
+      if (isComponentName(name) && !isSkeletonFunctionName(name)) components.push(node);
       // Literal count defaults: `skeletonRows = 8` anywhere, `rows = 6` / `count = 6` / `steps = 6` in a `*Skeleton`.
-      for (const param of node.parameters) checkCountDefaults(param.name, /Skeleton/.test(name));
+      checkCountDefaults(node, isSkeletonFunctionName(name));
     }
     if (
       ts.isVariableDeclaration(node) &&
@@ -1735,7 +1875,7 @@ function analyzeFile(project, path, active, rel, page) {
     }
 
     // --- identifiers: retired APIs ---------------------------------------------------------------------------------
-    if (ts.isIdentifier(node) && (MEMORY.has(node.text) || STAND_IN.has(node.text))) {
+    if (ts.isIdentifier(node) && isRetiredName(node.text)) {
       if (!(
         ts.isImportSpecifier(node.parent) ||
         (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
@@ -1806,7 +1946,7 @@ function analyzeFile(project, path, active, rel, page) {
         skeletonRender(node, tag);
         if (LOADERS.has(model.resolveName(tag))) report('LOADER_COMPONENT', node, RULES.LOADER_COMPONENT);
       }
-      if (/(?:^|\.)dynamic$/.test(callee)) checkDynamic(node);
+      if (isDynamicCall(node)) checkDynamic(node);
       if (callee === 'Math.min' && isPageCap(node, model) && !isClamp(node))
         report(
           'COUNT_CAP',
@@ -1845,22 +1985,92 @@ function analyzeFile(project, path, active, rel, page) {
     ts.forEachChild(node, visit);
   };
 
-  function checkCountDefaults(binding, inSkeleton) {
-    if (!ts.isObjectBindingPattern(binding)) return;
-    for (const el of binding.elements) {
-      const key = (el.propertyName ?? el.name).getText();
-      if (!el.initializer) continue;
-      const literal = ts.isNumericLiteral(strip(el.initializer));
+  /**
+   * A literal default on a count: `skeletonRows = 8` / `skeletonCount = 8` anywhere, `rows` / `count` / `steps` in a
+   * `*Skeleton`, and ANY parameter (a prop, or a field destructured from the props) whose value reaches a skeleton count
+   * in the function (`LoadingItems`' `count`, a skeleton count prop, the length of a list drawn while loading, a
+   * `skeletonCount:` key).
+   */
+  function checkCountDefaults(fn, inSkeleton) {
+    const defaults = [];
+    const collect = binding => {
+      if (ts.isObjectBindingPattern(binding)) {
+        for (const el of binding.elements) {
+          if (el.initializer && ts.isIdentifier(el.name))
+            defaults.push({ key: (el.propertyName ?? el.name).getText(), name: el.name.text, el });
+        }
+      }
+    };
+    for (const param of fn.parameters) {
+      if (ts.isIdentifier(param.name) && param.initializer)
+        defaults.push({ key: param.name.text, name: param.name.text, el: param });
+      collect(param.name);
+    }
+    // `const { rows = 6 } = props`: a field of the props.
+    const body = bodyOf(fn);
+    for (const st of body && ts.isBlock(body) ? body.statements : []) {
+      if (!ts.isVariableStatement(st)) continue;
+      for (const d of st.declarationList.declarations) {
+        const init = d.initializer && strip(d.initializer);
+        if (init && ts.isIdentifier(init) && model.lookup(init.text, init)?.kind === 'param') collect(d.name);
+      }
+    }
+    // A literal other than 0 (a default of none draws nothing).
+    const literals = defaults.filter(d => {
+      const init = d.el.initializer && strip(d.el.initializer);
+      return !!init && ts.isNumericLiteral(init) && init.text !== '0';
+    });
+    if (!literals.length) return;
+    const reached = countNamesIn(fn);
+    for (const { key, name, el } of literals) {
       if (
-        literal &&
-        (/^(?:skeletonRows|skeletonCount)$/.test(key) || (inSkeleton && /^(?:count|rows|steps)$/.test(key)))
+        /^(?:skeletonRows|skeletonCount)$/.test(key) ||
+        (inSkeleton && /^(?:count|rows|steps)$/.test(key)) ||
+        reached.has(name)
       )
         report(
           'TYPED_COUNT',
           el,
-          `a literal default for ${key} (name the page size, limit or a *_SKELETON_* constant)`,
+          `a literal default for ${key}, which a skeleton count draws (name the page size, limit or a *_SKELETON_* constant)`,
         );
     }
+  }
+
+  /** The names (parameters and props of `fn`, through its locals) that a skeleton count in `fn` reads. */
+  function countNamesIn(fn) {
+    const names = new Set();
+    const read = (expr, depth = 0) => {
+      const visitName = n => {
+        if (!ts.isIdentifier(n)) return undefined;
+        const decl = model.lookup(n.text, n);
+        if (decl?.kind === 'param') names.add(n.text);
+        else if (decl?.kind === 'var' && decl.init && depth < 3 && nearestFunction(decl.node) === fn) {
+          names.add(n.text);
+          if (!decl.destructured) read(decl.init, depth + 1);
+        }
+        return undefined;
+      };
+      visitName(strip(expr));
+      walk(expr, visitName);
+    };
+    walk(fn, n => {
+      if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
+        const tag = model.resolveName(n.tagName);
+        for (const a of n.attributes.properties) {
+          if (ts.isJsxAttribute(a) && attributeExpression(a) && isCountAttribute(tag, a.name.getText()))
+            read(attributeExpression(a));
+        }
+      }
+      if (ts.isPropertyAssignment(n) && COUNT_ATTR.test(n.name.getText().replace(/['"]/g, ''))) read(n.initializer);
+      const list = listOf(n, model);
+      if (list?.count && !list.literalArray) {
+        const countName = leafName(list.count);
+        // The cells of one row and a text's lines are not list items.
+        if (!isCellCount(countName) && !isTextLineCount(countName) && inLoadingContext(n, model)) read(list.count);
+      }
+      return undefined;
+    });
+    return names;
   }
 
   function containsLiteralFallback(expr) {
@@ -2033,8 +2243,6 @@ function analyzeFile(project, path, active, rel, page) {
     const leaf = tag.split('.').pop();
     skeletonRender(opening, opening.tagName);
     if (LOADERS.has(leaf)) report('LOADER_COMPONENT', opening, RULES.LOADER_COMPONENT);
-    if (leaf === 'Hold' || tag === 'Hold')
-      report('RETIRED_API', opening, "<Hold> (stand-in data is retired: draw the component's skeleton)");
     if (leaf === 'StreamedPage') {
       for (const a of opening.attributes.properties) {
         if (ts.isJsxAttribute(a) && /^(?:skeleton|memory|remember)$/.test(a.name.getText()))
@@ -2059,17 +2267,12 @@ function analyzeFile(project, path, active, rel, page) {
     }
     if (PRIMITIVE.test(tag)) checkPrimitiveInBranch(opening, tag);
     // Counts on loading elements.
-    const skeletonTag = isSkeletonName(tag);
     for (const a of opening.attributes.properties) {
       if (!ts.isJsxAttribute(a)) continue;
       const name = a.name.getText();
       const value = attributeExpression(a);
       if (!value) continue;
-      const counted =
-        COUNT_ATTR.test(name) ||
-        (leaf === 'LoadingItems' && name === 'count') ||
-        (skeletonTag && /^(?:rows|count)$/.test(name));
-      if (!counted) continue;
+      if (!isCountAttribute(tag, name)) continue;
       const kind = classifyCount(value, model, { attr: name });
       if (kind === 'typed')
         report(
@@ -2083,7 +2286,7 @@ function analyzeFile(project, path, active, rel, page) {
           a,
           `a capped skeleton count (${name}={${value.getText()}}); a list's skeleton draws its full page`,
         );
-      else if (kind === 'unnamed' && (/^(?:skeletonRows|skeletonCount)$/.test(name) || leaf === 'LoadingItems'))
+      else if (kind === 'unnamed')
         report(
           'COUNT_SOURCE',
           a,
@@ -2121,7 +2324,7 @@ function analyzeFile(project, path, active, rel, page) {
    * draws Y's loading state (Y renders itself in the scope).
    */
   function checkPrimitiveInBranch(opening, tag) {
-    if (enclosingNames(opening).some(n => /Skeleton$/.test(n))) return;
+    if (enclosingNames(opening).some(isSkeletonFunctionName)) return;
     const el = ts.isJsxOpeningElement(opening) ? opening.parent : opening;
     let child = el;
     let p = el.parent;
@@ -2187,11 +2390,11 @@ function analyzeFile(project, path, active, rel, page) {
     const item = callbackItem(callback);
     const countName = count && !literalArray ? leafName(count) : '';
     // Text: a typical line count, when each item is a skeleton line itself (a list of rows named `*LINES` is a list).
-    const textLines = /lines?$|paragraphs?$/i.test(countName);
+    const textLines = isTextLineCount(countName);
     if (textLines && (!item || lineItem(item))) return;
     const loading = loadingItems || inLoadingContext(node, model);
     // The cells of one row (`columns`, `cells`) are not list items: their count never changes the row's height.
-    const cells = /(?:col(?:umn)?s?|cells?)$/i.test(countName);
+    const cells = isCellCount(countName);
     if (loading && count && !loadingItems && !cells) {
       const kind = literalArray ? 'typed' : classifyCount(count, model);
       if (kind === 'typed')
@@ -2278,7 +2481,7 @@ function analyzeFile(project, path, active, rel, page) {
   function componentScope(node) {
     const fn = nearestFunction(node);
     if (!fn) return null;
-    return isComponentName(functionName(fn)) && !/Skeleton$/.test(functionName(fn)) ? fn : null;
+    return isComponentName(functionName(fn)) && !isSkeletonFunctionName(functionName(fn)) ? fn : null;
   }
 
   function checkIfNull(stmt) {
@@ -2879,7 +3082,7 @@ function analyzeFile(project, path, active, rel, page) {
       if ((ts.isFunctionDeclaration(n) || ts.isVariableDeclaration(n)) && n.name && ts.isIdentifier(n.name)) {
         const fnLike =
           ts.isFunctionDeclaration(n) || (n.initializer && (functionInside(n.initializer) || isJsx(n.initializer)));
-        if (fnLike && /^[A-Z]\w*Skeleton$/.test(n.name.text))
+        if (fnLike && isComponentSkeletonName(n.name.text))
           report('PAGE_CODE', n.name, `${n.name.text} (a component declared as a skeleton)`);
       }
       return undefined;
@@ -2913,8 +3116,7 @@ function rendersOutsideSkeletons(model, component) {
   walk(model.sf, n => {
     if (hit) return false;
     const tag = renderedTag(n);
-    if (tag && model.resolveName(tag) === component && !enclosingNames(n).some(name => /Skeleton$/.test(name)))
-      hit = true;
+    if (tag && model.resolveName(tag) === component && !enclosingNames(n).some(isSkeletonFunctionName)) hit = true;
     return undefined;
   });
   return hit;

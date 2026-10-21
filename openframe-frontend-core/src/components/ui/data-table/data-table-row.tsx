@@ -11,8 +11,10 @@ import { loadingItemProps, useLoadingScope } from '../loading-scope';
 import { useDataTableContext } from './data-table';
 import {
   DATA_TABLE_ROW_FRAME_CLASS,
+  ROW_DESKTOP_SHELL_CLASS,
   ROW_HEIGHT_DESKTOP,
   ROW_HEIGHT_MOBILE,
+  ROW_MOBILE_SHELL_CLASS,
   ROW_SHELL_CLASSES,
 } from './data-table-row-classes';
 import { alignJustify, getHideClasses } from './utils';
@@ -104,7 +106,7 @@ function DataTableRowSkeleton({
     >
       <div
         className={cn(
-          'hidden content-md:flex',
+          ROW_DESKTOP_SHELL_CLASS,
           !compact && 'py-0',
           ROW_SHELL_CLASSES,
           heightClass(ROW_HEIGHT_DESKTOP),
@@ -131,7 +133,7 @@ function DataTableRowSkeleton({
       </div>
       <div
         className={cn(
-          'flex justify-start content-md:hidden',
+          ROW_MOBILE_SHELL_CLASS,
           !compact && 'py-0',
           ROW_SHELL_CLASSES,
           heightClass(ROW_HEIGHT_MOBILE),

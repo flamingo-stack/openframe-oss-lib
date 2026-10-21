@@ -22,6 +22,13 @@ export const queryReportRowCellsClass = (compact: boolean) =>
 /** The header's row: the rows' shell, so each header cell sits over its column. */
 export const queryReportHeaderClass = (compact: boolean) =>
   cn('flex', ROW_SHELL_CLASSES, compact && 'border-b border-ods-border py-2');
+/** One header cell's box (48px high), loaded and loading. */
+export const QUERY_REPORT_HEADER_CELL_CLASS = 'flex h-12 shrink-0 items-center';
+/** The rows' stack and the gap between rows, loaded and loading. */
+export const queryReportRowsClass = (compact: boolean) =>
+  cn('flex flex-col', compact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]');
+/** One cell's box, loaded and loading. */
+export const QUERY_REPORT_CELL_CLASS = 'flex shrink-0 flex-col justify-center overflow-hidden';
 
 export function QueryReportTableRow({
   row,
@@ -44,11 +51,7 @@ export function QueryReportTableRow({
           const value = row[column];
           const displayValue = value === null || value === undefined ? '-' : String(value);
           return (
-            <div
-              key={column}
-              className="flex shrink-0 flex-col justify-center overflow-hidden"
-              style={{ width: columnWidth }}
-            >
+            <div key={column} className={QUERY_REPORT_CELL_CLASS} style={{ width: columnWidth }}>
               <TruncatedCell
                 className={cn('text-ods-text-primary', isCompact ? 'text-h6' : 'text-h4')}
                 value={displayValue}

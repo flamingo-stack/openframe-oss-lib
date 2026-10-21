@@ -8,7 +8,7 @@ import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { DateFilterPanel, type DateFilterResult } from './date-picker';
 import { FilterCheckboxItem } from './filter-checkbox-item';
-import { LoadingItems, LoadingScope } from './loading-scope';
+import { LOADING_NOOP, LoadingItems, LoadingScope } from './loading-scope';
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { ScrollFadeOverlay, useScrollFade } from './scroll-fade';
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item';
@@ -80,8 +80,6 @@ const FILTER_MODAL_SKELETON_GROUPS = 2;
 /** Options each loading group draws: a typical three (a facet's option count is the data's). */
 const FILTER_MODAL_SKELETON_OPTIONS = 3;
 
-/** A loading option's change handler: nothing is chosen while the facets are read. */
-const noop = () => {};
 export function FilterModal({
   isOpen,
   onClose,
@@ -248,7 +246,7 @@ export function FilterModal({
                                 label=""
                                 count={0}
                                 checked={false}
-                                onChange={noop}
+                                onChange={LOADING_NOOP}
                               />
                             )}
                           </LoadingItems>

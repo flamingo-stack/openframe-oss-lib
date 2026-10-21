@@ -7,7 +7,7 @@ import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from 
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button, DatePickerCalendar } from '../ui';
-import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -255,7 +255,6 @@ export function monthLabelFor(offset: number): string {
 
 /** Nothing is bookable yet — used while a month is still loading. */
 const DISABLE_EVERY_DAY = () => true;
-const NOOP = () => undefined;
 
 interface DayCalendarProps {
   monthOffset: number;
@@ -344,9 +343,9 @@ export function SlotPickerSkeleton({
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         <DayCalendar
           monthOffset={monthOffset}
-          onMonthOffsetChange={NOOP}
+          onMonthOffsetChange={LOADING_NOOP}
           selectedDay={null}
-          onSelectDay={NOOP}
+          onSelectDay={LOADING_NOOP}
           slotsByDay={null}
         />
       </div>

@@ -130,7 +130,7 @@ export function ProgramCardSkeleton({
   eyebrow = true,
   media = 0,
   tags = false,
-  hosts = 1,
+  hosts = PROGRAM_CARD_SKELETON_HOSTS,
   typeLabel,
   actionLabel,
   className,

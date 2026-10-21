@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { cn } from '../../../utils/cn';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip';
-import { queryReportHeaderClass } from './query-report-table-row';
+import { QUERY_REPORT_HEADER_CELL_CLASS, queryReportHeaderClass } from './query-report-table-row';
 import type { QueryReportTableHeaderProps } from './types';
 
 export function QueryReportTableHeader({
@@ -38,7 +38,7 @@ function TruncatedHeaderCell({ value, width }: { value: string; width: number })
     <TooltipProvider delayDuration={300}>
       <Tooltip open={isTruncated ? undefined : false}>
         <TooltipTrigger asChild onMouseEnter={checkTruncation}>
-          <div className="flex shrink-0 items-center" style={{ width, height: 48 }}>
+          <div className={QUERY_REPORT_HEADER_CELL_CLASS} style={{ width }}>
             <div ref={textRef} className="truncate text-ods-text-secondary text-h5">
               {value}
             </div>

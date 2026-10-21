@@ -665,19 +665,22 @@ const TRUST_PANEL_SHAPES: Record<
   ai: { mark: 'glyph', action: 'none', lines: { phone: 6, wide: 2 } },
 };
 
-function panelRowCount(rows: TrustPanelRows | undefined): number {
-  if (rows === undefined) return TRUST_PANEL_SKELETON_ROWS;
-  return typeof rows === 'number' ? rows : Math.max(rows.phone, rows.wide);
-}
-
 /**
  * A panel section while it is read: rows of the REAL `StackedRowsPanel` (its own row heights and borders, each row a
  * read list item) whose cells hold bars: the panel's mark, a value over its typical description, and the right-hand
  * badge or button in the page's `ACTION_COLUMN`.
  */
-function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?: TrustPanelRows }) {
+function TrustPanelSkeleton({
+  panel,
+  rows = TRUST_PANEL_SKELETON_ROWS,
+}: {
+  panel: TrustCenterPanelId;
+  rows?: TrustPanelRows;
+}) {
   const shape = TRUST_PANEL_SHAPES[panel];
-  const panelRows: PanelRow[] = Array.from({ length: panelRowCount(rows) }, (_, index) => ({
+  // The rows the host reads, or a typical panel; a count per width draws the larger, so neither width is short.
+  const length = typeof rows === 'number' ? rows : Math.max(rows.phone, rows.wide);
+  const panelRows: PanelRow[] = Array.from({ length }, (_, index) => ({
     id: `skeleton-${index}`,
     columns: [
       {

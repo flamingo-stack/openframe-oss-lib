@@ -28,10 +28,13 @@ function findingsOf(files: Record<string, string>): Finding[] {
 
 describe('loading-standard engine: one failing and one passing example per rule', () => {
   it('has an example for every rule', () => {
-    expect(RULE_EXAMPLES.map(e => e.rule).sort()).toEqual(Object.keys(RULES).sort());
+    expect([...new Set(RULE_EXAMPLES.map(e => e.rule))].sort()).toEqual(Object.keys(RULES).sort());
   });
 
-  it.each(RULE_EXAMPLES.map(example => [example.rule, example] as const))('%s', (rule, example) => {
+  it.each(
+    RULE_EXAMPLES.map(example => [example.name ? `${example.rule}: ${example.name}` : example.rule, example] as const),
+  )('%s', (_, example) => {
+    const { rule } = example;
     expect(findingsOf(example.fail).map(f => f.rule)).toContain(rule);
     expect(findingsOf(example.pass).filter(f => f.rule === rule)).toEqual([]);
   });

@@ -10,7 +10,7 @@ import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
-import { useLoadingScope } from './loading-scope';
+import { InertWhileLoading, useLoadingScope } from './loading-scope';
 import { useReportOverlayOpen } from './overlay-open-registry';
 import { COLLISION_PADDING_PX, useCollisionBoundary, usePortalContainer } from './portal-container';
 
@@ -451,11 +451,7 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   if (loading) {
     // A custom trigger is the host's control (it switches itself in the scope, e.g. a field trigger). Either trigger is
     // drawn as it is, inert: it cannot open while the subject is read.
-    return (
-      <span inert aria-hidden className="inline-flex shrink-0">
-        {triggerNode}
-      </span>
-    );
+    return <InertWhileLoading>{triggerNode}</InertWhileLoading>;
   }
 
   return (

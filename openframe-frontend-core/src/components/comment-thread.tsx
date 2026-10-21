@@ -6,7 +6,7 @@ import { CommentCard, type CommentCardComment } from './comment-card';
 import { CommentComposer } from './comment-composer';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
-import { LoadingItems, useLoadingScope } from './ui/loading-scope';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from './ui/loading-scope';
 
 /**
  * The comment cards a thread draws while it is read: a typical count (a thread with comments usually holds a few root
@@ -194,9 +194,6 @@ function CommentThreadRow({
   );
 }
 
-/** A loading row's delete handler: the button is drawn inert while the comments are read, so it is never called. */
-const HOLD_DELETE = () => undefined;
-
 /**
  * A thread while it is read: `count` comment rows, each `CommentCard loading` in the thread's own list, with the
  * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
@@ -244,7 +241,7 @@ export function CommentThreadSkeleton({
             leadWith={leadWith}
             titleRow={showTitle}
             footer={footer}
-            onDeleteComment={deletable ? HOLD_DELETE : undefined}
+            onDeleteComment={deletable ? LOADING_NOOP : undefined}
           />
         )}
       </LoadingItems>

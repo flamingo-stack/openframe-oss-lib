@@ -5,12 +5,11 @@ import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
 import { HostIdentity } from './host-identity';
 
 /** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
-const noop = () => {};
 
 /**
  * The head of the scheduler's MODAL layout: the host strip (who, and how long
@@ -111,7 +110,7 @@ export function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTime
       {showTimezone && (
         <div className={TIMEZONE_ROW_CLASS}>
           <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          <TimezoneSelect value={null} loading onChange={noop} />
+          <TimezoneSelect value={null} loading onChange={LOADING_NOOP} />
         </div>
       )}
     </>

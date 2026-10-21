@@ -4,7 +4,14 @@ import { cn } from '../../../utils/cn';
 import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { LoadingItems } from '../loading-scope';
-import { queryReportHeaderClass, queryReportRowCellsClass, queryReportRowFrameClass } from './query-report-table-row';
+import {
+  QUERY_REPORT_CELL_CLASS,
+  QUERY_REPORT_HEADER_CELL_CLASS,
+  queryReportHeaderClass,
+  queryReportRowCellsClass,
+  queryReportRowFrameClass,
+  queryReportRowsClass,
+} from './query-report-table-row';
 import type { QueryReportTableSkeletonProps } from './types';
 
 export function QueryReportTableSkeleton({
@@ -24,7 +31,7 @@ export function QueryReportTableSkeleton({
       <div className={queryReportHeaderClass(isCompact)}>
         <LoadingItems count={columns}>
           {() => (
-            <div className="flex shrink-0 items-center" style={{ width: columnWidth, height: 48 }}>
+            <div className={QUERY_REPORT_HEADER_CELL_CLASS} style={{ width: columnWidth }}>
               <TextLineSkeleton type="h5" className="w-3/4" />
             </div>
           )}
@@ -32,14 +39,14 @@ export function QueryReportTableSkeleton({
       </div>
 
       {/* Skeleton rows: the result's rows (marked like the loaded rows), each `columns` cells. */}
-      <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]')}>
+      <div className={queryReportRowsClass(isCompact)}>
         <LoadingItems count={rows}>
           {rowIndex => (
             <div data-loading-item className={queryReportRowFrameClass(isCompact)}>
               <div className={queryReportRowCellsClass(isCompact)}>
                 <LoadingItems count={columns}>
                   {colIndex => (
-                    <div className="flex shrink-0 flex-col justify-center" style={{ width: columnWidth }}>
+                    <div className={QUERY_REPORT_CELL_CLASS} style={{ width: columnWidth }}>
                       <TextLineSkeleton
                         type={isCompact ? 'h6' : 'h4'}
                         width={`${55 + ((rowIndex * colIndex * 7) % 35)}%`}

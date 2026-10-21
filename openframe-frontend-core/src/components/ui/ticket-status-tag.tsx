@@ -6,6 +6,7 @@ import { deriveActiveColor, deriveHoverColor, getReadableTextColor } from '../..
 import { CheckCircleIcon, Chevron02DownIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown } from './actions-menu';
 import { ColorSwatch } from './color-swatch';
+import { useLoadingScope } from './loading-scope';
 import { Tag, type TagProps, tagVariants } from './tag';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
@@ -182,8 +183,7 @@ export interface TicketStatusTagOption {
 export interface TicketStatusTagProps {
   /** Ticket status in any known format (ACTIVE, active, ACTION_REQUIRED, etc.) */
   status: string;
-  /** The status is still being read: the tag draws its skeleton (no dropdown). In a loading scope a tag with no
-   *  status yet does the same. */
+  /** The status is still being read: the tag draws its skeleton (no dropdown). A loading scope does the same. */
   loading?: boolean;
   /** Override the default label */
   label?: string;
@@ -233,8 +233,10 @@ export function TicketStatusTag({
   isPending = false,
   disabled = false,
   disabledReason,
-  loading = false,
+  loading: loadingProp = false,
 }: TicketStatusTagProps) {
+  // ONE switch: in a page's loading state, or while the status is read, the tag is its skeleton and opens no menu.
+  const loading = useLoadingScope() || loadingProp;
   const config = getTicketStatusConfig(status);
   // Custom color: drive bg via CSS vars so the derived hover/active fills can win
   // on :hover/:active (an inline backgroundColor would block class-based hover).

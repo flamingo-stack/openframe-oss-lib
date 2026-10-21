@@ -73,6 +73,9 @@ const ACTIVITY_DEFAULT_LABEL: Record<BoardTicketActivityKind, string> = {
 const TICKET_CARD_SHELL =
   'relative flex flex-col gap-[var(--spacing-system-sf)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] select-none text-left';
 
+/** The number and time line (`3891 • 5 min ago`), loaded and loading. */
+const TICKET_CARD_META_CLASS = 'truncate text-ods-text-secondary text-h6';
+
 // =============================================================================
 // Presentational body — the ONE ticket-card design, no drag/link/board context.
 // Reused by the draggable `TicketCard` AND the static `TicketCardView`.
@@ -172,7 +175,6 @@ export function TicketCardBody({
   // may be empty - the hub hero card and tickets without one send '' - so either
   // half stands on its own and the line disappears with both missing.
   const metaLabel = [ticket.ticketNumber || null, timestampLabel].filter(Boolean).join(' \u2022 ');
-  const metaClass = 'truncate text-ods-text-secondary text-h6';
   // Out of the tab order: the card's own link is the one stop for the ticket.
   const meta = href ? (
     <Link
@@ -181,12 +183,12 @@ export function TicketCardBody({
       prefetch={false}
       tabIndex={-1}
       onClick={onLinkClick}
-      className={cn('pointer-events-auto block', metaClass)}
+      className={cn('pointer-events-auto block', TICKET_CARD_META_CLASS)}
     >
       {metaLabel}
     </Link>
   ) : (
-    <p className={cn(tooltipLabel && 'pointer-events-auto', metaClass)}>{metaLabel}</p>
+    <p className={cn(tooltipLabel && 'pointer-events-auto', TICKET_CARD_META_CLASS)}>{metaLabel}</p>
   );
 
   return (
@@ -615,7 +617,7 @@ function TicketTagRow({ tags }: { tags: string[] }) {
 
 /**
  * A board card while it is read: the card's own shell, its title and device lines as bars of their own type steps,
- * the priority and assignee marks, and a typical tag row. The board card draws it itself (`ticket={null}` or a
+ * the priority and assignee marks, a typical tag row and the number and time line, in the body's order. The board card draws it itself (`ticket={null}` or a
  * loading scope).
  */
 export function TicketCardSkeleton({ className, ...props }: { className?: string; [key: `data-${string}`]: unknown }) {
@@ -638,6 +640,7 @@ export function TicketCardSkeleton({ className, ...props }: { className?: string
         <TagSkeleton />
         <TagSkeleton />
       </div>
+      <TextLineSkeleton type="h6" className={cn(TICKET_CARD_META_CLASS, 'w-1/3')} />
     </div>
   );
 }

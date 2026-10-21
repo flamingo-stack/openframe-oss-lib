@@ -132,7 +132,8 @@ export function DataTableBody<T = unknown>({
   // has rows to continue takes them over; an empty or loading one leaves the
   // footer drawing its own, as before.
   const loadMore = useDataTableLoadMoreStore();
-  const loadMoreRows = useSyncExternalStore(loadMore.subscribe, loadMore.getSkeletonRows, getNoRows);
+  // The next page the footer is reading: its page size, drawn as that many loading rows.
+  const loadMorePageSize = useSyncExternalStore(loadMore.subscribe, loadMore.getSkeletonRows, getNoRows);
   useIsomorphicLayoutEffect(() => (hasRows ? loadMore.registerRowsBody() : undefined), [loadMore, hasRows]);
 
   const skeletonRowClassName = typeof rowClassName === 'string' ? rowClassName : undefined;
@@ -190,7 +191,7 @@ export function DataTableBody<T = unknown>({
   }
 
   // Load-more rows are row slots too, so they count against `minRows`.
-  const padCount = minRows ? Math.max(0, minRows - rows.length - loadMoreRows) : 0;
+  const padCount = minRows ? Math.max(0, minRows - rows.length - loadMorePageSize) : 0;
 
   return (
     <div className={cn(ROW_STACK_CLASSES, className)}>
@@ -212,8 +213,8 @@ export function DataTableBody<T = unknown>({
           />
         );
       })}
-      {loadMoreRows > 0 && (
-        <LoadingItems count={loadMoreRows}>
+      {loadMorePageSize > 0 && (
+        <LoadingItems count={loadMorePageSize}>
           {index => (
             <DataTableRow
               row={null}

@@ -34,13 +34,15 @@ export function formatTestRunDuration(ms: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** A result column's least width, in px, loaded and loading (the loaded column's class states the same value). */
 const RESULT_COLUMN_MIN_WIDTH = 176;
+const RESULT_COLUMN_WIDTH_CLASS = 'flex-1 min-w-[176px]';
 /** A result set's columns are read with its rows and have no fixed count: a loading run draws a typical six (the count
  * this skeleton has always drawn), as header bars and as its one row's cells. */
 const TEST_RESULTS_SKELETON_COLUMNS = 6;
 
-/** Column-bar skeleton (header cells + one card row): fixed 160px columns on
-    every breakpoint, scrolling horizontally when they do not fit. The row is the data table's own row card and shell
+/** Column-bar skeleton (header cells + one card row): columns `RESULT_COLUMN_MIN_WIDTH` wide (the loaded columns' least
+    width) on every breakpoint, scrolling horizontally when they do not fit. The row is the data table's own row card and shell
     (`data-table-row-classes`); each bar a `TextLineSkeleton` of its text's type step. */
 export function TestResultsSkeleton({
   region = true,
@@ -57,7 +59,7 @@ export function TestResultsSkeleton({
           <div className={cn('flex', ROW_SHELL_CLASSES)}>
             <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
               {() => (
-                <div className="flex h-12 w-[160px] shrink-0 items-center">
+                <div className="flex h-12 shrink-0 items-center" style={{ width: RESULT_COLUMN_MIN_WIDTH }}>
                   <TextLineSkeleton type="h5" className="w-3/4" />
                 </div>
               )}
@@ -67,7 +69,7 @@ export function TestResultsSkeleton({
             <div className={cn('flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP)}>
               <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
                 {() => (
-                  <div data-loading-item className="w-[160px] shrink-0">
+                  <div data-loading-item className="shrink-0" style={{ width: RESULT_COLUMN_MIN_WIDTH }}>
                     <TextLineSkeleton type="h4" className="w-3/4" />
                   </div>
                 )}
@@ -105,11 +107,11 @@ export function TestResultsTable({ rows, loading: loadingProp }: { rows: QueryRe
         );
       },
       meta: {
-        width: 'flex-1 min-w-[176px]',
+        width: RESULT_COLUMN_WIDTH_CLASS,
         // Show headers on every breakpoint; headerClassName sizes the cells
         // below lg where meta.width is not applied.
         alwaysShowHeader: true,
-        headerClassName: 'flex-1 min-w-[176px]',
+        headerClassName: RESULT_COLUMN_WIDTH_CLASS,
       },
     }));
   }, [columnKeys]);

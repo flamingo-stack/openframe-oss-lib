@@ -35,13 +35,16 @@ export interface ContentLoaderProps {
   region?: boolean;
 }
 
+/** Items the loader draws when its host states none: a typical list. */
+const CONTENT_LOADER_SKELETON_ITEMS = 4;
+
 /**
  * Unified content loader component that replaces duplicate loading patterns
  * Uses ODS design tokens for consistent theming
  */
 export function ContentLoader({
   variant = 'card',
-  items = 4,
+  items = CONTENT_LOADER_SKELETON_ITEMS,
   showTitle = true,
   className,
   containerClassName,

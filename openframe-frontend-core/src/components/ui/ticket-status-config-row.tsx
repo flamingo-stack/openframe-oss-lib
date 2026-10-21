@@ -11,7 +11,7 @@ import { Button } from './button';
 import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
 import { Input } from './input';
 import { Label } from './label';
-import { LoadingWhen, useLoadingScope } from './loading-scope';
+import { InertWhileLoading, LOADING_NOOP, LoadingWhen, useLoadingScope } from './loading-scope';
 import type { TagProps } from './tag';
 import { TicketStatusTag } from './ticket-status-tag';
 import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
@@ -49,8 +49,6 @@ export interface TicketStatusConfigRowProps {
    */
   loading?: boolean;
 }
-
-const noop = () => {};
 
 /** The delete button's box, read by the button and its skeleton. */
 const DELETE_BUTTON_SIZE_CLASS = 'size-11 content-md:size-12';
@@ -181,7 +179,7 @@ export function TicketStatusConfigRow({
           <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] content-md:order-2 content-md:basis-0">
             <Label variant="large">Color</Label>
             <LoadingWhen loading={loading || !onColorChange || color === undefined}>
-              <ColorPresetSelect value={color ?? ''} presetKey={presetKey} onChange={onColorChange ?? noop} />
+              <ColorPresetSelect value={color ?? ''} presetKey={presetKey} onChange={onColorChange ?? LOADING_NOOP} />
             </LoadingWhen>
             {/* Custom hex: a second field row inside the Color column, directly
                 under the select (per design). Drawn for a row whose color is known to be custom; the field draws its
@@ -257,7 +255,7 @@ export function TicketStatusConfigRow({
             </div>
           ) : (
             // The delete button is a static control: drawn for real in both forms, inert while the status is read.
-            <span inert={loading || undefined} aria-hidden={loading || undefined} className="inline-flex">
+            <InertWhileLoading loading={loading} className="inline-flex">
               <TouchFriendlyTooltip content={deleteDisabled && !loading ? deleteDisabledReason : undefined}>
                 <span className="inline-flex">
                   <Button
@@ -273,7 +271,7 @@ export function TicketStatusConfigRow({
                   </Button>
                 </span>
               </TouchFriendlyTooltip>
-            </span>
+            </InertWhileLoading>
           )}
         </div>
       </div>

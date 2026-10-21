@@ -19,7 +19,12 @@ const component = body => `export function Thing({ loading, rows, record }: any)
 const switching = body =>
   `export function Thing({ loading, rows, record }: any) {\n  const isLoading = useLoadingScope() || loading;\n${body}\n}\n`;
 
-/** @type {Array<{ rule: string, fail: Record<string, string>, pass: Record<string, string> }>} */
+/**
+ * A rule may have more than one example: each names (`name`) the form it pins. Every failing tree must report its rule,
+ * every passing tree must not.
+ *
+ * @type {Array<{ rule: string, name?: string, fail: Record<string, string>, pass: Record<string, string> }>}
+ */
 export const RULE_EXAMPLES = [
   {
     rule: 'ONE_SWITCH',
@@ -482,6 +487,94 @@ export function B() {
     pass: {
       'app/thing/page.tsx':
         "import dynamic from 'next/dynamic';\nconst Thing = dynamic(() => import('x'), { loading: () => <ThingSkeleton /> });\nexport default function Page() { return <LoadingSuspense><Thing /></LoadingSuspense>; }\n",
+    },
+  },
+  {
+    rule: 'RETIRED_API',
+    name: 'a Hold* stand-in component',
+    fail: {
+      'components/retired.tsx': 'export function R() { return <HoldText text="x" />; }\n',
+    },
+    pass: {
+      'components/retired.tsx': 'export function R() { return <TextHold text="x" />; }\n',
+    },
+  },
+  {
+    rule: 'TYPED_COUNT',
+    name: 'a literal default on a prop that reaches a skeleton count',
+    fail: {
+      'components/list.tsx': `export function List({ size = 6, loading }: any) {
+  const isLoading = useLoadingScope() || loading;
+  return isLoading ? <LoadingItems count={size}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems> : <ul />;
+}
+`,
+    },
+    pass: {
+      'components/list.tsx': `const LIST_PAGE_SIZE = 6;
+export function List({ size = LIST_PAGE_SIZE, gap = 2, loading }: any) {
+  const isLoading = useLoadingScope() || loading;
+  return isLoading ? <LoadingItems count={size}>{(i: number) => <li key={i} data-loading-item className={\`gap-\${gap}\`} />}</LoadingItems> : <ul />;
+}
+`,
+    },
+  },
+  {
+    rule: 'TYPED_COUNT',
+    name: 'a field of a local object holding a literal',
+    fail: {
+      'components/settings.tsx': switching(`  const settings = { rows: 4 };
+  return isLoading ? <LoadingItems count={settings.rows}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems> : <ul />;`),
+    },
+    pass: {
+      'components/settings.tsx': `const ROWS_PAGE_SIZE = 4;\n${switching(`  const settings = { rows: ROWS_PAGE_SIZE };
+  return isLoading ? <LoadingItems count={settings.rows}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems> : <ul />;`)}`,
+    },
+  },
+  {
+    rule: 'TYPED_COUNT',
+    name: 'a module constant holding a literal list, mapped while loading',
+    fail: {
+      'components/items.tsx': `const ITEMS = [1, 2, 3, 4];\n${switching(`  return isLoading ? <ul>{ITEMS.map(i => <li key={i} data-loading-item />)}</ul> : <ul />;`)}`,
+    },
+    pass: {
+      'components/items.tsx': `const ITEMS_PAGE_SIZE = 4;\nconst WIDTHS = [60, 80, 40];\n${switching(`  return isLoading ? (
+    <ul>
+      {Array.from({ length: ITEMS_PAGE_SIZE }, (_, i) => <li key={i} data-loading-item style={{ width: WIDTHS[i % 3] }} />)}
+    </ul>
+  ) : <ul />;`)}`,
+    },
+  },
+  {
+    rule: 'COUNT_SOURCE',
+    name: 'a count computed by a call, from the read, or with typed rows added',
+    fail: {
+      'components/computed.tsx': `export function Thing({ loading, rows, w }: any) {
+  const isLoading = useLoadingScope() || loading;
+  const { data } = useThings();
+  return isLoading ? (
+    <>
+      <LoadingItems count={rowsFor(w)}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems>
+      <LoadingItems count={rows.length + 2}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems>
+      <LoadingItems count={data?.total ?? 0}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems>
+    </>
+  ) : <ul />;
+}
+`,
+    },
+    pass: {
+      'components/computed.tsx': `const ROWS_PAGE_SIZE = 10;
+export function Thing({ loading, rows }: any) {
+  const isLoading = useLoadingScope() || loading;
+  return isLoading ? (
+    <>
+      <LoadingItems count={ROWS_PAGE_SIZE}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems>
+      <LoadingItems count={rows - 1}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems>
+      <LoadingItems count={Math.min(ROWS_PAGE_SIZE, rows.length)}>{(i: number) => <li key={i} data-loading-item />}</LoadingItems>
+      <CardSkeleton rows={[{ width: 'w-1/2' }]} count={rows !== undefined} />
+    </>
+  ) : <ul />;
+}
+`,
     },
   },
 ];

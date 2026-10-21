@@ -33,7 +33,16 @@ export const ROW_SHELL_CLASSES = 'items-center gap-[var(--spacing-system-mf)] px
  * and the footer used to stack in nothing at all — its placeholder rows were
  * bare children of the table root, touching each other.
  */
+/** A row slot's box (its corners and its 1px border), shared by a row's card and a pad row, so both are one height. */
+const ROW_BOX_CLASS = 'overflow-hidden rounded-md border';
 /** A row's card (its frame and surface): read by `DataTableRow` and by the loading rows below, so both are one box. */
-export const DATA_TABLE_ROW_FRAME_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-card';
+export const DATA_TABLE_ROW_FRAME_CLASS = `${ROW_BOX_CLASS} border-ods-border bg-ods-card`;
+/** A pad row (`PlaceholderRows`): the card's box with a transparent border, so it is the row's height and invisible. */
+export const DATA_TABLE_PAD_ROW_FRAME_CLASS = `pointer-events-none relative ${ROW_BOX_CLASS} border-transparent`;
+
+/** The row's desktop shell (its cells in columns, from md) and its mobile shell (one stacked cell, below md): read by the
+ *  loading row and the pad rows, so a row's two layouts are one pair of boxes. */
+export const ROW_DESKTOP_SHELL_CLASS = 'hidden content-md:flex';
+export const ROW_MOBILE_SHELL_CLASS = 'flex justify-start content-md:hidden';
 
 export const ROW_STACK_CLASSES = 'flex w-full flex-col gap-[var(--spacing-system-xsf)]';

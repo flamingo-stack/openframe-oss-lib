@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
 import { ExternalLinkIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { useLoadingScope } from '../ui/loading-scope';
+import { InertWhileLoading, useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 
 export interface MspOrganizationCardProps {
@@ -92,14 +92,7 @@ export function MspOrganizationCard({
     </Button>
   ) : null;
   // The link button is static: drawn real while loading, inert.
-  const trailing =
-    action && loading ? (
-      <span inert aria-hidden className="inline-flex shrink-0">
-        {action}
-      </span>
-    ) : (
-      action
-    );
+  const trailing = action && loading ? <InertWhileLoading>{action}</InertWhileLoading> : action;
 
   if (footer) {
     return (

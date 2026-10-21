@@ -5,9 +5,8 @@ import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { isOwnClick } from '../../../utils/own-click';
 import { Checkbox } from '../checkbox';
-import { ROW_HEIGHT_DESKTOP } from '../data-table/data-table-row-classes';
 import { TableCell } from './table-cell';
-import { COMPACT_ROW_MIN_HEIGHT, TABLE_ROW_CELLS_CLASS, TABLE_ROW_FRAME_CLASS } from './table-skeleton';
+import { TABLE_ROW_CELLS_CLASS, TABLE_ROW_FRAME_CLASS, tableRowHeightClass } from './table-skeleton';
 import type { TableRowData, TableRowProps } from './types';
 import { getHideClasses } from './utils';
 
@@ -109,7 +108,7 @@ export function TableRow<T = TableRowData>({
           // function of the row COUNT alone. That is what lets a host reserve
           // space for a full page and stop the layout jumping between a full
           // page, a short last page and the skeleton.
-          compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
+          tableRowHeightClass(compact),
           isLinkMode && 'pointer-events-none',
         )}
       >

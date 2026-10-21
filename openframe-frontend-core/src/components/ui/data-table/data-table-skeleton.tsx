@@ -4,7 +4,14 @@ import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { LoadingItems } from '../loading-scope';
 import { DataTableRow } from './data-table-row';
-import { ROW_HEIGHT_DESKTOP, ROW_HEIGHT_MOBILE, ROW_SHELL_CLASSES } from './data-table-row-classes';
+import {
+  DATA_TABLE_PAD_ROW_FRAME_CLASS,
+  ROW_DESKTOP_SHELL_CLASS,
+  ROW_HEIGHT_DESKTOP,
+  ROW_HEIGHT_MOBILE,
+  ROW_MOBILE_SHELL_CLASS,
+  ROW_SHELL_CLASSES,
+} from './data-table-row-classes';
 import { DATA_TABLE_SKELETON_ROWS } from './utils';
 
 export interface DataTableSkeletonProps {
@@ -129,7 +136,7 @@ export function PlaceholderRows({
           // — invisible per row, 54px over a 27-row remainder, which is the
           // same shift `minRows` exists to prevent.
           className={cn(
-            'pointer-events-none relative overflow-hidden rounded-md border border-transparent',
+            DATA_TABLE_PAD_ROW_FRAME_CLASS,
             // The stated slot height belongs on the CARD, exactly as a real
             // row carries it — a real row with a sub-row is taller than its
             // cells, so reserving the cells' height here left every pad row
@@ -140,14 +147,16 @@ export function PlaceholderRows({
         >
           <div
             className={cn(
-              'hidden py-0 content-md:flex',
+              ROW_DESKTOP_SHELL_CLASS,
+              'py-0',
               ROW_SHELL_CLASSES,
               innerHeightClassName ?? (rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP),
             )}
           />
           <div
             className={cn(
-              'flex justify-start py-0 content-md:hidden',
+              ROW_MOBILE_SHELL_CLASS,
+              'py-0',
               ROW_SHELL_CLASSES,
               innerHeightClassName ?? (rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE),
             )}

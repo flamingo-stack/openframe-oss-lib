@@ -4,7 +4,7 @@ import type { MouseEvent, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { InteractiveSkeleton, MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { InertWhileLoading, LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
 
 export interface MingoOnboardingCardAction {
@@ -172,13 +172,7 @@ export function MingoOnboardingCard({
         </div>
       ) : hasActions ? (
         <div className={CARD_ACTIONS_CLASS}>
-          {loading ? (
-            <span inert aria-hidden className="contents">
-              {actionButtons}
-            </span>
-          ) : (
-            actionButtons
-          )}
+          {loading ? <InertWhileLoading className="contents">{actionButtons}</InertWhileLoading> : actionButtons}
         </div>
       ) : null}
     </div>

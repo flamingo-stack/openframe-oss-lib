@@ -16,18 +16,22 @@ import { getHideClasses, TABLE_ACTIONS_COLUMN_KEY, TABLE_CHEVRON_COLUMN_KEY } fr
  * a full page's height in every state (placeholders below), and a cell taller
  * than this floor (avatar + two lines) wants a non-compact, fixed-height row.
  */
-const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
+export const COMPACT_ROW_MIN_HEIGHT = 'min-h-[56px]';
+/** A row's cells' height, loaded and loading: a compact row's padding and floor, else the design height. */
+export const tableRowHeightClass = (compact: boolean | undefined) =>
+  compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP);
 /** A row's card (its frame and surface): read by `TableRow` and by its loading rows below, so both are one box. */
 export const TABLE_ROW_FRAME_CLASS = 'relative overflow-hidden rounded-[6px] border border-ods-border bg-ods-card';
 /** The cells' row inside the card (inset and column gap), in both forms. */
 export const TABLE_ROW_CELLS_CLASS = 'relative flex items-center gap-4 px-4';
 
-/** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 /**
  * Rows a table's skeleton draws when it knows no page size: a typical count for an UNPAGED table. A table with page
  * pagination draws its `pageSize` instead (one full page, at every width), and a host may state `skeletonRows`.
  */
 export const TABLE_SKELETON_ROWS = 10;
+
+/** The legacy `Table`'s loading rows (`Table` draws them itself); a new table is a `DataTable`, whose rows draw their own. */
 
 export function TableCardSkeleton({
   columns,
@@ -52,13 +56,7 @@ export function TableCardSkeleton({
         >
           {/* `TableRow`'s own row: the same frame, gap and height at every breakpoint, each column in its own cell
               width (the synthetic actions and chevron columns included), so a loaded row takes the skeleton's place. */}
-          <div
-            className={cn(
-              TABLE_ROW_CELLS_CLASS,
-              compact ? cn('py-2', COMPACT_ROW_MIN_HEIGHT) : cn('py-0', ROW_HEIGHT_DESKTOP),
-              rowClassName,
-            )}
-          >
+          <div className={cn(TABLE_ROW_CELLS_CLASS, tableRowHeightClass(compact), rowClassName)}>
             {selectable && (
               <div className="flex w-10 shrink-0 items-center justify-center">
                 <UnifiedSkeleton className={CHECKBOX_BOX_CLASS} />
@@ -100,6 +98,3 @@ export function TableCardSkeleton({
     </LoadingItems>
   );
 }
-
-/** @deprecated */
-export { COMPACT_ROW_MIN_HEIGHT };

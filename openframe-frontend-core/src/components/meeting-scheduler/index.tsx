@@ -59,7 +59,7 @@ import { formatDurationCompact, formatDateWithTimezone } from '../../utils/forma
 import { BackButton } from '../layout/back-button';
 import { LoadingRegion } from '../loading/loading-region';
 import { Alert, AlertDescription, Button } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { BookingForm, DEFAULT_SUBMIT_LABEL, type BookingFieldRow, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel } from './context-panel';
@@ -426,7 +426,6 @@ function isNativelyBookable(availability: MeetingAvailability): boolean {
 const MODAL_STACK_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
 const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
 const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
-const NOOP = () => undefined;
 const NOOP_SUBMIT = () => Promise.resolve();
 
 /** The modal's form draws the name pair first and the email under it, as its design does. */
@@ -1049,11 +1048,11 @@ export function HubSpotMeetingScheduler({
                   slots={slots}
                   timezone={timezone}
                   monthOffset={monthOffset}
-                  onMonthOffsetChange={NOOP}
+                  onMonthOffsetChange={LOADING_NOOP}
                   selectedSlot={null}
-                  onSelectSlot={NOOP}
+                  onSelectSlot={LOADING_NOOP}
                   selectedDay={null}
-                  onSelectDay={NOOP}
+                  onSelectDay={LOADING_NOOP}
                 />
               </div>
             )
