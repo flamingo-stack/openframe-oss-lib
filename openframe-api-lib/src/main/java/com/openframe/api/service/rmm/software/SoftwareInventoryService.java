@@ -90,6 +90,8 @@ public class SoftwareInventoryService {
     private final com.openframe.api.service.rmm.fleet.FleetHostMachineResolver hostMachineResolver;
     private final TenantIdProvider tenantIdProvider;
     private final DeviceHostInventoryLoader deviceHostInventoryLoader;
+    private final DeviceSoftwareReadModelQuery deviceSoftwareReadModelQuery;
+    private final TenantSoftwareReadModelQuery tenantSoftwareReadModelQuery;
 
     @Value("${TENANT_ID:}")
     private String tenantIdEnv;
@@ -97,8 +99,11 @@ public class SoftwareInventoryService {
     @Value("${openframe.fleet.multi-tenancy.enabled}")
     private boolean fleetMultiTenancyEnabled;
 
-    @Value("${openframe.rmm.software.fleet-paging.enabled:false}")
+    @Value("${openframe.rmm.software.fleet-paging.enabled}")
     private boolean fleetPaging;
+
+    @Value("${openframe.features.software-read-model.enabled}")
+    private boolean softwareReadModel;
 
     private FleetMdmClient fleet;
 
@@ -116,6 +121,9 @@ public class SoftwareInventoryService {
     }
 
     public Optional<SoftwareResponse> findById(String softwareId) {
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.findById(tenantIdProvider.getTenantId(), softwareId);
+        }
         return parseNumericId(softwareId)
                 .map(fleet()::getSoftwareTitle)
                 .map(FleetSoftwareMapper::toResponse)
@@ -133,6 +141,9 @@ public class SoftwareInventoryService {
         boolean desc = sort != null && sort.getDirection() == SortDirection.DESC;
         if (field != null && !SORTABLE.contains(field)) {
             throw new BadRequestException("Unknown sort field '" + field + "'. Sortable fields: " + SORTABLE_FIELDS);
+        }
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.listSoftware(tenantIdProvider.getTenantId(), search, page, perPage, sort, vulnerable);
         }
         if (fleetPaging) {
             return softwarePageFromFleet(search, page, perPage, sort, vulnerable);
@@ -298,6 +309,10 @@ public class SoftwareInventoryService {
     public PageResult<SoftwareVulnerabilityResponse> listVulnerabilitiesForSoftware(
             String softwareId, String search, int page, Integer perPage,
             String sortField, boolean sortAsc) {
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.listVulnerabilitiesForSoftware(
+                    tenantIdProvider.getTenantId(), softwareId, search, page, perPage, sortField, sortAsc);
+        }
         Optional<Long> parsed = parseNumericId(softwareId);
         if (parsed.isEmpty()) {
             return PageResult.empty(page);
@@ -333,6 +348,10 @@ public class SoftwareInventoryService {
     public PageResult<SoftwareOnDeviceResponse> listDevicesForSoftware(String softwareId,
                                                                        SoftwareOnDeviceFilterInput filter,
                                                                        String search, int page, Integer perPage) {
+        if (softwareReadModel) {
+            return tenantSoftwareReadModelQuery.listDevicesForSoftware(
+                    tenantIdProvider.getTenantId(), softwareId, filter, search, page, perPage);
+        }
         List<SoftwareOnDeviceResponse> all = allDevicesForSoftware(softwareId, search).stream()
                 .filter(row -> matchesStatusFilter(row, filter))
                 .toList();
@@ -350,6 +369,11 @@ public class SoftwareInventoryService {
                                                               String search, int page, Integer perPage,
                                                               SortInput sort) {
         Comparator<SoftwareResponse> order = deviceSoftwareOrder(sort);
+        if (softwareReadModel) {
+            List<SoftwareResponse> rows = deviceSoftwareReadModelQuery
+                    .rowsForDevice(tenantIdProvider.getTenantId(), machineId, filter, search);
+            return paginateList(rows.stream().sorted(order).toList(), page, perPage);
+        }
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, filter, search);
         if (!fleetPaging) {
@@ -360,6 +384,9 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareFilters getDeviceSoftwareFilters(String machineId, String search) {
+        if (softwareReadModel) {
+            return softwareFilters(deviceSoftwareReadModelQuery.rowsForDevice(tenantIdProvider.getTenantId(), machineId, null, search));
+        }
         HostInventory inventory = deviceHostInventoryLoader.load(fleet(), machineId);
         List<SoftwareResponse> rows = deviceSoftwareRows(inventory, null, search);
         return softwareFilters(rows);
@@ -467,7 +494,10 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareOnDeviceFilters getSoftwareDeviceFilters(String softwareId, String search) {
-        Map<SoftwareOnDeviceStatus, Long> counts = allDevicesForSoftware(softwareId, search).stream()
+        List<SoftwareOnDeviceResponse> devices = softwareReadModel
+                ? tenantSoftwareReadModelQuery.devicesForSoftwareRows(tenantIdProvider.getTenantId(), softwareId, search)
+                : allDevicesForSoftware(softwareId, search);
+        Map<SoftwareOnDeviceStatus, Long> counts = devices.stream()
                 .map(SoftwareOnDeviceResponse::getStatus)
                 .filter(Objects::nonNull)
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
@@ -573,6 +603,9 @@ public class SoftwareInventoryService {
     }
 
     public SoftwareFilters getSoftwareFilters(String search) {
+        if (softwareReadModel) {
+            return softwareFilters(tenantSoftwareReadModelQuery.allForFilters(tenantIdProvider.getTenantId(), search));
+        }
         if (fleetPaging) {
             // counting facets would mean downloading the whole Fleet catalog; the UI reads only versionStatuses,
             // which Fleet never fills
