@@ -7,7 +7,7 @@ import java.security.SecureRandom;
 
 @Component
 @RequiredArgsConstructor
-public class AgentRegistrationSecretGenerator {
+public class SecretKeyGenerator {
 
     private static final Integer KEY_LENGTH = 32;
 
