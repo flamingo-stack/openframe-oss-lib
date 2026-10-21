@@ -4,6 +4,9 @@ import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 
+/** Body lines the detail placeholder draws: a typical paragraph. */
+const CONTENT_LOADER_SKELETON_LINES = 3;
+
 export interface ContentLoaderProps {
   /**
    * The type of content being loaded
@@ -87,7 +90,7 @@ export function ContentLoader({
           <div className="content-lg:col-span-2">
             <UnifiedSkeleton className="mb-4 h-64 rounded" />
             <div className="space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
+              {Array.from({ length: CONTENT_LOADER_SKELETON_LINES }).map((_, i) => (
                 <UnifiedSkeleton key={i} className="h-4 rounded" />
               ))}
             </div>

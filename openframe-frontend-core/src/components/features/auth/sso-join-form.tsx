@@ -6,9 +6,9 @@ import { accentSentenceMarks } from '../../layout/page-heading';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { CheckboxBlock } from '../../ui/checkbox-block';
-import { LoadingWhen, useLoadingScope } from '../../ui/loading-scope';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
-import { Tag, TagSkeleton } from '../../ui/tag';
+import { Tag } from '../../ui/tag';
 import { TermsAgreementLabel } from './terms-agreement-label';
 
 export interface SsoJoinFormProps {
@@ -86,6 +86,7 @@ export function SsoJoinForm({
   const readingIdentity = useLoadingScope() || identityLoading;
   const fieldsDisabled = disabled || loading || readingIdentity;
   const displayName = name?.trim() || email?.trim() || '';
+  const shownRoles = readingIdentity && roles.length === 0 ? [''] : roles;
 
   return (
     <div
@@ -103,16 +104,15 @@ export function SsoJoinForm({
       {/* Identity row: who is joining, where, as what. Page-background surface inside the card, per design. */}
       <div className="flex items-center gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-m)]">
         {/* The avatar draws its own skeleton in a loading scope; the host's read switches it the same way. */}
-        <LoadingWhen loading={identityLoading}>
-          <SquareAvatar
-            size="lg"
-            variant="round"
-            src={avatarUrl}
-            alt={displayName}
-            fallback={displayName}
-            initialsClassName="text-ods-text-secondary text-h6"
-          />
-        </LoadingWhen>
+        <SquareAvatar
+          loading={identityLoading}
+          size="lg"
+          variant="round"
+          src={avatarUrl}
+          alt={displayName}
+          fallback={displayName}
+          initialsClassName="text-ods-text-secondary text-h6"
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           {readingIdentity ? (
             <>
@@ -126,21 +126,14 @@ export function SsoJoinForm({
             </>
           )}
         </div>
-        {readingIdentity ? (
-          // The roles are read with the identity: one tag per known role, else the typical one.
+        {/* The roles are read with the identity: each tag draws its own skeleton while it is, one per known role, else
+            the typical one. */}
+        {shownRoles.length > 0 && (
           <div className={ROLES_CLASS}>
-            {Array.from({ length: Math.max(roles.length, 1) }, (_, i) => (
-              <TagSkeleton key={i} />
+            {shownRoles.map((role, i) => (
+              <Tag key={`${role}-${i}`} loading={readingIdentity} variant="grey" label={role} />
             ))}
           </div>
-        ) : (
-          roles.length > 0 && (
-            <div className={ROLES_CLASS}>
-              {roles.map(role => (
-                <Tag key={role} variant="grey" label={role} />
-              ))}
-            </div>
-          )
         )}
       </div>
 

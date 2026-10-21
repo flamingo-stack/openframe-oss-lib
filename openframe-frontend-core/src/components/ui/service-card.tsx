@@ -122,50 +122,20 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loading
 
       {/* Rows */}
       <div className="space-y-3">
-        {rows.map((row, idx) =>
-          loading ? <ServiceCardRowSkeleton key={idx} row={row} /> : <ServiceCardRowItem key={idx} row={row} />,
-        )}
+        {rows.map((row, idx) => (
+          <ServiceCardRowItem key={idx} row={row} loading={loading} />
+        ))}
       </div>
     </div>
   );
 }
 
 /**
- * A row while its value is read: the label real (a bar in the label column while it is read too), the value a bar
- * in the value box (in the row's own face), and the row's actions, static, drawn for real and disabled.
+ * One row, loaded and loading. The label column is drawn when the row has a label (`''` is a label still being read:
+ * a bar in the column); the value is a bar in the value box (in the row's own face) while it is read; the actions are
+ * the row's own, drawn for real, disabled while the value is read.
  */
-function ServiceCardRowSkeleton({ row }: { row: ServiceCardRow }) {
-  const actions = rowActions(row);
-  return (
-    <div className={SERVICE_CARD_ROW_CLASS}>
-      <div className={SERVICE_CARD_ROW_LABEL_CLASS}>
-        {row.label || <TextLineSkeleton type="inherit" className="w-full" />}
-      </div>
-      <div className={cn(SERVICE_CARD_VALUE_BOX_CLASS, row.monospace ? 'font-mono' : '')}>
-        <TextLineSkeleton type="inherit" className="w-40 max-w-full" />
-        <div className={SERVICE_CARD_ACTIONS_CLASS}>
-          {actions.reveal && (
-            <button type="button" disabled tabIndex={-1} className={SERVICE_CARD_ACTION_CLASS} aria-label="Reveal">
-              <EyeClassicIcon className="h-5 w-5" />
-            </button>
-          )}
-          {actions.copy && (
-            <button type="button" disabled tabIndex={-1} className={SERVICE_CARD_ACTION_CLASS} aria-label="Copy">
-              <Copy01Icon size={20} />
-            </button>
-          )}
-          {actions.open && row.href && (
-            <button type="button" disabled tabIndex={-1} className={SERVICE_CARD_ACTION_CLASS} aria-label="Open">
-              <ExternalLink className="h-5 w-5" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
+function ServiceCardRowItem({ row, loading }: { row: ServiceCardRow; loading: boolean }) {
   const [revealed, setRevealed] = useState(false);
   const { copy, copied } = useCopyToClipboard();
   const { ref: valueRef, isTruncated: valueTruncated } = useIsTruncated<HTMLDivElement>(row.value);
@@ -184,27 +154,41 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
     window.open(row.href, '_blank', 'noopener,noreferrer');
   };
 
+  // A label column only where the loaded row has one; while loading, a label not here yet is a bar in it.
+  const labelColumn = loading ? row.label !== undefined : !!row.label;
+
   return (
     <div className={SERVICE_CARD_ROW_CLASS}>
-      {row.label && <div className={SERVICE_CARD_ROW_LABEL_CLASS}>{row.label}</div>}
+      {labelColumn && (
+        <div className={SERVICE_CARD_ROW_LABEL_CLASS}>
+          {row.label || <TextLineSkeleton type="inherit" className="w-full" />}
+        </div>
+      )}
       <div className={cn(SERVICE_CARD_VALUE_BOX_CLASS, row.monospace ? 'font-mono' : '')}>
-        {/* No tooltip while a secret is masked — the old native `title` leaked the raw value on hover. */}
-        <FloatingTooltip
-          content={row.value}
-          side="top"
-          disabled={!valueTruncated || (row.isSecret && !revealed)}
-          triggerClassName="min-w-0"
-          className="max-w-xs [overflow-wrap:anywhere]"
-        >
-          <div ref={valueRef} className="truncate text-ods-text-primary">
-            {displayValue}
-          </div>
-        </FloatingTooltip>
+        {loading ? (
+          <TextLineSkeleton type="inherit" className="w-40 max-w-full" />
+        ) : (
+          // No tooltip while a secret is masked — the old native `title` leaked the raw value on hover.
+          <FloatingTooltip
+            content={row.value}
+            side="top"
+            disabled={!valueTruncated || (row.isSecret && !revealed)}
+            triggerClassName="min-w-0"
+            className="max-w-xs [overflow-wrap:anywhere]"
+          >
+            <div ref={valueRef} className="truncate text-ods-text-primary">
+              {displayValue}
+            </div>
+          </FloatingTooltip>
+        )}
         <div className={SERVICE_CARD_ACTIONS_CLASS}>
           {actions.reveal && (
             <button
+              type="button"
+              disabled={loading}
+              tabIndex={loading ? -1 : undefined}
               onClick={() => setRevealed(v => !v)}
-              className={cn(SERVICE_CARD_ACTION_CLASS, 'hover:bg-ods-card')}
+              className={cn(SERVICE_CARD_ACTION_CLASS, !loading && 'hover:bg-ods-card')}
               aria-label={revealed ? 'Hide' : 'Reveal'}
             >
               {revealed ? <EyeOffClassicIcon className="h-5 w-5" /> : <EyeClassicIcon className="h-5 w-5" />}
@@ -213,12 +197,16 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
 
           {actions.copy && (
             <button
+              type="button"
+              disabled={loading}
+              tabIndex={loading ? -1 : undefined}
               onClick={handleCopy}
               className={cn(
-                'rounded p-2 transition-colors hover:bg-ods-card',
+                'rounded p-2 transition-colors',
+                !loading && 'hover:bg-ods-card',
                 copied ? 'text-ods-success' : 'text-ods-text-secondary',
               )}
-              aria-label={`Copy ${row.label ?? 'value'}`}
+              aria-label={`Copy ${row.label || 'value'}`}
             >
               {copied ? <CheckIcon size={20} /> : <Copy01Icon size={20} />}
             </button>
@@ -226,9 +214,12 @@ function ServiceCardRowItem({ row }: { row: ServiceCardRow }) {
 
           {actions.open && row.href && (
             <button
+              type="button"
+              disabled={loading}
+              tabIndex={loading ? -1 : undefined}
               onClick={openInNewTab}
-              className={cn(SERVICE_CARD_ACTION_CLASS, 'hover:bg-ods-card')}
-              aria-label={`Open ${row.label ?? 'link'}`}
+              className={cn(SERVICE_CARD_ACTION_CLASS, !loading && 'hover:bg-ods-card')}
+              aria-label={`Open ${row.label || 'link'}`}
             >
               <ExternalLink className="h-5 w-5" />
             </button>

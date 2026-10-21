@@ -9,11 +9,15 @@ import { MonitorIcon } from '../icons-v2-generated/devices/monitor-icon';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface';
 import {
   DEVICE_CARD_FRAME_CLASS,
+  DEVICE_CARD_HEAD_ROW_CLASS,
   DEVICE_CARD_ICON_BOX_CLASS,
   DEVICE_CARD_MORE_BUTTON_CLASS,
+  DEVICE_CARD_NAME_LINE_CLASS,
+  DEVICE_CARD_NAME_STACK_CLASS,
+  DEVICE_CARD_STATUS_ROW_CLASS,
   DeviceCardSkeleton,
 } from '../loading/device-card-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { Tag, type TagProps } from './tag';
 
 export interface Device {
@@ -61,12 +65,6 @@ export interface DeviceCardProps extends React.HTMLAttributes<HTMLDivElement> {
    * shows one, `data-loading-item` kept when the card carries it). A loading scope does the same.
    */
   loading?: boolean;
-  /**
-   * The details button's box while loading, overriding the default-size button box the card draws for it.
-   * @deprecated The card holds its details button as a button's box by itself; pass this only for a button of
-   * another size.
-   */
-  detailsButtonSkeletonClassName?: string;
 }
 
 export function DeviceCard({
@@ -77,7 +75,6 @@ export function DeviceCard({
   statusTag,
   onDeviceClick,
   loading: loadingProp,
-  detailsButtonSkeletonClassName,
   className,
   ...props
 }: DeviceCardProps) {
@@ -88,8 +85,7 @@ export function DeviceCard({
         className={className}
         moreButton={actions.moreButton?.visible !== false}
         detailsButton={actions.detailsButton?.visible !== false && !!actions.detailsButton?.component}
-        detailsButtonClassName={actions.detailsButton?.visible !== false ? detailsButtonSkeletonClassName : undefined}
-        listItem={'data-loading-item' in props}
+        {...loadingItemProps(props)}
       />
     );
   }
@@ -108,15 +104,15 @@ export function DeviceCard({
       {...props}
     >
       {/* Row 1: Device icon | OS icon + Name + Organization | More button | Details button | Custom actions */}
-      <div className="flex w-full items-center gap-4">
+      <div className={DEVICE_CARD_HEAD_ROW_CLASS}>
         {/* Device type icon */}
         <div className={DEVICE_CARD_ICON_BOX_CLASS}>
           <MonitorIcon className="text-ods-text-secondary" size={16} />
         </div>
 
         {/* OS icon + Device name + Organization (stacked) */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <div className="flex items-center gap-1">
+        <div className={DEVICE_CARD_NAME_STACK_CLASS}>
+          <div className={DEVICE_CARD_NAME_LINE_CLASS}>
             {device.operatingSystem && (
               <OSTypeIcon
                 osType={device.operatingSystem === 'macos' ? 'darwin' : device.operatingSystem}
@@ -175,7 +171,7 @@ export function DeviceCard({
 
       {/* Row 2: Status badge | Last seen */}
       {(statusTag || device.lastSeen) && (
-        <div className="flex w-full items-center gap-2">
+        <div className={DEVICE_CARD_STATUS_ROW_CLASS}>
           {statusTag && (
             <Tag
               variant={statusTag.variant}

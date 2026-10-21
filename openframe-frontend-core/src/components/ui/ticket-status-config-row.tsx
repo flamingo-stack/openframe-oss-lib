@@ -12,8 +12,8 @@ import { Button } from './button';
 import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
 import { Input } from './input';
 import { Label } from './label';
-import { useLoadingScope } from './loading-scope';
-import { type TagProps, TagSkeleton } from './tag';
+import { LoadingWhen, useLoadingScope } from './loading-scope';
+import type { TagProps } from './tag';
 import { TicketStatusTag } from './ticket-status-tag';
 import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
 
@@ -94,10 +94,11 @@ export function TicketStatusConfigRow({
   // exactly its height: the h4 line + the label's mb-1.
   const fieldRowOffset = 'mt-[calc(var(--font-line-space-h4-body)+0.25rem)]';
 
-  const chip = loading ? (
-    <TagSkeleton />
-  ) : (
+  // The chip, the name field and the color select draw their own loading forms (the chip its tag skeleton, each
+  // field its box with a bar for the value).
+  const chip = (
     <TicketStatusTag
+      loading={loading}
       status={statusKey}
       label={name || ' '}
       color={previewColor}
@@ -165,9 +166,7 @@ export function TicketStatusConfigRow({
           <Label variant="large" htmlFor={nameInputId}>
             Status Name
           </Label>
-          {loading ? (
-            <InteractiveSkeleton.Input />
-          ) : (
+          <LoadingWhen loading={loading}>
             <Input
               id={nameInputId}
               value={name}
@@ -176,17 +175,15 @@ export function TicketStatusConfigRow({
               readOnly={isSystem}
               maxLength={50}
             />
-          )}
+          </LoadingWhen>
         </div>
 
         {showColorPicker ? (
           <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] content-md:order-2 content-md:basis-0">
             <Label variant="large">Color</Label>
-            {loading || !onColorChange || color === undefined ? (
-              <InteractiveSkeleton.Input />
-            ) : (
-              <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
-            )}
+            <LoadingWhen loading={loading || !onColorChange || color === undefined}>
+              <ColorPresetSelect value={color ?? ''} presetKey={presetKey} onChange={onColorChange ?? noop} />
+            </LoadingWhen>
             {/* Custom hex: a second field row inside the Color column, directly
                 under the select (per design). Its presence is read data: not drawn while loading. */}
             {!loading && onColorChange && color !== undefined && isCustomColor && (

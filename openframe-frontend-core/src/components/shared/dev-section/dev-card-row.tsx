@@ -119,13 +119,16 @@ export function DevCardRowSkeleton() {
   );
 }
 
+/** Rows a list with no page size draws while it loads: a typical count. */
+const DEV_CARD_ROW_SKELETON_ROWS = 5;
+
 /**
  * The skeleton rows inside a bordered card: the loading state of every list shell. A list draws ONE FULL PAGE, so
  * a paged list passes its page size (the tickets list passes its own); `5` is the typical count for a list with none.
  */
 export function DevCardRowSkeletonList({
   region = true,
-  rows = 5,
+  rows = DEV_CARD_ROW_SKELETON_ROWS,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;

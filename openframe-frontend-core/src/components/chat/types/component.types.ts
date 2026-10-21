@@ -763,4 +763,7 @@ export interface DialogListItemProps extends HTMLAttributes<HTMLDivElement> {
   dialog: DialogItem;
   isActive?: boolean;
   onDialogSelect?: (dialogId: string) => void;
+  /** The dialog is still being read: the row draws its skeleton (as it does in a loading scope), carrying the row's
+   *  `data-*` markers. */
+  loading?: boolean;
 }

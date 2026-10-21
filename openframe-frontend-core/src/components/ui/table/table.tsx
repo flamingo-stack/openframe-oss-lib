@@ -345,7 +345,13 @@ export function Table<T = TableRowData>({
             {infiniteScroll?.isFetchingNextPage && (
               <TableCardSkeleton
                 {...skeletonShape}
-                rows={infiniteScroll.skeletonRows ?? DATA_TABLE_NEXT_PAGE_SKELETON_ROWS}
+                // The next page is one full page: the host's next-page count, else its page size, else a typical count.
+                rows={
+                  infiniteScroll.skeletonRows ??
+                  skeletonRowsProp ??
+                  pagePagination?.pageSize ??
+                  DATA_TABLE_NEXT_PAGE_SKELETON_ROWS
+                }
               />
             )}
             {/* Infinite scroll: sentinel element */}

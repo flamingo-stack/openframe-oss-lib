@@ -6,8 +6,8 @@ import { TILE_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { useLoadingScope } from '../../ui/loading-scope';
-import { Tag, TagSkeleton } from '../../ui/tag';
+import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
+import { Tag } from '../../ui/tag';
 import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag';
 
 export interface ChatTicketItemData {
@@ -69,22 +69,15 @@ const TICKET_ROW_CHEVRON = `flex ${TILE_SIZE.xl} shrink-0 items-center justify-c
  * A ticket row while it is read: the title as a `text-h3` line and the reference line as a `text-h6` line, the status
  * tag's box, and the chevron box with its icon (static) drawn for real.
  */
-export function ChatTicketItemSkeleton({
-  className,
-  listItem = false,
-}: {
-  className?: string;
-  /** One row of a read list (`data-loading-item`), like the loaded rows. */
-  listItem?: boolean;
-}) {
+export function ChatTicketItemSkeleton({ className, ...props }: { className?: string }) {
   return (
-    <div aria-hidden className={cn(TICKET_ROW, className)} {...(listItem ? { 'data-loading-item': '' } : undefined)}>
+    <div aria-hidden className={cn(TICKET_ROW, className)} {...props}>
       <div className={TICKET_ROW_TEXT}>
         <TextLineSkeleton type="h3" className="w-1/2" />
         <TextLineSkeleton type="h6" className="w-1/3" />
       </div>
       {/* The status is a `TicketStatusTag`, a default-size `Tag`: its own skeleton. */}
-      <TagSkeleton className="w-20" />
+      <Tag loading label="" className="w-20" />
       <div className={cn(TICKET_ROW_CHEVRON, 'border-ods-border bg-ods-card')}>
         <ChevronRight className="size-6 text-ods-text-secondary" />
       </div>
@@ -96,7 +89,7 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
   ({ className, ticket, onClick, isLoading = false, ...props }, ref) => {
     const scoped = useLoadingScope();
     if (isLoading || scoped) {
-      return <ChatTicketItemSkeleton className={className} listItem={'data-loading-item' in props} />;
+      return <ChatTicketItemSkeleton className={className} {...loadingItemProps(props)} />;
     }
 
     if (!ticket) return null;

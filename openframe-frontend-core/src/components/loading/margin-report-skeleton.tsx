@@ -13,6 +13,12 @@ interface MarginReportSkeletonProps {
   overlayContent?: React.ReactNode;
 }
 
+/**
+ * A whole margin report's placeholder (header, summary cards, sections).
+ * @deprecated A whole-view skeleton: a page's loading state is the page drawn by its own components in a loading
+ * scope (`LoadingFallback` / `LoadingWhen`), each component its own skeleton. Kept only for the hub's report view
+ * (as the backdrop behind its CTAs) until it renders the report itself in a scope.
+ */
 export function MarginReportSkeleton({
   region = true,
   animate = true,

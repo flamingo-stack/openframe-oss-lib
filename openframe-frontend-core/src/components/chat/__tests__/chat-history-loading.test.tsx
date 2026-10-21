@@ -137,8 +137,8 @@ describe('round 2: chat rows are their loaded twins', () => {
   });
 
   it('slash-command cards carry data-loading-item in both forms', () => {
-    const loading = render(<MingoOnboardingCard loading listItem title="" />).container;
-    const loaded = render(<MingoOnboardingCard listItem title="Roadmap" actions={[]} />).container;
+    const loading = render(<MingoOnboardingCard loading data-loading-item title="" />).container;
+    const loaded = render(<MingoOnboardingCard data-loading-item title="Roadmap" actions={[]} />).container;
     expect(loading.querySelectorAll('[data-loading-item]')).toHaveLength(1);
     expect(loaded.querySelectorAll('[data-loading-item]')).toHaveLength(1);
   });

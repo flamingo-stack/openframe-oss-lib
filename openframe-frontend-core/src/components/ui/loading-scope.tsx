@@ -11,7 +11,7 @@
  * and the same skeleton shows while it fetches on the client. Nothing in a scope fetches, writes, or draws invented
  * words.
  */
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, type ElementType, useContext, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 const LoadingScopeContext = createContext(false);
@@ -20,30 +20,34 @@ const LoadingScopeContext = createContext(false);
  *  region announces it once. `bare` draws no element of its own (the scope only): for a component's own `loading`
  *  mode, whose markup must not change and whose container already says it is loading. `active` (default true) turns
  *  the scope on and off without changing the tree, so a component that finishes loading is not remounted; a false
- *  never cancels an outer scope. */
+ *  never cancels an outer scope. `as` is the element (default `div`; a `contents` box keeps a flex parent's
+ *  layout). The scope that starts a loading state (no outer one) is also busy (`aria-busy`). */
 export function LoadingScope({
   children,
   className,
   bare = false,
   active,
+  as: Tag = 'div',
 }: {
   children: ReactNode;
   className?: string;
   bare?: boolean;
   active?: boolean;
+  as?: ElementType;
 }) {
   const outer = useContext(LoadingScopeContext);
   const on = outer || (active ?? true);
   if (bare) return <LoadingScopeContext.Provider value={on}>{children}</LoadingScopeContext.Provider>;
   return (
     <LoadingScopeContext.Provider value={on}>
-      <div
+      <Tag
+        aria-busy={on && !outer ? 'true' : undefined}
         aria-hidden={on || undefined}
         inert={on || undefined}
         className={cn(on && 'pointer-events-none select-none', className)}
       >
         {children}
-      </div>
+      </Tag>
     </LoadingScopeContext.Provider>
   );
 }
@@ -68,4 +72,13 @@ export function LoadingWhen({ loading, children }: { loading: boolean; children:
       {children}
     </LoadingScope>
   );
+}
+
+/**
+ * The `data-*` attributes among a component's props, for its skeleton: a list item's skeleton carries the same
+ * markers the loaded item carries (`data-loading-item` first), so the page's height gate counts both forms alike.
+ * THE one way a component hands its markers to its own skeleton (`<RowSkeleton {...loadingItemProps(props)} />`).
+ */
+export function loadingItemProps(props: object): { [key: `data-${string}`]: unknown } {
+  return Object.fromEntries(Object.entries(props).filter(([key]) => key.startsWith('data-')));
 }

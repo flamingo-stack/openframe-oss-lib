@@ -1,7 +1,6 @@
 'use client';
 
-import type { ElementType, ReactNode } from 'react';
-import { cn } from '../../utils/cn';
+import { type ElementType, type ReactNode, Suspense } from 'react';
 import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { LoadingStatus } from './loading-region';
 
@@ -12,14 +11,14 @@ import { LoadingStatus } from './loading-region';
  *
  *   <Suspense fallback={<LoadingFallback><Dashboard /></LoadingFallback>}><Dashboard /></Suspense>
  *
- * ONE element: the region (`as`, `className`) holds the children in a BARE scope, so nothing doubles the region's
- * padding or adds a wrapper a flex parent would lay out. The region is what a non-bare scope's own element is: busy,
- * inert and hidden from assistive technology. The status that announces it once sits beside it (visually hidden,
- * outside the hidden region, so it is still read), and is left out inside an outer scope, which has already said it.
+ * ONE element: the scope's own (`LoadingScope` with `as`, `className`): busy, inert and hidden from assistive
+ * technology, adding no wrapper a flex parent would lay out. The status that announces it once sits beside it
+ * (visually hidden, outside the hidden region, so it is still read), and is left out inside an outer scope, which has
+ * already said it.
  */
 export function LoadingFallback({
   label = 'Loading the page',
-  as: Tag = 'div',
+  as,
   className,
   children,
 }: {
@@ -33,14 +32,39 @@ export function LoadingFallback({
   return (
     <>
       {!inScope && <LoadingStatus label={label} />}
-      <Tag
-        aria-busy={inScope ? undefined : 'true'}
-        aria-hidden
-        inert
-        className={cn('pointer-events-none select-none', className)}
-      >
-        <LoadingScope bare>{children}</LoadingScope>
-      </Tag>
+      <LoadingScope as={as} className={className}>
+        {children}
+      </LoadingScope>
     </>
+  );
+}
+
+/**
+ * The one Suspense boundary whose fallback is its own children in a loading scope: what every screen wrote out as
+ * `<Suspense fallback={<LoadingFallback label={…}>{x}</LoadingFallback>}>{x}</Suspense>`, with the child twice.
+ *
+ *   <LoadingSuspense label="Loading the tenants"><TenantList /></LoadingSuspense>
+ */
+export function LoadingSuspense({
+  label,
+  as,
+  className,
+  children,
+}: {
+  label?: string;
+  as?: ElementType;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <LoadingFallback label={label} as={as} className={className}>
+          {children}
+        </LoadingFallback>
+      }
+    >
+      {children}
+    </Suspense>
   );
 }

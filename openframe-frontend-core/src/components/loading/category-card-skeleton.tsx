@@ -5,6 +5,9 @@ interface CategoryCardSkeletonProps {
   className?: string;
 }
 
+/** Vendor icons the loading card's icon row draws: the row the loaded card shows. */
+const CATEGORY_CARD_SKELETON_ICONS = 10;
+
 export function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
   return (
     <article
@@ -15,7 +18,7 @@ export function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
     >
       {/* Icons row */}
       <div className="mb-8 flex items-center justify-center gap-6">
-        {Array.from({ length: 10 }).map((_, i) => (
+        {Array.from({ length: CATEGORY_CARD_SKELETON_ICONS }).map((_, i) => (
           <UnifiedSkeleton key={i} variant="circular" className="h-10 w-10 flex-shrink-0" />
         ))}
       </div>

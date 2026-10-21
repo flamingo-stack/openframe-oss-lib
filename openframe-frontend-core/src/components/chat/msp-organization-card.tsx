@@ -7,7 +7,7 @@ import { ExternalLinkIcon } from '../icons-v2-generated';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 
 export interface MspOrganizationCardProps {
   /** MSP/organization name. Woven into the default title: "Your IT is managed by {name}". */
@@ -72,7 +72,9 @@ export function MspOrganizationCard({
   className,
 }: MspOrganizationCardProps) {
   const isLoading = useLoadingScope() || loading;
-  if (isLoading) return <MspOrganizationCardSkeleton variant={variant} className={className} />;
+  if (isLoading) {
+    return <MspOrganizationCardSkeleton variant={variant} action={!!(href || onOpenWebsite)} className={className} />;
+  }
   const actionLabel = website ? `Open ${website}` : 'Open organization website';
 
   if (variant === 'footer') {
@@ -125,6 +127,8 @@ export function MspOrganizationCard({
 export interface MspOrganizationCardSkeletonProps {
   /** The card's variant, as the loaded card's (`card` by default). */
   variant?: 'card' | 'footer';
+  /** The loaded card has its trailing link button (`href` or `onOpenWebsite`): the skeleton draws its box. */
+  action?: boolean;
   /** Appended to the root element. */
   className?: string;
 }
@@ -132,29 +136,33 @@ export interface MspOrganizationCardSkeletonProps {
 /**
  * {@link MspOrganizationCard} while the organization is read, in the card's own frame per variant: the logo's box,
  * the title (h3) over the website (h4) for the card, the static caption over the name (h4) for the footer, and the
- * trailing link button's box.
+ * trailing link button's box when the loaded card has one (`action`).
  */
-export function MspOrganizationCardSkeleton({ variant = 'card', className }: MspOrganizationCardSkeletonProps) {
+export function MspOrganizationCardSkeleton({
+  variant = 'card',
+  action = true,
+  className,
+}: MspOrganizationCardSkeletonProps) {
   if (variant === 'footer') {
     return (
       <div className={cn(FOOTER_FRAME_CLASS, className)}>
-        <SquareAvatarSkeleton size="sm" variant="square" />
+        <SquareAvatar loading size="sm" variant="square" />
         <div className={TEXT_STACK_CLASS}>
           <span className={FOOTER_CAPTION_CLASS}>{FOOTER_CAPTION}</span>
           <TextLineSkeleton type="h4" className="w-3/5" />
         </div>
-        <InteractiveSkeleton.Button size="icon-sm" className="shrink-0" />
+        {action && <InteractiveSkeleton.Button size="icon-sm" className="shrink-0" />}
       </div>
     );
   }
   return (
     <div className={cn(CARD_FRAME_CLASS, className)}>
-      <SquareAvatarSkeleton size="lg" variant="square" />
+      <SquareAvatar loading size="lg" variant="square" />
       <div className={TEXT_STACK_CLASS}>
         <TextLineSkeleton type="h3" className="w-3/5" />
         <TextLineSkeleton type="h4" className="w-2/5" />
       </div>
-      <InteractiveSkeleton.Button size="icon" className="shrink-0" />
+      {action && <InteractiveSkeleton.Button size="icon" className="shrink-0" />}
     </div>
   );
 }

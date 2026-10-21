@@ -312,7 +312,8 @@ function ActionSkeletons({
 }
 
 /** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
-function MobileTriggerSkeleton() {
+/** The "..." menu trigger while the page loads: the icon button's own box. */
+function MenuTriggerSkeleton() {
   return <InteractiveSkeleton.Button size="icon" />;
 }
 
@@ -380,7 +381,11 @@ function IconButtonsVariant({
       <div className={cn('hidden items-center content-md:flex', ACTIONS_GAP, className)}>
         {selector}
         {loading ? (
-          <ActionSkeletons actions={desktopActions} />
+          <>
+            {/* An empty action list falls back to the trigger's square: the menu trigger already is it. */}
+            {(desktopActions.length > 0 || !hasMenuActions) && <ActionSkeletons actions={desktopActions} />}
+            {hasMenuActions && <MenuTriggerSkeleton />}
+          </>
         ) : (
           <>
             {desktopActions.map((action, idx) => (
@@ -394,7 +399,7 @@ function IconButtonsVariant({
       {/* Mobile: single icon button OR all actions merged into one "..." menu */}
       <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
-          <MobileTriggerSkeleton />
+          <MenuTriggerSkeleton />
         ) : useSingleActionMobile && singleAction ? (
           renderActionButton(singleAction, { iconOnly: true })
         ) : hasMobileMenuItems ? (
@@ -448,7 +453,7 @@ function PrimaryButtonsVariant({
       </div>
 
       <div className={cn('hidden items-center md:content-max-md:flex', ACTIONS_GAP, className)}>
-        {loading ? <MobileTriggerSkeleton /> : <CompactPrimaryActions actions={desktopActions} />}
+        {loading ? <MenuTriggerSkeleton /> : <CompactPrimaryActions actions={desktopActions} />}
       </div>
 
       <MobileBottomActions actions={sortedActions} loading={loading} />
@@ -484,7 +489,11 @@ function MenuPrimaryVariant({
       <div className={cn('hidden items-center content-md:flex', ACTIONS_GAP, className)}>
         {selector}
         {loading ? (
-          <ActionSkeletons actions={desktopActions} />
+          <>
+            {hasMenuActions && <MenuTriggerSkeleton />}
+            {/* An empty action list falls back to the trigger's square: the menu trigger already is it. */}
+            {(desktopActions.length > 0 || !hasMenuActions) && <ActionSkeletons actions={desktopActions} />}
+          </>
         ) : (
           <>
             {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
@@ -499,7 +508,7 @@ function MenuPrimaryVariant({
 
       <div className={cn('flex content-md:hidden', className)}>
         {loading ? (
-          <MobileTriggerSkeleton />
+          <MenuTriggerSkeleton />
         ) : hasMobileMenuItems || selector ? (
           // The selector rides into the menu as its header row: on mobile the
           // title row has no room for it, and hiding it entirely (what

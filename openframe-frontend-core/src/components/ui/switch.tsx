@@ -8,10 +8,10 @@ import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
 
 /** The switch's box (its track), read by the switch and by its skeleton. */
-export const SWITCH_SIZE_CLASS = 'h-4 w-6';
+const SWITCH_SIZE_CLASS = 'h-4 w-6';
 
 /** A switch while its value is read: one box of the switch's own size and shape. */
-export function SwitchSkeleton({ className }: { className?: string }) {
+function SwitchSkeleton({ className }: { className?: string }) {
   return <UnifiedSkeleton as="span" className={cn(SWITCH_SIZE_CLASS, 'shrink-0 rounded-full', className)} />;
 }
 

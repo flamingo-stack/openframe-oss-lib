@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { MspOrganizationCard, MspOrganizationCardSkeleton } from '../components/chat/msp-organization-card';
+import { MspOrganizationCard } from '../components/chat/msp-organization-card';
 
 /**
  * MSP Organization card for the AI Assistant welcome screen.
@@ -79,8 +79,8 @@ export const LongValues: Story = {
   },
 };
 
-/** Loading — skeleton placeholder shown while the tenant info loads, then
- *  replaced by the card. Mirrors the card's blocks at the same 80px height. */
+/** Loading — the card while the tenant info loads (`loading`): it draws its own skeleton, the same blocks at the
+ *  same 80px height, its link button's box only when the card has one. */
 export const Loading: Story = {
-  render: () => <MspOrganizationCardSkeleton />,
+  args: { loading: true, name: '', href: 'https://www.techflow.com' },
 };

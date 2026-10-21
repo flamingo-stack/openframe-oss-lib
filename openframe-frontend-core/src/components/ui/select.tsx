@@ -8,6 +8,7 @@ import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
+import { FIELD_VALUE_SKELETON_CLASS } from './input-styles';
 import { useLoadingScope } from './loading-scope';
 import { usePortalContainer } from './portal-container';
 
@@ -68,7 +69,7 @@ const SelectTrigger = forwardRef<
       )}
       {...props}
     >
-      {inScope ? <TextLineSkeleton type="h4" className="w-1/2 min-w-0 flex-1" /> : children}
+      {inScope ? <TextLineSkeleton type="h4" className={FIELD_VALUE_SKELETON_CLASS} /> : children}
       <SelectPrimitive.Icon asChild>
         <Chevron02DownIcon
           className={cn(

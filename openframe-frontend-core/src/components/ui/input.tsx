@@ -5,7 +5,7 @@ import { type InputHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FieldWrapper } from './field-wrapper';
-import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
+import { FIELD_VALUE_SKELETON_CLASS, INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
 import { useLoadingScope } from './loading-scope';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -24,9 +24,11 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey).
       Only "error" and "warning" mark the field invalid (colored border). */
   errorVariant?: 'error' | 'warning' | 'success' | 'muted';
-  /** When true, shows a loading spinner as end adornment (an action in progress, e.g. a check of what was typed).
-   *  The field's own loading state is a loading scope's: the label and adornments drawn for real, the value a bar
-   *  in the field's box. */
+  /** An action on the field is in progress (e.g. a check of what was typed): a spinner as the end adornment. Not a
+   *  loading state: the field's own loading state is a loading scope's (the label and adornments drawn for real, the
+   *  value a bar in the field's box). */
+  pending?: boolean;
+  /** @deprecated Use `pending`: this is an action's spinner, not the field's loading state (a loading scope). */
   loading?: boolean;
   /** The value is typed by the person (a search or filter box), never read: drawn as is in a loading scope. */
   userValue?: boolean;
@@ -48,10 +50,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
     labelVariant,
     error,
     errorVariant = 'error',
-    loading = false,
+    pending: pendingProp = false,
+    loading: deprecatedLoading = false,
     userValue = false,
     ...props
   } = allProps;
+  const pending = pendingProp || deprecatedLoading;
   // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
   const errorSlot = 'error' in allProps;
   // success/muted are informational — they never paint the invalid border
@@ -139,7 +143,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
           {startAdornment}
         </span>
       )}
-      {inScope && <TextLineSkeleton type="h4" className="w-1/2 min-w-0 flex-1" />}
+      {inScope && <TextLineSkeleton type="h4" className={FIELD_VALUE_SKELETON_CLASS} />}
       <input
         type={type}
         hidden={inScope || props.hidden}
@@ -162,8 +166,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
         ref={ref}
         {...props}
       />
-      {loading && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
-      {!loading && endAdornment && (
+      {pending && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
+      {!pending && endAdornment && (
         <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
           {endAdornment}
         </span>

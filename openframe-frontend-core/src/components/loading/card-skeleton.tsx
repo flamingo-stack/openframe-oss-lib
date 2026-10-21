@@ -220,12 +220,15 @@ function AlternativeCardContent({ showActions }: { showActions: boolean }) {
   );
 }
 
+/** Cards a loading grid draws when its host names no page size: a typical page. */
+const CARD_SKELETON_GRID_CARDS = 6;
+
 /**
  * Grid of card skeletons for loading lists
  */
 export function CardSkeletonGrid({
   region = true,
-  count = 6,
+  count = CARD_SKELETON_GRID_CARDS,
   variant = 'vendor',
   className,
   containerClassName,

@@ -25,13 +25,16 @@ export interface AdminContentCardGridSkeletonProps {
   region?: boolean;
 }
 
+/** Cards a loading grid draws when its host names no page size: a typical page. */
+export const ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS = 12;
+
 /**
  * The grid's loading state on its own: one page of placeholder cards in the
  * grid's columns. `AdminContentCardGrid` draws exactly this while it loads; a
  * page that has no grid yet (a Suspense fallback) draws it directly.
  */
 export function AdminContentCardGridSkeleton({
-  count = 12,
+  count = ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS,
   Skeleton = AdminContentCardSkeleton,
   className,
   label = 'Loading',

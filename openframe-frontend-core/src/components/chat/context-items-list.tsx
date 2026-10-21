@@ -16,7 +16,7 @@ import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from '../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import type { ChatContextItem } from './types/context-item.types';
 
 const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
@@ -35,7 +35,7 @@ export const CONTEXT_STATE_CLASS = 'bg-ods-bg px-4 py-3 text-h4 text-ods-text-se
 const CONTEXT_LIST_CLASS = 'max-h-[min(340px,45vh)] overflow-y-auto overscroll-contain';
 
 /** The rows a page of items holds when the host states no page size: the loading list and each next page draw it. */
-export const CONTEXT_ITEMS_PAGE_SIZE = 10;
+const CONTEXT_ITEMS_PAGE_SIZE = 10;
 
 // ===========================================================================
 // ROW — one menu row (icon + label + optional trailing). Shared primitive.
@@ -64,6 +64,7 @@ export function ContextMenuRow({
   selected,
   role = 'menuitem',
   title,
+  ...props
 }: ContextMenuRowProps) {
   return (
     <button
@@ -74,6 +75,7 @@ export function ContextMenuRow({
       onClick={onClick}
       title={title}
       className={cn(CONTEXT_ROW_CLASS, disabled && 'cursor-not-allowed opacity-40 hover:bg-ods-bg')}
+      {...loadingItemProps(props)}
     >
       {icon != null && <span className={CONTEXT_ICON_CLASS}>{icon}</span>}
       <span className={CONTEXT_LABEL_CLASS}>{label}</span>
@@ -87,11 +89,16 @@ export function ContextMenuRow({
 // ===========================================================================
 
 /** Item rows while they are read: each an item row's own box (`CONTEXT_ROW_CLASS`), its label a text-h4 line. */
-export function ContextItemsSkeleton({ count }: { count: number }) {
+function ContextItemsSkeleton({ count }: { count: number }) {
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
-        <div key={`ctx-skeleton-${i}`} aria-hidden className={cn(CONTEXT_ROW_CLASS, 'hover:bg-ods-bg')}>
+        <div
+          key={`ctx-skeleton-${i}`}
+          aria-hidden
+          data-loading-item
+          className={cn(CONTEXT_ROW_CLASS, 'hover:bg-ods-bg')}
+        >
           <span className={CONTEXT_LABEL_CLASS}>
             <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
           </span>
@@ -175,6 +182,8 @@ export function ContextItemsList({
             label={item.label}
             title={!selected && atLimit ? 'Selection limit reached' : undefined}
             trailing={selected ? <CheckFillIcon className="size-4 shrink-0 text-ods-accent md:size-6" /> : undefined}
+            // One item of a read list, like its loading row.
+            data-loading-item
           />
         );
       })}

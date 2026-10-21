@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { AgentMark } from '../../agent-mark';
 import { MonitorIcon } from '../../icons-v2-generated/devices/monitor-icon';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
 import { scriptExecutionStatus } from './execution-status';
@@ -129,16 +131,24 @@ export function ScriptExecutionResult({
   result,
   inFlight = false,
   empty,
+  loading: loadingProp = false,
   className,
 }: {
   result?: string | null;
   inFlight?: boolean;
   empty: ReactNode;
+  /** The execution is still being read: the output is one `text-h4` line, the "Result" caption real. A loading
+   *  scope does the same. */
+  loading?: boolean;
   className?: string;
 }) {
+  // ONE switch: while the execution is read the output line is its skeleton; the caption is copy.
+  const loading = useLoadingScope() || loadingProp;
   return (
     <div className={cn('flex flex-col gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]', className)}>
-      {result ? (
+      {loading ? (
+        <TextLineSkeleton type="h4" className="w-3/4 max-w-full" />
+      ) : result ? (
         <div className="whitespace-pre-wrap break-words text-ods-text-primary text-h4">{result}</div>
       ) : (
         <div className="text-ods-text-secondary text-h4">{inFlight ? 'Waiting for output…' : empty}</div>

@@ -363,6 +363,9 @@ export function SlotPickerSkeleton({
   );
 }
 
+/** Time chips the loading day draws: enough to fill the visible scroll box at any column count. */
+const SLOT_PICKER_SKELETON_CHIPS = 16;
+
 /** Same-footprint skeleton for the time-chip column. */
 export function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
   return (
@@ -376,7 +379,7 @@ export function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayo
         {/* Enough to fill the visible scroll box at any column count — the
             grid's track count follows the card width, so no fixed number
             lands flush and a partial last row is the honest shape anyway. */}
-        {Array.from({ length: 16 }, (_, i) => (
+        {Array.from({ length: SLOT_PICKER_SKELETON_CHIPS }, (_, i) => (
           // h-11 content-md:h-12 — the loaded chip's own default-size height.
           <UnifiedSkeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
         ))}

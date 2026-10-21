@@ -1,6 +1,7 @@
 'use client';
 
 import { requireIcon, type IconComponent } from '../../chat/utils/icon-loading';
+import { InteractiveSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
 import { StatusBadge } from '../../ui/status-badge';
 
@@ -43,6 +44,26 @@ export interface SsoProviderButtonsProps {
   tag?: string;
 }
 
+/** The column the provider buttons stack in, read by the buttons and by their skeleton. */
+const SSO_PROVIDER_BUTTONS_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
+
+/**
+ * How many provider buttons a form draws while the providers are read: the typical offer, Google and Microsoft
+ * (Apple is offered only on Apple devices).
+ */
+export const SSO_PROVIDERS_SKELETON_COUNT = 2;
+
+/** The provider buttons while the providers are read: full-width boxes of the outline button, in the same column. */
+export function SsoProviderButtonsSkeleton({ count = SSO_PROVIDERS_SKELETON_COUNT }: { count?: number }) {
+  return (
+    <div className={SSO_PROVIDER_BUTTONS_CLASS} aria-hidden>
+      {Array.from({ length: count }, (_, index) => (
+        <InteractiveSkeleton.Button key={index} className="w-full" data-loading-item />
+      ))}
+    </div>
+  );
+}
+
 /** Stacked full-width SSO provider buttons shared by the auth forms. */
 export function SsoProviderButtons({
   providers,
@@ -53,7 +74,7 @@ export function SsoProviderButtons({
   tag,
 }: SsoProviderButtonsProps) {
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-l)]">
+    <div className={SSO_PROVIDER_BUTTONS_CLASS}>
       {providers.map(provider => {
         const meta = PROVIDER_META[provider];
         const Icon = meta.Icon;

@@ -87,6 +87,9 @@ export function OrganizationCardSkeleton({
   );
 }
 
+/** Cards a loading grid draws when its host names no page size: a typical page. */
+const ORGANIZATION_CARD_SKELETON_GRID_CARDS = 12;
+
 /**
  * OrganizationCardSkeletonGrid - Grid of organization card skeletons
  *
@@ -97,7 +100,7 @@ export function OrganizationCardSkeleton({
  */
 export function OrganizationCardSkeletonGrid({
   region = true,
-  count = 12,
+  count = ORGANIZATION_CARD_SKELETON_GRID_CARDS,
   className,
   containerClassName,
   showFooter = true,

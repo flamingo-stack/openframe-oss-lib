@@ -3,7 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from '../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
 export interface ChatNavSidebarItem {
@@ -126,6 +126,10 @@ export interface ChatListItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   trailing?: ReactNode;
   /** The chat open on screen. */
   active?: boolean;
+  /** The chat is still being read: the row draws its skeleton (as it does in a loading scope). */
+  loading?: boolean;
+  /** The row's place in its list: picks the loading title bar's width, so a page of loading rows reads like a list. */
+  index?: number;
 }
 
 /** The row's box, shared by the loaded row and its skeleton so both take the same space. */
@@ -140,9 +144,19 @@ const CHAT_LIST_ITEM_CLASS =
  * draws its own skeleton ({@link ChatListItemSkeleton}).
  */
 const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
-  ({ className, title, subtitle, leading, trailing, active, ...props }, ref) => {
-    if (useLoadingScope()) {
-      return <ChatListItemSkeleton subtitle={subtitle != null} trailing={trailing != null} className={className} />;
+  ({ className, title, subtitle, leading, trailing, active, loading = false, index = 0, ...props }, ref) => {
+    // ONE switch: while the host reads the chat, or in a loading scope, the row is its skeleton, carrying the row's
+    // markers.
+    if (useLoadingScope() || loading) {
+      return (
+        <ChatListItemSkeleton
+          subtitle={subtitle != null}
+          trailing={trailing != null}
+          index={index}
+          className={className}
+          {...loadingItemProps(props)}
+        />
+      );
     }
     return (
       <button
@@ -180,12 +194,11 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
 
 ChatListItem.displayName = 'ChatListItem';
 
-/** Title widths the loading rows cycle through (`index`), so a list of them reads like a list of chats. */
 /** A loading chat row's title widths, cycled by index: a believable spread, the same on every load. Shared by every
  *  chat list's loading rows. */
 export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
 
-export interface ChatListItemSkeletonProps extends HTMLAttributes<HTMLDivElement> {
+interface ChatListItemSkeletonProps extends HTMLAttributes<HTMLDivElement> {
   /** Draw the caption line (the loaded row has a `subtitle`). */
   subtitle?: boolean;
   /** Draw a short bar at the row's end (the loaded row has `trailing` text, e.g. a time). */
@@ -195,7 +208,7 @@ export interface ChatListItemSkeletonProps extends HTMLAttributes<HTMLDivElement
 }
 
 /** {@link ChatListItem}'s loading state: the same box, a title bar, and the caption and trailing parts the loaded row
- *  has. A list's loading state is a page of these (each marked `data-loading-item` by the list). */
+ *  has. */
 function ChatListItemSkeleton({
   subtitle = false,
   trailing = false,
@@ -214,4 +227,31 @@ function ChatListItemSkeleton({
   );
 }
 
-export { ChatNavSidebar, ChatListItem, ChatListItemSkeleton };
+/**
+ * A chat list's first page while it is read: `count` loading {@link ChatListItem} rows (the list's page size), each a
+ * list item, with the caption and trailing parts the list's loaded rows have.
+ */
+function ChatListItemLoadingPage({
+  count,
+  subtitle = false,
+  trailing = false,
+}: {
+  count: number;
+  subtitle?: boolean;
+  trailing?: boolean;
+}) {
+  return Array.from({ length: count }, (_, index) => (
+    <ChatListItem
+      // Static placeholder rows: the index IS the identity.
+      key={index}
+      loading
+      index={index}
+      title=""
+      subtitle={subtitle ? '' : undefined}
+      trailing={trailing ? '' : undefined}
+      data-loading-item
+    />
+  ));
+}
+
+export { ChatNavSidebar, ChatListItem, ChatListItemLoadingPage };

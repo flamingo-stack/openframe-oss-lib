@@ -2,6 +2,9 @@
 
 import { type ButtonHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { FIELD_VALUE_SKELETON_CLASS } from './input-styles';
+import { useLoadingScope } from './loading-scope';
 
 export interface InputTriggerProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   selectedLabel?: ReactNode;
@@ -26,16 +29,22 @@ export interface InputTriggerProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
  * The component is `forwardRef`'d so it works as the `asChild` child of any Radix
  * trigger (DropdownMenu, Popover, etc.). For form labels & error messages, compose
  * with `<FieldWrapper>`.
+ *
+ * Loading: in a loading scope the trigger draws its box and its icons for real and its value (or placeholder) as the
+ * field's value bar, like `SelectTrigger`.
  */
 export const InputTrigger = forwardRef<HTMLButtonElement, InputTriggerProps>(
   ({ selectedLabel, placeholder, startIcon, endIcon, invalid, className, disabled, ...props }, ref) => {
     const isPlaceholder = selectedLabel === undefined || selectedLabel === null || selectedLabel === '';
+    // ONE switch: in a page's loading state the value is a bar; the box and the icons are the field's own.
+    const inScope = useLoadingScope();
 
     return (
       <button
         ref={ref}
         type="button"
         disabled={disabled}
+        aria-busy={inScope || undefined}
         data-invalid={invalid || undefined}
         {...props}
         className={cn(
@@ -58,12 +67,16 @@ export const InputTrigger = forwardRef<HTMLButtonElement, InputTriggerProps>(
         )}
       >
         {startIcon && <span className="flex shrink-0 items-center text-ods-text-secondary">{startIcon}</span>}
-        <span
-          className={cn('min-w-0 flex-1 truncate text-left', isPlaceholder && 'text-ods-text-secondary')}
-          title={isPlaceholder ? placeholder : typeof selectedLabel === 'string' ? selectedLabel : undefined}
-        >
-          {isPlaceholder ? placeholder : selectedLabel}
-        </span>
+        {inScope ? (
+          <TextLineSkeleton type="h4" className={FIELD_VALUE_SKELETON_CLASS} />
+        ) : (
+          <span
+            className={cn('min-w-0 flex-1 truncate text-left', isPlaceholder && 'text-ods-text-secondary')}
+            title={isPlaceholder ? placeholder : typeof selectedLabel === 'string' ? selectedLabel : undefined}
+          >
+            {isPlaceholder ? placeholder : selectedLabel}
+          </span>
+        )}
         {endIcon && <span className="flex shrink-0 items-center text-ods-text-secondary">{endIcon}</span>}
       </button>
     );

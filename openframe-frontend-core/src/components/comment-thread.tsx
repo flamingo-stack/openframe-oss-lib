@@ -293,13 +293,16 @@ function CommentsBlockHeader({ title, open }: { title: string; open: boolean }) 
   );
 }
 
+/** Comment rows the loading block draws by default: none, the block is collapsed until it is read. */
+const COMMENTS_BLOCK_SKELETON_COMMENTS = 0;
+
 /**
  * The comments section while it is read: its real title, the summary as a bar, `count` comment rows (none: the
  * block is collapsed) and, with `composer`, the root composer's real static controls (inert).
  */
 export function CommentsBlockSkeleton({
   title,
-  count = 0,
+  count = COMMENTS_BLOCK_SKELETON_COMMENTS,
   composer = false,
   leadWith,
   showTitle,

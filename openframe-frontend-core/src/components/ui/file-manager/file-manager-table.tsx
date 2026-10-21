@@ -5,11 +5,9 @@ import { cn } from '../../../utils/cn';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Checkbox } from '../checkbox';
 import { FileManagerEmpty } from './file-manager-empty';
+import { FILE_MANAGER_SKELETON_ROWS } from './file-manager-skeleton';
 import { FileManagerTableRow } from './file-manager-table-row';
 import type { FileManagerTableProps } from './types';
-
-/** The rows a loading file list draws: a typical folder, since a folder listing has no page size. */
-export const FILE_MANAGER_SKELETON_ROWS = 8;
 
 export function FileManagerTable({
   files,

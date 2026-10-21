@@ -7,7 +7,7 @@ import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { LIVE_PULSE_CLASS } from '../ui/skeleton-surface';
-import { SquareAvatar as Avatar, SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar as Avatar } from '../ui/square-avatar';
 import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
 import { MspOrganizationCard } from './msp-organization-card';
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from './types';
@@ -110,33 +110,28 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
         )}
         <div className={cardClasses}>
           <div className="flex items-center justify-between gap-4 px-4 py-3">
-            {isLoading ? (
-              <div className="flex items-center gap-3">
-                {/* The avatar's own box: `xl` (64px), round, as the avatar / userIcon block below. */}
-                <SquareAvatarSkeleton size="xl" variant="round" />
+            <div className="flex items-center gap-3">
+              {userIcon && !isLoading ? (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent">{userIcon}</div>
+              ) : (
+                <Avatar
+                  loading={isLoading}
+                  src={userAvatar}
+                  alt={userName}
+                  fallback={userName}
+                  size="xl"
+                  variant="round"
+                  className="bg-ods-flamingo-pink"
+                />
+              )}
+              {isLoading ? (
                 <div className="flex flex-col">
                   {/* Name line — the `text-h3` name. */}
                   <TextLineSkeleton type="h3" className="w-40" />
                   {/* Server line — the `text-h4` secondary row. */}
                   <TextLineSkeleton type="h4" className="w-28" />
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                {userIcon ? (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent">
-                    {userIcon}
-                  </div>
-                ) : (
-                  <Avatar
-                    src={userAvatar}
-                    alt={userName}
-                    fallback={userName}
-                    size="xl"
-                    variant="round"
-                    className="bg-ods-flamingo-pink"
-                  />
-                )}
+              ) : (
                 <div className="flex flex-col">
                   <span className="text-h3">{userName}</span>
                   <div className="flex items-center gap-2">
@@ -148,8 +143,8 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             <div className="flex items-center gap-1">
               {showNewChat && onNewChat && (
                 <Button

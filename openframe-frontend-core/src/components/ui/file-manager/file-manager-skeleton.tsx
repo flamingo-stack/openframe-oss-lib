@@ -11,9 +11,13 @@ interface FileManagerSkeletonProps {
   showActions?: boolean;
 }
 
+/** Rows a loading file list draws: a typical folder, since a folder listing has no page size. Read by the table's
+ *  own loading rows too (module export only, not public). */
+export const FILE_MANAGER_SKELETON_ROWS = 8;
+
 export function FileManagerSkeleton({
   region = true,
-  rows = 8,
+  rows = FILE_MANAGER_SKELETON_ROWS,
   showSearch = true,
   showActions = true,
 }: FileManagerSkeletonProps) {

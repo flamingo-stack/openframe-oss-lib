@@ -5,7 +5,7 @@ import { cn } from '../../../utils/cn';
 import { ChatInput } from '../../chat/chat-input';
 import { LoadingRegion } from '../../loading/loading-region';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { RemoteDesktopChatMessageRow, RemoteDesktopChatMessageRowSkeleton } from './remote-desktop-chat-message-row';
+import { RemoteDesktopChatMessageRow } from './remote-desktop-chat-message-row';
 import type { RemoteSessionChatMessage } from './types';
 
 /**
@@ -85,7 +85,14 @@ export function RemoteDesktopChatPanel({
               {Array.from({ length: CHAT_PANEL_SKELETON_ROWS }, (_, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
                 // A conversation: the technician and the user take turns.
-                <RemoteDesktopChatMessageRowSkeleton key={i} isTechnician={i % 2 === 1} />
+                <RemoteDesktopChatMessageRow
+                  key={i}
+                  loading
+                  isTechnician={i % 2 === 1}
+                  authorName=""
+                  sentAt=""
+                  body=""
+                />
               ))}
             </LoadingRegion>
           ) : rows.length === 0 ? (

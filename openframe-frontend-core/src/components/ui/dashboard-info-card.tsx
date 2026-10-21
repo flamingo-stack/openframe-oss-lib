@@ -8,7 +8,7 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress';
 import { FloatingTooltip } from './floating-tooltip';
 import { useLoadingScope } from './loading-scope';
-import { Tag, TagSkeleton } from './tag';
+import { Tag } from './tag';
 
 /**
  * How the percentage is rendered next to the value:
@@ -161,7 +161,7 @@ export function DashboardInfoCard({
       if (!loadingShowsPercentage) return null;
       // The box the loaded percentage takes: a `Tag` (h-8) or one `text-h4` line.
       return percentageAsTag ? (
-        <TagSkeleton className="w-12" />
+        <Tag loading label="" className="w-12" />
       ) : (
         <p className="text-h4">
           <TextLineSkeleton type="inherit" as="span" className="w-12" />
@@ -365,12 +365,4 @@ export function DashboardInfoCard({
       {cardContent}
     </div>
   );
-}
-
-/**
- * A DashboardInfoCard while its figure is read: the same card with `loading` set, so it is the loaded card's box.
- * The title, title slot, tag and icon it is given are the page's own and draw as they are.
- */
-export function DashboardInfoCardSkeleton(props: Omit<DashboardInfoCardProps, 'value' | 'loading'>) {
-  return <DashboardInfoCard {...props} value="" loading />;
 }

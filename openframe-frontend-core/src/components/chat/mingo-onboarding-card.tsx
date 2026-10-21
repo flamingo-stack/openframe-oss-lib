@@ -2,9 +2,9 @@
 
 import type { MouseEvent, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
-import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { useLoadingScope } from '../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 
 export interface MingoOnboardingCardAction {
   /** Stable React key. */
@@ -39,8 +39,6 @@ export interface MingoOnboardingCardProps {
   loading?: boolean;
   /** The card's place in its list: picks the loading state's bar widths, so a list of loading cards is irregular. */
   skeletonIndex?: number;
-  /** One card of a read list (`data-loading-item`), in the loaded and the loading form alike. */
-  listItem?: boolean;
   /** Optional className appended to the root element. */
   className?: string;
 }
@@ -79,19 +77,20 @@ export function MingoOnboardingCard({
   onClick,
   loading = false,
   skeletonIndex = 0,
-  listItem = false,
   className,
+  ...props
 }: MingoOnboardingCardProps) {
   const hasActions = !!actions && actions.length > 0;
-  const itemProps = listItem ? { 'data-loading-item': '' } : undefined;
+  // The card's markers (`data-loading-item` for a card of a read list), on the loaded and the loading card alike.
+  const itemProps = loadingItemProps(props);
   if (useLoadingScope() || loading) {
     return (
       <MingoOnboardingCardSkeleton
         {...mingoOnboardingSkeletonVariant(skeletonIndex)}
         // A card known to have no actions draws no chip row; while the commands load, the typical card has them.
         chipWidths={actions && actions.length === 0 ? [] : undefined}
-        listItem={listItem}
         className={className}
+        {...itemProps}
       />
     );
   }
@@ -156,7 +155,7 @@ export function MingoOnboardingCard({
   );
 }
 
-export interface MingoOnboardingCardSkeletonProps {
+interface MingoOnboardingCardSkeletonProps {
   /** Title bar width (a Tailwind width utility). Defaults to `w-32`. */
   titleWidth?: string;
   /** Slash-command bar width (a Tailwind width utility). Defaults to `w-20`. */
@@ -165,8 +164,6 @@ export interface MingoOnboardingCardSkeletonProps {
   descriptionLines?: 1 | 2;
   /** Chip widths for the action row (the `Recent / Search / Find` triad by default); an empty array draws no row. */
   chipWidths?: ReadonlyArray<string>;
-  /** One card of a read list (`data-loading-item`). */
-  listItem?: boolean;
   className?: string;
 }
 
@@ -174,20 +171,20 @@ export interface MingoOnboardingCardSkeletonProps {
  * `MingoOnboardingCard` while its command is read: the card's own frame and rows (its class constants), the icon a
  * 16px box, the title, the slash command and the description as text-h6 lines, and the actions as small buttons.
  */
-export function MingoOnboardingCardSkeleton({
+function MingoOnboardingCardSkeleton({
   titleWidth = 'w-32',
   slashWidth = 'w-20',
   descriptionLines = 2,
   chipWidths = ['w-16', 'w-16', 'w-12'],
-  listItem = false,
   className,
+  ...props
 }: MingoOnboardingCardSkeletonProps) {
   return (
-    <div className={cn(CARD_BASE_CLASS, className)} {...(listItem ? { 'data-loading-item': '' } : undefined)}>
+    <div className={cn(CARD_BASE_CLASS, className)} {...props}>
       <div className={CARD_BODY_CLASS}>
         <div className={CARD_TITLE_ROW_CLASS}>
           <span className={CARD_ICON_CLASS}>
-            <UnifiedSkeleton className="size-4 rounded-sm" />
+            <MediaSkeleton.Icon size="sm" />
           </span>
           <span className="min-w-0 flex-1">
             <TextLineSkeleton type="h6" className={titleWidth} />

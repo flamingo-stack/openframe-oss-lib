@@ -6,7 +6,7 @@ import { BoxArchiveIcon } from '../icons-v2-generated';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatListEmptyState } from './chat-list-empty-state';
-import { ChatListItem, ChatListItemSkeleton } from './chat-nav-sidebar';
+import { ChatListItem, ChatListItemLoadingPage } from './chat-nav-sidebar';
 import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
 import type { DialogItem } from './types/component.types';
 
@@ -70,9 +70,7 @@ export function MingoArchiveList({
       </p>
       <div className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xxs)] overflow-y-auto overscroll-contain pb-[var(--spacing-system-mf)]">
         {loading ? (
-          Array.from({ length: pageSize }, (_, i) => (
-            <ChatListItemSkeleton key={i} index={i} trailing data-loading-item />
-          ))
+          <ChatListItemLoadingPage count={pageSize} trailing />
         ) : dialogs.length > 0 ? (
           <>
             {dialogs.map(dialog => (

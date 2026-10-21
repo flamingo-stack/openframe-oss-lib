@@ -260,7 +260,10 @@ function ColumnBody({
   );
 }
 
-function SkeletonStack({ count = 4 }: { count?: number }) {
+/** Cards a loading column draws: a typical column, since a board column loads with no page size of its own. */
+const BOARD_COLUMN_SKELETON_CARDS = 4;
+
+function SkeletonStack({ count = BOARD_COLUMN_SKELETON_CARDS }: { count?: number }) {
   // Position IS the identity here: the rows are interchangeable placeholders in
   // a fixed-length list, so the index is the correct key. Random keys remounted
   // every row whenever this re-rendered with a different `count`.

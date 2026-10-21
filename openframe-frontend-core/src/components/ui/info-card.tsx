@@ -122,28 +122,7 @@ export function InfoCard({ data, className = '', skeleton, loading }: InfoCardPr
           `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
           "Info-card" design. With no title/subtitle, the body is the only group. */}
       <div className={CONTENT_CLASS}>
-        {(data.title || data.subtitle) && (
-          <div className={HEAD_CLASS}>
-            {data.title && (
-              <div className={HEAD_LINE_CLASS}>
-                <span className={TITLE_TEXT_CLASS} title={data.title}>
-                  {data.title}
-                </span>
-                {data.icon}
-              </div>
-            )}
-            {data.subtitle && (
-              <div className={HEAD_LINE_CLASS}>
-                <span className={SUBTITLE_TEXT_CLASS} title={data.subtitle}>
-                  {data.subtitle}
-                </span>
-                {/* Icon lives with the title when present; otherwise it falls to the subtitle so
-                    subtitle-only cards still render it. */}
-                {!data.title && data.icon}
-              </div>
-            )}
-          </div>
-        )}
+        <InfoCardHead title={data.title} subtitle={data.subtitle} icon={data.icon} />
 
         {(data.items.length > 0 || data.progress) && (
           <div className={ROWS_CLASS}>
@@ -183,6 +162,51 @@ export function InfoCard({ data, className = '', skeleton, loading }: InfoCardPr
 
       {/* Footer */}
       {data.footer && <InfoCardFooter footer={data.footer} />}
+    </div>
+  );
+}
+
+/**
+ * The card's head, loaded and loading: the title over the subtitle. A string is drawn for real, `true` is a
+ * `text-h4` bar while it is read, nothing draws no line. The icon lives with the title when there is one; otherwise it
+ * falls to the subtitle so subtitle-only cards still render it.
+ */
+function InfoCardHead({
+  title,
+  subtitle,
+  icon,
+}: {
+  title?: string | boolean;
+  subtitle?: string | boolean;
+  icon?: React.ReactNode;
+}) {
+  if (!title && !subtitle) return null;
+  return (
+    <div className={HEAD_CLASS}>
+      {title && (
+        <div className={HEAD_LINE_CLASS}>
+          {typeof title === 'string' ? (
+            <span className={TITLE_TEXT_CLASS} title={title}>
+              {title}
+            </span>
+          ) : (
+            <TextLineSkeleton type="h4" className="w-1/2" />
+          )}
+          {icon}
+        </div>
+      )}
+      {subtitle && (
+        <div className={HEAD_LINE_CLASS}>
+          {typeof subtitle === 'string' ? (
+            <span className={SUBTITLE_TEXT_CLASS} title={subtitle}>
+              {subtitle}
+            </span>
+          ) : (
+            <TextLineSkeleton type="h4" className="w-1/3" />
+          )}
+          {!title && icon}
+        </div>
+      )}
     </div>
   );
 }
@@ -273,30 +297,7 @@ export function InfoCardSkeleton({
   return (
     <div className={cn(FRAME_CLASS, className)} aria-hidden>
       <div className={CONTENT_CLASS}>
-        {(title || subtitle) && (
-          <div className={HEAD_CLASS}>
-            {title && (
-              <div className={HEAD_LINE_CLASS}>
-                {typeof title === 'string' ? (
-                  <span className={TITLE_TEXT_CLASS}>{title}</span>
-                ) : (
-                  <TextLineSkeleton type="h4" className="w-1/2" />
-                )}
-                {icon}
-              </div>
-            )}
-            {subtitle && (
-              <div className={HEAD_LINE_CLASS}>
-                {typeof subtitle === 'string' ? (
-                  <span className={SUBTITLE_TEXT_CLASS}>{subtitle}</span>
-                ) : (
-                  <TextLineSkeleton type="h4" className="w-1/3" />
-                )}
-                {!title && icon}
-              </div>
-            )}
-          </div>
-        )}
+        <InfoCardHead title={title} subtitle={subtitle} icon={icon} />
         {(rowLabels.length > 0 || progress) && (
           <div className={ROWS_CLASS}>
             {rowLabels.map((label, index) => (

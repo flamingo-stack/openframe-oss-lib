@@ -187,8 +187,7 @@ function PanelCell({ column }: { column: PanelColumn }) {
   );
 }
 
-function PanelRowView({ row, listItem }: { row: PanelRow; listItem?: boolean }) {
-  const item = listItem ? { 'data-loading-item': '' } : undefined;
+function PanelRowView({ row, ...item }: { row: PanelRow }) {
   // Arbitrary content (e.g. a nested table): keep it edge-to-edge unless the caller
   // overrides via `className`. No fixed height — let the content size itself.
   if (row.content !== undefined) {
@@ -224,7 +223,7 @@ export function StackedRowsPanel({ rows, title, className, skeleton, listItems =
   const card = (
     <div className={CARD_CLASS}>
       {rows.map(row => (
-        <PanelRowView key={row.id} row={row} listItem={listItems} />
+        <PanelRowView key={row.id} row={row} data-loading-item={listItems || undefined} />
       ))}
     </div>
   );

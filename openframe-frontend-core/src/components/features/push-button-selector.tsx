@@ -87,7 +87,7 @@ interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
 
 /** The selector's layout, read by the selector and by its skeleton, so the skeleton is the selector's size. */
 /** The option rows a loading selector draws when the host states none (a typical short list of options). */
-export const PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS = 3;
+const PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS = 3;
 
 const SELECTOR_STACK_CLASS = 'space-y-4';
 const SELECTOR_TITLE_CLASS = 'text-ods-text-primary text-h5';
@@ -189,7 +189,7 @@ export interface PushButtonSelectorSkeletonProps {
  * row a skeleton of the row. `PushButtonSelector` draws it while `isLoading` and in a loading scope.
  */
 export function PushButtonSelectorSkeleton({
-  count = 3,
+  count = PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS,
   title,
   helpText,
   sections,

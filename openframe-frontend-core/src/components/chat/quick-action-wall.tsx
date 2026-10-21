@@ -29,7 +29,7 @@ export const WALL_SKELETON_LABEL_CH = [17, 24, 14, 20, 15, 25, 12, 21, 16, 19, 1
 
 /** Skeleton chips a loading wall draws when its host names none: a wall has no page size, and 24 overflow the
  *  typical caps at any width (the loaded wall's fill and fade). */
-export const QUICK_ACTION_WALL_SKELETON_CHIPS = 24;
+const QUICK_ACTION_WALL_SKELETON_CHIPS = 24;
 
 /** Deterministic index-alternating merge — the mixed "one stream" pile
  *  (deck slide 3's IT+SEC blend and its Storybook mirror). Input order

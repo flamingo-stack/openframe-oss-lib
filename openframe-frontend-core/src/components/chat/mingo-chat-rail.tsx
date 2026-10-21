@@ -25,7 +25,7 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatListEmptyState } from './chat-list-empty-state';
-import { ChatListItem, ChatListItemSkeleton, ChatNavSidebar, type ChatNavSidebarItem } from './chat-nav-sidebar';
+import { ChatListItem, ChatListItemLoadingPage, ChatNavSidebar, type ChatNavSidebarItem } from './chat-nav-sidebar';
 import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
 import type { MingoHistoryScope } from './mingo-history-rail';
 import type { DialogItem } from './types/component.types';
@@ -215,7 +215,7 @@ export function MingoChatRail({
       </div>
     );
   } else if (loading) {
-    list = Array.from({ length: pageSize }, (_, i) => <ChatListItemSkeleton key={i} index={i} data-loading-item />);
+    list = <ChatListItemLoadingPage count={pageSize} />;
   } else if (dialogs.length === 0 && !draftTitle) {
     list = hasSearch ? (
       <p className="px-[var(--spacing-system-xs)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h6">

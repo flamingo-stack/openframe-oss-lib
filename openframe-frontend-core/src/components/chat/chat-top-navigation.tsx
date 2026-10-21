@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn';
 import { Settings01Icon, SidebarIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 
 export interface ChatTopNavigationProps extends HTMLAttributes<HTMLElement> {
   /** Who the user is talking to. */
@@ -75,22 +75,24 @@ const ChatTopNavigation = forwardRef<HTMLElement, ChatTopNavigationProps>(
             </button>
           )}
           <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)]">
+            <SquareAvatar
+              loading={isLoading}
+              src={avatarUrl ?? undefined}
+              alt={name}
+              fallback={name}
+              size="md"
+              variant="round"
+            />
             {isLoading ? (
-              <>
-                <SquareAvatarSkeleton size="md" variant="round" />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <TextLineSkeleton type="h3" className="w-24" />
-                  {subtitle !== undefined && <TextLineSkeleton type="h6" className="w-32" />}
-                </div>
-              </>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <TextLineSkeleton type="h3" className="w-24" />
+                {subtitle !== undefined && <TextLineSkeleton type="h6" className="w-32" />}
+              </div>
             ) : (
-              <>
-                <SquareAvatar src={avatarUrl ?? undefined} alt={name} fallback={name} size="md" variant="round" />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <p className="truncate text-ods-text-primary text-h3">{name}</p>
-                  {subtitle && <p className="truncate text-ods-text-secondary text-h6">{subtitle}</p>}
-                </div>
-              </>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <p className="truncate text-ods-text-primary text-h3">{name}</p>
+                {subtitle && <p className="truncate text-ods-text-secondary text-h6">{subtitle}</p>}
+              </div>
             )}
             {actions && <div className="flex shrink-0 items-center gap-[var(--spacing-system-xs)]">{actions}</div>}
           </div>

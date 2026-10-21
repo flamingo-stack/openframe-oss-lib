@@ -3,11 +3,10 @@
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
-import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { AssigneeDropdown, type AssigneeDropdownProps } from './assignee-dropdown';
-import { useLoadingScope } from './loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from './square-avatar';
-import { TagSkeleton } from './tag';
+import { LoadingWhen, useLoadingScope } from './loading-scope';
+import { SquareAvatar } from './square-avatar';
 import { TicketStatusTag, type TicketStatusTagProps } from './ticket-status-tag';
 
 /** A plain-text value, optionally with a trailing image (avatar), leading icon, or click action. */
@@ -68,14 +67,22 @@ export interface InfoSectionProps {
   className?: string;
 }
 
+/** A text value's line while it is read: the `text-h4` line in the value box. */
+function TextValueSkeleton() {
+  return <TextLineSkeleton as="span" type="h4" className="inline-flex w-24" />;
+}
+
 function TextValue({ value }: { value: InfoSectionTextValue }) {
   const { text, imageSrc, imageFallback, imageVariant = 'round', icon, onClick, href, openInNewTab } = value;
+  const loading = useLoadingScope();
   const hasImage = imageSrc !== undefined || imageFallback !== undefined;
   const interactiveClass = 'truncate text-left text-h4 text-ods-text-primary transition-colors hover:text-ods-accent';
   return (
     <>
       {icon && <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary">{icon}</span>}
-      {href ? (
+      {loading ? (
+        <TextValueSkeleton />
+      ) : href ? (
         <Link
           href={href}
           target={openInNewTab ? '_blank' : undefined}
@@ -119,10 +126,17 @@ function RowValue({ value }: { value: InfoSectionValue }) {
       return <TicketStatusTag {...props} />;
     }
     case 'custom':
-      return <>{value.content}</>;
+      return <CustomValue content={value.content} />;
     default:
       return <TextValue value={value} />;
   }
+}
+
+/** Custom content: a node switches itself in a scope; plain text read by the host is drawn as the text line. */
+function CustomValue({ content }: { content: ReactNode }) {
+  const loading = useLoadingScope();
+  if (loading && (typeof content === 'string' || typeof content === 'number')) return <TextValueSkeleton />;
+  return <>{content}</>;
 }
 
 /** The card's layout, read by the loaded rows and by the skeleton rows, so both are one size. */
@@ -152,7 +166,8 @@ export function InfoSection({ title, rows, loading: loadingProp, className }: In
 
 /**
  * The card's ONE structure, loaded and loading: the caption, then a row per entry, its label and leader line drawn
- * for real, the value its control or, while loading, that control's skeleton in the same value box.
+ * for real, the value its control; while loading every control is drawn in a scope and draws its own skeleton in the
+ * same value box.
  */
 function InfoSectionCard({
   title,
@@ -161,7 +176,7 @@ function InfoSectionCard({
   className,
 }: {
   title?: string;
-  rows: Array<{ id: string; label: string; value?: InfoSectionValue }>;
+  rows: InfoSectionRow[];
   loading: boolean;
   className?: string;
 }) {
@@ -174,56 +189,13 @@ function InfoSectionCard({
             <span className={INFO_SECTION_LABEL_CLASS}>{row.label}</span>
             <div className={INFO_SECTION_LINE_CLASS} />
             <div className={INFO_SECTION_VALUE_CLASS}>
-              {loading || !row.value ? <RowValueSkeleton value={row.value} /> : <RowValue value={row.value} />}
+              <LoadingWhen loading={loading}>
+                <RowValue value={row.value} />
+              </LoadingWhen>
             </div>
           </div>
         ))}
       </div>
     </div>
-  );
-}
-
-/** One row's value while it is read, in the shape of the control the row holds. */
-function RowValueSkeleton({ value }: { value?: InfoSectionValue }) {
-  switch (value?.type) {
-    case 'status':
-      return <TagSkeleton />;
-    case 'assignee':
-      // The compact picker's trigger is the assignee's avatar; the default picker is a field.
-      return (value.variant ?? 'compact') === 'compact' ? (
-        <SquareAvatarSkeleton size="sm" variant="round" />
-      ) : (
-        <InteractiveSkeleton.Input className="w-48" />
-      );
-    default:
-      return <TextLineSkeleton as="span" type="h4" className="inline-flex w-24" />;
-  }
-}
-
-/**
- * The card while its values are read: the caption and each row's label drawn for real (static copy), the leader
- * line for real, and the value in the shape of its control (a tag for a status, the picker's box for an assignee, a
- * `text-h4` line for text), in the same row box as a loaded value.
- */
-export function InfoSectionSkeleton({
-  title,
-  labels,
-  values,
-  className,
-}: {
-  title?: string;
-  /** The rows' labels: the page's copy, one row each. */
-  labels: string[];
-  /** The rows' values (by index), for the shape of each value's skeleton; a text line without them. */
-  values?: Array<InfoSectionValue | undefined>;
-  className?: string;
-}) {
-  return (
-    <InfoSectionCard
-      title={title}
-      rows={labels.map((label, index) => ({ id: `${label}-${index}`, label, value: values?.[index] }))}
-      loading
-      className={className}
-    />
   );
 }

@@ -143,6 +143,15 @@ const PolicyRow: FC<{
   );
 };
 
+/** A category before its policies are read: the host's name and icon when it passes them, else nothing yet. */
+const LOADING_CATEGORY: PermissionCategory = { id: '', name: '', policies: [] };
+
+/**
+ * One category, loaded and loading. While its policies are read (`loading`) the header is the same row, collapsed and
+ * inert: the icon static (the host's, else the default shield), the name the host passes drawn for real (a bar when
+ * there is none), the configuration count a bar, and the edit-mode dropdowns with their static "Set Global
+ * Permission" label, disabled.
+ */
 const CategorySection: FC<{
   category: PermissionCategory;
   editMode: boolean;
@@ -152,7 +161,18 @@ const CategorySection: FC<{
   onToggle: (categoryId: string) => void;
   onBulkLevelChange: (categoryId: string, level: ApprovalLevel | undefined) => void;
   onPolicyPermissionChange: (categoryId: string, policyId: string, level: ApprovalLevel) => void;
-}> = ({ category, editMode, isExpanded, bulkLevel, onToggle, onBulkLevelChange, onPolicyPermissionChange }) => {
+  loading?: boolean;
+}> = ({
+  category,
+  editMode,
+  isExpanded: isExpandedProp,
+  bulkLevel,
+  onToggle,
+  onBulkLevelChange,
+  onPolicyPermissionChange,
+  loading = false,
+}) => {
+  const isExpanded = isExpandedProp && !loading;
   const { innerRef, containerStyle } = useCollapsible({ expanded: isExpanded, durationMs: 300 });
   const handleBulkChange = (level: ApprovalLevel | undefined) => onBulkLevelChange(category.id, level);
 
@@ -161,20 +181,28 @@ const CategorySection: FC<{
       {/* Category Header */}
       <div
         data-loading-item
-        className={cn(CATEGORY_HEADER_CLASS, 'cursor-pointer transition-colors hover:bg-ods-bg-hover')}
-        onClick={() => onToggle(category.id)}
+        className={cn(CATEGORY_HEADER_CLASS, !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover')}
+        onClick={loading ? undefined : () => onToggle(category.id)}
       >
-        {/* Category Icon */}
+        {/* Category Icon (static: the host's, else the default shield) */}
         <div className={ICON_TILE_CLASS}>
           <div className="text-ods-text-secondary">{category.icon ?? <Shield className="h-4 w-4" />}</div>
         </div>
 
         {/* Category Info — on mobile the bulk dropdown stacks below the count */}
         <div className={CATEGORY_TEXT_CLASS}>
-          <p className="truncate text-ods-text-primary text-h4" title={category.name}>
-            {category.name}
-          </p>
-          <p className="text-ods-text-secondary text-h6">{category.policies.length} Configurations</p>
+          {category.name ? (
+            <p className="truncate text-ods-text-primary text-h4" title={category.name}>
+              {category.name}
+            </p>
+          ) : (
+            <TextLineSkeleton type="h4" className="w-40 max-w-full" />
+          )}
+          {loading ? (
+            <TextLineSkeleton type="h6" className="w-24" />
+          ) : (
+            <p className="text-ods-text-secondary text-h6">{category.policies.length} Configurations</p>
+          )}
           {editMode && (
             <div className="mt-[var(--spacing-system-xsf)] content-md:hidden" onClick={e => e.stopPropagation()}>
               <ApprovalLevelDropdown
@@ -183,6 +211,7 @@ const CategorySection: FC<{
                 allowClear
                 triggerClassName="w-full"
                 contentClassName={CATEGORY_LEVEL_WIDTH}
+                disabled={loading}
               />
             </div>
           )}
@@ -197,6 +226,7 @@ const CategorySection: FC<{
               allowClear
               triggerClassName={CATEGORY_LEVEL_WIDTH}
               contentClassName={CATEGORY_LEVEL_WIDTH}
+              disabled={loading}
             />
           </div>
         ) : (
@@ -207,6 +237,7 @@ const CategorySection: FC<{
         <Button
           type="button"
           variant="transparent"
+          disabled={loading}
           onClick={e => {
             e.stopPropagation();
             onToggle(category.id);
@@ -217,79 +248,36 @@ const CategorySection: FC<{
         />
       </div>
 
-      {/* Policies List */}
-      <div
-        style={{
-          ...containerStyle,
-          transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
-          // visibility drops collapsed content from the tab order and a11y
-          // tree; its discrete transition delays hiding until the fade ends.
-          visibility: isExpanded ? 'visible' : 'hidden',
-        }}
-        className={isExpanded ? 'opacity-100' : 'opacity-0'}
-      >
-        <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
-          <div className="overflow-hidden rounded-md border border-ods-border">
-            {category.policies.map(policy => (
-              <PolicyRow
-                key={policy.id}
-                policy={policy}
-                categoryId={category.id}
-                editMode={editMode}
-                onPermissionChange={onPolicyPermissionChange}
-              />
-            ))}
+      {/* Policies List (none while they are read) */}
+      {!loading && (
+        <div
+          style={{
+            ...containerStyle,
+            transition: `${containerStyle.transition}, opacity 300ms ease-in-out, visibility 300ms`,
+            // visibility drops collapsed content from the tab order and a11y
+            // tree; its discrete transition delays hiding until the fade ends.
+            visibility: isExpanded ? 'visible' : 'hidden',
+          }}
+          className={isExpanded ? 'opacity-100' : 'opacity-0'}
+        >
+          <div ref={innerRef} className="px-[var(--spacing-system-mf)] pb-[var(--spacing-system-mf)] pt-0">
+            <div className="overflow-hidden rounded-md border border-ods-border">
+              {category.policies.map(policy => (
+                <PolicyRow
+                  key={policy.id}
+                  policy={policy}
+                  categoryId={category.id}
+                  editMode={editMode}
+                  onPermissionChange={onPolicyPermissionChange}
+                />
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </>
   );
 };
-
-/**
- * A category while its policies are read: the same header row, collapsed. The name the host passes is drawn for
- * real (a bar when there is none), the configuration count is a bar, and the edit-mode dropdowns are drawn with their
- * static "Set Global Permission" label, disabled.
- */
-const CategorySectionSkeleton: FC<{ category?: Pick<PermissionCategory, 'name' | 'icon'>; editMode: boolean }> = ({
-  category,
-  editMode,
-}) => (
-  <div data-loading-item className={CATEGORY_HEADER_CLASS}>
-    {/* The icon is static (the host's, else the default shield, as the loaded header draws it). */}
-    <div className={ICON_TILE_CLASS}>
-      <div className="text-ods-text-secondary">{category?.icon ?? <Shield className="h-4 w-4" />}</div>
-    </div>
-    <div className={CATEGORY_TEXT_CLASS}>
-      {category?.name ? (
-        <p className="truncate text-ods-text-primary text-h4">{category.name}</p>
-      ) : (
-        <TextLineSkeleton type="h4" className="w-40 max-w-full" />
-      )}
-      <TextLineSkeleton type="h6" className="w-24" />
-      {editMode && (
-        <div className="mt-[var(--spacing-system-xsf)] content-md:hidden">
-          <ApprovalLevelDropdown value={undefined} onChange={() => {}} triggerClassName="w-full" disabled />
-        </div>
-      )}
-    </div>
-    {editMode ? (
-      <div className="hidden shrink-0 content-md:block">
-        <ApprovalLevelDropdown value={undefined} onChange={() => {}} triggerClassName={CATEGORY_LEVEL_WIDTH} disabled />
-      </div>
-    ) : (
-      <div className={CATEGORY_LEVEL_COLUMN_CLASS} />
-    )}
-    <Button
-      type="button"
-      variant="transparent"
-      disabled
-      leftIcon={<ChevronDown className={CHEVRON_CLASS} />}
-      className="h-auto w-auto shrink-0 rounded-md"
-      aria-label="Expand"
-    />
-  </div>
-);
 
 /**
  * Grouped list of permission categories with per-policy approval dropdowns.
@@ -349,23 +337,15 @@ export const PolicyConfigurationPanel: FC<PolicyConfigurationPanelProps> = ({
     }
   };
 
-  if (loading) {
-    const rows: Array<Pick<PermissionCategory, 'name' | 'icon'> | undefined> =
-      categories.length > 0 ? categories : Array.from({ length: skeletonCount }, () => undefined);
-    return (
-      <div className={cn(PANEL_CLASS, className)}>
-        {rows.map((category, index) => (
-          <CategorySectionSkeleton key={index} category={category} editMode={editMode} />
-        ))}
-      </div>
-    );
-  }
+  // While loading: the host's categories as they are, else a typical count of categories not read yet.
+  const shown: PermissionCategory[] =
+    loading && categories.length === 0 ? Array.from({ length: skeletonCount }, () => LOADING_CATEGORY) : categories;
 
   return (
     <div className={cn(PANEL_CLASS, className)}>
-      {categories.map(category => (
+      {shown.map((category, index) => (
         <CategorySection
-          key={category.id}
+          key={category.id || index}
           category={category}
           editMode={editMode}
           isExpanded={expandedIds.has(category.id)}
@@ -373,6 +353,7 @@ export const PolicyConfigurationPanel: FC<PolicyConfigurationPanelProps> = ({
           onToggle={handleToggle}
           onBulkLevelChange={handleBulkLevelChange}
           onPolicyPermissionChange={onPolicyPermissionChange}
+          loading={loading}
         />
       ))}
     </div>

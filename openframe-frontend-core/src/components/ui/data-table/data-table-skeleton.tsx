@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { useDataTableContext } from './data-table';
-import { getHideClasses } from './utils';
+import { DATA_TABLE_SKELETON_ROWS, getHideClasses } from './utils';
 
 /**
  * Consistent INNER row heights. The row card wraps these in a 1px border on
@@ -51,7 +51,12 @@ export interface DataTableSkeletonProps {
   rowHeightClassName?: string;
 }
 
-export function DataTableSkeleton({ rows = 10, className, rowClassName, rowHeightClassName }: DataTableSkeletonProps) {
+export function DataTableSkeleton({
+  rows = DATA_TABLE_SKELETON_ROWS,
+  className,
+  rowClassName,
+  rowHeightClassName,
+}: DataTableSkeletonProps) {
   const table = useDataTableContext();
   const columns = table.getVisibleFlatColumns();
   const firstColumnId = columns[0]?.id;

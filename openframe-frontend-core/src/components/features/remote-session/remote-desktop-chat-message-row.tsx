@@ -3,7 +3,8 @@
 import { cn } from '../../../utils/cn';
 import { formatTime } from '../../../utils/format-date';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { SquareAvatar } from '../../ui/square-avatar';
 
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
 const MESSAGE_ROW_CLASS = 'grid grid-cols-1 gap-[var(--spacing-system-xxs)]';
@@ -20,6 +21,9 @@ export interface RemoteDesktopChatMessageRowProps {
   /** When the message was sent: an ISO timestamp or a `Date`. */
   sentAt: string | Date;
   body: string;
+  /** The message is still being read: the row draws its skeleton (the technician's avatar box on a technician's row).
+   *  A loading scope does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -38,7 +42,10 @@ export function RemoteDesktopChatMessageRow({
   avatarUrl,
   sentAt,
   body,
+  loading = false,
 }: RemoteDesktopChatMessageRowProps) {
+  // ONE switch: while the chat is read, or in a loading scope, the row is its skeleton.
+  if (useLoadingScope() || loading) return <RemoteDesktopChatMessageRowSkeleton isTechnician={isTechnician} />;
   return (
     <div className={MESSAGE_ROW_CLASS} data-loading-item>
       <div className={MESSAGE_HEAD_CLASS}>
@@ -68,11 +75,11 @@ export function RemoteDesktopChatMessageRow({
  * A message row while the chat is read: the technician's avatar box on a technician's row, the name and the time as
  * bars on the name row, one line of the body.
  */
-export function RemoteDesktopChatMessageRowSkeleton({ isTechnician = false }: { isTechnician?: boolean }) {
+function RemoteDesktopChatMessageRowSkeleton({ isTechnician = false }: { isTechnician?: boolean }) {
   return (
     <div className={MESSAGE_ROW_CLASS} aria-hidden data-loading-item>
       <div className={MESSAGE_HEAD_CLASS}>
-        {isTechnician && <SquareAvatarSkeleton variant="round" sizePx={TECHNICIAN_AVATAR_PX} />}
+        {isTechnician && <SquareAvatar loading variant="round" sizePx={TECHNICIAN_AVATAR_PX} className="shrink-0" />}
         <span className={MESSAGE_NAME_CLASS}>
           <TextLineSkeleton type="inherit" as="span" className="w-24" />
         </span>

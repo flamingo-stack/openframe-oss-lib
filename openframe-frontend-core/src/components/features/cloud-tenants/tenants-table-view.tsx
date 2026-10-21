@@ -40,7 +40,7 @@ export interface TenantsTableViewProps {
 }
 
 /** The rows a loading tenants table draws when the host states none (a typical page of tenants). */
-export const TENANTS_TABLE_SKELETON_ROWS = 20;
+const TENANTS_TABLE_SKELETON_ROWS = 20;
 
 /** The tenants list: tenant, customer, access state and a way into each tenant's details. */
 export function TenantsTableView({

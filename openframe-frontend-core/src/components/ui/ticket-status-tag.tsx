@@ -182,6 +182,9 @@ export interface TicketStatusTagOption {
 export interface TicketStatusTagProps {
   /** Ticket status in any known format (ACTIVE, active, ACTION_REQUIRED, etc.) */
   status: string;
+  /** The status is still being read: the tag draws its skeleton (no dropdown). In a loading scope a tag with no
+   *  status yet does the same. */
+  loading?: boolean;
   /** Override the default label */
   label?: string;
   /**
@@ -230,6 +233,7 @@ export function TicketStatusTag({
   isPending = false,
   disabled = false,
   disabledReason,
+  loading = false,
 }: TicketStatusTagProps) {
   const config = getTicketStatusConfig(status);
   // Custom color: drive bg via CSS vars so the derived hover/active fills can win
@@ -248,6 +252,7 @@ export function TicketStatusTag({
 
   const tag = (
     <Tag
+      loading={loading}
       label={label ?? config.label}
       variant={variant ?? config.variant}
       icon={showIcon ? config.icon : undefined}
@@ -256,8 +261,8 @@ export function TicketStatusTag({
     />
   );
 
-  if (disabled || !options || options.length === 0 || !onSelect) {
-    if (disabled && disabledReason) {
+  if (loading || disabled || !options || options.length === 0 || !onSelect) {
+    if (!loading && disabled && disabledReason) {
       return (
         <TooltipProvider delayDuration={0}>
           <Tooltip>

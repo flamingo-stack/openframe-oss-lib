@@ -5,16 +5,19 @@ import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { useLoadingScope } from '../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
-import type { ChatSidebarProps, DialogListItemProps } from './types';
+import type { ChatSidebarProps, DialogItem, DialogListItemProps } from './types';
 
 /** A dialog row's box, shared by the loaded row and its skeleton so both take the same space. */
 const DIALOG_LIST_ITEM_CLASS = 'flex items-center gap-4 overflow-clip px-4 py-3 border-b border-ods-border bg-ods-card';
 
 const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
-  ({ className, dialog, isActive, onDialogSelect, onClick, ...props }, ref) => {
-    if (useLoadingScope()) return <DialogListItemSkeleton className={className} />;
+  ({ className, dialog, isActive, onDialogSelect, onClick, loading = false, ...props }, ref) => {
+    // ONE switch: while the host reads the dialog, or in a loading scope, the row is its skeleton, with its markers.
+    if (useLoadingScope() || loading) {
+      return <DialogListItemSkeleton className={className} {...loadingItemProps(props)} />;
+    }
 
     const handleClick = (e: MouseEvent<HTMLDivElement>) => {
       onDialogSelect?.(dialog.id);
@@ -80,7 +83,7 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
 DialogListItem.displayName = 'DialogListItem';
 
 /** {@link DialogListItem}'s loading state: the same box, the title and time lines, and the chevron. */
-function DialogListItemSkeleton({ className, ...props }: { className?: string; 'data-loading-item'?: boolean }) {
+function DialogListItemSkeleton({ className, ...props }: { className?: string }) {
   return (
     <div aria-hidden className={cn(DIALOG_LIST_ITEM_CLASS, className)} {...props}>
       <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-1">
@@ -92,6 +95,17 @@ function DialogListItemSkeleton({ className, ...props }: { className?: string; '
       </div>
     </div>
   );
+}
+
+/** A dialog row while the list is read, with no dialog yet. */
+const LOADING_DIALOG: DialogItem = { id: '', title: '' };
+
+/** A page of loading dialog rows (the list's page size), each a list item: the first page and the next one alike. */
+function DialogListItemLoadingPage({ count }: { count: number }) {
+  return Array.from({ length: count }, (_, index) => (
+    // Static placeholder rows: the index IS the identity.
+    <DialogListItem key={index} loading dialog={LOADING_DIALOG} data-loading-item />
+  ));
 }
 
 const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
@@ -178,9 +192,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
           ) : loading ? (
             <div className="min-h-0 flex-1 overflow-hidden">
               <div className="flex flex-col">
-                {Array.from({ length: pageSize }, (_, index) => (
-                  <DialogListItemSkeleton key={index} data-loading-item />
-                ))}
+                <DialogListItemLoadingPage count={pageSize} />
               </div>
             </div>
           ) : children ? (
@@ -202,12 +214,7 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
 
                 {/* Infinite scroll intersection target; the next page draws as one page of skeleton rows. */}
                 {hasNextPage && (
-                  <div ref={loadMoreRef}>
-                    {isFetchingNextPage &&
-                      Array.from({ length: pageSize }, (_, index) => (
-                        <DialogListItemSkeleton key={index} data-loading-item />
-                      ))}
-                  </div>
+                  <div ref={loadMoreRef}>{isFetchingNextPage && <DialogListItemLoadingPage count={pageSize} />}</div>
                 )}
               </div>
             </div>

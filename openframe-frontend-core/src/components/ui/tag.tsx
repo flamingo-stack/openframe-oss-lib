@@ -106,8 +106,9 @@ export interface TagProps
    * `<a>` — don't combine `as="span"` + `onClose` inside an anchor.
    */
   as?: 'div' | 'span';
-  /** The label is still being read: the tag draws its `TagSkeleton` (the tag's own frame and size). A loading scope
-   *  does the same. */
+  /** The label is still being read: the tag draws its `TagSkeleton` (the tag's own frame and size). In a loading
+   *  scope a tag with an EMPTY label does the same (its label is read data not here yet); a tag whose label is
+   *  written ("Beta", "Coming Soon") is static copy and stays real. */
   loading?: boolean;
 }
 
@@ -157,8 +158,11 @@ function Tag({
   loading,
   ...props
 }: TagProps) {
-  // ONE switch: in a page's loading state (or while the host reads the label) the tag is its skeleton, in its box.
-  if (useLoadingScope() || !!loading) return <TagSkeleton size={size ?? 'default'} className={className} />;
+  // ONE switch: while the host reads the label, or in a page's loading state when the label is not here yet, the tag
+  // is its skeleton, in its box. A written label is static copy: it stays real in a scope.
+  const inScope = useLoadingScope();
+  if (!!loading || (inScope && isEmptyTagLabel(label)))
+    return <TagSkeleton size={size ?? 'default'} className={className} />;
   return (
     <Comp
       className={cn(tagVariants({ variant, size }), disabled && disabledTagClasses, className)}
@@ -190,6 +194,11 @@ function Tag({
       )}
     </Comp>
   );
+}
+
+/** A label with nothing to show: the read has not answered yet. */
+function isEmptyTagLabel(label: React.ReactNode): boolean {
+  return label == null || label === false || (typeof label === 'string' && label.trim() === '');
 }
 
 export { Tag, tagVariants };

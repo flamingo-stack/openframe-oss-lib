@@ -33,6 +33,21 @@ export const DEVICES_GRID_SKELETON_CARDS = 12;
 /** The grid's cards carry no "more" button (the card opens the device), loaded and loading alike. */
 const GRID_CARD_ACTIONS = { moreButton: { visible: false } };
 
+/** A page of the grid's own cards while they are read (the first page and the next one alike), each a list item. */
+function DeviceCardLoadingPage({ count }: { count: number }) {
+  return Array.from({ length: count }, (_, i) => (
+    // Static placeholder cards: the index IS the identity.
+    <DeviceCard
+      key={i}
+      loading
+      device={{ name: '' }}
+      actions={GRID_CARD_ACTIONS}
+      className="h-full"
+      data-loading-item
+    />
+  ));
+}
+
 export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   devices,
   isLoading: isLoadingProp,
@@ -58,16 +73,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
       {isLoading && devices.length === 0 ? (
         // A full page of the grid's own cards, each its own skeleton (no "more" button, as the loaded cards).
         <LoadingRegion label="Loading devices" announce={loadingRegion} className={DEVICES_GRID_CLASS}>
-          {Array.from({ length: pageSize }, (_, i) => (
-            <DeviceCard
-              key={`skeleton-${i}`}
-              loading
-              device={{ name: '' }}
-              actions={GRID_CARD_ACTIONS}
-              className="h-full"
-              data-loading-item
-            />
-          ))}
+          <DeviceCardLoadingPage count={pageSize} />
         </LoadingRegion>
       ) : devices.length === 0 ? (
         <div className="flex h-64 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card">
@@ -105,17 +111,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
                 />
               );
             })}
-            {isFetchingNextPage &&
-              Array.from({ length: pageSize }, (_, i) => (
-                <DeviceCard
-                  key={`skeleton-${i}`}
-                  loading
-                  device={{ name: '' }}
-                  actions={GRID_CARD_ACTIONS}
-                  className="h-full"
-                  data-loading-item
-                />
-              ))}
+            {isFetchingNextPage && <DeviceCardLoadingPage count={pageSize} />}
           </div>
           {hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
         </>

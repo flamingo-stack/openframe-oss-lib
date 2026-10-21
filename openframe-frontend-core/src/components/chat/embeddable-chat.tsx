@@ -3091,7 +3091,7 @@ function EmbeddableChatInner({
                                         <MingoOnboardingCard
                                           key={`chip-skeleton-${i}`}
                                           loading
-                                          listItem
+                                          data-loading-item
                                           skeletonIndex={i}
                                           title=""
                                         />
@@ -3113,7 +3113,7 @@ function EmbeddableChatInner({
                                           slashCommand={`/${cmdId}`}
                                           description={cmd.description}
                                           actions={cardActions}
-                                          listItem
+                                          data-loading-item
                                         />
                                       );
                                     })}

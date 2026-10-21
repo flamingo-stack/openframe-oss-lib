@@ -452,16 +452,9 @@ describe('loading gaps the frontend asked for', () => {
     expect(container.querySelectorAll(SURFACE).length).toBeGreaterThan(0);
   });
 
-  it('DeviceCard keeps the details button box while loading', () => {
-    const { container } = render(
-      <DeviceCard
-        loading
-        device={{ name: READ }}
-        actions={{ detailsButton: { visible: true, component: <span /> } }}
-        detailsButtonSkeletonClassName="size-12"
-      />,
-    );
-    expect(container.querySelector('.size-12')).not.toBeNull();
+  it('DeviceCard keeps its markers and draws no read word while loading', () => {
+    const { container } = render(<DeviceCard loading device={{ name: READ }} data-loading-item="" />);
+    expect(container.querySelector('[data-loading-item]')).not.toBeNull();
     expect(container.textContent).not.toContain(READ);
   });
 
@@ -514,11 +507,14 @@ describe('round 2: components draw their loaded twin', () => {
     expect(untitled.querySelectorAll(SURFACE)).toHaveLength(0);
   });
 
-  it("InfoSection draws each value as its control's skeleton (a status is a tag)", () => {
+  it("InfoSection draws each value as its control's skeleton (a status not here yet is a tag)", () => {
     const { container } = render(
       <InfoSection
         loading
-        rows={[{ id: 's', label: 'Status', value: { type: 'status', status: 'ACTIVE', label: READ } }]}
+        rows={[
+          { id: 's', label: 'Status', value: { type: 'status', status: '' } },
+          { id: 'a', label: 'Assignee', value: { text: READ } },
+        ]}
       />,
     );
     expect(container.textContent).toContain('Status');
@@ -541,9 +537,11 @@ describe('round 2: components draw their loaded twin', () => {
     expect(container.querySelectorAll('[data-loading-item]')).toHaveLength(0);
   });
 
-  it('ServiceCard draws a label bar for a row whose label is still read', () => {
-    const { container } = render(<ServiceCard loading title="Fleet" rows={[{ value: '' }]} />);
-    expect(container.querySelector('.w-20 .ods-skeleton')).not.toBeNull();
+  it('ServiceCard draws a label bar for a row whose label is still read, and no label column for a row with none', () => {
+    const { container } = render(
+      <ServiceCard loading title="Fleet" rows={[{ label: '', value: '' }, { value: '' }]} />,
+    );
+    expect(container.querySelectorAll('.w-20 .ods-skeleton')).toHaveLength(1);
   });
 
   it('DeviceCard draws a button box for its details button by itself', () => {
@@ -557,16 +555,25 @@ describe('round 2: components draw their loaded twin', () => {
     expect(container.querySelector('.ods-skeleton.h-11')).not.toBeNull();
   });
 
-  it('Switch and Tag switch on the scope', () => {
+  it('Switch and a Tag whose label is not here yet switch on the scope', () => {
     const { container } = render(
       <LoadingScope>
         <Switch checked />
-        <Tag label={READ} />
+        <Tag label="" />
       </LoadingScope>,
     );
     expect(container.querySelector('button[role="switch"]')).toBeNull();
-    expect(container.textContent).not.toContain(READ);
     expect(container.querySelectorAll(SURFACE)).toHaveLength(2);
+  });
+
+  it('a Tag with a written label is static copy and stays real in a scope', () => {
+    const { container } = render(
+      <LoadingScope>
+        <Tag label="Beta" />
+      </LoadingScope>,
+    );
+    expect(container.textContent).toContain('Beta');
+    expect(container.querySelectorAll(SURFACE)).toHaveLength(0);
   });
 
   it('Input and SelectTrigger draw their box and label, the value a bar, in a scope', () => {

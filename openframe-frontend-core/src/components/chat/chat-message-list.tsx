@@ -17,6 +17,12 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatMessageEnhanced } from './chat-message-enhanced';
+import {
+  CHAT_MESSAGE_LIST_COLUMN_CLASS,
+  CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
+} from './chat-message-layout';
 import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES, ChatMessageListSkeleton } from './chat-message-skeleton';
 import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
@@ -945,6 +951,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           fill={fill}
           messageCount={CHAT_MESSAGE_LIST_SKELETON_MESSAGES}
           appearance={appearance}
+          namedOthers={selfAuthorType === 'admin'}
         />
       );
     }
@@ -982,7 +989,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               <div
                 ref={setScrollRef}
                 className={cn(
-                  'flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden',
+                  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
                   // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
                   // reaching the top/bottom of the thread must NOT chain the wheel/
                   // touch scroll to the page behind the chat — e.g. the company-hub
@@ -992,7 +999,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   // the surrounding page keeps scrolling normally when the pointer is
                   // over the (non-interactive) thread.
                   overscrollContain && 'overscroll-contain',
-                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
+                  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
                   className,
                 )}
                 {...props}
@@ -1003,10 +1010,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // `fullWidth=true` drops the centered-narrow column for
                     // side-panel hosts (e.g. multi-platform-hub Mingo). Same
                     // semantics as ChatHeader / ChatInput / ChatFooter.
-                    fullWidth
-                      ? 'flex w-full min-w-0 flex-col pb-[var(--spacing-system-xs)]'
-                      : 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)]',
-                    contentClassName ?? 'px-[var(--spacing-system-m)]',
+                    CHAT_MESSAGE_LIST_COLUMN_CLASS[fullWidth ? 'full' : 'narrow'],
+                    contentClassName ?? CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
                   )}
                   style={{ minHeight: '100%' }}
                 >

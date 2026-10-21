@@ -23,6 +23,16 @@ import type { DialogItem } from './types/component.types';
  */
 export const CHAT_HISTORY_PAGE_SIZE = 20;
 
+/** The list's layout, read by the loaded groups and by the loading state, so both are one size. */
+const HISTORY_GROUP_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
+const HISTORY_GROUP_LABEL_CLASS = 'text-ods-text-secondary text-h5';
+const HISTORY_GROUP_BOX_CLASS = 'overflow-hidden rounded-md border border-ods-border';
+const HISTORY_ROW_CLASS = 'flex h-12 items-center border-b border-ods-border last:border-b-0';
+const HISTORY_ROW_CONTENT_CLASS = 'p-[var(--spacing-system-s)]';
+
+/** Date groups the loading state draws: the typical history, recent chats over older ones. */
+const HISTORY_SKELETON_GROUPS = 2;
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -150,7 +160,8 @@ function MingoChatHistoryRow({
     <div
       data-loading-item
       className={cn(
-        'group/row relative flex h-12 items-center border-b border-ods-border transition-colors last:border-b-0',
+        HISTORY_ROW_CLASS,
+        'group/row relative transition-colors',
         // Active (selected) dialog — Figma 259:91610: an accent-secondary
         // fill, a 4px accent bar down the leading edge, and accent-colored
         // title text. Inactive rows keep the dark surface with a hover tint.
@@ -170,7 +181,10 @@ function MingoChatHistoryRow({
             onSelect?.(dialog.id);
           }
         }}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent"
+        className={cn(
+          HISTORY_ROW_CONTENT_CLASS,
+          'flex min-w-0 flex-1 cursor-pointer items-center gap-[var(--spacing-system-xsf)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
+        )}
       >
         {unread > 0 ? (
           <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)] text-ods-text-on-accent text-h5">
@@ -263,47 +277,41 @@ function MingoChatHistoryRow({
 // Skeleton
 // =============================================================================
 
-/** Title widths the loading rows cycle through, so the page reads like a list of chats. */
 /**
- * The history's loading state, shaped like the loaded list: a group label over a bordered box of `h-12` rows, one
- * page of them (`rows`, the host's page size), each a title bar (no unread badge: a badge is read data most rows do
- * not have). `bg-ods-bg` rows read a touch darker than the `bg-ods-card` panel, like the loaded rows. Drawn by
- * `MingoChatHistory` itself (`loading`, or inside a `LoadingScope`); exported for hosts that drew it directly.
+ * The history's loading state, shaped like the loaded list: the typical two date groups, each a group label over a
+ * bordered box of `h-12` rows, one page of rows across them (`rows`, the host's page size), each a title bar (no
+ * unread badge: a badge is read data most rows do not have). `bg-ods-bg` rows read a touch darker than the
+ * `bg-ods-card` panel, like the loaded rows. Drawn by `MingoChatHistory` itself (`loading`, or inside a
+ * `LoadingScope`).
  */
-export function MingoChatHistorySkeleton({
-  region = true,
-  rows = CHAT_HISTORY_PAGE_SIZE,
-  className,
-}: {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-  /** Rows drawn: the host's page size. Default {@link CHAT_HISTORY_PAGE_SIZE}. */
-  rows?: number;
-  className?: string;
-}) {
+function MingoChatHistorySkeleton({ rows, className }: { rows: number; className?: string }) {
+  const perGroup = Math.ceil(rows / HISTORY_SKELETON_GROUPS);
+  const groups = Array.from({ length: HISTORY_SKELETON_GROUPS }, (_, group) =>
+    Math.max(0, Math.min(perGroup, rows - group * perGroup)),
+  ).filter(count => count > 0);
   return (
     <LoadingRegion
       label="Loading conversations"
-      announce={region}
       // `overflow-hidden` clips the page of rows to the flex-1 box (the loaded list scrolls; the loading state stays
       // within bounds).
       className={cn('flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-hidden', className)}
     >
-      <div className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]">
-        {/* Group label (Today / Yesterday / Older): read from the dialogs' dates. */}
-        <TextLineSkeleton type="h5" className="w-16" />
-        <div className="overflow-hidden rounded-md border border-ods-border">
-          {Array.from({ length: rows }, (_, i) => (
-            <div
-              key={i}
-              data-loading-item
-              className="flex h-12 items-center border-b border-ods-border bg-ods-bg p-[var(--spacing-system-s)] last:border-b-0"
-            >
-              <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[i % SKELETON_TITLE_WIDTHS.length]} />
-            </div>
-          ))}
+      {groups.map((count, group) => (
+        <div key={group} className={cn(HISTORY_GROUP_CLASS, 'shrink-0')}>
+          {/* Group label (Today / Yesterday / Older): read from the dialogs' dates. */}
+          <TextLineSkeleton type="h5" className="w-16" />
+          <div className={HISTORY_GROUP_BOX_CLASS}>
+            {Array.from({ length: count }, (_, i) => (
+              <div key={i} data-loading-item className={cn(HISTORY_ROW_CLASS, HISTORY_ROW_CONTENT_CLASS, 'bg-ods-bg')}>
+                <TextLineSkeleton
+                  type="h4"
+                  className={SKELETON_TITLE_WIDTHS[(group * perGroup + i) % SKELETON_TITLE_WIDTHS.length]}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      ))}
     </LoadingRegion>
   );
 }
@@ -409,9 +417,9 @@ export function MingoChatHistory({
             />
           ) : (
             groups.map(group => (
-              <div key={group.key} className="flex flex-col gap-[var(--spacing-system-xxs)]">
-                <p className="text-ods-text-secondary text-h5">{group.label}</p>
-                <div className="overflow-hidden rounded-md border border-ods-border">
+              <div key={group.key} className={HISTORY_GROUP_CLASS}>
+                <p className={HISTORY_GROUP_LABEL_CLASS}>{group.label}</p>
+                <div className={HISTORY_GROUP_BOX_CLASS}>
                   {group.items.map(dialog => (
                     <MingoChatHistoryRow
                       key={dialog.id}

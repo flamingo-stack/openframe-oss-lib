@@ -29,6 +29,9 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
    *  defaults (`text-xs font-medium text-ods-text-primary`) via tailwind-merge,
    *  so callers can shrink/recolor the initials for compact avatars. */
   initialsClassName?: string;
+  /** The person is still being read: the avatar draws its skeleton (its own size and corner) and fetches no image.
+   *  A loading scope does the same. */
+  loading?: boolean;
 }
 
 /** The avatar's corner at each variant, read by the avatar and by its skeleton. */
@@ -50,13 +53,16 @@ const SquareAvatar = memo(
         fallback,
         variant = 'square',
         initialsClassName,
+        loading,
         style,
         ...props
       },
       ref,
     ) => {
-      // In a loading scope the avatar is its skeleton, and its image is not fetched.
-      const held = useLoadingScope();
+      // ONE switch: while the host reads the person, or in a loading scope, the avatar is its skeleton, and its image
+      // is not fetched.
+      const inScope = useLoadingScope();
+      const held = inScope || !!loading;
       const authedSrc = useAuthedImageSrc(held ? undefined : src);
       if (held) {
         return <SquareAvatarSkeleton size={size} sizePx={sizePx} variant={variant} className={className} />;

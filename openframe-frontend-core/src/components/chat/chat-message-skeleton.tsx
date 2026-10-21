@@ -3,11 +3,15 @@
 import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 import { useChatAppearance } from './chat-appearance-context';
 import {
   CHAT_MESSAGE_FACE_PX,
   CHAT_MESSAGE_HEADER_CLASS,
+  CHAT_MESSAGE_LIST_COLUMN_CLASS,
+  CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
   CHAT_MESSAGE_ROW_PADDING_CLASS,
   CHAT_MESSAGE_SEGMENTS_CLASS,
   CHAT_MESSAGE_STACK_CLASS,
@@ -28,13 +32,19 @@ interface ChatMessageSkeletonProps {
    * another person answering (default false: the user's and the agent's turns show a face only).
    */
   showName?: boolean;
+  /**
+   * Whether the message carries its time. The loaded row writes it on the face line beside a name, else as a line
+   * under the message (at the right under the user's own bubble). Default true: a read message has its time.
+   */
+  showTime?: boolean;
   /** How many lines the message takes. Default 3 (a paragraph); 1 for single-line surfaces. */
   bodyLines?: number;
   /** The thread's appearance (its row padding); the surrounding chat's when not given. */
   appearance?: ChatAppearance;
-  /** One message of a read thread (`data-loading-item`): set by the list skeleton, like the loaded rows. */
-  listItem?: boolean;
 }
+
+/** The time line's bar: the `text-h6` time the loaded row writes. */
+const TIME_BAR_CLASS = 'w-14 shrink-0';
 
 /**
  * One message row while it is read: `ChatMessageEnhanced`'s own layout from its own class constants (the row's
@@ -46,24 +56,22 @@ export function ChatMessageSkeleton({
   showAvatar = true,
   isUser = false,
   showName = false,
+  showTime = true,
   bodyLines = 3,
   appearance: appearanceProp,
-  listItem = false,
+  ...props
 }: ChatMessageSkeletonProps) {
   const inherited = useChatAppearance();
   const appearance = appearanceProp ?? inherited;
   const lines = Math.max(1, bodyLines);
   return (
-    <div
-      className={cn('relative', CHAT_MESSAGE_ROW_PADDING_CLASS[appearance], className)}
-      {...(listItem ? { 'data-loading-item': '' } : undefined)}
-    >
+    <div className={cn('relative', CHAT_MESSAGE_ROW_PADDING_CLASS[appearance], className)} {...props}>
       <div className={CHAT_MESSAGE_STACK_CLASS}>
         {(showAvatar || showName) && (
           <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>
-            {showAvatar && <SquareAvatarSkeleton sizePx={CHAT_MESSAGE_FACE_PX} variant="round" />}
+            {showAvatar && <SquareAvatar loading sizePx={CHAT_MESSAGE_FACE_PX} variant="round" />}
             {showName && <TextLineSkeleton type="h6" className="w-24" />}
-            {showName && <TextLineSkeleton type="h6" className="ml-auto w-14 shrink-0" />}
+            {showName && showTime && <TextLineSkeleton type="h6" className={cn('ml-auto', TIME_BAR_CLASS)} />}
           </div>
         )}
         <div className={CHAT_MESSAGE_SEGMENTS_CLASS}>
@@ -79,6 +87,9 @@ export function ChatMessageSkeleton({
             </div>
           )}
         </div>
+        {showTime && !showName && (
+          <TextLineSkeleton type="h6" className={cn(TIME_BAR_CLASS, isUser && 'justify-self-end')} />
+        )}
       </div>
     </div>
   );
@@ -100,9 +111,8 @@ interface ChatMessageListSkeletonProps {
    * side gutters). Same semantics as the real list.
    */
   fullWidth?: boolean;
-  /** Extra classes on the content column (e.g. host-provided padding). The
-   *  host wrapper is expected to own the panel padding; this stays empty by
-   *  default so the skeleton sits flush. */
+  /** The content column's side padding, as `ChatMessageList`'s `contentClassName` (the list's own padding when not
+   *  given). */
   contentClassName?: string;
   /** Body lines per message row (forwarded to `ChatMessageSkeleton`). Default 3;
    *  pass 1 for single-line message surfaces. */
@@ -117,6 +127,11 @@ interface ChatMessageListSkeletonProps {
   fill?: boolean;
   /** The thread's appearance (its rows' padding), as `ChatMessageList`'s; the surrounding chat's when not given. */
   appearance?: ChatAppearance;
+  /**
+   * The thread holds another person's turns, written with their name and time on the face line (`ChatMessageList`
+   * with `selfAuthorType="admin"`: the technician reads the end user's replies). One row in three is such a turn.
+   */
+  namedOthers?: boolean;
 }
 
 export function ChatMessageListSkeleton({
@@ -129,29 +144,29 @@ export function ChatMessageListSkeleton({
   bodyLines,
   fill = false,
   appearance,
+  namedOthers = false,
 }: ChatMessageListSkeletonProps) {
+  // A typical thread: the viewer's own turn, then (where the thread has one) another person's named reply, then the
+  // agent.
   const messages = Array.from({ length: messageCount }, (_, index) => ({
     id: index,
     isUser: index % 3 === 0,
+    isNamedOther: namedOthers && index % 3 === 1,
   }));
 
   return (
     <LoadingRegion label="Loading messages" announce={region} className="relative flex min-h-0 flex-1 flex-col">
       <div
         className={cn(
-          'flex h-full w-full flex-1 flex-col',
-          fill
-            ? 'overflow-hidden'
-            : 'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30 overflow-y-auto overflow-x-hidden overscroll-contain [scroll-behavior:smooth]',
+          CHAT_MESSAGE_LIST_SCROLLER_CLASS,
+          fill ? 'overflow-hidden' : cn(CHAT_MESSAGE_LIST_SCROLLBAR_CLASS, 'overscroll-contain'),
           className,
         )}
       >
         <div
           className={cn(
-            fullWidth
-              ? 'flex w-full min-w-0 flex-col'
-              : 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col',
-            contentClassName,
+            CHAT_MESSAGE_LIST_COLUMN_CLASS[fullWidth ? 'full' : 'narrow'],
+            contentClassName ?? CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
           )}
           style={fill ? undefined : { minHeight: '100%' }}
         >
@@ -163,10 +178,12 @@ export function ChatMessageListSkeleton({
               key={message.id}
               showAvatar={showAvatars}
               isUser={message.isUser}
+              showName={message.isNamedOther}
               // The user's own turns are short: one line in the bubble, unless the surface states its line count.
               bodyLines={message.isUser ? (bodyLines ?? 1) : bodyLines}
               appearance={appearance}
-              listItem
+              // One message of a read thread, like the loaded rows.
+              data-loading-item
             />
           ))}
         </div>
