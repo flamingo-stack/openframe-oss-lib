@@ -6,6 +6,7 @@ import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import {
+  BUTTON_SIZE_CLASS,
   buttonSurfaceClasses,
   outlineBorderClasses,
   splitDividerColorClasses,
@@ -13,6 +14,9 @@ import {
 } from './button-styles';
 
 // Default layout: centered single content area, padding/gap on the button itself.
+/** The `icon-sm` button's size (its `h-8 w-8`), for a layout that must leave room for one. */
+export const BUTTON_ICON_SM_SIZE = '2rem';
+
 const buttonVariants = cva(
   [
     'relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]',
@@ -35,45 +39,7 @@ const buttonVariants = cva(
         overlay: buttonSurfaceClasses.overlay,
         link: buttonSurfaceClasses.link,
       },
-      size: {
-        default: 'h-11 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12',
-        small: 'h-6 p-[var(--spacing-system-xs)] text-h5 md:h-8',
-        // The CHILD is the affordance (a badge, a chip, a thumbnail): the button
-        // contributes the hit target, the focus ring and the keyboard/ARIA
-        // semantics, and NO box of its own. Without this, call sites reached for
-        // a `className="h-auto p-0"` override to cancel the default box.
-        wrap: 'h-auto p-0',
-        'small-legacy': 'h-10 px-[var(--spacing-system-m)] py-[var(--spacing-system-xs)] text-[14px] font-bold', // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
-        // 24px pill for slim strips (announcement/promo bars, inline banner
-        // actions — Primer banner / Polaris banner / Vercel-bar convention).
-        // The label matches the strip's MESSAGE type ramp exactly (DM Sans
-        // regular, 13px -> md:14px, snug leading — the announcement bar's
-        // subtitle styling): in-strip CTAs must never read louder than the
-        // message beside them, so this deliberately uses neither the
-        // mono-uppercase control style of "small" nor a heavier weight.
-        // Pinned h-6 across breakpoints (24px = the WCAG 2.5.8 target-size
-        // floor) with horizontal-dominant padding and a 14px glyph.
-        compact: 'h-6 px-[var(--spacing-system-sf)] py-0 font-normal text-h6 [&_svg]:h-3.5 [&_svg]:w-3.5',
-        icon: 'h-11 w-11 p-[var(--spacing-system-sf)] md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6',
-        // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
-        // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;
-        // ≥ the 24px WCAG 2.5.8 target floor). For icon actions that read as
-        // metadata rather than CTAs — author-page social rows, share rows.
-        // Pair with variant="transparent" for the ghost treatment.
-        'icon-sm': 'h-8 w-8 p-[var(--spacing-system-xxs)] [&_svg]:h-4 [&_svg]:w-4',
-        // 20px inline glyph for affordances that sit INSIDE a line of text —
-        // an info hint beside a badge, a copy glyph after an id. `icon-sm`'s
-        // 32px target is correct for a metadata row but visually swamps a
-        // 10px badge or a 14px label, so hosts were reaching for className
-        // overrides to shrink it. Below the WCAG 2.5.8 target floor on purpose:
-        // this is only for glyphs whose information is ALSO available another
-        // way (tooltip content mirrored into an aria-describedby node), never
-        // for a sole means of performing an action.
-        'icon-inline': 'h-5 min-h-0 w-5 min-w-0 shrink-0 p-0 [&_svg]:h-3.5 [&_svg]:w-3.5',
-        // Bare 56px media glyph (play / unmute over video). A size variant so
-        // hosts stop re-implementing a <button> to escape the 20px svg cap.
-        'icon-glyph': 'h-14 w-14 p-0 [&_svg]:h-14 [&_svg]:w-14',
-      },
+      size: BUTTON_SIZE_CLASS,
       // Label typography axis (Figma 133-740). `bold` is the classic h3-bold
       // label; `regular` swaps the DEFAULT size's label to the h4 step
       // (DM Sans 500, neutral tracking) — added for navigation buttons.

@@ -37,7 +37,6 @@ import { randomId } from '../../../utils/random-id';
 import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown';
 import { useOptionalTicketLive } from '../ticket-live-provider';
 import {
-  type AnyTicket,
   type MappedTicketActionError,
   type OptimisticTicket,
   type TicketActionErrorCode,
@@ -745,6 +744,3 @@ function resolveErrorCode(bodyCode: string | undefined, status: number): TicketA
   if (status === 412) return 'HUBSPOT_DISCONNECTED';
   return 'UNKNOWN';
 }
-
-// Re-export so callers can narrow the type when needed.
-export type { AnyTicket, OptimisticTicket };

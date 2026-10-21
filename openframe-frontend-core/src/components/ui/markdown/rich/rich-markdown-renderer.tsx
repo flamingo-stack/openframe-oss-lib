@@ -22,7 +22,7 @@ import {
   useRichMarkdownRuntime,
   type RichMarkdownRuntime,
 } from '../../../embeds/rich-markdown-runtime';
-import { MarkdownEngine, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
+import { MarkdownEngine, MarkdownEngineSkeleton, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
 import { resolveTextSizeConfig } from '../text-size';
 import { buildRichEmbedOverrides } from './embed-overrides';
 import { processShortcodes } from './shortcodes';
@@ -94,6 +94,8 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
   resolveSource,
   resolveLinkEndpointUrl,
   demoteMarkdownH1ToH2,
+  skeletonSections,
+  skeletonLines,
 }) => {
   const { ogScraperUrl } = useRichMarkdownRuntime();
 
@@ -148,6 +150,8 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       componentOverrides={componentOverrides}
       textSize="article"
       extraAllowedHtmlTags={RICH_EXTRA_TAGS}
+      skeletonSections={skeletonSections}
+      skeletonLines={skeletonLines}
     />
   );
 };
@@ -162,6 +166,8 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
   resolveSource = 'openframe-docs',
   resolveLinkEndpointUrl = '/api/docs/resolve-link',
   demoteMarkdownH1ToH2 = false,
+  skeletonSections,
+  skeletonLines,
   // Runtime overrides; provider fills the defaults
   redditProxyUrl,
   twitterProxyUrl,
@@ -185,6 +191,8 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
         resolveSource={resolveSource}
         resolveLinkEndpointUrl={resolveLinkEndpointUrl}
         demoteMarkdownH1ToH2={demoteMarkdownH1ToH2}
+        skeletonSections={skeletonSections}
+        skeletonLines={skeletonLines}
       />
     </RichMarkdownRuntimeProvider>
   );
@@ -201,3 +209,20 @@ type InnerProps = Omit<RichMarkdownRendererProps, keyof RichMarkdownRuntime> &
 
 /** Memoized — see the engine's memo rationale. */
 export const RichMarkdownRenderer = memo(RichMarkdownRendererImpl);
+
+/**
+ * A RichMarkdownRenderer while its content is read: the engine's skeleton at the `article` type, `sections`
+ * sections of a real `<h2>` holding a bar and its paragraphs (the renderer's own heading and paragraph classes).
+ */
+export function RichMarkdownRendererSkeleton({
+  sections,
+  title,
+  className,
+}: {
+  sections?: number;
+  /** The body opens with its own `# ` title (`MarkdownEngineSkeleton`'s `title`). */
+  title?: boolean;
+  className?: string;
+}) {
+  return <MarkdownEngineSkeleton sections={sections} title={title} textSize="article" className={className} />;
+}

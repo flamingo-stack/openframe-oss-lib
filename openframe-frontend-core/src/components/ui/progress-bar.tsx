@@ -3,6 +3,18 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useContentMdUp } from '../../hooks/ui/use-content-breakpoint';
+import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+
+/** The bar's height in px: below the content `md` step, and from it (the bar switches on the content's width). */
+export const PROGRESS_BAR_HEIGHT = { mobile: 8, desktop: 24 } as const;
+/** The same heights as a class (8px, 24px from `content-md`), read by the bar's box and by its skeleton. */
+const PROGRESS_BAR_HEIGHT_CLASS = 'h-2 content-md:h-6';
+
+/** The bar while its value is read: one box at the bar's own height, switched at the bar's own step. */
+export function ProgressBarSkeleton({ className }: { className?: string }) {
+  return <UnifiedSkeleton className={cn(PROGRESS_BAR_HEIGHT_CLASS, 'w-full rounded', className)} />;
+}
 
 type ProgressBarProps = {
   progress: number; // 0–100
@@ -23,8 +35,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   segmentWidth = 3.43,
   mobileSegmentWidth = 5,
   segmentGap = 2,
-  height = 24,
-  mobileHeight = 8,
+  height = PROGRESS_BAR_HEIGHT.desktop,
+  mobileHeight = PROGRESS_BAR_HEIGHT.mobile,
   inverted = false,
 }) => {
   const isMdUp = useContentMdUp() ?? true;
@@ -70,7 +82,18 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="flex w-full" style={{ gap: `${segmentGap}px` }}>
+    <div
+      ref={containerRef}
+      // The box holds the bar's height before its segments are counted: the default heights by the class the skeleton
+      // reads, a host's own by style.
+      className={cn(
+        'flex w-full',
+        height === PROGRESS_BAR_HEIGHT.desktop &&
+          mobileHeight === PROGRESS_BAR_HEIGHT.mobile &&
+          PROGRESS_BAR_HEIGHT_CLASS,
+      )}
+      style={{ gap: `${segmentGap}px` }}
+    >
       {Array.from({ length: segmentCount }).map((_, i) => (
         <div
           key={i}

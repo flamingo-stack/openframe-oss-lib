@@ -32,8 +32,6 @@ import { platformAccentVarName } from '../../../utils/platform-identity';
 import { iconFromSet, iconOf, lucideIcon, setIcon, type IconComponent, type IconRef } from './icon-loading';
 import { getIconComponent, normalizeIconKey, registryIcon } from './icon-registry';
 
-export type { IconComponent } from './icon-loading';
-
 // A sister platform's mark is drawn in THAT platform's brand colour (the
 // platform brand registry), never in the accent of the page showing it: on
 // flamingo.run the OpenMSP mark stays OpenMSP yellow, not flamingo pink.

@@ -42,6 +42,8 @@ export interface TimezoneSelectProps {
   clearable?: boolean;
   placeholder?: string;
   className?: string;
+  /** The zone is still being resolved or read: the field draws its skeleton (`Autocomplete`'s `fieldLoading`). */
+  loading?: boolean;
 }
 
 /**
@@ -56,11 +58,13 @@ export function TimezoneSelect({
   clearable = false,
   placeholder = 'Search timezone…',
   className,
+  loading = false,
 }: TimezoneSelectProps) {
   const options = useMemo(() => timezoneOptions(value), [value]);
   return (
     <Autocomplete
       className={className}
+      fieldLoading={loading}
       value={value || null}
       disabled={disabled}
       onChange={tz => {

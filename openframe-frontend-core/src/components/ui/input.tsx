@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { type InputHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { FieldWrapper } from './field-wrapper';
+import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** When true, renders error border & ring */
@@ -96,7 +97,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
       data-invalid={isInvalid || undefined}
       className={cn(
         // Layout & spacing
-        'flex h-11 w-full cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+        'flex w-full cursor-text items-center gap-2 border px-3',
+        INPUT_HEIGHT_CLASS,
+        INPUT_RADIUS_CLASS,
         // Focus-within states
         'has-[:focus-visible]:outline-none',
         'group',

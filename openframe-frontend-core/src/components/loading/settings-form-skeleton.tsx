@@ -17,7 +17,10 @@ export interface SettingsFormSkeletonProps {
  * A settings FORM while it loads: cards of labelled controls (a title and a
  * line, then label, help line and control per field), and the save row under
  * them.
+ *
+ * @deprecated Render the settings form itself inside a `LoadingScope`: its cards and fields draw their own skeletons. Kept so hosts on an older release keep compiling; nothing in the lib uses it.
  */
+// loading-standard-ok: deprecated re-export kept for external consumers
 export function SettingsFormSkeleton({ region = true, cards = [2, 3, 2, 2], className }: SettingsFormSkeletonProps) {
   return (
     <LoadingRegion

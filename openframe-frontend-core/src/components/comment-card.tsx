@@ -1,10 +1,18 @@
 'use client';
 
+import { TILE_SIZE } from '../styles/component-sizes';
+import { cn } from '../utils/cn';
 import { formatRelativeTime } from '../utils/date-utils';
 import { useAuth } from './auth-stub';
+import { TextLineSkeleton, UnifiedSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
+import { useLoadingScope } from './ui/loading-scope';
 import { UserSummary } from './user-summary-stub';
-import { VendorDisplayButton } from './vendor-display-button';
+import {
+  VENDOR_DISPLAY_BUTTON_FRAME_CLASS,
+  VENDOR_DISPLAY_BUTTON_LOGO_CLASS,
+  VendorDisplayButton,
+} from './vendor-display-button';
 
 /** The comment shape every comment surface renders (vendor reviews, design-doc and prompt threads). */
 export interface CommentCardComment {
@@ -60,6 +68,24 @@ interface CommentCardProps {
   children?: React.ReactNode;
 }
 
+// The card's boxes, read by the card AND its skeleton, so the two are one size at every width.
+const COMMENT_CARD_FRAME =
+  'group box-border w-full max-w-full overflow-hidden rounded-lg border border-ods-border bg-ods-card p-4 transition-all hover:border-ods-accent';
+const COMMENT_CARD_HEADER =
+  'mb-3 flex w-full flex-col gap-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between min-[420px]:gap-2';
+const COMMENT_CARD_LEAD = 'flex min-w-0 flex-1 items-center gap-2';
+const COMMENT_CARD_ACTIONS = 'flex justify-start gap-2 min-[420px]:justify-end';
+const COMMENT_CARD_TIME = 'flex-shrink-0 whitespace-nowrap text-ods-text-secondary text-h6';
+const COMMENT_CARD_CONTENT = 'w-full max-w-full space-y-2 overflow-hidden';
+/** The card's footer row (a thread's reply count, badges and Reply), loaded and loading. */
+const COMMENT_CARD_FOOTER = 'flex flex-wrap items-center gap-2 pt-2';
+const commentTitleRow = (compact: boolean) => (compact ? 'flex h-[20px] items-center' : 'flex h-[24px] items-center');
+const commentBodyRow = (compact: boolean) => (compact ? 'flex h-[60px] items-center' : 'flex h-[72px] items-center');
+/** The commenter header's avatar (UserSummary `compact`, `avatarSize`). */
+const COMMENT_CARD_AVATAR_PX = 48;
+/** The delete button's box (`Button` size `icon`). */
+const COMMENT_CARD_DELETE_BOX = TILE_SIZE.touch;
+
 export function CommentCard({
   comment,
   onViewProduct,
@@ -92,32 +118,41 @@ export function CommentCard({
 
   const showDeleteButton = canUserDeleteComment();
 
+  if (useLoadingScope()) {
+    return (
+      <>
+        <CommentCardSkeleton
+          leadWith={leadWith}
+          showTitle={!!comment.title}
+          showDelete={showDeleteButton && !!onDeleteComment}
+          compact={compact}
+        />
+        {children}
+      </>
+    );
+  }
+
   return (
     <>
-      <div
-        className="group box-border w-full max-w-full overflow-hidden rounded-lg border border-ods-border bg-ods-card p-4 transition-all hover:border-ods-accent"
-        style={{ maxWidth: '100%', wordBreak: 'break-word' }}
-      >
+      <div className={COMMENT_CARD_FRAME} style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
         {/* Comment Header */}
-        <div className="mb-3 flex w-full flex-col gap-3 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between min-[420px]:gap-2">
+        <div className={COMMENT_CARD_HEADER}>
           {/* Row 1: Info + Timestamp */}
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className={COMMENT_CARD_LEAD}>
             {leadWith === 'vendor' && comment.vendor ? (
               <>
                 {/* Vendor Button - Icon + Name */}
                 <VendorDisplayButton vendor={comment.vendor} onClick={onViewProduct || (() => {})} />
 
                 {/* Timestamp */}
-                <span className="flex-shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
-                  {formatActivityTime(comment.createdAt)}
-                </span>
+                <span className={COMMENT_CARD_TIME}>{formatActivityTime(comment.createdAt)}</span>
               </>
             ) : comment.user ? (
               <UserSummary
                 name={comment.user.name}
                 email=""
                 compact
-                avatarSize={48}
+                avatarSize={COMMENT_CARD_AVATAR_PX}
                 subtitle={formatActivityTime(comment.createdAt)}
                 avatarUrl={comment.user.profilePicture ?? null}
                 mspPreview={
@@ -138,7 +173,7 @@ export function CommentCard({
           </div>
 
           {/* Row 2: Action Buttons */}
-          <div className="flex justify-start gap-2 min-[420px]:justify-end">
+          <div className={COMMENT_CARD_ACTIONS}>
             {/* Delete Button - shown when user can delete the comment */}
             {showDeleteButton && onDeleteComment && (
               <Button
@@ -170,12 +205,9 @@ export function CommentCard({
         </div>
 
         {/* Comment Content */}
-        <div
-          className="w-full max-w-full space-y-2 overflow-hidden"
-          style={{ maxWidth: '100%', wordBreak: 'break-word' }}
-        >
+        <div className={COMMENT_CARD_CONTENT} style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
           {comment.title && (
-            <div className={compact ? 'flex h-[20px] items-center' : 'flex h-[24px] items-center'}>
+            <div className={commentTitleRow(compact)}>
               <h4
                 className="line-clamp-1 tracking-[-0.02em] text-ods-text-primary transition-colors text-h3 group-hover:text-ods-accent"
                 style={{
@@ -202,7 +234,7 @@ export function CommentCard({
               {comment.content}
             </p>
           ) : (
-            <div className={compact ? 'flex h-[60px] items-center' : 'flex h-[72px] items-center'}>
+            <div className={commentBodyRow(compact)}>
               <p
                 className="line-clamp-3 text-ods-text-primary text-h4"
                 style={{
@@ -220,10 +252,77 @@ export function CommentCard({
               </p>
             </div>
           )}
-          {footer ? <div className="flex flex-wrap items-center gap-2 pt-2">{footer}</div> : null}
+          {footer ? <div className={COMMENT_CARD_FOOTER}>{footer}</div> : null}
         </div>
       </div>
       {children}
     </>
+  );
+}
+
+/**
+ * A comment tile while it is read, in the card's own boxes: the header it leads with (the vendor button's outline
+ * with its logo box and a name bar, then a time bar; or the commenter's 48px avatar box with name and time bars), the
+ * delete button's box, the title as one `text-h3` line, and the body as the tile's three `text-h4` lines.
+ */
+export function CommentCardSkeleton({
+  leadWith = 'vendor',
+  showTitle = true,
+  showDelete = false,
+  compact = false,
+  footer,
+  className,
+}: {
+  leadWith?: 'vendor' | 'commenter';
+  showTitle?: boolean;
+  /** Draw the delete button's box (the viewer may delete the comment). */
+  showDelete?: boolean;
+  compact?: boolean;
+  /** The card's footer row as the loaded card draws it (its static controls, such as a thread's Reply). */
+  footer?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn(COMMENT_CARD_FRAME, className)} aria-hidden>
+      <div className={COMMENT_CARD_HEADER}>
+        <div className={COMMENT_CARD_LEAD}>
+          {leadWith === 'vendor' ? (
+            <>
+              <div className={VENDOR_DISPLAY_BUTTON_FRAME_CLASS}>
+                <UnifiedSkeleton className={VENDOR_DISPLAY_BUTTON_LOGO_CLASS} />
+                <TextLineSkeleton type="h4" className="w-28" />
+              </div>
+              <TextLineSkeleton type="h6" className="w-16 shrink-0" />
+            </>
+          ) : (
+            <div className="flex min-w-0 items-center gap-3">
+              <UnifiedSkeleton
+                className="shrink-0 rounded-lg"
+                width={COMMENT_CARD_AVATAR_PX}
+                height={COMMENT_CARD_AVATAR_PX}
+              />
+              <div className="min-w-0 flex-1">
+                <TextLineSkeleton type="h4" className="w-32" />
+                <TextLineSkeleton type="h6" className="w-16" />
+              </div>
+            </div>
+          )}
+        </div>
+        <div className={COMMENT_CARD_ACTIONS}>
+          {showDelete && <UnifiedSkeleton className={cn(COMMENT_CARD_DELETE_BOX, 'rounded-md')} />}
+        </div>
+      </div>
+      <div className={COMMENT_CARD_CONTENT}>
+        {showTitle && (
+          <div className={commentTitleRow(compact)}>
+            <TextLineSkeleton type="h3" className="w-2/3" />
+          </div>
+        )}
+        <div className={commentBodyRow(compact)}>
+          <TextLineSkeleton type="h4" lines={3} className="w-full" />
+        </div>
+        {footer ? <div className={COMMENT_CARD_FOOTER}>{footer}</div> : null}
+      </div>
+    </div>
   );
 }

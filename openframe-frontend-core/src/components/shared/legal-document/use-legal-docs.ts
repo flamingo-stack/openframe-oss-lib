@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { contentFetch } from '../../../utils/embed-content-fetch';
+import { useLoadingScope } from '../../ui/loading-scope';
 
 export interface LegalDocument {
   title: string;
@@ -179,7 +180,10 @@ export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {})
 
   // Fetch on mount (only if we don't already have server-provided initialData),
   // and on every explicit `refetch()`.
+  // In a loading scope nothing is fetched: the page draws what it was given.
+  const held = useLoadingScope();
   useEffect(() => {
+    if (held) return;
     if (initialData && reloadCount === 0) return;
 
     const requestId = ++requestIdRef.current;
@@ -228,7 +232,7 @@ export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {})
 
     // Never rejects — settles every failure into `error` state.
     void fetchDocument();
-  }, [docType, effectiveEndpoint, initialData, reloadCount]);
+  }, [docType, effectiveEndpoint, initialData, reloadCount, held]);
 
   const refetch = () => {
     // An explicit retry starts from a settled (usually errored) state, so it

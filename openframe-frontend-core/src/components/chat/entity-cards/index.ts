@@ -12,13 +12,22 @@ export {
   EntityAuthorCard,
   EntityMetadataValueCell,
   EntityMetadataAuthorCell,
+  EntityAuthorCardSkeleton,
+  EntityMetadataValueCellSkeleton,
+  EntityMetadataAuthorCellSkeleton,
+  type EntityAuthorCardSkeletonProps,
   EMPTY_AUTHOR_PLACEHOLDER,
   type EntityAuthorCardProps,
 } from './entity-author-card';
 export { BlogImagePlaceholder } from './blog-image-placeholder';
-export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPerson } from './entity-portrait-card';
+export {
+  EntityPortraitCard,
+  EntityPortraitCardSkeleton,
+  type EntityPortraitCardProps,
+  type EntityPortraitPerson,
+} from './entity-portrait-card';
 export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
-export { AdminContentCard } from './admin-content-card';
+export { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
 export {
   CONTENT_CARD_FRAME_CLASS,
   CONTENT_CARD_SKELETON_FRAME_CLASS,
@@ -28,7 +37,6 @@ export {
 export {
   AdminContentCardGrid,
   AdminContentCardGridSkeleton,
-  AdminContentCardSkeleton,
   ADMIN_CONTENT_CARD_GRID_CLASS,
   type AdminContentCardGridProps,
   type AdminContentCardGridSkeletonProps,
@@ -44,15 +52,20 @@ export type { AiPromptCardData, AiPromptCardProps } from './ai-prompt-card';
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card';
-export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
+export {
+  ChatTicketItem,
+  ChatTicketItemSkeleton,
+  type ChatTicketItemData,
+  type ChatTicketItemProps,
+} from './chat-ticket-item';
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
   ProductReleaseCard,
-  ProductReleaseCardSkeleton,
   type ProductReleaseCardProps,
   type ProductReleaseCardSize,
   type ProductReleaseCardAnchorProps,
-} from './product-release-card';
+} from '../../shared/product-release/product-release-card';
+export { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton';
 // Card-prop builders: `defaultBuildProductReleaseCardProps` (sm chat default) +
 // `buildProductReleaseCardProps` (RICH lg builder — the ProductReleasesView
 // default; lifted from the hub so embedders get the full metadata grid).
@@ -140,5 +153,5 @@ export {
 // Program author-ref + video-bites profile adapter — re-exported through the
 // PACKAGE-EXPORTED chat barrel so the hub can value-import them (deep paths
 // into chat/types/* are not in the package exports map and 404 at runtime).
-export { programItemToStripProfile, type ProgramAuthorRef } from '../types/entities/program-types';
+export { programItemToStripProfile, type ProgramAuthorRef } from '../../features/video-bites-shared';
 export { type MingoInfoCardAction, MingoInfoCardActionProvider } from '../mingo-info-card';

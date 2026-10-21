@@ -7,10 +7,12 @@ import { cn } from '../../utils/cn';
 import { Filter02Icon, SearchIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
 import { PageError } from '../ui/error-state';
-import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal';
+import { FilterModal, type FilterGroup } from '../ui/filter-modal';
 import { Input } from '../ui/input';
+import type { PageActionButton } from '../ui/page-actions';
+import type { SortConfig, SortDirection } from '../ui/sort-column-item';
 import type { TableFilters } from '../ui/table/types';
-import { ListPageContainer, type PageActionButton } from './page-container';
+import { ListPageContainer } from './page-container';
 
 export interface ListPageLayoutProps {
   title: string;
@@ -202,9 +204,6 @@ export function ListPageLayout({
     </ListPageContainer>
   );
 }
-
-// Re-export PageActionButton type for convenience
-export type { PageActionButton } from './page-container';
 
 /** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default ListPageLayout;

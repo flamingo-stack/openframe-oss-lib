@@ -85,6 +85,7 @@ class GatewayRouteAuthorizationTest {
             "/tools/agent/fleet/x, 401, 403, 200",
             "/ws/tools/agent/meshcentral/x, 401, 403, 200",
             "/clients/api/agents/heartbeat, 401, 403, 200",
+            "/clients/tool-agent/x, 401, 403, 200",
             "/ws/nats, 401, 200, 200",
             "/ws/nats-api, 401, 200, 200",
             "/chat/x, 401, 200, 200",
@@ -98,13 +99,13 @@ class GatewayRouteAuthorizationTest {
 
     @ParameterizedTest
     @CsvSource({"/clients/api/agents/register", "/clients/api/agents/reinstall", "/clients/api/agents/uninstall",
-            "/clients/api/release-version", "/clients/oauth/token", "/clients/metrics/x", "/clients/tool-agent/x", "/public/x"})
+            "/clients/api/release-version", "/clients/oauth/token", "/clients/metrics/x", "/public/x"})
     void shouldKeepPublicPathsOpen(String path) {
         assertThat(call(path, null)).isEqualTo(200);
     }
 
     @ParameterizedTest
-    @CsvSource({"/api/graphql", "/clients/api/agents/heartbeat"})
+    @CsvSource({"/api/graphql", "/clients/api/agents/heartbeat", "/clients/tool-agent/x"})
     void shouldRejectInvalidBearerEverywherePrivate(String path) {
         assertThat(call(path, "forged-token")).isEqualTo(401);
     }
