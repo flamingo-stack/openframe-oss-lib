@@ -32,6 +32,7 @@
 import type React from 'react';
 import {
   createElement,
+  forwardRef,
   useCallback,
   useEffect,
   useMemo,
@@ -40,6 +41,7 @@ import {
   useSyncExternalStore,
   type ComponentType,
 } from 'react';
+import Image from '../../embed-shims/next-image';
 import { useNearViewport } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
@@ -97,19 +99,40 @@ function subscribeToFilePlayer(listener: () => void): () => void {
 const loadedFilePlayer = () => filePlayer;
 const noFilePlayer = () => null;
 
-/** The player's box while its module loads: the poster at the player's own size, so nothing moves. */
-function FilePlayerFallback({ poster, className }: { poster?: string | null; className?: string }) {
+/**
+ * The video's box with its poster in it, until the player is drawn. The poster is a real image, not a CSS background:
+ * a background is found only after layout and is never ranked, so on a page whose video is the largest thing painted
+ * the poster arrived last (CU-17tkuw5xp4q). A `priority` video's poster is fetched at once and ranked high.
+ */
+const PosterBox = forwardRef<
+  HTMLDivElement,
+  { poster?: string | null; className?: string; priority?: boolean; fill?: boolean }
+>(function PosterBoxView({ poster, className, priority, fill }, ref) {
   return (
     <div
+      ref={ref}
       aria-hidden="true"
-      className={className}
-      style={{
-        width: '100%',
-        height: '100%',
-        ...(poster ? { backgroundImage: `url(${poster})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
-      }}
-    />
+      className={cn('relative overflow-hidden', className)}
+      style={fill ? { width: '100%', height: '100%' } : undefined}
+    >
+      {poster ? (
+        <Image src={poster} alt="" fill sizes="100vw" priority={priority} unoptimized className="object-cover" />
+      ) : null}
+    </div>
   );
+});
+
+/** The player's box while its module loads: the poster at the player's own size, so nothing moves. */
+function FilePlayerFallback({
+  poster,
+  className,
+  priority,
+}: {
+  poster?: string | null;
+  className?: string;
+  priority?: boolean;
+}) {
+  return <PosterBox poster={poster} className={className} priority={priority} fill />;
 }
 
 /**
@@ -132,14 +155,18 @@ function waitsForPlay(props: FilePlayerProps): boolean {
   );
 }
 
-function FilePlayer({ title, ...props }: FilePlayerProps & { title?: string }): React.ReactElement {
+function FilePlayer({
+  title,
+  priority,
+  ...props
+}: FilePlayerProps & { title?: string; priority?: boolean }): React.ReactElement {
   // Decided once: a video that started as a facade stays the player once pressed, whatever its props do later.
   const [facade] = useState(() => waitsForPlay(props));
   const [pressed, setPressed] = useState(false);
   if (facade && !pressed) {
     return (
       <div className={cn('relative', props.className)} style={{ width: '100%', height: '100%' }}>
-        <FilePlayerFallback poster={props.poster} className="absolute inset-0" />
+        <FilePlayerFallback poster={props.poster} className="absolute inset-0" priority={priority} />
         <button
           type="button"
           aria-label={title ? `Play: ${title}` : 'Play video'}
@@ -161,14 +188,14 @@ function FilePlayer({ title, ...props }: FilePlayerProps & { title?: string }): 
     );
   }
   // Pressed: the click is the visitor's gesture, so the player starts with sound (muted if the browser refuses).
-  return <LoadedFilePlayer {...props} {...(facade ? { autoPlayUnmuted: true } : {})} />;
+  return <LoadedFilePlayer {...props} priority={priority} {...(facade ? { autoPlayUnmuted: true } : {})} />;
 }
 
-function LoadedFilePlayer(props: FilePlayerProps): React.ReactElement {
+function LoadedFilePlayer({ priority, ...props }: FilePlayerProps & { priority?: boolean }): React.ReactElement {
   // The player's component when its module has arrived (a loaded module, drawn through `createElement`).
   const arrived = useSyncExternalStore(subscribeToFilePlayer, loadedFilePlayer, noFilePlayer);
   if (arrived) return createElement(arrived, props);
-  return <FilePlayerFallback poster={props.poster} className={props.className} />;
+  return <FilePlayerFallback poster={props.poster} className={props.className} priority={priority} />;
 }
 
 // =============================================================================
@@ -265,15 +292,11 @@ export function Video(props: VideoProps): React.ReactElement | null {
   if ((props.lazy ?? true) && !isNear) {
     // Same box, poster only: the observer target IS the reserved space.
     return wrapWithLayout(
-      <div
+      <PosterBox
         ref={nearRef}
+        poster={props.poster}
         className={props.className}
-        style={
-          props.poster
-            ? { backgroundImage: `url(${props.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-            : undefined
-        }
-        aria-hidden="true"
+        priority={'priority' in props ? props.priority : undefined}
       />,
       layout,
     );
@@ -302,6 +325,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
         url={url}
         poster={props.poster}
         title={props.title}
+        priority={props.priority}
         muted={props.muted}
         {...pickFilePlayback(props)}
         className={props.className}
