@@ -16,6 +16,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 /**
@@ -39,6 +40,9 @@ public class MeshControlFilteringWebSocketSessionDecorator implements WebSocketS
     private final String tenant;
     private final MeshControlCommandProperties props;
     private final ObjectMapper objectMapper;
+    /** A frame that is not a JSON command is almost always a tunnel this filter should not have been
+     *  wrapped around, and a tunnel carries thousands of frames: log it once, not once per frame. */
+    private final AtomicBoolean nonJsonLogged = new AtomicBoolean(false);
 
     public MeshControlFilteringWebSocketSessionDecorator(WebSocketSession webSocketSession, String path, String tenant,
                                                          MeshControlCommandProperties props, ObjectMapper objectMapper) {
@@ -87,9 +91,12 @@ public class MeshControlFilteringWebSocketSessionDecorator implements WebSocketS
         } catch (Exception e) {
             // Not JSON, or unparseable. Fail closed when enforcing: everything the frontend sends on
             // this channel is JSON with an action, so anything else is not a command we know how to
-            // vet.
-            log.warn("Mesh control frame is not a JSON command, {} path={} tenant={} : {}",
-                    props.isEnforce() ? "dropping" : "relaying", path, tenant, e.toString());
+            // vet. Worth looking at: it means either a probe or an endpoint that belongs in
+            // tunnelSuffixes, and in the second case enforcing would break that feature.
+            if (nonJsonLogged.compareAndSet(false, true)) {
+                log.warn("Mesh control frame is not a JSON command, {} (logged once per session) path={} tenant={} : {}",
+                        props.isEnforce() ? "dropping" : "relaying", path, tenant, e.toString());
+            }
             return dropOrRelay(message);
         }
         if (props.isAllowedAction(action)) {

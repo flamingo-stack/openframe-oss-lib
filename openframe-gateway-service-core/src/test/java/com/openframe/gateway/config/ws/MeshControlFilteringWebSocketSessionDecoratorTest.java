@@ -78,6 +78,9 @@ class MeshControlFilteringWebSocketSessionDecoratorTest {
         assertThat(props.isControlPath("/ws/tools/meshcentral-server/Control.ashx")).isTrue();
         assertThat(props.isControlPath("/ws/tools/meshcentral-server/control.ashx/")).isTrue();
         assertThat(props.isControlPath("/ws/tools/meshcentral-server/control%2Eashx")).isTrue();
+        // A tunnel keeps its exemption with a trailing slash, which is what makes stripping one
+        // unnecessary in the first place.
+        assertThat(props.isControlPath("/ws/tools/meshcentral-server/meshrelay.ashx/")).isFalse();
         // An endpoint nobody has listed is treated as a command channel, not waved through.
         assertThat(props.isControlPath("/ws/tools/meshcentral-server/something-new.ashx")).isTrue();
         // Outside the MeshCentral space the filter does not apply at all.

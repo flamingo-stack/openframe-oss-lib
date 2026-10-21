@@ -45,12 +45,11 @@ public class MeshControlCommandProperties {
      * the command channel unless it is one of {@link #tunnelSuffixes}.
      * <p>
      * Deliberately inverted. Matching only {@code /control.ashx} as a suffix leaves the filter open to
-     * every spelling Express accepts but a literal comparison does not: Express routes on the decoded
-     * path and, by default, is neither case sensitive ({@code caseSensitive=false}) nor strict about a
-     * trailing slash ({@code strict=false}), so {@code /Control.ashx}, {@code /control.ashx/} and
-     * {@code /control%2Eashx} all reach the same handler. Normalising covers those, but the next
-     * spelling would not be covered, whereas an unlisted tunnel shows up as a warning during the
-     * {@code enforce=false} phase, before anything is dropped.
+     * spellings Express accepts but a literal comparison does not: by default Express is neither case
+     * sensitive ({@code caseSensitive=false}) nor strict about a trailing slash ({@code strict=false}),
+     * so {@code /Control.ashx} and {@code /control.ashx/} reach the same handler. Normalising covers
+     * those, but the next spelling would not be, whereas an unlisted tunnel shows up as a warning
+     * during the {@code enforce=false} phase, before anything is dropped.
      */
     private List<String> pathPrefixes = List.of("/ws/tools/meshcentral-server/");
 
@@ -114,9 +113,12 @@ public class MeshControlCommandProperties {
                 .noneMatch(t -> p.endsWith("/" + t) || p.contains("/" + t + "/"));
     }
 
-    /** The path as Express sees it when it routes: query dropped, percent-decoded, lower case, no
-     *  trailing slash. A tunnel is matched both at the end of the path and as a segment of it, since
-     *  ipkvm.ashx routes with a wildcard and carries further segments. */
+    /** Query dropped, percent-decoded, lower case. A trailing slash needs no handling: the prefix
+     *  still matches with one, and a tunnel is matched as a path segment as well as at the end —
+     *  which is also what ipkvm.ashx needs, since it routes with a wildcard and carries further
+     *  segments. Decoding is belt and braces: Express matches the raw pathname, so an encoded
+     *  spelling probably never reaches the handler in the first place; treating it as the control
+     *  channel costs nothing if it does not. */
     private static String normalize(String path) {
         String p = path;
         int q = p.indexOf('?');
@@ -128,11 +130,7 @@ public class MeshControlCommandProperties {
         } catch (IllegalArgumentException e) {
             // Malformed escape: keep the raw form rather than letting it through unmatched.
         }
-        p = p.toLowerCase(Locale.ROOT);
-        while (p.length() > 1 && p.endsWith("/")) {
-            p = p.substring(0, p.length() - 1);
-        }
-        return p;
+        return p.toLowerCase(Locale.ROOT);
     }
 
     public boolean isAllowedAction(String action) {
