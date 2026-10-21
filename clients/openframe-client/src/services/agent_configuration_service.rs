@@ -122,3 +122,7 @@ impl AgentConfigurationService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "agent_configuration_service_tests.rs"]
+mod tests;

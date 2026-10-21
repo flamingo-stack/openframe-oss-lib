@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use crate::models::{DeviceTag, InitialConfiguration};
 use crate::platform::directories::DirectoryManager;
@@ -8,6 +9,8 @@ use crate::platform::directories::DirectoryManager;
 #[derive(Clone)]
 pub struct InitialConfigurationService {
     config_file_path: PathBuf,
+    // Serializes read-modify-write of the config so concurrent savers can't lose each other's fields.
+    write_lock: Arc<Mutex<()>>,
 }
 
 impl InitialConfigurationService {
@@ -18,7 +21,10 @@ impl InitialConfigurationService {
             .ensure_directories()
             .with_context(|| "Failed to ensure secured directory exists")?;
 
-        Ok(Self { config_file_path })
+        Ok(Self {
+            config_file_path,
+            write_lock: Arc::new(Mutex::new(())),
+        })
     }
 
     pub fn get_initial_key(&self) -> Result<String> {
@@ -62,6 +68,7 @@ impl InitialConfigurationService {
     }
 
     pub fn clear_remote_access_mode(&self) -> Result<()> {
+        let _guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         let mut config = self.get()?;
         config.remote_access_mode = None;
         self.save(&config)
@@ -96,23 +103,11 @@ impl InitialConfigurationService {
     }
 
     pub fn clear_initial_key(&self) -> Result<()> {
+        let _guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         let mut config = self.get()?;
         config.initial_key = String::new();
         self.save(&config)
             .context("Failed to save initial configuration to file")?;
-        Ok(())
-    }
-
-    pub fn is_initial_key_missing(&self) -> Result<bool> {
-        let config = self.get()?;
-        Ok(config.initial_key.is_empty())
-    }
-
-    pub fn update_initial_key(&self, initial_key: String) -> Result<()> {
-        let mut config = self.get()?;
-        config.initial_key = initial_key;
-        self.save(&config)
-            .context("Failed to save initial configuration with new initial key")?;
         Ok(())
     }
 

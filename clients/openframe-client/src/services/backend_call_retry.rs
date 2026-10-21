@@ -14,7 +14,7 @@ pub(crate) struct RetryTiming {
 }
 
 impl RetryTiming {
-    fn next(self, delay: Duration) -> Duration {
+    pub(crate) fn next(self, delay: Duration) -> Duration {
         delay.saturating_mul(2).min(self.max)
     }
 }

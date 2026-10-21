@@ -4,10 +4,11 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::time::{interval, Duration};
+use tokio::time::{interval, Duration, Instant};
 use tracing::{debug, error, info, warn};
 
 use crate::platform::DirectoryManager;
+use crate::services::backend_call_retry::RetryTiming;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::{
     AgentConfigurationService, InitialConfigurationService, InstalledToolsService, LogKeyService,
@@ -21,6 +22,12 @@ use super::log_source::{FileLogSource, LogSource, LogSourceKind, LogSourceRegist
 const BATCH_INTERVAL_SECS: u64 = 60;
 const MAX_LOGS_PER_BATCH: usize = 50;
 const RECONNECT_DELAY_SECS: u64 = 5;
+// Bounds the client's own retry loop so an abandoned connection stops dialing; the streaming loop rebuilds after that.
+const MAX_RECONNECT_ATTEMPTS: usize = 12;
+const REBUILD_TIMING: RetryTiming = RetryTiming {
+    initial: Duration::from_secs(60),
+    max: Duration::from_secs(600),
+};
 const KEY_CHECK_INTERVAL_SECS: u64 = 10;
 const SOURCE_DISCOVERY_INTERVAL_SECS: u64 = 30;
 const NATS_SUBJECT: &str = "agents.logs";
@@ -48,14 +55,42 @@ impl LogStreamKey {
     }
 }
 
+/// Flags the client's event callback raises for the streaming loop, which owns rebuilding the connection.
+#[derive(Default)]
+struct ConnectionState {
+    connected: AtomicBool,
+    // The gateway rejected the key on the handshake; cleared once a handshake succeeds.
+    key_rejected: AtomicBool,
+    // The client gave up reconnecting; it will never publish again.
+    exhausted: AtomicBool,
+}
+
+impl ConnectionState {
+    fn on_event(&self, event: &async_nats::Event) {
+        match event {
+            async_nats::Event::Connected => {
+                self.connected.store(true, Ordering::Relaxed);
+                self.key_rejected.store(false, Ordering::Relaxed);
+            }
+            async_nats::Event::Disconnected => self.connected.store(false, Ordering::Relaxed),
+            async_nats::Event::ClientError(async_nats::ClientError::MaxReconnects) => {
+                self.exhausted.store(true, Ordering::Relaxed)
+            }
+            async_nats::Event::ClientError(err) if is_authorization_error(&err.to_string()) => {
+                self.key_rejected.store(true, Ordering::Relaxed)
+            }
+            _ => {}
+        }
+    }
+}
+
 pub struct NatsLogConnection {
     jetstream: Option<jetstream::Context>,
     server_host: String,
     tenant_domain: String,
     key: LogStreamKey,
     machine_id: String,
-    // Raised by the event callback when the gateway rejects the key; the streaming loop then reconnects with a fresh one.
-    key_rejected: Arc<AtomicBool>,
+    state: Arc<ConnectionState>,
 }
 
 impl NatsLogConnection {
@@ -71,7 +106,7 @@ impl NatsLogConnection {
             tenant_domain,
             key,
             machine_id,
-            key_rejected: Arc::new(AtomicBool::new(false)),
+            state: Arc::new(ConnectionState::default()),
         }
     }
 
@@ -85,13 +120,14 @@ impl NatsLogConnection {
         );
 
         let tenant_domain = self.tenant_domain.clone();
-        let key_rejected = self.key_rejected.clone();
+        let state = self.state.clone();
         let (key_header, key_value) = self.key.header();
         let client = async_nats::ConnectOptions::new()
             .custom_header("x-tenant-domain", &self.tenant_domain)
             .custom_header(key_header, key_value)
             .custom_header(MACHINE_ID_HEADER, &self.machine_id)
             .retry_on_initial_connect()
+            .max_reconnects(Some(MAX_RECONNECT_ATTEMPTS))
             .reconnect_delay_callback(|attempt| {
                 let delay = Duration::from_secs(RECONNECT_DELAY_SECS);
                 error!("NATS logs: reconnecting, attempt {}", attempt);
@@ -99,8 +135,9 @@ impl NatsLogConnection {
             })
             .event_callback(move |event| {
                 let tenant = tenant_domain.clone();
-                let key_rejected = key_rejected.clone();
+                let state = state.clone();
                 async move {
+                    state.on_event(&event);
                     match event {
                         async_nats::Event::Connected => {
                             info!("NATS logs: connected (tenant={})", tenant);
@@ -112,11 +149,7 @@ impl NatsLogConnection {
                             error!("NATS logs: server error: {} (tenant={})", err, tenant);
                         }
                         async_nats::Event::ClientError(err) => {
-                            let text = err.to_string();
-                            if is_authorization_error(&text) {
-                                key_rejected.store(true, Ordering::Relaxed);
-                            }
-                            error!("NATS logs: client error: {} (tenant={})", text, tenant);
+                            error!("NATS logs: client error: {} (tenant={})", err, tenant);
                         }
                         _ => {}
                     }
@@ -131,8 +164,17 @@ impl NatsLogConnection {
         Ok(())
     }
 
-    pub fn key_rejected(&self) -> bool {
-        self.key_rejected.load(Ordering::Relaxed)
+    fn is_connected(&self) -> bool {
+        self.state.connected.load(Ordering::Relaxed)
+    }
+
+    fn key_rejected(&self) -> bool {
+        self.state.key_rejected.load(Ordering::Relaxed)
+    }
+
+    /// True when this client will not recover on its own and must be replaced.
+    fn needs_rebuild(&self) -> bool {
+        self.key_rejected() || self.state.exhausted.load(Ordering::Relaxed)
     }
 
     pub async fn publish(&self, payload: &LogBatchMessage) -> Result<()> {
@@ -160,6 +202,28 @@ impl NatsLogConnection {
 /// The gateway answers a rejected key with HTTP 401, which the NATS client reports as an authorization violation.
 fn is_authorization_error(client_error: &str) -> bool {
     client_error.contains("authorization violation")
+}
+
+/// Key for the connection that replaces a failed one.
+#[derive(Debug, PartialEq)]
+enum Replacement {
+    Use(LogStreamKey),
+    Fetch,
+    Keep,
+}
+
+/// A key on disk that differs from the rejected one wins; the same key must be fetched again; an exhausted client reuses what is on disk.
+fn replacement_for(
+    current: &LogStreamKey,
+    rejected: bool,
+    stored: Option<LogStreamKey>,
+) -> Replacement {
+    match (rejected, stored) {
+        (false, Some(key)) => Replacement::Use(key),
+        (false, None) => Replacement::Keep,
+        (true, Some(key)) if key != *current => Replacement::Use(key),
+        (true, _) => Replacement::Fetch,
+    }
 }
 
 pub struct LogStreamingRunManager {
@@ -294,26 +358,31 @@ impl LogStreamingRunManager {
         }
     }
 
-    /// The gateway rejected the key: reconnect with a freshly fetched log key.
-    async fn reconnect_with_fresh_key(&self, connection: &mut NatsLogConnection) {
-        let key = match self.log_key_service.refresh().await {
-            Ok(key) => LogStreamKey::Log(key),
-            Err(e) => {
-                warn!(
-                    "NATS logs: key rejected, could not fetch a fresh one: {:#}",
-                    e
-                );
-                match self.stored_key() {
-                    Some(key) if key != connection.key => key,
-                    _ => return,
+    /// Replaces a client whose key was rejected or whose reconnects ran out.
+    async fn rebuild(&self, connection: &mut NatsLogConnection) {
+        let key = match replacement_for(
+            &connection.key,
+            connection.key_rejected(),
+            self.stored_key(),
+        ) {
+            Replacement::Use(key) => key,
+            Replacement::Keep => return,
+            Replacement::Fetch => match self.log_key_service.refresh().await {
+                Ok(key) => LogStreamKey::Log(key),
+                Err(e) => {
+                    warn!(
+                        "NATS logs: key rejected, could not fetch a fresh one: {:#}",
+                        e
+                    );
+                    return;
                 }
-            }
+            },
         };
 
         let mut fresh = self.build_connection(key);
         match fresh.connect().await {
             Ok(()) => *connection = fresh,
-            Err(e) => error!("NATS logs: failed to reconnect with a fresh key: {:#}", e),
+            Err(e) => error!("NATS logs: failed to rebuild the connection: {:#}", e),
         }
     }
 
@@ -326,6 +395,8 @@ impl LogStreamingRunManager {
     ) {
         let mut ticker = interval(Duration::from_secs(BATCH_INTERVAL_SECS));
         let mut file_position: u64 = rotation_manager.load_offset();
+        let mut rebuild_delay = REBUILD_TIMING.initial;
+        let mut rebuild_allowed_at = Instant::now();
 
         loop {
             ticker.tick().await;
@@ -335,8 +406,12 @@ impl LogStreamingRunManager {
                 registry.register(source);
             }
 
-            if connection.key_rejected() {
-                self.reconnect_with_fresh_key(&mut connection).await;
+            if connection.is_connected() {
+                rebuild_delay = REBUILD_TIMING.initial;
+            } else if connection.needs_rebuild() && Instant::now() >= rebuild_allowed_at {
+                self.rebuild(&mut connection).await;
+                rebuild_allowed_at = Instant::now() + rebuild_delay;
+                rebuild_delay = REBUILD_TIMING.next(rebuild_delay);
             }
 
             let logs = registry.read_all(MAX_LOGS_PER_BATCH);
