@@ -43,9 +43,9 @@ import { CardHoverPlay } from '../../features/video-center-badge';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
-import { useLoadingScope } from '../../ui/loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
-import { Tag, TagSkeleton } from '../../ui/tag';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { SquareAvatar } from '../../ui/square-avatar';
+import { Tag } from '../../ui/tag';
 import type { BaseProgramItem, ProgramConfig, ProgramMedia, ProgramHost } from '../types/entities/program-types';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -59,7 +59,7 @@ import {
 } from '../utils/compact-card-classes';
 import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS, ContentCardFrame } from './content-card-frame';
-import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -146,7 +146,8 @@ export function ProgramCardSkeleton({
 }) {
   // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
   // that row's line height.
-  if (size === 'portrait') return <EntityPortraitCardSkeleton typeLabel={typeLabel} className={className} />;
+  if (size === 'portrait')
+    return <EntityPortraitCard loading href="" imageAlt="" title="" typeLabel={typeLabel} className={className} />;
   if (size === 'row') {
     return (
       <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, className)}>
@@ -173,7 +174,7 @@ export function ProgramCardSkeleton({
           </span>
           <TextLineSkeleton as="span" type="h4" lines={3} className="w-full" />
           <span className={EDITORIAL_PERSON_ROW}>
-            <SquareAvatarSkeleton {...EDITORIAL_PERSON_AVATAR} className="shrink-0" />
+            <SquareAvatar loading {...EDITORIAL_PERSON_AVATAR} className="shrink-0" />
             <TextLineSkeleton as="span" type="h6" className="w-40" />
           </span>
         </span>
@@ -200,25 +201,21 @@ export function ProgramCardSkeleton({
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
-              {Array.from({ length: DEFAULT_SKELETON_TAGS }, (_, i) => (
-                <TagSkeleton key={i} />
-              ))}
+              <LoadingItems count={DEFAULT_SKELETON_TAGS}>
+                {() => <Tag loading as="span" label="" variant="outline" />}
+              </LoadingItems>
             </div>
           )}
         </div>
         {hosts > 0 && (
           <div className={DEFAULT_HOSTS_ROW}>
-            {Array.from({ length: hosts }, (_, i) => (
-              <SquareAvatarSkeleton key={i} variant="round" size="sm" />
-            ))}
+            <LoadingItems count={hosts}>{() => <SquareAvatar loading variant="round" size="sm" />}</LoadingItems>
           </div>
         )}
       </div>
       {media > 0 && (
         <div className={DEFAULT_GALLERY_ROW}>
-          {Array.from({ length: media }, (_, i) => (
-            <UnifiedSkeleton key={i} className={DEFAULT_GALLERY_THUMB} />
-          ))}
+          <LoadingItems count={media}>{() => <UnifiedSkeleton className={DEFAULT_GALLERY_THUMB} />}</LoadingItems>
         </div>
       )}
       <div className={DEFAULT_FOOTER}>

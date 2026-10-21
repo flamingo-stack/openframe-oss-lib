@@ -1,6 +1,11 @@
 import { render, screen } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { FieldValueSkeleton } from '../field-value-skeleton';
+import { Input } from '../input';
+import { InputTrigger } from '../input-trigger';
+import { LoadingScope } from '../loading-scope';
+import { Select, SelectTrigger, SelectValue } from '../select';
 import { TAGS_INPUT_CLASS, TAGS_INPUT_ROW_CLASS, TagsInput, TagsInputSkeleton } from '../tags-input';
 import { TEXTAREA_BOX_CLASS, Textarea, TextareaSkeleton, textareaBoxHeight } from '../textarea';
 
@@ -49,5 +54,27 @@ describe('TagsInputSkeleton', () => {
     const without = renderToStaticMarkup(<TagsInputSkeleton label="Tags" />);
     const bars = (markup: string) => markup.split('aria-hidden="true"').length - 1;
     expect(bars(withLimit)).toBeGreaterThan(bars(without));
+  });
+});
+
+describe('FieldValueSkeleton', () => {
+  const bar = renderToStaticMarkup(<FieldValueSkeleton />);
+
+  it.each([
+    ['Input', <Input key="input" label="Name" defaultValue="Ada" />],
+    [
+      'SelectTrigger',
+      <Select key="select" value="a">
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+      </Select>,
+    ],
+    ['InputTrigger', <InputTrigger key="trigger" selectedLabel="Ada" />],
+  ])('is the value %s draws in a loading scope, never its value', (_name, field) => {
+    const loaded = renderToStaticMarkup(field);
+    const loading = renderToStaticMarkup(<LoadingScope>{field}</LoadingScope>);
+    expect(loaded).not.toContain(bar);
+    expect(loading).toContain(bar);
   });
 });

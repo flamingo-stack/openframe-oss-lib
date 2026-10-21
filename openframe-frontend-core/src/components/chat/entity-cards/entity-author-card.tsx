@@ -75,6 +75,9 @@ export interface EntityAuthorCardProps {
    *  holds. Defaults to false. */
   renderEmptyAuthor?: boolean;
   className?: string;
+  /** The record is still being read: the card draws its skeleton, its cells the ones the caller asked for (a
+   *  Published cell when `publishedAt` is passed at all, `null` included). A loading scope does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -259,8 +262,9 @@ export function EntityAuthorCard({
   extraCells,
   renderEmptyAuthor = false,
   className,
+  loading: loadingProp,
 }: EntityAuthorCardProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   // In a loading scope the card is its skeleton: its cells are the ones the caller asked for (a Published cell
   // when it passed `publishedAt` at all), never decided by data that is not read yet.
   if (loading) {

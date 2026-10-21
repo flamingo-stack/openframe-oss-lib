@@ -7,7 +7,7 @@ import { CardsStrip } from '../features/cards-strip';
 import { LoadingRegion } from '../loading/loading-region';
 import { Card } from '../ui/card';
 import { useLoadingScope } from '../ui/loading-scope';
-import { PersonCell, PersonCellSkeleton } from '../ui/people-cell';
+import { PersonCell } from '../ui/people-cell';
 
 /** One customer quote chip: the line, who said it, their logo, and the case study it opens. */
 export interface QuoteCard {
@@ -53,7 +53,7 @@ export function QuoteCardTileSkeleton({ className }: { className?: string }) {
   return (
     <Card variant="panel" className={cn(QUOTE_CARD_CLASS, className)}>
       <LoadingRegion label="Loading a customer story">
-        <PersonCellSkeleton size="lg" />
+        <PersonCell loading size="lg" />
       </LoadingRegion>
     </Card>
   );

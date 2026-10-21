@@ -25,7 +25,7 @@ import { type ReactNode, useCallback, useState } from 'react';
 import { toast as defaultToast } from '../../hooks/use-toast';
 import type { DataSync } from '../../types/data-sync';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
-import { ChatTicketItemSkeleton } from '../chat/entity-cards/chat-ticket-item';
+import { ChatTicketItem } from '../chat/entity-cards/chat-ticket-item';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
 import { usePageDataSync } from '../layout/page-data-sync';
@@ -33,7 +33,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
 import { DataSyncLine } from '../ui/data-attribution';
-import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, LoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { useTicketActions } from './hooks/use-ticket-actions';
 import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import { TicketOpenForm, type TicketOpenFormProps } from './ticket-open-form';
@@ -310,15 +310,13 @@ function TicketListHeader({
 function TicketListSkeleton() {
   return (
     <Card className="overflow-hidden">
-      {Array.from({ length: TICKETS_PAGE_SIZE }, (_, i) => (
-        <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-          key={i}
-          className={TICKET_ROW_FRAME_CLASS}
-        >
-          <ChatTicketItemSkeleton />
-        </div>
-      ))}
+      <LoadingItems count={TICKETS_PAGE_SIZE}>
+        {() => (
+          <div className={TICKET_ROW_FRAME_CLASS}>
+            <ChatTicketItem loading />
+          </div>
+        )}
+      </LoadingItems>
     </Card>
   );
 }

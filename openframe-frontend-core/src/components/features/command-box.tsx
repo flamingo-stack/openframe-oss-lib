@@ -53,6 +53,9 @@ export interface CommandBoxProps {
   onCopy?: () => void;
   /** Accessible label for the corner copy button */
   copyAriaLabel?: string;
+  /** The command is still being read: the box draws its skeleton, as tall as the command, its action labels real. A
+   *  loading scope does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -122,10 +125,11 @@ export function CommandBox({
   visibleLines,
   onCopy,
   copyAriaLabel = 'Copy command',
+  loading,
 }: CommandBoxProps) {
   const fixedHeight = visibleLines !== undefined && visibleLines > 0;
   // While the page is read the command is not known: the box is drawn as its skeleton, as tall as the command.
-  if (useLoadingScope()) {
+  if (useLoadingScope() || loading) {
     return (
       <CommandBoxSkeleton
         title={title}

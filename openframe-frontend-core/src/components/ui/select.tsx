@@ -6,9 +6,8 @@ import { type ComponentPropsWithoutRef, type ComponentRef, type ElementRef, forw
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { FieldValueSkeleton } from './field-value-skeleton';
 import { FieldWrapper } from './field-wrapper';
-import { FIELD_VALUE_SKELETON_CLASS } from './input-styles';
 import { useLoadingScope } from './loading-scope';
 import { usePortalContainer } from './portal-container';
 
@@ -69,7 +68,7 @@ const SelectTrigger = forwardRef<
       )}
       {...props}
     >
-      {inScope ? <TextLineSkeleton type="h4" className={FIELD_VALUE_SKELETON_CLASS} /> : children}
+      {inScope ? <FieldValueSkeleton /> : children}
       <SelectPrimitive.Icon asChild>
         <Chevron02DownIcon
           className={cn(

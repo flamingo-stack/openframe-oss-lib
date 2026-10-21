@@ -6,7 +6,7 @@ import { AvatarStack } from './avatar-stack';
 import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
 import { useLoadingScope } from './loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from './square-avatar';
+import { SquareAvatar } from './square-avatar';
 import { TruncateText } from './truncate-text';
 
 /**
@@ -46,6 +46,8 @@ export interface PersonCellProps {
    * (the landing quote chips).
    */
   size?: 'sm' | 'lg';
+  /** The person is still being read: the cell draws its skeleton at its size. A loading scope does the same. */
+  loading?: boolean;
 }
 
 const PERSON_CELL_SIZE = {
@@ -64,9 +66,10 @@ export function PersonCell({
   onClick,
   actionTitle,
   size = 'sm',
+  loading,
 }: PersonCellProps) {
-  // In a page's loading state the person is read: the cell is its skeleton.
-  if (useLoadingScope()) return <PersonCellSkeleton size={size} />;
+  // In a page's loading state (or while the host reads the person) the cell is its skeleton.
+  if (useLoadingScope() || loading) return <PersonCellSkeleton size={size} />;
   const displayName = name || fallbackName;
   const scale = PERSON_CELL_SIZE[size];
   const row = (
@@ -105,7 +108,7 @@ export function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['si
   const scale = PERSON_CELL_SIZE[size];
   return (
     <div className={`${PERSON_ROW_CLASS} ${scale.gap}`} aria-hidden>
-      <SquareAvatarSkeleton size={scale.avatar} />
+      <SquareAvatar loading size={scale.avatar} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TextLineSkeleton type={scale.primary} className="w-3/4" />
         <TextLineSkeleton type="h6" className="w-1/2" />

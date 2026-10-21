@@ -7,7 +7,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { SquareAvatar } from '../ui/square-avatar';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
@@ -118,8 +118,14 @@ function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
 // =============================================================================
 
 interface RowProps {
-  dialog: DialogItem;
-  isActive: boolean;
+  /** Absent while `loading`: the loading row needs no data. */
+  dialog?: DialogItem;
+  isActive?: boolean;
+  /** The dialog is still being read: the SAME row, its title slot a bar (no unread badge, no trailing cell: both are
+   *  read data most rows do not have). */
+  loading?: boolean;
+  /** The loading row's place in the list: picks its title bar's width. */
+  skeletonIndex?: number;
   onSelect?: (id: string) => void;
   onRequestRename?: (dialog: DialogItem) => void;
   onRequestCopyLink?: (dialog: DialogItem) => void;
@@ -129,28 +135,36 @@ interface RowProps {
 
 function MingoChatHistoryRow({
   dialog,
-  isActive,
+  isActive = false,
+  loading: loadingProp = false,
+  skeletonIndex = 0,
   onSelect,
   onRequestCopyLink,
   onRequestRename,
   onRequestCompact,
   onRequestArchive,
-}: RowProps) {
-  const title = dialog.title || 'Untitled Chat';
-  const unread = dialog.unreadMessagesCount ?? 0;
-  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink || !!onRequestCompact;
-  const owner = dialog.owner;
-  const hasAvatar = !!(owner?.name || owner?.avatarUrl);
+  ...props
+}: RowProps & { [key: `data-${string}`]: unknown }) {
+  // ONE switch: a row with no dialog yet is a loading row.
+  const loading = useLoadingScope() || loadingProp || !dialog;
+  const title = dialog?.title || 'Untitled Chat';
+  const unread = dialog?.unreadMessagesCount ?? 0;
+  const hasMenu = !loading && (!!onRequestRename || !!onRequestArchive || !!onRequestCopyLink || !!onRequestCompact);
+  const owner = dialog?.owner;
+  const hasAvatar = !loading && !!(owner?.name || owner?.avatarUrl);
   // Keep the `⋯` visible while its menu is open — once Radix moves focus into
   // the portalled content the row loses hover/focus-within.
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const menuItems = chatDialogMenuItems({
-    onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
-    onRename: onRequestRename && (() => onRequestRename(dialog)),
-    onCompact: onRequestCompact && (() => onRequestCompact(dialog)),
-    onArchive: onRequestArchive && (() => onRequestArchive(dialog)),
-  });
+  const menuItems = dialog
+    ? chatDialogMenuItems({
+        onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
+        onRename: onRequestRename && (() => onRequestRename(dialog)),
+        onCompact: onRequestCompact && (() => onRequestCompact(dialog)),
+        onArchive: onRequestArchive && (() => onRequestArchive(dialog)),
+      })
+    : [];
+  const select = () => dialog && onSelect?.(dialog.id);
 
   // The item is the full-width row (inside the group's bordered box). Padding
   // lives on the inner content button (badge + title) only — the `⋯` is a
@@ -158,45 +172,57 @@ function MingoChatHistoryRow({
   // the item but outside its padded content area.
   return (
     <div
-      data-loading-item
+      {...loadingItemProps(props)}
+      aria-hidden={loading || undefined}
       className={cn(
         HISTORY_ROW_CLASS,
         'group/row relative transition-colors',
         // Active (selected) dialog — Figma 259:91610: an accent-secondary
         // fill, a 4px accent bar down the leading edge, and accent-colored
         // title text. Inactive rows keep the dark surface with a hover tint.
-        isActive ? 'bg-ods-accent-secondary' : 'bg-ods-bg hover:bg-ods-bg-hover',
+        isActive ? 'bg-ods-accent-secondary' : cn('bg-ods-bg', !loading && 'hover:bg-ods-bg-hover'),
       )}
     >
       {isActive ? (
         <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-accent" />
       ) : null}
       <div
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect?.(dialog.id)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onSelect?.(dialog.id);
-          }
-        }}
+        role={loading ? undefined : 'button'}
+        tabIndex={loading ? undefined : 0}
+        onClick={loading ? undefined : select}
+        onKeyDown={
+          loading
+            ? undefined
+            : e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  select();
+                }
+              }
+        }
         className={cn(
           HISTORY_ROW_CONTENT_CLASS,
-          'flex min-w-0 flex-1 cursor-pointer items-center gap-[var(--spacing-system-xsf)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
+          'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]',
+          !loading &&
+            'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
         )}
       >
-        {unread > 0 ? (
+        {loading ? (
+          <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[skeletonIndex % SKELETON_TITLE_WIDTHS.length]} />
+        ) : null}
+        {!loading && unread > 0 ? (
           <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)] text-ods-text-on-accent text-h5">
             {unread > 99 ? '99+' : unread}
           </span>
         ) : null}
-        <span
-          className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-accent' : 'text-ods-text-primary')}
-          title={title}
-        >
-          {title}
-        </span>
+        {loading ? null : (
+          <span
+            className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-accent' : 'text-ods-text-primary')}
+            title={title}
+          >
+            {title}
+          </span>
+        )}
       </div>
       {hasMenu || hasAvatar ? (
         // Trailing 48px cell (Figma 113:63224): the owner avatar sits centred
@@ -247,7 +273,7 @@ function MingoChatHistoryRow({
             // the cell whenever the menu trigger is faded out). On desktop it
             // fades for the menu swap; on mobile it's always shown.
             <span
-              onClick={() => onSelect?.(dialog.id)}
+              onClick={select}
               title={owner?.name || undefined}
               className={cn(
                 'absolute inset-0 flex cursor-pointer items-center justify-center transition-opacity',
@@ -279,10 +305,8 @@ function MingoChatHistoryRow({
 
 /**
  * The history's loading state, shaped like the loaded list: the typical two date groups, each a group label over a
- * bordered box of `h-12` rows, one page of rows across them (`rows`, the host's page size), each a title bar (no
- * unread badge: a badge is read data most rows do not have). `bg-ods-bg` rows read a touch darker than the
- * `bg-ods-card` panel, like the loaded rows. Drawn by `MingoChatHistory` itself (`loading`, or inside a
- * `LoadingScope`).
+ * bordered box of rows, one page of rows across them (`rows`, the host's page size), each the row itself in its loading
+ * form (`MingoChatHistoryRow loading`). Drawn by `MingoChatHistory` itself (`loading`, or inside a `LoadingScope`).
  */
 function MingoChatHistorySkeleton({ rows, className }: { rows: number; className?: string }) {
   const perGroup = Math.ceil(rows / HISTORY_SKELETON_GROUPS);
@@ -301,14 +325,9 @@ function MingoChatHistorySkeleton({ rows, className }: { rows: number; className
           {/* Group label (Today / Yesterday / Older): read from the dialogs' dates. */}
           <TextLineSkeleton type="h5" className="w-16" />
           <div className={HISTORY_GROUP_BOX_CLASS}>
-            {Array.from({ length: count }, (_, i) => (
-              <div key={i} data-loading-item className={cn(HISTORY_ROW_CLASS, HISTORY_ROW_CONTENT_CLASS, 'bg-ods-bg')}>
-                <TextLineSkeleton
-                  type="h4"
-                  className={SKELETON_TITLE_WIDTHS[(group * perGroup + i) % SKELETON_TITLE_WIDTHS.length]}
-                />
-              </div>
-            ))}
+            <LoadingItems count={count}>
+              {i => <MingoChatHistoryRow loading data-loading-item skeletonIndex={group * perGroup + i} />}
+            </LoadingItems>
           </div>
         </div>
       ))}
@@ -423,6 +442,7 @@ export function MingoChatHistory({
                   {group.items.map(dialog => (
                     <MingoChatHistoryRow
                       key={dialog.id}
+                      data-loading-item
                       dialog={dialog}
                       isActive={dialog.id === activeDialogId}
                       onSelect={onSelectDialog}

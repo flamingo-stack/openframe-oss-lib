@@ -8,7 +8,7 @@ import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { useLoadingScope } from '../ui/loading-scope';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { useCaptions } from './use-captions';
-import { Video, VideoSkeleton } from './video';
+import { Video } from './video';
 import { DEFAULT_VIDEO_BITES_TITLE, type VideoBiteStripProfile } from './video-bites-shared';
 import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
 
@@ -230,11 +230,11 @@ export function EntityVideoSection({
 }
 
 /**
- * The video section while its record is read: the centered player box (`VideoSkeleton`), under the real static
+ * The video section while its record is read: the centered player box (`Video loading`), under the real static
  * "Full Video" / "Highlights" tab row when `tabs` (a record that has both). Its classes are the section's own.
  */
 export function EntityVideoSectionSkeleton({ tabs = false, className }: { tabs?: boolean; className?: string }) {
-  if (!tabs) return <VideoSkeleton layout="centered" className={className} />;
+  if (!tabs) return <Video loading url="" layout="centered" className={className} />;
   // The real tabs (static labels): TabsTrigger draws its own box in a scope. `inert`: nothing in it can be focused or clicked.
   return (
     <Tabs defaultValue="full-video" className={cn('w-full', className)} aria-hidden inert>
@@ -247,7 +247,7 @@ export function EntityVideoSectionSkeleton({ tabs = false, className }: { tabs?:
         </TabsTrigger>
       </TabsList>
       <TabsContent value="full-video" className={VIDEO_TAB_CONTENT_CLASS}>
-        <VideoSkeleton layout="centered" />
+        <Video loading url="" layout="centered" />
       </TabsContent>
     </Tabs>
   );

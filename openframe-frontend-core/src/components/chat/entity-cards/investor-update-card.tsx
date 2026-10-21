@@ -25,8 +25,8 @@ import {
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
 import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
-import { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
-import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+import { AdminContentCard } from './admin-content-card';
+import { EntityPortraitCard } from './entity-portrait-card';
 
 /** The content-type chip a portrait investor update shows (a static label). */
 const INVESTOR_UPDATE_TYPE_LABEL = 'Investor Update';
@@ -65,7 +65,11 @@ export function InvestorUpdateCardSkeleton({
 }) {
   if (size === 'portrait') {
     return (
-      <EntityPortraitCardSkeleton
+      <EntityPortraitCard
+        loading
+        href=""
+        imageAlt=""
+        title=""
         typeLabel={showTypeBadge ? INVESTOR_UPDATE_TYPE_LABEL : undefined}
         className={className}
       />
@@ -74,7 +78,7 @@ export function InvestorUpdateCardSkeleton({
   if (size === 'default') {
     return (
       <div className={`block h-full ${className ?? ''}`}>
-        <AdminContentCardSkeleton actions={false} subtitleRow={false} />
+        <AdminContentCard loading title="" subtitleRow={false} />
       </div>
     );
   }

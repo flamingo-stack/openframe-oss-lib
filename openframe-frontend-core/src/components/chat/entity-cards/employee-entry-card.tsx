@@ -3,7 +3,7 @@ import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
-import { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
+import { AdminContentCard } from './admin-content-card';
 
 /** The fields every people-hub employee entry shares. Entity-specific bindings
  *  (`WhatIShippedCard`, `HowIWorkCard`) map their own date column to `dateLabel`
@@ -120,7 +120,7 @@ export function EmployeeEntryCard({
       actions={actions}
       // Every row keeps its space, so every card in a rail or a grid is one
       // height with its rows aligned, and `EmployeeEntryCardSkeleton` (the
-      // shared AdminContentCardSkeleton) matches it box for box.
+      // shared `AdminContentCard loading`) matches it box for box.
       reserveRows
       // An entry has no subtitle line: nothing to reserve between title and summary.
       subtitleRow={false}
@@ -143,5 +143,5 @@ export function EmployeeEntryCard({
  * owner action row (the dashboards); a read-only card (rails) has none.
  */
 export function EmployeeEntryCardSkeleton({ className, actions = false }: { className?: string; actions?: boolean }) {
-  return <AdminContentCardSkeleton className={className} actions={actions} subtitleRow={false} />;
+  return <AdminContentCard loading title="" className={className} actions={actions} subtitleRow={false} />;
 }

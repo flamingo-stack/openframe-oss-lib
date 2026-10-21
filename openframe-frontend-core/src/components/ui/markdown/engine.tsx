@@ -186,6 +186,11 @@ export interface MarkdownEngineProps {
   skeletonSections?: number;
   /** Lines of the one paragraph a loading body draws when it names no sections. Default 3. */
   skeletonLines?: number;
+  /** A loading body opens with its own `# ` title (a legal document's): its title row is drawn first. */
+  skeletonTitle?: boolean;
+  /** The content is still being read: the body draws its skeleton (the `skeleton*` shape). A loading scope does the
+   *  same while `content` is empty. */
+  loading?: boolean;
 }
 
 /** Lines a loading body draws when its caller names no shape. */
@@ -424,11 +429,12 @@ export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEn
   // In a page's loading state with no content yet (it is read) the body is its skeleton; content it is given
   // there is the page's own and renders as it is.
   const inScope = useLoadingScope();
-  if (inScope && !props.content) {
+  if ((inScope && !props.content) || props.loading) {
     return (
       <MarkdownEngineSkeleton
         sections={props.skeletonSections}
         lines={props.skeletonLines}
+        title={props.skeletonTitle}
         textSize={props.textSize}
         className={props.className}
       />

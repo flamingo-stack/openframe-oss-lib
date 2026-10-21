@@ -7,7 +7,6 @@ import type { SortableDragHandleProps } from '../features/sortable-list/use-sort
 import { DraggerIcon } from '../icons-v2-generated/interface/dragger-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { InfoCircleIcon } from '../icons-v2-generated/signs-and-symbols/info-circle-icon';
-import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
 import { Input } from './input';
@@ -45,8 +44,8 @@ export interface TicketStatusConfigRowProps {
    */
   moveButtons?: ReactNode;
   /**
-   * The status is still being read: the row keeps its layout and its labels, and every read part (the name, the
-   * color, the chip, the delete button) is a skeleton of its own size. A loading scope does the same.
+   * The status is still being read: the row keeps its layout, its labels and its delete button (real, inert), and
+   * every read part (the name, the color, the chip) draws its own loading form. A loading scope does the same.
    */
   loading?: boolean;
 }
@@ -185,10 +184,15 @@ export function TicketStatusConfigRow({
               <ColorPresetSelect value={color ?? ''} presetKey={presetKey} onChange={onColorChange ?? noop} />
             </LoadingWhen>
             {/* Custom hex: a second field row inside the Color column, directly
-                under the select (per design). Its presence is read data: not drawn while loading. */}
-            {!loading && onColorChange && color !== undefined && isCustomColor && (
+                under the select (per design). Drawn for a row whose color is known to be custom; the field draws its
+                own loading form. */}
+            {onColorChange && color !== undefined && isCustomColor && (
               <div className="mt-[var(--spacing-system-xxs)] flex min-w-0">
-                <ColorPickerInput value={color} onChange={next => onColorChange({ color: next, preset: undefined })} />
+                <ColorPickerInput
+                  value={color}
+                  onChange={next => onColorChange({ color: next, preset: undefined })}
+                  loading={loading}
+                />
               </div>
             )}
           </div>
@@ -251,35 +255,28 @@ export function TicketStatusConfigRow({
                 </button>
               </TouchFriendlyTooltip>
             </div>
-          ) : loading ? (
-            <InteractiveSkeleton.Button size="icon" className={DELETE_BUTTON_SIZE_CLASS} />
           ) : (
-            <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Delete status"
-                  disabled={deleteDisabled}
-                  onClick={deleteDisabled ? undefined : onDelete}
-                  className={cn(DELETE_BUTTON_SIZE_CLASS, deleteDisabled && 'pointer-events-none')}
-                >
-                  <TrashIcon className="text-ods-error" />
-                </Button>
-              </span>
-            </TouchFriendlyTooltip>
+            // The delete button is a static control: drawn for real in both forms, inert while the status is read.
+            <span inert={loading || undefined} aria-hidden={loading || undefined} className="inline-flex">
+              <TouchFriendlyTooltip content={deleteDisabled && !loading ? deleteDisabledReason : undefined}>
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Delete status"
+                    disabled={deleteDisabled}
+                    onClick={deleteDisabled ? undefined : onDelete}
+                    className={cn(DELETE_BUTTON_SIZE_CLASS, deleteDisabled && 'pointer-events-none')}
+                  >
+                    <TrashIcon className="text-ods-error" />
+                  </Button>
+                </span>
+              </TouchFriendlyTooltip>
+            </span>
           )}
         </div>
       </div>
     </div>
   );
-}
-
-/**
- * A status row while it is read: the row itself in its loading form (labels real, every read part a skeleton).
- * `variant` is the row's kind when the host knows it; a list that knows nothing yet draws `custom` rows.
- */
-export function TicketStatusConfigRowSkeleton({ variant = 'custom' }: { variant?: 'system' | 'custom' }) {
-  return <TicketStatusConfigRow variant={variant} statusKey="" name="" onColorChange={noop} loading />;
 }

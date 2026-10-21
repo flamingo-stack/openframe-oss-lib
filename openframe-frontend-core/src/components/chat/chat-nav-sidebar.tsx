@@ -3,7 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
 export interface ChatNavSidebarItem {
@@ -132,7 +132,11 @@ export interface ChatListItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   index?: number;
 }
 
-/** The row's box, shared by the loaded row and its skeleton so both take the same space. */
+/** A loading chat row's title widths, cycled by index: a believable spread, the same on every load. Shared by every
+ *  chat list's loading rows. */
+export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
+
+/** The row's box, loaded and loading. */
 const CHAT_LIST_ITEM_CLASS =
   'flex w-full shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left';
 
@@ -140,22 +144,49 @@ const CHAT_LIST_ITEM_CLASS =
  * One row of the `ChatNavSidebar` list (Figma `chat-list-item`): a one-line
  * title over a caption, an optional mark before the title and a status glyph
  * at the end. The selected row takes the accent's secondary fill, so a tenant
- * accent recolours it with the rest of the brand. Inside a `LoadingScope` it
- * draws its own skeleton ({@link ChatListItemSkeleton}).
+ * accent recolours it with the rest of the brand. ONE switch (`useLoadingScope() || loading`): while the chat is read
+ * the SAME row (an inert `div`) draws its title, caption and trailing text as bars; the `leading` mark stays.
  */
 const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
-  ({ className, title, subtitle, leading, trailing, active, loading = false, index = 0, ...props }, ref) => {
-    // ONE switch: while the host reads the chat, or in a loading scope, the row is its skeleton, carrying the row's
-    // markers.
-    if (useLoadingScope() || loading) {
+  (
+    { className, title, subtitle, leading, trailing, active, loading: loadingProp = false, index = 0, ...props },
+    ref,
+  ) => {
+    const loading = useLoadingScope() || loadingProp;
+    const content = (
+      <>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
+            {leading && <span className="flex shrink-0 items-center [&_svg]:size-4">{leading}</span>}
+            {loading ? (
+              <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length]} />
+            ) : (
+              <span
+                className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
+              >
+                {title}
+              </span>
+            )}
+          </span>
+          {subtitle != null &&
+            (loading ? (
+              <TextLineSkeleton type="h6" className="w-1/3" />
+            ) : (
+              <span className={cn('truncate text-h6', active ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
+                {subtitle}
+              </span>
+            ))}
+        </span>
+        {loading
+          ? trailing != null && <TextLineSkeleton type="h6" className="w-12 shrink-0" />
+          : trailing && <span className="flex shrink-0 items-center [&_svg]:size-6">{trailing}</span>}
+      </>
+    );
+    if (loading) {
       return (
-        <ChatListItemSkeleton
-          subtitle={subtitle != null}
-          trailing={trailing != null}
-          index={index}
-          className={className}
-          {...loadingItemProps(props)}
-        />
+        <div aria-hidden className={cn(CHAT_LIST_ITEM_CLASS, className)} {...loadingItemProps(props)}>
+          {content}
+        </div>
       );
     }
     return (
@@ -171,61 +202,13 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
         )}
         {...props}
       >
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
-            {leading && <span className="flex shrink-0 items-center [&_svg]:size-4">{leading}</span>}
-            <span
-              className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
-            >
-              {title}
-            </span>
-          </span>
-          {subtitle != null && (
-            <span className={cn('truncate text-h6', active ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
-              {subtitle}
-            </span>
-          )}
-        </span>
-        {trailing && <span className="flex shrink-0 items-center [&_svg]:size-6">{trailing}</span>}
+        {content}
       </button>
     );
   },
 );
 
 ChatListItem.displayName = 'ChatListItem';
-
-/** A loading chat row's title widths, cycled by index: a believable spread, the same on every load. Shared by every
- *  chat list's loading rows. */
-export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
-
-interface ChatListItemSkeletonProps extends HTMLAttributes<HTMLDivElement> {
-  /** Draw the caption line (the loaded row has a `subtitle`). */
-  subtitle?: boolean;
-  /** Draw a short bar at the row's end (the loaded row has `trailing` text, e.g. a time). */
-  trailing?: boolean;
-  /** The row's place in its list: picks the title bar's width. */
-  index?: number;
-}
-
-/** {@link ChatListItem}'s loading state: the same box, a title bar, and the caption and trailing parts the loaded row
- *  has. */
-function ChatListItemSkeleton({
-  subtitle = false,
-  trailing = false,
-  index = 0,
-  className,
-  ...props
-}: ChatListItemSkeletonProps) {
-  return (
-    <div aria-hidden className={cn(CHAT_LIST_ITEM_CLASS, className)} {...props}>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length]} />
-        {subtitle && <TextLineSkeleton type="h6" className="w-1/3" />}
-      </span>
-      {trailing && <TextLineSkeleton type="h6" className="w-12 shrink-0" />}
-    </div>
-  );
-}
 
 /**
  * A chat list's first page while it is read: `count` loading {@link ChatListItem} rows (the list's page size), each a
@@ -240,18 +223,20 @@ function ChatListItemLoadingPage({
   subtitle?: boolean;
   trailing?: boolean;
 }) {
-  return Array.from({ length: count }, (_, index) => (
-    <ChatListItem
-      // Static placeholder rows: the index IS the identity.
-      key={index}
-      loading
-      index={index}
-      title=""
-      subtitle={subtitle ? '' : undefined}
-      trailing={trailing ? '' : undefined}
-      data-loading-item
-    />
-  ));
+  return (
+    <LoadingItems count={count}>
+      {index => (
+        <ChatListItem
+          loading
+          index={index}
+          title=""
+          subtitle={subtitle ? '' : undefined}
+          trailing={trailing ? '' : undefined}
+          data-loading-item
+        />
+      )}
+    </LoadingItems>
+  );
 }
 
 export { ChatNavSidebar, ChatListItem, ChatListItemLoadingPage };

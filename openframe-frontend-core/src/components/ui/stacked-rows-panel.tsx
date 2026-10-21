@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from './loading-scope';
 
 /**
  * StackedRowsPanel — a single bordered card that stacks rows inside it.
@@ -69,8 +69,10 @@ export interface StackedRowsPanelProps {
   /** Optional uppercase caption rendered above the card. */
   title?: string;
   className?: string;
-  /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty). */
-  skeleton?: StackedRowsPanelSkeletonShape;
+  /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty): how many rows (default
+   *  3), how many value/label columns each carries (default 1, a full-width title/caption row), and whether each cell
+   *  carries a label under its value (default `true`). */
+  skeleton?: { rows?: number; columns?: number; labels?: boolean };
   /**
    * The rows are a read list (how many there are is the data's, and a loading state draws a fold of them): every
    * row carries `data-loading-item`. Default false (a panel of fixed fields).
@@ -78,18 +80,8 @@ export interface StackedRowsPanelProps {
   listItems?: boolean;
 }
 
-/** How many rows a loading panel draws, and how many value/label columns each carries. */
-export interface StackedRowsPanelSkeletonShape {
-  /** Rows drawn. Default {@link STACKED_ROWS_SKELETON_COUNT}. */
-  rows?: number;
-  /** Columns per row; one is a full-width title/caption row. Default 1. */
-  columns?: number;
-  /** Each cell carries a label under its value. Default `true`. */
-  labels?: boolean;
-}
-
 /** Rows a loading panel draws when its caller names no count. */
-export const STACKED_ROWS_SKELETON_COUNT = 3;
+const STACKED_ROWS_SKELETON_COUNT = 3;
 
 const ALIGN_CLASS: Record<PanelColumnAlign, string> = {
   left: 'justify-start items-start',
@@ -187,7 +179,8 @@ function PanelCell({ column }: { column: PanelColumn }) {
   );
 }
 
-function PanelRowView({ row, ...item }: { row: PanelRow }) {
+function PanelRowView({ row, ...props }: { row: PanelRow; [key: `data-${string}`]: unknown }) {
+  const item = loadingItemProps(props);
   // Arbitrary content (e.g. a nested table): keep it edge-to-edge unless the caller
   // overrides via `className`. No fixed height — let the content size itself.
   if (row.content !== undefined) {
@@ -214,24 +207,9 @@ function PanelRowView({ row, ...item }: { row: PanelRow }) {
   );
 }
 
-export function StackedRowsPanel({ rows, title, className, skeleton, listItems = false }: StackedRowsPanelProps) {
-  // In a page's loading state with no rows yet (they are read) the panel is its skeleton; rows it is given there
-  // are the page's own copy and draw as they are.
-  const inScope = useLoadingScope();
-  if (inScope && rows.length === 0)
-    return <StackedRowsPanelSkeleton {...skeleton} title={title} className={className} listItems={listItems} />;
-  const card = (
-    <div className={CARD_CLASS}>
-      {rows.map(row => (
-        <PanelRowView key={row.id} row={row} data-loading-item={listItems || undefined} />
-      ))}
-    </div>
-  );
-
-  if (!title) {
-    return <div className={className}>{card}</div>;
-  }
-
+/** The panel's frame, loaded and loading: the optional uppercase title (static copy) over the card. */
+function PanelFrame({ title, className, card }: { title?: string; className?: string; card: ReactNode }) {
+  if (!title) return <div className={className}>{card}</div>;
   return (
     <div className={cn(TITLED_CLASS, className)}>
       <p className={TITLE_CLASS}>{title}</p>
@@ -240,41 +218,49 @@ export function StackedRowsPanel({ rows, title, className, skeleton, listItems =
   );
 }
 
-/**
- * A StackedRowsPanel while its rows are read: the same card and row heights, each cell's value a `text-h4` bar
- * over its label's `text-h6` bar. The title above the card is the page's own and draws as it is.
- */
-export function StackedRowsPanelSkeleton({
-  rows = STACKED_ROWS_SKELETON_COUNT,
-  columns = 1,
-  labels = true,
-  title,
-  className,
-  listItems = false,
-}: StackedRowsPanelSkeletonShape & Pick<StackedRowsPanelProps, 'title' | 'className' | 'listItems'>) {
-  const card = (
-    <div className={CARD_CLASS} aria-hidden>
-      {Array.from({ length: rows }, (_, row) => (
-        <div
-          key={row}
-          className={columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS}
-          {...(listItems ? { 'data-loading-item': '' } : undefined)}
-        >
-          {Array.from({ length: columns }, (_cell, column) => (
-            <div key={column} className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
-              <TextLineSkeleton type="h4" className="w-1/2" />
-              {labels && <TextLineSkeleton type="h6" className="w-3/4" />}
-            </div>
-          ))}
-        </div>
+export function StackedRowsPanel({ rows, title, className, skeleton, listItems = false }: StackedRowsPanelProps) {
+  // In a page's loading state with no rows yet (they are read) the panel draws its loading rows in the same frame;
+  // rows it is given there are the page's own copy and draw as they are.
+  const loading = useLoadingScope() && rows.length === 0;
+  const marker = { 'data-loading-item': listItems || undefined };
+  const card = loading ? (
+    <StackedRowsPanelSkeleton {...skeleton} marker={marker} />
+  ) : (
+    <div className={CARD_CLASS}>
+      {rows.map(row => (
+        <PanelRowView key={row.id} row={row} {...marker} />
       ))}
     </div>
   );
-  if (!title) return <div className={className}>{card}</div>;
+  return <PanelFrame title={title} className={className} card={card} />;
+}
+
+/**
+ * The card while its rows are read: the same card and row heights, each cell's value a `text-h4` bar over its
+ * label's `text-h6` bar. Each row carries the panel's list markers, like the loaded rows.
+ */
+function StackedRowsPanelSkeleton({
+  rows = STACKED_ROWS_SKELETON_COUNT,
+  columns = 1,
+  labels = true,
+  marker,
+}: NonNullable<StackedRowsPanelProps['skeleton']> & { marker: object }) {
   return (
-    <div className={cn(TITLED_CLASS, className)}>
-      <p className={TITLE_CLASS}>{title}</p>
-      {card}
+    <div className={CARD_CLASS} aria-hidden>
+      <LoadingItems count={rows}>
+        {() => (
+          <div className={columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS} {...loadingItemProps(marker)}>
+            <LoadingItems count={columns}>
+              {() => (
+                <div className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
+                  <TextLineSkeleton type="h4" className="w-1/2" />
+                  {labels && <TextLineSkeleton type="h6" className="w-3/4" />}
+                </div>
+              )}
+            </LoadingItems>
+          </div>
+        )}
+      </LoadingItems>
     </div>
   );
 }

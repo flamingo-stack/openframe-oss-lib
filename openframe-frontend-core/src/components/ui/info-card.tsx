@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { useCopyToClipboard } from '../../hooks';
 import { cn } from '../../utils/cn';
@@ -8,7 +8,7 @@ import { CheckIcon } from '../icons-v2-generated';
 import { Copy01Icon } from '../icons-v2-generated/documents';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
-import { ProgressBar, ProgressBarSkeleton } from './progress-bar';
+import { ProgressBar } from './progress-bar';
 
 export interface InfoCardFooterData {
   /** Leading icon next to the text, expected at 24x24 (e.g. <ShieldCheckIcon size={24} />) */
@@ -54,8 +54,8 @@ interface InfoCardProps {
    * its footer.
    */
   skeleton?: InfoCardSkeletonShape;
-  /** The data is still being read: the card draws its `skeleton` shape. A loading scope does the same while
-   *  `data.items` is empty. */
+  /** The data is still being read: the card keeps its ONE structure in its `skeleton` shape, its copy real and every
+   *  read value a bar. A loading scope does the same while `data.items` is empty. */
   loading?: boolean;
 }
 
@@ -83,10 +83,10 @@ export interface InfoCardSkeletonShape {
   icon?: React.ReactNode;
 }
 
-/** Rows a loading card draws when its caller names no count. */
-export const INFO_CARD_SKELETON_ROWS = 3;
+/** Rows a loading card draws when its caller names no count (a typical card's rows). */
+const INFO_CARD_SKELETON_ROWS = 3;
 
-/** The card's frame and groups, read by the card and by its skeleton. */
+/** The card's frame and groups, loaded and loading. */
 const FRAME_CLASS = 'flex w-full flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
 const CONTENT_CLASS = 'flex w-full flex-col items-start gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]';
 const HEAD_CLASS = 'flex w-full flex-col items-start self-stretch';
@@ -99,69 +99,91 @@ const SUBTITLE_TEXT_CLASS = 'min-w-0 truncate text-ods-text-secondary text-h4';
 const ROW_LABEL_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const FOOTER_CLASS = 'mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]';
 
-export function InfoCard({ data, className = '', skeleton, loading }: InfoCardProps) {
+export function InfoCard({ data, className = '', skeleton, loading: loadingProp }: InfoCardProps) {
   // ONE switch: in a page's loading state with no rows yet (they are read), or while the host reads the data, the
-  // card is its skeleton.
+  // card keeps its structure in its `skeleton` shape: what the shape leaves out is taken from `data`.
   const inScope = useLoadingScope();
-  if (loading || (inScope && data.items.length === 0)) {
-    return (
-      <InfoCardSkeleton
-        title={data.title || false}
-        subtitle={data.subtitle || false}
-        icon={data.icon}
-        progress={!!data.progress}
-        footer={data.footer ?? false}
-        {...skeleton}
-        className={className}
-      />
-    );
-  }
+  const loading = !!loadingProp || (inScope && data.items.length === 0);
+  const shape: InfoCardSkeletonShape & Required<Pick<InfoCardSkeletonShape, 'rows'>> = {
+    rows: INFO_CARD_SKELETON_ROWS,
+    unlabelledRows: false,
+    title: data.title || false,
+    subtitle: data.subtitle || false,
+    icon: data.icon,
+    progress: !!data.progress,
+    footer: data.footer ?? false,
+    ...skeleton,
+  };
+
+  // Each row: its label (real; `null` none; `undefined` a bar while loading), its value, whether it heads its item.
+  const rows: Array<InfoCardValueRowProps & { key: string }> = loading
+    ? (Array.isArray(shape.rows)
+        ? shape.rows.map(label => label || null)
+        : Array.from({ length: shape.rows }, () => (shape.unlabelledRows ? null : undefined))
+      ).map((label, index) => ({
+        key: String(index),
+        label,
+        value: '',
+        showLabel: true,
+        copyAriaLabel: '',
+        loading: true,
+      }))
+    : data.items.flatMap((item, index) => {
+        const values = Array.isArray(item.value) ? item.value : [item.value];
+        return values.map((val, valIndex) => ({
+          key: `${index}-${valIndex}`,
+          label: item.label,
+          value: val,
+          showLabel: valIndex === 0,
+          copyable: item.copyable,
+          icon: valIndex === 0 ? item.icon : undefined,
+          copyAriaLabel: `Copy ${item.label ?? 'value'} ${valIndex + 1}`,
+        }));
+      });
+  const showProgress = loading ? !!shape.progress : !!data.progress;
+  const footer = loading ? shape.footer : (data.footer ?? false);
+
   return (
-    <div className={cn(FRAME_CLASS, className)}>
+    <div className={cn(FRAME_CLASS, className)} aria-hidden={loading || undefined}>
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
           `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
           "Info-card" design. With no title/subtitle, the body is the only group. */}
       <div className={CONTENT_CLASS}>
-        <InfoCardHead title={data.title} subtitle={data.subtitle} icon={data.icon} />
+        <InfoCardHead
+          title={loading ? shape.title : data.title}
+          subtitle={loading ? shape.subtitle : data.subtitle}
+          icon={loading ? shape.icon : data.icon}
+        />
 
-        {(data.items.length > 0 || data.progress) && (
+        {(rows.length > 0 || showProgress) && (
           <div className={ROWS_CLASS}>
-            {/* Info items */}
-            {data.items.map((item, index) => {
-              const values = Array.isArray(item.value) ? item.value : [item.value];
+            {rows.map(({ key, ...row }) => (
+              <InfoCardValueRow key={key} {...row} />
+            ))}
 
-              return (
-                <React.Fragment key={index}>
-                  {values.map((val, valIndex) => (
-                    <InfoCardValueRow
-                      key={`${index}-${valIndex}`}
-                      label={item.label}
-                      value={val}
-                      showLabel={valIndex === 0}
-                      copyable={item.copyable}
-                      icon={valIndex === 0 ? item.icon : undefined}
-                      copyAriaLabel={`Copy ${item.label ?? 'value'} ${valIndex + 1}`}
-                    />
-                  ))}
-                </React.Fragment>
-              );
-            })}
-
-            {/* Progress bar */}
-            {data.progress && (
+            {showProgress && (
               <ProgressBar
-                progress={data.progress.value}
-                warningThreshold={data.progress.warningThreshold}
-                criticalThreshold={data.progress.criticalThreshold}
-                inverted={data.progress.inverted}
+                loading={loading}
+                progress={data.progress?.value ?? 0}
+                warningThreshold={data.progress?.warningThreshold}
+                criticalThreshold={data.progress?.criticalThreshold}
+                inverted={data.progress?.inverted}
               />
             )}
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      {data.footer && <InfoCardFooter footer={data.footer} />}
+      {/* Footer: its data drawn for real (a loading shape may pass it), `true` a bar while read. */}
+      {typeof footer === 'object' ? (
+        <InfoCardFooter footer={footer} />
+      ) : (
+        footer && (
+          <div className={FOOTER_CLASS}>
+            <TextLineSkeleton type="h4" className="w-1/2" />
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -236,93 +258,51 @@ function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
 }
 
 interface InfoCardValueRowProps {
-  label?: string;
+  /** The row's label; while loading, `undefined` is a label not here yet (a bar) and `null` a row with no label. */
+  label?: string | null;
   value: string;
   showLabel: boolean;
   copyable?: boolean;
   icon?: React.ReactNode;
   copyAriaLabel: string;
+  /** The value is still being read: a bar in the value's place, without its icon and copy button. */
+  loading?: boolean;
 }
 
-function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel }: InfoCardValueRowProps) {
+/** One `label —— value` row, loaded and loading (the card decides: its rows are its own read data). */
+function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel, loading }: InfoCardValueRowProps) {
   const { copy, copied } = useCopyToClipboard();
 
   return (
     <div className={VALUE_ROW_CLASS}>
-      <span className={ROW_LABEL_CLASS}>{showLabel ? label : ''}</span>
-      <div className={DIVIDER_CLASS} />
-      <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
-        <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
-          {value}
-        </span>
-        {icon}
-        {copyable && (
-          <button
-            type="button"
-            onClick={() => copy(value)}
-            className={cn(
-              'transition-colors',
-              copied ? 'text-ods-success' : 'text-ods-text-secondary hover:text-ods-text-primary',
-            )}
-            aria-label={copyAriaLabel}
-          >
-            {copied ? <CheckIcon size={16} /> : <Copy01Icon size={16} />}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * An InfoCard while its data is read: the same frame and groups, the title and subtitle drawn for real when the
- * caller passes their words (`text-h4` bars otherwise), each row its label (real when passed, a bar when not, none
- * when unlabelled) and a value bar either side of the row's divider, the progress bar and the footer line boxes of
- * their own height.
- */
-export function InfoCardSkeleton({
-  rows = INFO_CARD_SKELETON_ROWS,
-  unlabelledRows = false,
-  title = true,
-  subtitle = false,
-  progress = false,
-  footer = false,
-  icon,
-  className = '',
-}: InfoCardSkeletonShape & { className?: string }) {
-  // Each row's label: a word drawn for real, `null` for no label, `undefined` for a label bar.
-  const rowLabels: Array<string | null | undefined> = Array.isArray(rows)
-    ? rows.map(label => label || null)
-    : Array.from({ length: rows }, () => (unlabelledRows ? null : undefined));
-  return (
-    <div className={cn(FRAME_CLASS, className)} aria-hidden>
-      <div className={CONTENT_CLASS}>
-        <InfoCardHead title={title} subtitle={subtitle} icon={icon} />
-        {(rowLabels.length > 0 || progress) && (
-          <div className={ROWS_CLASS}>
-            {rowLabels.map((label, index) => (
-              <div key={index} className={VALUE_ROW_CLASS}>
-                {label === undefined ? (
-                  <TextLineSkeleton type="h4" className="w-20" />
-                ) : (
-                  <span className={ROW_LABEL_CLASS}>{label ?? ''}</span>
-                )}
-                <div className={DIVIDER_CLASS} />
-                <TextLineSkeleton type="h4" className="w-24" />
-              </div>
-            ))}
-            {progress && <ProgressBarSkeleton />}
-          </div>
-        )}
-      </div>
-      {typeof footer === 'object' ? (
-        <InfoCardFooter footer={footer} />
+      {loading && label === undefined ? (
+        <TextLineSkeleton type="h4" className="w-20" />
       ) : (
-        footer && (
-          <div className={FOOTER_CLASS}>
-            <TextLineSkeleton type="h4" className="w-1/2" />
-          </div>
-        )
+        <span className={ROW_LABEL_CLASS}>{showLabel ? (label ?? '') : ''}</span>
+      )}
+      <div className={DIVIDER_CLASS} />
+      {loading ? (
+        <TextLineSkeleton type="h4" className="w-24" />
+      ) : (
+        <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
+          <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
+            {value}
+          </span>
+          {icon}
+          {copyable && (
+            <button
+              type="button"
+              onClick={() => copy(value)}
+              className={cn(
+                'transition-colors',
+                copied ? 'text-ods-success' : 'text-ods-text-secondary hover:text-ods-text-primary',
+              )}
+              aria-label={copyAriaLabel}
+            >
+              {copied ? <CheckIcon size={16} /> : <Copy01Icon size={16} />}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

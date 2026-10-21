@@ -16,6 +16,11 @@ export interface FaqItem {
 interface FaqAccordionProps {
   items: FaqItem[];
   defaultOpenIds?: (number | string)[];
+  /** The questions are still being read: the accordion draws its skeleton. A loading scope does the same. */
+  loading?: boolean;
+  /** Rows the skeleton draws: the questions the host reads. Default the items' count, else
+   *  `FAQ_ACCORDION_SKELETON_ROWS`. */
+  skeletonCount?: number;
 }
 
 /** The accordion's layout, read by the accordion and by its skeleton, so the skeleton is the accordion's size. */
@@ -35,11 +40,11 @@ export const FAQ_ACCORDION_SKELETON_ROWS = 12;
  */
 const wrapsOnPhone = (index: number) => index % 2 === 0;
 
-export function FaqAccordion({ items, defaultOpenIds = [] }: FaqAccordionProps) {
+export function FaqAccordion({ items, defaultOpenIds = [], loading: loadingProp, skeletonCount }: FaqAccordionProps) {
   const [openSet, setOpenSet] = useState<Set<string | number>>(new Set(defaultOpenIds));
   // In a loading scope the items are the empty record: the accordion is its skeleton.
-  const loading = useLoadingScope();
-  if (loading) return <FaqAccordionSkeleton count={items.length || undefined} />;
+  const loading = useLoadingScope() || !!loadingProp;
+  if (loading) return <FaqAccordionSkeleton count={skeletonCount ?? (items.length || undefined)} />;
 
   const toggle = (id: string | number) => {
     setOpenSet(prev => {

@@ -2,11 +2,11 @@
 
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { CommentCard, CommentCardSkeleton, type CommentCardComment } from './comment-card';
+import { CommentCard, type CommentCardComment } from './comment-card';
 import { CommentComposer } from './comment-composer';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
-import { useLoadingScope } from './ui/loading-scope';
+import { LoadingItems, useLoadingScope } from './ui/loading-scope';
 
 /**
  * The comment cards a thread's skeleton draws: its first fold (about three root cards fill a section's screen). Never
@@ -140,6 +140,7 @@ function CommentThreadRow({
     <CommentCard
       fullBody
       comment={comment}
+      data-loading-item
       leadWith={leadWith}
       onViewProduct={onViewProduct}
       onDeleteComment={onDelete ? id => void onDelete(id) : undefined}
@@ -178,7 +179,7 @@ function CommentThreadRow({
 }
 
 /**
- * A thread while it is read: `count` comment rows, each `CommentCardSkeleton` in the thread's own list, with the
+ * A thread while it is read: `count` comment rows, each `CommentCard loading` in the thread's own list, with the
  * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
  * so they are not drawn).
  */
@@ -202,9 +203,9 @@ export function CommentThreadSkeleton({
   ) : undefined;
   return (
     <div className={COMMENT_THREAD_LIST} aria-hidden="true" inert>
-      {Array.from({ length: count }, (_, i) => (
-        <CommentCardSkeleton key={i} leadWith={leadWith} showTitle={showTitle} showDelete={false} footer={footer} />
-      ))}
+      <LoadingItems count={count}>
+        {() => <CommentCard loading data-loading-item leadWith={leadWith} titleRow={showTitle} footer={footer} />}
+      </LoadingItems>
     </div>
   );
 }

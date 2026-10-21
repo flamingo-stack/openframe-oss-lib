@@ -52,12 +52,7 @@ export type { AiPromptCardData, AiPromptCardProps } from './ai-prompt-card';
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card';
-export {
-  ChatTicketItem,
-  ChatTicketItemSkeleton,
-  type ChatTicketItemData,
-  type ChatTicketItemProps,
-} from './chat-ticket-item';
+export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
   ProductReleaseCard,

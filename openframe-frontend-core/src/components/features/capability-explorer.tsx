@@ -12,7 +12,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 import { TruncateText } from '../ui/truncate-text';
 
 /** One job the product does, as the explorer shows it. Every field is the host's data. */
@@ -205,7 +205,7 @@ function ExampleSkeleton({ className }: { className?: string }) {
   const turn = (first: boolean) => (
     <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
       {first ? (
-        <SquareAvatarSkeleton variant="round" sizePx={EXAMPLE_MARK_PX} className="shrink-0" />
+        <SquareAvatar loading variant="round" sizePx={EXAMPLE_MARK_PX} className="shrink-0" />
       ) : (
         <AgentAvatarSkeleton size={EXAMPLE_MARK_PX} />
       )}

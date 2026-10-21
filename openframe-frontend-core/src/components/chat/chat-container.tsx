@@ -84,7 +84,10 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
     ref,
   ) => {
     // ONE switch: in a page's loading state (or while the host reads the identity) the identity is its skeleton.
-    const isLoading = useLoadingScope() || isLoadingProp;
+    const inScope = useLoadingScope();
+    const isLoading = inScope || isLoadingProp;
+    // The MSP card: read with the page (a loading scope) or by the host (`isMspLoading`), drawn in its loading form.
+    const mspLoading = inScope || isMspLoading;
     const cardClasses = bare ? '' : 'rounded-md bg-ods-card border border-ods-border';
     return (
       <div
@@ -175,13 +178,13 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
               claims this space, so it wins when both are provided. The card
               already draws the chrome: strip the section's own ring and keep
               only the bottom rounding so its bg fits the card corners. */}
-          {!ticketInfo && (isMspLoading || mspOrganization) && (
+          {!ticketInfo && (mspLoading || mspOrganization) && (
             <>
               <div className="h-px bg-ods-border" />
               <MspOrganizationCard
                 name=""
                 {...mspOrganization}
-                loading={isMspLoading || !mspOrganization}
+                loading={mspLoading || !mspOrganization}
                 className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization?.className)}
               />
             </>

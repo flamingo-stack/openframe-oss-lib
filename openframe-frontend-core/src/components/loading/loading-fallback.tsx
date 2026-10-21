@@ -44,23 +44,31 @@ export function LoadingFallback({
  * `<Suspense fallback={<LoadingFallback label={…}>{x}</LoadingFallback>}>{x}</Suspense>`, with the child twice.
  *
  *   <LoadingSuspense label="Loading the tenants"><TenantList /></LoadingSuspense>
+ *   <LoadingSuspense label="Loading the script" fallback={<ScriptView script={null} />}><ScriptReader /></LoadingSuspense>
  */
 export function LoadingSuspense({
   label,
   as,
   className,
+  fallback,
   children,
 }: {
   label?: string;
   as?: ElementType;
   className?: string;
+  /**
+   * What the boundary draws while its children suspend, when that is not the children themselves (a reader whose view
+   * is a separate component: `fallback={<ThingView thing={null} />}`). Drawn in the same loading scope. Default: the
+   * children.
+   */
+  fallback?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Suspense
       fallback={
         <LoadingFallback label={label} as={as} className={className}>
-          {children}
+          {fallback ?? children}
         </LoadingFallback>
       }
     >

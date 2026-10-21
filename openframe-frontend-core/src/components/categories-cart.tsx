@@ -6,8 +6,8 @@ import { ICON_SIZE } from '../styles/component-sizes';
 import type { RealCategoryCardProps } from '../types/category';
 import { cn } from '../utils/cn';
 import { TextLineSkeleton } from './loading/unified-skeleton';
-import { useLoadingScope } from './ui/loading-scope';
-import { VendorIcon, VendorIconSkeleton } from './vendor-icon';
+import { LoadingItems, useLoadingScope } from './ui/loading-scope';
+import { VendorIcon } from './vendor-icon';
 
 /** The card's layout, read by the card and by its skeleton, so the skeleton is the card's size. */
 const CARD_SHELL_CLASS = 'group relative block rounded-lg border border-ods-border bg-ods-card p-3 pb-4 md:p-4 md:pb-6';
@@ -16,6 +16,8 @@ const ICON_STRIP_CLASS = 'relative h-8 w-full overflow-hidden md:h-10';
 const ICON_ROW_CLASS = 'flex w-full gap-2 md:gap-3';
 /** The strip's vendor icons: one size and frame for the loaded icon and its skeleton. */
 const VENDOR_ICON_SIZE = 'md';
+/** The vendor a loading icon is handed: none is read yet. */
+const EMPTY_VENDOR = { title: '' };
 const VENDOR_ICON_CLASS = 'overflow-hidden rounded opacity-60 grayscale filter';
 /** The inner stacks only stack: a one-column grid, not another column flexbox (WEBVIEW-001). */
 const INFO_STACK_CLASS = 'grid grid-cols-1 gap-2';
@@ -113,10 +115,9 @@ export function CategoriesCartSkeleton({
       <div className={CARD_STACK_CLASS}>
         <div className={ICON_STRIP_CLASS}>
           <div className={ICON_ROW_CLASS}>
-            {Array.from({ length: vendors }, (_, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton icons never reorder
-              <VendorIconSkeleton key={index} size={VENDOR_ICON_SIZE} className="rounded" />
-            ))}
+            <LoadingItems count={vendors}>
+              {() => <VendorIcon loading vendor={EMPTY_VENDOR} size={VENDOR_ICON_SIZE} className="rounded" />}
+            </LoadingItems>
           </div>
           <StripFades />
         </div>

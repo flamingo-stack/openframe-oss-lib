@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 
 export interface ChatTurnProps {
   /** Rendered as given, at the size the caller draws it (a person's picture, an agent's mark). */
@@ -139,7 +139,7 @@ export function ChatTurnSkeleton({
 }: ChatTurnSkeletonProps) {
   return (
     <div className={cn(TURN_ROW_CLASS, className)} aria-hidden>
-      {avatarPx ? <SquareAvatarSkeleton sizePx={avatarPx} variant={avatarShape} /> : null}
+      {avatarPx ? <SquareAvatar loading sizePx={avatarPx} variant={avatarShape} /> : null}
       <div className={TURN_BODY_CLASS}>
         <ChatTurnNameSkeleton nameSize={nameSize} meta={meta} time={time} />
         <div>

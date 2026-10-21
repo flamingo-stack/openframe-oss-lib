@@ -4,7 +4,8 @@ import type { MouseEvent, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { InteractiveSkeleton, MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
 
 export interface MingoOnboardingCardAction {
   /** Stable React key. */
@@ -34,8 +35,8 @@ export interface MingoOnboardingCardProps {
    *  the card renders as a `<button>` with hover/focus affordances.
    *  Ignored when `actions` is non-empty. */
   onClick?: () => void;
-  /** The commands are still loading: the card draws its own skeleton. Inside a `LoadingScope` it does so whatever
-   *  this says. */
+  /** The commands are still loading: the card draws its loading form (its known actions real and inert). Inside a
+   *  `LoadingScope` it does so whatever this says. */
   loading?: boolean;
   /** The card's place in its list: picks the loading state's bar widths, so a list of loading cards is irregular. */
   skeletonIndex?: number;
@@ -43,13 +44,30 @@ export interface MingoOnboardingCardProps {
   className?: string;
 }
 
-/** The card's frame, read by the card and its skeleton. */
+/** The card's frame, loaded and loading. */
 const CARD_BASE_CLASS =
   'flex w-full items-start border-b border-ods-border bg-ods-card p-[var(--spacing-system-s)] text-left last:border-b-0';
 const CARD_BODY_CLASS = 'flex w-full flex-col gap-[var(--spacing-system-xxs)]';
 const CARD_TITLE_ROW_CLASS = 'flex w-full items-center gap-[var(--spacing-system-xxs)]';
 const CARD_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary';
 const CARD_ACTIONS_CLASS = 'mt-[var(--spacing-system-xs)] flex flex-wrap items-center gap-[var(--spacing-system-xxs)]';
+
+/** Action chips a loading card draws while it knows none of its actions: the typical `Recent / Search / Find` row. */
+const TYPICAL_ACTION_CHIPS = 3;
+
+/**
+ * Per-card loading shapes, cycled by index so a list of loading cards is irregular and the same list draws the same
+ * bars (the title's width is the chat lists' shared {@link SKELETON_TITLE_WIDTHS}). Slashes range from `/docs` to
+ * `/getting-started`.
+ */
+const ROW_VARIANTS: ReadonlyArray<{ slashWidth: string; descriptionLines: 1 | 2 }> = [
+  { slashWidth: 'w-20', descriptionLines: 2 },
+  { slashWidth: 'w-16', descriptionLines: 2 },
+  { slashWidth: 'w-24', descriptionLines: 2 },
+  { slashWidth: 'w-28', descriptionLines: 2 },
+  { slashWidth: 'w-24', descriptionLines: 1 },
+  { slashWidth: 'w-16', descriptionLines: 2 },
+];
 
 /**
  * MingoOnboardingCard — Figma node `7363:205939`.
@@ -75,59 +93,91 @@ export function MingoOnboardingCard({
   description,
   actions,
   onClick,
-  loading = false,
+  loading: loadingProp = false,
   skeletonIndex = 0,
   className,
   ...props
 }: MingoOnboardingCardProps) {
+  // ONE switch: while the commands are read the SAME card draws its icon box, title, slash command and description as
+  // bars; the actions it knows are drawn real and inert, and the typical three chips only when it knows none yet.
+  const loading = useLoadingScope() || loadingProp;
   const hasActions = !!actions && actions.length > 0;
   // The card's markers (`data-loading-item` for a card of a read list), on the loaded and the loading card alike.
   const itemProps = loadingItemProps(props);
-  if (useLoadingScope() || loading) {
-    return (
-      <MingoOnboardingCardSkeleton
-        {...mingoOnboardingSkeletonVariant(skeletonIndex)}
-        // A card known to have no actions draws no chip row; while the commands load, the typical card has them.
-        chipWidths={actions && actions.length === 0 ? [] : undefined}
-        className={className}
-        {...itemProps}
-      />
-    );
-  }
-  const isInteractive = !hasActions && !!onClick;
+  const variant = ROW_VARIANTS[skeletonIndex % ROW_VARIANTS.length];
+  const isInteractive = !loading && !hasActions && !!onClick;
+
+  const actionButtons = hasActions
+    ? actions.map(action => (
+        <Button
+          key={action.id}
+          type="button"
+          variant="outline"
+          size="small"
+          onClick={e => {
+            e.stopPropagation();
+            action.onClick(e);
+          }}
+        >
+          {action.label}
+        </Button>
+      ))
+    : null;
 
   const body = (
     <div className={CARD_BODY_CLASS}>
       <div className={CARD_TITLE_ROW_CLASS}>
-        {icon ? (
+        {loading ? (
+          <span className={CARD_ICON_CLASS}>
+            <MediaSkeleton.Icon size="sm" />
+          </span>
+        ) : icon ? (
           // Icon slot — monochrome `ods-text-secondary` (≈ #888) so
           // consumers can drop any `icons-v2-generated` glyph (they use
           // `currentColor`) without per-card styling. Brand multi-color
           // SVGs ignore this color.
           <span className={CARD_ICON_CLASS}>{icon}</span>
         ) : null}
-        <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h6">{title}</span>
-        {slashCommand ? (
-          <span className="whitespace-nowrap text-ods-text-secondary text-h6">{slashCommand}</span>
-        ) : null}
+        {loading ? (
+          <>
+            <span className="min-w-0 flex-1">
+              <TextLineSkeleton
+                type="h6"
+                className={SKELETON_TITLE_WIDTHS[skeletonIndex % SKELETON_TITLE_WIDTHS.length]}
+              />
+            </span>
+            <TextLineSkeleton type="h6" className={cn('shrink-0', variant.slashWidth)} />
+          </>
+        ) : (
+          <>
+            <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h6">{title}</span>
+            {slashCommand ? (
+              <span className="whitespace-nowrap text-ods-text-secondary text-h6">{slashCommand}</span>
+            ) : null}
+          </>
+        )}
       </div>
-      {description ? <p className="w-full text-ods-text-secondary text-h6">{description}</p> : null}
-      {hasActions ? (
+      {loading ? (
+        <TextLineSkeleton type="h6" lines={variant.descriptionLines} className="w-full" />
+      ) : description ? (
+        <p className="w-full text-ods-text-secondary text-h6">{description}</p>
+      ) : null}
+      {loading && actions === undefined ? (
+        // The commands are not read yet: the typical card's three action chips.
         <div className={CARD_ACTIONS_CLASS}>
-          {actions.map(action => (
-            <Button
-              key={action.id}
-              type="button"
-              variant="outline"
-              size="small"
-              onClick={e => {
-                e.stopPropagation();
-                action.onClick(e);
-              }}
-            >
-              {action.label}
-            </Button>
-          ))}
+          <LoadingItems count={TYPICAL_ACTION_CHIPS}>
+            {() => <InteractiveSkeleton.Button size="small" className="w-16" />}
+          </LoadingItems>
+        </div>
+      ) : hasActions ? (
+        <div className={CARD_ACTIONS_CLASS}>
+          {loading ? (
+            <span inert aria-hidden className="contents">
+              {actionButtons}
+            </span>
+          ) : (
+            actionButtons
+          )}
         </div>
       ) : null}
     </div>
@@ -149,86 +199,11 @@ export function MingoOnboardingCard({
   }
 
   return (
-    <div className={baseClass} {...itemProps}>
+    <div className={baseClass} aria-hidden={loading || undefined} {...itemProps}>
       {body}
     </div>
   );
 }
 
-interface MingoOnboardingCardSkeletonProps {
-  /** Title bar width (a Tailwind width utility). Defaults to `w-32`. */
-  titleWidth?: string;
-  /** Slash-command bar width (a Tailwind width utility). Defaults to `w-20`. */
-  slashWidth?: string;
-  /** Description lines (1 or 2). Defaults to 2, the typical card. */
-  descriptionLines?: 1 | 2;
-  /** Chip widths for the action row (the `Recent / Search / Find` triad by default); an empty array draws no row. */
-  chipWidths?: ReadonlyArray<string>;
-  className?: string;
-}
-
-/**
- * `MingoOnboardingCard` while its command is read: the card's own frame and rows (its class constants), the icon a
- * 16px box, the title, the slash command and the description as text-h6 lines, and the actions as small buttons.
- */
-function MingoOnboardingCardSkeleton({
-  titleWidth = 'w-32',
-  slashWidth = 'w-20',
-  descriptionLines = 2,
-  chipWidths = ['w-16', 'w-16', 'w-12'],
-  className,
-  ...props
-}: MingoOnboardingCardSkeletonProps) {
-  return (
-    <div className={cn(CARD_BASE_CLASS, className)} {...props}>
-      <div className={CARD_BODY_CLASS}>
-        <div className={CARD_TITLE_ROW_CLASS}>
-          <span className={CARD_ICON_CLASS}>
-            <MediaSkeleton.Icon size="sm" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <TextLineSkeleton type="h6" className={titleWidth} />
-          </span>
-          <TextLineSkeleton type="h6" className={cn('shrink-0', slashWidth)} />
-        </div>
-        <TextLineSkeleton type="h6" lines={descriptionLines} className="w-full" />
-        {chipWidths.length > 0 ? (
-          <div className={CARD_ACTIONS_CLASS}>
-            {chipWidths.map((width, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton chips never reorder
-              <InteractiveSkeleton.Button key={i} size="small" className={width} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Per-card bar widths, cycled by index so a list of loading cards is irregular and the same list draws the same bars.
- * Titles range from short ("Webinars") to long ("OpenFrame Pull Requests"), slashes from `/docs` to
- * `/getting-started`.
- */
-const ROW_VARIANTS: ReadonlyArray<{
-  titleWidth: string;
-  slashWidth: string;
-  descriptionLines: 1 | 2;
-}> = [
-  { titleWidth: 'w-32', slashWidth: 'w-20', descriptionLines: 2 },
-  { titleWidth: 'w-28', slashWidth: 'w-16', descriptionLines: 2 },
-  { titleWidth: 'w-40', slashWidth: 'w-24', descriptionLines: 2 },
-  { titleWidth: 'w-44', slashWidth: 'w-28', descriptionLines: 2 },
-  { titleWidth: 'w-36', slashWidth: 'w-24', descriptionLines: 1 },
-  { titleWidth: 'w-24', slashWidth: 'w-16', descriptionLines: 2 },
-];
-
 /** Slash-command cards the loading state draws: a typical list, since the commands list has no page size of its own. */
 export const MINGO_ONBOARDING_SKELETON_ROWS = ROW_VARIANTS.length;
-
-/** The bar widths of the loading card at `index` in its list (cycled, so the same list draws the same bars). */
-export function mingoOnboardingSkeletonVariant(
-  index: number,
-): Pick<MingoOnboardingCardSkeletonProps, 'titleWidth' | 'slashWidth' | 'descriptionLines'> {
-  return ROW_VARIANTS[index % ROW_VARIANTS.length];
-}

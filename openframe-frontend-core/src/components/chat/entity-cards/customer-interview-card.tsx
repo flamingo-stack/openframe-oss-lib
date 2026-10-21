@@ -30,7 +30,7 @@ import {
 } from '../utils/compact-card-classes';
 import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
-import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+import { EntityPortraitCard } from './entity-portrait-card';
 import { hideOnError } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
@@ -77,7 +77,14 @@ export function CustomerInterviewCardSkeleton({
 }) {
   if (size === 'portrait') {
     return (
-      <EntityPortraitCardSkeleton typeLabel={showTypeBadge ? INTERVIEW_TYPE_LABEL : undefined} className={className} />
+      <EntityPortraitCard
+        loading
+        href=""
+        imageAlt=""
+        title=""
+        typeLabel={showTypeBadge ? INTERVIEW_TYPE_LABEL : undefined}
+        className={className}
+      />
     );
   }
   if (size === 'sm') {

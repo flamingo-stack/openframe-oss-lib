@@ -91,6 +91,24 @@ describe('chat parts switch themselves', () => {
     expect(container.querySelector('.overflow-hidden')).not.toBeNull();
   });
 
+  it('ChatMessageList draws the same thread in a scope, and its loaded messages carry the same marker', () => {
+    const { container: scoped } = render(
+      <LoadingScope>
+        <ChatMessageList messages={[]} />
+      </LoadingScope>,
+    );
+    expect(items(scoped)).toHaveLength(CHAT_MESSAGE_LIST_SKELETON_MESSAGES);
+    const { container: loaded } = render(
+      <ChatMessageList
+        messages={[
+          { id: '1', role: 'user', content: 'Hi', timestamp: new Date() },
+          { id: '2', role: 'assistant', content: 'Hello', timestamp: new Date() },
+        ]}
+      />,
+    );
+    expect(items(loaded)).toHaveLength(2);
+  });
+
   it('MingoOnboardingCard draws its skeleton while loading', () => {
     const { container } = render(<MingoOnboardingCard loading title={READ} />);
     expect(container.textContent).not.toContain(READ);

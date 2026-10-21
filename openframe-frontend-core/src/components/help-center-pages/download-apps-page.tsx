@@ -54,7 +54,7 @@ import { cn } from '../../utils/cn';
 import { formatUrlForDisplay } from '../../utils/format';
 import { DESKTOP_OSES, type DesktopOs } from '../../utils/visitor-os';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../faq/faq-section';
-import { CommandBox, CommandBoxSkeleton } from '../features/command-box';
+import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
@@ -260,6 +260,9 @@ function WebCard({ web }: { web: DownloadAppsWebOption }) {
  * loaded grid's own rule), each with its real logo and name, the requirement line as a bar, the installer button's
  * own skeleton and one install command's box (a system the deployment does not offer drops out when it lands).
  */
+/** A loading command box's copy button: the button is drawn, there is nothing to copy yet. */
+const NO_COMMAND_TO_COPY = () => {};
+
 function SystemCardsSkeleton() {
   return (
     <div className={cardsGridClass(DESKTOP_OSES.length)}>
@@ -276,7 +279,7 @@ function SystemCardsSkeleton() {
               <InteractiveSkeleton.Button size="default" className="w-56" />
             </div>
             <div className={COMMANDS_CLASS}>
-              <CommandBoxSkeleton lines={1} showCopy />
+              <CommandBox loading command="" maxLines={1} onCopy={NO_COMMAND_TO_COPY} />
             </div>
           </div>
         );

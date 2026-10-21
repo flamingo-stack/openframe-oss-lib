@@ -2,8 +2,8 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
-import { useLoadingScope } from '../../ui/loading-scope';
-import { TicketStatusConfigRowSkeleton } from '../../ui/ticket-status-config-row';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { TicketStatusConfigRow } from '../../ui/ticket-status-config-row';
 import { SortableList } from '../sortable-list/sortable-list';
 import { SortableMoveButtons } from '../sortable-list/sortable-move-buttons';
 import { type SortableDragHandleProps, useSortableItem } from '../sortable-list/use-sortable-item';
@@ -39,6 +39,8 @@ export interface TicketStatusConfigListProps<T extends { id: string }> {
 /** Row skeletons a status list draws while it has none: a typical list (the list is not paged). */
 export const TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS = 4;
 
+const noop = () => {};
+
 const LIST_CLASS = 'flex w-full flex-col gap-[var(--spacing-system-xs)]';
 
 /**
@@ -63,11 +65,15 @@ export function TicketStatusConfigList<T extends { id: string }>({
   if (loading && items.length === 0) {
     return (
       <div className={cn(LIST_CLASS, className)} aria-hidden>
-        {Array.from({ length: skeletonRows }, (_, index) => (
-          <div key={index} data-loading-item>
-            <TicketStatusConfigRowSkeleton />
-          </div>
-        ))}
+        <LoadingItems count={skeletonRows}>
+          {() => (
+            // The row's own loading form, in the frame a sortable row has. A list that knows nothing yet draws
+            // `custom` rows (the kind a host can recolor, so the Color column is drawn).
+            <div data-loading-item>
+              <TicketStatusConfigRow variant="custom" statusKey="" name="" onColorChange={noop} loading />
+            </div>
+          )}
+        </LoadingItems>
       </div>
     );
   }

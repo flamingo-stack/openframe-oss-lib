@@ -58,8 +58,8 @@ import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/moda
 import { ScrollShadow } from '../ui/scroll-fade';
 import { SearchInput } from '../ui/search-input';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
-import { StatusBadge, StatusBadgeSkeleton } from '../ui/status-badge';
-import { TabNavigation, TabNavigationSkeleton, type TabItem } from '../ui/tab-navigation';
+import { StatusBadge } from '../ui/status-badge';
+import { TabNavigation, type TabItem } from '../ui/tab-navigation';
 
 /** Monitoring `icon` vocabulary (owned by `TRUST_FRAMEWORK_MONITORING`) → icon component, ONE lookup. */
 const FRAMEWORK_ICONS: Record<TrustFrameworkMonitoringEntry['icon'], typeof ShieldCheckIcon> = {
@@ -716,7 +716,7 @@ function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?:
               align: 'right' as const,
               content:
                 shape.action === 'badge' ? (
-                  <StatusBadgeSkeleton />
+                  <StatusBadge loading text="" />
                 ) : (
                   // The rows' action is a `size="small"` Button: its own size classes.
                   <InteractiveSkeleton.Button size="small" className="w-16" />
@@ -737,7 +737,7 @@ function ControlsSummarySkeleton() {
 function ControlsSectionSkeleton() {
   return (
     <div className={CONTROLS_SECTION_CLASS} style={controlsSectionStyle}>
-      <TabNavigationSkeleton count={CONTROLS_SKELETON_TABS} />
+      <TabNavigation loading tabs={[]} skeletonCount={CONTROLS_SKELETON_TABS} />
       <div className={CONTROLS_TOOLBAR_CLASS}>
         <p className={BODY_TEXT}>
           <ControlsSummarySkeleton />

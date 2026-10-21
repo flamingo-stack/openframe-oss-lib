@@ -43,7 +43,6 @@ export { LoadingFallback, LoadingSuspense } from './loading-fallback';
 
 export { MarginReportSkeleton } from './margin-report-skeleton';
 
-// Organization & Device skeleton components
+// Organization skeleton components
 export { OrganizationIconSkeleton } from './organization-icon-skeleton';
 export { OrganizationCardSkeleton, OrganizationCardSkeletonGrid } from './organization-card-skeleton';
-export { DeviceCardSkeleton } from './device-card-skeleton';

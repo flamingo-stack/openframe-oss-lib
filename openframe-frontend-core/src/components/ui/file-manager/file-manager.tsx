@@ -154,7 +154,7 @@ export function FileManager({
             placeholder="Search..."
             disabled={disableSearch}
             startAdornment={<SearchIcon />}
-            loading={isSearching}
+            pending={isSearching}
           />
         )}
 

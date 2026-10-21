@@ -86,6 +86,9 @@ export interface EntityPortraitCardProps {
   titleClassName?: string;
   person?: EntityPortraitPerson | null;
   className?: string;
+  /** The record is still being read: the card draws its skeleton (the same three zones, the chip real). A loading
+   *  scope does the same. */
+  loading?: boolean;
 }
 
 export function EntityPortraitCard({
@@ -100,8 +103,9 @@ export function EntityPortraitCard({
   titleClassName,
   person,
   className,
+  loading: loadingProp,
 }: EntityPortraitCardProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   const { src, onError: onMediaError } = useCoverImageFallback(imageUrl, placeholderUrl);
   // null = unknown (assume wide until the image reports its natural size).
   // The measurement carries the src it was taken from, so re-detection when the
@@ -156,6 +160,7 @@ export function EntityPortraitCard({
               variant="button"
               colorScheme="accentBorder"
               singleLine
+              staticText
               text={typeLabel}
               className="self-start"
             />
@@ -224,6 +229,7 @@ export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel
               variant="button"
               colorScheme="accentBorder"
               singleLine
+              staticText
               text={typeLabel}
               className="self-start"
             />

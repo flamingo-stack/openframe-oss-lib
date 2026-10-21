@@ -7,7 +7,6 @@ import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { CategoriesCart } from '../../categories-cart';
 import { ChatMessageList } from '../../chat/chat-message-list';
-import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from '../../chat/chat-message-skeleton';
 import { ChatTurn } from '../../chat/chat-turn';
 import { EntityAuthorCard } from '../../chat/entity-cards/entity-author-card';
 import { SsoJoinForm } from '../../features/auth/sso-join-form';
@@ -39,7 +38,7 @@ import { CheckboxBlock } from '../checkbox-block';
 import { CheckboxWithDescription } from '../checkbox-with-description';
 import { DashboardInfoCard } from '../dashboard-info-card';
 import { DeviceCard } from '../device-card';
-import { InfoCard, InfoCardSkeleton } from '../info-card';
+import { InfoCard } from '../info-card';
 import { InfoSection } from '../info-section';
 import { Input } from '../input';
 import { LeaderRow } from '../leader-row';
@@ -341,8 +340,7 @@ describe('a component in a scope draws its own skeleton', () => {
   });
 
   it('a list in a scope draws its declared typical count, each item a `data-loading-item`', () => {
-    const { container: chatView } = inScope(<ChatMessageList messages={[]} />);
-    expect(chatView.querySelectorAll('[data-loading-item]')).toHaveLength(CHAT_MESSAGE_LIST_SKELETON_MESSAGES);
+    // The chat thread's count is asserted with the chat (chat-history-loading.test).
     const { container: statusesView } = inScope(
       <TicketStatusConfigList items={[]} onReorder={() => {}} renderRow={() => null} />,
     );
@@ -394,7 +392,9 @@ describe('a component in a scope draws its own skeleton', () => {
   });
 
   it('a skeleton InfoCard draws unlabelled rows as value bars only', () => {
-    const { container } = render(<InfoCardSkeleton title={false} rows={2} unlabelledRows />);
+    const { container } = render(
+      <InfoCard data={{ items: [] }} skeleton={{ title: false, rows: 2, unlabelledRows: true }} loading />,
+    );
     expect(container.querySelectorAll(SURFACE)).toHaveLength(2);
   });
 
@@ -424,7 +424,7 @@ describe('a component in a scope draws its own skeleton', () => {
     expect(container.querySelectorAll('[data-loading-item]')).toHaveLength(7);
   });
 
-  it('the loaded forms carry the same item markers: status rows and chat messages', () => {
+  it('the loaded forms carry the same item markers: status rows', () => {
     const { container: statusesView } = render(
       <TicketStatusConfigList
         items={[{ id: 'a' }, { id: 'b' }]}
@@ -433,15 +433,6 @@ describe('a component in a scope draws its own skeleton', () => {
       />,
     );
     expect(statusesView.querySelectorAll('[data-loading-item]')).toHaveLength(2);
-    const { container: chatView } = render(
-      <ChatMessageList
-        messages={[
-          { id: '1', role: 'user', content: 'Hi', timestamp: new Date() },
-          { id: '2', role: 'assistant', content: 'Hello', timestamp: new Date() },
-        ]}
-      />,
-    );
-    expect(chatView.querySelectorAll('[data-loading-item]')).toHaveLength(2);
   });
 });
 
@@ -544,15 +535,21 @@ describe('round 2: components draw their loaded twin', () => {
     expect(container.querySelectorAll('.w-20 .ods-skeleton')).toHaveLength(1);
   });
 
-  it('DeviceCard draws a button box for its details button by itself', () => {
+  it('DeviceCard keeps its one structure: its details button drawn for real and inert, the read values bars', () => {
     const { container } = render(
       <DeviceCard
         loading
-        device={{ name: READ }}
-        actions={{ detailsButton: { visible: true, component: <span /> } }}
+        data-loading-item
+        device={{ name: READ, organization: READ }}
+        actions={{ detailsButton: { visible: true, component: <button type="button">Details</button> } }}
       />,
     );
-    expect(container.querySelector('.ods-skeleton.h-11')).not.toBeNull();
+    const card = container.firstElementChild as HTMLElement;
+    expect(card).toHaveAttribute('inert');
+    expect(card).toHaveAttribute('data-loading-item');
+    expect(container.querySelector('button')?.textContent).toBe('Details');
+    expect(container.textContent).toContain('Last Seen:');
+    expect(container.textContent).not.toContain(READ);
   });
 
   it('Switch and a Tag whose label is not here yet switch on the scope', () => {

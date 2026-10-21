@@ -2,8 +2,7 @@
 
 import { type ButtonHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { FIELD_VALUE_SKELETON_CLASS } from './input-styles';
+import { FieldValueSkeleton } from './field-value-skeleton';
 import { useLoadingScope } from './loading-scope';
 
 export interface InputTriggerProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
@@ -68,7 +67,7 @@ export const InputTrigger = forwardRef<HTMLButtonElement, InputTriggerProps>(
       >
         {startIcon && <span className="flex shrink-0 items-center text-ods-text-secondary">{startIcon}</span>}
         {inScope ? (
-          <TextLineSkeleton type="h4" className={FIELD_VALUE_SKELETON_CLASS} />
+          <FieldValueSkeleton />
         ) : (
           <span
             className={cn('min-w-0 flex-1 truncate text-left', isPlaceholder && 'text-ods-text-secondary')}

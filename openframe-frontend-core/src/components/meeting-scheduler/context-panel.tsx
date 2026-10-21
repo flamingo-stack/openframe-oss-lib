@@ -7,8 +7,7 @@ import { BackButton } from '../layout/back-button';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar, AvatarStack, Button } from '../ui';
 import { AutocompleteSkeleton } from '../ui/autocomplete';
-import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
 
 /**
@@ -162,7 +161,7 @@ export function ContextPanelSkeleton({
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
             <div className={HOST_ROW_CLASS}>
-              <SquareAvatarSkeleton variant="round" size="sm" />
+              <SquareAvatar loading variant="round" size="sm" />
               <div className={HOST_TEXT_CLASS}>
                 <TextLineSkeleton type="h4" className="w-32" />
                 <TextLineSkeleton type="h6" className="w-24" />
@@ -176,9 +175,9 @@ export function ContextPanelSkeleton({
             <div className={DURATION_FIELD_CLASS}>
               <p className={FIELD_LABEL_CLASS}>Duration</p>
               <div className={DURATION_CHIPS_CLASS}>
-                {Array.from({ length: durations }, (_, i) => (
-                  <InteractiveSkeleton.Button key={i} size="small-legacy" className="w-16" />
-                ))}
+                <LoadingItems count={durations}>
+                  {() => <InteractiveSkeleton.Button size="small-legacy" className="w-16" />}
+                </LoadingItems>
               </div>
             </div>
           )}

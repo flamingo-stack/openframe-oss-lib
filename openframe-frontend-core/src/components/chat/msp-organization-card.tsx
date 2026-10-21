@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { ExternalLinkIcon } from '../icons-v2-generated';
-import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -38,7 +38,7 @@ export interface MspOrganizationCardProps {
   className?: string;
 }
 
-/** The card's layout per variant, read by the card and by its skeleton. */
+/** The card's layout per variant, loaded and loading. */
 // Inset ring (box-shadow) instead of `border` so the 1px stroke does not add to the box height — matches Figma's
 // 80px frame (16 + 48 + 16) with its inside-aligned stroke. A real border would render 82px.
 const CARD_FRAME_CLASS =
@@ -59,6 +59,10 @@ const FOOTER_CAPTION_CLASS = 'truncate text-ods-text-secondary text-h6';
  *
  * The trailing button renders only when `href` or `onOpenWebsite` is provided:
  * `href` becomes an anchor (new tab), otherwise `onOpenWebsite` fires on click.
+ *
+ * ONE switch (`useLoadingScope() || loading`): while the organization is read the SAME card (either variant) draws
+ * the logo in its loading form and its read text as bars (the footer's static caption stays real), and its link button
+ * real and inert.
  */
 export function MspOrganizationCard({
   name,
@@ -68,101 +72,71 @@ export function MspOrganizationCard({
   href,
   onOpenWebsite,
   variant = 'card',
-  loading = false,
+  loading: loadingProp = false,
   className,
 }: MspOrganizationCardProps) {
-  const isLoading = useLoadingScope() || loading;
-  if (isLoading) {
-    return <MspOrganizationCardSkeleton variant={variant} action={!!(href || onOpenWebsite)} className={className} />;
-  }
+  const loading = useLoadingScope() || loadingProp;
   const actionLabel = website ? `Open ${website}` : 'Open organization website';
+  const footer = variant === 'footer';
+  const buttonSize = footer ? 'icon-sm' : 'icon';
 
-  if (variant === 'footer') {
+  const action = href ? (
+    <Button asChild variant="outline" size={buttonSize} aria-label={actionLabel}>
+      <Link href={href} target="_blank" rel="noreferrer noopener">
+        <ExternalLinkIcon />
+      </Link>
+    </Button>
+  ) : onOpenWebsite ? (
+    <Button variant="outline" size={buttonSize} aria-label={actionLabel} onClick={onOpenWebsite}>
+      <ExternalLinkIcon />
+    </Button>
+  ) : null;
+  // The link button is static: drawn real while loading, inert.
+  const trailing =
+    action && loading ? (
+      <span inert aria-hidden className="inline-flex shrink-0">
+        {action}
+      </span>
+    ) : (
+      action
+    );
+
+  if (footer) {
     return (
       <div className={cn(FOOTER_FRAME_CLASS, className)}>
-        <SquareAvatar src={logoUrl} alt={name} fallback={name} size="sm" variant="square" />
+        <SquareAvatar loading={loading} src={logoUrl} alt={name} fallback={name} size="sm" variant="square" />
         <div className={TEXT_STACK_CLASS}>
           <span className={FOOTER_CAPTION_CLASS}>{FOOTER_CAPTION}</span>
-          <span className="truncate text-ods-text-primary text-h4">{title ?? name}</span>
+          {loading ? (
+            <TextLineSkeleton type="h4" className="w-3/5" />
+          ) : (
+            <span className="truncate text-ods-text-primary text-h4">{title ?? name}</span>
+          )}
         </div>
-        {href ? (
-          <Button asChild variant="outline" size="icon-sm" aria-label={actionLabel}>
-            <Link href={href} target="_blank" rel="noreferrer noopener">
-              <ExternalLinkIcon />
-            </Link>
-          </Button>
-        ) : onOpenWebsite ? (
-          <Button variant="outline" size="icon-sm" aria-label={actionLabel} onClick={onOpenWebsite}>
-            <ExternalLinkIcon />
-          </Button>
-        ) : null}
+        {trailing}
       </div>
     );
   }
 
   return (
     <div className={cn(CARD_FRAME_CLASS, className)}>
-      <SquareAvatar src={logoUrl} alt={name} fallback={name} size="lg" variant="square" />
+      <SquareAvatar loading={loading} src={logoUrl} alt={name} fallback={name} size="lg" variant="square" />
 
       <div className={TEXT_STACK_CLASS}>
-        <span className="truncate text-ods-text-primary text-h3">{title ?? `Your IT is managed by ${name}`}</span>
-        {website ? <span className="truncate text-ods-text-secondary text-h4">{website}</span> : null}
+        {loading ? (
+          <>
+            <TextLineSkeleton type="h3" className="w-3/5" />
+            <TextLineSkeleton type="h4" className="w-2/5" />
+          </>
+        ) : (
+          <>
+            <span className="truncate text-ods-text-primary text-h3">{title ?? `Your IT is managed by ${name}`}</span>
+            {website ? <span className="truncate text-ods-text-secondary text-h4">{website}</span> : null}
+          </>
+        )}
       </div>
 
-      {href ? (
-        <Button asChild variant="outline" size="icon" aria-label={actionLabel}>
-          <Link href={href} target="_blank" rel="noreferrer noopener">
-            <ExternalLinkIcon />
-          </Link>
-        </Button>
-      ) : onOpenWebsite ? (
-        <Button variant="outline" size="icon" aria-label={actionLabel} onClick={onOpenWebsite}>
-          <ExternalLinkIcon />
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
-export interface MspOrganizationCardSkeletonProps {
-  /** The card's variant, as the loaded card's (`card` by default). */
-  variant?: 'card' | 'footer';
-  /** The loaded card has its trailing link button (`href` or `onOpenWebsite`): the skeleton draws its box. */
-  action?: boolean;
-  /** Appended to the root element. */
-  className?: string;
-}
-
-/**
- * {@link MspOrganizationCard} while the organization is read, in the card's own frame per variant: the logo's box,
- * the title (h3) over the website (h4) for the card, the static caption over the name (h4) for the footer, and the
- * trailing link button's box when the loaded card has one (`action`).
- */
-export function MspOrganizationCardSkeleton({
-  variant = 'card',
-  action = true,
-  className,
-}: MspOrganizationCardSkeletonProps) {
-  if (variant === 'footer') {
-    return (
-      <div className={cn(FOOTER_FRAME_CLASS, className)}>
-        <SquareAvatar loading size="sm" variant="square" />
-        <div className={TEXT_STACK_CLASS}>
-          <span className={FOOTER_CAPTION_CLASS}>{FOOTER_CAPTION}</span>
-          <TextLineSkeleton type="h4" className="w-3/5" />
-        </div>
-        {action && <InteractiveSkeleton.Button size="icon-sm" className="shrink-0" />}
-      </div>
-    );
-  }
-  return (
-    <div className={cn(CARD_FRAME_CLASS, className)}>
-      <SquareAvatar loading size="lg" variant="square" />
-      <div className={TEXT_STACK_CLASS}>
-        <TextLineSkeleton type="h3" className="w-3/5" />
-        <TextLineSkeleton type="h4" className="w-2/5" />
-      </div>
-      {action && <InteractiveSkeleton.Button size="icon" className="shrink-0" />}
+      {trailing}
     </div>
   );
 }

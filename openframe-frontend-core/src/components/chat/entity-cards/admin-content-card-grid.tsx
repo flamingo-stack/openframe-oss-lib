@@ -26,7 +26,7 @@ export interface AdminContentCardGridSkeletonProps {
 }
 
 /** Cards a loading grid draws when its host names no page size: a typical page. */
-export const ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS = 12;
+const ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS = 12;
 
 /**
  * The grid's loading state on its own: one page of placeholder cards in the

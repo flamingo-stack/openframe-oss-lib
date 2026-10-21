@@ -3,6 +3,7 @@
 import { requireIcon, type IconComponent } from '../../chat/utils/icon-loading';
 import { InteractiveSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 
 /** SSO providers offered on the auth forms. */
@@ -42,6 +43,9 @@ export interface SsoProviderButtonsProps {
    * button as the generic one.
    */
   tag?: string;
+  /** The providers are still being read: the buttons draw their boxes (`SSO_PROVIDERS_SKELETON_COUNT`, the typical
+   *  offer). A loading scope does the same. */
+  loading?: boolean;
 }
 
 /** The column the provider buttons stack in, read by the buttons and by their skeleton. */
@@ -54,12 +58,12 @@ const SSO_PROVIDER_BUTTONS_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]'
 export const SSO_PROVIDERS_SKELETON_COUNT = 2;
 
 /** The provider buttons while the providers are read: full-width boxes of the outline button, in the same column. */
-export function SsoProviderButtonsSkeleton({ count = SSO_PROVIDERS_SKELETON_COUNT }: { count?: number }) {
+function SsoProviderButtonsSkeleton() {
   return (
     <div className={SSO_PROVIDER_BUTTONS_CLASS} aria-hidden>
-      {Array.from({ length: count }, (_, index) => (
-        <InteractiveSkeleton.Button key={index} className="w-full" data-loading-item />
-      ))}
+      <LoadingItems count={SSO_PROVIDERS_SKELETON_COUNT}>
+        {() => <InteractiveSkeleton.Button className="w-full" data-loading-item />}
+      </LoadingItems>
     </div>
   );
 }
@@ -72,7 +76,9 @@ export function SsoProviderButtons({
   disabled = false,
   enabledProviders,
   tag,
+  loading,
 }: SsoProviderButtonsProps) {
+  if (useLoadingScope() || loading) return <SsoProviderButtonsSkeleton />;
   return (
     <div className={SSO_PROVIDER_BUTTONS_CLASS}>
       {providers.map(provider => {
@@ -81,6 +87,7 @@ export function SsoProviderButtons({
         return (
           <Button
             key={provider}
+            data-loading-item
             type="button"
             variant="outline"
             fullWidth

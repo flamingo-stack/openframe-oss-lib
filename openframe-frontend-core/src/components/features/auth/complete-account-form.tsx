@@ -7,7 +7,7 @@ import { Button } from '../../ui/button';
 import { AccountDetailsFields } from './account-details-fields';
 import { LabeledDivider } from './labeled-divider';
 import type { AuthSsoProvider } from './sso-providers';
-import { SSO_PROVIDERS_SKELETON_COUNT, SsoProviderButtons, SsoProviderButtonsSkeleton } from './sso-providers';
+import { SsoProviderButtons } from './sso-providers';
 
 export interface CompleteAccountFormProps {
   /** Controlled field values */
@@ -26,11 +26,9 @@ export interface CompleteAccountFormProps {
   /** SSO alternatives offered above the fields ("Continue with …"). */
   ssoProviders?: AuthSsoProvider[];
   onSsoClick?: (provider: AuthSsoProvider) => void;
-  /** The SSO providers are still being read: the form draws their button boxes (`ssoProvidersSkeletonCount`, the
-   *  typical offer by default) and the real divider under them. */
+  /** The SSO providers are still being read: the provider buttons draw their boxes (the typical offer) over the real
+   *  divider. */
   ssoProvidersLoading?: boolean;
-  /** How many provider buttons to draw while the providers are read. Default `SSO_PROVIDERS_SKELETON_COUNT`. */
-  ssoProvidersSkeletonCount?: number;
   title?: string;
   subtitle?: string;
   dividerLabel?: string;
@@ -70,7 +68,6 @@ export function CompleteAccountForm({
   ssoProviders,
   onSsoClick,
   ssoProvidersLoading = false,
-  ssoProvidersSkeletonCount = SSO_PROVIDERS_SKELETON_COUNT,
   title = 'Complete your Account',
   subtitle = 'Fill in the details below to get started',
   dividerLabel = 'or create account',
@@ -105,25 +102,18 @@ export function CompleteAccountForm({
         <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
-      {/* SSO shortcuts + divider; while the providers are read, their boxes over the real divider */}
-      {ssoProvidersLoading ? (
+      {/* SSO shortcuts + divider; while the providers are read, the buttons draw their boxes over the real divider */}
+      {(ssoProvidersLoading || (ssoProviders && ssoProviders.length > 0)) && (
         <>
-          <SsoProviderButtonsSkeleton count={ssoProvidersSkeletonCount} />
+          <SsoProviderButtons
+            providers={ssoProviders ?? []}
+            onSsoClick={onSsoClick}
+            actionLabel={ssoActionLabel}
+            disabled={fieldsDisabled}
+            loading={ssoProvidersLoading}
+          />
           <LabeledDivider label={dividerLabel} />
         </>
-      ) : (
-        ssoProviders &&
-        ssoProviders.length > 0 && (
-          <>
-            <SsoProviderButtons
-              providers={ssoProviders}
-              onSsoClick={onSsoClick}
-              actionLabel={ssoActionLabel}
-              disabled={fieldsDisabled}
-            />
-            <LabeledDivider label={dividerLabel} />
-          </>
-        )
       )}
 
       <AccountDetailsFields

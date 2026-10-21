@@ -30,7 +30,7 @@ import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadgeSkeleton } from '../../ui/status-badge';
+import { StatusBadge } from '../../ui/status-badge';
 
 export interface DevCardRowContentProps {
   title: string;
@@ -99,8 +99,8 @@ export function DevCardRowContentSkeleton() {
         </div>
       </div>
       <div className={ROW_BADGES_CLASS}>
-        <StatusBadgeSkeleton variant="card" />
-        <StatusBadgeSkeleton variant="card" />
+        <StatusBadge loading text="" variant="card" />
+        <StatusBadge loading text="" variant="card" />
       </div>
     </div>
   );

@@ -109,15 +109,12 @@ export function ServiceCard({ title, subtitle, icon, tag, rows, loading: loading
             )}
           </div>
         </div>
-        {tag &&
-          (loading ? (
-            // The tag is read with the values: the pill's own box, its label a bar.
-            <div className={SERVICE_CARD_TAG_CLASS}>
-              <TextLineSkeleton type="inherit" className="w-12" />
-            </div>
-          ) : (
-            <div className={SERVICE_CARD_TAG_CLASS}>{tag.label}</div>
-          ))}
+        {tag && (
+          // The tag is read with the values: the pill's own box, its label a bar while loading.
+          <div className={SERVICE_CARD_TAG_CLASS}>
+            {loading ? <TextLineSkeleton type="inherit" className="w-12" /> : tag.label}
+          </div>
+        )}
       </div>
 
       {/* Rows */}

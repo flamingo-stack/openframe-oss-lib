@@ -15,7 +15,7 @@ import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ToolIcon } from '../tool-icon';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { useLoadingScope } from '../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { APPROVAL_LEVEL_META, APPROVAL_LEVELS } from './approval-level';
 
 const approvalLevelOptions = APPROVAL_LEVELS.map(value => ({ value, label: APPROVAL_LEVEL_META[value].label }));
@@ -162,6 +162,8 @@ const CategorySection: FC<{
   onBulkLevelChange: (categoryId: string, level: ApprovalLevel | undefined) => void;
   onPolicyPermissionChange: (categoryId: string, policyId: string, level: ApprovalLevel) => void;
   loading?: boolean;
+  /** List markers (`data-loading-item`), set by the panel on each category header. */
+  [key: `data-${string}`]: unknown;
 }> = ({
   category,
   editMode,
@@ -171,6 +173,7 @@ const CategorySection: FC<{
   onBulkLevelChange,
   onPolicyPermissionChange,
   loading = false,
+  ...props
 }) => {
   const isExpanded = isExpandedProp && !loading;
   const { innerRef, containerStyle } = useCollapsible({ expanded: isExpanded, durationMs: 300 });
@@ -180,7 +183,7 @@ const CategorySection: FC<{
     <>
       {/* Category Header */}
       <div
-        data-loading-item
+        {...loadingItemProps(props)}
         className={cn(CATEGORY_HEADER_CLASS, !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover')}
         onClick={loading ? undefined : () => onToggle(category.id)}
       >
@@ -346,6 +349,7 @@ export const PolicyConfigurationPanel: FC<PolicyConfigurationPanelProps> = ({
       {shown.map((category, index) => (
         <CategorySection
           key={category.id || index}
+          data-loading-item
           category={category}
           editMode={editMode}
           isExpanded={expandedIds.has(category.id)}

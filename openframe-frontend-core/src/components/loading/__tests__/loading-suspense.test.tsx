@@ -39,4 +39,17 @@ describe('LoadingSuspense', () => {
     expect(screen.getByText('loaded')).toBeTruthy();
     expect(screen.queryByTestId('bar')).toBeNull();
   });
+
+  it('draws its fallback in the loading scope when one is given', () => {
+    const never = new Promise<void>(() => {});
+    const Reader = () => {
+      throw never;
+    };
+    render(
+      <LoadingSuspense label="Loading the view" fallback={<Value read={() => 'unused'} />}>
+        <Reader />
+      </LoadingSuspense>,
+    );
+    expect(screen.getByTestId('bar')).toBeTruthy();
+  });
 });

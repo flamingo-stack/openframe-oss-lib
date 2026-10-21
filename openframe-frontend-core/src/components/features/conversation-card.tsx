@@ -12,7 +12,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { BUTTON_ICON_SM_SIZE, Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 import { Tag } from '../ui/tag';
 
 /**
@@ -238,7 +238,7 @@ export function ConversationCard({
 function TurnSkeleton({ avatarPx, meta, children }: { avatarPx: number; meta: boolean | string; children: ReactNode }) {
   return (
     <div className={TURN_ROW_CLASS}>
-      <SquareAvatarSkeleton sizePx={avatarPx} />
+      <SquareAvatar loading sizePx={avatarPx} />
       <div className={TURN_BODY_CLASS}>
         <ChatTurnNameSkeleton meta={meta} time />
         {children}

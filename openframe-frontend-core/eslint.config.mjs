@@ -217,6 +217,9 @@ export default defineConfig([
       'src/__tests__/data-table-loading-items.test.tsx',
       // The same marker on the chat's conversation rows (loaded and loading), counted per list.
       'src/components/chat/__tests__/chat-history-loading.test.tsx',
+      // Static controls drawn real and inert while loading: the `inert` ancestor and the skeleton surfaces are
+      // role-less and aria-hidden, so `screen` cannot see what is under test.
+      'src/components/ui/__tests__/static-controls-loading.test.tsx',
       // A header action's icon in the mobile "..." row: what is under test is the
       // re-tint wrapper around it, a role-less <span> whose class IS the contract
       // (an accent-tinted icon must not stay dark on the menu's dark row). No

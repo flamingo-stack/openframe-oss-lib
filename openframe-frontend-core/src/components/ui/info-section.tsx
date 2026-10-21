@@ -139,7 +139,7 @@ function CustomValue({ content }: { content: ReactNode }) {
   return <>{content}</>;
 }
 
-/** The card's layout, read by the loaded rows and by the skeleton rows, so both are one size. */
+/** The card's layout. */
 const INFO_SECTION_ROOT_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
 const INFO_SECTION_TITLE_CLASS = 'text-ods-text-secondary text-h5';
 const INFO_SECTION_CARD_CLASS =
@@ -156,30 +156,12 @@ const INFO_SECTION_VALUE_CLASS = 'flex min-w-0 items-center gap-[var(--spacing-s
  * assignee picker (autocomplete with search), an inline status dropdown, or an
  * arbitrary node.
  *
- * Loading (`loading`, or a `LoadingScope`): the caption and the labels are the page's copy and are drawn for real;
- * every value is its control's skeleton (a tag for a status, the picker's box for an assignee, a text line).
+ * Loading (`loading`, or a `LoadingScope`): ONE structure. The caption, the labels and the leader lines are the page's
+ * copy and are drawn for real; every value is its control, drawn in a scope, so it draws its own skeleton (a tag for
+ * a status, the picker's box for an assignee, a text line) in the same value box.
  */
 export function InfoSection({ title, rows, loading: loadingProp, className }: InfoSectionProps) {
   const loading = useLoadingScope() || !!loadingProp;
-  return <InfoSectionCard title={title} rows={rows} loading={loading} className={className} />;
-}
-
-/**
- * The card's ONE structure, loaded and loading: the caption, then a row per entry, its label and leader line drawn
- * for real, the value its control; while loading every control is drawn in a scope and draws its own skeleton in the
- * same value box.
- */
-function InfoSectionCard({
-  title,
-  rows,
-  loading,
-  className,
-}: {
-  title?: string;
-  rows: InfoSectionRow[];
-  loading: boolean;
-  className?: string;
-}) {
   return (
     <div className={cn(INFO_SECTION_ROOT_CLASS, className)} aria-hidden={loading || undefined}>
       {title && <p className={INFO_SECTION_TITLE_CLASS}>{title}</p>}

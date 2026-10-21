@@ -16,7 +16,7 @@ import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import type { ChatContextItem } from './types/context-item.types';
 
 const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
@@ -53,6 +53,9 @@ export interface ContextMenuRowProps {
   selected?: boolean;
   role?: 'menuitem' | 'option';
   title?: string;
+  /** The row's item is still being read: the SAME row (an inert `div`) draws its label as a bar. In a loading scope a
+   *  row with no label yet does the same. */
+  loading?: boolean;
 }
 
 export function ContextMenuRow({
@@ -64,8 +67,29 @@ export function ContextMenuRow({
   selected,
   role = 'menuitem',
   title,
+  loading: loadingProp = false,
   ...props
 }: ContextMenuRowProps) {
+  // ONE switch. A row with a label of its own (a static menu entry such as "Assign Item") stays real in a loading
+  // scope; only a row whose item is not here yet draws its label as a bar.
+  const inScope = useLoadingScope();
+  const loading = loadingProp || (inScope && (label == null || label === ''));
+  const content = (
+    <>
+      {icon != null && <span className={CONTEXT_ICON_CLASS}>{icon}</span>}
+      <span className={CONTEXT_LABEL_CLASS}>
+        {loading ? <TextLineSkeleton type="inherit" as="span" className="w-1/2" /> : label}
+      </span>
+      {!loading && trailing}
+    </>
+  );
+  if (loading) {
+    return (
+      <div aria-hidden className={cn(CONTEXT_ROW_CLASS, 'hover:bg-ods-bg')} {...loadingItemProps(props)}>
+        {content}
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -77,9 +101,7 @@ export function ContextMenuRow({
       className={cn(CONTEXT_ROW_CLASS, disabled && 'cursor-not-allowed opacity-40 hover:bg-ods-bg')}
       {...loadingItemProps(props)}
     >
-      {icon != null && <span className={CONTEXT_ICON_CLASS}>{icon}</span>}
-      <span className={CONTEXT_LABEL_CLASS}>{label}</span>
-      {trailing}
+      {content}
     </button>
   );
 }
@@ -88,24 +110,9 @@ export function ContextMenuRow({
 // SKELETON — Suspense fallback (initial load) + inline load-more rows.
 // ===========================================================================
 
-/** Item rows while they are read: each an item row's own box (`CONTEXT_ROW_CLASS`), its label a text-h4 line. */
+/** Item rows while they are read: `count` loading item rows (`ContextMenuRow loading`), each one item of the list. */
 function ContextItemsSkeleton({ count }: { count: number }) {
-  return (
-    <>
-      {Array.from({ length: count }, (_, i) => (
-        <div
-          key={`ctx-skeleton-${i}`}
-          aria-hidden
-          data-loading-item
-          className={cn(CONTEXT_ROW_CLASS, 'hover:bg-ods-bg')}
-        >
-          <span className={CONTEXT_LABEL_CLASS}>
-            <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
-          </span>
-        </div>
-      ))}
-    </>
-  );
+  return <LoadingItems count={count}>{() => <ContextMenuRow loading label="" data-loading-item />}</LoadingItems>;
 }
 
 // ===========================================================================

@@ -51,6 +51,9 @@ export interface AvatarStackProps {
    *  Default "Assignees". */
   label?: string;
   className?: string;
+  /** The people are still being read: the stack draws its skeleton, `slots ?? max` faces of its size. A loading scope
+   *  does the same. */
+  loading?: boolean;
 }
 
 /** Face diameter and how far each later face tucks under the previous one — the
@@ -116,8 +119,9 @@ export function AvatarStack({
   ringClassName = 'ring-ods-card',
   label = 'Assignees',
   className,
+  loading: loadingProp,
 }: AvatarStackProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   if (loading) return <AvatarStackSkeleton count={slots ?? max} size={size} slots={slots} className={className} />;
   if (people.length === 0) return null;
   const groupSize = Math.max(total ?? people.length, people.length);

@@ -64,6 +64,7 @@ import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import { Drawer, DrawerContent } from '../ui/drawer';
 import { HoverDropdown, type HoverDropdownItem } from '../ui/hover-dropdown';
+import { LoadingItems } from '../ui/loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from '../ui/portal-container';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ChatAppearanceContext } from './chat-appearance-context';
@@ -3085,17 +3086,13 @@ function EmbeddableChatInner({
                         rounded-md frame holds the cards on the dark surface. */}
                                 {(chipCommands.length > 0 || !commandsLoaded) && (
                                   <div className="shrink-0 overflow-hidden rounded-md border border-ods-border">
-                                    {!commandsLoaded &&
-                                      chipCommands.length === 0 &&
-                                      Array.from({ length: MINGO_ONBOARDING_SKELETON_ROWS }, (_, i) => (
-                                        <MingoOnboardingCard
-                                          key={`chip-skeleton-${i}`}
-                                          loading
-                                          data-loading-item
-                                          skeletonIndex={i}
-                                          title=""
-                                        />
-                                      ))}
+                                    {!commandsLoaded && chipCommands.length === 0 && (
+                                      <LoadingItems count={MINGO_ONBOARDING_SKELETON_ROWS}>
+                                        {i => (
+                                          <MingoOnboardingCard loading data-loading-item skeletonIndex={i} title="" />
+                                        )}
+                                      </LoadingItems>
+                                    )}
                                     {chipCommands.map(cmd => {
                                       const Icon = resolveIcon(cmd.iconName);
                                       const cmdId = cmd.id;

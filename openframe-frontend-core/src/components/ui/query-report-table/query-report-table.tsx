@@ -5,7 +5,7 @@ import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollb
 import { cn } from '../../../utils/cn';
 import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon';
 import { Button } from '../button';
-import { TableEmptyState } from '../table/table-empty-state';
+import { DataTableEmpty } from '../data-table/data-table-empty';
 import { QueryReportTableHeader } from './query-report-table-header';
 import { QueryReportTableRow } from './query-report-table-row';
 import { QueryReportTableSkeleton } from './query-report-table-skeleton';
@@ -23,6 +23,7 @@ export function QueryReportTable({
   skeletonRows = QUERY_REPORT_TABLE_SKELETON_ROWS,
   skeletonColumns = 6,
   emptyMessage,
+  emptyState,
   columnWidth = 160,
   columnOrder,
   showExport = true,
@@ -93,7 +94,16 @@ export function QueryReportTable({
       )}
 
       {/* Empty state */}
-      {!loading && data.length === 0 && <TableEmptyState message={emptyMessage} />}
+      {/* Empty state: the same mapping `DataTable.Body` makes (`emptyState` wins; `emptyMessage` is its title) */}
+      {!loading &&
+        data.length === 0 &&
+        (emptyState ? (
+          <DataTableEmpty {...emptyState} />
+        ) : emptyMessage != null ? (
+          <DataTableEmpty title={emptyMessage} description={undefined} />
+        ) : (
+          <DataTableEmpty />
+        ))}
 
       {/* Table content */}
       {!loading && data.length > 0 && (

@@ -30,6 +30,7 @@ import { useChatIdentity } from './../chat/hooks/use-chat-identity';
 import type { ChatAttachment } from './../chat/utils/chat-attachment-markdown';
 import { EmptyState } from './../empty-state';
 import { Button } from './../ui/button';
+import { LoadingItems } from './../ui/loading-scope';
 import { SquareAvatar } from './../ui/square-avatar';
 import { TicketAttachmentsList, type TicketAttachment } from './../ui/ticket-attachments-list';
 import { useTicketEngagements } from './hooks/use-ticket-engagements';
@@ -299,9 +300,7 @@ function TicketTimelinePanel({ ticket }: { ticket: AnyTicket }) {
     return (
       <div className={`${TICKET_FEED_FRAME} ${TICKET_FEED_HEIGHT}`}>
         <LoadingRegion label="Loading messages" className={TICKET_FEED_INNER}>
-          {Array.from({ length: TICKET_FEED_SKELETON_ROWS }, (_, i) => (
-            <ChatMessageRowSkeleton key={i} />
-          ))}
+          <LoadingItems count={TICKET_FEED_SKELETON_ROWS}>{() => <ChatMessageRowSkeleton />}</LoadingItems>
         </LoadingRegion>
       </div>
     );

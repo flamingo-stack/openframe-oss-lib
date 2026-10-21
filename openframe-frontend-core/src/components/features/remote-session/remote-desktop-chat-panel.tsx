@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { cn } from '../../../utils/cn';
 import { ChatInput } from '../../chat/chat-input';
 import { LoadingRegion } from '../../loading/loading-region';
-import { useLoadingScope } from '../../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { RemoteDesktopChatMessageRow } from './remote-desktop-chat-message-row';
 import type { RemoteSessionChatMessage } from './types';
 
@@ -82,18 +82,19 @@ export function RemoteDesktopChatPanel({
             // The chat while it is read: a screen of the panel's own message rows, stacked by a one-column grid
             // (the thread above is already the column flexbox: WEBVIEW-001).
             <LoadingRegion label="Loading the chat" className="grid grid-cols-1 gap-[var(--spacing-system-xsf)]">
-              {Array.from({ length: CHAT_PANEL_SKELETON_ROWS }, (_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-                // A conversation: the technician and the user take turns.
-                <RemoteDesktopChatMessageRow
-                  key={i}
-                  loading
-                  isTechnician={i % 2 === 1}
-                  authorName=""
-                  sentAt=""
-                  body=""
-                />
-              ))}
+              <LoadingItems count={CHAT_PANEL_SKELETON_ROWS}>
+                {i => (
+                  // A conversation: the technician and the user take turns.
+                  <RemoteDesktopChatMessageRow
+                    loading
+                    data-loading-item
+                    isTechnician={i % 2 === 1}
+                    authorName=""
+                    sentAt=""
+                    body=""
+                  />
+                )}
+              </LoadingItems>
             </LoadingRegion>
           ) : rows.length === 0 ? (
             <p className="text-center text-ods-text-muted text-h6">No messages yet - say hello to the user.</p>
@@ -101,6 +102,7 @@ export function RemoteDesktopChatPanel({
             rows.map(message => (
               <RemoteDesktopChatMessageRow
                 key={message.id}
+                data-loading-item
                 authorName={
                   message.name ||
                   (message.author === 'technician' ? technician.name : REMOTE_DESKTOP_CHAT_END_USER_NAME)

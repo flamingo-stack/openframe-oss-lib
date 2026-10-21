@@ -7,7 +7,6 @@ import React, { useCallback } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
-import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
@@ -353,8 +352,8 @@ export interface ActionsMenuDropdownProps extends ActionsMenuProps {
   /** Forwarded to the dropdown content — e.g. `e.preventDefault()` to stop
    *  Radix returning focus (and its focus ring) to the trigger on close. */
   onCloseAutoFocus?: (event: Event) => void;
-  /** The menu's subject is still being read: the menu draws its trigger's box (the default trigger's icon-button
-   *  skeleton, or the custom trigger drawn inert) and cannot open. A loading scope does the same. */
+  /** The menu's subject is still being read: the trigger (default or custom) is drawn for real and inert, and the menu
+   *  cannot open. A loading scope does the same. */
   loading?: boolean;
 }
 
@@ -435,33 +434,34 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
     [onItemClick, setOpen],
   );
 
+  // The trigger is a static control: drawn for real in both forms, inert while the menu's subject loads.
+  const triggerNode = customTrigger ?? (
+    <Button
+      variant="outline"
+      size="icon"
+      aria-label={triggerAriaLabel}
+      className={
+        triggerClassName ||
+        'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover focus-visible:ring-0'
+      }
+      leftIcon={trigger ?? <Ellipsis01Icon size={24} className="text-ods-text-primary" />}
+    />
+  );
+
   if (loading) {
-    // A custom trigger is the host's control: drawn as it is (it switches itself in the scope, e.g. a field trigger),
-    // inert. The default trigger is the outline icon button: its box.
-    return customTrigger ? (
-      <span inert aria-hidden className="inline-flex">
-        {customTrigger}
+    // A custom trigger is the host's control (it switches itself in the scope, e.g. a field trigger). Either trigger is
+    // drawn as it is, inert: it cannot open while the subject is read.
+    return (
+      <span inert aria-hidden className="inline-flex shrink-0">
+        {triggerNode}
       </span>
-    ) : (
-      <InteractiveSkeleton.Button size="icon" className="shrink-0" />
     );
   }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild ref={triggerRef}>
-        {customTrigger ?? (
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={triggerAriaLabel}
-            className={
-              triggerClassName ||
-              'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover focus-visible:ring-0'
-            }
-            leftIcon={trigger ?? <Ellipsis01Icon size={24} className="text-ods-text-primary" />}
-          />
-        )}
+        {triggerNode}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align={align}

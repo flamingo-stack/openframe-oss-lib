@@ -5,19 +5,20 @@ import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
 import type { ChatSidebarProps, DialogItem, DialogListItemProps } from './types';
 
-/** A dialog row's box, shared by the loaded row and its skeleton so both take the same space. */
+/** A dialog row's box, loaded and loading. */
 const DIALOG_LIST_ITEM_CLASS = 'flex items-center gap-4 overflow-clip px-4 py-3 border-b border-ods-border bg-ods-card';
 
+/**
+ * One dialog row. ONE switch (`useLoadingScope() || loading`): while the dialog is read the SAME row (inert, not
+ * clickable) draws its title and time as bars and its chevron (static) for real.
+ */
 const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
-  ({ className, dialog, isActive, onDialogSelect, onClick, loading = false, ...props }, ref) => {
-    // ONE switch: while the host reads the dialog, or in a loading scope, the row is its skeleton, with its markers.
-    if (useLoadingScope() || loading) {
-      return <DialogListItemSkeleton className={className} {...loadingItemProps(props)} />;
-    }
+  ({ className, dialog, isActive, onDialogSelect, onClick, loading: loadingProp = false, ...props }, ref) => {
+    const loading = useLoadingScope() || loadingProp;
 
     const handleClick = (e: MouseEvent<HTMLDivElement>) => {
       onDialogSelect?.(dialog.id);
@@ -30,46 +31,56 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
       return formatDateWithTimezone(timestamp, VIEWER_TIMEZONE, 'numericDateTime24h');
     };
 
+    const unread = loading ? 0 : (dialog.unreadMessagesCount ?? 0);
+
     return (
       <div
-        ref={ref}
+        ref={loading ? undefined : ref}
+        aria-hidden={loading || undefined}
         className={cn(
           DIALOG_LIST_ITEM_CLASS,
-          'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-          isActive && 'border-l-2 border-l-ods-accent bg-ods-bg-hover',
+          !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover',
+          !loading && isActive && 'border-l-2 border-l-ods-accent bg-ods-bg-hover',
           className,
         )}
-        onClick={handleClick}
-        {...props}
+        onClick={loading ? undefined : handleClick}
+        {...(loading ? loadingItemProps(props) : props)}
       >
         {/* Content area */}
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-1">
-          <div className="flex w-full min-w-0 items-center">
-            <h3
-              className={cn(
-                'min-w-0 flex-1 text-h6',
-                isActive ? 'text-ods-accent' : 'text-ods-text-primary',
-                'truncate',
+          {loading ? (
+            <>
+              <TextLineSkeleton type="h6" className="w-full max-w-[200px]" />
+              <TextLineSkeleton type="h6" className="w-32" />
+            </>
+          ) : (
+            <>
+              <div className="flex w-full min-w-0 items-center">
+                <h3
+                  className={cn(
+                    'min-w-0 flex-1 text-h6',
+                    isActive ? 'text-ods-accent' : 'text-ods-text-primary',
+                    'truncate',
+                  )}
+                  title={dialog.title || 'Untitled Chat'}
+                >
+                  {dialog.title || 'Untitled Chat'}
+                </h3>
+              </div>
+              {dialog.timestamp && (
+                <p className="w-full min-w-0 truncate text-ods-text-secondary text-h6">
+                  {formatTimestamp(dialog.timestamp)}
+                </p>
               )}
-              title={dialog.title || 'Untitled Chat'}
-            >
-              {dialog.title || 'Untitled Chat'}
-            </h3>
-          </div>
-          {dialog.timestamp && (
-            <p className="w-full min-w-0 truncate text-ods-text-secondary text-h6">
-              {formatTimestamp(dialog.timestamp)}
-            </p>
+            </>
           )}
         </div>
 
         {/* Right side indicator - always visible */}
         <div className="ml-2 flex-shrink-0">
-          {dialog.unreadMessagesCount && dialog.unreadMessagesCount > 0 ? (
+          {unread > 0 ? (
             <div className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)]">
-              <span className="text-ods-text-on-accent text-h6">
-                {dialog.unreadMessagesCount > 99 ? '99+' : dialog.unreadMessagesCount}
-              </span>
+              <span className="text-ods-text-on-accent text-h6">{unread > 99 ? '99+' : unread}</span>
             </div>
           ) : (
             <Chevron02RightIcon className="size-6 text-ods-text-secondary" />
@@ -82,30 +93,16 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
 
 DialogListItem.displayName = 'DialogListItem';
 
-/** {@link DialogListItem}'s loading state: the same box, the title and time lines, and the chevron. */
-function DialogListItemSkeleton({ className, ...props }: { className?: string }) {
-  return (
-    <div aria-hidden className={cn(DIALOG_LIST_ITEM_CLASS, className)} {...props}>
-      <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-1">
-        <TextLineSkeleton type="h6" className="w-full max-w-[200px]" />
-        <TextLineSkeleton type="h6" className="w-32" />
-      </div>
-      <div className="ml-2 flex-shrink-0">
-        <Chevron02RightIcon className="size-6 text-ods-text-secondary" />
-      </div>
-    </div>
-  );
-}
-
 /** A dialog row while the list is read, with no dialog yet. */
 const LOADING_DIALOG: DialogItem = { id: '', title: '' };
 
 /** A page of loading dialog rows (the list's page size), each a list item: the first page and the next one alike. */
 function DialogListItemLoadingPage({ count }: { count: number }) {
-  return Array.from({ length: count }, (_, index) => (
-    // Static placeholder rows: the index IS the identity.
-    <DialogListItem key={index} loading dialog={LOADING_DIALOG} data-loading-item />
-  ));
+  return (
+    <LoadingItems count={count}>
+      {() => <DialogListItem loading dialog={LOADING_DIALOG} data-loading-item />}
+    </LoadingItems>
+  );
 }
 
 const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(

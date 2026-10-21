@@ -18,6 +18,8 @@ interface VendorIconProps {
   className?: string;
   showBackground?: boolean;
   backgroundStyle?: 'dark' | 'light' | 'white';
+  /** The vendor is still being read: the icon draws its skeleton, the tile's own box. A loading scope does the same. */
+  loading?: boolean;
 }
 
 const sizeClasses = {
@@ -74,8 +76,9 @@ export function VendorIcon({
   className = '',
   showBackground = true,
   backgroundStyle = 'dark',
+  loading: loadingProp,
 }: VendorIconProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   const logoUrl = getVendorLogo(vendor);
   const logoSrc = useProxiedImageUrl(logoUrl, { directHttps: false });
   const { width, height } = showBackground ? imageSizeMap[size] : { width: tilePxMap[size], height: tilePxMap[size] };

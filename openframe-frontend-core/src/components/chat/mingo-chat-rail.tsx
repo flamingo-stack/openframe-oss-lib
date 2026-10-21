@@ -21,7 +21,7 @@ import {
 } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
-import { useLoadingScope } from '../ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatListEmptyState } from './chat-list-empty-state';
@@ -235,6 +235,7 @@ export function MingoChatRail({
         {dialogs.map(dialog => (
           <MingoChatRailRow
             key={dialog.id}
+            data-loading-item
             dialog={dialog}
             active={dialog.id === activeDialogId}
             status={statusFor(dialog, statusOf)}
@@ -318,16 +319,18 @@ interface MingoChatRailRowProps {
   status?: MingoDialogStatus;
   onSelect?: (id: string) => void;
   menuItems: ActionsMenuItem[];
+  /** List markers (`data-loading-item`), set by the list on its rows. */
+  [key: `data-${string}`]: unknown;
 }
 
-function MingoChatRailRow({ dialog, active, status, onSelect, menuItems }: MingoChatRailRowProps) {
+function MingoChatRailRow({ dialog, active, status, onSelect, menuItems, ...props }: MingoChatRailRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMenu = menuItems.length > 0;
   const glyph = status ? STATUS_GLYPHS[status] : undefined;
   const title = dialog.title || 'Untitled Chat';
 
   return (
-    <div data-loading-item className="group/row relative shrink-0">
+    <div {...loadingItemProps(props)} className="group/row relative shrink-0">
       <ChatListItem
         active={active}
         title={title}

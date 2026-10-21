@@ -260,6 +260,9 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** The thread is still loading: the list draws its own loading state. Inside a `LoadingScope` it does so whatever
    *  this says. */
   isLoading?: boolean;
+  /** The reader's limit: how many messages the host reads for the thread, so the loading state draws exactly that
+   *  many rows. Default `CHAT_MESSAGE_LIST_SKELETON_MESSAGES` (a typical thread, for a host that reads with no limit). */
+  pageSize?: number;
   /** The loading state top-anchors its rows and clips them, so a fixed-height host box reads as "the whole panel is
    *  loading" and never grows a scrollbar. Default `false` (rows bottom-anchored like the loaded thread). */
   fill?: boolean;

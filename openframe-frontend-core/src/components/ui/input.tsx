@@ -3,9 +3,9 @@
 import { Loader2 } from 'lucide-react';
 import { type InputHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { FieldValueSkeleton } from './field-value-skeleton';
 import { FieldWrapper } from './field-wrapper';
-import { FIELD_VALUE_SKELETON_CLASS, INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
+import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
 import { useLoadingScope } from './loading-scope';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -143,7 +143,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
           {startAdornment}
         </span>
       )}
-      {inScope && <TextLineSkeleton type="h4" className={FIELD_VALUE_SKELETON_CLASS} />}
+      {inScope && <FieldValueSkeleton />}
       <input
         type={type}
         hidden={inScope || props.hidden}

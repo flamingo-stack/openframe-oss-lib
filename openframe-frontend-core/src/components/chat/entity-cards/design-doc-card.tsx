@@ -18,9 +18,9 @@ import {
   formatCompletionLabelWithBlockers,
 } from '../../../utils/design-doc-readiness';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { AvatarStack, AvatarStackSkeleton, type AvatarStackPerson } from '../../ui/avatar-stack';
+import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge, StatusBadgeSkeleton } from '../../ui/status-badge';
+import { StatusBadge } from '../../ui/status-badge';
 import { safeHref } from '../utils/compact-card-classes';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 
@@ -84,10 +84,10 @@ export function DesignDocCardSkeleton({ className }: { className?: string } = {}
             <TextLineSkeleton type="h5" className="w-1/3" />
           </div>
         </div>
-        <StatusBadgeSkeleton variant="button" className="hidden md:inline-flex" />
+        <StatusBadge loading text="" variant="button" className="hidden md:inline-flex" />
       </div>
       <div className="md:hidden">
-        <StatusBadgeSkeleton variant="button" />
+        <StatusBadge loading text="" variant="button" />
       </div>
       <div className={DESIGN_DOC_CARD_SUMMARY_ROW}>
         <TextLineSkeleton type="h4" lines={3} className="w-full" />
@@ -95,7 +95,7 @@ export function DesignDocCardSkeleton({ className }: { className?: string } = {}
       <div className="flex-1" />
       <div className={DESIGN_DOC_CARD_FOOTER}>
         <TextLineSkeleton type="h6" className="w-1/3" />
-        <AvatarStackSkeleton count={1} size="xs" className="shrink-0" />
+        <AvatarStack loading people={[]} max={1} size="xs" className="shrink-0" />
       </div>
     </div>
   );

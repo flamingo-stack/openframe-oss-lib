@@ -12,7 +12,7 @@ import { serializeJsonLd } from '../../utils/common';
 import { faqSectionSlug, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
-import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, FaqAccordionSkeleton, type FaqItem } from '../faq-accordion';
+import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, type FaqItem } from '../faq-accordion';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
@@ -713,7 +713,11 @@ export function FaqSectionSkeleton({
                 <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
               </CategoryHeading>
             )}
-            <FaqAccordionSkeleton count={Math.max(1, group.rows ?? FAQ_SECTION_SKELETON_QUESTIONS)} />
+            <FaqAccordion
+              loading
+              items={[]}
+              skeletonCount={Math.max(1, group.rows ?? FAQ_SECTION_SKELETON_QUESTIONS)}
+            />
           </section>
         );
       })}

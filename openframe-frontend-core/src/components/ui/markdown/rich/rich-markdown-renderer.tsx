@@ -22,7 +22,7 @@ import {
   useRichMarkdownRuntime,
   type RichMarkdownRuntime,
 } from '../../../embeds/rich-markdown-runtime';
-import { MarkdownEngine, MarkdownEngineSkeleton, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
+import { MarkdownEngine, NO_BROKEN_LINKS, type MarkdownEngineProps } from '../engine';
 import { resolveTextSizeConfig } from '../text-size';
 import { buildRichEmbedOverrides } from './embed-overrides';
 import { processShortcodes } from './shortcodes';
@@ -211,7 +211,7 @@ type InnerProps = Omit<RichMarkdownRendererProps, keyof RichMarkdownRuntime> &
 export const RichMarkdownRenderer = memo(RichMarkdownRendererImpl);
 
 /**
- * A RichMarkdownRenderer while its content is read: the engine's skeleton at the `article` type, `sections`
+ * A RichMarkdownRenderer while its content is read: the engine (`MarkdownEngine loading`) at the `article` type, `sections`
  * sections of a real `<h2>` holding a bar and its paragraphs (the renderer's own heading and paragraph classes).
  */
 export function RichMarkdownRendererSkeleton({
@@ -224,5 +224,14 @@ export function RichMarkdownRendererSkeleton({
   title?: boolean;
   className?: string;
 }) {
-  return <MarkdownEngineSkeleton sections={sections} title={title} textSize="article" className={className} />;
+  return (
+    <MarkdownEngine
+      loading
+      content=""
+      skeletonSections={sections}
+      skeletonTitle={title}
+      textSize="article"
+      className={className}
+    />
+  );
 }

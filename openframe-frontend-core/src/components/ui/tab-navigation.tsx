@@ -139,6 +139,11 @@ interface TabNavigationProps {
    * instead of its skeleton bars. Default `false`: labels built from read data stay skeletons.
    */
   staticLabels?: boolean;
+  /** The tabs are still being read: the strip draws its skeleton (or, with `staticLabels`, the real strip inert). A
+   *  loading scope does the same. */
+  loading?: boolean;
+  /** Tabs the skeleton draws: the tabs the host reads. Default `tabs.length`. */
+  skeletonCount?: number;
 
   /**
    * Render prop for the tab BODY. Receives the tab to render and, additively,
@@ -672,6 +677,8 @@ export function TabNavigation({
   urlSync = false,
   defaultTab,
   staticLabels = false,
+  loading: loadingProp,
+  skeletonCount,
   children,
 }: TabNavigationProps) {
   const providedVariant = useContext(TabNavigationVariantContext);
@@ -835,7 +842,7 @@ export function TabNavigation({
   const isStale = activeTab !== deferredActiveTab;
   // In a loading scope the body below draws its own loading state. The strip draws its skeleton, unless the caller
   // says its labels are static copy (`staticLabels`): then the real strip is drawn, inert.
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
 
   return (
     <>
@@ -857,7 +864,7 @@ export function TabNavigation({
         </div>
       ) : loading ? (
         <TabNavigationSkeleton
-          count={tabs.length}
+          count={skeletonCount ?? tabs.length}
           avatar={tabs.some(tab => Boolean(tab.avatar))}
           sublabel={tabs.some(tab => Boolean(tab.sublabel))}
           stretchTabs={stretchTabs}

@@ -39,8 +39,8 @@ import {
 import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { BlogImagePlaceholder } from './blog-image-placeholder';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
-import { EntityAuthorCard, EntityAuthorCardSkeleton } from './entity-author-card';
-import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+import { EntityAuthorCard } from './entity-author-card';
+import { EntityPortraitCard } from './entity-portrait-card';
 
 /** The content-type chip a portrait guide shows (a static label). */
 const GUIDE_TYPE_LABEL = 'Guide';
@@ -128,7 +128,14 @@ export function OnboardingGuideCardSkeleton({
 }) {
   if (size === 'portrait') {
     return (
-      <EntityPortraitCardSkeleton typeLabel={showTypeBadge ? GUIDE_TYPE_LABEL : undefined} className={className} />
+      <EntityPortraitCard
+        loading
+        href=""
+        imageAlt=""
+        title=""
+        typeLabel={showTypeBadge ? GUIDE_TYPE_LABEL : undefined}
+        className={className}
+      />
     );
   }
   if (size === 'catalog') {
@@ -151,9 +158,11 @@ export function OnboardingGuideCardSkeleton({
               </div>
             </div>
           </div>
-          <EntityAuthorCardSkeleton
-            extraCellLabels={CATALOG_EXTRA_CELL_LABELS}
-            publishedLabel={published ? undefined : null}
+          <EntityAuthorCard
+            loading
+            author={null}
+            extraCells={CATALOG_EXTRA_CELL_LABELS.map(label => ({ value: '', label }))}
+            publishedAt={published ? null : undefined}
           />
         </div>
       </div>

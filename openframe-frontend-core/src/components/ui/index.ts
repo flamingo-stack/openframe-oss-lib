@@ -14,6 +14,7 @@ export * from './date-picker';
 export * from './duration-input';
 export * from './field';
 export * from './field-wrapper';
+export * from './field-value-skeleton';
 export * from './honeypot-field';
 export * from './info-hint';
 export * from './json-detail-list';

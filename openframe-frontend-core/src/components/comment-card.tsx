@@ -6,7 +6,7 @@ import { formatRelativeTime } from '../utils/date-utils';
 import { useAuth } from './auth-stub';
 import { TextLineSkeleton, UnifiedSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
-import { useLoadingScope } from './ui/loading-scope';
+import { loadingItemProps, useLoadingScope } from './ui/loading-scope';
 import { UserSummary } from './user-summary-stub';
 import {
   VENDOR_DISPLAY_BUTTON_FRAME_CLASS,
@@ -42,8 +42,7 @@ export interface CommentCardComment {
   canDelete?: boolean;
 }
 
-interface CommentCardProps {
-  comment: CommentCardComment;
+interface CommentCardBaseProps {
   onViewProduct?: (vendorSlug: string) => void;
   onDeleteComment?: (commentId: string) => void;
   /** @deprecated Superseded by `leadWith`; the component ignores it. */
@@ -66,7 +65,18 @@ interface CommentCardProps {
   footer?: React.ReactNode;
   /** Rendered after the card — nested replies + reply composer (design-doc threads). */
   children?: React.ReactNode;
+  /** While `loading` with no comment: the card draws its title row (titled reviews). Default true. */
+  titleRow?: boolean;
+  /** List markers (`data-loading-item`), on the card's frame in both forms. */
+  [marker: `data-${string}`]: unknown;
 }
+
+/**
+ * A comment (`comment`), or, while it is read, `loading` with no comment: the card draws its skeleton in its own boxes,
+ * with the `footer` it is given (the host's static controls). A loading scope draws the skeleton too.
+ */
+type CommentCardProps = CommentCardBaseProps &
+  ({ comment: CommentCardComment; loading?: false } | { comment?: undefined; loading: true });
 
 // The card's boxes, read by the card AND its skeleton, so the two are one size at every width.
 const COMMENT_CARD_FRAME =
@@ -95,8 +105,12 @@ export function CommentCard({
   fullBody = false,
   footer,
   children,
+  loading,
+  titleRow = true,
+  ...markers
 }: CommentCardProps) {
   const { user: currentUser } = useAuth();
+  const inScope = useLoadingScope();
 
   // Use unified date formatting function
   const formatActivityTime = (timestamp: string) => {
@@ -110,31 +124,37 @@ export function CommentCard({
    * with their gate module and hand it in), and the default is the only rule
    * this component can honestly know by itself — your own comment.
    */
-  const canUserDeleteComment = () => {
+  const canUserDeleteComment = (shown: CommentCardComment) => {
     if (!currentUser) return false;
-    if (typeof comment.canDelete === 'boolean') return comment.canDelete;
-    return !!comment.user && currentUser.id === comment.user.id;
+    if (typeof shown.canDelete === 'boolean') return shown.canDelete;
+    return !!shown.user && currentUser.id === shown.user.id;
   };
 
-  const showDeleteButton = canUserDeleteComment();
-
-  if (useLoadingScope()) {
+  if (inScope || loading) {
     return (
       <>
         <CommentCardSkeleton
           leadWith={leadWith}
-          showTitle={!!comment.title}
-          showDelete={showDeleteButton && !!onDeleteComment}
+          showTitle={comment ? !!comment.title : titleRow}
+          showDelete={!!comment && canUserDeleteComment(comment) && !!onDeleteComment}
           compact={compact}
+          footer={loading ? footer : undefined}
+          {...loadingItemProps(markers)}
         />
         {children}
       </>
     );
   }
 
+  const showDeleteButton = canUserDeleteComment(comment);
+
   return (
     <>
-      <div className={COMMENT_CARD_FRAME} style={{ maxWidth: '100%', wordBreak: 'break-word' }}>
+      <div
+        className={COMMENT_CARD_FRAME}
+        style={{ maxWidth: '100%', wordBreak: 'break-word' }}
+        {...loadingItemProps(markers)}
+      >
         {/* Comment Header */}
         <div className={COMMENT_CARD_HEADER}>
           {/* Row 1: Info + Timestamp */}
@@ -272,6 +292,7 @@ export function CommentCardSkeleton({
   compact = false,
   footer,
   className,
+  ...markers
 }: {
   leadWith?: 'vendor' | 'commenter';
   showTitle?: boolean;
@@ -281,9 +302,11 @@ export function CommentCardSkeleton({
   /** The card's footer row as the loaded card draws it (its static controls, such as a thread's Reply). */
   footer?: React.ReactNode;
   className?: string;
+  /** List markers (`data-loading-item`), as the loaded card carries them. */
+  [marker: `data-${string}`]: unknown;
 }) {
   return (
-    <div className={cn(COMMENT_CARD_FRAME, className)} aria-hidden>
+    <div className={cn(COMMENT_CARD_FRAME, className)} aria-hidden {...loadingItemProps(markers)}>
       <div className={COMMENT_CARD_HEADER}>
         <div className={COMMENT_CARD_LEAD}>
           {leadWith === 'vendor' ? (

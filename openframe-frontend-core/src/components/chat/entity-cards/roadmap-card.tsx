@@ -23,7 +23,7 @@ import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge, StatusBadgeSkeleton, generationTierFromLabel } from '../../ui/status-badge';
+import { StatusBadge, generationTierFromLabel } from '../../ui/status-badge';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import type { RoadmapItem } from '../types/entities/roadmap-item';
 import { getStatusColorScheme } from '../utils/agent-status-message';
@@ -109,11 +109,11 @@ export function RoadmapCardSkeleton({
           </div>
         </div>
         <div className="hidden md:block">
-          <StatusBadgeSkeleton />
+          <StatusBadge loading text="" />
         </div>
       </div>
       <div className="md:hidden">
-        <StatusBadgeSkeleton />
+        <StatusBadge loading text="" />
       </div>
       <div className={ROADMAP_CARD_SUMMARY_ROW}>
         <TextLineSkeleton type="h4" lines={3} className="w-full" />

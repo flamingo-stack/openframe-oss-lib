@@ -11,7 +11,7 @@
  * and the same skeleton shows while it fetches on the client. Nothing in a scope fetches, writes, or draws invented
  * words.
  */
-import { createContext, type ElementType, useContext, type ReactNode } from 'react';
+import { createContext, type ElementType, Fragment, useContext, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 const LoadingScopeContext = createContext(false);
@@ -81,4 +81,22 @@ export function LoadingWhen({ loading, children }: { loading: boolean; children:
  */
 export function loadingItemProps(props: object): { [key: `data-${string}`]: unknown } {
   return Object.fromEntries(Object.entries(props).filter(([key]) => key.startsWith('data-')));
+}
+
+/**
+ * A list's items while the list is read: `count` of them, each drawn by `children(index)` (keyed here, so the caller
+ * writes no key). THE one way a skeleton draws N items: the count is the list's own page size, limit or declared
+ * typical constant, never a literal typed here, and each item carries the list's markers (`data-loading-item`, through
+ * `loadingItemProps`), like the loaded item.
+ *
+ *   <LoadingItems count={pageSize}>{() => <RowSkeleton data-loading-item />}</LoadingItems>
+ */
+export function LoadingItems({ count, children }: { count: number; children: (index: number) => ReactNode }) {
+  return (
+    <>
+      {Array.from({ length: count }, (_, index) => (
+        <Fragment key={index}>{children(index)}</Fragment>
+      ))}
+    </>
+  );
 }

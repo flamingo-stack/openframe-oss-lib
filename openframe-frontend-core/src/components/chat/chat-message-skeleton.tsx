@@ -3,6 +3,7 @@
 import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { loadingItemProps } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { useChatAppearance } from './chat-appearance-context';
 import {
@@ -41,6 +42,8 @@ interface ChatMessageSkeletonProps {
   bodyLines?: number;
   /** The thread's appearance (its row padding); the surrounding chat's when not given. */
   appearance?: ChatAppearance;
+  /** List markers (`data-loading-item`), set by the list on its rows. */
+  [key: `data-${string}`]: unknown;
 }
 
 /** The time line's bar: the `text-h6` time the loaded row writes. */
@@ -65,7 +68,7 @@ export function ChatMessageSkeleton({
   const appearance = appearanceProp ?? inherited;
   const lines = Math.max(1, bodyLines);
   return (
-    <div className={cn('relative', CHAT_MESSAGE_ROW_PADDING_CLASS[appearance], className)} {...props}>
+    <div className={cn('relative', CHAT_MESSAGE_ROW_PADDING_CLASS[appearance], className)} {...loadingItemProps(props)}>
       <div className={CHAT_MESSAGE_STACK_CLASS}>
         {(showAvatar || showName) && (
           <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>

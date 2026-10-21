@@ -7,7 +7,6 @@ import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { SquareAvatar, AvatarStack, Button } from '../ui';
 import { AutocompleteSkeleton } from '../ui/autocomplete';
 import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
 import { TimezoneSelect } from '../ui/timezone-select';
 
 /**
@@ -140,7 +139,7 @@ export function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTime
       <div className={STRIP_CLASS}>
         <div className={HOST_LIST_CLASS}>
           <div className={HOST_ROW_CLASS}>
-            <SquareAvatarSkeleton variant="round" size="sm" />
+            <SquareAvatar loading variant="round" size="sm" />
             <div className={HOST_TEXT_CLASS}>
               <TextLineSkeleton type="h4" className="w-32" />
               <TextLineSkeleton type="h6" className="w-24" />

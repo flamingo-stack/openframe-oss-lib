@@ -137,6 +137,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       messages,
       dialogId,
       isLoading: isLoadingProp = false,
+      pageSize = CHAT_MESSAGE_LIST_SKELETON_MESSAGES,
       fill = false,
       isTyping = false,
       typingMessage,
@@ -949,7 +950,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           fullWidth={fullWidth}
           contentClassName={contentClassName}
           fill={fill}
-          messageCount={CHAT_MESSAGE_LIST_SKELETON_MESSAGES}
+          messageCount={pageSize}
           appearance={appearance}
           namedOthers={selfAuthorType === 'admin'}
         />

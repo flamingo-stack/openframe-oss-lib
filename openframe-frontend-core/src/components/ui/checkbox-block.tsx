@@ -1,12 +1,9 @@
 'use client';
 
-import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
+import type * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
-import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { booleanCheckedChange, CHECKBOX_BOX_CLASS } from './checkbox';
-import { useLoadingScope } from './loading-scope';
+import { Checkbox } from './checkbox';
 import { RequiredMark } from './required-mark';
 
 interface CheckboxBlockProps {
@@ -40,8 +37,9 @@ interface CheckboxBlockProps {
   className?: string;
 }
 
-/** The block's box: the checkbox's own box (`CHECKBOX_BOX_CLASS`), grown at `md`. Read by the box and its skeleton. */
-const CHECKBOX_BLOCK_BOX_CLASS = cn(CHECKBOX_BOX_CLASS, 'rounded-[6px] content-md:size-6');
+/** The block's box over the checkbox's own (`CHECKBOX_BOX_CLASS`): grown at `md`. `Checkbox` reads it for the box and
+ *  for its skeleton. */
+const CHECKBOX_BLOCK_BOX_CLASS = 'rounded-[6px] content-md:size-6';
 
 const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, CheckboxBlockProps>(
   (
@@ -62,8 +60,6 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
     },
     ref,
   ) => {
-    // ONE switch: in a page's loading state (or while the host reads it) the box is a skeleton; the copy is real.
-    const loading = useLoadingScope() || !!loadingProp;
     return (
       <div className={cn('relative flex w-full flex-col', className)}>
         <label
@@ -94,37 +90,32 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
             error && 'ring-ods-error',
           )}
         >
-          {loading ? (
-            <UnifiedSkeleton className={CHECKBOX_BLOCK_BOX_CLASS} />
-          ) : (
-            <CheckboxPrimitive.Root
-              ref={ref}
-              id={id}
-              checked={checked}
-              defaultChecked={defaultChecked}
-              onCheckedChange={booleanCheckedChange(onCheckedChange)}
-              disabled={disabled}
-              aria-required={required || undefined}
-              aria-invalid={error ? true : undefined}
-              className={cn(
-                CHECKBOX_BLOCK_BOX_CLASS,
-                'border-2',
-                error ? 'border-ods-error' : 'border-[var(--color-border-strong)]',
-                'bg-ods-card',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-card',
-                // Disabled: the EMPTY box dims with the text instead of the whole
-                // block fading. A checked box keeps its accent fill — greying it too
-                // would bury the checkmark, and "on but locked" has to stay readable.
-                'disabled:cursor-not-allowed',
-                'disabled:data-[state=unchecked]:border-ods-border disabled:data-[state=unchecked]:bg-ods-bg',
-                'data-[state=checked]:border-[var(--color-accent-primary)] data-[state=checked]:bg-[var(--color-accent-primary)]',
-              )}
-            >
-              <CheckboxPrimitive.Indicator className="flex items-center justify-center text-ods-text-on-accent">
-                <CheckboxCheckmarkIcon className="h-2 w-2 content-md:h-2.5 content-md:w-2.5" />
-              </CheckboxPrimitive.Indicator>
-            </CheckboxPrimitive.Root>
-          )}
+          {/* The box switches itself: in a loading scope (or `loading`) it is its skeleton; the copy stays real. */}
+          <Checkbox
+            ref={ref}
+            id={id}
+            checked={checked}
+            defaultChecked={defaultChecked}
+            onCheckedChange={onCheckedChange}
+            disabled={disabled}
+            loading={loadingProp}
+            aria-required={required || undefined}
+            aria-invalid={error ? true : undefined}
+            boxClassName={CHECKBOX_BLOCK_BOX_CLASS}
+            indicatorClassName="h-2 w-2 content-md:h-2.5 content-md:w-2.5"
+            className={cn(
+              'border-2',
+              error ? 'border-ods-error' : 'border-[var(--color-border-strong)]',
+              'bg-ods-card',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-card',
+              // Disabled: the EMPTY box dims with the text instead of the whole
+              // block fading. A checked box keeps its accent fill — greying it too
+              // would bury the checkmark, and "on but locked" has to stay readable.
+              'disabled:cursor-not-allowed disabled:opacity-100',
+              'disabled:data-[state=unchecked]:border-ods-border disabled:data-[state=unchecked]:bg-ods-bg',
+              'data-[state=checked]:border-[var(--color-accent-primary)] data-[state=checked]:bg-[var(--color-accent-primary)]',
+            )}
+          />
           <div
             className={cn(
               'flex min-w-0 flex-1 flex-col justify-center',
