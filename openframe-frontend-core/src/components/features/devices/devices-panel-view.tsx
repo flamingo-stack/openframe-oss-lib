@@ -111,6 +111,11 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   onLoadMore?: () => void;
   /** The grid's infinite-scroll sentinel. */
   gridSentinelRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * The host query's page size: a loading table or grid draws one full page, and the next page's skeleton the same.
+   * Omitted, the table draws 10 rows and the grid its default.
+   */
+  pageSize?: number;
 }
 
 /**
@@ -152,6 +157,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   isFetchingNextPage = false,
   onLoadMore = noop,
   gridSentinelRef,
+  pageSize,
 }: DevicesPanelViewProps<T>) {
   const gridColumns =
     filterColumns ?? getDeviceFilterColumns(deviceFilters).filter(column => !hideFilters?.includes(column.key));
@@ -165,7 +171,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           isLoading={loading}
           loadingRegion={false}
           emptyMessage={loading ? '' : emptyMessage}
-          skeletonRows={10}
+          skeletonRows={pageSize ?? 10}
           stickyHeaderOffset="top-[96px]"
           deviceFilters={deviceFilters}
           // Loading: the facets have not answered, which is not "this list has
@@ -185,7 +191,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
                 onLoadMore={onLoadMore}
-                skeletonRows={2}
+                skeletonRows={pageSize ?? 2}
               />
             )
           }
@@ -210,6 +216,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
             isFetchingNextPage={isFetchingNextPage}
             sentinelRef={gridSentinelRef}
             emptyMessage={loading ? '' : emptyMessage}
+            pageSize={pageSize}
           />
         </>
       )}

@@ -19,7 +19,15 @@ export interface DevicesGridProps<T extends DeviceRow = DeviceRow> {
   emptyMessage?: string;
   /** The loading state announces itself ("Loading devices"). `false` inside another loading region. Default `true`. */
   loadingRegion?: boolean;
+  /**
+   * The host's page size: the loading grid draws one full page of cards, and the next page's skeleton the same.
+   * Omitted, it falls back to {@link DEVICES_GRID_SKELETON_CARDS}.
+   */
+  pageSize?: number;
 }
+
+/** The cards a loading grid draws when the host states no page size. */
+export const DEVICES_GRID_SKELETON_CARDS = 12;
 
 export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   devices,
@@ -29,6 +37,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   sentinelRef,
   emptyMessage = 'No devices found. Try adjusting your search or filters.',
   loadingRegion = true,
+  pageSize = DEVICES_GRID_SKELETON_CARDS,
 }: DevicesGridProps<T>) {
   // ONE switch: in a page's loading state (or while the host reads the devices) the grid is its skeleton.
   const isLoading = useLoadingScope() || isLoadingProp;
@@ -43,7 +52,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
   return (
     <div className="space-y-4">
       {isLoading && devices.length === 0 ? (
-        <DeviceCardSkeletonGrid count={12} region={loadingRegion} />
+        <DeviceCardSkeletonGrid count={pageSize} region={loadingRegion} />
       ) : devices.length === 0 ? (
         <div className="flex h-64 items-center justify-center rounded-[6px] border border-ods-border bg-ods-card">
           <p className="text-ods-text-secondary">{emptyMessage}</p>
@@ -85,7 +94,7 @@ export function DevicesGrid<T extends DeviceRow = DeviceRow>({
               );
             })}
             {isFetchingNextPage &&
-              Array.from({ length: 4 }, (_, i) => <DeviceCardSkeleton key={`skeleton-${i}`} listItem />)}
+              Array.from({ length: pageSize }, (_, i) => <DeviceCardSkeleton key={`skeleton-${i}`} listItem />)}
           </div>
           {hasNextPage && <div ref={sentinelRef} className="h-1" aria-hidden="true" />}
         </>

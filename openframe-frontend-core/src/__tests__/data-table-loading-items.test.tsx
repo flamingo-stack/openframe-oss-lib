@@ -1,6 +1,7 @@
 import { createColumnHelper } from '@tanstack/react-table';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { DEVICES_GRID_SKELETON_CARDS, DevicesGrid } from '../components/features/devices/devices-grid';
 import { DataTable } from '../components/ui/data-table';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
 import { Table as LegacyTable } from '../components/ui/table/table';
@@ -47,5 +48,17 @@ describe('DataTable rows are loading items', () => {
       <LegacyTable<Row> data={rows(2)} columns={[{ key: 'name', label: 'Name' }]} rowKey="id" />,
     );
     expect(container.querySelectorAll(ITEM).length).toBe(2);
+  });
+});
+
+describe('the devices grid draws its host page', () => {
+  it('a loading grid draws one card per row of the page size, each an item', () => {
+    const { container } = render(<DevicesGrid devices={[]} isLoading pageSize={7} />);
+    expect(container.querySelectorAll(ITEM).length).toBe(7);
+  });
+
+  it('with no page size it draws its declared default', () => {
+    const { container } = render(<DevicesGrid devices={[]} isLoading />);
+    expect(container.querySelectorAll(ITEM).length).toBe(DEVICES_GRID_SKELETON_CARDS);
   });
 });
