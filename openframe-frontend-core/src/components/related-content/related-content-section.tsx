@@ -318,33 +318,13 @@ const GROUP_LIST_CLASS = 'space-y-4';
 const GROUP_HEADING_CLASS = 'font-semibold text-ods-text-secondary text-h5';
 // A column with a gap, not space-y: the region's screen-reader status (absolutely positioned) must not take a margin.
 // The rail is a page section (a `<section>`, loaded and loading). Its groups and each group's cards are read lists
-// (`data-loading-item`): how many there are is the data's, and the skeleton draws one fold of each group.
+// (`data-loading-item`): how many there are is the data's, and the skeleton draws ONE FULL PAGE of each group.
 const RAIL_CLASS = 'flex flex-col gap-8';
-/** Cards per group a skeleton draws when the host states no count. */
-const RAIL_SKELETON_CARDS = 3;
-/**
- * One screen of a group, the most its skeleton draws (the host's count is the upper bound): list groups stack
- * full-width cards, two of which fill a screen; grid groups show two rows at their widest column count, and the
- * cards past two rows at a narrower step are hidden by the same breakpoints the grid uses (`gridClassFor`).
- */
-const RAIL_LIST_FOLD = 2;
-const RAIL_GRID_FOLD_ROWS = 2;
 /**
  * The card an unknown-type group draws while its type is read: the rail's grid content card (a cover over a title
  * and an excerpt), the shape the read types' grid cards share, so the group holds a grid card's height.
  */
 const UNKNOWN_TYPE_CARD = 'blog_post_existing';
-/** The grid's column count per step, as `gridClassFor` sets it: [phone, sm, lg]. */
-const GRID_COLUMNS_BY_STEP: Record<2 | 3, readonly [number, number, number]> = { 2: [1, 2, 2], 3: [1, 2, 3] };
-
-/** A grid skeleton card's visibility: shown only at the steps where it is within the fold's rows. */
-function gridFoldClass(index: number, columns: 2 | 3): string | undefined {
-  const [phone, sm, lg] = GRID_COLUMNS_BY_STEP[columns].map(c => c * RAIL_GRID_FOLD_ROWS);
-  if (index < phone) return undefined;
-  if (index < sm) return 'hidden sm:block';
-  if (index < lg) return 'hidden lg:block';
-  return 'hidden';
-}
 
 /** A group's heading: the type's label (static copy), loaded and loading. */
 function GroupHeading({ type }: { type: string }) {
@@ -848,9 +828,9 @@ export function RelatedContentSectionSkeleton({
           <TextLineSkeleton type="inherit" as="span" className="w-24" />
         </h3>
         <div className={gridClassFor(columns)}>
-          {Array.from({ length: Math.max(...GRID_COLUMNS_BY_STEP[columns]) * RAIL_GRID_FOLD_ROWS }, (_, i) => (
+          {Array.from({ length: GROUP_PAGE_SIZE }, (_, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-            <div key={i} className={gridFoldClass(i, columns)} data-loading-item>
+            <div key={i} data-loading-item>
               {renderSkeletonForType(UNKNOWN_TYPE_CARD, 'default', adminCampaignCard, extras)}
             </div>
           ))}
@@ -868,15 +848,14 @@ export function RelatedContentSectionSkeleton({
         const config = resolveGroupConfig(type);
         const sameType = canonicalEntityType !== null && canonicalContentRefType(type) === canonicalEntityType;
         const isList = config.layout === 'list';
-        const fold = isList ? RAIL_LIST_FOLD : Math.max(...GRID_COLUMNS_BY_STEP[columns]) * RAIL_GRID_FOLD_ROWS;
+        // One full page of the group: the count the host fetches, never more than a group's page.
         const count = Math.min(
           GROUP_PAGE_SIZE,
-          fold,
-          (sameType ? (sameTypeMinResults ?? minResults) : minResults) ?? RAIL_SKELETON_CARDS,
+          (sameType ? (sameTypeMinResults ?? minResults) : minResults) ?? GROUP_PAGE_SIZE,
         );
         const cards = Array.from({ length: count }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-          <div key={i} className={isList ? undefined : gridFoldClass(i, columns)} data-loading-item>
+          <div key={i} data-loading-item>
             {renderSkeletonForType(type, config.gridSize, adminCampaignCard, extras)}
           </div>
         ));

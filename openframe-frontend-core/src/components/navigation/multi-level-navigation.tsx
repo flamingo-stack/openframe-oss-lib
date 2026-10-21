@@ -60,13 +60,12 @@ const NAV_ROW_HEIGHT = {
   mobile: { row: 'h-11', toggle: 'h-11 w-11', toggleRoom: 'pr-11' },
 } as const;
 /**
- * How many rows each skeleton draws (the desktop tree, the mobile dropdown): a layout fold, the rows one screen holds.
- * A row is 48px (44px in the dropdown) with its border and the list's gap, about 54px (50px): a first screen of 900px
- * (844px on a phone) holds 17. The tree opens on the reader's repository, so the skeleton draws that shape: one root
- * entry open, the rest of the fold its entries (indented as the tree indents them). It is drawn open FIRST: the root
- * order is the source's path sort, and which repositories sort before the reader's needs the read, so a page in a
- * later repository differs by one collapsed root row above the open one. A repository holding fewer entries ends
- * past the first screen anyway, and the tree's other root entries are list growth below it.
+ * How many rows each skeleton draws (the desktop tree, the mobile dropdown) when its host states no count. The tree
+ * lists every entry its source holds (no page, no limit), so this is a typical count, drawn at every width. The tree
+ * opens on the reader's repository, so the skeleton draws that shape: one root entry open, the rest its entries
+ * (indented as the tree indents them). It is drawn open FIRST: the root order is the source's path sort, and which
+ * repositories sort before the reader's needs the read, so a page in a later repository differs by one collapsed
+ * root row above the open one. A host that knows its entry count passes it as `rows`.
  */
 export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 17;
 export const MOBILE_NAVIGATION_SKELETON_ROWS = 17;

@@ -22,8 +22,8 @@ const ROW_HEIGHT_MOBILE = 'h-[66px]';
 
 /** @deprecated Use `DataTableSkeleton` from `data-table` instead. */
 /**
- * Rows a table's skeleton draws when its host states no count: one screen of rows under a page's header (a 68px row
- * card and its 8px gap; about ten fit under the header of a 1440x900 screen, nine of a phone's 66px rows).
+ * Rows a table's skeleton draws when it knows no page size: a typical count for an UNPAGED table. A table with page
+ * pagination draws its `pageSize` instead (one full page, at every width), and a host may state `skeletonRows`.
  */
 export const TABLE_SKELETON_ROWS = 10;
 
