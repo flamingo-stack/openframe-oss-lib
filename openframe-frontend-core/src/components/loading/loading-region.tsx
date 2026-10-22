@@ -49,10 +49,13 @@ export function LoadingRegion({
   const announce = announceGiven && !inScope;
   // One tree for both states: `children` keeps its slot whether or not the status is drawn, so an
   // `announce` that flips at runtime does not remount the content (and drop its state and focus).
+  // The status comes AFTER the content: it takes no space (visually hidden, absolutely positioned), but placed first
+  // in a `space-y-*` stack it made the content the second child, which takes the stack's top margin, so a region
+  // that announced stood a gap taller than the same region inside a loading scope (a jump at hydration).
   return (
     <Tag aria-busy={announce ? 'true' : undefined} className={className} {...props}>
-      {announce && status && <LoadingStatus label={label} />}
       {children}
+      {announce && status && <LoadingStatus label={label} />}
     </Tag>
   );
 }

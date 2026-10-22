@@ -121,12 +121,13 @@ export function AnnouncedLoadingScope({
   children: ReactNode;
 }) {
   const outer = useLoadingScope();
+  // The status follows the content, so in a `space-y-*` stack it never pushes the content down (see LoadingRegion).
   return (
     <>
-      {status && active && !outer && <LoadingStatus label={label} />}
       <LoadingScope active={active} as={as} className={className}>
         {children}
       </LoadingScope>
+      {status && active && !outer && <LoadingStatus label={label} />}
     </>
   );
 }
