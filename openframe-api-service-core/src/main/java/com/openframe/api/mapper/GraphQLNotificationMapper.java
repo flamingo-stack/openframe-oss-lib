@@ -1,8 +1,8 @@
 package com.openframe.api.mapper;
 
-import com.openframe.api.dto.CountedGenericConnection;
-import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationView;
 import com.openframe.api.dto.notification.UnreadCategoryCount;
 import com.openframe.api.dto.shared.ConnectionArgs;
@@ -47,8 +47,7 @@ public class GraphQLNotificationMapper {
                 .build();
     }
 
-    public CountedGenericConnection<GenericEdge<NotificationView>> toConnection(
-            CountedGenericQueryResult<NotificationView> result) {
+    public GenericConnection<GenericEdge<NotificationView>> toConnection(GenericQueryResult<NotificationView> result) {
         List<GenericEdge<NotificationView>> edges = result.getItems().stream()
                 .map(view -> GenericEdge.<NotificationView>builder()
                         .node(view)
@@ -56,10 +55,9 @@ public class GraphQLNotificationMapper {
                         .build())
                 .toList();
 
-        return CountedGenericConnection.<GenericEdge<NotificationView>>builder()
+        return GenericConnection.<GenericEdge<NotificationView>>builder()
                 .edges(edges)
                 .pageInfo(result.getPageInfo())
-                .filteredCount(result.getFilteredCount())
                 .build();
     }
 }

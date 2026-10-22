@@ -409,8 +409,6 @@ public class TicketService {
     private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
                                    String search, String ownerMachineId) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
-        List<String> excludedTicketIds = ticketIdsForFilter.resolveExcluded(filter);
-        queryFilter.setExcludedTicketIds(excludedTicketIds);
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filter);
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
     }
@@ -425,7 +423,6 @@ public class TicketService {
                 .deviceIds(filter.getDeviceIds())
                 .assigneeIds(filter.getAssigneeIds())
                 .activity(ticketStalenessResolver.resolve(filter.getActivity()))
-                .escalatedByUser(filter.getEscalatedByUser())
                 .build();
     }
 

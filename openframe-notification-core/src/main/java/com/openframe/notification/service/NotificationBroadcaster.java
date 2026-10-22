@@ -78,10 +78,12 @@ public class NotificationBroadcaster {
         try {
             NotificationEntityRef entity = command.getEntity();
             if (!admins.isEmpty()) {
-                readStateService.createForAudience(saved, entity, RecipientType.USER, admins);
+                readStateService.createForAudience(
+                        saved.getId(), category, title, entity, RecipientType.USER, admins);
             }
             if (!machines.isEmpty()) {
-                readStateService.createForAudience(saved, entity, RecipientType.MACHINE, machines);
+                readStateService.createForAudience(
+                        saved.getId(), category, title, entity, RecipientType.MACHINE, machines);
             }
         } catch (RuntimeException ex) {
             log.error("createForAudience failed for notification {} (admins={}, machines={}); "

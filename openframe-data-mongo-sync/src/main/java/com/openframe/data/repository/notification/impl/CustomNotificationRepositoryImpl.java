@@ -1,16 +1,13 @@
 package com.openframe.data.repository.notification.impl;
 
 import com.openframe.data.document.notification.Notification;
-import com.openframe.data.document.notification.NotificationCategory;
 import com.openframe.data.document.notification.NotificationReadState;
-import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.data.document.notification.ReadStatus;
 import com.openframe.data.document.notification.RecipientType;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.notification.CustomNotificationRepository;
 import com.openframe.data.repository.notification.NotificationPage;
-import com.openframe.data.repository.notification.NotificationReadStateFilter;
 import com.openframe.data.repository.notification.NotificationWithStatus;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.types.ObjectId;
@@ -27,7 +24,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.springframework.util.CollectionUtils.isEmpty;
 
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -39,9 +35,6 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
     private static final String FIELD_RECIPIENT_TYPE = "recipientType";
     private static final String FIELD_NOTIFICATION_ID = "notificationId";
     private static final String FIELD_STATUS = "status";
-    private static final String FIELD_CATEGORY = "category";
-    private static final String FIELD_TYPE = "type";
-    private static final String FIELD_SEVERITY = "severity";
 
     public CustomNotificationRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
         super(mongoTemplate);
@@ -49,43 +42,28 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
 
     @Override
     public NotificationPage findPageForRecipient(String recipientId, RecipientType recipientType,
-                                                 NotificationReadStateFilter filter,
+                                                 Boolean readFilter, String search,
                                                  String cursor, boolean backward,
                                                  Sort.Direction direction, int limit) {
         Sort.Direction effective = effectiveDirection(direction, backward);
         LinkedHashMap<String, ReadStatus> idsToStatus = fetchReadStates(
-                recipientId, recipientType, filter, cursor, effective, limit);
+                recipientId, recipientType, readFilter, search, cursor, effective, limit);
         if (idsToStatus.isEmpty()) {
             return NotificationPage.of(List.of());
         }
         return NotificationPage.of(fetchNotificationsPreservingOrder(idsToStatus));
     }
 
-    @Override
-    public long countForRecipient(String recipientId, RecipientType recipientType, NotificationReadStateFilter filter) {
-        Criteria criteria = recipientCriteria(recipientId, recipientType, filter);
-        Query query = new Query(criteria);
-        return mongoTemplate.count(query, NotificationReadState.class);
-    }
-
-    private Criteria recipientCriteria(String recipientId, RecipientType recipientType,
-                                       NotificationReadStateFilter filter) {
+    private LinkedHashMap<String, ReadStatus> fetchReadStates(String recipientId, RecipientType recipientType,
+                                                              Boolean readFilter, String search,
+                                                              String cursor, Sort.Direction effectiveDirection,
+                                                              int limit) {
         Criteria criteria = tenantCriteria()
                 .and(FIELD_RECIPIENT_ID).is(recipientId)
                 .and(FIELD_RECIPIENT_TYPE).is(recipientType);
-        applyStatusFilter(criteria, filter.getRead());
-        applyCategories(criteria, filter.getCategories());
-        applyTypes(criteria, filter.getTypes());
-        applySeverities(criteria, filter.getSeverities());
-        applySearch(criteria, filter.getSearch());
-        return criteria;
-    }
-
-    private LinkedHashMap<String, ReadStatus> fetchReadStates(String recipientId, RecipientType recipientType,
-                                                              NotificationReadStateFilter filter, String cursor,
-                                                              Sort.Direction effectiveDirection, int limit) {
-        Criteria criteria = recipientCriteria(recipientId, recipientType, filter);
+        applyStatusFilter(criteria, readFilter);
         applyCursor(criteria, cursor, effectiveDirection);
+        applySearch(criteria, search);
 
         Query query = new Query(criteria);
         query.fields().include(FIELD_NOTIFICATION_ID).include(FIELD_STATUS);
@@ -144,27 +122,6 @@ public class CustomNotificationRepositoryImpl extends TenantAwareRepositorySuppo
         } else {
             criteria.and(FIELD_STATUS).is(ReadStatus.UNREAD);
         }
-    }
-
-    private static void applyCategories(Criteria criteria, List<NotificationCategory> categories) {
-        if (isEmpty(categories)) {
-            return;
-        }
-        criteria.and(FIELD_CATEGORY).in(categories);
-    }
-
-    private static void applyTypes(Criteria criteria, List<String> types) {
-        if (isEmpty(types)) {
-            return;
-        }
-        criteria.and(FIELD_TYPE).in(types);
-    }
-
-    private static void applySeverities(Criteria criteria, List<NotificationSeverity> severities) {
-        if (isEmpty(severities)) {
-            return;
-        }
-        criteria.and(FIELD_SEVERITY).in(severities);
     }
 
     private static void applyCursor(Criteria criteria, String cursor, Sort.Direction effectiveDirection) {
