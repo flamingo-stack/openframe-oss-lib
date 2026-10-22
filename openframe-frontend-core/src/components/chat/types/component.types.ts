@@ -142,6 +142,9 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    *  write (`ChatMessageList.selfAuthorType`). Omit and every `user` turn is
    *  the viewer's own. */
   selfAuthorType?: AuthorType;
+  /** Write the speaker's name on the agent's turn and the viewer's own bubble
+   *  too (`ChatMessageList.nameEveryTurn`). Default false. */
+  nameEveryTurn?: boolean;
   /** Viewer variant for approval blocks in this message's segments.
    *  `'admin'` (default) = full command block; `'client'` = end-client
    *  (Fae desktop app) title-only card. Forwarded to
@@ -305,6 +308,12 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  is the viewer's (Mingo: the admin's own turns arrive as `admin`); the Fae
    *  client passes `'user'`, so a technician (`admin`) answers from the left. */
   selfAuthorType?: AuthorType;
+  /** Write the speaker's name on every turn: the agent's and the viewer's own
+   *  bubbles too, not only another person's. For a thread of several parties
+   *  — a ticket, where the end user, the agent and any number of technicians
+   *  (all `admin`) write — so who said what is information. Default false: a
+   *  two-party thread (Mingo, the Fae client) is told apart by its faces. */
+  nameEveryTurn?: boolean;
   /** Visual generation of the whole thread, blocks included. Default
    *  `classic`; the Fae client passes `v2`. See `ChatAppearance`. */
   appearance?: ChatAppearance;
