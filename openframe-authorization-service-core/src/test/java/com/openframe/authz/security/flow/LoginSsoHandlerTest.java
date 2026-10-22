@@ -93,9 +93,13 @@ class LoginSsoHandlerTest {
 
     private MockHttpServletRequest request(String redirectTo, boolean authMobile) {
         MockHttpServletRequest request = bind(new MockHttpServletRequest("GET", "/login/oauth2/code/google"));
-        request.setCookies(new Cookie(SsoFlowCookieNames.OF_SSO_LOGIN, codec.encodeLogin(
-                new SsoLoginCookiePayload("login-state", "google", redirectTo, authMobile, 1L, inTenMinutes()))));
+        request.setCookies(loginCookie(redirectTo, authMobile));
         return request;
+    }
+
+    private Cookie loginCookie(String redirectTo, boolean authMobile) {
+        return new Cookie(SsoFlowCookieNames.OF_SSO_LOGIN, codec.encodeLogin(
+                new SsoLoginCookiePayload("login-state", "google", redirectTo, authMobile, 1L, inTenMinutes())));
     }
 
     private MockHttpServletRequest request() {
@@ -239,7 +243,8 @@ class LoginSsoHandlerTest {
                 RegistrationAttribution.builder().downloadId("dl-1").utmSource("producthunt").build()))
                 .thenReturn("ticket/1");
         MockHttpServletRequest request = request("com.openframe.app://auth", true);
-        request.setCookies(request.getCookies()[0], new Cookie("of_src", "id=dl-1&utm_source=producthunt"));
+        request.setCookies(loginCookie("com.openframe.app://auth", true),
+                new Cookie("of_src", "id=dl-1&utm_source=producthunt"));
 
         handler.handle(request, response, authentication("google", trustedGoogle));
 

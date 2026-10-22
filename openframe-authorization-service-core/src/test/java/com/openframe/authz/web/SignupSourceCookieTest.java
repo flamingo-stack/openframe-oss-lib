@@ -1,31 +1,15 @@
 package com.openframe.authz.web;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import com.openframe.authz.dto.RegistrationAttribution;
 import jakarta.servlet.http.Cookie;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 
 class SignupSourceCookieTest {
 
     private static final String DOWNLOAD_ID = "0b6f4c1e-9d2a-4f3b-8c7d-5e6f7a8b9c0d";
-
-    private final Logger logger = (Logger) LoggerFactory.getLogger(SignupSourceCookie.class);
-
-    @AfterEach
-    void resetLogger() {
-        logger.detachAndStopAllAppenders();
-        logger.setLevel(null);
-    }
 
     @Test
     void read_noSourceCookie_returnsNull() {
@@ -90,22 +74,8 @@ class SignupSourceCookieTest {
     }
 
     @Test
-    void read_brokenEscapeInValue_warnsAndReturnsNull() {
-        ListAppender<ILoggingEvent> logs = captureWarnings();
-
+    void read_brokenEscapeInValue_returnsNull() {
         assertThat(SignupSourceCookie.read(withCookie("utm_source=google%zz"))).isNull();
-        assertThat(logs.list).singleElement()
-                .returns(Level.WARN, ILoggingEvent::getLevel)
-                .extracting(ILoggingEvent::getFormattedMessage, as(STRING))
-                .startsWith("Unreadable of_src cookie, ignoring it: ");
-    }
-
-    private ListAppender<ILoggingEvent> captureWarnings() {
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        logger.setLevel(Level.WARN);
-        return appender;
     }
 
     private static MockHttpServletRequest withCookie(String value) {

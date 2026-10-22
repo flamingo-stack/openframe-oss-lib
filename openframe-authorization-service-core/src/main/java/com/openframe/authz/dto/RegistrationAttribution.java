@@ -40,16 +40,30 @@ public class RegistrationAttribution {
 
     private String eventId;
 
+    /**
+     * A partner code in the link ({@code ?ref=acme}). Marketing gives each partner a code; a matching code makes
+     * the channel {@code partner}.
+     */
     private String ref;
 
+    /**
+     * The page the browser came from ({@code https://www.google.com/}). The frontend reads it from the browser and
+     * sends it. Google → organic search, chatgpt.com → AI search, another site → referral.
+     */
     private String referrer;
 
     private String landingUrl;
 
     private String downloadId;
 
+    /**
+     * The answer picked in the app's "How did you hear about us?" list ({@code search}, {@code ai},
+     * {@code producthunt}, {@code social_ad}, {@code newsletter}, {@code friend}, {@code partner}, {@code other}).
+     * Used only when nothing else says where the person came from.
+     */
     private String heardFrom;
 
+    /** The free text typed when the answer is {@code other}. Sent to HubSpot as the source. */
     private String heardFromOther;
 
     public int totalLength() {

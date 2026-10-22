@@ -1,6 +1,5 @@
 package com.openframe.authz.controller;
 
-import com.openframe.core.constants.SsoFlowCookieNames;
 
 import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.dto.SsoLoginInitRequest;
@@ -172,8 +171,6 @@ public class SsoLoginController {
             var tenant = registrationService.registerTenant(reg);
             signupTicketService.bind(signupCompletion.ticket(), tenant.getOwnerId(), tenant.getId());
             return new SignupTicketCompleteResponse(tenant.getId());
-        } catch (ResponseStatusException e) {
-            throw e;
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
         } catch (IllegalArgumentException e) {

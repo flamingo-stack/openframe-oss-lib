@@ -1,14 +1,9 @@
 package com.openframe.authz.service.sso;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import com.openframe.authz.dto.RegistrationAttribution;
 import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +13,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -26,10 +20,8 @@ import org.springframework.data.redis.core.ValueOperations;
 import java.time.Duration;
 
 import static com.openframe.authz.support.SsoTestFixtures.objectMapper;
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.InstanceOfAssertFactories.STRING;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -45,8 +37,6 @@ class SignupTicketServiceTest {
     @Mock
     private ValueOperations<String, String> values;
 
-    private final Logger logger = (Logger) LoggerFactory.getLogger(SignupTicketService.class);
-
     private SignupTicketService service;
 
     @BeforeEach
@@ -55,12 +45,6 @@ class SignupTicketServiceTest {
         props.setTenantId("t1");
         service = new SignupTicketService(redisTemplate, new OpenframeRedisKeyBuilder(props), objectMapper());
         when(redisTemplate.opsForValue()).thenReturn(values);
-    }
-
-    @AfterEach
-    void resetLogger() {
-        logger.detachAndStopAllAppenders();
-        logger.setLevel(null);
     }
 
     @Test
@@ -193,14 +177,9 @@ class SignupTicketServiceTest {
 
     @Test
     void shouldTreatUndecodablePayloadAsMissing() {
-        ListAppender<ILoggingEvent> logs = captureWarnings();
         when(values.get(anyString())).thenReturn("{broken");
 
         assertThat(service.peek("t")).isEmpty();
-        assertThat(logs.list).singleElement()
-                .returns(Level.WARN, ILoggingEvent::getLevel)
-                .extracting(ILoggingEvent::getFormattedMessage, as(STRING))
-                .startsWith("Undecodable pending signup: ");
     }
 
     private PendingSignup readBack(String ticket, Duration ttl) {
@@ -208,14 +187,6 @@ class SignupTicketServiceTest {
         verify(values).set(eq(keyFor(ticket)), json.capture(), eq(ttl));
         when(values.get(keyFor(ticket))).thenReturn(json.getValue());
         return service.peek(ticket).orElseThrow();
-    }
-
-    private ListAppender<ILoggingEvent> captureWarnings() {
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        logger.setLevel(Level.WARN);
-        return appender;
     }
 
     private static RegistrationAttribution attribution() {

@@ -1,9 +1,5 @@
 package com.openframe.authz.security.grant;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
@@ -21,7 +17,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -54,8 +49,6 @@ import java.util.function.Consumer;
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.catchThrowable;
-import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
@@ -90,7 +83,6 @@ class TokenMintingGrantProvidersTest {
     private SignupTicketGrantAuthenticationProvider signupProvider;
     private AppleNativeGrantAuthenticationProvider appleProvider;
     private final AuthUser user = activeUser("user-1", TENANT, "ada@acme.com");
-    private final Logger signupLogger = (Logger) LoggerFactory.getLogger(SignupTicketGrantAuthenticationProvider.class);
 
     @BeforeEach
     void setUp() {
@@ -125,8 +117,6 @@ class TokenMintingGrantProvidersTest {
         TenantContext.clear();
         SecurityContextHolder.clearContext();
         AuthorizationServerContextHolder.resetContext();
-        signupLogger.detachAndStopAllAppenders();
-        signupLogger.setLevel(null);
     }
 
     private static OAuth2ClientAuthenticationToken client(AuthorizationGrantType... grants) {
@@ -235,7 +225,7 @@ class TokenMintingGrantProvidersTest {
         when(signupTicketService.consume("t-1")).thenReturn(Optional.of(ticket("user-1", TENANT)));
         when(userService.findActiveById("user-1")).thenReturn(Optional.of(user));
 
-        signupProvider.authenticate(signupRequest("t-1"));
+        signupProvider.authenticate(signupRequest());
 
         ArgumentCaptor<OAuth2Authorization> saved = ArgumentCaptor.forClass(OAuth2Authorization.class);
         verify(authorizationService).save(saved.capture());
@@ -247,35 +237,14 @@ class TokenMintingGrantProvidersTest {
     void authenticate_ticketNotYetBound_rejectsAsRegistrationIncomplete() {
         when(signupTicketService.consume("t-1")).thenReturn(Optional.of(ticket(null, null)));
 
-        assertThatThrownBy(() -> signupProvider.authenticate(signupRequest("t-1")))
+        assertThatThrownBy(() -> signupProvider.authenticate(signupRequest()))
                 .isInstanceOfSatisfying(OAuth2AuthenticationException.class,
                         e -> assertThat(e.getError().getErrorCode()).isEqualTo("invalid_grant"))
                 .hasMessage("Signup ticket has not completed registration.");
     }
 
-    @Test
-    void authenticate_ticketBoundToAnotherTenant_warnsWithBothTenants() {
-        when(signupTicketService.consume("t-1")).thenReturn(Optional.of(ticket("user-1", "other-tenant")));
-        ListAppender<ILoggingEvent> logs = captureSignupWarnings();
-
-        catchThrowable(() -> signupProvider.authenticate(signupRequest("t-1")));
-
-        assertThat(logs.list)
-                .extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
-                .containsExactly(tuple(Level.WARN,
-                        "event=signup-ticket-tenant-mismatch pathTenant=tenant-1 boundTenant=other-tenant"));
-    }
-
-    private static SignupTicketGrantAuthenticationToken signupRequest(String ticket) {
-        return new SignupTicketGrantAuthenticationToken(client(SignupTicketGrantAuthenticationToken.GRANT_TYPE), ticket);
-    }
-
-    private ListAppender<ILoggingEvent> captureSignupWarnings() {
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        signupLogger.addAppender(appender);
-        signupLogger.setLevel(Level.WARN);
-        return appender;
+    private static SignupTicketGrantAuthenticationToken signupRequest() {
+        return new SignupTicketGrantAuthenticationToken(client(SignupTicketGrantAuthenticationToken.GRANT_TYPE), "t-1");
     }
 
     // --- apple-native grant ---

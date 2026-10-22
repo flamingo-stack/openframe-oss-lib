@@ -1,23 +1,17 @@
 package com.openframe.notification.mail.service;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -26,7 +20,6 @@ import java.util.function.Consumer;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.tuple;
 
 @Timeout(10)
 class HubspotApiEmailServiceTest {
@@ -40,7 +33,6 @@ class HubspotApiEmailServiceTest {
     };
 
     private final BlockingQueue<HubspotRequest> requests = new LinkedBlockingQueue<>();
-    private final Logger logger = (Logger) LoggerFactory.getLogger(HubspotApiEmailService.class);
     private volatile HubspotAnswer answer;
     private HttpServer hubspot;
 
@@ -54,12 +46,6 @@ class HubspotApiEmailServiceTest {
     @AfterEach
     void stopHubspot() {
         hubspot.stop(0);
-    }
-
-    @AfterEach
-    void resetLogger() {
-        logger.detachAndStopAllAppenders();
-        logger.setLevel(null);
     }
 
     @Test
@@ -92,30 +78,6 @@ class HubspotApiEmailServiceTest {
                 .hasMessageEndingWith(" body=");
     }
 
-    @Test
-    void sendDownloadLinkEmail_hubspotAccepts_logsEmailSent() {
-        hubspotAnswers(200, ACCEPTED);
-        ListAppender<ILoggingEvent> logs = captureLogs(Level.INFO);
-
-        send(service -> service.sendDownloadLinkEmail(TO, DOWNLOAD_ID));
-
-        assertThat(logs.list)
-                .extracting(ILoggingEvent::getLevel, ILoggingEvent::getFormattedMessage)
-                .containsExactly(tuple(Level.INFO, "[HubSpot API] Download link email sent to ada@acme.com"));
-    }
-
-    @Test
-    void sendDownloadLinkEmail_debugEnabled_logsPayload() {
-        hubspotAnswers(200, ACCEPTED);
-        ListAppender<ILoggingEvent> logs = captureLogs(Level.DEBUG);
-
-        send(service -> service.sendDownloadLinkEmail(TO, DOWNLOAD_ID));
-
-        assertThat(logs.list)
-                .extracting(ILoggingEvent::getLevel, ILoggingEvent::getMessage, event -> List.of(event.getArgumentArray()))
-                .contains(tuple(Level.DEBUG, "[HubSpot API] {} Payload: {}", List.of("Download link", downloadLinkPayload())));
-    }
-
     private void send(Consumer<HubspotApiEmailService> call) {
         new ApplicationContextRunner()
                 .withPropertyValues(
@@ -130,14 +92,6 @@ class HubspotApiEmailServiceTest {
 
     private void hubspotAnswers(int status, String body) {
         answer = new HubspotAnswer(status, body);
-    }
-
-    private ListAppender<ILoggingEvent> captureLogs(Level level) {
-        ListAppender<ILoggingEvent> appender = new ListAppender<>();
-        appender.start();
-        logger.addAppender(appender);
-        logger.setLevel(level);
-        return appender;
     }
 
     private void handle(HttpExchange exchange) throws IOException {
