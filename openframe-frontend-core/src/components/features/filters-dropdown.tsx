@@ -388,19 +388,19 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
           {triggerElement}
         </div>
       ) : (
-        <button
+        <Button
+          variant="link"
+          size="compact"
+          noPaddingX
           ref={triggerRef as RefObject<HTMLButtonElement>}
           onClick={() => setIsOpen(!isOpen)}
-          className={cn(
-            'flex items-center gap-1.5 transition-colors text-h5',
-            getActiveFiltersCount() > 0
-              ? 'text-ods-accent hover:text-ods-accent/80'
-              : 'text-ods-text-secondary hover:text-ods-text-primary',
-          )}
+          aria-expanded={isOpen}
+          // Filters applied: the trigger holds the accent. Otherwise the secondary text, the primary on hover.
+          data-state={getActiveFiltersCount() > 0 ? 'active' : undefined}
+          data-tone="neutral"
         >
-          {triggerLabel}
-          {getActiveFiltersCount() > 0 && <span className="size-1.5 rounded-full bg-ods-accent" />}
-        </button>
+          <span className="text-h5">{triggerLabel}</span>
+        </Button>
       )}
 
       {/* Dropdown Panel — kept mounted briefly on close to play exit transition. */}
@@ -433,17 +433,20 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                     <div className="sticky top-0 z-10 flex items-center justify-between bg-ods-bg pb-2">
                       <h3 className="text-ods-text-secondary text-h5">{section.title}</h3>
                       {section.allowSelectAll && section.type === 'checkbox' && (
-                        <button
+                        <Button
+                          variant="link"
+                          size="compact"
+                          noPaddingX
+                          data-tone="neutral"
                           onClick={() => handleSelectAll(section.id, section)}
-                          className="text-ods-text-secondary underline transition-colors text-h6 hover:text-ods-text-primary"
                         >
                           {allSelected ? 'Deselect All' : 'Select All'}
-                        </button>
+                        </Button>
                       )}
                     </div>
 
                     {/* Options Container */}
-                    <div className="overflow-hidden rounded-md border border-ods-border bg-ods-bg">
+                    <div className="divide-y divide-ods-border overflow-hidden rounded-md border border-ods-border bg-ods-bg">
                       {section.options.map((option, index) => {
                         // Handle separator type
                         if (option.type === 'separator') {
@@ -453,19 +456,16 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                         }
 
                         const isSelected = sectionSelection.includes(option.id);
-                        const isLast = index === section.options.length - 1;
 
                         return (
-                          <button
+                          <Button
+                            variant="row"
                             type="button"
                             key={`${section.id}-${option.id}-${index}`}
                             onClick={() => handleToggleOption(section.id, option.id, section.type)}
-                            className={cn(
-                              'flex w-full items-center gap-[var(--spacing-system-s)] p-[var(--spacing-system-s)] text-left',
-                              isSelected ? 'bg-ods-bg-surface' : 'bg-ods-bg',
-                              !isLast && 'border-b border-ods-border',
-                              'transition-colors hover:bg-ods-bg-hover',
-                            )}
+                            data-state={isSelected ? 'active' : undefined}
+                            // A checked option sits on the raised surface; the hover still shows over it.
+                            data-tone="surface"
                           >
                             <FilterCheckbox checked={isSelected} />
                             <span
@@ -479,7 +479,7 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                                 {option.count.toLocaleString()}
                               </span>
                             )}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>

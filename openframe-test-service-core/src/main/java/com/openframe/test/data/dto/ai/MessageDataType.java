@@ -26,7 +26,7 @@ public enum MessageDataType {
     CONTEXT_COMPACTION_START,
     CONTEXT_COMPACTION_END,
     THINKING,
-    GUIDE,
+    ATTACHMENTS,
     /**
      * The assistant putting a question back to the caller instead of acting — emitted when the intent
      * router cannot decide where a message belongs. Its payload ({@code question}, {@code options}) is

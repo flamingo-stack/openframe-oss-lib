@@ -1,6 +1,8 @@
 package com.openframe.api.service.ticket;
 
 import com.github.pravin.raha.lexorank4j.LexoRank;
+import com.openframe.core.exception.ValidationException;
+import com.openframe.core.exception.ConflictException;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.dto.ticket.TicketFilterInput;
 import com.openframe.api.dto.ticket.TransitionTicketInput;
@@ -8,6 +10,9 @@ import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.InternalException;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusDefinition;
 import com.openframe.data.document.ticket.TicketStatusKind;
@@ -188,7 +193,7 @@ public class TicketLifecycleService {
         TicketStatusDefinition status = statusRepository.findById(statusId)
                 .orElseThrow(() -> new TicketStatusNotFoundException(statusId));
         if (!MANUALLY_CREATABLE_KINDS.contains(status.getKind())) {
-            throw new IllegalArgumentException(
+            throw new ValidationException(
                     "Tickets cannot be created in the \"" + status.getName() + "\" status");
         }
         return status;
@@ -197,12 +202,13 @@ public class TicketLifecycleService {
     private TicketStatusDefinition firstCustomStatus() {
         return statusRepository.findByKindOrderByPositionAsc(TicketStatusKind.CUSTOM).stream()
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No custom ticket status configured for this tenant"));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TICKET_STATUS_NOT_FOUND,
+                        "No custom ticket status configured for this tenant"));
     }
 
     private TicketStatusDefinition requireByKind(TicketStatusKind kind) {
         return statusRepository.findByKind(kind)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new InternalException(
                         "System ticket status " + kind + " is not seeded for this tenant"));
     }
 
@@ -260,7 +266,7 @@ public class TicketLifecycleService {
 
     public String computeRankBetween(String afterTicketId, String beforeTicketId, String targetStatusId) {
         if (areBothNeighborsAbsent(afterTicketId, beforeTicketId)) {
-            throw new IllegalArgumentException("afterTicketId or beforeTicketId must be specified");
+            throw new ValidationException("afterTicketId or beforeTicketId must be specified");
         }
 
         if (areBothNeighborsPresent(afterTicketId, beforeTicketId)) {
@@ -310,9 +316,9 @@ public class TicketLifecycleService {
 
     private LexoRank loadRank(String ticketId, String expectedStatusId) {
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new IllegalArgumentException("Neighbor ticket not found: " + ticketId));
+                .orElseThrow(() -> new TicketNotFoundException(ticketId));
         if (isWrongStatus(ticket, expectedStatusId)) {
-            throw new IllegalArgumentException(
+            throw new ConflictException(
                     "Neighbor " + ticketId + " is in statusId " + ticket.getStatusId()
                             + ", expected " + expectedStatusId);
         }
@@ -326,7 +332,7 @@ public class TicketLifecycleService {
     private LexoRank parseOrder(Ticket ticket) {
         String order = ticket.getOrder();
         if (order == null) {
-            throw new IllegalStateException("Ticket " + ticket.getId() + " has no order");
+            throw new InternalException("Ticket " + ticket.getId() + " has no order");
         }
         return LexoRank.parse(order);
     }
@@ -336,7 +342,7 @@ public class TicketLifecycleService {
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
         TicketStatusDefinition currentStatus = statusRepository
                 .findById(ticket.getStatusId())
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new InternalException(
                         "Ticket " + ticketId + " has unknown statusId: " + ticket.getStatusId()));
         return new TransitionContext(ticket, currentStatus);
     }
@@ -388,6 +394,7 @@ public class TicketLifecycleService {
                 .statusIds(List.of(resolvedStatusId));
         if (filterInput != null) {
             builder.organizationIds(filterInput.getOrganizationIds())
+                    .deviceIds(filterInput.getDeviceIds())
                     .assigneeIds(filterInput.getAssigneeIds());
         }
         return builder.build();

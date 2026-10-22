@@ -1,17 +1,17 @@
 package com.openframe.delivery.sweep;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.config.DeliveryProperties.Sweep;
+import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
@@ -42,24 +43,42 @@ public class DeliverySweepService {
     private final DeliveryCloser closer;
     private final DeliveryMetrics metrics;
     private final DeliveryPublisher publisher;
-    private final ObjectMapper objectMapper;
+    private final DeliveryPayloadJson payloadJson;
+    private final RetryBackoff retryBackoff;
 
+    // the regular pass leaves the types with fast-sweep to the fast pass: one publisher per row at a time
     public void retryPending() {
         Instant now = Instant.now();
         int batchSize = properties.getSweep().getBatchSize();
-        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, now, batchSize);
+        Set<DeliveryType> fastTypes = properties.fastTypes();
+        List<MachineDelivery> due = repository.findDueExcept(DeliveryStatus.PENDING, fastTypes, now, batchSize);
+        retry(due, now);
+    }
+
+    public void retryPendingFast() {
+        Set<DeliveryType> fastTypes = properties.fastTypes();
+        if (fastTypes.isEmpty()) {
+            return;
+        }
+        Instant now = Instant.now();
+        int batchSize = properties.getSweep().getBatchSize();
+        List<MachineDelivery> due = repository.findDue(DeliveryStatus.PENDING, fastTypes, now, batchSize);
+        retry(due, now);
+    }
+
+    private void retry(List<MachineDelivery> due, Instant now) {
         if (due.isEmpty()) {
             return;
         }
         Set<String> machineIds = due.stream().map(MachineDelivery::getMachineId).collect(toSet());
-        Set<String> gone = machineOnlineStatus.gone(machineIds);
+        Map<String, DeviceStatus> statuses = machineOnlineStatus.statuses(machineIds);
         Set<String> online = machineOnlineStatus.online(machineIds);
-        due.forEach(delivery -> retryOne(delivery, gone, online, now));
+        due.forEach(delivery -> retryOne(delivery, statuses, online, now));
     }
 
-    private void retryOne(MachineDelivery delivery, Set<String> gone, Set<String> online, Instant now) {
+    private void retryOne(MachineDelivery delivery, Map<String, DeviceStatus> statuses, Set<String> online, Instant now) {
         try {
-            retryOrClose(delivery, gone, online, now);
+            retryOrClose(delivery, statuses, online, now);
         } catch (Exception e) {
             metrics.recordRowError();
             countErrorAndBackOff(delivery, now);
@@ -67,13 +86,14 @@ public class DeliverySweepService {
         }
     }
 
-    private void retryOrClose(MachineDelivery delivery, Set<String> gone, Set<String> online, Instant now) {
+    private void retryOrClose(MachineDelivery delivery, Map<String, DeviceStatus> statuses, Set<String> online, Instant now) {
         String machineId = delivery.getMachineId();
-        if (gone.contains(machineId)) {
-            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine gone", now);
+        DeliveryType type = delivery.getType();
+        DeviceStatus status = statuses.get(machineId);
+        if (status != null && !registry.require(type).getDeliverableStatuses().contains(status)) {
+            closer.cancel(delivery, DeliveryStatus.UNACKED, "machine in status " + status + " takes no " + type, now);
             return;
         }
-        DeliveryType type = delivery.getType();
         Policy policy = properties.resolve(type);
         if (!online.contains(machineId)) {
             parkSkipOrFailOffline(delivery, policy, now);
@@ -110,7 +130,8 @@ public class DeliverySweepService {
         DeliveryType type = delivery.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
-        DeliveryPayload payload = readPayload(delivery, payloadClass);
+        String json = delivery.getPayloadJson();
+        DeliveryPayload payload = payloadJson.read(json, payloadClass);
         String machineId = delivery.getMachineId();
         boolean published = publish(spec, machineId, payload);
         if (!published) {
@@ -120,7 +141,7 @@ public class DeliverySweepService {
         }
         int attempts = delivery.getAttempts();
         int attempt = attempts + 1;
-        long delaySeconds = retryDelaySeconds(attempt, policy);
+        long delaySeconds = retryBackoff.delaySeconds(attempt, policy);
         Instant dueAt = now.plusSeconds(delaySeconds);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
@@ -177,27 +198,10 @@ public class DeliverySweepService {
     private Instant recheckAt(MachineDelivery delivery, Instant now) {
         DeliveryType type = delivery.getType();
         Policy policy = properties.resolve(type);
-        long delaySeconds = policy.getMaxRetryIntervalSeconds();
+        long delaySeconds = policy.getBackoff().getMaxIntervalSeconds();
         return now.plusSeconds(delaySeconds);
     }
 
-    private <P> P readPayload(MachineDelivery delivery, Class<P> payloadClass) {
-        String payloadJson = delivery.getPayloadJson();
-        try {
-            return objectMapper.readValue(payloadJson, payloadClass);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Corrupt delivery payload: " + delivery.getId(), e);
-        }
-    }
-
-    private static long retryDelaySeconds(int attempt, Policy policy) {
-        int multiplier = policy.getBackoffMultiplier();
-        long firstDelay = policy.getAckThresholdSeconds();
-        double growth = Math.pow(multiplier, attempt);
-        long delay = (long) (firstDelay * growth);
-        long cap = policy.getMaxRetryIntervalSeconds();
-        return Math.min(delay, cap);
-    }
 
     private static Instant earliest(Instant first, Instant second) {
         return first.isBefore(second) ? first : second;

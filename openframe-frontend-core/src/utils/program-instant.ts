@@ -98,8 +98,9 @@ export function webinarTiming(item: ProgramDateFields): {
 
 /**
  * THE compact meta line a program renders under its title:
- * `"<day> · <type-specific>"` — podcast duration, event location, or webinar
- * time + duration.
+ * `"<day> · <type-specific> · <audience>"` — podcast duration, event location,
+ * or webinar time + duration, then an event's attendee count (`audience`, "34
+ * people", the count only: a guest list is never shown).
  *
  * The public card and the chat card built this separately, under a comment
  * saying the second "mirrors" the first. That is the arrangement this module
@@ -115,6 +116,7 @@ export function programMetaLine(
     status?: unknown;
     duration_seconds?: unknown;
     location_name?: unknown;
+    guest_count?: unknown;
   },
   kind: 'podcast' | 'event' | 'webinar' | (string & {}),
   fmt: {
@@ -122,7 +124,7 @@ export function programMetaLine(
     duration: (seconds: number) => string;
     webinarMeta: (at: ProgramInstant, opts: { startAt: string | null; endAt: string | null }) => string;
   },
-): { at: ProgramInstant; typeMeta: string | null; line: string } {
+): { at: ProgramInstant; typeMeta: string | null; audience: string | null; line: string } {
   const at = programDateInstant(item);
   // A scheduled podcast has not aired, so its stored duration is not elapsed
   // time yet and must not be shown as one.
@@ -135,7 +137,15 @@ export function programMetaLine(
   } else if (kind === 'webinar' && programStr(item.start_at)) {
     typeMeta = fmt.webinarMeta(at, webinarTiming(item)) || null;
   }
-  return { at, typeMeta, line: [fmt.date(at), typeMeta].filter(Boolean).join(' · ') };
+  const audience = kind === 'event' ? eventAudience(item.guest_count) : null;
+  return { at, typeMeta, audience, line: [fmt.date(at), typeMeta, audience].filter(Boolean).join(' · ') };
+}
+
+/** An event's attendee count as a phrase ("1 person", "34 people"); null when unknown or zero. */
+export function eventAudience(guestCount: unknown): string | null {
+  if (typeof guestCount !== 'number' || !Number.isFinite(guestCount) || guestCount <= 0) return null;
+  const count = Math.round(guestCount);
+  return `${count.toLocaleString('en-US')} ${count === 1 ? 'person' : 'people'}`;
 }
 
 /** The shape `programMetaFormatters` adapts — the three renderers a program

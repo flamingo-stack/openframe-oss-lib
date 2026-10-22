@@ -17,6 +17,8 @@ import com.openframe.api.dto.ticket.UpdateTicketInput;
 import com.openframe.api.exception.ticket.InvalidTicketTransitionException;
 import com.openframe.api.exception.ticket.TicketNotFoundException;
 import com.openframe.api.exception.ticket.TicketStatusNotFoundException;
+import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
 import com.openframe.external.exception.TicketNoteNotFoundException;
 import com.openframe.api.service.ticket.TicketFilterService;
 import com.openframe.api.service.ticket.TicketLifecycleService;
@@ -513,14 +515,14 @@ class TicketControllerTest {
     }
 
     @Test
-    void createRejectedByTheDomainAsIllegalArgumentIs400() throws Exception {
+    void createRejectedByTheDomainAsConflictIs409() throws Exception {
         AuthPrincipal principal = resolvedPrincipal();
         when(ticketService.createTicket(same(principal), any()))
-                .thenThrow(new IllegalArgumentException("Device doesn't belong to selected organization"));
+                .thenThrow(new ConflictException(ErrorCode.CONFLICT, "Device doesn't belong to selected organization"));
 
         mockMvc.perform(jsonRequest(post(BASE), body("title", "ok", "deviceId", "machine-1", "customerId", "org-2")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
                 .andExpect(jsonPath("$.message").value("Device doesn't belong to selected organization"));
 
         verifyNoInteractions(ticketReadService);
@@ -885,14 +887,14 @@ class TicketControllerTest {
     }
 
     @Test
-    void updateNoteByNonAuthorIs409() throws Exception {
+    void updateNoteByNonAuthorIs403() throws Exception {
         AuthPrincipal principal = resolvedPrincipal();
         when(ticketNoteService.updateNote(same(principal), eq("n-1"), eq("Edited")))
-                .thenThrow(new IllegalStateException("Only the author can update this note"));
+                .thenThrow(new ForbiddenException(ErrorCode.OPERATION_NOT_ALLOWED, "Only the author can update this note"));
 
         mockMvc.perform(jsonRequest(put(BASE + "/" + TICKET_ID + "/notes/n-1"), body("content", "Edited")))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("OPERATION_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.message").value("Only the author can update this note"));
     }
 

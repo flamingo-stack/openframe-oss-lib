@@ -1,12 +1,18 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { cn } from '../../../utils/cn';
 import { ApprovalBatchMessage, ApprovalStatusTag } from '../../chat/approval-batch-message';
 import { ExpandChevron } from '../../chat/expand-chevron';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import type { ChatApprovalStatus } from '../../chat/types';
 import { Button } from '../../ui/button';
-import { NotificationTile } from './notification-tile';
+import {
+  APPROVAL_BUTTON_CLASS,
+  APPROVAL_TOGGLE_BUTTON_CLASS,
+  LOCKSCREEN_APPROVAL_BUTTON_CLASS,
+  NotificationTile,
+} from './notification-tile';
 import { approvalMetaToBatchData, getApprovalMeta, resolutionToStatus } from './types';
 import type { Notification } from './types';
 
@@ -21,6 +27,18 @@ export interface ApprovalRequestNotificationTileProps {
   className?: string;
   /** Title lines before the ellipsis — see `NotificationTileProps.titleLines`. */
   titleLines?: 1 | 2;
+  /**
+   * `lockscreen`: the approval as a phone shows it (see `NotificationTile`):
+   * two compact buttons and no command drawer.
+   */
+  presentation?: 'card' | 'lockscreen';
+  /**
+   * Show Approve as being pressed (a scripted demo's "the tap lands" beat):
+   * the button dims for as long as this is true. No effect once resolved.
+   */
+  approvePressed?: boolean;
+  /** See `NotificationTileProps.timeLabel`. */
+  timeLabel?: string;
 }
 
 export function ApprovalRequestNotificationTile({
@@ -33,7 +51,11 @@ export function ApprovalRequestNotificationTile({
   defaultExpanded = false,
   className,
   titleLines,
+  presentation = 'card',
+  approvePressed = false,
+  timeLabel,
 }: ApprovalRequestNotificationTileProps) {
+  const lockscreen = presentation === 'lockscreen';
   const [expanded, setExpanded] = useState(defaultExpanded);
   // Toggling the command section pins the tile so a live pop-up doesn't
   // auto-dismiss out from under the user mid-read.
@@ -87,6 +109,8 @@ export function ApprovalRequestNotificationTile({
       onSettle={onSettle}
       className={className}
       titleLines={titleLines}
+      presentation={presentation}
+      timeLabel={timeLabel}
       paused={pinned || processing}
       actions={
         <div className="flex w-full items-center gap-[var(--spacing-system-xs)]">
@@ -97,6 +121,12 @@ export function ApprovalRequestNotificationTile({
                 size="small"
                 onClick={() => resolve('approved', onApprove)}
                 disabled={processing}
+                data-pressed={approvePressed || undefined}
+                className={cn(
+                  'ease-[cubic-bezier(.2,0,0,1)] transition-[filter,transform] duration-200 motion-reduce:transition-none',
+                  lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS,
+                  approvePressed && 'scale-[0.98] brightness-75',
+                )}
               >
                 Approve
               </Button>
@@ -105,6 +135,7 @@ export function ApprovalRequestNotificationTile({
                 size="small"
                 onClick={() => resolve('rejected', onReject)}
                 disabled={processing}
+                className={lockscreen ? LOCKSCREEN_APPROVAL_BUTTON_CLASS : APPROVAL_BUTTON_CLASS}
               >
                 Reject
               </Button>
@@ -117,37 +148,41 @@ export function ApprovalRequestNotificationTile({
               ) : null}
             </span>
           )}
-          <Button
-            variant="outline"
-            size="small"
-            onClick={() => {
-              setExpanded(prev => !prev);
-              setPinned(true);
-            }}
-            aria-expanded={expanded}
-            aria-label={toggleLabel}
-            className="ml-auto w-6 shrink-0 px-0 md:w-8"
-          >
-            <ExpandChevron expanded={expanded} />
-          </Button>
+          {!lockscreen && (
+            <Button
+              variant="outline"
+              size="small"
+              onClick={() => {
+                setExpanded(prev => !prev);
+                setPinned(true);
+              }}
+              aria-expanded={expanded}
+              aria-label={toggleLabel}
+              className={APPROVAL_TOGGLE_BUTTON_CLASS}
+            >
+              <ExpandChevron expanded={expanded} />
+            </Button>
+          )}
         </div>
       }
     >
-      <div style={containerStyle}>
-        {/* Divider lives inside the measured element — useCollapsible caps the
-            container at the inner scrollHeight, which excludes the inner's own borders. */}
-        <div ref={innerRef}>
-          <div className="border-t border-ods-border">
-            <ApprovalBatchMessage
-              data={batchData}
-              showExecutionStatus={false}
-              showFooterActions={false}
-              maxBodyHeight="50vh"
-              className="mb-0 rounded-none border-0"
-            />
+      {!lockscreen && (
+        <div style={containerStyle}>
+          {/* Divider lives inside the measured element — useCollapsible caps the
+              container at the inner scrollHeight, which excludes the inner's own borders. */}
+          <div ref={innerRef}>
+            <div className="border-t border-ods-border">
+              <ApprovalBatchMessage
+                data={batchData}
+                showExecutionStatus={false}
+                showFooterActions={false}
+                maxBodyHeight="50vh"
+                className="mb-0 rounded-none border-0"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </NotificationTile>
   );
 }

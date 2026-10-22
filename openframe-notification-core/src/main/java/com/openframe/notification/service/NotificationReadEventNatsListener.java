@@ -27,12 +27,7 @@ public class NotificationReadEventNatsListener implements NotificationReadEventL
         if (event.recipientType() != RecipientType.USER) {
             return;
         }
-        natsPublisher.publishReadStateToUser(event.recipientId(), event.notificationIds(), eventType(event));
-    }
-
-    private static NotificationEventType eventType(NotificationReadEvent event) {
-        return event.transition() == NotificationReadEvent.Transition.DELETED
-                ? NotificationEventType.DELETED
-                : NotificationEventType.READ;
+        NotificationEventType eventType = NotificationEventType.valueOf(event.transition().name());
+        natsPublisher.publishReadStateToUser(event.recipientId(), event.notificationIds(), eventType);
     }
 }

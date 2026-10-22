@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * Meeting-booking wire contracts + validation factory.
@@ -430,6 +430,17 @@ export function normalizeFormField(
     delete normalized.optionLabels;
   }
   return normalized;
+}
+
+/**
+ * Whether the form asks a question the link declares: a required one always, an optional one when the host's
+ * `optionalFields` names it (or names none). THE rule; a host that answers a question outside the form reads it.
+ */
+export function bookingFormAsks(
+  field: { name: string; required?: boolean },
+  optionalFields: readonly string[] | undefined,
+): boolean {
+  return Boolean(field.required) || !optionalFields || optionalFields.includes(field.name);
 }
 
 /** The questions the native form draws and validates, in declared order. */

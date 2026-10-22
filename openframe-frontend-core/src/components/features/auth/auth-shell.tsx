@@ -12,6 +12,8 @@ export interface AuthShellProps {
   children: ReactNode;
   /** Marketing panel. Defaults to <AuthBenefitsPanel />. */
   benefits?: ReactNode;
+  /** The free trial's length in days, from the host's billing plan; the default panel states it when given. */
+  trialDays?: number | null;
   /** Pinned to the bottom-left of the form column on desktop only (e.g. "Back to Login"). */
   footer?: ReactNode;
   className?: string;
@@ -28,8 +30,8 @@ export interface AuthShellProps {
  * `of-auth-shell` on the root is a stable hook for shell/consumer CSS (the
  * native mobile shell pads it by the top safe-area inset).
  */
-export function AuthShell({ tabs, children, benefits, footer, className }: AuthShellProps) {
-  const benefitsNode = benefits ?? <AuthBenefitsPanel />;
+export function AuthShell({ tabs, children, benefits, trialDays, footer, className }: AuthShellProps) {
+  const benefitsNode = benefits ?? <AuthBenefitsPanel trialDays={trialDays} />;
 
   return (
     <div

@@ -1,4 +1,4 @@
-import type { SVGProps } from "react";
+import { useId, type SVGProps } from "react";
 export interface GoogleSheetsIconProps
   extends Omit<SVGProps<SVGSVGElement>, "width" | "height"> {
   className?: string;
@@ -11,6 +11,8 @@ export function GoogleSheetsIcon({
   color = "currentColor",
   ...props
 }: GoogleSheetsIconProps) {
+  // Per-instance ids: see scopeIds in scripts/generate-icons.mjs.
+  const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '');
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -22,7 +24,7 @@ export function GoogleSheetsIcon({
       {...props}
     >
       <defs>
-        <mask id="sheets-grid">
+        <mask id={`${uid}sheets-grid`}>
           <rect width="24" height="24" fill="white" />
           {/* Grid cells cut out as transparent */}
           <rect x="7" y="10" width="4" height="2" fill="black" />
@@ -38,7 +40,7 @@ export function GoogleSheetsIcon({
         fillRule="evenodd"
         clipRule="evenodd"
         d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6H6Zm8 1.5V8h4.5L14 3.5Z"
-        mask="url(#sheets-grid)"
+        mask={`url(#${uid}sheets-grid)`}
       />
     </svg>
   );

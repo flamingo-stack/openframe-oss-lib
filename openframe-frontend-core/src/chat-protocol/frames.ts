@@ -18,6 +18,8 @@
  * Server-safe: no React, no browser APIs beyond TextEncoder/TextDecoder.
  */
 
+import type { ChatProgressStage } from './progress';
+
 // =============================================================================
 // Sentinel constants
 // =============================================================================
@@ -82,6 +84,11 @@ export interface RoutedAnswerBreakdown {
  *  within ~200ms, before any upstream byte arrives. */
 export interface StatusThinkingFrame {
   status: 'thinking';
+  /** What the turn is doing right now (`./progress`): a fixed vocabulary, shown
+   *  as one line while the user waits. May be sent again as the stage moves. */
+  stage?: ChatProgressStage;
+  /** How many of the thing the stage works on (sources searched, results read). */
+  count?: number;
 }
 
 /** Per-turn metadata frame. The emitter sends `options.metadata`

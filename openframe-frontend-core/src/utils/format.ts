@@ -3,6 +3,7 @@
  */
 
 import type { ProgramInstant } from './program-instant';
+import { vendorClassificationCopy } from './vendor-classification';
 
 /**
  * Format a date to a human-readable string
@@ -407,12 +408,24 @@ function toValidDate(date: DateInput): Date | null {
 }
 
 /**
+ * The viewer's locale: the language the user put first in the browser's own
+ * Languages setting (`navigator.language`), not `Intl`'s default. The two
+ * differ on macOS, where Chrome's default locale is the OS language — a user
+ * with an English (US) Mac who chose English (Australia) in Chrome reads
+ * `en-AU` here and `en-US` from a bare `Intl.DateTimeFormat()`. Undefined off
+ * the client (SSR, a test without a navigator): the runtime's own default.
+ */
+export const viewerLocale = (): string | undefined =>
+  typeof navigator === 'undefined' ? undefined : navigator.language || undefined;
+
+/**
  * Render a date (and, for a date-time style, its time) in an explicit zone.
  * Returns `''` for a missing or unparseable value.
  *
- * `options.viewerLocale` renders in the runtime's own LOCALE instead of the
- * fixed `en-US` — for client-only UI that should read the way its user writes
- * dates. The locale is never implied, for the same hydration reason as the zone.
+ * `options.viewerLocale` renders in the viewer's LOCALE (`viewerLocale()`)
+ * instead of the fixed `en-US` — for client-only UI that should read the way
+ * its user writes dates. The locale is never implied, for the same hydration
+ * reason as the zone.
  */
 export function formatDateWithTimezone(
   date: DateInput,
@@ -423,7 +436,7 @@ export function formatDateWithTimezone(
   const dateObj = toValidDate(date);
   if (!dateObj) return '';
   const { timeZone: _ignored, ...fields } = typeof style === 'string' ? ZONED_DATE_STYLES[style] : style;
-  return formatterFor(timezone, fields, options?.viewerLocale ? undefined : 'en-US').format(dateObj);
+  return formatterFor(timezone, fields, options?.viewerLocale ? viewerLocale() : 'en-US').format(dateObj);
 }
 
 /**
@@ -499,6 +512,31 @@ export function formatProgramDate(at: ProgramInstant, style: ZonedDateStyle = 'm
   // `timezone` is already null for a day-valued row, so this one call covers
   // the zoned render, the no-zone render and the override render alike.
   return formatDateWithTimezone(at.instant ?? at.utcDate, at.timezone, style);
+}
+
+/**
+ * A program that spans DAYS, as one range: "Aug 14 – 20, 2026". `null` when
+ * there is no end, the end does not follow the start, or both fall on one day
+ * (the caller then prints its single date).
+ */
+export function formatProgramDateRange(at: ProgramInstant, end: Date | string | null | undefined): string | null {
+  const start = toValidDate(at.instant ?? at.utcDate);
+  const ends = end ? toValidDate(end) : null;
+  if (!start || !ends || ends.getTime() <= start.getTime()) return null;
+  // An end at midnight closes the day BEFORE it (Aug 14 to Aug 21 00:00 is "Aug 14 – 20").
+  const finish = new Date(ends.getTime() - 1);
+  const formatter = formatterFor(at.timezone, { year: 'numeric', month: 'short', day: 'numeric' }, 'en-US');
+  const partsOf = (date: Date) => {
+    const parts = formatter.formatToParts(date);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(p => p.type === type)?.value ?? '';
+    return { month: part('month'), day: part('day'), year: part('year') };
+  };
+  const from = partsOf(start);
+  const to = partsOf(finish);
+  if (from.year !== to.year) return `${from.month} ${from.day}, ${from.year} – ${to.month} ${to.day}, ${to.year}`;
+  if (from.month !== to.month) return `${from.month} ${from.day} – ${to.month} ${to.day}, ${to.year}`;
+  if (from.day === to.day) return null;
+  return `${from.month} ${from.day} – ${to.day}, ${to.year}`;
 }
 
 /**
@@ -915,10 +953,7 @@ export function stripHtml(html: string): string {
  * curated mapping.
  */
 export function formatClassification(classification: string): string {
-  const customMappings: Record<string, string> = {
-    openframe_selected: 'OpenFrame Selected',
-  };
-  return customMappings[classification] || formatUnderscoreText(classification);
+  return vendorClassificationCopy(classification)?.label ?? formatUnderscoreText(classification);
 }
 
 /**
@@ -1034,4 +1069,19 @@ export function formatWebinarTimeMeta(
   const duration = formatDurationFromRange(opts.startAt, opts.endAt);
   const time = formatProgramTimeRange(at, { startAt: opts.startAt, withZoneLabel: opts.withZoneLabel });
   return [time, duration].filter(Boolean).join(' · ');
+}
+
+/**
+ * A web address as it is shown to a person to read or type, not to follow: no
+ * scheme, no query or fragment, no trailing slash.
+ * `https://www.example.com/mobile?from=qr` reads `example.com/mobile`.
+ *
+ * `www` is dropped by default, because nobody types it; `keepWww` keeps it where
+ * the address is shown as the site's own name.
+ */
+export function formatUrlForDisplay(url: string, options: { keepWww?: boolean } = {}): string {
+  return url
+    .replace(options.keepWww ? /^https?:\/\//i : /^https?:\/\/(www\.)?/i, '')
+    .replace(/[?#].*$/, '')
+    .replace(/\/$/, '');
 }

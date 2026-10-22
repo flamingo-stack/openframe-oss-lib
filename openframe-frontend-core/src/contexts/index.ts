@@ -30,4 +30,13 @@ export {
 
 export { ChatRuntimeContext, useChatRuntime, useRequiredChatRuntime, type ChatRuntime } from './chat-runtime-context';
 
+export {
+  AssistantRuntimeContext,
+  useAssistantRuntime,
+  type AssistantAskCardCopy,
+  type AssistantAskEvent,
+  type AssistantOpenRequest,
+  type AssistantRuntime,
+} from './assistant-runtime-context';
+
 export { useOuterOrDefault } from './use-outer-or-default';

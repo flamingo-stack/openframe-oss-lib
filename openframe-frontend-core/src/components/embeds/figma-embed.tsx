@@ -105,7 +105,7 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
       title={heading}
       titleVariant="h6"
       actions={
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 content-sm:flex-row content-sm:items-center">
           {isSlides && embedSrc && <SlidesViewToggle view={view} onChange={setView} />}
           {originalUrl && (
             <Button
@@ -115,7 +115,7 @@ export function FigmaEmbed({ url, title, height, loading = 'lazy' }: FigmaEmbedP
               openInNewTab
               leftIcon={<FigmaIcon className="h-4 w-4" />}
               rightIcon={<ExternalLink className="h-4 w-4" />}
-              className="w-full sm:w-auto"
+              className="w-full content-sm:w-auto"
             >
               Open in Figma
             </Button>

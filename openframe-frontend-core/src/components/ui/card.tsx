@@ -4,19 +4,34 @@ import { type HTMLAttributes, type ReactNode, forwardRef } from 'react';
 
 import { cn } from '../../utils/cn';
 
-const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      // `border` with NO color token resolves to `currentColor` — on a dark card
-      // with light text that paints a WHITE outline. Every ODS surface borders
-      // on `--color-border`; say so.
-      'rounded-lg border border-ods-border bg-card text-card-foreground shadow-sm',
-      className,
-    )}
-    {...props}
-  />
-));
+/**
+ * `default`: the raised card (a shadow, the card colour). `panel`: a flat ODS card surface,
+ * the frame a page section draws around a block of its own (a call-to-action band, the
+ * booking fold, a quote tile): small radius, the card fill, no shadow.
+ */
+const CARD_VARIANT_CLASS = {
+  default: 'rounded-lg bg-card text-card-foreground shadow-sm',
+  panel: 'rounded-md bg-ods-card text-ods-text-primary',
+} as const;
+
+export type CardVariant = keyof typeof CARD_VARIANT_CLASS;
+
+const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { variant?: CardVariant }>(
+  ({ className, variant = 'default', ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(
+        // `border` with NO color token resolves to `currentColor` — on a dark card
+        // with light text that paints a WHITE outline. Every ODS surface borders
+        // on `--color-border`; say so.
+        'border border-ods-border',
+        CARD_VARIANT_CLASS[variant],
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
 Card.displayName = 'Card';
 
 const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
@@ -57,7 +72,7 @@ export function CardHorizontal({ icon, title, description, className = '', borde
   return (
     <div
       className={cn(
-        'flex min-h-[80px] w-full flex-row items-center gap-3 bg-ods-card p-4 md:gap-4 md:p-6',
+        'flex min-h-[80px] w-full flex-row items-center gap-3 bg-ods-card p-4 content-md:gap-4 content-md:p-6',
         borderLeft ? 'border-l border-ods-border' : '',
         className,
       )}

@@ -3,9 +3,10 @@
 import { CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../../utils/cn';
-import { SparklesIcon } from '../../icons/sparkles-icon';
+import { SparklesIcon } from '../../icons-v2-generated/interface/sparkles-icon';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
+import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { AIEnrichButton } from './AIEnrichButton';
 import { AIWarningsSection } from './AIWarningsSection';
@@ -157,9 +158,7 @@ export const AIEnrichSection: React.FC<AIEnrichSectionProps> = ({
       {showCustomInstructions && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <label htmlFor="ai-enrich-custom-instructions" className="text-ods-text-primary text-h6">
-              {customInstructionsLabel}
-            </label>
+            <Label htmlFor="ai-enrich-custom-instructions">{customInstructionsLabel}</Label>
             {customInstructionsMaxLength !== undefined && (
               <span className="text-ods-text-secondary text-h6">
                 {(customInstructions ?? '').length}/{customInstructionsMaxLength}

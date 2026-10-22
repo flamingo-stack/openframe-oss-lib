@@ -16,6 +16,7 @@
  * `sources`). In the off-mode they're null/undefined.
  */
 
+import type { ChatProgress } from '../../../chat-protocol/progress';
 import type { ChatRef } from '../chat-ref.types';
 import type { ChatAttachment } from '../utils/chat-attachment-markdown';
 import type { AuthorType } from './chat.types';
@@ -238,7 +239,7 @@ export interface UnifiedChatMessage {
   /**
    * Documents this answer cited, rendered as chips beneath it. Produced by
    * BOTH transports now — SSE reads them off the per-turn metadata frame, NATS
-   * decodes them out of a `GUIDE`/`SOURCES` chunk.
+   * decodes them out of an `ATTACHMENTS` chunk.
    */
   sources?: ChatSource[];
   /**
@@ -335,6 +336,11 @@ export interface UnifiedChatState {
   /** Granular phase for the "Thinking..."/"Streaming..." status row above input. */
   streamingPhase: StreamingPhase;
 
+  /** What the pending turn is doing before its first token ("searching 28
+   *  sources"), when the transport reports it. Optional: a transport with no
+   *  stages leaves it out and the status row keeps its generic phrase. */
+  streamingProgress?: ChatProgress | null;
+
   /** True while the adapter is rebuilding the message list from the
    *  server-side transcript store (SSE/Guide mount-time hydration). Optional —
    *  transports without server hydration (NATS manages its own dialog
@@ -423,6 +429,19 @@ export interface UnifiedChatState {
   /** Currently-selected dialog id, or `null` when no dialog is active
    *  (draft state — "start a new conversation"). */
   activeDialogId: string | null;
+
+  /**
+   * The open conversation's own record, when the host resolves one. A
+   * conversation reached by link, notification or reload is not necessarily in
+   * `dialogs` - it may be archived, or past the pages loaded so far - and
+   * without its record the panel has no title, owner or restore action for it,
+   * and no way to know it is archived: `archived` on it makes the conversation
+   * read-only exactly as opening it from the Chat Archive does. Keyed on `id`:
+   * a record for another dialog than `activeDialogId` is ignored. The host
+   * keeps it current - once its `unarchiveDialog` resolves, the record must no
+   * longer say archived.
+   */
+  activeDialog?: DialogItem | null;
 
   /** Switch the panel to an existing dialog. Idempotent — selecting the
    *  active id is a no-op. Pass `null` to drop back to draft state. */

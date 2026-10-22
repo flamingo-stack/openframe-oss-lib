@@ -1,9 +1,10 @@
 package com.openframe.data.config;
 
 import com.openframe.data.document.rmm.script.ScriptStatus;
-import jakarta.annotation.PostConstruct;
+import com.openframe.data.repository.knowledgebase.CustomKnowledgeBaseItemRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -13,7 +14,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 
 @Slf4j
 @Configuration
-public class MongoIndexConfig {
+public class MongoIndexConfig implements SmartLifecycle {
 
     /**
      * Partial-unique name index on {@code scripts}. Explicitly named so it
@@ -30,7 +31,33 @@ public class MongoIndexConfig {
     @Autowired
     private MongoTemplate mongoTemplate;
 
-    @PostConstruct
+    private volatile boolean running;
+
+    /**
+     * Phase 0: before the web server (phase {@code Integer.MAX_VALUE - 1}) takes traffic, but after the
+     * context refresh, so a refresh alone needs no Mongo (the JVM AOT cache training run exits there).
+     */
+    @Override
+    public int getPhase() {
+        return 0;
+    }
+
+    @Override
+    public void start() {
+        initIndexes();
+        running = true;
+    }
+
+    @Override
+    public void stop() {
+        running = false;
+    }
+
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+
     public void initIndexes() {
         // Load-bearing: the (provider, subject) unique index IS the enforcement of the
         // one-SSO-account-one-user invariant (registration guards rely on it, and
@@ -93,6 +120,35 @@ public class MongoIndexConfig {
                         .named(SCRIPT_SCHEDULES_NAME_UNIQUE_INDEX)
                         .partial(PartialIndexFilter.of(Criteria.where("status")
                                 .in(ScriptStatus.ACTIVE.name(), ScriptStatus.ARCHIVED.name()))));
+
+        initKnowledgeBaseFolderIndexes();
+    }
+
+    /**
+     * Knowledge base folders are listed by name under a collation (case-insensitive, digits by
+     * value). A query that names a collation can use an index only if the index was built with the
+     * same one — for the sort, and for the string equalities on tenantId/parentId/type in front of
+     * it. So these two are created here, from the very constant the query uses, rather than by a
+     * @CompoundIndex that would have to restate it. The first serves a level or a subtree, the
+     * second the whole knowledge base.
+     */
+    private void initKnowledgeBaseFolderIndexes() {
+        mongoTemplate.indexOps("knowledge_base_items").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("parentId", Sort.Direction.ASC)
+                        .on("type", Sort.Direction.ASC)
+                        .on("name", Sort.Direction.ASC)
+                        .on("_id", Sort.Direction.DESC)
+                        .named("knowledge_base_items_parent_type_name_collated")
+                        .collation(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION));
+
+        mongoTemplate.indexOps("knowledge_base_items").ensureIndex(
+                new Index().on("tenantId", Sort.Direction.ASC)
+                        .on("type", Sort.Direction.ASC)
+                        .on("name", Sort.Direction.ASC)
+                        .on("_id", Sort.Direction.DESC)
+                        .named("knowledge_base_items_type_name_collated")
+                        .collation(CustomKnowledgeBaseItemRepositoryImpl.FOLDER_NAME_COLLATION));
     }
 
     private void dropStaleIndex(String collection, String indexName) {

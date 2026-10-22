@@ -1,16 +1,16 @@
 'use client';
 
-import { OpenFrameLogo } from '../../icons';
 import { FlamingoLogoIcon } from '../../icons-v2-generated/logos/flamingo-logo-icon';
+import { OpenframeLogoIcon } from '../../icons-v2-generated/logos/openframe-logo-icon';
 
 /** OpenFrame logo + wordmark, shown at the top of the auth screens. */
 export function OpenFrameWordmark() {
   return (
     <div className="flex items-center gap-[var(--spacing-system-xs)]">
-      <OpenFrameLogo
+      <OpenframeLogoIcon
+        secondaryColor="var(--color-accent-primary)"
         className="h-10 w-10"
-        lowerPathColor="var(--color-accent-primary)"
-        upperPathColor="var(--color-text-primary)"
+        color="var(--color-text-primary)"
       />
       <span className="tracking-[-0.64px] text-ods-text-primary text-h2">OpenFrame</span>
     </div>

@@ -707,6 +707,10 @@ export class MessageSegmentAccumulator {
             this.completeContextCompaction(segment.summary);
           }
           break;
+        case 'suggestions':
+          // Built locally by the host, never streamed: kept as it is.
+          this.segments.push(segment);
+          break;
       }
     }
     return this.getSegments();

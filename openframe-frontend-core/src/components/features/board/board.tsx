@@ -83,6 +83,8 @@ export interface BoardProps {
   onApprove?: (ticketId: string, requestId?: string) => void | Promise<void>;
   onReject?: (ticketId: string, requestId?: string) => void | Promise<void>;
   collapseStorageKey?: string;
+  /** The lanes folded when the board mounts, by column id. Read only without `collapseStorageKey`. */
+  initialCollapsed?: Record<string, boolean>;
   loadMoreRootMargin?: string;
   className?: string;
 }
@@ -104,16 +106,50 @@ export interface BoardProps {
  *
  * While the answer is unknown (SSR and the hydration render) neither subtree
  * exists — mounting one is a guess that runs the loser's effects and, for the
- * drag board, registers DnD on a device that may be a phone. The empty shell
- * keeps the container's footprint; `useMediaQuery` resolves in a pre-paint
- * layout effect, so on the client the shell is never actually painted.
+ * drag board, registers DnD on a device that may be a phone. `BoardShell` stands
+ * in: the same lanes, laid out as the drag board lays them out, with no DnD. It
+ * is what the server's HTML paints before the page hydrates, so the first paint
+ * already shows the lanes (and a loading lane its own loading cards) instead of
+ * an empty strip that fills in after hydration.
  */
 export function Board(props: BoardProps) {
   const dragAndDropEnabled = useMediaQuery(DRAG_AND_DROP_MEDIA_QUERY);
-  if (dragAndDropEnabled === undefined) {
-    return <div aria-hidden className={cn('flex h-full min-h-0 flex-col', props.className)} />;
-  }
+  if (dragAndDropEnabled === undefined) return <BoardShell {...props} />;
   return dragAndDropEnabled ? <DragBoard {...props} /> : <TouchBoard {...props} />;
+}
+
+/**
+ * How a lane meets its neighbours on the drag board: adjacent system lanes join into one strip, any other pair has a
+ * gap. One rule for the board and its pre-hydration shell, so the shell's lanes sit where the board's will.
+ */
+function laneJoins(columns: BoardColumnDef[], i: number) {
+  const column = columns[i];
+  const joinLeft = !!(column.system && columns[i - 1]?.system);
+  const joinRight = !!(column.system && columns[i + 1]?.system);
+  return { joinLeft, joinRight, showGap: i > 0 && !joinLeft };
+}
+
+/**
+ * The board before it knows which board it is (the server's HTML and the hydration render): the lanes, arranged as
+ * the drag board arranges them, each a `touchMode` lane (no drop target), none collapsed (the stored collapse is read
+ * after hydration). Nothing in it can be used, so it is inert.
+ */
+function BoardShell({ columns, className }: BoardProps) {
+  return (
+    <div inert aria-hidden className={cn('flex h-full min-h-0 flex-col', className)}>
+      <div className="flex min-h-0 flex-1 overflow-x-hidden">
+        {columns.map((column, i) => {
+          const { joinLeft, joinRight, showGap } = laneJoins(columns, i);
+          return (
+            <Fragment key={column.id}>
+              {showGap && <div aria-hidden className="w-[var(--spacing-system-mf)] shrink-0" />}
+              <BoardColumn column={column} touchMode joinLeft={joinLeft} joinRight={joinRight} />
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -138,10 +174,11 @@ function DragBoard({
   onApprove,
   onReject,
   collapseStorageKey,
+  initialCollapsed,
   loadMoreRootMargin,
   className,
 }: BoardProps) {
-  const { collapsed, toggle } = useBoardCollapse(collapseStorageKey);
+  const { collapsed, toggle } = useBoardCollapse(collapseStorageKey, initialCollapsed);
 
   const {
     scrollRef,
@@ -584,11 +621,7 @@ function DragBoard({
               className="flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {view.map((column, i) => {
-                const prev = view[i - 1];
-                const next = view[i + 1];
-                const joinLeft = !!(column.system && prev?.system);
-                const joinRight = !!(column.system && next?.system);
-                const showGap = i > 0 && !joinLeft;
+                const { joinLeft, joinRight, showGap } = laneJoins(view, i);
                 return (
                   <Fragment key={column.id}>
                     {showGap && <div aria-hidden className="w-[var(--spacing-system-mf)] shrink-0" />}

@@ -18,6 +18,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "machine_delivery")
 @CompoundIndex(name = "machine_delivery_due", def = "{'tenantId': 1, 'status': 1, 'dueAt': 1}")
+@CompoundIndex(name = "machine_delivery_type_due", def = "{'tenantId': 1, 'status': 1, 'type': 1, 'dueAt': 1}")
 public class MachineDelivery implements TenantScoped {
 
     @Id
@@ -32,6 +33,7 @@ public class MachineDelivery implements TenantScoped {
     private int attempts;
     private int errors;
     private String dispatchId;
+    private int sequence;
     private String payloadJson;
 
     private Instant dispatchedAt;

@@ -13,8 +13,13 @@ import {
   type TrustCenterControlsPage,
   type TrustCenterPublic,
 } from '../../../types/trust-center';
-import { TRUST_CENTER_FIXTURE_WINDOW_MS, makeTrustCenterData } from '../__fixtures__/trust-center';
-import { TrustCenterPage, TrustCenterPageSkeleton } from '../trust-center-page';
+import { LoadingScope } from '../../ui/loading-scope';
+import {
+  TRUST_CENTER_FIXTURE_FAQ,
+  TRUST_CENTER_FIXTURE_WINDOW_MS,
+  makeTrustCenterData,
+} from '../__fixtures__/trust-center';
+import { TrustCenterPage } from '../trust-center-page';
 import { TRUST_SECTION_LEADS } from '../trust-center-sections';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
@@ -101,6 +106,19 @@ describe('TrustCenterPage', () => {
     expect(html).not.toMatch(/Controls (continuously )?monitored/);
   });
 
+  it('in a loading scope: draws its skeleton (every section heading and lead real, no read words) and fetches nothing', () => {
+    const html = renderToString(
+      <LoadingScope>
+        <TrustCenterPage />
+      </LoadingScope>,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    for (const lead of Object.values(TRUST_SECTION_LEADS)) expect(html).toContain(lead);
+    expect(html).toContain('Security questions');
+    expect(html).not.toContain('Checking monitoring status');
+    expect(html).toMatch(/bg-ods-skeleton/);
+  });
+
   it('does not fetch when initialData is given', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -119,7 +137,9 @@ describe('TrustCenterPage', () => {
     let answer: (response: Response) => void = () => {};
     fetchMock.mockReturnValueOnce(new Promise<Response>(resolve => (answer = resolve)));
     render(<TrustCenterPage endpoint="/content/api/trust-center" />);
-    const loading = await screen.findByLabelText('Loading the trust center');
+    // The loading region's one status names what loads; the skeleton under it carries the real headings.
+    expect(await screen.findByRole('status')).toHaveTextContent('Loading the trust center');
+    const loading = document.body;
     for (const [label, lead] of [
       ['Compliance', TRUST_SECTION_LEADS.compliance],
       ['Controls', TRUST_SECTION_LEADS.controls],
@@ -130,15 +150,22 @@ describe('TrustCenterPage', () => {
     }
     act(() => answer(jsonResponse(makeData())));
     expect(await screen.findByText('SOC 2 Type II')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Loading the trust center')).toBeNull();
+    expect(screen.queryByText('Loading the trust center')).toBeNull();
   });
 
-  it('TrustCenterPageSkeleton wears the page chrome it is given: no title and subtitle means no header at all', () => {
-    const { rerender } = render(<TrustCenterPageSkeleton shell={false} title="" subtitle="" />);
-    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
-    expect(screen.getByLabelText('Loading the trust center')).toBeInTheDocument();
-    rerender(<TrustCenterPageSkeleton shell={false} />);
-    expect(screen.getByRole('heading', { level: 1, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
+  it('in a loading scope the page wears the chrome it is given: no title and subtitle means no header at all', () => {
+    const { rerender } = render(
+      <LoadingScope>
+        <TrustCenterPage shell={false} title="" subtitle="" />
+      </LoadingScope>,
+    );
+    expect(screen.queryByRole('heading', { level: 1, hidden: true })).toBeNull();
+    rerender(
+      <LoadingScope>
+        <TrustCenterPage shell={false} />
+      </LoadingScope>,
+    );
+    expect(screen.getByRole('heading', { level: 1, hidden: true, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
   });
 
   it('is ONE page: every section is an anchored h2, in reading order — AI & data use after Subprocessors, Contact before FAQ', () => {
@@ -206,6 +233,46 @@ describe('TrustCenterPage', () => {
   it('public documents open in a new tab (a Vanta file or an outside link), without leaving the trust center', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     expect(screen.getByRole('link', { name: 'View Privacy policy' })).toHaveAttribute('target', '_blank');
+  });
+
+  it("offers the page as a PDF: ONE small download button in the status line, the hub's pdf route beside the endpoint, in a new tab", () => {
+    render(<TrustCenterPage endpoint="/content/api/trust-center?tenant=a" initialData={makeData()} />);
+    const link = screen.getByRole('link', { name: 'Download PDF' });
+    expect(link).toHaveAttribute('href', '/content/api/trust-center/pdf?tenant=a');
+    expect(link).toHaveAttribute('target', '_blank');
+    // One control only: never also a header action or part of the phone's fixed bottom bar (those are for Request access).
+    expect(screen.getAllByText('Download PDF')).toHaveLength(1);
+  });
+
+  it('attribution={false}: the host states the sync line and its download, so the page keeps only the monitoring status', () => {
+    render(<TrustCenterPage initialData={makeData()} attribution={false} />);
+    expect(screen.queryByText(/Data synced from/)).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Download PDF' })).toBeNull();
+  });
+
+  it('still offers the PDF when monitoring is not connected (no source line to end)', () => {
+    render(<TrustCenterPage initialData={makeData({ connected: false, syncedAt: null })} />);
+    expect(screen.getByRole('link', { name: 'Download PDF' })).toHaveAttribute('href', '/api/trust-center/pdf');
+    expect(screen.queryByText(/Data synced from/)).toBeNull();
+  });
+
+  it('with host content before it, the FAQ is the last thing on the page, after that content', () => {
+    render(
+      <TrustCenterPage
+        initialData={makeData({ faqs: [TRUST_CENTER_FIXTURE_FAQ] })}
+        beforeFaq={<h2>Why we build in the open</h2>}
+      />,
+    );
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings.indexOf('Why we build in the open')).toBeGreaterThan(headings.indexOf('Contact'));
+    expect(headings.indexOf('FAQ')).toBeGreaterThan(headings.indexOf('Why we build in the open'));
+    expect(headings.filter(h => h === 'FAQ')).toHaveLength(1);
+  });
+
+  it('without host content the FAQ closes the sections column, as before', () => {
+    render(<TrustCenterPage initialData={makeData({ faqs: [TRUST_CENTER_FIXTURE_FAQ] })} />);
+    const headings = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+    expect(headings.indexOf('FAQ')).toBeGreaterThan(headings.indexOf('Contact'));
   });
 
   it('hides empty sections and the request CTA when nothing is gated', () => {
@@ -421,7 +488,7 @@ describe('TrustCenterPage', () => {
       // event lands (inside a `<main overflow-y-auto>` shell none ever did).
       expect(rail.getByRole('button', { name: 'Documents' })).toHaveAttribute('aria-current', 'location');
       expect(rail.getByRole('button', { name: 'Compliance' })).not.toHaveAttribute('aria-current');
-      expect(replaceState).toHaveBeenCalledWith(null, '', '/trust-center#documents');
+      expect(replaceState).toHaveBeenCalledWith({ __hashSync: '#documents' }, '', '/trust-center#documents');
       expect(pushState).not.toHaveBeenCalled();
     } finally {
       replaceState.mockRestore();

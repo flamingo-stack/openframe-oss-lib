@@ -16,6 +16,7 @@ extend type Mutation {
 enum NotificationEntityType {
     TICKET
     DIALOG
+    INSIGHT
 }
 
 
@@ -61,6 +62,7 @@ enum NotificationCategory {
     TICKETS
     INSIGHTS
     MINGO
+    INTEGRATIONS
     GENERIC
 }
 

@@ -36,6 +36,14 @@ public interface OrganizationRepository extends MongoRepository<Organization, St
     Optional<Organization> findByIsDefaultTrue();
 
     /**
+     * Whether the tenant already has its default organization. Keyed explicitly by tenantId for
+     * shared-plane callers (tenant registration), where queries are not auto-scoped to a tenant.
+     * @param tenantId tenant identifier
+     * @return true if a default organization exists for the tenant
+     */
+    boolean existsByTenantIdAndIsDefaultTrue(String tenantId);
+
+    /**
      * Find organizations by organizationIds (for batch loading)
      * @param organizationIds collection of organization identifiers (can be Set or List)
      * @return list of organizations

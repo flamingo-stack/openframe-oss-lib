@@ -55,4 +55,7 @@ public class UserOnboardingProgress implements TenantScoped {
 
     /** When {@link #skipped} was set; null while not skipped. */
     private Instant skippedAt;
+
+    /** Mingo dialog hosting the Getting Started block; null until "Start with Mingo", overwritten by every start, cleared by reset. */
+    private String tourDialogId;
 }

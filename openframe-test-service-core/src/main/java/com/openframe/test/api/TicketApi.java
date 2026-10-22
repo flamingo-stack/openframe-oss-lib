@@ -7,6 +7,7 @@ import com.openframe.test.data.dto.shared.MutationDeleteInput;
 import com.openframe.test.data.dto.shared.MutationDeletePayload;
 import com.openframe.test.data.dto.ticket.AddTicketNoteInput;
 import com.openframe.test.data.dto.ticket.AssignTicketInput;
+import com.openframe.test.data.dto.ticket.BulkOperationPayload;
 import com.openframe.test.data.dto.ticket.CreateTempAttachmentInput;
 import com.openframe.test.data.dto.ticket.ReorderTicketStatusInput;
 import com.openframe.test.data.dto.ticket.TakeOverTicketInput;
@@ -39,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.test.api.graphql.TicketQueries.ARCHIVE_RESOLVED_TICKETS;
 import static com.openframe.test.api.graphql.TicketQueries.CREATE_TICKET;
 import static com.openframe.test.api.graphql.TicketQueries.CREATE_TICKET_STATUS;
 import static com.openframe.test.api.graphql.TicketQueries.DELETE_TICKET_STATUS;
@@ -188,6 +190,17 @@ public class TicketApi {
     public static Ticket transitionTicket(String ticketId, String toStatusId) {
         return mutateTicket(TRANSITION_TICKET, "transitionTicket",
                 Map.of("input", TransitionTicketInput.builder().ticketId(ticketId).toStatusId(toStatusId).build()));
+    }
+
+    // A transition for teardown, where the ticket may already be in that status: returns the HTTP status instead of asserting.
+    public static int transitionTicketRaw(String ticketId, String toStatusId) {
+        Map<String, Object> body = Map.of(
+                "query", TRANSITION_TICKET,
+                "variables", Map.of("input", TransitionTicketInput.builder().ticketId(ticketId).toStatusId(toStatusId).build())
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(CHAT_GRAPHQL)
+                .then().extract().statusCode();
     }
 
     /**
@@ -380,6 +393,45 @@ public class TicketApi {
                 .then().statusCode(200)
                 .extract().jsonPath().getList("errors", GraphqlError.class);
         return errors == null ? List.of() : errors;
+    }
+
+    // ---- bulk archive (CP-14) ----
+
+    // The board's "archive resolved" action; returns the payload as-is so a case asserts count and userErrors itself.
+    public static BulkOperationPayload archiveResolvedTickets(TicketFilterInput filter) {
+        Map<String, Object> variables = new HashMap<>();
+        if (filter != null) variables.put("filter", filter);
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", ARCHIVE_RESOLVED_TICKETS, "variables", variables))
+                .post(CHAT_GRAPHQL)
+                .then().spec(graphqlSuccess())
+                .extract().jsonPath().getObject("data.archiveResolvedTickets", BulkOperationPayload.class);
+    }
+
+    // For teardown: the ticket's lifecycle kind, or null when it cannot be read; never asserts.
+    public static String ticketKindRaw(String id) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", GET_TICKET, "variables", Map.of("id", id)))
+                .post(CHAT_GRAPHQL)
+                .then().extract().jsonPath().getString("data.ticket.statusDefinition.kind");
+    }
+
+    // For teardown: discards a staged file and returns the HTTP status instead of asserting.
+    public static int deleteTempAttachmentRaw(String tempAttachmentId) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", DELETE_TEMP_ATTACHMENT, "variables",
+                        Map.of("input", MutationDeleteInput.builder().id(tempAttachmentId).build())))
+                .post(CHAT_GRAPHQL)
+                .then().extract().statusCode();
+    }
+
+    // For teardown: deletes a custom status and returns the HTTP status instead of asserting.
+    public static int deleteTicketStatusRaw(String id) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", DELETE_TICKET_STATUS, "variables",
+                        Map.of("input", DeleteTicketStatusInput.builder().id(id).build())))
+                .post(CHAT_GRAPHQL)
+                .then().extract().statusCode();
     }
 
     public static Ticket createTicket(CreateTicketInput input) {

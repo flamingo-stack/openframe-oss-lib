@@ -1,9 +1,16 @@
 package com.openframe.sdk.fleetmdm;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import com.openframe.sdk.fleetmdm.exception.FleetMdmArgumentException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
 import com.openframe.sdk.fleetmdm.exception.FleetMdmException;
+import com.openframe.sdk.fleetmdm.model.AffectedSoftware;
+import com.openframe.sdk.fleetmdm.model.FleetSoftware;
 import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSearchResponse;
@@ -15,6 +22,7 @@ import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchRequest;
 import com.openframe.sdk.fleetmdm.model.OsquerySchemaSearchResponse;
 import com.openframe.sdk.fleetmdm.model.RunLiveQueryRequest;
 import com.openframe.sdk.fleetmdm.model.Policy;
+import com.openframe.sdk.fleetmdm.model.ScheduledQueriesResponse;
 import com.openframe.sdk.fleetmdm.model.Query;
 import com.openframe.sdk.fleetmdm.model.CreatePolicyRequest;
 import com.openframe.sdk.fleetmdm.model.UpdatePolicyRequest;
@@ -45,6 +53,7 @@ import java.util.concurrent.CompletableFuture;
 public class FleetMdmClient {
 
     private static final String HOSTS_URL = "/api/v1/fleet/hosts";
+    private static final String HOSTS_COUNT_URL = "/api/v1/fleet/hosts/count";
     private static final String QUERIES_URL = "/api/v1/fleet/queries";
     private static final String POLICIES_URL = "/api/v1/fleet/global/policies";
     private static final String GET_ENROLL_SECRET_URL = "/api/latest/fleet/spec/enroll_secret";
@@ -53,6 +62,7 @@ public class FleetMdmClient {
     private static final String POLICIES_DELETE_URL = "/api/latest/fleet/policies/delete";
     private static final String VULNERABILITIES_URL = "/api/latest/fleet/vulnerabilities";
     private static final String SOFTWARE_TITLES_URL = "/api/latest/fleet/software/titles";
+    private static final String SOFTWARE_VERSIONS_URL = "/api/latest/fleet/software/versions/";
     private static final String VULNERABILITY_DETAIL_URL = "/api/latest/fleet/vulnerabilities/";
     private static final String INCLUDE_MANAGED_QUERY = "?include_openframe_managed=1";
 
@@ -67,7 +77,12 @@ public class FleetMdmClient {
      * Thread-safe reusable {@link ObjectMapper}. Creating it once is cheaper than instantiating a new one
      * every request.
      */
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    // Jackson 2 behaviour (lenient primitives, declaration order), as openframe-core's Jackson2Compatibility;
+    // the SDK does not depend on it
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+            .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+            .build();
 
     /**
      * Body of a Fleet API call. It may throw checked exceptions so the call sites keep plain
@@ -204,11 +219,11 @@ public class FleetMdmClient {
      */
     public List<Host> searchHosts(HostSearchRequest searchRequest) {
         if (searchRequest == null) {
-            throw new IllegalArgumentException("Search request cannot be null");
+            throw new FleetMdmArgumentException("Search request cannot be null");
         }
 
         return call("process host search request", () -> {
-            String url = buildSearchUrl(searchRequest);
+            String url = buildSearchUrl(HOSTS_URL, searchRequest);
             HttpRequest request = addHeaders(HttpRequest.newBuilder()
                     .uri(URI.create(url)))
                     .GET()
@@ -252,11 +267,24 @@ public class FleetMdmClient {
         return searchHosts(new HostSearchRequest(query, page, perPage));
     }
 
+    public int countHosts(HostSearchRequest searchRequest) {
+        return call("count Fleet hosts", () -> {
+            HttpRequest request = addHeaders(HttpRequest.newBuilder()
+                    .uri(URI.create(buildSearchUrl(HOSTS_COUNT_URL, searchRequest))))
+                    .GET()
+                    .timeout(Duration.ofSeconds(30))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            checkResponse(response, "count Fleet hosts");
+            return requireNode(response.body(), "count").asInt();
+        });
+    }
+
     /**
      * Build the search URL with query parameters
      */
-    private String buildSearchUrl(HostSearchRequest searchRequest) {
-        StringBuilder urlBuilder = new StringBuilder(baseUrl + HOSTS_URL);
+    private String buildSearchUrl(String path, HostSearchRequest searchRequest) {
+        StringBuilder urlBuilder = new StringBuilder(baseUrl + path);
         List<String> params = new ArrayList<>();
 
         if (searchRequest.getQuery() != null && !searchRequest.getQuery().trim().isEmpty()) {
@@ -351,7 +379,7 @@ public class FleetMdmClient {
 
     private static void validateQuery(String query) {
         if (query == null || query.trim().isEmpty()) {
-            throw new IllegalArgumentException("Query cannot be null or empty");
+            throw new FleetMdmArgumentException("Query cannot be null or empty");
         }
     }
 
@@ -411,7 +439,7 @@ public class FleetMdmClient {
                     .path("secrets");
 
             if (secretsArray.isArray() && !secretsArray.isEmpty()) {
-                return secretsArray.get(0).path("secret").asText();
+                return secretsArray.get(0).path("secret").asString();
             }
 
             throw new FleetMdmException("Failed to parse enroll secret: " + response.body());
@@ -517,7 +545,21 @@ public class FleetMdmClient {
                 return null;
             }
             checkResponse(response, "get Fleet vulnerability");
-            return MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+            Vulnerability vulnerability = MAPPER.treeToValue(requireNode(response.body(), "vulnerability"), Vulnerability.class);
+            vulnerability.setSoftware(MAPPER.convertValue(listNodeOrEmpty(response.body(), "software"),
+                    new TypeReference<List<AffectedSoftware>>() { }));
+            return vulnerability;
+        });
+    }
+
+    public FleetSoftware getSoftwareVersion(long id) {
+        return call("get Fleet software version " + id, () -> {
+            HttpResponse<String> response = sendRequest(SOFTWARE_VERSIONS_URL + id, "GET", null);
+            if (response.statusCode() == 404) {
+                return null;
+            }
+            checkResponse(response, "get Fleet software version");
+            return MAPPER.treeToValue(requireNode(response.body(), "software"), FleetSoftware.class);
         });
     }
 
@@ -690,7 +732,15 @@ public class FleetMdmClient {
     }
 
     public CompletableFuture<List<Policy>> listPoliciesAsync() {
-        HttpRequest httpRequest = buildRequest(POLICIES_URL, "GET", null);
+        return listPoliciesAsync(POLICIES_URL);
+    }
+
+    public CompletableFuture<List<Policy>> listPoliciesAsync(Long afterId, int perPage) {
+        return listPoliciesAsync(POLICIES_URL + pageAfterId(afterId, perPage));
+    }
+
+    private CompletableFuture<List<Policy>> listPoliciesAsync(String path) {
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet policies");
@@ -756,7 +806,26 @@ public class FleetMdmClient {
     }
 
     public CompletableFuture<List<Query>> listScheduledQueriesAsync() {
-        HttpRequest httpRequest = buildRequest(QUERIES_URL, "GET", null);
+        return listScheduledQueriesAsync(QUERIES_URL);
+    }
+
+    // Paged by number: Fleet's query list fails with after, unlike the policy list.
+    public CompletableFuture<ScheduledQueriesResponse> listScheduledQueriesPageAsync(int page, int perPage) {
+        String path = QUERIES_URL + "?order_key=id&order_direction=asc&page=" + page + "&per_page=" + perPage;
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
+        return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
+                .thenApply(response -> {
+                    checkResponse(response, "list Fleet scheduled queries");
+                    try {
+                        return MAPPER.readValue(response.body(), ScheduledQueriesResponse.class);
+                    } catch (Exception e) {
+                        throw new FleetMdmException("Failed to parse list scheduled queries response", e);
+                    }
+                });
+    }
+
+    private CompletableFuture<List<Query>> listScheduledQueriesAsync(String path) {
+        HttpRequest httpRequest = buildRequest(path, "GET", null);
         return httpClient.sendAsync(httpRequest, HttpResponse.BodyHandlers.ofString())
                 .thenApply(response -> {
                     checkResponse(response, "list Fleet scheduled queries");
@@ -809,12 +878,12 @@ public class FleetMdmClient {
     public CompletableFuture<LiveQueryCampaign> runLiveQueryAsync(RunLiveQueryRequest request) {
         if (request == null) {
             CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalArgumentException("Live query request cannot be null"));
+            failed.completeExceptionally(new FleetMdmArgumentException("Live query request cannot be null"));
             return failed;
         }
         if ((request.getQuery() == null || request.getQuery().trim().isEmpty()) && request.getQueryId() == null) {
             CompletableFuture<LiveQueryCampaign> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalArgumentException("Live query request must specify either query or queryId"));
+            failed.completeExceptionally(new FleetMdmArgumentException("Live query request must specify either query or queryId"));
             return failed;
         }
         try {
@@ -868,7 +937,7 @@ public class FleetMdmClient {
 
     private long modifyQueryHosts(long queryId, List<Long> hostIds, String method, String responseField) {
         if (hostIds == null || hostIds.isEmpty()) {
-            throw new IllegalArgumentException("hostIds must not be empty");
+            throw new FleetMdmArgumentException("hostIds must not be empty");
         }
         String path = QUERIES_URL + "/" + queryId + "/hosts";
         String action = ("POST".equals(method) ? "assign hosts to " : "remove hosts from ")
@@ -965,7 +1034,7 @@ public class FleetMdmClient {
     private CompletableFuture<Long> modifyAssociationAsync(String path, List<Long> hostIds, String method, String responseField, String contextLabel) {
         if (hostIds == null || hostIds.isEmpty()) {
             CompletableFuture<Long> failed = new CompletableFuture<>();
-            failed.completeExceptionally(new IllegalArgumentException("hostIds must not be empty"));
+            failed.completeExceptionally(new FleetMdmArgumentException("hostIds must not be empty"));
             return failed;
         }
         try {
@@ -1054,6 +1123,12 @@ public class FleetMdmClient {
             throw new FleetMdmException("Fleet response missing field \"" + fieldName + "\". Body: " + responseBody);
         }
         return node;
+    }
+
+    // Fleet applies "after" only together with an order key.
+    private static String pageAfterId(Long afterId, int perPage) {
+        String page = "?order_key=id&order_direction=asc&per_page=" + perPage;
+        return afterId == null ? page : page + "&after=" + afterId;
     }
 
     private HttpRequest.Builder addHeaders(HttpRequest.Builder builder) {

@@ -4,6 +4,7 @@
  */
 
 import type { ChatRef } from '../chat-ref.types';
+import type { QuickActionIconSpec } from '../quick-action-chip';
 import type { AssistantType, AuthorType, ChatApprovalStatus, MessageOwner } from './chat.types';
 
 // ========== Message Type Definitions ==========
@@ -12,15 +13,13 @@ export const MESSAGE_TYPE = {
   TEXT: 'TEXT',
   THINKING: 'THINKING',
   ASK: 'ASK',
-  /** Per-answer source metadata (documents, videos, entity cards).
+  /** Per-answer attachments (cited documents, videos, entity cards).
    *
-   *  TWO names for ONE payload, on purpose. `SOURCES` is the contract the
-   *  backend is moving to; `GUIDE` is the envelope it ships in today, reused
-   *  from Guide Mode v2 so a released frontend keeps working during the v2→v3
-   *  rollout. Both decode through the same path, so dropping `GUIDE` later is a
-   *  deletion here and nothing else. */
+   *  `ATTACHMENTS` carries `sources` / `videos` / `cards` on the record itself.
+   *  `GUIDE` is the envelope it replaced — the same arrays under `payload` —
+   *  and stays only until every backend ships `ATTACHMENTS`. */
+  ATTACHMENTS: 'ATTACHMENTS',
   GUIDE: 'GUIDE',
-  SOURCES: 'SOURCES',
   EXECUTING_TOOL: 'EXECUTING_TOOL',
   EXECUTED_TOOL: 'EXECUTED_TOOL',
   APPROVAL_REQUEST: 'APPROVAL_REQUEST',
@@ -73,6 +72,12 @@ export interface ToolExecutionData {
   parameters?: Record<string, unknown>;
   result?: string;
   success?: boolean;
+  /**
+   * The words of the row's status line where it is drawn as a card (the
+   * end-client view): e.g. "Fixed on its own". Omitted: "Working on it",
+   * "Done" or "Failed" by state.
+   */
+  statusLabel?: string;
   /**
    * Backend-issued id (matches `PendingToolCallData.toolExecutionRequestId`).
    * When present, lets the accumulator merge this execution event into the
@@ -366,6 +371,34 @@ export type ContextCompactionSegment = {
   summary?: string;
 };
 
+/** One prompt a `suggestions` block offers: the chip shows `label`, and
+ *  picking it hands `prompt` (absent: the label) to be sent. `icon` is a
+ *  quick-action icon (a spec or a node). */
+export type SuggestionPrompt = {
+  label: string;
+  prompt?: string;
+  icon?: ReactNode | QuickActionIconSpec;
+};
+
+/** A titled row of prompts in a `suggestions` block (e.g. "Diagnose"). */
+export type SuggestionGroup = {
+  label: string;
+  prompts: SuggestionPrompt[];
+};
+
+/**
+ * Prompts the assistant offers as chips, grouped under captions, with an
+ * optional line under them. Never on the wire: a host builds it locally (the
+ * "What to ask?" answer, see `useWhatToAsk`). Picking a chip calls `onPick`;
+ * without one, inside an `EmbeddableChat` the prompt is sent in its open chat.
+ */
+export type SuggestionsSegment = {
+  type: 'suggestions';
+  groups: SuggestionGroup[];
+  note?: string;
+  onPick?: (prompt: string) => void;
+};
+
 export type MessageSegment =
   | TextSegment
   | ThinkingSegment
@@ -377,7 +410,8 @@ export type MessageSegment =
   | TicketEscalatedSegment
   | TicketEventSegment
   | ErrorSegment
-  | ContextCompactionSegment;
+  | ContextCompactionSegment
+  | SuggestionsSegment;
 
 export type MessageContent = string | MessageSegment[];
 
@@ -406,7 +440,7 @@ export interface ThinkingMessageData extends MessageDataBase {
  *
  * Lives here, beside `Message`, because BOTH transports produce it now: the SSE
  * adapter reads it off the per-turn metadata frame, and the NATS path decodes it
- * out of a `GUIDE`/`SOURCES` chunk. It used to be declared inside
+ * out of an `ATTACHMENTS` chunk. It used to be declared inside
  * `use-sse-chat-adapter`, which made "a Guide answer's citations" structurally a
  * property of one transport — `use-sse-chat-adapter` still re-exports the name
  * so existing imports keep working.
@@ -445,13 +479,20 @@ export interface ChatSource {
   label?: string;
 }
 
-/** Persisted source-metadata row. `payload` is the SAME object the live chunk
- *  carries, so history and realtime share one decoder (`sourceMetadataEvent`)
- *  and cannot drift apart. Left as an open record here rather than typed
- *  structurally: it is unvalidated wire data, and the decoder is what turns it
- *  into `ChatSource[]` / `ChatRef[]`. */
+/** Persisted attachments row (GraphQL `AttachmentsData`). The arrays are the
+ *  SAME ones the live chunk carries, so history and realtime share one decoder
+ *  (`attachmentsEvent`) and cannot drift apart. Left untyped: it is unvalidated
+ *  wire data, and the decoder is what turns it into `ChatSource[]` / `ChatRef[]`. */
+export interface AttachmentsMessageData extends MessageDataBase {
+  type: 'ATTACHMENTS';
+  sources?: unknown;
+  videos?: unknown;
+  cards?: unknown;
+}
+
+/** The envelope `ATTACHMENTS` replaced: the same arrays under `payload`. */
 export interface SourceMetadataMessageData extends MessageDataBase {
-  type: 'GUIDE' | 'SOURCES';
+  type: 'GUIDE';
   payload?: unknown;
 }
 
@@ -597,6 +638,7 @@ export type MessageData =
   | TextMessageData
   | ThinkingMessageData
   | AskMessageData
+  | AttachmentsMessageData
   | SourceMetadataMessageData
   | ExecutingToolMessageData
   | ExecutedToolMessageData
@@ -648,7 +690,7 @@ export interface ProcessedMessage {
    *  Absent when the source row(s) carried no seq. */
   streamSeq?: number;
   /** Documents this answer cited — see `Message.sources`, the same field.
-   *  Replayed from the turn's persisted `GUIDE`/`SOURCES` row, so a reloaded
+   *  Replayed from the turn's persisted `ATTACHMENTS` row, so a reloaded
    *  answer carries the citations the live one did. */
   sources?: ChatSource[];
   /** Entity references this answer's metadata described — see `Message.refs`. */

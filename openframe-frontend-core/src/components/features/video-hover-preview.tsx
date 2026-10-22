@@ -27,8 +27,9 @@ import { NEAR_VIEWPORT_ROOT_MARGIN } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { useCoverImageFallback } from '../chat/entity-cards/use-cover-image-fallback';
 import { toMuxPreviewUrl } from './mux-origins';
-import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
+import { Video } from './video';
 import { VideoPlayBadge } from './video-center-badge';
+import type { VideoPlayerHandle, VideoMutedFallbackState } from './video-shared';
 
 export interface VideoHoverPreviewSurfaceProps {
   /** Source URL (Mux HLS / Supabase mp4). Rendition-capped internally. */
@@ -49,6 +50,9 @@ export interface VideoHoverPreviewSurfaceProps {
   fit?: 'contain' | 'cover';
   /** next/image sizes for the poster. Default '234px' (strip cell). */
   posterSizes?: string;
+  /** The poster is in view from the first paint (a card pinned to the screen),
+   *  so it loads at once rather than lazily. Default false (a strip cell). */
+  posterInView?: boolean;
   /** Preview-player preload override. When 'none' AND the poster resolves null,
    *  the network-fetching first-frame facade is SKIPPED (flat surface + badge)
    *  so a fixed always-near widget card fetches nothing until first hover. */
@@ -85,6 +89,7 @@ export function VideoHoverPreviewSurface({
   badge = 'play',
   fit,
   posterSizes = '234px',
+  posterInView = false,
   preload,
   hideMutedBadge,
   onMutedFallbackChange,
@@ -141,6 +146,7 @@ export function VideoHoverPreviewSurface({
               alt=""
               fill
               sizes={posterSizes}
+              loading={posterInView ? 'eager' : 'lazy'}
               unoptimized
               onError={onPosterError}
               className="object-cover"

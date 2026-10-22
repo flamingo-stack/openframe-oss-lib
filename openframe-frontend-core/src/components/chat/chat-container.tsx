@@ -1,14 +1,15 @@
 import { type FC, type HTMLAttributes, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated';
+import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { PlusCircleIcon } from '../plus-circle-icon';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { Skeleton } from '../ui/skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
+import { LIVE_PULSE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar as Avatar } from '../ui/square-avatar';
 import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
 import { MspOrganizationCard } from './msp-organization-card';
-import { MspOrganizationCardSkeleton } from './msp-organization-card-skeleton';
 import type { ConnectionIndicatorProps, ChatContainerProps, ChatHeaderProps } from './types';
 
 const ConnectionIndicator: FC<ConnectionIndicatorProps> = ({ status }) => {
@@ -19,7 +20,7 @@ const ConnectionIndicator: FC<ConnectionIndicatorProps> = ({ status }) => {
       case 'connected':
         return 'bg-ods-success';
       case 'connecting':
-        return 'bg-ods-warning animate-pulse';
+        return `bg-ods-warning ${LIVE_PULSE_CLASS}`;
       case 'disconnected':
         return 'bg-ods-error';
       default:
@@ -77,11 +78,16 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
       isMspLoading = false,
       fullWidth = false,
       bare = false,
-      isLoading = false,
+      isLoading: isLoadingProp = false,
       ...props
     },
     ref,
   ) => {
+    // ONE switch: in a page's loading state (or while the host reads the identity) the identity is its skeleton.
+    const inScope = useLoadingScope();
+    const isLoading = inScope || isLoadingProp;
+    // The MSP card: read with the page (a loading scope) or by the host (`isMspLoading`), drawn in its loading form.
+    const mspLoading = inScope || isMspLoading;
     const cardClasses = bare ? '' : 'rounded-md bg-ods-card border border-ods-border';
     return (
       <div
@@ -107,34 +113,28 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
         )}
         <div className={cardClasses}>
           <div className="flex items-center justify-between gap-4 px-4 py-3">
-            {isLoading ? (
-              <div className="flex items-center gap-3">
-                {/* 64px round avatar placeholder — matches the `w-16 h-16`
-                    rounded-full avatar / userIcon block below. */}
-                <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
-                <div className="flex flex-col gap-1">
-                  {/* Name line — sized to the `text-h3` name. */}
-                  <Skeleton className="h-6 w-40" />
-                  {/* Server line — sized to the `text-h4` secondary row. */}
-                  <Skeleton className="h-4 w-28" />
+            <div className="flex items-center gap-3">
+              {userIcon && !isLoading ? (
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent">{userIcon}</div>
+              ) : (
+                <Avatar
+                  loading={isLoading}
+                  src={userAvatar}
+                  alt={userName}
+                  fallback={userName}
+                  size="xl"
+                  variant="round"
+                  className="bg-ods-flamingo-pink"
+                />
+              )}
+              {isLoading ? (
+                <div className="flex flex-col">
+                  {/* Name line — the `text-h3` name. */}
+                  <TextLineSkeleton type="h3" className="w-40" />
+                  {/* Server line — the `text-h4` secondary row. */}
+                  <TextLineSkeleton type="h4" className="w-28" />
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                {userIcon ? (
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-ods-accent">
-                    {userIcon}
-                  </div>
-                ) : (
-                  <Avatar
-                    src={userAvatar}
-                    alt={userName}
-                    fallback={userName}
-                    size="xl"
-                    variant="round"
-                    className="bg-ods-flamingo-pink"
-                  />
-                )}
+              ) : (
                 <div className="flex flex-col">
                   <span className="text-h3">{userName}</span>
                   <div className="flex items-center gap-2">
@@ -146,15 +146,15 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             <div className="flex items-center gap-1">
               {showNewChat && onNewChat && (
                 <Button
                   onClick={onNewChat}
                   variant="transparent"
                   size="small-legacy"
-                  leftIcon={<PlusCircleIcon className="h-5 w-5" whiteOverlay />}
+                  leftIcon={<PlusCircleIcon className="h-5 w-5" />}
                   className="text-ods-text-primary hover:bg-ods-bg-hover"
                 >
                   New Chat
@@ -178,17 +178,15 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
               claims this space, so it wins when both are provided. The card
               already draws the chrome: strip the section's own ring and keep
               only the bottom rounding so its bg fits the card corners. */}
-          {!ticketInfo && (isMspLoading || mspOrganization) && (
+          {!ticketInfo && (mspLoading || mspOrganization) && (
             <>
               <div className="h-px bg-ods-border" />
-              {isMspLoading || !mspOrganization ? (
-                <MspOrganizationCardSkeleton className={cn('rounded-none ring-0', !bare && 'rounded-b-md')} />
-              ) : (
-                <MspOrganizationCard
-                  {...mspOrganization}
-                  className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization.className)}
-                />
-              )}
+              <MspOrganizationCard
+                name=""
+                {...mspOrganization}
+                loading={mspLoading || !mspOrganization}
+                className={cn('rounded-none ring-0', !bare && 'rounded-b-md', mspOrganization?.className)}
+              />
             </>
           )}
           {ticketInfo && (
@@ -202,6 +200,7 @@ const ChatHeader = forwardRef<HTMLDivElement, ChatHeaderProps>(
                   >
                     {ticketInfo.title}
                   </span>
+                  {/* loading-standard-ok(OPTIONAL_MARK): the host hands `ticketInfo` in, the same in both forms (no read of this component decides it) */}
                   {ticketInfo.meta && (
                     <div
                       className="truncate text-ods-text-secondary text-h6"

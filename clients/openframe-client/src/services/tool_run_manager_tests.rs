@@ -1,4 +1,5 @@
-use super::{shutdown_break, ClientUpdatePendingFlag};
+use super::{launchable_gui_app, shutdown_break, ClientUpdatePendingFlag};
+use crate::models::{Installation, InstalledTool, ToolRecordState};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -6,42 +7,42 @@ use tokio::sync::RwLock;
 
 const LONG_TTL: Duration = Duration::from_secs(3600);
 
-#[tokio::test]
-async fn not_pending_before_first_mark() {
+#[test]
+fn not_pending_before_first_mark() {
     let flag = ClientUpdatePendingFlag::default();
-    assert!(!flag.is_pending(LONG_TTL).await);
+    assert!(!flag.is_pending(LONG_TTL));
 }
 
-#[tokio::test]
-async fn pending_after_mark_within_ttl() {
+#[test]
+fn pending_after_mark_within_ttl() {
     let flag = ClientUpdatePendingFlag::default();
-    flag.mark().await;
-    assert!(flag.is_pending(LONG_TTL).await);
+    flag.mark();
+    assert!(flag.is_pending(LONG_TTL));
 }
 
-#[tokio::test]
-async fn expired_when_ttl_elapsed() {
+#[test]
+fn expired_when_ttl_elapsed() {
     let flag = ClientUpdatePendingFlag::default();
-    flag.mark().await;
-    assert!(!flag.is_pending(Duration::ZERO).await);
+    flag.mark();
+    assert!(!flag.is_pending(Duration::ZERO));
 }
 
 #[tokio::test]
 async fn remark_refreshes_the_ttl() {
     let flag = ClientUpdatePendingFlag::default();
-    flag.mark().await;
+    flag.mark();
     tokio::time::sleep(Duration::from_millis(30)).await;
-    assert!(!flag.is_pending(Duration::from_millis(10)).await);
-    flag.mark().await;
-    assert!(flag.is_pending(Duration::from_millis(10)).await);
+    assert!(!flag.is_pending(Duration::from_millis(10)));
+    flag.mark();
+    assert!(flag.is_pending(Duration::from_millis(10)));
 }
 
-#[tokio::test]
-async fn clones_share_state() {
+#[test]
+fn clones_share_state() {
     let flag = ClientUpdatePendingFlag::default();
     let clone = flag.clone();
-    clone.mark().await;
-    assert!(flag.is_pending(LONG_TTL).await);
+    clone.mark();
+    assert!(flag.is_pending(LONG_TTL));
 }
 
 #[tokio::test]
@@ -56,11 +57,83 @@ async fn shutdown_break_drops_supervision_only_once_signalled() {
     assert!(!running_tools.read().await.contains("mesh"));
 }
 
-#[tokio::test]
-async fn clear_releases_the_flag() {
+#[test]
+fn clear_releases_the_flag() {
     let flag = ClientUpdatePendingFlag::default();
-    flag.mark().await;
-    assert!(flag.is_pending(LONG_TTL).await);
-    flag.clear().await;
-    assert!(!flag.is_pending(LONG_TTL).await);
+    flag.mark();
+    assert!(flag.is_pending(LONG_TTL));
+    flag.clear();
+    assert!(!flag.is_pending(LONG_TTL));
+}
+
+#[test]
+fn the_view_follows_the_flag() {
+    let flag = ClientUpdatePendingFlag::default();
+    let view = flag.view();
+    assert!(!view.is_pending());
+
+    flag.mark();
+    assert!(view.is_pending());
+
+    flag.clear();
+    assert!(!view.is_pending());
+}
+
+fn gui_app_record(state: ToolRecordState) -> InstalledTool {
+    InstalledTool {
+        tool_agent_id: "openframe-chat".to_string(),
+        installation: Installation::GuiApp {
+            executable_path: "/Applications/OpenFrame.app/Contents/MacOS/openframe-chat".into(),
+            bundle_id: Some("com.openframe.chat".into()),
+        },
+        state,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn an_installed_gui_app_is_launchable() {
+    let tool = launchable_gui_app(Some(gui_app_record(ToolRecordState::Installed)));
+    assert_eq!(
+        tool.map(|t| t.tool_agent_id).as_deref(),
+        Some("openframe-chat")
+    );
+}
+
+#[test]
+fn a_missing_record_is_not_launchable() {
+    assert!(launchable_gui_app(None).is_none());
+}
+
+#[test]
+fn a_record_still_installing_is_not_launchable() {
+    assert!(launchable_gui_app(Some(gui_app_record(ToolRecordState::Installing))).is_none());
+}
+
+#[test]
+fn a_standard_record_is_not_launchable() {
+    let standard = InstalledTool {
+        installation: Installation::Standard {
+            executable_path: Some("agent".into()),
+        },
+        ..gui_app_record(ToolRecordState::Installed)
+    };
+    assert!(launchable_gui_app(Some(standard)).is_none());
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+#[test]
+fn chat_gets_first_run_flag_while_pending() {
+    use super::gui_launch_flag;
+    use crate::models::{FirstRunState, CHAT_TOOL_AGENT_ID};
+
+    assert_eq!(
+        gui_launch_flag(CHAT_TOOL_AGENT_ID, FirstRunState::Pending),
+        Some("--first-run")
+    );
+    assert_eq!(
+        gui_launch_flag(CHAT_TOOL_AGENT_ID, FirstRunState::Done),
+        Some("--background")
+    );
+    assert_eq!(gui_launch_flag("other-tool", FirstRunState::Done), None);
 }

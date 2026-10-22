@@ -19,6 +19,9 @@ public class TicketFilterInput {
     private List<String> statusIds;
     @Size(max = 50)
     private List<String> organizationIds;
+    /** Filter by linked device: machine ids, the same id {@code UpdateTicketInput.deviceId} takes. */
+    @Size(max = 50)
+    private List<String> deviceIds;
     @Size(max = 50)
     private List<String> assigneeIds;
     @Size(max = 20)

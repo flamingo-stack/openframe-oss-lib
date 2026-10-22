@@ -1,6 +1,7 @@
 package com.openframe.gateway.filter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.apikey.ApiKey;
 import com.openframe.gateway.config.prop.RateLimitProperties;
 import com.openframe.gateway.model.RateLimitStatus;
@@ -51,7 +52,7 @@ class ApiKeyAuthenticationFilterTest {
     @BeforeEach
     void setUp() {
         properties.setIncludeHeaders(true);
-        filter = new ApiKeyAuthenticationFilter(validation, rateLimit, properties, new ObjectMapper());
+        filter = new ApiKeyAuthenticationFilter(validation, rateLimit, properties, new JsonMapper());
         when(rateLimit.getRateLimitStatus(anyString(), any())).thenReturn(Mono.just(status));
     }
 
@@ -110,7 +111,7 @@ class ApiKeyAuthenticationFilterTest {
 
         assertThat(forwarded.get().getHeaders().get("X-User-Id")).containsExactly("user-1");
         assertThat(forwarded.get().getHeaders().get("X-API-Key-Id")).containsExactly("ak_12345678abc");
-        assertThat(forwarded.get().getHeaders().containsKey("X-API-Key")).isFalse();
+        assertThat(forwarded.get().getHeaders().containsHeader("X-API-Key")).isFalse();
         verify(validation).recordSuccessfulRequest("ak_12345678abc", null);
         exchange.getResponse().setComplete().block();
         assertThat(exchange.getResponse().getHeaders().getFirst("X-RateLimit-Remaining-Minute")).isEqualTo("57");

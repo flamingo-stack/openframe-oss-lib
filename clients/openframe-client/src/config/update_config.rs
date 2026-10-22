@@ -6,7 +6,7 @@ pub const MIN_BINARY_SIZE_BYTES: u64 = 1024 * 100; // 100 KB
 // HTTP client timeouts
 pub const HTTP_CLIENT_TIMEOUT_SECS: u64 = 120; // control-plane (auth, registration, heartbeat, key fetch)
 pub const AWAITING_AUTH_POLL_SECS: u64 = 15; // unauthenticated service polling for the config `auth` writes
-pub const DOWNLOAD_CLIENT_TIMEOUT_SECS: u64 = 300; // binary downloads (GitHub, Artifactory, tool API)
+pub const DOWNLOAD_CLIENT_TIMEOUT_SECS: u64 = 300; // binary downloads (GitHub, tool API)
 
 // Consumer retry
 pub const CONSUMER_RETRY_ATTEMPTS_PER_CYCLE: u32 = 5;
@@ -16,6 +16,12 @@ pub const CONSUMER_CYCLE_PAUSE_MS: u64 = 30000; // 30 seconds pause between retr
 
 // Reconnection
 pub const RECONNECTION_DELAY_MS: u64 = 5000; // 5 seconds
+
+pub const SELF_RESTART_EXIT_CODE: i32 = 75;
+pub const SELF_RESTART_IDLE_WAIT_SECS: u64 = 600;
+pub const SELF_RESTART_IDLE_POLL_SECS: u64 = 5;
+pub const SELF_RESTART_HANDOFF_SECS: u64 = 900;
+pub const DEV_CLIENT_VERSION: &str = "0.0.0-dev";
 
 // Durable result outbox
 pub const OUTBOX_MAX_ENTRIES: usize = 500;

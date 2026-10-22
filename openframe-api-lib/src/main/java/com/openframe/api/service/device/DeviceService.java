@@ -12,7 +12,6 @@ import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
-import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
@@ -22,12 +21,13 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
-import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -41,7 +41,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -58,12 +57,11 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 public class DeviceService {
 
     private final MachineRepository machineRepository;
-    private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    private final DeletedMachineCleanup deletedMachineCleanup;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
-    private final ScheduleScriptDeviceService scheduleScriptDeviceService;
     private final DeviceFilterOptionMapper deviceFilterOptionMapper;
     private final TenantIdProvider tenantIdProvider;
     private final ApplicationEventPublisher eventPublisher;
@@ -92,7 +90,7 @@ public class DeviceService {
     public void verifyDispatchable(String machineId) {
         Machine machine = findByMachineId(machineId)
                 .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
-        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(machine.getStatus())) {
+        if (!DeviceStatus.CONNECTED.contains(machine.getStatus())) {
             throw new BadRequestException(
                     "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
         }
@@ -105,6 +103,18 @@ public class DeviceService {
         log.debug("Querying devices with filter: {}, pagination: {}, search: {}, sort: {}",
                 filterOptions, paginationCriteria, search, sort);
         return paginate(machineFilter(filterOptions, null, null), search, paginationCriteria, sort);
+    }
+
+    public List<Machine> findDevicesAfter(DeviceFilterCriteria filterOptions, String afterMachineId, int limit) {
+        String tenantId = tenantIdProvider.getTenantId();
+        MachineQueryFilter filter = machineFilter(filterOptions, null, null);
+        return machineRepository.findMachinesAfter(tenantId, filter, afterMachineId, limit);
+    }
+
+    public MachineNameMatches findMatchingNames(DeviceFilterCriteria filterOptions) {
+        String tenantId = tenantIdProvider.getTenantId();
+        MachineQueryFilter filter = machineFilter(filterOptions, null, null);
+        return machineRepository.findMatchingNames(tenantId, filter);
     }
 
     public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
@@ -235,10 +245,9 @@ public class DeviceService {
                 .build();
     }
 
-    private static final Set<DeviceStatus> SCHEDULE_ALLOWED_STATUSES = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
 
     private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
-            .filter(status -> !SCHEDULE_ALLOWED_STATUSES.contains(status))
+            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
             .map(Enum::name)
             .toList();
 
@@ -253,20 +262,23 @@ public class DeviceService {
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
                                              Collection<OsType> osTypeScope,
                                              Collection<String> restrictToMachineIds) {
-        MachineQueryFilter out = new MachineQueryFilter();
+        MachineQueryFilter.MachineQueryFilterBuilder builder = MachineQueryFilter.builder();
         List<OsType> filterOsTypes = null;
         if (filter != null) {
-            out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setOrganizationIds(filter.getOrganizationIds());
-            out.setManageableByPackageManagers(filter.getManageableByPackageManagers());
+            builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .organizationIds(filter.getOrganizationIds())
+                    .manageableByPackageManagers(filter.getManageableByPackageManagers())
+                    .pattern(filter.getPattern())
+                    .hostnames(filter.getHostnames())
+                    .nicknames(filter.getNicknames())
+                    .tagKeys(filter.getTagKeys())
+                    .tagValues(filter.getTagValues());
             filterOsTypes = filter.getOsTypes();
         }
-        out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));
-        List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
-        out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
-
-        return out;
+        return builder.osTypes(resolveOsTypes(filterOsTypes, osTypeScope))
+                .restrictToMachineIds(restrictToMachineIds)
+                .build();
     }
 
     private static List<OsType> resolveOsTypes(Collection<OsType> filterOsTypes, Collection<OsType> osTypeScope) {
@@ -338,11 +350,7 @@ public class DeviceService {
             return;
         }
         if (status == DeviceStatus.DELETED) {
-            scheduleScriptDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
-            long removedDispatch = deviceOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
-            if (removedDispatch > 0) {
-                log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
-            }
+            deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
         }
 
         machine.setStatus(status);

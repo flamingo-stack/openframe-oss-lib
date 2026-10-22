@@ -3,23 +3,13 @@ package com.openframe.api.datafetcher;
 import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
-import com.openframe.api.relay.NodeType;
-import com.openframe.api.service.device.DeviceService;
-import com.openframe.api.service.InstalledAgentService;
-import com.openframe.api.service.TagService;
-import com.openframe.api.service.ToolConnectionService;
-import com.openframe.api.service.ToolService;
-import com.openframe.api.service.rmm.schedule.ScheduleRunService;
-import com.openframe.api.service.rmm.script.ScriptExecutionService;
-import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
-import com.openframe.api.service.rmm.script.ScriptService;
-import com.openframe.api.service.rmm.software.SoftwareBundleService;
-import com.openframe.data.repository.tenant.TenantRepository;
-import com.openframe.data.service.OrganizationService;
-import graphql.relay.Relay;
+import com.openframe.graphql.node.RelayNodeFinder;
+import com.openframe.security.authentication.AuthPrincipal;
+import graphql.schema.DataFetchingEnvironment;
+import graphql.schema.GraphQLSchema;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,64 +19,35 @@ import java.util.Optional;
 @Slf4j
 public class NodeDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
-    private final DeviceService deviceService;
-    private final OrganizationService organizationService;
-    private final ToolService toolService;
-    private final TagService tagService;
-    private final ToolConnectionService toolConnectionService;
-    private final InstalledAgentService installedAgentService;
-    private final ScriptService scriptService;
-    private final ScriptExecutionService scriptExecutionService;
-    private final ScheduleScriptService scheduleScriptService;
-    private final ScheduleRunService scheduleRunService;
-    private final ObjectProvider<TenantRepository> tenantRepository;
-    private final ObjectProvider<SoftwareBundleService> softwareBundleService;
+    private final RelayNodeFinder nodeFinder;
 
     @DgsQuery
-    public Object node(@InputArgument String id) {
+    public Object node(@InputArgument String id, @AuthenticationPrincipal AuthPrincipal principal,
+                       DataFetchingEnvironment environment) {
         log.debug("Resolving node with global ID: {}", id);
-        Relay.ResolvedGlobalId globalId = RELAY.fromGlobalId(id);
-        return resolveNode(globalId);
+        GraphQLSchema schema = environment.getGraphQLSchema();
+        Optional<Object> node = nodeFinder.findNode(principal, id, schema);
+        return node.orElse(null);
     }
 
     @DgsQuery
-    public List<Object> nodes(@InputArgument List<String> ids) {
+    public List<Object> nodes(@InputArgument List<String> ids, @AuthenticationPrincipal AuthPrincipal principal,
+                              DataFetchingEnvironment environment) {
         log.debug("Resolving {} nodes", ids.size());
+        GraphQLSchema schema = environment.getGraphQLSchema();
         return ids.stream()
-                .map(id -> {
-                    try {
-                        Relay.ResolvedGlobalId globalId = RELAY.fromGlobalId(id);
-                        return resolveNode(globalId);
-                    } catch (Exception e) {
-                        log.warn("Failed to resolve node: {}", id, e);
-                        return null;
-                    }
-                })
+                .map(id -> findNodeOrNull(principal, id, schema))
                 .toList();
     }
 
-    private Object resolveNode(Relay.ResolvedGlobalId globalId) {
-        NodeType nodeType = NodeType.fromTypeName(globalId.getType());
-        return switch (nodeType) {
-            case MACHINE -> deviceService.findByMachineId(globalId.getId()).orElse(null);
-            case ORGANIZATION -> organizationService.getOrganizationByOrganizationId(globalId.getId()).orElse(null);
-            case INTEGRATED_TOOL -> toolService.findById(globalId.getId()).orElse(null);
-            case TAG -> tagService.findById(globalId.getId()).orElse(null);
-            case TOOL_CONNECTION -> toolConnectionService.findById(globalId.getId()).orElse(null);
-            case INSTALLED_AGENT -> installedAgentService.getInstalledAgent(globalId.getId()).orElse(null);
-            case SCRIPT -> scriptService.findById(globalId.getId()).orElse(null);
-            case SCRIPT_EXECUTION -> scriptExecutionService.findById(globalId.getId()).orElse(null);
-            case SCRIPT_SCHEDULE -> scheduleScriptService.findById(globalId.getId()).orElse(null);
-            case SCHEDULE_RUN -> scheduleRunService.findById(globalId.getId()).orElse(null);
-            case TENANT -> Optional.ofNullable(tenantRepository.getIfAvailable())
-                    .flatMap(repo -> repo.findById(globalId.getId()))
-                    .orElse(null);
-            case SOFTWARE_BUNDLE -> Optional.ofNullable(softwareBundleService.getIfAvailable())
-                    .flatMap(service -> service.findById(globalId.getId()))
-                    .orElse(null);
-            default -> throw new IllegalArgumentException("Unsupported node type: " + globalId.getType());
-        };
+    // One unresolvable id answers null in its slot instead of failing the whole list.
+    private Object findNodeOrNull(AuthPrincipal principal, String id, GraphQLSchema schema) {
+        try {
+            Optional<Object> node = nodeFinder.findNode(principal, id, schema);
+            return node.orElse(null);
+        } catch (RuntimeException e) {
+            log.warn("Failed to resolve node: {}", id, e);
+            return null;
+        }
     }
 }

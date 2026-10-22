@@ -1,6 +1,7 @@
 package com.openframe.security.oauth.controller;
 
 import com.openframe.core.constants.SsoFlowCookieNames;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
 import com.openframe.security.oauth.dto.TokenResponse;
@@ -24,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -172,14 +174,25 @@ class OAuthBffControllerFlowTest {
     @Test
     void shouldSendCallbackFailureToErrorPageWithoutAuthCookies() {
         when(oauthBffService.handleCallback("code", "st", request))
-                .thenReturn(Mono.error(new IllegalStateException("Authentication session expired. Please try again.")));
+                .thenReturn(Mono.error(new AuthFlowException(SSO_SESSION_EXPIRED, "Authentication session expired. Please try again.")));
 
         ResponseEntity<Void> response = controller.callback("code", "st", request).block();
 
-        assertThat(location(response)).isEqualTo(
-                "https://app.openframe.ai/auth/error?error=Authentication+session+expired.+Please+try+again.");
+        assertThat(location(response)).isEqualTo("https://app.openframe.ai/auth/error?ref=SSO_SESSION_EXPIRED");
         assertThat(setCookies(response)).noneMatch(c -> c.startsWith("access_token=" + ACCESS));
         assertThat(setCookies(response)).anyMatch(c -> c.startsWith("of_oauth_st=;"));
+    }
+
+    @Test
+    void shouldSendUncodedCallbackFailureToErrorPageAsLoginFailureWithoutTheMessage() {
+        when(oauthBffService.handleCallback("code", "st", request))
+                .thenReturn(Mono.error(new IllegalStateException("Your account is suspended. Call +1-555-0100")));
+
+        ResponseEntity<Void> response = controller.callback("code", "st", request).block();
+
+        assertThat(location(response))
+                .isEqualTo("https://app.openframe.ai/auth/error?ref=SSO_LOGIN_FAILED")
+                .doesNotContain("suspended");
     }
 
     // --- /oauth/refresh headers, /oauth/logout ---

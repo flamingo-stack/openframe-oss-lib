@@ -9,7 +9,7 @@ import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query';
 import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
-import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item';
+import { NavigationSidebarItemButton } from './navigation-sidebar-item';
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
 const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
@@ -123,9 +123,16 @@ export interface NavigationSidebarProps {
    * The collapse/expand toggle button remains interactive.
    */
   disabled?: boolean;
+  /**
+   * On tablet, open the expanded sidebar beside the content instead of over
+   * it: the slot it holds widens with it and there is no scrim. A layout with
+   * a docked side panel needs the content's real width to change. Default
+   * false (overlay).
+   */
+  pushOnTablet?: boolean;
 }
 
-export function NavigationSidebar({ config, disabled = false }: NavigationSidebarProps) {
+export function NavigationSidebar({ config, disabled = false, pushOnTablet = false }: NavigationSidebarProps) {
   const isMdUp = useMdUp() ?? false;
   const isLgUp = useLgUp() ?? false;
 
@@ -320,7 +327,7 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           'fixed inset-0 z-[40] bg-ods-overlay',
           'hidden md:block lg:hidden',
           'transition-opacity duration-300',
-          isOverlayOpen ? 'opacity-100' : 'pointer-events-none opacity-0',
+          isOverlayOpen && !pushOnTablet ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         onClick={closeOverlay}
         aria-hidden="true"
@@ -332,7 +339,14 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           geometry is: gated on `isTablet`, it was missing from the server HTML
           and from the first client paint — exactly when the sidebar it
           compensates for has already gone `absolute`. */}
-      <div className="hidden h-full w-14 flex-shrink-0 md:block lg:hidden" aria-hidden="true" />
+      <div
+        className={cn(
+          'hidden h-full flex-shrink-0 md:block lg:hidden',
+          isOverlayOpen && pushOnTablet ? 'w-56' : 'w-14',
+          transitionsEnabled && 'transition-[width] duration-300',
+        )}
+        aria-hidden="true"
+      />
 
       <aside
         className={cn(
@@ -362,7 +376,9 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
                 and each placeholder row is already `aria-hidden`. */}
             <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
               {loadingRows
-                ? loadingRows.primary.map(key => <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />)
+                ? loadingRows.primary.map(key => (
+                    <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
+                  ))
                 : primaryItems.map(item => (
                     <NavigationSidebarItemButton
                       key={item.id}
@@ -380,7 +396,9 @@ export function NavigationSidebar({ config, disabled = false }: NavigationSideba
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
             <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
               {loadingRows
-                ? loadingRows.secondary.map(key => <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />)
+                ? loadingRows.secondary.map(key => (
+                    <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
+                  ))
                 : secondaryItems.map(item => (
                     <NavigationSidebarItemButton
                       key={item.id}

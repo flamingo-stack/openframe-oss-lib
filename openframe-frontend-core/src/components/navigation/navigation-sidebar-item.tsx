@@ -4,15 +4,21 @@ import { cloneElement, memo, type ReactElement, type ReactNode, type MouseEvent 
 import Link from '../../embed-shims/next-link';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
+
+/** A sidebar row's height: the loaded row (a `rail` button or link) and its loading form are one box. */
+const NAV_SIDEBAR_ROW_LAYOUT_CLASS = 'h-14';
 
 interface IconProps {
   color?: string;
   className?: string;
 }
 
-export interface NavigationSidebarItemButtonProps {
+interface LoadedNavigationSidebarItemButtonProps {
   item: NavigationSidebarItem;
   /** "You are on this page" — pathname-derived, and the only thing that carries `aria-current`. */
   isActive: boolean;
@@ -28,6 +34,14 @@ export interface NavigationSidebarItemButtonProps {
 }
 
 /**
+ * The entry and its handlers, or `loading` while the navigation is read (`NavigationSidebarConfig.loading`): the
+ * row then draws its own loading form (also in a loading scope). `showLabel` is the sidebar's minimized state.
+ */
+export type NavigationSidebarItemButtonProps =
+  | (LoadedNavigationSidebarItemButtonProps & { loading?: boolean })
+  | (Partial<LoadedNavigationSidebarItemButtonProps> & { loading: true; showLabel: boolean });
+
+/**
  * One sidebar entry.
  *
  * Rendered as a real anchor whenever it has a `path` — which is what buys the
@@ -41,56 +55,27 @@ export interface NavigationSidebarItemButtonProps {
  * destination to link to) and for the disabled state, which an anchor cannot
  * express.
  */
-export const NavigationSidebarItemButton = memo(function NavigationSidebarItemButtonImpl({
+export const NavigationSidebarItemButton = memo(function NavigationSidebarItemButtonSwitch(
+  props: NavigationSidebarItemButtonProps,
+) {
+  // ONE switch: while the navigation is read (`loading`, or a loading scope) the row is its own loading form.
+  if (useLoadingScope() || props.loading) return <NavigationSidebarItemSkeleton showLabel={props.showLabel} />;
+  return <LoadedNavigationSidebarItemButton {...props} />;
+});
+
+function LoadedNavigationSidebarItemButton({
   item,
   isActive,
   isPending,
   showLabel,
   disabled,
   onClick,
-}: NavigationSidebarItemButtonProps) {
+}: LoadedNavigationSidebarItemButtonProps) {
   const unreadCount = item.unreadCount ?? 0;
   const hasUnread = unreadCount > 0;
   // The accessible name carries the stamp — "Devices (Beta)" — because `aria-label`
   // replaces the content; the rail's tooltip is the same string.
   const name = item.badge ? `${item.label} (${item.badge})` : item.label;
-
-  const className = cn(
-    // `isolate` scopes the hover layer's negative z-index to this row, so it
-    // paints over the row's own background and under its content instead of
-    // sliding behind the sidebar.
-    'relative isolate flex w-full items-center justify-start',
-    'h-14 p-[var(--spacing-system-m)]',
-    // The hover/pending wash is its own LAYER, and that separation is the whole
-    // point. Hover and active both want the row's background-color, so a
-    // `transition-colors` that smooths hover necessarily smooths the accent too
-    // — and it runs on the OUTGOING row as well as the incoming one. Measured on
-    // a real navigation: for 150ms two rows carried the accent background AND
-    // the accent bar, mid-fade, with nothing to say which one was the page you
-    // were actually on. Shortening it (300ms -> 150ms) only shortened the lie.
-    //
-    // Split apart, each gets the timing its meaning calls for: the wash fades,
-    // because it is decoration reacting to a cursor; the accent switches in a
-    // single frame, because it is a statement of fact — exactly one row is the
-    // current page, at every instant, including the instant the route commits.
-    "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:bg-ods-bg-hover after:opacity-0 after:transition-opacity after:duration-150 after:content-['']",
-    "before:absolute before:bottom-0 before:left-0 before:top-0 before:w-1 before:content-['']",
-    // Pending borrows the HOVER weight and nothing else — no accent bar, no
-    // accent text, no `aria-current`. It says "this row is working", not "this
-    // is where you are", and it reads as the row staying pressed under the
-    // cursor, which is exactly what happened.
-    !isActive && !disabled && 'text-ods-text-primary hover:after:opacity-100 [&_svg]:fill-ods-text-secondary',
-    !isActive && !disabled && isPending && 'after:opacity-100',
-    !isActive && disabled && 'text-ods-text-secondary [&_svg]:fill-ods-text-secondary',
-    isActive &&
-      !disabled && [
-        'bg-[var(--ods-open-yellow-light)] text-ods-accent',
-        '[&_svg]:fill-ods-accent',
-        'before:bg-ods-accent',
-      ],
-    isActive && disabled && 'text-ods-text-secondary [&_svg]:fill-ods-text-secondary',
-    disabled && 'cursor-not-allowed opacity-50',
-  );
 
   const content: ReactNode = (
     <>
@@ -119,7 +104,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
       </span>
 
       {hasUnread && showLabel && (
-        <span className="flex size-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent p-2">
+        <span className="ml-[var(--spacing-system-xs)] flex h-6 min-w-6 flex-shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)]">
           <span className="text-ods-text-on-accent text-h5">{unreadCount > 99 ? '99+' : unreadCount}</span>
         </span>
       )}
@@ -127,47 +112,59 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
   );
 
   const shared = {
-    className,
     title: !showLabel ? name : undefined,
     'aria-label': name,
     'aria-current': isActive ? ('page' as const) : undefined,
+    // A row whose route is still committing: announced, never drawn as the current page.
+    'aria-busy': isPending || undefined,
   };
+  // The current page's entry: the rail kind's accent fill, text and bar (`aria-busy` above holds its hover wash).
+  const rowState = isActive && !disabled ? 'active' : undefined;
 
   // An entry with a custom onClick has no destination of its own, and a
   // disabled one must not be followable — both stay buttons.
   if (disabled || !item.path || item.onClick) {
     return (
-      <button type="button" onClick={event => onClick(item, event)} disabled={disabled} {...shared}>
+      <Button
+        variant="rail"
+        type="button"
+        onClick={event => onClick(item, event)}
+        disabled={disabled}
+        data-state={rowState}
+        className={NAV_SIDEBAR_ROW_LAYOUT_CLASS}
+        {...shared}
+      >
         {content}
-      </button>
+      </Button>
     );
   }
 
   return (
-    <Link href={item.path} onClick={event => onClick(item, event)} {...shared}>
-      {content}
-    </Link>
+    <Button asChild variant="rail" data-state={rowState} className={NAV_SIDEBAR_ROW_LAYOUT_CLASS}>
+      <Link href={item.path} onClick={event => onClick(item, event)} {...shared}>
+        {content}
+      </Link>
+    </Button>
   );
-});
+}
 
 /**
- * One placeholder entry, for `NavigationSidebarConfig.loading`.
+ * One entry's loading form (`NavigationSidebarItemButton loading`, for `NavigationSidebarConfig.loading`).
  *
  * Deliberately in this file, beside `NavigationSidebarItemButton`: the two must
  * agree on `h-14`, the `p-[var(--spacing-system-m)]` inset, the 24px icon box and
- * the label column, or the nav resizes on the handoff. Same reason
- * `header-skeleton.tsx` sits beside `header.tsx`.
+ * the label column, or the nav resizes on the handoff.
  *
  * `showLabel` is the sidebar's own minimized state, so the caller passes what it
  * already passes the real row — no separate width handling.
  */
-export function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolean }) {
+function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolean }) {
   return (
-    <div className="flex h-14 w-full items-center justify-start p-[var(--spacing-system-m)]" aria-hidden="true">
+    <div className={cn(BUTTON_KIND_CLASS.rail, NAV_SIDEBAR_ROW_LAYOUT_CLASS)} aria-hidden="true">
       <div className="relative flex flex-shrink-0 items-center justify-center">
-        <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+        <UnifiedSkeleton className="h-6 w-6 rounded" />
       </div>
-      {showLabel && <div className="ml-[var(--spacing-system-xs)] h-4 flex-1 animate-pulse rounded bg-ods-border" />}
+      {showLabel && <UnifiedSkeleton className="ml-[var(--spacing-system-xs)] h-4 flex-1 rounded" />}
     </div>
   );
 }

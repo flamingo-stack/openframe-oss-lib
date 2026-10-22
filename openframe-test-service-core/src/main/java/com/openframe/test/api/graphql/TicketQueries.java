@@ -417,4 +417,14 @@ public class TicketQueries {
                 }
             }
             """;
+
+    // Moves every RESOLVED ticket the filter matches to ARCHIVED; only organizationIds and assigneeIds narrow it.
+    public static final String ARCHIVE_RESOLVED_TICKETS = """
+            mutation ArchiveResolvedTickets($filter: TicketFilterInput) {
+                archiveResolvedTickets(filter: $filter) {
+                    count
+                    userErrors { field message }
+                }
+            }
+            """;
 }

@@ -28,6 +28,7 @@ export { HillRockslideIcon } from './hill-rockslide-icon';
 export { HurricaneIcon } from './hurricane-icon';
 export { LeafIcon } from './leaf-icon';
 export { LeavesIcon } from './leaves-icon';
+export { MoonClassicIcon } from './moon-classic-icon';
 export { MoonIcon } from './moon-icon';
 export { MoonStarIcon } from './moon-star-icon';
 export { PawIcon } from './paw-icon';

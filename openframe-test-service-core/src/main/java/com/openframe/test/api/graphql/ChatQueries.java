@@ -98,6 +98,22 @@ public class ChatQueries {
             }
             """.formatted(DIALOG_NODE);
 
+    // One dialog with the caller's side of the unread message counter; an AGENT may read its own machine's dialog.
+    public static final String DIALOG_QUERY = """
+            query Dialog($id: ID!) {
+                dialog(id: $id) { %s unreadMessageCount }
+            }
+            """.formatted(DIALOG_NODE);
+
+    public static final String MARK_DIALOG_MESSAGES_READ = """
+            mutation MarkDialogMessagesRead($input: DialogIdInput!) {
+                markDialogMessagesRead(input: $input) {
+                    dialog { %s unreadMessageCount }
+                    userErrors { message }
+                }
+            }
+            """.formatted(DIALOG_NODE);
+
     public static final String ARCHIVE_DIALOG = """
             mutation ArchiveDialog($input: DialogIdInput!) {
                 archiveDialog(input: $input) {

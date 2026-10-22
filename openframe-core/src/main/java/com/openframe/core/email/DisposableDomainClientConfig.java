@@ -1,5 +1,6 @@
 package com.openframe.core.email;
 
+import com.openframe.core.jackson.Jackson2Compatibility;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -34,6 +35,7 @@ public class DisposableDomainClientConfig {
         RestClient restClient = RestClient.builder()
                 .baseUrl(properties.getDisposableCheck().getUrl())
                 .requestFactory(requestFactory)
+                .configureMessageConverters(Jackson2Compatibility::restClientConverters)
                 .build();
 
         RestClientAdapter adapter = RestClientAdapter.create(restClient);

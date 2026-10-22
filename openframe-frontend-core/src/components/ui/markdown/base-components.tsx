@@ -1,19 +1,22 @@
 'use client';
 
+import type React from 'react';
+import type { Components, ExtraProps } from 'react-markdown';
+import Image from '../../../embed-shims/next-image';
 /**
  * Default react-markdown component map for the unified markdown engine.
  * ONE implementation of code blocks, headings, links, lists, tables etc.
  * Compositions layer on top via `componentOverrides` (spread LAST by the
  * engine, so caller overrides always win).
  */
-import type React from 'react';
-import type { Components, ExtraProps } from 'react-markdown';
-import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
 import { useAuthedImageSrc } from '../../../hooks/use-authed-image-src';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
 import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
+import { renderedLinkRel } from '../../../utils/markdown-link';
 import { getHashTargetElement, navigateSamePageHash, HUB_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
+import { useLoadingScope } from '../loading-scope';
 import { extractText, resolveFallbackHeadingId, useAssignedHeadingIds, useHeadingId } from './heading-ids';
 import { MermaidDiagram } from './mermaid-diagram';
 import type { TextSizeElement } from './text-size';
@@ -62,8 +65,21 @@ export interface StandardLeafRenderers {
  * the engine's cap: 400x400 intrinsic, `w-auto h-auto max-h-[400px]` drives
  * the actual rendered box; click-to-expand surfaces provide full resolution.
  */
+/**
+ * The page title, a section heading and a paragraph of rendered markdown (before the text size): read by the
+ * renderer and by every skeleton that stands in for a markdown body.
+ */
+export const MARKDOWN_H1_CLASS = 'mb-4 mt-8 font-sans font-bold text-ods-text-primary first:mt-0';
+export const MARKDOWN_H2_CLASS =
+  'mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary';
+export const MARKDOWN_PARAGRAPH_CLASS = 'mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0';
+
 const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, alt }) => {
-  const resolvedSrc = useAuthedImageSrc(src);
+  // In a loading scope the image is a box and nothing is fetched: the authed fetch is skipped, and the `Image` shim
+  // draws its skeleton box (`HeldImage`) without reading `src`. `src` is passed only so the box is drawn at all.
+  const inScope = useLoadingScope();
+  const authedSrc = useAuthedImageSrc(inScope ? undefined : src);
+  const resolvedSrc = inScope ? src : authedSrc;
   if (!resolvedSrc) return null;
   return (
     <Image
@@ -233,23 +249,18 @@ export function buildBaseComponents({
     ...buildStandardLeafRenderers({ textSizes }),
 
     // --- headings ---
-    h1: makeHeading('h1', cn('mb-4 mt-8 font-sans font-bold text-ods-text-primary first:mt-0', textSizes.h1)),
-    h2: makeHeading(
-      'h2',
-      cn('mb-4 mt-8 border-b border-ods-border pb-2 font-sans font-semibold text-ods-text-primary', textSizes.h2),
-    ),
+    h1: makeHeading('h1', cn(MARKDOWN_H1_CLASS, textSizes.h1)),
+    h2: makeHeading('h2', cn(MARKDOWN_H2_CLASS, textSizes.h2)),
     h3: makeHeading('h3', cn('mb-3 mt-6 font-sans font-semibold text-ods-text-primary', textSizes.h3)),
     h4: makeHeading('h4', cn('mb-2 mt-4 font-sans font-semibold text-ods-text-primary', textSizes.h4)),
     h5: makeHeading('h5', cn('mb-2 mt-3 font-sans font-semibold text-ods-text-primary', textSizes.h5)),
     h6: makeHeading('h6', cn('mb-1 mt-3 font-sans font-semibold text-ods-text-primary', textSizes.h6)),
 
     // --- paragraph ---
-    p: ({ children }: MdRenderProps<'p'>) => (
-      <p className={cn('mb-4 leading-relaxed text-ods-text-primary first:mt-0 last:mb-0', textSizes.p)}>{children}</p>
-    ),
+    p: ({ children }: MdRenderProps<'p'>) => <p className={cn(MARKDOWN_PARAGRAPH_CLASS, textSizes.p)}>{children}</p>,
 
     // --- links ---
-    a: ({ href, children, className: linkClassName }: MdRenderProps<'a'>) => {
+    a: ({ href, children, className: linkClassName, rel: authoredRel }: MdRenderProps<'a'>) => {
       const isBroken = href !== undefined && brokenLinks.includes(href);
       const isInternalDocLink =
         propCurrentPath !== undefined &&
@@ -334,15 +345,17 @@ export function buildBaseComponents({
       };
 
       return (
-        <a
+        <Link
           href={href}
           className={`relative text-ods-accent no-underline transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-0 after:bg-ods-accent after:transition-all after:duration-300 after:content-[''] hover:after:w-full ${linkClassName || ''}`}
           target={href?.startsWith('http') ? '_blank' : undefined}
-          rel={href?.startsWith('http') ? 'noopener noreferrer' : undefined}
+          // The author's SEO tokens (`<a rel="nofollow">`, the editor's Nofollow choice) are kept;
+          // every other authored token is dropped, and a new-tab link always gets noopener noreferrer.
+          rel={renderedLinkRel(authoredRel, href?.startsWith('http') ?? false)}
           onClick={inPageAnchorId !== null ? handleAnchorClick : undefined}
         >
           {children}
-        </a>
+        </Link>
       );
     },
 
@@ -383,7 +396,7 @@ export function buildBaseComponents({
 
     // --- tables ---
     // The frame and the scroll container are ONE element, matching the sibling
-    // block embed (`mermaid-diagram.tsx`) and `users-grid-skeleton`. It used to
+    // block embed (`mermaid-diagram.tsx`). It used to
     // be two — `overflow-x-auto` outside, `rounded-lg border` on an inner
     // `min-w-full` div — so nothing clipped: the cells' own `border-r`/`border-b`
     // ran straight through the rounded corners and out past the frame's edge.

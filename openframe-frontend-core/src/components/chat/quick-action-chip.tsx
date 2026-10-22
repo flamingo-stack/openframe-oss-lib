@@ -1,8 +1,11 @@
 'use client';
 
-import { type CSSProperties, type ReactNode, isValidElement } from 'react';
+import { type ReactNode, isValidElement } from 'react';
 import { cn } from '../../utils/cn';
 import { EntityIcon, type EntityIconValue } from '../icon-display';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { Tag } from '../ui/tag';
 
 // =============================================================================
@@ -156,8 +159,10 @@ export interface QuickActionChipButtonProps {
   /** {@link QuickActionChipLozenge} at the label's leading edge (e.g. an
    *  IT/SEC classification affix). `true` renders the `theme`'s lozenge. */
   lozenge?: QuickActionChipLozenge | boolean;
-  /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default). */
-  variant?: 'primary' | 'outline';
+  /** `'primary'` = accent (yellow) chip, `'outline'` = bordered chip (default),
+   *  `'question'` = a bordered chip whose label is a SENTENCE in the case it was
+   *  written in (a question to ask the assistant), not an uppercase task label. */
+  variant?: 'primary' | 'outline' | 'question';
   /** Active single-select state (Figma "Feature Item" active): renders the
    *  Tag's `selected` variant (pink border + pink-secondary fill), overriding
    *  `variant`. Used by chip groups acting as tabs (OpenFrame categories). */
@@ -178,13 +183,20 @@ export interface QuickActionChipButtonProps {
    *  strips, table cells). Default `true`. */
   interactive?: boolean;
   className?: string;
+  /** The chip's label is still being read: the chip draws its {@link QuickActionChipSkeleton} (same box). In a loading
+   *  scope it does the same. */
+  loading?: boolean;
+  /** While loading, the label placeholder's width in `ch` (see {@link QuickActionChipSkeletonProps.labelCh}). */
+  labelCh?: number;
+  /** The list's markers (`data-loading-item`), forwarded in both forms. */
+  [marker: `data-${string}`]: unknown;
 }
 
 // =============================================================================
 // Skeleton
 // =============================================================================
 
-export interface QuickActionChipSkeletonProps {
+interface QuickActionChipSkeletonProps {
   /** Label placeholder width in `ch` of the chip's own font — vary per item
    *  for a realistic spread. Default 16. */
   labelCh?: number;
@@ -194,41 +206,53 @@ export interface QuickActionChipSkeletonProps {
   lozenge?: boolean;
   /** Chip scale — MUST match the loaded chips' `size` or the swap jumps. */
   size?: 'default' | 'large';
+  /** `'question'`: the placeholder of a `variant="question"` chip (its height and padding). */
+  variant?: 'outline' | 'question';
   className?: string;
-}
-
-/** Pulse bar inside the chip skeleton — the standard `ui/skeleton` treatment
- *  (`animate-pulse bg-ods-border`), as a SPAN so it stays valid phrasing
- *  content inside the Tag's label span. */
-function ChipSkelBar({ className, style }: { className?: string; style?: CSSProperties }) {
-  return <span aria-hidden className={cn('animate-pulse rounded-md bg-ods-border', className)} style={style} />;
+  /** The list's markers (`data-loading-item`), forwarded like the loaded chip's. */
+  [marker: `data-${string}`]: unknown;
 }
 
 /**
  * Loading placeholder for {@link QuickActionChipButton} — renders the REAL
- * `Tag` (same height, padding, border, radius, icon box) with standard
- * skeleton pulse bars (identical animation + token as `ui/skeleton`) in the
- * icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
+ * `Tag` (same height, padding, border, radius, icon box) with `UnifiedSkeleton`
+ * bars (as spans, so they stay valid phrasing content inside the Tag's label
+ * span) in the icon/lozenge/label slots, so a skeleton chip is 1:1 with a loaded chip by
  * construction. Use anywhere quick actions stream in (chat empty states,
  * marketing walls, deck panels).
  */
-export function QuickActionChipSkeleton({
+function QuickActionChipSkeleton({
   labelCh = 16,
   icon = true,
   lozenge = false,
   size = 'default',
+  variant = 'outline',
   className,
+  ...props
 }: QuickActionChipSkeletonProps) {
+  const question = variant === 'question';
   return (
     <Tag
+      {...loadingItemProps(props)}
       variant="outline"
-      size={size}
-      className={className}
-      icon={icon ? <ChipSkelBar className={size === 'large' ? 'block size-5' : 'block size-4'} /> : undefined}
+      size={question ? 'sentence' : size}
+      className={cn(question && 'max-w-full', className)}
+      icon={
+        icon && !question ? (
+          <UnifiedSkeleton as="span" aria-hidden className={size === 'large' ? 'block size-5' : 'block size-4'} />
+        ) : undefined
+      }
       label={
         <>
-          {lozenge && <ChipSkelBar className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />}
-          <ChipSkelBar className="inline-block h-[0.9em] translate-y-[0.08em]" style={{ width: `${labelCh}ch` }} />
+          {lozenge && (
+            <UnifiedSkeleton as="span" aria-hidden className="mr-2 inline-block h-[16px] w-[26px] translate-y-[2px]" />
+          )}
+          <UnifiedSkeleton
+            as="span"
+            aria-hidden
+            className="inline-block h-[0.9em] translate-y-[0.08em]"
+            width={`${labelCh}ch`}
+          />
         </>
       }
     />
@@ -261,19 +285,56 @@ export function QuickActionChipButton({
   onHoverEnd,
   interactive = true,
   className,
+  loading: loadingProp = false,
+  labelCh,
+  ...props
 }: QuickActionChipButtonProps) {
+  // ONE switch: in a page's loading state, or while the host reads the label, the chip is its skeleton (same box).
+  const loading = useLoadingScope() || loadingProp;
+  const markers = loadingItemProps(props);
+  if (loading)
+    return (
+      <QuickActionChipSkeleton
+        {...markers}
+        labelCh={labelCh}
+        icon={icon != null}
+        lozenge={!!lozenge}
+        size={size}
+        variant={variant === 'question' ? 'question' : 'outline'}
+        className={className}
+      />
+    );
   // The theme's accent only fills the gap — an icon spec's own accent
   // (admin-configured per-action color) always wins.
   const themedIcon = theme && isQuickActionIconSpec(icon) && !icon.accent ? { ...icon, accent: theme.accent } : icon;
   const resolvedLozenge = lozenge === true ? theme?.lozenge : lozenge === false ? undefined : lozenge;
   const resolvedIcon = renderQuickActionIcon(themedIcon);
   const resolvedLabel = composeChipLabel(label, resolvedLozenge);
-  const tagVariant = selected ? (selectedAccent === 'cyan' ? 'selectedCyan' : 'selected') : variant;
+  const question = variant === 'question';
+  const tagVariant = selected
+    ? selectedAccent === 'cyan'
+      ? 'selectedCyan'
+      : 'selected'
+    : question
+      ? 'outline'
+      : variant;
+  const tagSize = question ? 'sentence' : size;
   if (!interactive) {
-    return <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} className={className} />;
+    return (
+      <Tag
+        {...markers}
+        variant={tagVariant}
+        size={tagSize}
+        icon={resolvedIcon}
+        label={resolvedLabel}
+        className={className}
+      />
+    );
   }
   return (
-    <button
+    <Button
+      variant="card"
+      {...markers}
       type="button"
       onClick={onSelect}
       onMouseEnter={onHoverStart}
@@ -282,12 +343,19 @@ export function QuickActionChipButton({
       onBlur={onHoverEnd}
       aria-pressed={selected || undefined}
       className={cn(
-        'shrink-0 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
+        // A question may be longer than a narrow column: it shrinks and clips there, read from its start.
+        question ? 'w-auto min-w-0 max-w-full' : 'w-auto shrink-0',
         className,
       )}
     >
-      <Tag variant={tagVariant} size={size} icon={resolvedIcon} label={resolvedLabel} />
-    </button>
+      <Tag
+        variant={tagVariant}
+        size={tagSize}
+        icon={resolvedIcon}
+        label={resolvedLabel}
+        className={question ? 'max-w-full' : undefined}
+      />
+    </Button>
   );
 }
 
@@ -343,15 +411,19 @@ export function QuickActionChipFromData({
   defaultLozenge,
   interactive = true,
   className,
+  ...props
 }: {
   chip: QuickActionChip;
   defaultTheme?: QuickActionThemeSpec;
   defaultLozenge?: boolean;
   interactive?: boolean;
   className?: string;
+  /** The list's markers (`data-loading-item`), forwarded to the chip. */
+  [marker: `data-${string}`]: unknown;
 }) {
   return (
     <QuickActionChipButton
+      {...loadingItemProps(props)}
       label={chip.label}
       icon={chip.icon}
       theme={chip.theme ?? defaultTheme}

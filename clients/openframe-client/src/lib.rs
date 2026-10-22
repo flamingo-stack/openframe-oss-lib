@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub mod clients;
 mod config;
@@ -29,18 +29,26 @@ pub mod service_adapter;
 pub mod system;
 pub mod utils;
 
+#[cfg(test)]
+mod test_support;
+
 pub mod cli;
 pub use cli::run;
 
 #[cfg(any(unix, windows))]
 pub mod executor;
 
-use crate::clients::tool_agent_file_client::ToolAgentFileClient;
-use crate::clients::{AuthClient, RegistrationClient, ToolApiClient};
-use crate::config::update_config::{DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS};
+use crate::clients::build_agent_http_client;
+use crate::clients::{AuthClient, RegistrationClient, RemoteAccessClient, ToolApiClient};
+use crate::config::update_config::{
+    DOWNLOAD_CLIENT_TIMEOUT_SECS, HTTP_CLIENT_TIMEOUT_SECS, SELF_RESTART_EXIT_CODE,
+    SELF_RESTART_HANDOFF_SECS,
+};
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
+use crate::listener::command::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
+use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
 use crate::listener::tool_agent_update_listener::ToolAgentUpdateListener;
 use crate::listener::tool_installation_message_listener::ToolInstallationMessageListener;
 use crate::listener::tool_restart_message_listener::ToolRestartMessageListener;
@@ -57,6 +65,7 @@ use crate::services::deactivation_service::DeactivationService;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
+use crate::services::feature_flags_service::FeatureFlagsService;
 use crate::services::github_download_service::GithubDownloadService;
 use crate::services::hostname_report_publisher::HostnameReportPublisher;
 use crate::services::initial_authentication_processor::InitialAuthenticationProcessor;
@@ -75,6 +84,7 @@ use crate::services::package_manager::report_publisher::PackageManagerReportPubl
 use crate::services::package_manager::report_run_manager::PackageManagerReportRunManager;
 use crate::services::package_manager::PackageManagerUpdateRunManager;
 use crate::services::registration_processor::RegistrationProcessor;
+use crate::services::remote_access_mode_service::RemoteAccessModeService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
 use crate::services::result_store::ResultStore;
 use crate::services::shared_token_service::SharedTokenService;
@@ -86,16 +96,16 @@ use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
+use crate::services::MachineIdService;
 use crate::services::{
     AgentAuthService, AgentRegistrationService, InitialConfigurationService,
-    ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolRunManager,
-    ToolUrlParamsResolver,
+    ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolOps,
+    ToolRunManager, ToolUrlParamsResolver,
 };
 use crate::services::{
     InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
-use crate::services::{MachineIdService, MACHINE_ID_HEADER};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -169,6 +179,9 @@ pub struct Client {
     openframe_client_update_listener: OpenFrameClientUpdateListener,
     tool_agent_update_listener: ToolAgentUpdateListener,
     client_uninstall_message_listener: ClientUninstallMessageListener,
+    remote_access_message_listener: RemoteAccessMessageListener,
+    feature_flags_listener: CommandListener<FeatureFlagsHandler>,
+    restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
     script_execution_listener: ExecutionListener<ScriptMessage>,
     script_bootstrap_execution_listener: ExecutionListener<BootstrapScriptMessage>,
@@ -193,6 +206,7 @@ pub struct Client {
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
     initial_key_service: Arc<InitialKeyService>,
+    remote_access_mode_service: Arc<RemoteAccessModeService>,
     deactivation_service: Arc<DeactivationService>,
 }
 
@@ -228,32 +242,21 @@ impl Client {
             .get_or_create()
             .context("Failed to get or create machine ID")?;
 
-        let mut default_headers = reqwest::header::HeaderMap::new();
-        default_headers.insert(
-            MACHINE_ID_HEADER,
-            reqwest::header::HeaderValue::from_str(&machine_id)
-                .context("Invalid machine ID for header")?,
-        );
+        let local_mode = initial_configuration_service.is_local_mode()?;
 
-        let http_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS))
-            .default_headers(default_headers.clone())
-            // disable TLS verification for dev mode only
-            .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
-            .no_proxy()
-            // disable connection pooling to force fresh DNS lookup on each request
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create HTTP client")?;
+        let http_client = build_agent_http_client(
+            &machine_id,
+            Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS),
+            local_mode,
+        )
+        .context("Failed to create HTTP client")?;
 
-        let download_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS))
-            .default_headers(default_headers)
-            .danger_accept_invalid_certs(initial_configuration_service.is_local_mode()?)
-            .no_proxy()
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create download HTTP client")?;
+        let download_client = build_agent_http_client(
+            &machine_id,
+            Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS),
+            local_mode,
+        )
+        .context("Failed to create download HTTP client")?;
 
         // Initialize http url
         let http_url = format!(
@@ -324,10 +327,6 @@ impl Client {
             machine_id_service.clone(),
         );
 
-        // Initialize tool agent file client
-        let tool_agent_file_client =
-            ToolAgentFileClient::new(download_client.clone(), http_url.clone());
-
         // Initialize tool API client
         let tool_api_client = ToolApiClient::new(
             download_client.clone(),
@@ -340,6 +339,16 @@ impl Client {
             http_url.clone(),
             initial_configuration_service.clone(),
             config_service.clone(),
+            deactivation_service.clone(),
+        ));
+
+        let remote_access_mode_service = Arc::new(RemoteAccessModeService::new(
+            RemoteAccessClient::new(
+                http_client.clone(),
+                http_url.clone(),
+                config_service.clone(),
+            ),
+            initial_configuration_service.clone(),
             deactivation_service.clone(),
         ));
 
@@ -372,11 +381,19 @@ impl Client {
         // Initialize tool kill service
         let tool_kill_service = ToolKillService::new();
 
+        let tool_ops = ToolOps::default();
+
+        let feature_flags_service = Arc::new(FeatureFlagsService::load(
+            directory_manager.secured_dir().join("feature_flags.json"),
+            env!("OPENFRAME_VERSION").to_string(),
+        ));
+
         // Initialize tool run manager
         let tool_run_manager = ToolRunManager::new(
             installed_tools_service.clone(),
             tool_command_params_resolver.clone(),
             tool_kill_service.clone(),
+            tool_ops.clone(),
         );
 
         // Initialize tool restart service
@@ -384,6 +401,7 @@ impl Client {
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
         );
 
         // Initialize mesh self-heal service
@@ -394,7 +412,7 @@ impl Client {
             tool_restart_service.clone(),
             initial_configuration_service.clone(),
             config_service.clone(),
-            tool_run_manager.clone(),
+            tool_ops.clone(),
             deactivation_service.clone(),
             http_client.clone(),
         );
@@ -410,7 +428,7 @@ impl Client {
             tool_connection_message_publisher.clone(),
             config_service.clone(),
             tool_connection_service.clone(),
-            tool_run_manager.clone(),
+            tool_ops.clone(),
         );
 
         // Initialize OpenFrame client info service
@@ -444,13 +462,13 @@ impl Client {
         // Initialize tool installation service
         let tool_installation_service = ToolInstallationService::new(
             github_download_service.clone(),
-            tool_agent_file_client.clone(),
             tool_api_client,
             tool_command_params_resolver.clone(),
             tool_url_params_resolver.clone(),
             installed_tools_service.clone(),
             directory_manager.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             tool_connection_processing_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
@@ -464,16 +482,17 @@ impl Client {
             update_state_service.clone(),
             last_known_good_service.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             update_handler_service.clone(),
         );
 
         // Initialize tool agent update service
         let tool_agent_update_service = ToolAgentUpdateService::new(
             github_download_service.clone(),
-            tool_agent_file_client.clone(),
             installed_tools_service.clone(),
             tool_kill_service.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             directory_manager.clone(),
             config_service.clone(),
             installed_agent_message_publisher.clone(),
@@ -497,6 +516,7 @@ impl Client {
         let tool_uninstall_message_listener = ToolUninstallMessageListener::new(
             nats_connection_manager.clone(),
             tool_run_manager.clone(),
+            tool_ops.clone(),
             tool_uninstall_service,
             config_service.clone(),
         );
@@ -531,6 +551,13 @@ impl Client {
             config_service.clone(),
         );
 
+        // Relaunches the chat app on remote-access traffic so sessions reach a device whose chat has exited
+        let remote_access_message_listener = RemoteAccessMessageListener::new(
+            nats_connection_manager.clone(),
+            config_service.clone(),
+            tool_run_manager.clone(),
+        );
+
         let execution_service = ExecutionService::new();
 
         let result_store = Arc::new(ResultStore::open_or_degrade(
@@ -545,6 +572,24 @@ impl Client {
             flush_notify.clone(),
         );
         let result_store_for_recovery = result_store.clone();
+
+        let restart_gate = RestartGate::new(
+            tool_ops.busy_tools(),
+            execution_service.running_scripts(),
+            tool_run_manager.client_update_pending(),
+        );
+        let command_context = CommandContext::new(
+            nats_connection_manager.clone(),
+            config_service.clone(),
+            restart_gate.clone(),
+            nats_message_publisher.clone(),
+            result_store.clone(),
+            flush_notify.clone(),
+        );
+        let feature_flags_listener = CommandListener::new(
+            FeatureFlagsHandler::new(feature_flags_service),
+            command_context,
+        );
 
         let command_execution_listener = ExecutionListener::<CommandMessage>::new(
             nats_connection_manager.clone(),
@@ -627,6 +672,9 @@ impl Client {
             openframe_client_update_listener,
             tool_agent_update_listener,
             client_uninstall_message_listener,
+            remote_access_message_listener,
+            feature_flags_listener,
+            restart_gate,
             command_execution_listener,
             script_execution_listener,
             script_bootstrap_execution_listener,
@@ -650,6 +698,7 @@ impl Client {
             agent_configuration_service: config_service,
             installed_tools_service,
             initial_key_service,
+            remote_access_mode_service,
             deactivation_service,
         })
     }
@@ -683,7 +732,7 @@ impl Client {
             error!("Failed to record boot attempt: {:#}", e);
         }
 
-        self.initial_key_service.clone().ensure_initial_key().await;
+        self.initial_key_service.clone().start();
 
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
@@ -700,6 +749,8 @@ impl Client {
 
         self.token_refresh_run_manager.start();
 
+        self.remote_access_mode_service.clone().start();
+
         // Connect to NATS
         self.nats_connection_manager.connect().await?;
 
@@ -710,6 +761,59 @@ impl Client {
             error!("Failed to handle pending update: {:#}", e);
             // Continue startup even if update handling fails - don't block the client
         }
+
+        self.feature_flags_listener.start().await?;
+        let restart_gate = self.restart_gate.clone();
+        tokio::spawn(async move {
+            restart_gate.requested().await;
+            match crate::platform::detached_process::spawn_detached(
+                &crate::service::Service::get_install_location(),
+                cli::RESTART_SERVICE_SUBCOMMAND,
+            ) {
+                Ok(mut child) => {
+                    info!(
+                        pid = child.id(),
+                        "Service restart handed to a detached process"
+                    );
+                    let finished = tokio::time::timeout(
+                        Duration::from_secs(SELF_RESTART_HANDOFF_SECS),
+                        tokio::task::spawn_blocking(move || child.wait()),
+                    )
+                    .await;
+                    match finished {
+                        Ok(Ok(Ok(status))) => warn!(
+                            %status,
+                            "Detached restart finished but did not stop this process, exiting instead"
+                        ),
+                        Ok(Ok(Err(e))) => {
+                            warn!(
+                                "Cannot wait for the detached restart, exiting instead: {:#}",
+                                e
+                            )
+                        }
+                        Ok(Err(e)) => {
+                            warn!(
+                                "Cannot wait for the detached restart, exiting instead: {:#}",
+                                e
+                            )
+                        }
+                        Err(_) => warn!(
+                            "Detached restart still running after {}s, exiting instead",
+                            SELF_RESTART_HANDOFF_SECS
+                        ),
+                    }
+                }
+                Err(e) => warn!(
+                    "Cannot hand the service restart off, exiting instead: {:#}",
+                    e
+                ),
+            }
+            info!(
+                code = SELF_RESTART_EXIT_CODE,
+                "Exiting so the service manager restarts the client"
+            );
+            std::process::exit(SELF_RESTART_EXIT_CODE);
+        });
 
         // Start machine heartbeat run manager
         self.machine_heartbeat_run_manager.start();
@@ -736,6 +840,8 @@ impl Client {
 
         // Start client uninstall listener in background
         self.client_uninstall_message_listener.start().await?;
+
+        self.remote_access_message_listener.start().await?;
 
         // Recover interrupted scheduled scripts, then start the outbox flusher,
         // both strictly before any execution listener can accept new batches

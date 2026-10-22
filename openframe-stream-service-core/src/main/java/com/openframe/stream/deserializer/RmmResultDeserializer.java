@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -164,6 +164,14 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
             log.error("Failed to build details JSON for command result", e);
             return null;
         }
+    }
+
+    protected ObjectNode toObjectNode(String json) {
+        if (json == null) {
+            return mapper.createObjectNode();
+        }
+        JsonNode parsed = mapper.readTree(json);
+        return parsed.isObject() ? (ObjectNode) parsed : mapper.createObjectNode();
     }
 
     private static void putIntOrString(ObjectNode node, String key, String value) {

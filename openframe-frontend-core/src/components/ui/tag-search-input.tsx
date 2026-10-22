@@ -14,6 +14,7 @@ import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-
 import { cn } from '../../utils/cn';
 import { SearchIcon } from '../icons-v2-generated/interface/search-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { Button } from './button';
 import { HiddenTagsPopup } from './hidden-tags-popup';
 import { Tag } from './tag';
 
@@ -149,7 +150,7 @@ export function TagSearchInput<T = string>({
       {/* ---- Visible container ---- */}
       <div
         className={cn(
-          'flex h-11 cursor-text items-center rounded-[6px] border md:h-12',
+          'flex h-11 cursor-text items-center rounded-[6px] border content-md:h-12',
           'transition-colors duration-200',
           'border-ods-border bg-ods-card',
           'has-[:focus]:border-ods-accent',
@@ -170,7 +171,7 @@ export function TagSearchInput<T = string>({
       >
         {/* Search icon — pinned left, responsive size */}
         <div className="flex shrink-0 items-center pl-3">
-          <SearchIcon className="size-4 text-ods-text-secondary md:size-6" />
+          <SearchIcon className="size-4 text-ods-text-secondary content-md:size-6" />
         </div>
 
         {/* Middle zone: tags + input — overflow hidden so tags never push clear btn */}
@@ -188,22 +189,18 @@ export function TagSearchInput<T = string>({
           {/* "+N" overflow badge */}
           {hiddenCount > 0 && (
             <div ref={hiddenTagsRef} className="shrink-0">
-              <button
+              <Button
+                variant="chip"
                 ref={badgeRef}
                 type="button"
+                aria-expanded={showHiddenTags}
                 onClick={e => {
                   e.stopPropagation();
                   setShowHiddenTags(prev => !prev);
                 }}
-                className={cn(
-                  'flex h-8 items-center px-2',
-                  'rounded-[6px] border border-ods-border bg-ods-card',
-                  'text-ods-text-secondary text-h5',
-                  'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-                )}
               >
                 {getLimitTagsText(hiddenCount)}
-              </button>
+              </Button>
             </div>
           )}
 
@@ -228,14 +225,16 @@ export function TagSearchInput<T = string>({
 
         {/* Clear all — pinned right */}
         {showClearAll && hasValue && !disabled && (
-          <button
+          <Button
+            variant="transparent"
+            size="icon-sm"
             type="button"
             onClick={handleClearAll}
-            className="flex shrink-0 cursor-pointer items-center justify-center pr-3 transition-opacity hover:opacity-70"
+            className="mr-[var(--spacing-system-xxs)] shrink-0"
             aria-label="Clear all"
           >
-            <XmarkCircleIcon className="size-4 text-ods-text-secondary md:size-6" />
-          </button>
+            <XmarkCircleIcon className="text-ods-text-secondary" />
+          </Button>
         )}
       </div>
 

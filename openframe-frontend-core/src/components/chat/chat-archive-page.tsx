@@ -2,10 +2,11 @@
 
 import { Chevron02LeftIcon, BoxArchiveIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
-import { ChatHeaderIconButton } from './chat-header-icon-button';
+import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
-import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history';
+import { MingoChatHistory } from './mingo-chat-history';
 import type { DialogItem } from './types/component.types';
 
 interface ChatArchivePageBaseProps {
@@ -13,26 +14,27 @@ interface ChatArchivePageBaseProps {
   dialogs: ReadonlyArray<DialogItem>;
   /** Open an archived dialog. */
   onSelectDialog: (id: string) => void;
-  /** The delayed skeleton is visible (a slow first page is loading). */
+  /** A page is loading (the first: the list draws its loading state; a later one: its next-page rows). */
   isLoading?: boolean;
-  /** A first-page load is in flight but the delayed skeleton hasn't appeared
-   *  yet — keeps the empty state suppressed so it never flashes before the
-   *  skeleton/data arrives. */
+  /** A first-page load is in flight: the list draws its loading state, so the empty state never flashes. */
   isFetching?: boolean;
   /** Whether another page of archived dialogs remains. */
   hasMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
+  /** The archive's page size: how many rows the first-load loading state draws. Default
+   *  `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
 }
 
-/** Standalone (default): renders its own back/close header, so BOTH handlers
- *  are required. */
+/** Standalone (default): renders its own back/close header. `onBack` is
+ *  required; without `onClose` the close button is left out. */
 export interface ChatArchivePageStandaloneProps extends ChatArchivePageBaseProps {
   embedded?: false;
   /** Back chevron — returns to the previous (list) view. */
   onBack: () => void;
   /** Close the whole chat panel. */
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 /** Embedded (wide split layout): the archive lives in the left rail and the
@@ -53,23 +55,24 @@ export type ChatArchivePageProps = ChatArchivePageStandaloneProps | ChatArchiveP
  * the list can slot into the split layout's left rail.
  */
 export function ChatArchivePage(props: ChatArchivePageProps) {
-  const { dialogs, onSelectDialog, isLoading = false, isFetching = false, hasMore = false, onLoadMore } = props;
-
-  // A first, uncached load is in flight but the delayed skeleton hasn't
-  // appeared yet (the 120ms window). Render nothing rather than flashing
-  // the empty state before the skeleton / data arrives.
-  //
-  // Hoisted out of the ternary on 2026-08-24: Prettier joins `//` comments
-  // that sit inside a nested ternary onto one line, in reverse order, and
-  // reattaches them to the following branch. The explanation is worth more
-  // than the inline position.
-  const suppressEmptyStateWhileFetching = isFetching;
+  const {
+    dialogs,
+    onSelectDialog,
+    isLoading = false,
+    isFetching = false,
+    hasMore = false,
+    onLoadMore,
+    pageSize,
+  } = props;
+  // ONE switch: a first page with nothing to show yet (in flight at all, or the page's loading state) is the list's
+  // own loading state, never a blank.
+  const firstLoad = useLoadingScope() || ((isLoading || isFetching) && dialogs.length === 0);
   return (
     <>
       {/* Mobile (<md): the shared mobile header — back to the list + a ⋯ menu
           (Close only here, since the archive list has no per-chat actions).
           `!props.embedded` narrows the union so `onBack` / `onClose` are the
-          required standalone handlers (no no-op fallbacks). */}
+          standalone handlers (no no-op fallbacks). */}
       {!props.embedded && (
         <ChatPanelHeaderMobile
           className="flex md:hidden"
@@ -82,37 +85,39 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
       )}
 
       {/* Desktop (md+): fixed-height bar with full-height divider action cells —
-          the back chevron is a leading `ChatHeaderIconButton` cell matching the
+          the back chevron is a leading ``Button variant="cell"`` cell matching the
           trailing close cell (not a small inline chevron). */}
       {!props.embedded && (
-        <div className="hidden h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card md:flex">
-          <ChatHeaderIconButton divider="right" onClick={props.onBack} aria-label="Back">
+        <div className="hidden h-14 w-full flex-shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border bg-ods-card md:flex">
+          <Button variant="cell" className="w-14" onClick={props.onBack} aria-label="Back">
             <Chevron02LeftIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
           <div className="flex min-w-0 flex-1 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
             <span className="truncate text-ods-text-primary text-h3">Chat Archive</span>
           </div>
 
-          <ChatHeaderIconButton onClick={props.onClose} aria-label="Close">
-            <XmarkIcon size={24} />
-          </ChatHeaderIconButton>
+          {props.onClose && (
+            <Button variant="cell" className="w-14" onClick={props.onClose} aria-label="Close">
+              <XmarkIcon size={24} />
+            </Button>
+          )}
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
-        {dialogs.length > 0 ? (
+        {firstLoad || dialogs.length > 0 ? (
+          // The first load is the list's own loading state — the SAME grouped/
+          // bordered rows the active list draws, so the archive loads and lands
+          // without a layout shift.
           <MingoChatHistory
+            loading={firstLoad}
+            pageSize={pageSize}
             dialogs={dialogs}
             onSelectDialog={onSelectDialog}
             hasMore={hasMore}
             isLoadingMore={isLoading && dialogs.length > 0}
             onLoadMore={onLoadMore}
           />
-        ) : isLoading ? (
-          // First-load skeleton — the SAME grouped/bordered placeholder the
-          // active list uses, so the archive loads and lands without a layout
-          // shift or a mismatched flat-list skeleton.
-          <MingoChatHistorySkeleton />
-        ) : suppressEmptyStateWhileFetching ? null : (
+        ) : (
           // Empty state — mirrors the "Current Chats" rail empty state
           // (Figma 113:60939): centred 24px muted glyph + h4 title + h6 caption.
           <ChatListEmptyState

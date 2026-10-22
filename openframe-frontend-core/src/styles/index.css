@@ -5,9 +5,12 @@
 @import './ods-interaction-states.css';
 @import './ods-effects.css';
 @import './ods-responsive-tokens.css';
+@import './ods-content-area.css';
+@import './ods-content-area-tokens.css';
 @import './app-globals.css';
 @import './chat-animations.css';
 @import './ods-page-shell.css';
+@import './product-screen-frame.css';
 
 /* Vendor/library style overrides */
 @import './vendor-react-easy-crop.css';

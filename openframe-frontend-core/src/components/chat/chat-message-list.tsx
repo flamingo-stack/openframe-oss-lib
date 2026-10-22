@@ -13,10 +13,18 @@ import {
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatMessageEnhanced } from './chat-message-enhanced';
-import { ChatMessageListSkeleton } from './chat-message-skeleton';
+import {
+  CHAT_MESSAGE_LIST_COLUMN_CLASS,
+  CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
+} from './chat-message-layout';
+import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES, ChatMessageListSkeleton } from './chat-message-skeleton';
 import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -50,6 +58,15 @@ const BOTTOM_THRESHOLD_PX = 70;
  *  spring re-reads `calculatedTargetScrollTop` every frame instead of
  *  finishing against the target captured when the call was made. */
 const FOLLOW_RETAIN_MS = 350;
+
+/** How long the scrollHeight poll keeps running after the thread last grew,
+ *  in ms. Long enough for the async growth that lands after a message —
+ *  images settling, entity cards resolving out of their skeletons — and
+ *  short enough that an idle open drawer stops waking the page every frame. */
+const GROWTH_WATCH_IDLE_MS = 10_000;
+
+/** Media events after which the thread's height can have changed. */
+const MEDIA_SETTLE_EVENTS = ['load', 'error', 'loadedmetadata'] as const;
 
 /*
  * Stick-to-bottom: `use-stick-to-bottom` (stackblitz-labs)
@@ -120,8 +137,11 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       className,
       messages,
       dialogId,
-      isLoading = false,
+      isLoading: isLoadingProp = false,
+      pageSize = CHAT_MESSAGE_LIST_SKELETON_MESSAGES,
+      fill = false,
       isTyping = false,
+      typingMessage,
       autoScroll = true,
       overscrollContain = true,
       pinBottom = false,
@@ -130,6 +150,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       contentClassName,
       assistantType,
       approvalVariant,
+      selfAuthorType,
+      nameEveryTurn,
       appearance = CHAT_APPEARANCE.CLASSIC,
       assistantIcon,
       pendingApprovals,
@@ -147,6 +169,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     },
     ref,
   ) => {
+    // ONE switch: in a page's loading state (or while the host reads the thread) the list is its skeleton. Every
+    // effect below keys on `isLoading`, so the switch is resolved before any of them.
+    const isLoading = useLoadingScope() || isLoadingProp;
+
     // ---- Library: useStickToBottom -----------------------------------
     // `resize: 'smooth'` — during streaming, content grows token-by-
     // token; library uses spring physics to follow the bottom for a
@@ -251,6 +277,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     // because that call also re-sets the library's `isAtBottom`, a lost
     // lock self-heals instead of being permanent.
     const followBottomRef = useRef(false);
+    // Restarts the follow effect's scrollHeight poll; null while it is not
+    // installed.
+    const kickGrowthWatchRef = useRef<(() => void) | null>(null);
 
     // Drives the jump-to-bottom affordance. Derived from GEOMETRY, not
     // from the library's `isAtBottom`: that flag is the one this list
@@ -424,11 +453,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         measure();
       };
 
-      const ro = new ResizeObserver(reassert);
-      ro.observe(content); // tokens, entity cards, images
-      ro.observe(scroller); // streaming loader / source chips below it
-
-      // GROWTH WATCH — the load-bearing one, because the ResizeObserver above
+      // GROWTH WATCH — the load-bearing one, because the ResizeObserver below
       // is not reliable for this list.
       //
       // `content` is a SNAPSHOT taken when this effect installed, and the deps
@@ -442,20 +467,42 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // A poll on `scrollHeight` sidesteps the whole question of WHICH node is
       // live: it reads the scroller (always mounted, it owns the listeners)
       // and reacts to growth from any source — tokens, images settling, cards
-      // resolving. Gated on the intent, so it costs one rAF-tick comparison
-      // per frame only while actually following, and stops the moment a
-      // gesture disarms.
+      // resolving. It stops once the thread has not grown for
+      // GROWTH_WATCH_IDLE_MS — polled every frame forever it kept an idle open
+      // drawer rendering at 60fps (~5% of a core in WebKit) — and `kick`
+      // restarts it on everything that can grow the thread: new messages and
+      // typing-state changes (the effect below), scroll, the observer, and
+      // media inside the thread settling (an image loading or failing, a video
+      // learning its size) — that can land well after the last message, when
+      // the observer may be watching a detached node.
       let growthRaf = 0;
       let lastScrollHeight = scroller.scrollHeight;
-      const watchGrowth = () => {
-        growthRaf = requestAnimationFrame(watchGrowth);
-
+      let lastGrowthAt = performance.now();
+      const watchGrowth = (now: number) => {
         const height = scroller.scrollHeight;
-        if (height === lastScrollHeight) return;
-        lastScrollHeight = height;
-        reassert();
+        if (height !== lastScrollHeight) {
+          lastScrollHeight = height;
+          lastGrowthAt = now;
+          reassert();
+        } else if (now - lastGrowthAt > GROWTH_WATCH_IDLE_MS) {
+          growthRaf = 0;
+          return;
+        }
+        growthRaf = requestAnimationFrame(watchGrowth);
       };
-      growthRaf = requestAnimationFrame(watchGrowth);
+      const kick = () => {
+        lastGrowthAt = performance.now();
+        if (!growthRaf) growthRaf = requestAnimationFrame(watchGrowth);
+      };
+      kick();
+      kickGrowthWatchRef.current = kick;
+
+      const ro = new ResizeObserver(() => {
+        kick();
+        reassert();
+      });
+      ro.observe(content); // tokens, entity cards, images
+      ro.observe(scroller); // streaming loader / source chips below it
 
       // --- user-intent disarm ---------------------------------------
       // Only a deliberate move AWAY from the bottom releases the lock.
@@ -542,6 +589,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         rearmIfAtBottom();
       };
       const onScroll = () => {
+        kick();
         const st = scroller.scrollTop;
         if (pointerDown && st < lastScrollTop) disarm();
         lastScrollTop = st;
@@ -577,6 +625,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       scroller.addEventListener('touchmove', onTouchMove, { passive: true });
       window.addEventListener('pointerdown', onPointerDown, winCapture);
       scroller.addEventListener('scroll', onScroll, { passive: true });
+      // Media events do not bubble — capture them from the elements inside.
+      for (const type of MEDIA_SETTLE_EVENTS) scroller.addEventListener(type, kick, { capture: true, passive: true });
       window.addEventListener('pointerup', endPointer, winCapture);
       window.addEventListener('pointercancel', endPointer, winCapture);
       // Bubble phase, NOT capture — see the note above.
@@ -585,6 +635,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       return () => {
         ro.disconnect();
         cancelAnimationFrame(growthRaf);
+        kickGrowthWatchRef.current = null;
         scroller.removeEventListener('wheel', onWheel);
         scroller.removeEventListener('keydown', onKeyDown);
         scroller.removeEventListener('touchstart', onTouchStart);
@@ -592,6 +643,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
         // `capture` must match the add call or the listener is not removed.
         window.removeEventListener('pointerdown', onPointerDown, { capture: true });
         scroller.removeEventListener('scroll', onScroll);
+        for (const type of MEDIA_SETTLE_EVENTS) scroller.removeEventListener(type, kick, { capture: true });
         window.removeEventListener('pointerup', endPointer, { capture: true });
         window.removeEventListener('pointercancel', endPointer, { capture: true });
         // Added WITHOUT capture — the remove must match.
@@ -609,6 +661,12 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       // dialog) also swaps the scroller element, so the stale closure kept
       // observing and listening on DETACHED nodes.
     }, [autoScroll, scrollRef, contentRef, scrollToBottom, stopScroll, isLoading]);
+
+    // Restart the growth watch (see GROWTH WATCH above) whenever the thread
+    // can be about to grow; it stops itself again once growth settles.
+    useEffect(() => {
+      kickGrowthWatchRef.current?.();
+    }, [messages, isTyping]);
 
     // ---- Passive-demo hard pin (pinBottom) ---------------------------
     // Scripted in-page replays (the Fae/Mingo demos) have no human at the
@@ -893,7 +951,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           showAvatars={showAvatars}
           fullWidth={fullWidth}
           contentClassName={contentClassName}
-          messageCount={6}
+          fill={fill}
+          messageCount={pageSize}
+          appearance={appearance}
+          namedOthers={selfAuthorType === 'admin'}
         />
       );
     }
@@ -931,7 +992,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               <div
                 ref={setScrollRef}
                 className={cn(
-                  'flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden',
+                  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
                   // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
                   // reaching the top/bottom of the thread must NOT chain the wheel/
                   // touch scroll to the page behind the chat — e.g. the company-hub
@@ -941,7 +1002,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   // the surrounding page keeps scrolling normally when the pointer is
                   // over the (non-interactive) thread.
                   overscrollContain && 'overscroll-contain',
-                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
+                  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
                   className,
                 )}
                 {...props}
@@ -952,10 +1013,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // `fullWidth=true` drops the centered-narrow column for
                     // side-panel hosts (e.g. multi-platform-hub Mingo). Same
                     // semantics as ChatHeader / ChatInput / ChatFooter.
-                    fullWidth
-                      ? 'flex w-full min-w-0 flex-col pb-[var(--spacing-system-xs)]'
-                      : 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)]',
-                    contentClassName ?? 'px-[var(--spacing-system-m)]',
+                    CHAT_MESSAGE_LIST_COLUMN_CLASS[fullWidth ? 'full' : 'narrow'],
+                    contentClassName ?? CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
                   )}
                   style={{ minHeight: '100%' }}
                 >
@@ -1005,6 +1064,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         assistantType={message.assistantType || assistantType}
                         approvalVariant={approvalVariant}
                         authorType={message.authorType}
+                        selfAuthorType={selfAuthorType}
+                        nameEveryTurn={nameEveryTurn}
                         assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                         contextItems={message.contextItems}
                         resolveContextIcon={resolveContextIcon}
@@ -1014,6 +1075,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         refs={message.refs}
                         onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
                         NavLinkAnchor={NavLinkAnchor}
+                        // One message of a read thread (the height gate counts them); the wrapper carries it instead
+                        // when the row has content of its own below it.
+                        data-loading-item={ownedContent ? undefined : ''}
                       />
                     );
                     // Only wrap when there IS owned content: the bare row keeps
@@ -1021,7 +1085,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // thread without any stays byte-identical to before.
                     if (!ownedContent) return row;
                     return (
-                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1">
+                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1" data-loading-item>
                         {row}
                         {ownedContent}
                       </div>
@@ -1042,7 +1106,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               move the very bottom it points at. Hidden while at the bottom
               and in passive demo hosts. */}
               {autoScroll && !atBottom && messages.length > 0 && (
-                <button
+                <Button
+                  variant="outline"
+                  size="icon-sm"
                   type="button"
                   onClick={() => {
                     // Clicking IS the intent to return to the live end, so it
@@ -1051,15 +1117,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     void scrollToBottom({ animation: 'smooth' });
                   }}
                   aria-label="Scroll to latest message"
-                  className={cn(
-                    'absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2',
-                    'flex size-9 items-center justify-center rounded-full',
-                    'border border-ods-border bg-ods-card text-ods-text-primary shadow-lg',
-                    'transition-colors hover:bg-ods-bg-hover',
-                  )}
+                  className="absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2"
                 >
                   <Arrow02DownIcon size={16} />
-                </button>
+                </Button>
               )}
             </div>
 
@@ -1080,7 +1141,15 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                 aria-live="polite"
               >
                 <DotsLoaderIcon className="h-6 w-6" />
-                <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
+                {/* What the turn is actually doing, when the host knows; the
+                    cycling phrase when it does not. One line, updated in place. */}
+                {typingMessage ? (
+                  <span className="text-h6" aria-atomic="true">
+                    {typingMessage}
+                  </span>
+                ) : (
+                  <CyclingPhrase words={STREAMING_WORDS} className="text-h6" />
+                )}
               </div>
             )}
 

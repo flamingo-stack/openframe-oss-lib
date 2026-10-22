@@ -3,10 +3,10 @@
 /**
  * TicketLiveProvider — the ONE client home for support-ticket realtime.
  *
- * DOMAIN logic only — connection lifecycle (subscribed-confirm, server
- * retry grace, failed-reconnect pacing, hidden-tab suspend/resume) is
- * owned entirely by the common SSE client (`createSseSubscription`);
- * this provider consumes its consolidated `onConnectedChange` signal.
+ * DOMAIN logic only — connection lifecycle is owned entirely by the
+ * common SSE client (`createSseSubscription`; its module header lists
+ * the policies); this provider consumes its consolidated
+ * `onConnectedChange` signal.
  *
  * Owns:
  *   - the unread summary — delivered EXCLUSIVELY by the stream
@@ -20,8 +20,9 @@
  *   - the ticket-contract `no-stream` (204) retry policy.
  *
  * There is NO polling anywhere and NO summary endpoint. Hosts whose
- * stream endpoint 404s (terminal) or is absent get no unread indication
- * — the indication IS a realtime feature.
+ * stream endpoint 404s or is absent get no unread indication — the
+ * indication IS a realtime feature (a 404ing endpoint is re-probed on
+ * presence, rate-limited by the client).
  *
  * Invalidation semantics on events — deliberately `invalidateQueries`,
  * NOT `setQueryData` patches: the ticket hooks run `gcTime: 0`, so
@@ -286,11 +287,10 @@ export function TicketLiveProvider({ children, enabled = true }: TicketLiveProvi
   };
 
   const handleStatus = (status: SseTransportStatus) => {
-    // The client owns connection lifecycle (confirm timeout, server
-    // retry grace, failed-reconnect pacing, hidden-suspend). The only
-    // transport status with DOMAIN meaning is the ticket contract's
-    // `no-stream` (204 = zero owned tickets): remember it so a domain
-    // signal (own create_ticket, window focus) can retry.
+    // The client owns connection lifecycle. The only transport status
+    // with DOMAIN meaning is the ticket contract's `no-stream` (204 =
+    // zero owned tickets): remember it so a domain signal (own
+    // create_ticket, window focus) can retry.
     if (status === 'open') noStreamRef.current = false;
     if (status === 'no-stream') noStreamRef.current = true;
   };
@@ -324,7 +324,9 @@ export function TicketLiveProvider({ children, enabled = true }: TicketLiveProvi
     });
 
     const retryIfIdle = () => {
-      // After a 204 (no-stream), a focus signal is the retry trigger.
+      // After a 204 (no-stream), a focus signal is the retry trigger. Only
+      // 204 — the client's contract leaves that retry to the caller; it
+      // retries terminal / 401 states on its own.
       if (noStreamRef.current) {
         noStreamRef.current = false;
         subscriptionRef.current?.reconnectNow();

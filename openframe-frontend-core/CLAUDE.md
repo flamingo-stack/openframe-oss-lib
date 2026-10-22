@@ -121,7 +121,7 @@ security boundary — and also why bypassing buys you nothing.
 Before writing any new component, **search the codebase first** to avoid duplicates:
 
 - Grep for similar names (`ProviderButton`, `*-button`, `*-card`, etc.)
-- Check `src/components/ui/`, `src/components/features/`, `src/components/navigation/`, `src/components/icons/`, `src/components/layout/`
+- Check `src/components/ui/`, `src/components/features/`, `src/components/navigation/`, `src/components/icons-v2-generated/`, `src/components/layout/`
 - Check the main consuming apps too — a component may already exist there and be ready to migrate into the core library
 - If something close exists: extend it (new variant, new prop) instead of cloning
 
@@ -137,7 +137,22 @@ package, so **edit the rules only here**:
 
 @src/ODS_TOKEN_RULES.md
 
-### 3. React Hooks — always at the top, unconditionally
+### 3. Links and pictures are the boxed primitives, never raw tags
+
+A link is `Link` from `src/embed-shims/next-link`, a picture is `Image` from `src/embed-shims/next-image`.
+Never write a raw `<a>` or `<img>` in a component: the boxed ones are the host's router link and image
+optimizer where a host registered them, and a plain anchor or image everywhere else, so one component is
+right in every host.
+
+- Lint enforces both: `flamingo/no-raw-anchor` and `@next/next/no-img-element`. The only exemptions are the
+  named blocks in `eslint.config.mjs` (the primitives' own fallbacks, a `blob:` preview).
+- A picture whose slot the caller measured asks for that width with `optimizedWidth` (the host's resizer
+  answers the URL). Do not build a resized URL by hand next to an `<Image>`.
+- An AI agent's picture is its identity's (`AgentMark`, `EntityIcon`, fed by `AgentIdentityProvider`). The
+  library packages no picture of an agent.
+- A random id is `randomId()` (`src/utils/random-id.ts`); no caller carries its own `crypto.randomUUID` fallback.
+
+### 4. React Hooks — always at the top, unconditionally
 
 ```typescript
 // BAD — hook after early return
@@ -201,7 +216,7 @@ import '@flamingo-stack/openframe-frontend-core/styles'
 - `src/components/navigation/` — Header, AppLayout, NavigationSidebar, SlidingSidebar, StickySectionNav
 - `src/components/chat/` — embeddable Mingo/Fae chat + the chat stream engine (chunk processor, history merge)
 - `src/components/tickets/`, `docs/`, `embeds/`, `help-center-pages/`, `onboarding-guides/`, `faq/`, `contact/`, `case-studies/`, `related-content/` — content/page verticals
-- `src/components/icons/` — 133 legacy hand-written icons (exported via `icons/index.ts`)
+- There is ONE icon set, `icons-v2`: every icon, logo and platform mark is a generated component with `size`, `className` and one `color`. A mark drawn in more than one colour has `secondaryColor` / `tertiaryColor` props. An icon's own default colours are ODS tokens in `src/components/icons-v2/icon-colors.json`; `npm run generate:icons <category> <icon>` adds one icon without touching the rest. A new icon is an SVG in `src/components/icons-v2/<category>/`; never a hand-written icon component.
 - `src/components/icons-v2/` (raw SVGs) → `src/components/icons-v2-generated/` (SVGR output, the `components/icons-v2` export) — regenerate via `npm run generate:icons`
 - `src/hooks/ui/` `hooks/state/` (URL-state: useApiParams, useQueryParams, introspector) `hooks/platform/` `hooks/nats/`; `hooks/api/` is intentionally empty
 - `src/nats/` — nats.ws client, NatsProvider, `buildNatsWsUrl`
@@ -296,9 +311,9 @@ Variants: `primary`, `secondary`, `outline`, `footer-link` (minimal, zero-paddin
 
 Radix-based. `z-[2147483647]` so it beats everything. Always wrap trigger in `TooltipProvider`.
 
-### Header
+### SiteHeader
 
-`autoHide` flag in `HeaderConfig` — true hides on scroll-down/shows on scroll-up, false stays fixed. Z-index `z-[50]`. `border-ods-border` is always applied.
+`autoHide` prop of `SiteHeader`: true hides on scroll-down/shows on scroll-up, false stays fixed. Z-index `z-[50]`. `border-ods-border` is always applied.
 
 ### StickySectionNav
 
@@ -450,7 +465,7 @@ Standard admin skeleton: 12 items in a 3-column grid matching the real content l
 
 1. **Reuse over recreate** — search first (see Core Rule 1)
 2. **ODS compliance** — tokens only, no hardcoded colors or raw font sizes (see Core Rule 2)
-3. **Hooks** unconditional at the top (see Core Rule 3)
+3. **Hooks** unconditional at the top (see Core Rule 4)
 4. **Platform agnostic** — core components must work across all platforms
 5. **TypeScript strict** — zero errors
 6. **Accessibility** — ARIA, keyboard, focus management

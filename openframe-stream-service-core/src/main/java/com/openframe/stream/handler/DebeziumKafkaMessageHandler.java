@@ -1,6 +1,6 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.kafka.model.IntegratedToolEvent;
@@ -36,6 +36,8 @@ public abstract class DebeziumKafkaMessageHandler
             message.setDeviceId(enrichedData.getMachineId());
             message.setHostname(enrichedData.getHostname());
             message.setNickname(enrichedData.getNickname());
+            message.setExecutionSource(enrichedData.getExecutionSource());
+            message.setScriptCreationSource(enrichedData.getScriptCreationSource());
             message.setOrganizationId(enrichedData.getOrganizationId());
             message.setOrganizationName(enrichedData.getOrganizationName());
             message.setIngestDay(debeziumMessage.getIngestDay());

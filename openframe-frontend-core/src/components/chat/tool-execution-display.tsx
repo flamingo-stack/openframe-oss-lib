@@ -6,6 +6,9 @@ import { cn } from '../../utils/cn';
 import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from '../icons-v2-generated';
 import type { ToolType } from '../platform';
 import { ToolIcon } from '../tool-icon';
+import { Button } from '../ui/button';
+import { StatusLine, type StatusLineTone } from '../ui/status-line';
+import { CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
 import { ArgRow, ResultBlock } from './tool-call-blocks';
@@ -67,6 +70,11 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
     const isConciseRemoteRead = !message.integratedToolType && !!previewText && argEntries.length === 0 && !hasResult;
     const isStaticRow = isClientView || isConciseRemoteRead;
     const hasBody = argEntries.length > 0 || hasResult || isExecuting;
+    // A run with no arguments and no result has nothing behind a chevron either:
+    // its header stays, with no chevron and no click target, so the row never
+    // opens onto an empty box. (A run still executing has a body: its live
+    // "Result:" placeholder.)
+    const isExpanded = expanded && hasBody;
 
     const renderStatusIcon = () => {
       if (isExecuting) return <DotsLoaderIcon size={16} className="text-ods-text-secondary" />;
@@ -74,6 +82,12 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
       if (isExecuted && message.success === false) return <XmarkCircleIcon className="h-4 w-4 text-ods-error" />;
       return null;
     };
+
+    // The static row's status line. The run's own wording (`statusLabel`) wins;
+    // without one it says what the row's icon says.
+    const statusTone: StatusLineTone = isExecuting ? 'working' : message.success === false ? 'error' : 'success';
+    const statusLabel =
+      message.statusLabel?.trim() || (isExecuting ? 'Working on it' : message.success === false ? 'Failed' : 'Done');
 
     const headerContent = (
       <>
@@ -88,7 +102,7 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
             'min-w-0 flex-1 text-h6',
             isClientView
               ? 'whitespace-pre-wrap break-words text-ods-text-primary'
-              : expanded
+              : isExpanded
                 ? 'whitespace-pre-wrap break-all text-ods-text-primary'
                 : 'line-clamp-2 max-h-10 break-all text-ods-text-secondary',
           )}
@@ -96,9 +110,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           {previewText}
         </div>
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">{renderStatusIcon()}</div>
-        {!isStaticRow && (
+        {!isStaticRow && hasBody && (
           <div className="flex h-5 w-5 shrink-0 items-center justify-center">
-            <ExpandChevron expanded={expanded} />
+            <ExpandChevron expanded={isExpanded} />
           </div>
         )}
       </>
@@ -110,7 +124,8 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         className={cn(
           // The command running block keeps its bordered box in both chats
           // (Figma 1972-6109). CLIENT (Fae) only drops the tool icon below.
-          'flex w-full flex-col overflow-hidden rounded-[6px] border border-ods-border bg-ods-card',
+          'flex w-full flex-col overflow-hidden',
+          CHAT_BLOCK_FRAME_CLASS,
           className,
         )}
         {...props}
@@ -119,23 +134,27 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
           // Static, non-expandable row — no chevron, no body. Two cases reach
           // here: the Fae end-user view (command/args/result are admin-only
           // detail) and a remote read-only tool (there IS no detail).
-          <div className="flex w-full items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left">
-            {headerContent}
+          // It reads as a card: what was done, then one status line under it.
+          <div className="flex w-full flex-col gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)] text-left">
+            <span className="min-w-0 whitespace-pre-wrap break-words text-ods-text-primary text-h4">{previewText}</span>
+            <StatusLine tone={statusTone} label={statusLabel} />
           </div>
         ) : (
           <>
-            <button
-              type="button"
-              className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left"
-              onClick={() => setExpanded(prev => !prev)}
-            >
-              {headerContent}
-            </button>
+            {hasBody ? (
+              <Button variant="row" type="button" aria-expanded={expanded} onClick={() => setExpanded(prev => !prev)}>
+                {headerContent}
+              </Button>
+            ) : (
+              <div className="flex w-full items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left">
+                {headerContent}
+              </div>
+            )}
 
             <div className="w-full" style={containerStyle}>
               <div ref={innerRef}>
                 {hasBody && (
-                  <div className="flex w-full flex-col items-start gap-0 bg-ods-card p-[var(--spacing-system-sf)] text-h6">
+                  <div className="flex w-full flex-col items-start gap-0 border-t border-ods-border p-[var(--spacing-system-sf)] text-h6">
                     {argEntries.map(([key, value]) => (
                       <ArgRow key={key} argKey={key} value={value} />
                     ))}

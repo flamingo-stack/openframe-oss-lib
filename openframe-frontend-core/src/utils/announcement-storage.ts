@@ -33,13 +33,6 @@ export function announcementDismissCookieName(platform: string): string {
   return `${platform}-announcement-dismissed`;
 }
 
-/** THE dismissal match rule (id-match, not presence), shared across the
- *  server/client boundary. `undefined` id (no active announcement) → false. */
-// The match rule + cookie IO live in `utils/dismiss-cookie.ts` — shared with
-// every other dismissible surface. Re-exported so existing importers (incl. the
-// hub's SSR layout) keep their import path.
-export { isDismissedCookieValue } from './dismiss-cookie';
-
 const legacyDismissKey = (platform: string, id: string) => `${platform}-announcement-${id}-dismissed`;
 
 /** Persist a dismissal (1 year). The SSR layout sees it on the next request —

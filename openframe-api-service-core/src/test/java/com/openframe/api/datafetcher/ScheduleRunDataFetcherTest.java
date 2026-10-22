@@ -1,6 +1,6 @@
 package com.openframe.api.datafetcher;
 
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.datafetcher.rmm.ScheduleRunDataFetcher;
 import com.openframe.api.dto.rmm.schedulerun.ScheduleRunResponse;
 import com.openframe.api.mapper.GraphQLScheduleRunMapper;
@@ -12,11 +12,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +28,8 @@ class ScheduleRunDataFetcherTest {
     private ScheduleRunFilterService scheduleRunFilterService;
     @Mock
     private GraphQLScheduleRunMapper mapper;
+    @Spy
+    private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks
     private ScheduleRunDataFetcher dataFetcher;
@@ -43,14 +44,5 @@ class ScheduleRunDataFetcherTest {
 
         assertThat(dataFetcher.scheduleRun(globalId)).isSameAs(response);
         verify(scheduleRunService).get(rawId);
-    }
-
-    @Test
-    @DisplayName("ScheduleRun.id resolver returns the Relay global id (\"ScheduleRun:<rawId>\")")
-    void scheduleRunNodeId_returnsGlobalId() {
-        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
-        doReturn(ScheduleRunResponse.builder().id("run-1").build()).when(dfe).getSource();
-
-        assertThat(dataFetcher.scheduleRunNodeId(dfe)).isEqualTo(new Relay().toGlobalId("ScheduleRun", "run-1"));
     }
 }

@@ -72,8 +72,17 @@ class DeviceLogSchemaTest {
     }
 
     @Test
-    void exposesTheDeviceOfEachLine() {
+    void acceptsAnOptionalListOfOrganizations() {
+        GraphQLArgument organizationIds = deviceLogs().getArgument("organizationIds");
+
+        assertThat(organizationIds.getType()).isInstanceOf(GraphQLList.class);
+        assertThat(organizationIds.getType()).isNotInstanceOf(GraphQLNonNull.class);
+    }
+
+    @Test
+    void exposesTheDeviceAndOrganizationOfEachLine() {
         assertThat(schema.getObjectType("DeviceLogEntry").getFieldDefinition("machineId")).isNotNull();
+        assertThat(schema.getObjectType("DeviceLogEntry").getFieldDefinition("organizationId")).isNotNull();
     }
 
     private static GraphQLFieldDefinition deviceLogs() {

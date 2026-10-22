@@ -1,3 +1,4 @@
+import type { AgentName } from '../../agent-mark';
 import type { PendingToolCallData } from '../../chat/types';
 import type { TicketStatus } from '../../ui/ticket-status-tag';
 
@@ -68,7 +69,12 @@ export interface BoardTicket {
   escalatedByUser?: boolean;
   /** Single live-activity indicator rendered as the card's footer row. */
   activity?: BoardTicketActivity;
+  /** The AI agent that owns the ticket: its mark is shown with the assignees. */
+  agent?: AgentName;
 }
+
+/** Tickets a lane reads per page when its host names no `pageSize` (its loading form draws this many cards). */
+export const BOARD_COLUMN_PAGE_SIZE = 20;
 
 export interface BoardColumnDef {
   id: string;
@@ -92,6 +98,9 @@ export interface BoardColumnDef {
   total?: number;
   hasMore?: boolean;
   isLoading?: boolean;
+  /** How many tickets the lane reads per page: its loading form draws that many cards. Default
+   *  {@link BOARD_COLUMN_PAGE_SIZE}. */
+  pageSize?: number;
   isLoadingMore?: boolean;
 
   system?: boolean;

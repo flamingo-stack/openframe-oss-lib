@@ -1,6 +1,6 @@
 package com.openframe.management.service;
 
-import com.openframe.core.service.AgentRegistrationSecretGenerator;
+import com.openframe.core.service.SecretKeyGenerator;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
@@ -17,7 +17,7 @@ import java.time.Instant;
 public class AgentRegistrationSecretManagementService {
 
     private final AgentRegistrationSecretRepository secretRepository;
-    private final AgentRegistrationSecretGenerator secretGenerator;
+    private final SecretKeyGenerator secretGenerator;
     private final EncryptionService encryptionService;
     private final AgentRegistrationSecretManagementProcessor secretProcessor;
 

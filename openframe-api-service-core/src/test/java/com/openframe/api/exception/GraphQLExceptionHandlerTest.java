@@ -1,6 +1,7 @@
 package com.openframe.api.exception;
 
 import com.openframe.api.dto.device.DeviceLogFilterInput;
+import com.openframe.graphql.relay.InvalidRelayIdException;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
@@ -43,6 +44,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 class GraphQLExceptionHandlerTest {
 
     private static final String UNEXPECTED = "An unexpected error occurred. Please try again later.";
+    private static final String WRONG_TYPE_ID = "Expected a Ticket id, got Tag";
 
     private final GraphQLExceptionHandler handler = new GraphQLExceptionHandler();
 
@@ -100,6 +102,30 @@ class GraphQLExceptionHandlerTest {
         assertThat(output.getOut())
                 .containsPattern("ERROR .*GraphQL error occurred")
                 .contains("java.lang.RuntimeException: boom");
+    }
+
+    @Test
+    void handleException_lokiFailureWithACause_logsItAsAnErrorWithTheCause(CapturedOutput output) {
+        handle(new LokiQueryException("line not readable", new IllegalStateException("unexpected end of input")));
+
+        assertThat(output.getOut())
+                .containsPattern("ERROR .*GraphQL error occurred")
+                .contains("line not readable", "unexpected end of input");
+    }
+
+    @Test
+    void handleException_invalidRelayId_logsTheReasonAsAWarningOnly(CapturedOutput output) {
+        // setup
+        InvalidRelayIdException exception = new InvalidRelayIdException(WRONG_TYPE_ID);
+
+        // execution
+        handle(exception);
+
+        // verifications
+        assertThat(output.getOut())
+                .containsPattern("WARN .*GraphQL invalid id: " + WRONG_TYPE_ID)
+                .doesNotContain("GraphQL error occurred")
+                .doesNotContain("InvalidRelayIdException");
     }
 
     @Test
@@ -166,6 +192,7 @@ class GraphQLExceptionHandlerTest {
                 arguments(new ConflictException(ErrorCode.TAG_ALREADY_EXISTS, "Tag already exists: prod"),
                         "TAG_ALREADY_EXISTS", 409),
                 arguments(new BadRequestException("Unsupported image type"), "BAD_REQUEST", 400),
+                arguments(new InvalidRelayIdException(WRONG_TYPE_ID), "INVALID_ID", 400),
                 arguments(new IllegalArgumentException("page size too large"), "VALIDATION_ERROR", 400),
                 arguments(new IllegalStateException("range too wide"), "VALIDATION_ERROR", 400));
     }
@@ -178,7 +205,7 @@ class GraphQLExceptionHandlerTest {
                         "This log search covers too much data. Narrow the time range, or filter by device or level.",
                         "LOKI_QUERY_REJECTED", 400),
                 arguments(new LokiQueryException("loki down"),
-                        "Device logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
+                        "Logs are temporarily unavailable. Please try again later.", "LOKI_QUERY_ERROR", 503),
                 arguments(new DataAccessResourceFailureException("mongo down"),
                         "Database operation failed. Please try again later.", "DATABASE_ERROR", 503),
                 arguments(new RuntimeException("boom"), UNEXPECTED, "INTERNAL_ERROR", 500),

@@ -30,11 +30,10 @@ const metadataRow = (id: string, createdAt: string): HistoricalMessage => ({
   owner: { type: 'ASSISTANT' },
   messageData: [
     {
-      type: 'GUIDE',
-      payload: {
-        sources: [SOURCE],
-        cards: [{ ref: '[card://onboarding_guide:88dd40cc]', entityType: 'onboarding_guide', entityId: '88dd40cc' }],
-      },
+      type: 'ATTACHMENTS',
+      sources: [SOURCE],
+      videos: [],
+      cards: [{ ref: '[card://onboarding_guide:88dd40cc]', entityType: 'onboarding_guide', entityId: '88dd40cc' }],
     },
   ],
 });
@@ -79,6 +78,19 @@ describe('processHistoricalMessages — source metadata', () => {
     ]);
   });
 
+  it('still replays the GUIDE envelope the row used to arrive in', () => {
+    const { messages } = processHistoricalMessages([
+      userRow('u1', '2026-08-26T09:00:00Z'),
+      {
+        ...metadataRow('m1', '2026-08-26T09:00:01Z'),
+        messageData: [{ type: 'GUIDE', payload: { sources: [SOURCE] } }],
+      },
+      answerRow('a1', '2026-08-26T09:00:02Z', 'Use this guide [1].'),
+    ]);
+
+    expect(messages[messages.length - 1].sources).toEqual([SOURCE]);
+  });
+
   it('does not render a metadata-only row as its own empty bubble', () => {
     const { messages } = processHistoricalMessages([
       userRow('u1', '2026-08-26T09:00:00Z'),
@@ -99,7 +111,7 @@ describe('processHistoricalMessages — source metadata', () => {
       userRow('u2', '2026-08-26T09:01:00Z'),
       {
         ...metadataRow('m2', '2026-08-26T09:01:01Z'),
-        messageData: [{ type: 'GUIDE', payload: { sources: [secondSource] } }],
+        messageData: [{ type: 'ATTACHMENTS', sources: [secondSource], videos: [], cards: [] }],
       },
       answerRow('a2', '2026-08-26T09:01:02Z', 'Second answer [1].'),
     ]);
@@ -127,7 +139,9 @@ describe('processHistoricalMessages — source metadata', () => {
       metadataRow('m1', '2026-08-26T09:00:01Z'),
       {
         ...metadataRow('m2', '2026-08-26T09:00:02Z'),
-        messageData: [{ type: 'GUIDE', payload: { sources: [{ index: 2, name: 'Second tool result' }] } }],
+        messageData: [
+          { type: 'ATTACHMENTS', sources: [{ index: 2, name: 'Second tool result' }], videos: [], cards: [] },
+        ],
       },
       answerRow('a1', '2026-08-26T09:00:03Z', 'Both [1] and [2].'),
     ]);

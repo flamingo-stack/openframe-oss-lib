@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockReplace, setMockSearchParams } from '../../../../vitest.setup';
-import { createSearchParams, useApiParams } from '../use-api-params';
+import { createSearchParams } from '../../../utils/search-params';
+import { useApiParams } from '../use-api-params';
 
 describe('useApiParams', () => {
   beforeEach(() => {

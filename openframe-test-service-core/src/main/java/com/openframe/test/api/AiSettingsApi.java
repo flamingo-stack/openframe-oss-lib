@@ -1,15 +1,25 @@
 package com.openframe.test.api;
 
 import com.openframe.test.data.dto.aisettings.AgentAiConfig;
+import com.openframe.test.data.dto.aisettings.AiConfiguration;
+import com.openframe.test.data.dto.aisettings.AiConfigurationRequest;
+import com.openframe.test.data.dto.aisettings.AiConfigurationTestResult;
+import com.openframe.test.data.dto.aisettings.AiPolicySummary;
 import com.openframe.test.data.dto.aisettings.AgentAiConfigInput;
 import com.openframe.test.data.dto.aisettings.AgentAiConfigPayload;
 import com.openframe.test.data.dto.aisettings.ClientView;
 import com.openframe.test.data.dto.aisettings.ClientViewInput;
 import com.openframe.test.data.dto.aisettings.ClientViewPayload;
+import com.openframe.test.data.dto.aisettings.OrganizationClientAiConfig;
+import com.openframe.test.data.dto.aisettings.OrganizationClientAiConfigPayload;
+import com.openframe.test.data.dto.aisettings.OrganizationGuardrails;
+import com.openframe.test.data.dto.aisettings.OrganizationGuardrailsInput;
+import com.openframe.test.data.dto.aisettings.OrganizationGuardrailsPayload;
 import com.openframe.test.data.dto.aisettings.SupportedModel;
 import io.restassured.common.mapper.TypeRef;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 
 import java.util.HashMap;
 import java.util.List;
@@ -18,10 +28,17 @@ import java.util.Map;
 import static com.openframe.test.api.graphql.AiSettingsQueries.ADMIN_AI_CONFIG;
 import static com.openframe.test.api.graphql.AiSettingsQueries.CLIENT_AI_CONFIG;
 import static com.openframe.test.api.graphql.AiSettingsQueries.CLIENT_VIEW;
+import static com.openframe.test.api.graphql.AiSettingsQueries.ORGANIZATION_CLIENT_AI_CONFIG;
+import static com.openframe.test.api.graphql.AiSettingsQueries.ORGANIZATION_GUARDRAILS;
 import static com.openframe.test.api.graphql.AiSettingsQueries.RESET_CLIENT_VIEW;
+import static com.openframe.test.api.graphql.AiSettingsQueries.RESET_ORGANIZATION_CLIENT_AI_CONFIG;
+import static com.openframe.test.api.graphql.AiSettingsQueries.RESET_ORGANIZATION_CLIENT_AI_QUICK_ACTIONS;
+import static com.openframe.test.api.graphql.AiSettingsQueries.RESET_ORGANIZATION_GUARDRAILS;
 import static com.openframe.test.api.graphql.AiSettingsQueries.UPDATE_ADMIN_AI_CONFIG;
 import static com.openframe.test.api.graphql.AiSettingsQueries.UPDATE_CLIENT_AI_CONFIG;
 import static com.openframe.test.api.graphql.AiSettingsQueries.UPDATE_CLIENT_VIEW;
+import static com.openframe.test.api.graphql.AiSettingsQueries.UPDATE_ORGANIZATION_CLIENT_AI_CONFIG;
+import static com.openframe.test.api.graphql.AiSettingsQueries.UPDATE_ORGANIZATION_GUARDRAILS;
 import static com.openframe.test.config.EnvironmentConfig.CHAT_GRAPHQL;
 import static com.openframe.test.helpers.RequestSpecHelper.getAuthorizedSpec;
 import static com.openframe.test.helpers.RequestSpecHelper.graphqlSuccess;
@@ -34,7 +51,11 @@ import static io.restassured.RestAssured.given;
  */
 public class AiSettingsApi {
 
+    private static final String AI_CONFIGURATION = "chat/api/v1/ai-configuration";
     private static final String SUPPORTED_MODELS = "chat/api/v1/ai-configuration/supported-models";
+    private static final String TEST_AI_CONFIGURATION = "chat/api/v1/ai-configuration/test";
+    // Deferred surface (KG-15), read only for a guardrail template id per the owner's decision of 2026-10-01
+    private static final String POLICIES = "chat/api/v1/policies";
 
     /**
      * The models this environment offers, keyed by provider group. Only these are honoured: a stored model
@@ -87,6 +108,99 @@ public class AiSettingsApi {
 
     public static ClientViewPayload resetClientView(String organizationId) {
         return object(RESET_CLIENT_VIEW, "resetClientView", Map.of("organizationId", organizationId), ClientViewPayload.class);
+    }
+
+    // The tenant's active model configuration (the deprecated REST twin of the per-agent AI configs)
+    public static AiConfiguration getAiConfiguration() {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .get(AI_CONFIGURATION)
+                .then().statusCode(200)
+                .extract().as(AiConfiguration.class);
+    }
+
+    // Saves a new active configuration and refreshes the assistants' model beans tenant-wide
+    public static AiConfiguration saveAiConfiguration(AiConfigurationRequest request) {
+        return given(getAuthorizedSpec())
+                .contentType(ContentType.JSON)
+                .body(request).post(AI_CONFIGURATION)
+                .then().statusCode(200)
+                .extract().as(AiConfiguration.class);
+    }
+
+    // A failed connection is still 200 with success=false
+    public static AiConfigurationTestResult testAiConfiguration(AiConfigurationRequest request) {
+        return testAiConfigurationRaw(request)
+                .then().statusCode(200)
+                .extract().as(AiConfigurationTestResult.class);
+    }
+
+    public static Response testAiConfigurationRaw(AiConfigurationRequest request) {
+        return given(getAuthorizedSpec())
+                .contentType(ContentType.JSON)
+                .body(request).post(TEST_AI_CONFIGURATION);
+    }
+
+    public static List<AiPolicySummary> getAiPolicies() {
+        return given(getAuthorizedSpec())
+                .accept(ContentType.JSON)
+                .get(POLICIES)
+                .then().statusCode(200)
+                .extract().jsonPath().getList(".", AiPolicySummary.class);
+    }
+
+    public static OrganizationClientAiConfig getOrganizationClientAiConfig(String organizationId) {
+        return object(ORGANIZATION_CLIENT_AI_CONFIG, "organizationClientAiConfig",
+                Map.of("organizationId", organizationId), OrganizationClientAiConfig.class);
+    }
+
+    public static OrganizationClientAiConfigPayload updateOrganizationClientAiConfig(String organizationId, AgentAiConfigInput input) {
+        return object(UPDATE_ORGANIZATION_CLIENT_AI_CONFIG, "updateOrganizationClientAiConfig",
+                Map.of("organizationId", organizationId, "input", input), OrganizationClientAiConfigPayload.class);
+    }
+
+    public static OrganizationClientAiConfigPayload resetOrganizationClientAiConfig(String organizationId) {
+        return object(RESET_ORGANIZATION_CLIENT_AI_CONFIG, "resetOrganizationClientAiConfig",
+                Map.of("organizationId", organizationId), OrganizationClientAiConfigPayload.class);
+    }
+
+    public static OrganizationClientAiConfigPayload resetOrganizationClientAiQuickActions(String organizationId) {
+        return object(RESET_ORGANIZATION_CLIENT_AI_QUICK_ACTIONS, "resetOrganizationClientAiQuickActions",
+                Map.of("organizationId", organizationId), OrganizationClientAiConfigPayload.class);
+    }
+
+    public static OrganizationGuardrails getOrganizationGuardrails(String organizationId) {
+        return object(ORGANIZATION_GUARDRAILS, "organizationGuardrails",
+                Map.of("organizationId", organizationId), OrganizationGuardrails.class);
+    }
+
+    public static OrganizationGuardrailsPayload updateOrganizationGuardrails(String organizationId, OrganizationGuardrailsInput input) {
+        return object(UPDATE_ORGANIZATION_GUARDRAILS, "updateOrganizationGuardrails",
+                Map.of("organizationId", organizationId, "input", input), OrganizationGuardrailsPayload.class);
+    }
+
+    public static OrganizationGuardrailsPayload resetOrganizationGuardrails(String organizationId) {
+        return object(RESET_ORGANIZATION_GUARDRAILS, "resetOrganizationGuardrails",
+                Map.of("organizationId", organizationId), OrganizationGuardrailsPayload.class);
+    }
+
+    // Cleanup forms: the HTTP status instead of an assertion, so a failed reset cannot mask a failed case
+    public static int resetClientViewRaw(String organizationId) {
+        return raw(RESET_CLIENT_VIEW, Map.of("organizationId", organizationId));
+    }
+
+    public static int resetOrganizationClientAiConfigRaw(String organizationId) {
+        return raw(RESET_ORGANIZATION_CLIENT_AI_CONFIG, Map.of("organizationId", organizationId));
+    }
+
+    public static int resetOrganizationGuardrailsRaw(String organizationId) {
+        return raw(RESET_ORGANIZATION_GUARDRAILS, Map.of("organizationId", organizationId));
+    }
+
+    private static int raw(String document, Map<String, Object> variables) {
+        return given(getAuthorizedSpec())
+                .body(Map.of("query", document, "variables", variables)).post(CHAT_GRAPHQL)
+                .statusCode();
     }
 
     /**

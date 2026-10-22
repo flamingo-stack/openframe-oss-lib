@@ -17,7 +17,7 @@ export function FileManagerActionBar({
   className,
 }: FileManagerActionBarProps) {
   return (
-    <div className={cn('flex flex-wrap items-center gap-4 md:justify-end', className)}>
+    <div className={cn('flex flex-wrap items-center gap-4 content-md:justify-end', className)}>
       <Button variant="outline" size="small-legacy" onClick={onNewFolder} leftIcon={<FolderPlus className="h-4 w-4" />}>
         New Folder
       </Button>

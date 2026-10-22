@@ -1,7 +1,13 @@
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { mockPush, mockReplace, setMockSearchParams } from '../../../../vitest.setup';
-import { TabNavigation, type TabItem, type TabNavigationUrlSyncOptions } from '../tab-navigation';
+import { mockPush, mockReplace, mockSearchParams, setMockSearchParams } from '../../../../vitest.setup';
+import { registerNavigation } from '../../../embed-shims/next-navigation';
+import {
+  TabNavigation,
+  TabNavigationVariantProvider,
+  type TabItem,
+  type TabNavigationUrlSyncOptions,
+} from '../tab-navigation';
 
 beforeAll(() => {
   // jsdom ships no ResizeObserver; the tab strip observes itself on mount to
@@ -241,5 +247,79 @@ describe('TabNavigation with urlSync', () => {
         leftSpy.mockRestore();
       }
     });
+  });
+
+  describe('the variant', () => {
+    const ICON_TABS: TabItem[] = [
+      { id: 'list', label: 'Scripts List', icon: props => <svg {...props} data-testid="icon-list" /> },
+      { id: 'schedules', label: 'Scripts Schedules', icon: props => <svg {...props} data-testid="icon-schedules" /> },
+    ];
+
+    function strip() {
+      return {
+        open: screen.getByRole('button', { name: 'Scripts List' }),
+        other: screen.getByRole('button', { name: 'Scripts Schedules' }),
+        otherIcon: screen.getByTestId('icon-schedules'),
+      };
+    }
+
+    it('draws `default` with the open tab marked by the underline alone', () => {
+      render(<TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} />);
+
+      const { open, other, otherIcon } = strip();
+      expect(open).not.toHaveAttribute('data-emphasis');
+      expect(other).not.toHaveAttribute('data-emphasis');
+      expect(otherIcon.getAttribute('class')).toContain('group-hover:text-ods-text-primary');
+    });
+
+    // Regression guard. The homepage demo's look once replaced the admin's on
+    // every strip: the gap and the accent fade were gone, and an inactive tab's
+    // icon lit up on hover while its label stayed grey.
+    it('draws `admin` with the accent fade, and leaves an inactive icon its colour on hover', () => {
+      render(<TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} variant="admin" />);
+
+      const { open, other, otherIcon } = strip();
+      // The fade is the tab variant's, drawn for a tab marked `data-emphasis="fade"`: open, and hovered.
+      expect(open.getAttribute('data-emphasis')).toBe('fade');
+      expect(other.getAttribute('data-emphasis')).toBe('fade');
+      expect(open.className).toContain('data-[emphasis=fade]:data-[state=active]:bg-gradient-to-b');
+      expect(other.className).toContain('data-[emphasis=fade]:hover:bg-gradient-to-b');
+      expect(otherIcon.getAttribute('class')).not.toContain('group-hover:');
+    });
+
+    it('takes the variant of the nearest provider, and a strip that names its own keeps it', () => {
+      render(
+        <TabNavigationVariantProvider variant="admin">
+          <TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} />
+          <TabNavigation
+            tabs={[{ id: 'own', label: 'Own Variant' }]}
+            activeTab="own"
+            onTabChange={() => {}}
+            variant="default"
+          />
+        </TabNavigationVariantProvider>,
+      );
+
+      expect(strip().open.getAttribute('data-emphasis')).toBe('fade');
+      expect(screen.getByRole('button', { name: 'Own Variant' })).not.toHaveAttribute('data-emphasis');
+    });
+  });
+});
+
+describe('which bars read the URL', () => {
+  // A bar that reads the URL makes Next render its whole page in the browser when the page is prerendered, so a
+  // page with a plain controlled tab strip could not be served from a CDN (CU-17tkuw5xp4q).
+  it('only a URL-synced bar calls useSearchParams', () => {
+    const read = vi.fn(() => mockSearchParams);
+    registerNavigation({ useSearchParams: read });
+    try {
+      const { unmount } = render(<TabNavigation tabs={TABS} activeTab="general" onTabChange={() => {}} />);
+      expect(read).not.toHaveBeenCalled();
+      unmount();
+      render(<TabNavigation tabs={TABS} urlSync />);
+      expect(read).toHaveBeenCalled();
+    } finally {
+      registerNavigation({ useSearchParams: () => mockSearchParams });
+    }
   });
 });

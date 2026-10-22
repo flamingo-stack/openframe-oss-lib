@@ -1,13 +1,17 @@
 package com.openframe.delivery.sweep;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
+import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryTestPolicies;
@@ -26,6 +30,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
 
@@ -38,9 +44,11 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDO
 import static com.openframe.delivery.config.DeliveryTestPolicies.SWEEP_INTERVAL_MILLIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -57,7 +65,7 @@ class DeliverySweepServiceTest {
     private static final String CORRUPT_JSON = "not-json";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long TEN_SECONDS = 10L;
-    private static final long FIRST_RETRY_DELAY = ACK_THRESHOLD * BACKOFF_MULTIPLIER;
+    private static final long FIRST_RETRY_DELAY = (long) (ACK_THRESHOLD * BACKOFF_MULTIPLIER);
     private static final long CLOCK_SLACK_SECONDS = 5L;
     private static final int MANY_ATTEMPTS_ALLOWED = 10;
     private static final int ATTEMPTS_PAST_CAP = 5;
@@ -85,7 +93,7 @@ class DeliverySweepServiceTest {
         dispatchedAt = Instant.now().minusSeconds(ACK_THRESHOLD * 2);
         delivery = row(MACHINE_ID, PAYLOAD_JSON);
         properties = DeliveryTestPolicies.properties();
-        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new ObjectMapper());
+        service = new DeliverySweepService(repository, machineOnlineStatus, registry, properties, closer, metrics, publisher, new DeliveryPayloadJson(new JsonMapper()), new RetryBackoff());
     }
 
     @Test
@@ -217,7 +225,7 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(closer).fail(eq(delivery), eq(DeliveryFailure.EXHAUSTED), eq(DeliveryStatus.UNACKED), any(Instant.class));
-        verifyNoInteractions(registry, metrics);
+        verifyNoInteractions(metrics);
     }
 
     @Test
@@ -236,7 +244,7 @@ class DeliverySweepServiceTest {
         assertThat(dueAtCaptor.getValue())
                 .isAfterOrEqualTo(nextSweep)
                 .isBefore(nextSweep.plusSeconds(CLOCK_SLACK_SECONDS));
-        verifyNoInteractions(registry, closer, metrics);
+        verifyNoInteractions(closer, metrics);
     }
 
     @Test
@@ -283,7 +291,7 @@ class DeliverySweepServiceTest {
         // verifications
         verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
         verify(closer, never()).fail(eq(delivery), any(DeliveryFailure.class), eq(DeliveryStatus.UNACKED), any(Instant.class));
-        verifyNoInteractions(registry, metrics);
+        verifyNoInteractions(metrics);
     }
 
     @Test
@@ -297,7 +305,36 @@ class DeliverySweepServiceTest {
 
         // verifications
         verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
-        verifyNoInteractions(registry, metrics);
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void retryPending_machineLeavingAndTypeDoesNotReachIt_cancelled() {
+        // setup
+        stubDue(delivery);
+        stubMachine(DeviceStatus.PENDING_DELETION, false);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verifyNoInteractions(metrics);
+    }
+
+    @Test
+    void retryPending_machineLeavingAndTypeReachesIt_waitsForOnlineInstead() {
+        // setup
+        stubDue(delivery);
+        stubMachine(DeviceStatus.PENDING_DELETION, false);
+        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.complementOf(EnumSet.of(DeviceStatus.DELETED)));
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(closer, never()).cancel(eq(delivery), eq(DeliveryStatus.UNACKED), any(String.class), any(Instant.class));
+        verify(repository).postpone(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(Instant.class));
     }
 
     @Test
@@ -306,8 +343,9 @@ class DeliverySweepServiceTest {
         MachineDelivery corrupt = row(OTHER_MACHINE_ID, CORRUPT_JSON);
         stubDue(corrupt, delivery);
         Set<String> both = Set.of(OTHER_MACHINE_ID, MACHINE_ID);
-        when(machineOnlineStatus.gone(both)).thenReturn(Set.of());
+        when(machineOnlineStatus.statuses(both)).thenReturn(Map.of(OTHER_MACHINE_ID, DeviceStatus.ONLINE, MACHINE_ID, DeviceStatus.ONLINE));
         when(machineOnlineStatus.online(both)).thenReturn(both);
+        when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
         stubSpec();
         when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
 
@@ -321,6 +359,51 @@ class DeliverySweepServiceTest {
         verify(spec, never()).subject(OTHER_MACHINE_ID);
         verify(metrics).recordRetried(DeliveryType.TOOL_INSTALLATION);
         verify(metrics).recordRowError();
+    }
+
+    @Test
+    void retryPendingFast_typeWithFastSweep_itsDueRowsRepublished() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        when(repository.findDue(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(delivery));
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
+
+        // execution
+        service.retryPendingFast();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
+        verify(repository, never()).findDueExcept(any(DeliveryStatus.class), anySet(), any(Instant.class), any(Integer.class));
+    }
+
+    @Test
+    void retryPending_typeWithFastSweep_leftToTheFastPass() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        stubDue();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).findDueExcept(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE));
+    }
+
+    @Test
+    void retryPendingFast_noTypeWithFastSweep_nothingQueried() {
+        // execution
+        service.retryPendingFast();
+
+        // verifications
+        verifyNoInteractions(repository, machineOnlineStatus, publisher);
     }
 
     @Test
@@ -351,22 +434,26 @@ class DeliverySweepServiceTest {
     }
 
     private void stubDue(MachineDelivery... rows) {
-        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
+        when(repository.findDueExcept(eq(DeliveryStatus.PENDING), anySet(), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
     private void stubMachineOnline() {
-        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of());
-        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of(MACHINE_ID));
+        stubMachine(DeviceStatus.ONLINE, true);
     }
 
     private void stubMachineNotOnline() {
-        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of());
-        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of());
+        stubMachine(DeviceStatus.OFFLINE, false);
     }
 
     private void stubMachineGone() {
-        when(machineOnlineStatus.gone(Set.of(MACHINE_ID))).thenReturn(Set.of(MACHINE_ID));
-        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(Set.of());
+        stubMachine(DeviceStatus.DELETED, false);
+    }
+
+    private void stubMachine(DeviceStatus status, boolean online) {
+        when(machineOnlineStatus.statuses(Set.of(MACHINE_ID))).thenReturn(Map.of(MACHINE_ID, status));
+        when(machineOnlineStatus.online(Set.of(MACHINE_ID))).thenReturn(online ? Set.of(MACHINE_ID) : Set.of());
+        lenient().doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        lenient().when(spec.getDeliverableStatuses()).thenReturn(EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE, DeviceStatus.PENDING));
     }
 
     private void stubSpec() {

@@ -1,23 +1,21 @@
 package com.openframe.api.service.packagesearch;
 
-import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.packagesearch.PackageDetails;
+import com.openframe.api.dto.packagesearch.PackageSearchHit;
 import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.api.dto.packagesearch.PackageSearchResult;
 import com.openframe.api.dto.shared.CursorCodec;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.config.PackageManagerProperties;
+import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.IntStream;
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toUnmodifiableMap;
@@ -43,12 +41,16 @@ public class PackageSearchService {
 
     public CountedGenericConnection<GenericEdge<PackageSearchItem>> search(
             PackageManagerType packageManager, String rawSearch, CursorPaginationCriteria pagination) {
+        if (pagination.isBackward()) {
+            throw new IllegalArgumentException("package search pages forward only: use first/after");
+        }
         String search = rawSearch == null ? "" : rawSearch.trim();
-        Page page = resolvePage(pagination);
+        int limit = clamp(pagination.getLimit());
+        String afterCursor = pagination.getCursor();
 
         PackageManagerClient client = clientFor(packageManager);
-        PackageSearchResult result = client.search(search, page.getLimit(), page.getStartIndex());
-        return toConnection(result, page);
+        PackageSearchResult result = client.search(search, afterCursor, limit);
+        return toConnection(result, pagination);
     }
 
     public PackageDetails findPackage(PackageManagerType packageManager, String packageId, BrewPackageType packageType) {
@@ -60,26 +62,16 @@ public class PackageSearchService {
         return client.findPackage(id, packageType);
     }
 
-    // offset math is source-specific (brew/winget rank in-memory, choco is external $skip), so it stays
-    // here; direction and cursor decoding are the shared CursorPaginationCriteria.
-    private Page resolvePage(CursorPaginationCriteria pagination) {
-        int cursorIndex = indexOf(pagination.getCursor());
-        if (pagination.isBackward()) {
-            int size = clamp(pagination.getLimit());
-            int startIndex = Math.max(0, cursorIndex - size);
-            return new Page(startIndex, cursorIndex - startIndex, true);
-        }
-        int startIndex = pagination.hasCursor() ? cursorIndex + 1 : 0;
-        return new Page(startIndex, clamp(pagination.getLimit()), false);
-    }
-
-    private CountedGenericConnection<GenericEdge<PackageSearchItem>> toConnection(PackageSearchResult result, Page page) {
-        List<GenericEdge<PackageSearchItem>> edges = buildEdges(result.getItems(), page.getStartIndex());
+    private CountedGenericConnection<GenericEdge<PackageSearchItem>> toConnection(PackageSearchResult result,
+                                                                                 CursorPaginationCriteria pagination) {
+        List<GenericEdge<PackageSearchItem>> edges = result.getHits().stream()
+                .map(PackageSearchService::toEdge)
+                .toList();
         String startCursor = edges.isEmpty() ? null : edges.getFirst().getCursor();
         String endCursor = edges.isEmpty() ? null : edges.getLast().getCursor();
         PageInfo pageInfo = PageInfo.builder()
-                .hasNextPage(page.isBackward() || result.isHasMore())
-                .hasPreviousPage(page.getStartIndex() > 0)
+                .hasNextPage(result.isHasMore())
+                .hasPreviousPage(pagination.hasCursor())
                 .startCursor(startCursor)
                 .endCursor(endCursor)
                 .build();
@@ -90,30 +82,16 @@ public class PackageSearchService {
                 .build();
     }
 
-    private static List<GenericEdge<PackageSearchItem>> buildEdges(List<PackageSearchItem> items, int startIndex) {
-        return IntStream.range(0, items.size())
-                .mapToObj(i -> GenericEdge.<PackageSearchItem>builder()
-                        .node(items.get(i))
-                        .cursor(CursorCodec.encode(String.valueOf(startIndex + i)))
-                        .build())
-                .toList();
+    private static GenericEdge<PackageSearchItem> toEdge(PackageSearchHit hit) {
+        String cursor = CursorCodec.encode(hit.getCursor());
+        return GenericEdge.<PackageSearchItem>builder()
+                .node(hit.getItem())
+                .cursor(cursor)
+                .build();
     }
 
     private static int clamp(Integer requested) {
         return requested == null ? DEFAULT_LIMIT : Math.clamp(requested, 1, MAX_LIMIT);
-    }
-
-    // the decoded cursor is the item's 0-based index; a missing/tampered one falls back to the
-    // boundary (index 0), the repo-wide cursor convention
-    private static int indexOf(String decodedCursor) {
-        if (decodedCursor == null) {
-            return 0;
-        }
-        try {
-            return Math.max(0, Integer.parseInt(decodedCursor));
-        } catch (NumberFormatException e) {
-            return 0;
-        }
     }
 
     private PackageManagerClient clientFor(PackageManagerType packageManager) {
@@ -125,13 +103,5 @@ public class PackageSearchService {
             throw new IllegalStateException("no package manager client registered for " + packageManager);
         }
         return client;
-    }
-
-    @Getter
-    @AllArgsConstructor
-    private static final class Page {
-        private final int startIndex;
-        private final int limit;
-        private final boolean backward;
     }
 }

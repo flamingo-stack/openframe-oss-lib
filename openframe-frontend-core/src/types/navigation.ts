@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { CaseStudyCardData } from './case-study';
 
 /**
  * Base navigation item interface used across all navigation components
@@ -13,80 +14,93 @@ export interface NavigationItem {
   children?: NavigationItem[];
   onClick?: () => void;
   element?: React.ReactNode; // For completely custom navigation items
-  isExternal?: boolean; // For external links that open in new tab
-  type?: 'single' | 'dropdown'; // Type of navigation item
-  dropdownContent?: React.ReactNode; // Additional content for dropdown (e.g., social icons)
-  showDropdownDivider?: boolean; // Whether to show divider above dropdown content
-  className?: string; // Custom CSS classes to override default styling
-  dropdownClassName?: string; // Custom CSS classes for dropdown menu background
 }
 
 /**
- * Configuration for the header component
+ * The site navigation model: ONE serializable description of a platform's
+ * header, mega menus, mobile menu and footer. Plain data only (no functions, no
+ * React elements), so a server resolver can build it and hand it to the client
+ * components (`SiteHeader`, `MobileNavSheet`, `SiteFooter`), which only render.
+ *
+ * A link is declared once and referenced from every surface, so one change to
+ * the model changes the header, the mobile menu and the footer together.
  */
-export interface HeaderConfig {
-  logo: {
-    element: React.ReactNode;
-    /** Where the logo links. Omitted, the logo is not a link (a landing page that keeps the visitor on it). */
-    href?: string;
-  };
-  navigation?: {
-    items: NavigationItem[];
-    position?: 'left' | 'center' | 'right';
-  };
-  actions?: {
-    left?: React.ReactNode[];
-    right?: React.ReactNode[];
-    persistent?: React.ReactNode[];
-  };
-  mobile?: {
-    enabled: boolean;
-    menuIcon?: React.ReactNode;
-    closeIcon?: React.ReactNode;
-    onToggle?: () => void;
-    isOpen?: boolean;
-  };
-  mingo?: {
-    enabled?: boolean;
-    source?: string;
-    className?: string;
-    /** Server-configured Mingo identity glyph (same EntityIcon the chat
-     *  panel renders); omit to use the packaged fallback mark. */
-    icon?: React.ReactNode;
-    /** Server-configured assistant name for the wordmark/aria-label; omit
-     *  for the default "Mingo AI". */
-    label?: string;
-  };
-  /** Support-ticket alerts cell (`TicketAlertsButton`), rendered before
-   *  the Mingo launcher in the flush cell row. Attention-only: renders
-   *  nothing unless a `<TicketLiveProvider>` is mounted AND there are
-   *  unread support replies — declaring it is side-effect-free. */
-  tickets?: {
-    /** BASE path of the tickets surface (any nesting prefix allowed —
-     *  '/tickets', '/support/portal/tickets'). The cell builds the SSOT
-     *  deep link `<href>?ticket=<id>` for the newest-unread ticket. */
-    href: string;
-    /** Optional host navigation (router push) — receives the FULL
-     *  computed href. Defaults to `window.location.assign`. */
-    onClick?: (href: string) => void;
-  };
-  className?: string;
-  style?: React.CSSProperties;
-  autoHide?: boolean;
-  backgroundColor?: string; // ODS background color (e.g., 'bg-ods-card', 'bg-ods-accent')
+export interface NavLink {
+  id: string;
+  /** The label shown in menus and the footer. */
+  label: string;
+  /** Internal path, internal path with `#anchor`, or absolute URL. */
+  href: string;
+  /** One line shown under the label in mega menus and the mobile sheet. */
+  description?: string;
+  /** An `EntityIcon` glyph name. */
+  iconName?: string;
+  /**
+   * A server-configured icon (an agent's avatar: a packaged mark by name, or an
+   * uploaded image), in `EntityIcon`'s own shape. Drawn round, and it wins over
+   * `iconName`.
+   */
+  icon?: { name?: string | null; url?: string | null; props?: Record<string, unknown> | null };
+  /** "Chocolatey · Homebrew · WinGet"; rendered as "Built on ...". */
+  builtOn?: string;
+  /** Filled by the resolver, for labels such as "All {count} customer stories". */
+  count?: number;
+  /** Names a live counter the host supplies at render (`badges` prop). */
+  badgeKey?: string;
+  /** Set by the resolver, never by a config: the link leaves this site. */
+  external?: boolean;
+}
+
+export interface NavGroup {
+  id: string;
+  title?: string;
+  links: NavLink[];
 }
 
 /**
- * Configuration for the mobile navigation panel
+ * A featured customer story shown as a card beside a menu's columns: the
+ * record itself, drawn by the shared case study card.
  */
-export interface MobileNavConfig {
-  sections: Array<{
-    title?: string;
-    items: NavigationItem[];
-  }>;
-  footer?: React.ReactNode;
-  className?: string;
-  onClose?: () => void;
+export interface NavFeature {
+  id: string;
+  href: string;
+  study: CaseStudyCardData;
+}
+
+export interface NavMenu {
+  id: string;
+  label: string;
+  /** A menu with only `href` is a plain link. */
+  href?: string;
+  iconName?: string;
+  /** Path prefixes that mark this menu as the current section. */
+  match?: string[];
+  /** One column is a list; more than one makes a mega menu. */
+  columns?: NavGroup[];
+  /** Featured cards shown beside the columns. */
+  features?: NavFeature[];
+  /** The side list of a mega menu. */
+  sideLinks?: NavLink[];
+  sideTitle?: string;
+  /** Show the brand's social links under the menu's links. */
+  showSocial?: boolean;
+}
+
+export type SiteNavPrimaryCta = 'trial' | 'waitlist' | 'none' | { label: string; href: string };
+
+export interface SiteNav {
+  menus: NavMenu[];
+  /**
+   * The mobile sheet's groups, when they differ from `menus` (a column promoted
+   * to its own group). Omitted: the sheet uses `menus`.
+   */
+  mobileMenus?: NavMenu[];
+  footerColumns: NavGroup[];
+  signIn?: NavLink;
+  primaryCta: SiteNavPrimaryCta;
+  closingBand?: { heading: string; subheading: string; secondary?: NavLink };
+  legal: { company: string; notes: string[]; links: NavLink[] };
+  brand: { name: string; tagline: string; social: NavLink[]; statusUrl?: string };
 }
 
 /**

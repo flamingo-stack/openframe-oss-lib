@@ -17,21 +17,26 @@
  *   → escapeUnknownHtmlTags (text pre-pass, React 19 crash guard)
  *   → remark: remarkGfm, remarkBreaks, ...additionalRemarkPlugins
  *   → rehype: rehypeRaw → rehypeSanitize(schema) → rehypeStripUnsafe
- *       → rehypeHighlight
+ *       → rehypeLabelBareFences → rehypeHighlight (not on the streaming tail)
  *   → urlTransform: cardAwareUrlTransform
  *   → components: buildBaseComponents(...) spread-last componentOverrides
  */
+
+import type { Element, Root } from 'hast';
 import type React from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo, useSyncExternalStore } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
+import type RehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
-import { buildBaseComponents } from './base-components';
+import { cn } from '../../../utils/cn';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { LoadingItems, useLoadingScope } from '../loading-scope';
+import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
   buildEffectiveTagSet,
@@ -42,8 +47,6 @@ import {
 } from './sanitize';
 import { completeStreamingTail, splitStreamingBlocks } from './streaming';
 import { resolveTextSizeConfig, type TextSizeConfig } from './text-size';
-
-export type { ResolveLinkResult };
 
 /**
  * Module-scope empty default for `brokenLinks`.
@@ -63,6 +66,81 @@ export type { ResolveLinkResult };
  * engine and its compositions, not public API.
  */
 export const NO_BROKEN_LINKS: readonly string[] = [];
+
+const BARE_FENCE_LANGUAGE = 'code';
+
+// The code highlighter (rehype-highlight and its grammars) is the heaviest part
+// of the renderer, and most text has no code in it. It is fetched the first time
+// a text with a code block is drawn, once per page; until it lands that block is
+// drawn unhighlighted, the way the streaming tail already is.
+type HighlightPlugin = typeof RehypeHighlight;
+let highlightPlugin: HighlightPlugin | null = null;
+let highlightRequest: Promise<void> | null = null;
+const highlightListeners = new Set<() => void>();
+
+function loadHighlightPlugin(): void {
+  highlightRequest ??= import('rehype-highlight')
+    .then(module => {
+      highlightPlugin = module.default;
+      for (const listener of highlightListeners) listener();
+    })
+    .catch(() => {
+      // A failed fetch leaves code unhighlighted; the next text with code asks again.
+      highlightRequest = null;
+    });
+}
+
+function subscribeToHighlightPlugin(listener: () => void): () => void {
+  highlightListeners.add(listener);
+  return () => {
+    highlightListeners.delete(listener);
+  };
+}
+
+/** A fenced block or inline HTML code: the only things the highlighter colours. */
+const HAS_CODE_BLOCK = /```|~~~|<pre[\s>]|<code[\s>]/;
+
+/** The highlighter once it has loaded, asked for only when `content` has code to colour. */
+function useHighlightPlugin(content: string): HighlightPlugin | null {
+  const wanted = HAS_CODE_BLOCK.test(content);
+  const plugin = useSyncExternalStore(
+    subscribeToHighlightPlugin,
+    () => highlightPlugin,
+    () => null,
+  );
+  useEffect(() => {
+    if (wanted) loadHighlightPlugin();
+  }, [wanted]);
+  return wanted ? plugin : null;
+}
+
+/**
+ * Gives a fenced code block written without a language the `language-code`
+ * class. The `code` renderer tells a fenced block from inline code only by a
+ * `language-*` class, which unlabelled fences used to get from
+ * rehype-highlight's language detection; without detection (and on the
+ * streaming tail, which is not highlighted at all) they would render as
+ * inline-code pills. `code` is in rehype-highlight's `plainText` list, so
+ * the block is left unhighlighted, and its header reads "code".
+ */
+function rehypeLabelBareFences() {
+  const visit = (node: Root | Element) => {
+    for (const child of node.children) {
+      if (child.type !== 'element') continue;
+      if (child.tagName === 'pre') {
+        for (const code of child.children) {
+          if (code.type !== 'element' || code.tagName !== 'code') continue;
+          const classes = Array.isArray(code.properties.className) ? code.properties.className : [];
+          if (!classes.some(c => String(c).startsWith('language-'))) {
+            code.properties.className = [...classes, `language-${BARE_FENCE_LANGUAGE}`];
+          }
+        }
+      }
+      visit(child);
+    }
+  };
+  return (tree: Root) => visit(tree);
+}
 
 export interface MarkdownEngineProps {
   content: string;
@@ -101,7 +179,42 @@ export interface MarkdownEngineProps {
    * streaming can never permanently diverge from the settled output.
    */
   streaming?: boolean;
+  /**
+   * The shape drawn while the content is read (a page's loading state, where `content` is empty): this many
+   * sections, each a heading and its paragraphs. Unset, one paragraph of `skeletonLines` lines.
+   */
+  skeletonSections?: number;
+  /** Lines of the one paragraph a loading body draws when it names no sections. Default 3. */
+  skeletonLines?: number;
+  /** A loading body opens with its own `# ` title (a legal document's): its title row is drawn first. */
+  skeletonTitle?: boolean;
+  /** The content is still being read: the body draws its skeleton (the `skeleton*` shape). A loading scope does the
+   *  same while `content` is empty. */
+  loading?: boolean;
 }
+
+/** Lines a loading body draws when its caller names no shape. */
+export const MARKDOWN_SKELETON_LINES = 3;
+/** Paragraphs under each heading of a loading body, and their lines. */
+const SKELETON_SECTION_PARAGRAPHS = [3, 2] as const;
+/**
+ * Lines a typical body's opening line set takes, on a phone (below `content-md`) and from `content-md`: a document's
+ * `# ` title wraps on a phone, and the opening paragraph every post and legal document starts with runs a few lines.
+ * Typical lengths, never one record's: a longer record growing past them is a settle below its own lines.
+ */
+const SKELETON_TITLE_LINES = { phone: 2, wide: 1 } as const;
+const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
+/** The renderer's own frame: read by the engine and by its skeleton. */
+/** The renderer's root class, on the rendered document and on every skeleton of one: it names a markdown body. */
+export const MARKDOWN_RENDERER_CLASS = 'simple-markdown-renderer';
+const RENDERER_CLASS = MARKDOWN_RENDERER_CLASS;
+const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
+/**
+ * The rendered body. `[&>*:last-child]:mb-0`: the last block never pushes what follows the document further down.
+ * Prose's own last-child reset has zero specificity, so a block that sets its own margin (a table's `my-6`) kept it,
+ * and a document's distance to the next section depended on which block it ended with.
+ */
+const ARTICLE_CLASS = 'prose prose-lg max-w-none [&>*:last-child]:mb-0';
 
 /**
  * One memoized completed block of a streaming message. Parent-level memos
@@ -195,20 +308,32 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     [additionalRemarkPlugins],
   );
 
-  const rehypePlugins = useMemo<PluggableList>(() => {
+  const rehypeHighlight = useHighlightPlugin(processedContent);
+  const { rehypePlugins, liveRehypePlugins } = useMemo(() => {
     const schema = buildSanitizeSchema({
       extraAllowedHtmlTags: extraTagsKey ? extraTagsKey.split('|') : undefined,
     });
-    return [
-      // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
-      // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
-      // defense-in-depth (srcset scanning, iframe[srcdoc]); highlight last.
-      rehypeRaw,
-      [rehypeSanitize, schema],
-      rehypeStripUnsafe,
-      [rehypeHighlight, { detect: true, ignoreMissing: true }],
-    ];
-  }, [extraTagsKey]);
+    // ORDER MATTERS: rehype-raw parses embedded raw HTML into HAST;
+    // rehypeSanitize is the allow-list boundary; rehypeStripUnsafe is
+    // defense-in-depth (srcset scanning, iframe[srcdoc]); the fence label
+    // goes on after sanitizing and before highlight, which runs last.
+    const safe: PluggableList = [rehypeRaw, [rehypeSanitize, schema], rehypeStripUnsafe, rehypeLabelBareFences];
+    // No language detection: it ran highlightAuto over every registered
+    // grammar for each unlabelled fence (~2.5x the cost of opening a
+    // thread) and often guessed wrong (PowerShell shown as "VBNET").
+    const highlighted: PluggableList = rehypeHighlight
+      ? [...safe, [rehypeHighlight, { plainText: [BARE_FENCE_LANGUAGE] }]]
+      : safe;
+    return {
+      rehypePlugins: highlighted,
+      // The streaming tail re-parses on every chunk, and a code fence being
+      // typed is one tail block — highlighting it every chunk was the
+      // costliest step of a streamed reply. It is highlighted once it
+      // completes: every block before the tail and the final parse use
+      // `rehypePlugins`.
+      liveRehypePlugins: safe,
+    };
+  }, [extraTagsKey, rehypeHighlight]);
 
   const components: Components = useMemo(
     () => ({
@@ -238,7 +363,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
     // spam (polite + additions). Streaming caret/pulse affordances live in
     // chat components and honor prefers-reduced-motion there.
     <div aria-live="polite" aria-relevant="additions text">
-      {streamingBlocks.map(block => (
+      {streamingBlocks.map((block, i) => (
         // Each unit is parsed on its own, so hast positions restart at 1;
         // the offset maps them back onto the document-wide heading-id map.
         <HeadingLineOffsetContext.Provider key={block.index} value={block.startLine - 1}>
@@ -252,7 +377,7 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
           ) : (
             <ReactMarkdown
               remarkPlugins={remarkPlugins}
-              rehypePlugins={rehypePlugins}
+              rehypePlugins={i === streamingBlocks.length - 1 ? liveRehypePlugins : rehypePlugins}
               urlTransform={cardAwareUrlTransform}
               components={components}
             >
@@ -274,15 +399,15 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
   );
 
   return (
-    <div className={`simple-markdown-renderer ${className}`}>
+    <div className={`${RENDERER_CLASS} ${className}`}>
       {/* Mermaid's <style> is rendered by MermaidDiagram itself — one tag
           per mounted diagram instead of one per engine instance (i.e. per
           chat segment), where the overwhelming majority render no diagram. */}
       {/* `overflow-wrap: anywhere` is inherited from `.simple-markdown-renderer`
           in app-globals.css — do NOT re-add `break-words` here, it would
           override the cascade with the weaker `break-word` for this subtree. */}
-      <div className="content-wrapper max-w-none">
-        <article className="prose prose-lg max-w-none">
+      <div className={CONTENT_WRAPPER_CLASS}>
+        <article className={ARTICLE_CLASS}>
           <HeadingIdMapContext.Provider value={headingIds}>{body}</HeadingIdMapContext.Provider>
         </article>
       </div>
@@ -300,4 +425,106 @@ const MarkdownEngineImpl: React.FC<MarkdownEngineProps> = ({
  * cards stay mounted. The streaming path additionally memoizes completed
  * atomic blocks so the in-flight message re-parses only its live tail.
  */
-export const MarkdownEngine = memo(MarkdownEngineImpl);
+export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEngineProps) {
+  // In a page's loading state with no content yet (it is read) the body is its skeleton; content it is given
+  // there is the page's own and renders as it is.
+  const inScope = useLoadingScope();
+  if ((inScope && !props.content) || props.loading) {
+    return (
+      <MarkdownEngineSkeleton
+        sections={props.skeletonSections}
+        lines={props.skeletonLines}
+        title={props.skeletonTitle}
+        textSize={props.textSize}
+        className={props.className}
+      />
+    );
+  }
+  return <MarkdownEngineImpl {...props} />;
+});
+
+/** A paragraph of `lines` lines at the body's own paragraph type, as one bar of its line height. */
+function ParagraphBar({ lines, className }: { lines: number; className: string }) {
+  return (
+    <div className={className}>
+      <TextLineSkeleton type="inherit" lines={lines} className="w-full" />
+    </div>
+  );
+}
+
+/** Lines of a text run per breakpoint: on a phone, and from `content-md`. */
+interface SkeletonLinesByBreakpoint {
+  phone: number;
+  wide: number;
+}
+
+/** A text run of the lines it takes on a phone and from `content-md` (the content area's own steps). */
+function LinesByBreakpoint({ lines, as = 'div' }: { lines: SkeletonLinesByBreakpoint; as?: 'div' | 'span' }) {
+  return (
+    <>
+      <TextLineSkeleton type="inherit" as={as} lines={lines.phone} className="w-full content-md:hidden" />
+      <TextLineSkeleton type="inherit" as={as} lines={lines.wide} className="hidden w-full content-md:flex" />
+    </>
+  );
+}
+
+/**
+ * A markdown body while it is read: the renderer's own frame and type. With `sections`, the body's opening paragraph
+ * (a typical length per breakpoint), then each section a REAL `<h2>` (the renderer's heading classes) holding a bar,
+ * then its paragraphs; without, one paragraph of `lines` lines. Every bar takes the line height of the element it
+ * stands for, at the body's text size.
+ */
+export function MarkdownEngineSkeleton({
+  sections,
+  lines = MARKDOWN_SKELETON_LINES,
+  textSize,
+  title = false,
+  className = '',
+}: {
+  sections?: number;
+  lines?: number;
+  textSize?: TextSizeConfig;
+  /** The body opens with its own `# ` title (a legal document's, demoted to an `h2`): its H1 row is drawn first. */
+  title?: boolean;
+  className?: string;
+}) {
+  const textSizes = resolveTextSizeConfig(textSize);
+  const paragraphClass = cn(MARKDOWN_PARAGRAPH_CLASS, textSizes.p);
+  return (
+    // `w-full`: bars have no width of their own, so in a shrink-to-fit parent (a flex item) the skeleton would be
+    // 0px wide where the loaded text fills its line.
+    <div className={`${RENDERER_CLASS} w-full ${className}`} aria-hidden>
+      <div className={CONTENT_WRAPPER_CLASS}>
+        <div className={ARTICLE_CLASS}>
+          {title && (
+            <h2 className={cn(MARKDOWN_H1_CLASS, textSizes.h1)}>
+              <LinesByBreakpoint lines={SKELETON_TITLE_LINES} as="span" />
+            </h2>
+          )}
+          {sections ? (
+            <div className={paragraphClass}>
+              <LinesByBreakpoint lines={SKELETON_LEAD_LINES} />
+            </div>
+          ) : null}
+          {sections ? (
+            // loading-standard-ok(ITEM_MARK): a document's sections are its markdown text; the loaded body has no items to mark
+            <LoadingItems count={sections}>
+              {() => (
+                <div>
+                  <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
+                    <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
+                  </h2>
+                  {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
+                    <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
+                  ))}
+                </div>
+              )}
+            </LoadingItems>
+          ) : (
+            <ParagraphBar lines={lines} className={paragraphClass} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

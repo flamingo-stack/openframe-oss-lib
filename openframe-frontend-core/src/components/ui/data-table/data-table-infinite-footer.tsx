@@ -2,16 +2,23 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
+import { LoadingRegion } from '../../loading/loading-region';
 import { Button } from '../button';
+import { LoadingItems } from '../loading-scope';
 import { useOptionalDataTableContext } from './data-table';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
-import { DataTableSkeleton, ROW_STACK_CLASSES } from './data-table-skeleton';
+import { DataTableRow } from './data-table-row';
+import { ROW_STACK_CLASSES } from './data-table-row-classes';
+import { DATA_TABLE_NEXT_PAGE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableInfiniteFooterProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   onLoadMore: () => void;
-  /** Skeleton rows shown while fetching. Default `3`. */
+  /**
+   * Skeleton rows shown while the next page is fetched: that page, in full. Default the table's page size
+   * (`state.pagination.pageSize`), else a typical `3`.
+   */
   skeletonRows?: number;
   /**
    * `IntersectionObserver` rootMargin — how far ahead of the sentinel the next
@@ -92,7 +99,7 @@ export function DataTableInfiniteFooter({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
-  skeletonRows = 3,
+  skeletonRows: skeletonRowsProp,
   rootMargin = DEFAULT_ROOT_MARGIN,
   loadedCount,
 }: DataTableInfiniteFooterProps) {
@@ -105,9 +112,13 @@ export function DataTableInfiniteFooter({
     onLoadMoreRef.current = onLoadMore;
   });
 
+  const table = useOptionalDataTableContext();
+  const pageSize =
+    skeletonRowsProp ?? (table ? dataTablePageSize(table) : undefined) ?? DATA_TABLE_NEXT_PAGE_SKELETON_ROWS;
+
   const loadMore = useDataTableLoadMoreStore();
   const bodyDrawsRows = useSyncExternalStore(loadMore.subscribe, loadMore.getHasRowsBody, getNoBody);
-  const requestedRows = isFetchingNextPage ? skeletonRows : 0;
+  const requestedRows = isFetchingNextPage ? pageSize : 0;
   // A layout effect, so the body's re-render lands before paint: no frame
   // between "fetching" and the rows appearing.
   useIsomorphicLayoutEffect(() => {
@@ -121,7 +132,7 @@ export function DataTableInfiniteFooter({
   // TAIL (how many rows, and which one is last) rather than the count alone: a
   // search that replaces 40 rows with 20 while a page is in flight ends that
   // fetch with FEWER rows, and that is a new list, not a stalled one.
-  const tableRows = useOptionalDataTableContext()?.getRowModel().rows;
+  const tableRows = table?.getRowModel().rows;
   const progressCount = loadedCount ?? tableRows?.length;
   const lastRowId = tableRows?.[tableRows.length - 1]?.id ?? '';
   const tail = progressCount === undefined ? null : `${progressCount}:${lastRowId}`;
@@ -163,9 +174,12 @@ export function DataTableInfiniteFooter({
   return (
     <>
       {isFetchingNextPage && !bodyDrawsRows && (
-        <div className={ROW_STACK_CLASSES}>
-          <DataTableSkeleton rows={skeletonRows} />
-        </div>
+        // Busy, without a second status: the footer's own one below says "Loading more results".
+        <LoadingRegion status={false} className={ROW_STACK_CLASSES}>
+          <LoadingItems count={pageSize}>
+            {index => <DataTableRow row={null} loadingIndex={index} data-loading-item />}
+          </LoadingItems>
+        </LoadingRegion>
       )}
       {isStalled && (
         <div className="flex justify-center pt-[var(--spacing-system-mf)]">

@@ -4,12 +4,14 @@ import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
 import com.openframe.data.repository.delivery.CustomMachineDeliveryRepository;
 import org.bson.Document;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -17,6 +19,7 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
@@ -26,9 +29,11 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_ID = "_id";
     private static final String FIELD_TENANT_ID = "tenantId";
     private static final String FIELD_STATUS = "status";
+    private static final String FIELD_TYPE = "type";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
+    private static final String FIELD_SEQUENCE = "sequence";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_DUE_AT = "dueAt";
@@ -44,10 +49,34 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
         super(mongoTemplate);
     }
 
-    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
     @Override
     public List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit) {
         Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    @Override
+    public List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
+        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).in(types).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    @Override
+    public List<MachineDelivery> findDueExcept(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit) {
+        Criteria due = Criteria.where(FIELD_STATUS).is(status).and(FIELD_TYPE).nin(types).and(FIELD_DUE_AT).lt(before);
+        return findDue(due, limit);
+    }
+
+    // primary on purpose: a receiver that reports by key does so milliseconds after the row was written
+    @Override
+    public Optional<MachineDelivery> findByIdOnPrimary(String id) {
+        Query query = new Query(Criteria.where(FIELD_ID).is(id)).withReadPreference(ReadPreference.primary());
+        MachineDelivery row = mongoTemplate.findOne(query, MachineDelivery.class);
+        return Optional.ofNullable(row);
+    }
+
+    // primary on purpose: a lagging secondary shows a row the sweep already re-sent as still due
+    private List<MachineDelivery> findDue(Criteria due, int limit) {
         Query query = new Query(due)
                 .with(OLDEST_DUE_FIRST)
                 .limit(limit)
@@ -56,9 +85,10 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     }
 
     // $set per field, not a replacement document: a replacement is inserted without the tenant of the scoped filter;
-    // null fields are not written, so what a previous dispatch closed the row with has to be unset explicitly
+    // null fields are not written, so what a previous dispatch closed the row with has to be unset explicitly.
+    // false = a newer dispatch of the same key holds the row: a rollout reaching a machine after a force leaves it alone
     @Override
-    public void upsertPending(MachineDelivery delivery) {
+    public boolean upsertPending(MachineDelivery delivery) {
         Document document = new Document();
         mongoTemplate.getConverter().write(delivery, document);
         Update update = new Update().set(FIELD_TENANT_ID, tenantId())
@@ -67,9 +97,24 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .unset(FIELD_FAILURE)
                 .unset(FIELD_ERROR);
         document.forEach((field, value) -> setField(update, field, value));
+        Query notOutranked = notOutranked(delivery);
+        try {
+            mongoTemplate.upsert(notOutranked, update, MachineDelivery.class);
+            return true;
+        } catch (DuplicateKeyException rowExists) {
+            // the filter missed an existing row: a newer decision holds it, or another pod inserted it a moment ago
+            UpdateResult result = mongoTemplate.updateFirst(notOutranked, update, MachineDelivery.class);
+            return result.getMatchedCount() > 0;
+        }
+    }
+
+    private static Query notOutranked(MachineDelivery delivery) {
         String id = delivery.getId();
-        Query byId = new Query(Criteria.where(FIELD_ID).is(id));
-        mongoTemplate.upsert(byId, update, MachineDelivery.class);
+        int sequence = delivery.getSequence();
+        Criteria noSequenceYet = Criteria.where(FIELD_SEQUENCE).exists(false);
+        Criteria older = Criteria.where(FIELD_SEQUENCE).lt(sequence);
+        Criteria notOutranked = Criteria.where(FIELD_ID).is(id).orOperator(noSequenceYet, older);
+        return new Query(notOutranked);
     }
 
     @Override
@@ -108,12 +153,6 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     public boolean markDone(String id, String dispatchId, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
         Update update = closed(DeliveryStatus.DONE, finishedAt, expiresAt);
         return updateOne(thisDispatch(id, from, dispatchId), update);
-    }
-
-    @Override
-    public boolean markCancelled(String id, Set<DeliveryStatus> from, Instant finishedAt, Instant expiresAt) {
-        Update update = closed(DeliveryStatus.CANCELLED, finishedAt, expiresAt);
-        return updateOne(stillIn(id, from), update);
     }
 
     @Override

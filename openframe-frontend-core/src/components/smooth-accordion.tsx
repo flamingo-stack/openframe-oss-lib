@@ -46,8 +46,6 @@ export const SmoothAccordionTrigger = forwardRef<HTMLButtonElement, SmoothAccord
         <ChevronButton
           size="md"
           isExpanded={false}
-          backgroundColor="transparent"
-          borderColor="var(--color-border-default)"
           className="transition-transform duration-300 ease-in-out group-data-[state=open]:rotate-180"
         />
       </AccordionPrimitive.Trigger>

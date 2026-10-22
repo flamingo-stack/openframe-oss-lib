@@ -226,6 +226,45 @@ public class SshMachineVerifier {
         }
     }
 
+    // Whether a Windows Uninstall registry entry (64- or 32-bit) has a DisplayName matching the -like pattern, e.g. '7-Zip*'.
+    public boolean windowsProgramInstalled(String displayNamePattern) {
+        ExecResult r = exec(findUninstallEntries(displayNamePattern) + "\n@(Find).Count");
+        String count = r.stdout().trim();
+        if (!r.ok() || !count.matches("\\d+")) {
+            throw new InfraFailureException("Could not read the Uninstall entries matching " + displayNamePattern
+                    + ": exit " + r.exitStatus() + ", stdout '" + count + "', stderr '" + r.stderr().trim() + "'");
+        }
+        return Integer.parseInt(count) > 0;
+    }
+
+    // winget uninstall by exact id, then the entry's own silent uninstaller for whatever winget left; exits 0 once no entry matches.
+    public ExecResult uninstallWindowsProgram(String wingetId, String displayNamePattern) {
+        String script = findUninstallEntries(displayNamePattern) + """
+
+                if (Get-Command winget -ErrorAction SilentlyContinue) {
+                    winget uninstall --id %s -e --silent --accept-source-agreements --disable-interactivity | Out-Host
+                }
+                foreach ($e in @(Find)) {
+                    if ($e.UninstallString -match 'msiexec') {
+                        Start-Process msiexec.exe -ArgumentList "/x $($e.PSChildName) /qn /norestart" -Wait
+                    } else {
+                        Start-Process -FilePath $e.UninstallString.Trim('"') -ArgumentList '/S' -Wait
+                    }
+                }
+                $deadline = (Get-Date).AddSeconds(90)
+                while (@(Find).Count -gt 0 -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 3 }
+                if (@(Find).Count -gt 0) { exit 1 } else { exit 0 }
+                """.formatted(psq(wingetId));
+        return exec(script);
+    }
+
+    private static String findUninstallEntries(String displayNamePattern) {
+        return "function Find { Get-ItemProperty -Path "
+                + "'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',"
+                + "'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*'"
+                + " -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like " + psq(displayNamePattern) + " } }";
+    }
+
     /** Wraps a PowerShell script as {@code powershell -EncodedCommand <base64 UTF-16LE>} (shell-independent). */
     private static String wrapPowerShell(String psScript) {
         String encoded = Base64.getEncoder().encodeToString(psScript.getBytes(StandardCharsets.UTF_16LE));

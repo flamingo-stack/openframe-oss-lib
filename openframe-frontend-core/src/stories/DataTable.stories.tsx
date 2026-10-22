@@ -1,8 +1,8 @@
 /**
  * DataTable — detailed Storybook showcase.
  *
- * The new DataTable is a headless wrapper over TanStack Table (`@tanstack/react-table`)
- * with the card-row UI from the legacy `Table`. Every piece of state (sorting, filters,
+ * DataTable is the lib's one table: a headless wrapper over TanStack Table (`@tanstack/react-table`)
+ * drawing card rows. Every piece of state (sorting, filters,
  * row selection, column visibility) lives inside TanStack — we just render. See the
  * individual stories below for how each feature lights up.
  */
@@ -1279,7 +1279,7 @@ export const SkeletonParity: Story = {
  * count from the table context and renders `"Showing N devices"`. Two common
  * placements:
  *
- * - **Inside the header's right slot** — same look as the legacy `Table`:
+ * - **Inside the header's right slot**:
  *   `<DataTable.Header rightSlot={<DataTable.RowCount itemName="device" />} />`
  * - **Above the table in a toolbar** — when you want to pair it with action
  *   buttons or filter pills.

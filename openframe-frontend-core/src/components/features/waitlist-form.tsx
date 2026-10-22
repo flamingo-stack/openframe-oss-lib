@@ -13,7 +13,8 @@ import { formatPhoneE164 } from '../../utils/country-phone-utils';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
 import { hasGenericEmailDomain } from '../../utils/generic-domain-utils';
 import type { HumanitySignals } from '../../utils/humanity-signals';
-import { OpenFrameLogo } from '../icons';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { CheckboxBlock } from '../ui/checkbox-block';
 import { HoneypotField } from '../ui/honeypot-field';
@@ -201,16 +202,16 @@ export function WaitlistForm({
         )}
       >
         {/* Email input skeleton */}
-        <div className="h-12 w-full animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
+        <UnifiedSkeleton className="h-12 w-full rounded-[6px] border border-ods-border" />
         {/* Phone input skeleton */}
         <div className="flex w-full gap-[var(--spacing-system-xs)]">
-          <div className="h-12 w-[130px] shrink-0 animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
-          <div className="h-12 flex-1 animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
+          <UnifiedSkeleton className="h-12 w-[130px] shrink-0 rounded-[6px] border border-ods-border" />
+          <UnifiedSkeleton className="h-12 flex-1 rounded-[6px] border border-ods-border" />
         </div>
         {/* Disclaimer + button skeleton */}
         <div className="flex w-full flex-col items-end gap-[var(--spacing-system-m)]">
-          <div className="w-full animate-pulse rounded-[6px] border border-ods-border bg-ods-bg px-4 py-6" />
-          <div className="h-12 w-[200px] animate-pulse rounded-[6px] border border-ods-border bg-ods-card" />
+          <UnifiedSkeleton className="h-auto w-full rounded-[6px] border border-ods-border px-4 py-6" />
+          <UnifiedSkeleton className="h-12 w-[200px] rounded-[6px] border border-ods-border" />
         </div>
       </div>
     );
@@ -303,9 +304,15 @@ export function WaitlistForm({
           type="button"
           loading={isSubmitting}
           disabled={isSubmitting}
-          leftIcon={<OpenFrameLogo />}
+          leftIcon={
+            <OpenframeLogoIcon
+              color="var(--color-text-on-accent)"
+              secondaryColor="var(--color-text-primary)"
+              size={32}
+            />
+          }
           onClick={handleSubmit}
-          className="w-full md:w-auto"
+          className="w-full content-md:w-auto"
         >
           {isSuccess ? successLabel : submitLabel}
         </Button>

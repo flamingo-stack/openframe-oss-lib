@@ -2,7 +2,20 @@
 
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { useMdUp } from '../../hooks';
+import { useContentMdUp } from '../../hooks/ui/use-content-breakpoint';
+import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
+
+/** The bar's height in px: below the content `md` step, and from it (the bar switches on the content's width). */
+export const PROGRESS_BAR_HEIGHT = { mobile: 8, desktop: 24 } as const;
+/** The same heights as a class (8px, 24px from `content-md`), read by the bar's box and by its skeleton. */
+const PROGRESS_BAR_HEIGHT_CLASS = 'h-2 content-md:h-6';
+
+/** The bar while its value is read: one box at the bar's own height, switched at the bar's own step. */
+function ProgressBarSkeleton({ className }: { className?: string }) {
+  return <UnifiedSkeleton className={cn(PROGRESS_BAR_HEIGHT_CLASS, 'w-full rounded', className)} />;
+}
 
 type ProgressBarProps = {
   progress: number; // 0–100
@@ -14,6 +27,9 @@ type ProgressBarProps = {
   height?: number; // desktop height (px)
   mobileHeight?: number; // mobile height (px)
   inverted?: boolean; // if true, high values are good (green), low values are bad (red)
+  /** The value is still being read: the bar draws its `ProgressBarSkeleton` at its own height. A loading scope does
+   *  the same. */
+  loading?: boolean;
 };
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
@@ -23,11 +39,14 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   segmentWidth = 3.43,
   mobileSegmentWidth = 5,
   segmentGap = 2,
-  height = 24,
-  mobileHeight = 8,
+  height = PROGRESS_BAR_HEIGHT.desktop,
+  mobileHeight = PROGRESS_BAR_HEIGHT.mobile,
   inverted = false,
+  loading: loadingProp,
 }) => {
-  const isMdUp = useMdUp() ?? true;
+  // ONE switch: in a page's loading state (or while the host reads the value) the bar is its skeleton.
+  const loading = useLoadingScope() || !!loadingProp;
+  const isMdUp = useContentMdUp() ?? true;
   const effectiveSegmentWidth = isMdUp ? segmentWidth : mobileSegmentWidth;
   const effectiveHeight = isMdUp ? height : mobileHeight;
 
@@ -50,7 +69,10 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     resizeObserver.observe(containerRef.current);
 
     return () => resizeObserver.disconnect();
-  }, [effectiveSegmentWidth, segmentGap]);
+    // `loading`: the box is mounted when the value arrives, so its segments are counted then.
+  }, [effectiveSegmentWidth, segmentGap, loading]);
+
+  if (loading) return <ProgressBarSkeleton />;
 
   // Pick color based on thresholds using ODS design tokens
   const getColor = () => {
@@ -70,7 +92,18 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="flex w-full" style={{ gap: `${segmentGap}px` }}>
+    <div
+      ref={containerRef}
+      // The box holds the bar's height before its segments are counted: the default heights by the class the skeleton
+      // reads, a host's own by style.
+      className={cn(
+        'flex w-full',
+        height === PROGRESS_BAR_HEIGHT.desktop &&
+          mobileHeight === PROGRESS_BAR_HEIGHT.mobile &&
+          PROGRESS_BAR_HEIGHT_CLASS,
+      )}
+      style={{ gap: `${segmentGap}px` }}
+    >
       {Array.from({ length: segmentCount }).map((_, i) => (
         <div
           key={i}

@@ -1,8 +1,6 @@
 package com.openframe.data.nats.delivery;
 
-import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
-import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.tool.IntegratedTool;
 import com.openframe.data.document.toolagent.IntegratedToolAgent;
 import com.openframe.data.document.toolagent.ToolAgentAsset;
@@ -26,7 +24,9 @@ import static java.util.Objects.requireNonNullElse;
 @ConditionalOnProperty("spring.cloud.stream.enabled")
 public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallationDeliverySeed, ToolInstallationMessage> {
 
-    private static final String SUBJECT_TEMPLATE = "machine.%s.tool-installation";
+    // .v2 keeps the engine out of the TOOL_INSTALLATION stream, which captures machine.*.tool-installation for the
+    // agent's durable: an agent that listens to both gets a command once, from whichever path the server uses
+    private static final String SUBJECT_TEMPLATE = "machine.%s.tool-installation.v2";
 
     private final DownloadConfigurationMapper downloadConfigurationMapper;
     private final LocalFilenameConfigurationMapper localFilenameConfigurationMapper;
@@ -41,15 +41,13 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
         return ToolInstallationMessage.class;
     }
 
-    // targetId must equal the agentType the agent sends in installed-agent, or complete() never finds the row
     @Override
     public DeliveryRequest<ToolInstallationMessage> request(ToolInstallationDeliverySeed seed) {
         IntegratedToolAgent toolAgent = seed.getToolAgent();
         ToolInstallationMessage message = buildMessage(toolAgent, seed.getTool(), seed.isReinstall());
-        String targetId = toolAgent.getKey();
         return DeliveryRequest.<ToolInstallationMessage>builder()
                 .type(DeliveryType.TOOL_INSTALLATION)
-                .targetId(targetId)
+                .targetId(seed.getTargetId())
                 .machineId(seed.getMachineId())
                 .payload(message)
                 .build();
@@ -58,11 +56,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
     @Override
     public String subject(String machineId) {
         return format(SUBJECT_TEMPLATE, machineId);
-    }
-
-    @Override
-    public void onFailed(MachineDelivery delivery, DeliveryFailure failure) {
-        // intentionally empty: a failed install leaves nothing to compensate
     }
 
     private ToolInstallationMessage buildMessage(IntegratedToolAgent toolAgent, IntegratedTool tool, boolean reinstall) {
@@ -110,7 +103,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
             return null;
         }
         return switch (source) {
-            case ARTIFACTORY -> ToolInstallationMessage.AssetSource.ARTIFACTORY;
             case TOOL_API -> ToolInstallationMessage.AssetSource.TOOL_API;
             case GITHUB -> ToolInstallationMessage.AssetSource.GITHUB;
         };

@@ -10,7 +10,7 @@
  * styles/app-globals.css).
  *
  * Glyphs come from THE icon system — never inline SVG paths here:
- * PlayFilledIcon / VolumeOffFilledIcon (components/icons — the FILLED
+ * PlayFilledIcon / VolumeOffFilledIcon (the icon set — the FILLED
  * media-chrome-matching glyphs, so custom affordances are pixel-identical to
  * MuxPlayer's native center button on real players).
  *
@@ -25,8 +25,8 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { PlayFilledIcon } from '../icons/play-filled-icon';
-import { VolumeOffFilledIcon } from '../icons/volume-off-filled-icon';
+import { PlayFilledIcon } from '../icons-v2-generated/interface/play-filled-icon';
+import { VolumeOffFilledIcon } from '../icons-v2-generated/interface/volume-off-filled-icon';
 
 export type VideoCenterBadgeSize = 'sm' | 'md' | 'lg';
 
@@ -63,6 +63,29 @@ export function VideoPlayBadge({ size = 'md', className }: VideoPlayBadgeProps):
     >
       <PlayFilledIcon size={SIZES[size]} color="currentColor" />
     </div>
+  );
+}
+
+/**
+ * The play affordance of a CARD cover: the bare play glyph, shown ONLY while
+ * the card is hovered or holds focus, with no tint over the artwork. One
+ * definition for every entity card whose record has a video (programs, guides,
+ * releases), so none of them paints a permanent glyph or dims its cover. The
+ * host card carries `group` (and `group/card` for the accent); the cover slot
+ * is `relative`.
+ */
+export function CardHoverPlay({ size = 'md', className }: VideoPlayBadgeProps): React.ReactElement {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200',
+        'group-focus-within:opacity-100 group-hover:opacity-100',
+        className,
+      )}
+    >
+      <VideoPlayBadge size={size} />
+    </span>
   );
 }
 

@@ -123,3 +123,15 @@ describe('formatProgramTimeRange', () => {
     );
   });
 });
+
+describe('event audience', () => {
+  it('reads a positive count as people and anything else as nothing', async () => {
+    const { eventAudience } = await import('../program-instant');
+    expect(eventAudience(34)).toBe('34 people');
+    expect(eventAudience(1)).toBe('1 person');
+    expect(eventAudience(1200)).toBe('1,200 people');
+    expect(eventAudience(0)).toBeNull();
+    expect(eventAudience(null)).toBeNull();
+    expect(eventAudience('34')).toBeNull();
+  });
+});

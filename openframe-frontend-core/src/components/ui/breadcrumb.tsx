@@ -5,6 +5,8 @@ import { ChevronRight, MoreHorizontal } from 'lucide-react';
 import { type ComponentProps, type ComponentPropsWithoutRef, type ReactNode, forwardRef } from 'react';
 
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 const Breadcrumb = forwardRef<
   HTMLElement,
@@ -17,7 +19,10 @@ Breadcrumb.displayName = 'Breadcrumb';
 const BreadcrumbList = forwardRef<HTMLOListElement, ComponentPropsWithoutRef<'ol'>>(({ className, ...props }, ref) => (
   <ol
     ref={ref}
-    className={cn('flex flex-wrap items-center gap-1.5 break-words text-ods-text-muted text-h6 md:gap-2.5', className)}
+    className={cn(
+      'flex flex-wrap items-center gap-1.5 break-words text-ods-text-muted text-h6 content-md:gap-2.5',
+      className,
+    )}
     {...props}
   />
 ));
@@ -32,8 +37,13 @@ const BreadcrumbLink = forwardRef<
   HTMLAnchorElement,
   ComponentPropsWithoutRef<'a'> & {
     asChild?: boolean;
+    /** The link's label is still being read: a bar the height of its line (also inside a loading scope). */
+    loading?: boolean;
   }
->(({ asChild, className, ...props }, ref) => {
+>(({ asChild, className, loading, ...props }, ref) => {
+  const inScope = useLoadingScope();
+  // ONE switch: while its label is read the link is a bar the height of its line (`text-h6`).
+  if (inScope || loading) return <UnifiedSkeleton as="span" className={cn('inline-block h-5 w-16', className)} />;
   const Comp = asChild ? Slot : 'a';
 
   return <Comp ref={ref} className={cn('transition-colors hover:text-ods-text-primary', className)} {...props} />;
