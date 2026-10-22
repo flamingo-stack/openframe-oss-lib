@@ -2,6 +2,7 @@
 
 import { cn } from '../../utils/cn';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { LIVE_PULSE_CLASS } from './skeleton-surface';
 
 export interface PageLoaderProps {
   /**
@@ -28,7 +29,7 @@ function LoaderMark() {
     <div className="relative h-6 w-6">
       <OpenframeLogoIcon
         secondaryColor="var(--color-text-tertiary)"
-        className="h-6 w-6 animate-pulse text-ods-accent"
+        className={cn('h-6 w-6 text-ods-accent', LIVE_PULSE_CLASS)}
         color="currentColor"
       />
     </div>

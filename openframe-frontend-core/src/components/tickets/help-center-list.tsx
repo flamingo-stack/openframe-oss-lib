@@ -31,7 +31,11 @@ import { useCallback, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { toast as defaultToast } from '../../hooks/use-toast';
-import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
+import {
+  DEV_SECTION_PARAM_KEYS,
+  devSectionAnchorId,
+  TICKET_OPEN_PARAM,
+} from '../../utils/dev-sections/dev-section-param-keys';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { positiveInt } from '../../utils/search-params';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
@@ -44,9 +48,9 @@ import { UnifiedPagination } from '../unified-pagination';
 import { HelpCenterCard } from './help-center-card';
 import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form';
 import { useTicketActions } from './hooks/use-ticket-actions';
-import { useTicketsList } from './hooks/use-tickets-list';
+import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
-import { isOptimistic, TICKET_OPEN_PARAM } from './types';
+import { isOptimistic } from './types';
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -101,7 +105,7 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
         shell={shell}
         preControls={<HelpCenterCreateFormSkeleton />}
       >
-        <DevCardRowSkeletonList />
+        <DevCardRowSkeletonList rows={TICKETS_PAGE_SIZE} />
       </DevSectionPage>
     );
   }
@@ -202,7 +206,7 @@ function HelpCenterListAuthed({
     [searchParams, router, pathname],
   );
 
-  const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
+  const { tickets, isLoading, isFetching, error, refetch, totalPages, pageSize } = useTicketsList({
     // `sessionEmail` is drilled in from the parent — see the same
     // pattern + race-cause rationale documented in
     // `HelpCenterCreateForm.sessionName/sessionEmail`. Calling
@@ -326,7 +330,7 @@ function HelpCenterListAuthed({
       {!error && (
         <div className="w-full">
           {isLoading ? (
-            <DevCardRowSkeletonList />
+            <DevCardRowSkeletonList rows={pageSize} />
           ) : !hasResults && isFetching ? (
             // Bridge state — background refetch in flight and the
             // optimistic placeholder was just removed by the mutation

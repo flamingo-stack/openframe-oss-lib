@@ -12,7 +12,8 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { DialogItem } from '../../types/component.types';
-import { useNatsChatAdapter, type FetchDialogsParams, type UseNatsChatAdapterConfig } from '../use-nats-chat-adapter';
+import type { FetchDialogsParams } from '../../types/unified-chat-state.types';
+import { useNatsChatAdapter, type UseNatsChatAdapterConfig } from '../use-nats-chat-adapter';
 
 const page = (ids: string[], nextCursor: string | null = null) => ({
   dialogs: ids.map<DialogItem>(id => ({ id, title: `Chat ${id}`, timestamp: new Date('2026-01-01T00:00:00Z') })),

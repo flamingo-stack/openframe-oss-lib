@@ -16,16 +16,16 @@
 import { ExternalLink } from 'lucide-react';
 import type React from 'react';
 import Link from '../../../embed-shims/next-link';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 import type { DataRoomDocCardItem } from '../types/entities/data-room-doc';
 import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_OUTER_STATIC,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 export interface DataRoomDocCardAnchorProps {
   href: string;
@@ -58,6 +58,7 @@ export interface DataRoomDocCardProps {
 }
 
 export function DataRoomDocCard({ item, className, badgeText, anchorProps }: DataRoomDocCardProps) {
+  if (useLoadingScope()) return <DataRoomDocCardSkeleton className={className} />;
   const body = (
     <>
       <span className={COMPACT_CARD_TEXT_COL}>
@@ -102,21 +103,13 @@ export function DataRoomDocCard({ item, className, badgeText, anchorProps }: Dat
 
 export function DataRoomDocCardSkeleton({ className }: { className?: string }) {
   return (
-    <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <span className={COMPACT_CARD_TEXT_COL}>
-        <span className="flex min-w-0 items-center gap-1.5">
-          <UnifiedSkeleton as="span" className="h-3.5 w-2/3 rounded" />
-          <UnifiedSkeleton as="span" className="h-4 w-16 rounded-full" />
-        </span>
-        <UnifiedSkeleton as="span" className="h-4 w-1/2 rounded" />
-        <span className="flex min-w-0 flex-col gap-0">
-          <UnifiedSkeleton as="span" className="h-5 w-5/6 rounded" />
-          <UnifiedSkeleton as="span" className="h-5 w-3/4 rounded" />
-        </span>
-      </span>
-      <span className="flex h-5 shrink-0 items-center self-start">
-        <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
-      </span>
-    </span>
+    <CompactCardSkeleton
+      slot={false}
+      titleWidth="w-2/3"
+      titleBadges={['w-16']}
+      rows={[{ width: 'w-1/2' }, { width: 'w-5/6', lines: 2 }]}
+      trailingIcon
+      className={className}
+    />
   );
 }

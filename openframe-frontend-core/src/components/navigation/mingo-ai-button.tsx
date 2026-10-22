@@ -7,7 +7,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import { AgentMark } from '../agent-mark';
-import { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT } from '../chat/utils/ask-ai-events';
+import { ASK_AI_OPEN_EVENT, ASK_AI_TRIGGER_ATTRIBUTE } from '../chat/utils/ask-ai-events';
 import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -33,8 +33,6 @@ export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButto
    *  event. */
   variant?: 'inline' | 'button' | 'field';
 }
-
-export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_WITH_REF_EVENT };
 
 /** What an `ask-ai:open` event carries. */
 export interface AskAiOpenDetail {
@@ -118,7 +116,8 @@ export function MingoAiButton({
       // The modifier the key cap shows, and only that one: on a Mac Ctrl+K is
       // the text fields' own "delete to the end of the line".
       const modifier = commandKey ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-      if (event.key.toLowerCase() !== 'k' || !modifier) return;
+      // A keydown with no key is real: the browser's autofill fires one when it fills a form field.
+      if (typeof event.key !== 'string' || event.key.toLowerCase() !== 'k' || !modifier) return;
       event.preventDefault();
       openRef.current();
     };
@@ -133,6 +132,7 @@ export function MingoAiButton({
     <Button
       {...props}
       type="button"
+      {...{ [ASK_AI_TRIGGER_ATTRIBUTE]: '' }}
       variant={field ? 'glyph' : 'transparent'}
       size="wrap"
       font="regular"

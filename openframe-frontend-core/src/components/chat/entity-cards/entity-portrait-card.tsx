@@ -37,14 +37,28 @@ import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { cn } from '../../../utils/cn';
+import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Card } from '../../ui/card';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
-import { CONTENT_CARD_FRAME_CLASS } from './content-card-frame';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { useCoverImageFallback } from './use-cover-image-fallback';
 
 /** Sources narrower than this are "not wide" → contained on the edge-color
  *  fill. Wide covers are 1200/630 ≈ 1.9; squares are 1.0; 1.3 splits safely. */
 const MIN_WIDE_RATIO = 1.3;
+
+// The card's zones, read by the card AND its skeleton, so the two are one box.
+const PORTRAIT_BODY = 'flex h-full flex-col gap-6 p-6';
+const PORTRAIT_MEDIA =
+  'relative flex aspect-[1200/630] w-full shrink-0 items-center justify-center overflow-hidden rounded-sm';
+const PORTRAIT_TITLE_ZONE = 'flex h-[72px] shrink-0 flex-col justify-center gap-1.5';
+/** The title's line height, read by the title and by its skeleton's lines. */
+const PORTRAIT_TITLE_LEADING = 'leading-6';
+const PORTRAIT_TITLE = cn('break-words text-ods-text-primary text-h4', PORTRAIT_TITLE_LEADING);
+const PORTRAIT_FOOTER = 'flex h-[60px] shrink-0 items-center';
+const PORTRAIT_PERSON_ROW = 'flex w-full min-w-0 items-center gap-3';
+const PORTRAIT_PERSON_TEXT = 'flex min-w-0 flex-col';
 
 export interface EntityPortraitPerson {
   name: string;
@@ -71,6 +85,8 @@ export interface EntityPortraitCardProps {
   /** Typography override for the title (entity identity), zone box unchanged. */
   titleClassName?: string;
   person?: EntityPortraitPerson | null;
+  /** The card's picture is likely the page's largest paint: fetch it at once and ranked high, not lazily. */
+  priority?: boolean;
   className?: string;
 }
 
@@ -85,8 +101,10 @@ export function EntityPortraitCard({
   title,
   titleClassName,
   person,
+  priority,
   className,
 }: EntityPortraitCardProps) {
+  const loading = useLoadingScope();
   const { src, onError: onMediaError } = useCoverImageFallback(imageUrl, placeholderUrl);
   // null = unknown (assume wide until the image reports its natural size).
   // The measurement carries the src it was taken from, so re-detection when the
@@ -107,13 +125,15 @@ export function EntityPortraitCard({
   // media/news cards use (og-link-preview.tsx).
   const edgeColor = useImageEdgeColor(isWide === false ? src : null, 'var(--color-bg-surface)');
 
+  if (loading) return <EntityPortraitCardSkeleton typeLabel={typeLabel} className={className} />;
+
   return (
     <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
-      <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex h-full flex-col gap-6 p-6')}>
+      <Card className={cn(CONTENT_CARD_FRAME_CLASS, PORTRAIT_BODY)}>
         {/* Media zone — the real cover always wins: wide → cover-fill;
             non-wide → contained on the edge-color fill (news-card treatment). */}
         <div
-          className="relative flex aspect-[1200/630] w-full shrink-0 items-center justify-center overflow-hidden rounded-sm bg-ods-bg transition-colors duration-300"
+          className={cn(PORTRAIT_MEDIA, 'bg-ods-bg transition-colors duration-300')}
           style={isWide === false ? { backgroundColor: edgeColor } : undefined}
         >
           {src && (
@@ -123,6 +143,7 @@ export function EntityPortraitCard({
               className={cn('h-full w-full', isWide === false ? 'object-contain' : 'object-cover')}
               sizes="(min-width: 800px) 400px, 100vw"
               fill
+              priority={priority}
               unoptimized
               onLoad={onMediaLoad}
               onError={onMediaError}
@@ -133,7 +154,7 @@ export function EntityPortraitCard({
         {/* Title zone — fixed box. Mixed rails: common StatusBadge eyebrow +
             2-line title (chip lives here, never on the artwork). Single-type
             rails (no typeLabel): centered 3-line title. */}
-        <div className="flex h-[72px] shrink-0 flex-col justify-center gap-1.5">
+        <div className={PORTRAIT_TITLE_ZONE}>
           {typeLabel && (
             <StatusBadge
               variant="button"
@@ -143,22 +164,14 @@ export function EntityPortraitCard({
               className="self-start"
             />
           )}
-          <h3
-            className={cn(
-              'break-words leading-6 text-ods-text-primary text-h4',
-              typeLabel ? 'line-clamp-2' : 'line-clamp-3',
-              titleClassName,
-            )}
-          >
-            {title}
-          </h3>
+          <h3 className={cn(PORTRAIT_TITLE, typeLabel ? 'line-clamp-2' : 'line-clamp-3', titleClassName)}>{title}</h3>
         </div>
 
         {/* Person/footer zone — fixed box (kept even when empty so every card
             in a rail shares baselines). */}
-        <div className="flex h-[60px] shrink-0 items-center">
+        <div className={PORTRAIT_FOOTER}>
           {person && (
-            <div className="flex w-full min-w-0 items-center gap-3">
+            <div className={PORTRAIT_PERSON_ROW}>
               <div className="relative h-12 w-12 shrink-0">
                 {person.avatarUrl ? (
                   <Image
@@ -187,7 +200,7 @@ export function EntityPortraitCard({
                   </div>
                 )}
               </div>
-              <div className="flex min-w-0 flex-col">
+              <div className={PORTRAIT_PERSON_TEXT}>
                 <span className="truncate font-bold text-ods-text-primary text-h6">{person.name}</span>
                 {person.subtitle && <span className="truncate text-ods-text-secondary text-h6">{person.subtitle}</span>}
               </div>
@@ -196,5 +209,41 @@ export function EntityPortraitCard({
         </div>
       </Card>
     </Link>
+  );
+}
+
+/**
+ * The portrait card while it is read: the same three zones. The content-type chip is the caller's static label and
+ * is drawn for real; the title (two lines under a chip, three without, at the 24px title leading) and the person
+ * (48px avatar, name and subtitle lines) are bars.
+ */
+export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel?: string; className?: string }) {
+  return (
+    <div className={cn('block h-full', className)} aria-hidden>
+      <Card className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, PORTRAIT_BODY)}>
+        <UnifiedSkeleton className={cn(PORTRAIT_MEDIA, 'rounded-sm')} />
+        <div className={PORTRAIT_TITLE_ZONE}>
+          {typeLabel && (
+            <StatusBadge
+              variant="button"
+              colorScheme="accentBorder"
+              singleLine
+              text={typeLabel}
+              className="self-start"
+            />
+          )}
+          <TextLineSkeleton type="h4" lines={typeLabel ? 2 : 3} className={cn('w-full', PORTRAIT_TITLE_LEADING)} />
+        </div>
+        <div className={PORTRAIT_FOOTER}>
+          <div className={PORTRAIT_PERSON_ROW}>
+            <MediaSkeleton.Avatar size="md" className="shrink-0" />
+            <div className={cn(PORTRAIT_PERSON_TEXT, 'gap-0')}>
+              <TextLineSkeleton type="h6" className="w-32" />
+              <TextLineSkeleton type="h6" className="w-24" />
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 }

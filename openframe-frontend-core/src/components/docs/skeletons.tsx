@@ -1,66 +1,54 @@
+import { cn } from '../../utils/cn';
 import { EmbedLoadingSkeleton } from '../embeds/embed-iframe';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from '../ui/markdown/base-components';
+import { MARKDOWN_RENDERER_CLASS } from '../ui/markdown/engine';
+import { TEXT_SIZE_PRESETS } from '../ui/markdown/text-size';
 /**
  * Text-style skeleton — matches a rendered markdown article layout.
  * Used by `<DocsHubPage>` as the default for `markdown` (and unknown
  * document types). Embedders can override via `renderSkeleton`.
  */
+/** Paragraphs and headings the markdown skeleton draws (a document's first fold), with each paragraph's lines. */
+const MARKDOWN_SKELETON_BLOCKS = [
+  { kind: 'p', lines: 4 },
+  { kind: 'p', lines: 4 },
+  { kind: 'p', lines: 5 },
+  { kind: 'h2' },
+  { kind: 'p', lines: 4 },
+  { kind: 'p', lines: 5 },
+  { kind: 'h2' },
+  { kind: 'p', lines: 3 },
+  { kind: 'p', lines: 4 },
+] as const;
+const MARKDOWN_SKELETON_H2_CLASS = cn(MARKDOWN_H2_CLASS, TEXT_SIZE_PRESETS.default.h2);
+const MARKDOWN_SKELETON_P_CLASS = cn(MARKDOWN_PARAGRAPH_CLASS, TEXT_SIZE_PRESETS.default.p);
+
 export function MarkdownSkeleton({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
 } = {}) {
+  // The rendered document's own heading and paragraph elements (the markdown renderer's default preset), each line a
+  // bar of the element's line box.
   return (
-    <LoadingRegion label="Loading the document" announce={region} className="mt-6 space-y-7">
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-3/4 rounded" />
-      </div>
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-5/6 rounded" />
-      </div>
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-2/3 rounded" />
-      </div>
-      <UnifiedSkeleton className="h-[88px] rounded-lg border border-ods-border" />
-      <UnifiedSkeleton className="h-7 w-1/3 rounded" />
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-[72%] rounded" />
-      </div>
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-[58%] rounded" />
-      </div>
-      <UnifiedSkeleton className="h-7 w-2/5 rounded" />
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-[90%] rounded" />
-      </div>
-      <div className="space-y-[14px]">
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-full rounded" />
-        <UnifiedSkeleton className="h-[16px] w-[70%] rounded" />
-      </div>
-      <UnifiedSkeleton className="h-[88px] rounded-lg border border-ods-border" />
+    // The renderer's root class, and its box (no margin of its own, like the rendered body): the document's first fold.
+    <LoadingRegion label="Loading the document" announce={region} className={MARKDOWN_RENDERER_CLASS}>
+      {MARKDOWN_SKELETON_BLOCKS.map((block, i) =>
+        block.kind === 'h2' ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton blocks never reorder
+          <h2 key={i} className={MARKDOWN_SKELETON_H2_CLASS} aria-hidden>
+            <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
+          </h2>
+        ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton blocks never reorder
+          <p key={i} className={MARKDOWN_SKELETON_P_CLASS} aria-hidden>
+            <TextLineSkeleton type="inherit" as="span" lines={block.lines} className="w-full" />
+          </p>
+        ),
+      )}
     </LoadingRegion>
   );
 }

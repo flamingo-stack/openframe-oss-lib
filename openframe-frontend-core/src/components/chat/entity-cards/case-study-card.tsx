@@ -21,37 +21,36 @@
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { ICON_SIZE, MEDIA_ASPECT } from '../../../styles/component-sizes';
 import type { CaseStudyCardData, CaseStudyMetric } from '../../../types/case-study';
 import { cn } from '../../../utils/cn';
 import { sortBitesByFeaturedAtDesc } from '../../features/video-bites-shared';
 import { CardHoverPlay } from '../../features/video-center-badge';
 import { VideoHoverPreviewSurface } from '../../features/video-hover-preview';
 import { EntityIcon } from '../../icon-display';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Card } from '../../ui/card';
+import { useLoadingScope } from '../../ui/loading-scope';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUBTITLE,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
-import { EntityPortraitCard } from './entity-portrait-card';
+import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
 import { hideOnError } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface CaseStudyCardProps {
-  study: CaseStudyCardData;
-  /** Detail URL resolved by the caller. */
-  href: string;
+/** The card's options, the same loaded or loading. */
+interface CaseStudyCardOptions {
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
@@ -75,11 +74,48 @@ export interface CaseStudyCardProps {
   className?: string;
 }
 
+/**
+ * The story and its link, or `loading` while the host reads the story (a client read): the card then draws its own
+ * skeleton (`CaseStudyCardSkeleton`), as it does in a loading scope.
+ */
+export type CaseStudyCardProps = CaseStudyCardOptions &
+  (
+    | {
+        study: CaseStudyCardData;
+        /** Detail URL resolved by the caller. */
+        href: string;
+        loading?: false;
+      }
+    | { loading: true; study?: undefined; href?: undefined }
+  );
+
+type LoadedCaseStudyCardProps = CaseStudyCardOptions & { study: CaseStudyCardData; href: string };
+
 /** The `result` card's boxes: the card and its skeleton share them, so they are one height. */
 const CASE_STUDY_RESULT_STACK = 'flex h-full flex-col gap-5 p-6';
 const CASE_STUDY_RESULT_METRIC_BOX = 'flex h-[112px] shrink-0 flex-col justify-start gap-1 overflow-hidden';
 const CASE_STUDY_RESULT_FOOTER_BOX =
   'mt-auto flex h-[60px] shrink-0 items-center justify-between gap-3 border-t border-ods-border pt-4';
+/** The `default` card's boxes, shared with its skeleton. */
+const CASE_STUDY_DEFAULT_BODY = 'flex flex-col gap-6 p-6';
+const CASE_STUDY_COVER = `relative ${MEDIA_ASPECT.og} w-full shrink-0 overflow-hidden rounded-sm`;
+const CASE_STUDY_TITLE_ZONE = 'flex h-[72px] shrink-0 items-center';
+/** The person row's boxes (a fixed 60px zone), shared with its skeleton. */
+const CASE_STUDY_PERSON_ZONE = 'flex h-[60px] shrink-0 items-center';
+const CASE_STUDY_PERSON_ROW = 'flex w-full min-w-0 items-center gap-3';
+const CASE_STUDY_PERSON_TEXT = 'min-w-0 flex-1';
+/** The `menu` card's boxes, shared with its skeleton. */
+const CASE_STUDY_MENU_FRAME =
+  'group/card group flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)] text-ods-text-primary transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent';
+const CASE_STUDY_MENU_SKELETON_FRAME =
+  'flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)]';
+const CASE_STUDY_MENU_MEDIA = `relative block ${MEDIA_ASPECT.video} w-full shrink-0 overflow-hidden rounded-md`;
+const CASE_STUDY_MENU_MSP_ROW = 'flex items-center gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6';
+/** The MSP's icon in the menu card's MSP row (20px), read by the card and its skeleton. */
+const MSP_ICON_PX = 20;
+const MSP_ICON_CLASS = `${ICON_SIZE.md} shrink-0 rounded`;
+/** The content-type chip a portrait case study shows (a static label). */
+const CASE_STUDY_TYPE_LABEL = 'Case Study';
 
 /** The metric a card shows: the story's first one, when it has both halves. */
 function headlineMetric(study: CaseStudyCardData): CaseStudyMetric | null {
@@ -90,8 +126,8 @@ function headlineMetric(study: CaseStudyCardData): CaseStudyMetric | null {
 /** Who tells the story: the portrait with the MSP's mark on it, the name and MSP, the job title. A fixed 60px zone. */
 function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
   return (
-    <div className="flex h-[60px] shrink-0 items-center">
-      <div className="flex w-full min-w-0 items-center gap-3">
+    <div className={CASE_STUDY_PERSON_ZONE}>
+      <div className={CASE_STUDY_PERSON_ROW}>
         <div className="relative h-12 w-12 shrink-0">
           {study.user?.avatar_url ? (
             <Image
@@ -122,7 +158,7 @@ function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
             </div>
           )}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className={CASE_STUDY_PERSON_TEXT}>
           <p className="truncate text-ods-text-primary text-h6">
             {study.user?.full_name || 'Anonymous'}
             {study.msp?.name && <span className="text-ods-text-secondary"> • {study.msp.name}</span>}
@@ -134,62 +170,81 @@ function CaseStudyPersonRow({ study }: { study: CaseStudyCardData }) {
   );
 }
 
-/** `portrait` shares the default skeleton shape — the portrait anatomy uses the
- *  same zone boxes (media aspect → 72px title → 60px person footer). */
-export function CaseStudyCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' | 'result' }) {
+/** The person row while it is read: the 48px portrait and the name and job-title lines. */
+function CaseStudyPersonRowSkeleton() {
+  return (
+    <div className={CASE_STUDY_PERSON_ZONE}>
+      <div className={CASE_STUDY_PERSON_ROW}>
+        <MediaSkeleton.Avatar size="md" className="shrink-0" />
+        <div className={CASE_STUDY_PERSON_TEXT}>
+          <TextLineSkeleton type="h6" className="w-2/3" />
+          <TextLineSkeleton type="h6" className="w-1/2" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A case study card while it is read, one per density, in the card's own boxes. Static words (the "Read" link, the
+ * portrait chip) are drawn for real; the title, people, metric and summary are bars.
+ */
+export function CaseStudyCardSkeleton({
+  size = 'default',
+  showTypeBadge = true,
+  className,
+}: {
+  size?: 'default' | 'sm' | 'portrait' | 'menu' | 'result';
+  /** `portrait`: the card shows the "Case Study" chip. */
+  showTypeBadge?: boolean;
+  className?: string;
+}) {
+  if (size === 'portrait') {
+    return (
+      <EntityPortraitCardSkeleton typeLabel={showTypeBadge ? CASE_STUDY_TYPE_LABEL : undefined} className={className} />
+    );
+  }
   if (size === 'result') {
     return (
-      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_RESULT_STACK)}>
-        <div className="flex h-[60px] shrink-0 items-center gap-3">
-          <UnifiedSkeleton className="h-12 w-12 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <UnifiedSkeleton className="h-4 w-2/3 rounded" />
-            <UnifiedSkeleton className="h-3 w-1/2 rounded" />
-          </div>
-        </div>
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_RESULT_STACK, className)} aria-hidden>
+        <CaseStudyPersonRowSkeleton />
         <div className={CASE_STUDY_RESULT_METRIC_BOX} data-testid="case-study-result-skeleton-metric">
-          <UnifiedSkeleton className="h-10 w-1/3 rounded" />
-          <UnifiedSkeleton className="h-4 w-3/4 rounded" />
+          <TextLineSkeleton type="h1" className="w-1/3" />
+          <TextLineSkeleton type="h4" lines={2} className="w-3/4" />
         </div>
         <div className={CASE_STUDY_RESULT_FOOTER_BOX}>
-          <UnifiedSkeleton className="h-4 w-2/3 rounded" />
+          <TextLineSkeleton type="h6" lines={2} className="w-2/3" />
+          <span className="shrink-0 text-ods-accent text-h6">Read</span>
         </div>
+      </div>
+    );
+  }
+  if (size === 'menu') {
+    return (
+      <div className={cn(CASE_STUDY_MENU_SKELETON_FRAME, className)} aria-hidden>
+        <UnifiedSkeleton className={CASE_STUDY_MENU_MEDIA} />
+        <div className={CASE_STUDY_MENU_MSP_ROW}>
+          <UnifiedSkeleton className={MSP_ICON_CLASS} />
+          <TextLineSkeleton type="h6" className="w-28" />
+        </div>
+        <TextLineSkeleton type="h6" lines={2} className="w-full" />
+        <TextLineSkeleton type="h6" className="w-3/4" />
+        <TextLineSkeleton type="h6" className="mt-auto w-28" />
       </div>
     );
   }
   if (size === 'sm') {
-    return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={COMPACT_CARD_TITLE_ROW}>
-            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-1/2 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
-          </span>
-        </span>
-      </span>
-    );
+    return <CompactCardSkeleton rows={[{ width: 'w-1/2' }, { width: 'w-11/12' }]} className={className} />;
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
-      {/* Skeleton aspect matches the real card's image slot (OG 1200×630) */}
-      <UnifiedSkeleton className="aspect-[1200/630] w-full rounded-sm" />
-      <div className="flex h-[72px] flex-col gap-2">
-        <UnifiedSkeleton className="h-5 w-3/4 rounded" />
-        <UnifiedSkeleton className="h-5 w-1/2 rounded" />
-      </div>
-      <div className="flex h-[60px] items-center gap-3">
-        <UnifiedSkeleton className="h-12 w-12 rounded-full" />
-        <div className="flex-1 space-y-2">
-          <UnifiedSkeleton className="h-4 w-2/3 rounded" />
-          <UnifiedSkeleton className="h-3 w-1/2 rounded" />
+    <div className={cn('block h-full', className)} aria-hidden>
+      <Card className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, CASE_STUDY_DEFAULT_BODY)}>
+        <UnifiedSkeleton className={cn(CASE_STUDY_COVER, 'rounded-sm')} />
+        <div className={CASE_STUDY_TITLE_ZONE}>
+          <TextLineSkeleton type="h4" lines={3} className="w-full" />
         </div>
-      </div>
+        <CaseStudyPersonRowSkeleton />
+      </Card>
     </div>
   );
 }
@@ -210,7 +265,16 @@ function caseStudyHighlight(study: CaseStudyCardData): { url: string; posterUrl:
   return bite ? { url: bite.url, posterUrl: bite.thumbnail_url ?? null } : null;
 }
 
-export function CaseStudyCard({
+export function CaseStudyCard(props: CaseStudyCardProps) {
+  const inScope = useLoadingScope();
+  if (inScope || props.loading) {
+    return <CaseStudyCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />;
+  }
+  return <LoadedCaseStudyCard {...props} />;
+}
+
+/** The card for a read story (`CaseStudyCard` decides whether it is read). */
+function LoadedCaseStudyCard({
   study,
   href,
   target: targetProp,
@@ -223,7 +287,7 @@ export function CaseStudyCard({
   mediaMounted,
   onNavigate,
   className,
-}: CaseStudyCardProps) {
+}: LoadedCaseStudyCardProps) {
   const [hovered, setHovered] = useState(false);
   const { target, rel } = useEntityCardLink({
     href,
@@ -288,14 +352,11 @@ export function CaseStudyCard({
         onPointerLeave={() => setHovered(false)}
         onFocus={() => setHovered(true)}
         onBlur={() => setHovered(false)}
-        className={cn(
-          // `group/card` is what the shared play glyph accents on.
-          'group/card group flex min-w-0 flex-col gap-[var(--spacing-system-sf)] rounded-xl border border-ods-border bg-ods-bg p-[var(--spacing-system-mf)] text-ods-text-primary transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
-          className,
-        )}
+        // `group/card` is what the shared play glyph accents on.
+        className={cn(CASE_STUDY_MENU_FRAME, className)}
       >
         {/* The media never takes the click: the whole card is the link. */}
-        <span className="pointer-events-none relative block aspect-video w-full shrink-0 overflow-hidden rounded-md bg-ods-bg">
+        <span className={cn('pointer-events-none bg-ods-bg', CASE_STUDY_MENU_MEDIA)}>
           {videoUrl ? (
             // The shared hover surface, filled the way the walkthrough card fills
             // its own 16:9 slot (`cover`): an upright cut is cropped to the slot,
@@ -326,12 +387,12 @@ export function CaseStudyCard({
           )}
         </span>
         {study.msp?.name && (
-          <span className="flex items-center gap-[var(--spacing-system-xsf)] text-ods-text-secondary text-h6">
+          <span className={CASE_STUDY_MENU_MSP_ROW}>
             {study.msp.icon_url && (
               <EntityIcon
                 icon={{ url: study.msp.icon_url }}
-                size={20}
-                className="size-5 shrink-0 rounded object-contain"
+                size={MSP_ICON_PX}
+                className={cn(MSP_ICON_CLASS, 'object-contain')}
               />
             )}
             <span className="min-w-0 truncate">{study.msp.name}</span>
@@ -377,7 +438,7 @@ export function CaseStudyCard({
         href={href}
         target={target}
         rel={rel}
-        typeLabel={showTypeBadge ? 'Case Study' : undefined}
+        typeLabel={showTypeBadge ? CASE_STUDY_TYPE_LABEL : undefined}
         imageUrl={study.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={study.msp?.name || study.title}
@@ -395,14 +456,14 @@ export function CaseStudyCard({
 
   return (
     <Link href={href} target={target} rel={rel} className={cn('block h-full', className)}>
-      <Card className={cn(CONTENT_CARD_FRAME_CLASS, 'flex flex-col gap-6 p-6')}>
+      <Card className={cn(CONTENT_CARD_FRAME_CLASS, CASE_STUDY_DEFAULT_BODY)}>
         {/* Fixed aspect ratio matches the standard OG card source aspect
             (1200×630 = 1.91:1), so the image fits with near-zero CSS-side
             cropping. Subject anchoring is then a function of the source
             image's center-66% safe zone (OG design convention) — visually
             uniform across all cards regardless of column width. Skeleton
             (lines 73-74) uses the same aspect for consistent layout. */}
-        <div className="relative aspect-[1200/630] w-full shrink-0 overflow-hidden rounded-sm bg-ods-bg">
+        <div className={cn(CASE_STUDY_COVER, 'bg-ods-bg')}>
           {coverImage && (
             <Image
               src={coverImage}
@@ -416,7 +477,7 @@ export function CaseStudyCard({
           )}
         </div>
 
-        <div className="flex h-[72px] shrink-0 items-center">
+        <div className={CASE_STUDY_TITLE_ZONE}>
           <p className="line-clamp-3 break-words text-ods-text-primary text-h4">{study.title}</p>
         </div>
 

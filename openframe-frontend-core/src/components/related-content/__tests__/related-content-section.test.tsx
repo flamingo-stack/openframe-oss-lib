@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentRef } from '../../../types/content-ref';
-import { GROUP_PAGE_SIZE, RelatedContentSection } from '../related-content-section';
+import { GROUP_PAGE_SIZE } from '../../../utils/content-ref-groups';
+import { RelatedContentSection } from '../related-content-section';
 
 const fetchMock = vi.fn<typeof fetch>();
 
@@ -49,5 +50,29 @@ describe('RelatedContentSection group paging', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Page 1' }));
     expect(screen.getByText('Case 1')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('RelatedContentSection rows the server read', () => {
+  it('draws the first page from initialRows with no request, and still fetches later pages', async () => {
+    fetchMock.mockImplementation(input =>
+      Promise.resolve(
+        new Response(JSON.stringify({ items: idsOf(input).map(id => ({ id: Number(id), title: `Case ${id}` })) }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    const firstPage = REFS.slice(0, GROUP_PAGE_SIZE).map(r => ({ id: Number(r.id), title: r.title }));
+    render(<RelatedContentSection contentRefs={REFS} initialRows={{ case_study: firstPage }} />);
+
+    // In the first render: no skeleton, no request.
+    expect(screen.getByText('Case 1')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Page 2' }));
+    expect(await screen.findByText('Case 13')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => idsOf(input))).toEqual([
+      REFS.slice(GROUP_PAGE_SIZE, 2 * GROUP_PAGE_SIZE).map(r => r.id),
+    ]);
   });
 });

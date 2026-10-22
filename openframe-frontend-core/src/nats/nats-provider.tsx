@@ -10,8 +10,6 @@ import {
   type NatsReconnectionBackoff,
 } from './shared-connection';
 
-export type { NatsReconnectionBackoff } from './shared-connection';
-
 export interface NatsProviderProps {
   children: ReactNode;
   /** Return the current NATS WebSocket URL (or null when not yet available, e.g. unauthenticated). */

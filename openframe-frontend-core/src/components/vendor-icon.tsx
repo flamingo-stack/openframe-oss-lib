@@ -2,8 +2,10 @@
 
 import Image from '../embed-shims/next-image';
 import { cn } from '../utils/cn';
-import { getProxiedImageUrl } from '../utils/image-proxy-stub';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
+import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
+import { useLoadingScope } from './ui/loading-scope';
 
 interface VendorIconProps {
   vendor: VendorWithMedia & {
@@ -57,6 +59,11 @@ const backgroundClasses = {
   white: 'bg-white border border-[#E5E5E5]',
 };
 
+/** A vendor's logo while it is read: the tile's own box. */
+export function VendorIconSkeleton({ size = 'md', className }: { size?: VendorIconProps['size']; className?: string }) {
+  return <UnifiedSkeleton className={cn(sizeClasses[size], 'flex-shrink-0 rounded-lg', className)} />;
+}
+
 /**
  * Common VendorIcon component for displaying vendor logos consistently across the platform
  * Extracted from vendor-card.tsx for reuse in comparison tables, dropdowns, etc.
@@ -68,7 +75,9 @@ export function VendorIcon({
   showBackground = true,
   backgroundStyle = 'dark',
 }: VendorIconProps) {
+  const loading = useLoadingScope();
   const logoUrl = getVendorLogo(vendor);
+  const logoSrc = useProxiedImageUrl(logoUrl, { directHttps: false });
   const { width, height } = showBackground ? imageSizeMap[size] : { width: tilePxMap[size], height: tilePxMap[size] };
 
   const containerClasses = cn(
@@ -79,11 +88,13 @@ export function VendorIcon({
     className,
   );
 
+  if (loading) return <VendorIconSkeleton size={size} className={className} />;
+
   return (
     <div className={containerClasses}>
       {logoUrl ? (
         <Image
-          src={getProxiedImageUrl(logoUrl) || logoUrl}
+          src={logoSrc}
           alt={`${vendor.title} logo`}
           width={width}
           height={height}

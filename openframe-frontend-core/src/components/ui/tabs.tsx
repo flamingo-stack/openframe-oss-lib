@@ -4,6 +4,8 @@ import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'react';
 
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 /**
  * @deprecated Use `TabNavigation` from `components/ui/tab-navigation` — the
@@ -81,11 +83,69 @@ interface TabsTriggerProps extends ComponentPropsWithoutRef<typeof TabsPrimitive
 
 /** @deprecated for `variant="default"` — use `TabNavigation`. `variant="admin-rail"` is the sanctioned admin tabs styling. See {@link Tabs}. */
 const TabsTrigger = forwardRef<ElementRef<typeof TabsPrimitive.Trigger>, TabsTriggerProps>(
-  ({ className, variant = 'default', ...props }, ref) => (
-    <TabsPrimitive.Trigger ref={ref} className={cn(tabsTriggerVariantClasses[variant], className)} {...props} />
-  ),
+  ({ className, variant = 'default', ...props }, ref) => {
+    // In a loading scope the tab is its skeleton: the trigger's own box; a tab named by a string (a tab name the page
+    // states) keeps its name, any other label is a bar.
+    if (useLoadingScope()) {
+      const label = typeof props.children === 'string' && props.children !== '' ? props.children : undefined;
+      return <TabsTriggerSkeleton variant={variant} label={label} className={className} />;
+    }
+    return <TabsPrimitive.Trigger ref={ref} className={cn(tabsTriggerVariantClasses[variant], className)} {...props} />;
+  },
 );
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
+
+/** The label's type step per variant: the step its trigger's classes set. */
+const TRIGGER_LABEL_TYPE: Record<TabsVariant, 'h4' | 'h6'> = { default: 'h6', 'admin-rail': 'h4' };
+
+/**
+ * A tab while it is read: the trigger's own box (padding, border, type step). `label` is a tab name the page states,
+ * drawn as it is; without one the label is a bar.
+ */
+function TabsTriggerSkeleton({
+  variant = 'default',
+  label,
+  className,
+}: {
+  variant?: TabsVariant;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div aria-hidden className={cn(tabsTriggerVariantClasses[variant], className)}>
+      {label ?? <TextLineSkeleton type={TRIGGER_LABEL_TYPE[variant]} className="w-20" />}
+    </div>
+  );
+}
+
+/**
+ * A tab list whose tabs are not known until a read: the list's own frame (the bordered rail for `admin-rail`) and
+ * `count` trigger skeletons.
+ */
+function TabsListSkeleton({
+  variant = 'default',
+  count,
+  labels,
+  className,
+}: {
+  variant?: TabsVariant;
+  /** How many tabs, when their names are read. */
+  count?: number;
+  /** The tabs' names, when the page states them (drawn as they are). */
+  labels?: string[];
+  className?: string;
+}) {
+  const tabs: Array<string | undefined> = labels ?? Array.from({ length: count ?? 0 }, () => undefined);
+  const list = (
+    <div aria-hidden className={cn(tabsListVariantClasses[variant], className)}>
+      {tabs.map((label, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tabs never reorder
+        <TabsTriggerSkeleton key={i} variant={variant} label={label} />
+      ))}
+    </div>
+  );
+  return variant === 'admin-rail' ? <div className={ADMIN_RAIL_WRAPPER_CLASS}>{list}</div> : list;
+}
 
 /** @deprecated Use `TabNavigation` from `components/ui/tab-navigation`. See {@link Tabs}. */
 const TabsContent = forwardRef<
@@ -103,4 +163,4 @@ const TabsContent = forwardRef<
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent };
+export { Tabs, TabsList, TabsTrigger, TabsContent, TabsTriggerSkeleton, TabsListSkeleton };

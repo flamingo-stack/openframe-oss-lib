@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { formatReleaseDate, formatDateShort, formatDateSlashUTC } from '../date-formatters';
 import { formatAbsoluteDate, formatTicketFullTimestamp, formatTicketRelativeTime } from '../date-utils';
 import {
   VIEWER_TIMEZONE,
   formatDateTimeYmd,
+  viewerLocale,
   formatDateUTC,
   formatDateWithTimezone,
   formatEntryMonthUTC,
@@ -116,11 +117,11 @@ describe('named helpers are presets over the core', () => {
 });
 
 describe("ticket timestamps read in the viewer's own zone and locale", () => {
-  // The expected strings come from the runtime's own `Intl` with no locale and
-  // no zone named — exactly what "the viewer's" means — so the assertions hold
-  // on an en-AU laptop (20/03/2026, 13:05) as well as on en-US CI.
+  // The expected strings come from `Intl` in the viewer's locale with no zone
+  // named — exactly what "the viewer's" means — so the assertions hold on an
+  // en-AU laptop (20/03/2026, 13:05) as well as on en-US CI.
   const viewer = (at: string, fields: Intl.DateTimeFormatOptions) =>
-    new Intl.DateTimeFormat(undefined, fields).format(new Date(at));
+    new Intl.DateTimeFormat(viewerLocale(), fields).format(new Date(at));
 
   it('the full tooltip timestamp is the numeric date and the clock, not UTC', () => {
     const AT = '2026-03-20T13:05:00Z';
@@ -132,5 +133,27 @@ describe("ticket timestamps read in the viewer's own zone and locale", () => {
   it('a ticket older than a day shows its calendar day as the viewer writes it', () => {
     const AT = '2020-01-02T00:00:00Z';
     expect(formatTicketRelativeTime(AT)).toBe(viewer(AT, { year: 'numeric', month: '2-digit', day: '2-digit' }));
+  });
+});
+
+describe("the viewer's locale is the browser's first language, not Intl's default", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reads navigator.language, which Chrome on macOS sets apart from the Intl default', () => {
+    vi.stubGlobal('navigator', { language: 'en-AU' });
+    expect(viewerLocale()).toBe('en-AU');
+    expect(formatDateWithTimezone('2026-03-20T13:05:00Z', null, 'numeric', { viewerLocale: true })).toBe('20/03/2026');
+  });
+
+  it('falls back to the runtime default without a navigator or a language', () => {
+    vi.stubGlobal('navigator', undefined);
+    expect(viewerLocale()).toBeUndefined();
+    vi.stubGlobal('navigator', { language: '' });
+    expect(viewerLocale()).toBeUndefined();
+  });
+
+  it('the en-US pin for content dates is untouched by the browser language', () => {
+    vi.stubGlobal('navigator', { language: 'en-AU' });
+    expect(formatDateWithTimezone('2026-03-20T13:05:00Z', null, 'numeric')).toBe('03/20/2026');
   });
 });

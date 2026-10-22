@@ -79,26 +79,6 @@ import { useChunkCatchup } from './use-chunk-catchup';
 import { useManagedDialogList } from './use-managed-dialog-list';
 import { useNatsDialogSubscription } from './use-nats-dialog-subscription';
 
-// Legacy public home of the pure message-mutation helpers ("exported for
-// host reuse"). Canonical implementation moved to the stream module in
-// Phase 3 — these re-exports keep the import path stable until Phase 4
-// migrates consumers.
-export {
-  appendToTrailingAssistant,
-  applyToolExecutionToMessages,
-  upsertTrailingCompaction,
-} from '../stream/message-mutations';
-
-// =============================================================================
-// Config + options
-// =============================================================================
-
-// `FetchDialogsParams` / `FetchDialogsResult` moved to the unified types
-// module (they are the host contract of the SHARED `useManagedDialogList`
-// hook, consumed by both adapters); re-exported here so the public import
-// path stays stable.
-export type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
-
 /** Page-fetch parameters passed to `fetchDialogMessages`. */
 export interface FetchDialogMessagesParams {
   dialogId: string;

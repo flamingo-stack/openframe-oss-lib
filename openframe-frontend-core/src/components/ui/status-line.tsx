@@ -1,6 +1,7 @@
 import { cn } from '../../utils/cn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LIVE_PULSE_CLASS } from './skeleton-surface';
 
 /**
  * What a status line says about the thing above it:
@@ -40,10 +41,7 @@ export function StatusLine({ tone, label, className }: StatusLineProps) {
       )}
     >
       {tone === 'working' && (
-        <span
-          className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-ods-flamingo-cyan motion-reduce:animate-none"
-          aria-hidden
-        />
+        <span className={cn('h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan', LIVE_PULSE_CLASS)} aria-hidden />
       )}
       {tone === 'success' && <CheckCircleIcon size={16} className="shrink-0 text-ods-success" aria-hidden />}
       {tone === 'error' && <XmarkCircleIcon size={16} className="shrink-0 text-ods-error" aria-hidden />}

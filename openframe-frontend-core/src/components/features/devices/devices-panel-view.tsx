@@ -71,7 +71,7 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
    */
   loading?: boolean;
   /**
-   * The loading state announces itself, once ("Loading devices…"; the table or grid inside it stays quiet).
+   * The loading state announces itself, once ("Loading devices"; the table or grid inside it stays quiet).
    * `false` inside another loading region. Default `true`.
    */
   loadingRegion?: boolean;
@@ -237,7 +237,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
       {headerSlot}
       {loading && loadingRegion && (
         <span role="status" className="sr-only">
-          Loading devices…
+          Loading devices
         </span>
       )}
       {noOrganizations && !loading && (

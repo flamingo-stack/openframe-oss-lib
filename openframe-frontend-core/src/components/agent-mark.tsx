@@ -6,6 +6,7 @@ import Image from '../embed-shims/next-image';
 import { cn } from '../utils/cn';
 import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
+import { UnifiedSkeleton } from './loading/unified-skeleton';
 
 /** The agents the product ships. A mark is drawn for any agent slug the server has an identity for. */
 export type AgentName = 'fae' | 'mingo';
@@ -73,13 +74,21 @@ export interface AgentAvatarProps {
  * slug and never a picture, so an agent looks the same in a card, a log row, a
  * command bar and an example, and a new icon in its identity reaches all of them.
  */
+/** The avatar's round frame, read by the avatar and by its skeleton, so the two are one box. */
+const AGENT_AVATAR_FRAME_CLASS = 'inline-flex shrink-0 overflow-hidden rounded-full';
+
 export function AgentAvatar({ agent, size, className }: AgentAvatarProps) {
   return (
-    <span
-      className={cn('inline-flex shrink-0 overflow-hidden rounded-full', className)}
-      style={{ width: size, height: size }}
-    >
+    <span className={cn(AGENT_AVATAR_FRAME_CLASS, className)} style={{ width: size, height: size }}>
       <AgentMark agent={agent} className="h-full w-full" />
     </span>
   );
+}
+
+/**
+ * An agent's avatar while the agent is not known yet (the record that names it is read): the avatar's own round
+ * frame at the same `size`, so the picture takes its place without moving anything.
+ */
+export function AgentAvatarSkeleton({ size, className }: Pick<AgentAvatarProps, 'size' | 'className'>) {
+  return <UnifiedSkeleton as="span" className={cn(AGENT_AVATAR_FRAME_CLASS, className)} width={size} height={size} />;
 }

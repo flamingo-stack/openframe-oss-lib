@@ -60,7 +60,6 @@ import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
 import { HowIWorkCard, HowIWorkCardSkeleton, type HowIWorkCardData } from '../chat/entity-cards/how-i-work-card';
 import { InvestorUpdateCard, InvestorUpdateCardSkeleton } from '../chat/entity-cards/investor-update-card';
 import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
-import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
 import { buildProductReleaseCardProps } from '../chat/entity-cards/product-release-card-defaults';
 import { ProgramCard, ProgramCardSkeleton } from '../chat/entity-cards/program-card';
 import { RoadmapCard, RoadmapCardSkeleton } from '../chat/entity-cards/roadmap-card';
@@ -73,6 +72,8 @@ import type { InvestorUpdate } from '../chat/types/entities/investor-update';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import type { BaseProgramItem, ProgramHost, ProgramMedia } from '../chat/types/entities/program-types';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
+import { ProductReleaseCard } from '../shared/product-release/product-release-card';
+import { ProductReleaseCardSkeleton } from '../shared/product-release/product-release-card-skeleton';
 
 export type CardSize = 'lg' | 'default' | 'sm';
 
@@ -579,14 +580,20 @@ export interface RelatedCardContext {
   anchorAttrs: Pick<CardLinkAnchorProps, 'target' | 'rel'>;
   /** Branded OG fallback for cards whose row has no featured image. */
   placeholderUrl?: string;
+  /**
+   * The rail's first card: its image is likely the page's largest paint (an author page opens on it), so a card that
+   * can rank its image fetches it at once instead of lazily.
+   */
+  priority?: boolean;
   extras?: ChatCardDispatchExtras;
 }
 
 /** One registered content type. `Row` is erased here — `cardEntry` below is
  *  what keeps each branch's row type concrete. */
 export interface RelatedCardRegistryEntry {
-  /** Sized to match the resolved card exactly (zero layout shift). */
-  skeleton: (size: CardSize) => React.ReactNode;
+  /** Sized to match the resolved card exactly (zero layout shift). `extras` are the host's (a program's config says
+   *  whether its cards show hosts). */
+  skeleton: (size: CardSize, extras?: ChatCardDispatchExtras) => React.ReactNode;
   render: (row: unknown, ctx: RelatedCardContext) => React.ReactNode;
 }
 
@@ -600,7 +607,7 @@ export interface RelatedCardRegistryEntry {
  * used to do, minus the promise it could not keep.
  */
 function cardEntry<Row>(definition: {
-  skeleton: (size: CardSize) => React.ReactNode;
+  skeleton: (size: CardSize, extras?: ChatCardDispatchExtras) => React.ReactNode;
   decode: (row: unknown) => Row;
   render: (row: Row, ctx: RelatedCardContext) => React.ReactNode;
 }): RelatedCardRegistryEntry {
@@ -614,9 +621,21 @@ function cardEntry<Row>(definition: {
  *  which host-supplied `ProgramConfig` they render with. A group whose config
  *  the host didn't supply renders nothing (the skeleton still reserves its
  *  height, so a rail that never resolves collapses instead of flickering). */
+/** Gallery thumbnails an event card's skeleton draws: the gallery row's first fold (the row scrolls past it). */
+const EVENT_CARD_SKELETON_MEDIA = 4;
+
 function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRegistryEntry {
   return cardEntry({
-    skeleton: size => <ProgramCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    // An event's list API serves its gallery (the loaded card draws its photo row), the other programs' none.
+    // Hosts are drawn only for a type whose cards show them (its config's `cardShowsHosts`): elsewhere a record may
+    // have none.
+    skeleton: (size, extras) => (
+      <ProgramCardSkeleton
+        size={size === 'sm' ? 'sm' : 'default'}
+        media={configKey === 'event' ? EVENT_CARD_SKELETON_MEDIA : 0}
+        hosts={extras?.programConfigs?.[configKey]?.cardShowsHosts ? 1 : 0}
+      />
+    ),
     decode: decodeProgramRow,
     render: (item, ctx) => {
       const config = ctx.extras?.programConfigs?.[configKey];
@@ -631,6 +650,7 @@ function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRe
           href={ctx.href}
           targetPlatform={ctx.targetPlatform}
           placeholderUrl={ctx.placeholderUrl}
+          priority={ctx.priority}
           {...ctx.anchorAttrs}
         />
       );
@@ -670,6 +690,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
         href={ctx.href}
         targetPlatform={ctx.targetPlatform}
         placeholderUrl={ctx.placeholderUrl}
+        priority={ctx.priority}
         {...ctx.anchorAttrs}
       />
     ),
@@ -761,7 +782,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
    *  step-numbered 'default' variant is for the guide detail page's "More in
    *  section" rail, not this full-width row. */
   onboarding_guide: cardEntry({
-    skeleton: size => <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />,
+    skeleton: size => <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} published={false} />,
     decode: decodeOnboardingGuideRow,
     render: (guide, ctx) => (
       <OnboardingGuideCard
