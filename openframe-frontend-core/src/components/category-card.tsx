@@ -15,7 +15,7 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
     <article className="box-border flex min-w-0 flex-col rounded-[12px] border border-ods-border bg-ods-card p-8">
       <div className="mb-8 flex items-center justify-center gap-6">
         {(icons.length > 0 ? icons : Array(10).fill(null)).map((icon, i) => (
-          <div key={i} className="flex h-10 w-10 items-center justify-center rounded bg-ods-skeleton">
+          <div key={i} className="flex h-10 w-10 items-center justify-center rounded bg-ods-border">
             {icon}
           </div>
         ))}

@@ -107,3 +107,21 @@ export const multiSelectFilterFn: FilterFn<unknown> = (row, columnId, filterValu
   const cellValue = row.getValue(columnId);
   return values.some(v => v === cellValue || String(v) === String(cellValue));
 };
+
+/** Skeleton rows of a table that knows no page size: a typical count for an UNPAGED table. */
+export const DATA_TABLE_SKELETON_ROWS = 10;
+
+/**
+ * The page size a host gave its table (`state.pagination.pageSize`, else `initialState.pagination.pageSize`), or
+ * undefined when it gave none. Read from the OPTIONS, never `getState()`: TanStack fills in a page size of 10 for a
+ * table that has no pagination at all, which is not a page this table loads.
+ */
+export function dataTablePageSize(table: {
+  options: {
+    state?: { pagination?: { pageSize?: number } };
+    initialState?: { pagination?: { pageSize?: number } };
+  };
+}): number | undefined {
+  const size = table.options.state?.pagination?.pageSize ?? table.options.initialState?.pagination?.pageSize;
+  return size && size > 0 ? size : undefined;
+}

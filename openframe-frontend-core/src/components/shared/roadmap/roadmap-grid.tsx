@@ -29,7 +29,10 @@ import { contentFetch } from '../../../utils/embed-content-fetch';
 import { RoadmapCard } from '../../chat/entity-cards/roadmap-card';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 import { EmptyState } from '../../empty-state';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { RoadmapGridSkeleton, roadmapGridClass } from './roadmap-grid-skeleton';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
@@ -121,6 +124,15 @@ export interface RoadmapGridProps {
   /** Past quarters within this window of the current quarter stay open by
    *  default; older ones collapse. Default `2`. */
   quartersToKeepClosed?: number;
+  /** The items are being read (the host's query runs): the grid draws its own skeleton. A page's loading scope does too. */
+  isLoading?: boolean;
+  /**
+   * The cards the grid's skeleton draws: the number of items the host reads (its limit), drawn at every width.
+   * Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count for a roadmap that lists everything it holds.
+   */
+  skeletonCount?: number;
+  /** @deprecated Use `skeletonCount`. */
+  fold?: number;
 }
 
 /** Internal flat 2-col grid for ONE set of items. Voting comes from the parent
@@ -141,28 +153,63 @@ function RoadmapGridSingle({
   votingTasks: Set<string>;
 }) {
   return (
-    // LITERAL class strings: an interpolated `content-md:grid-cols-${n}` is invisible
-    // to Tailwind's scanner and is never generated.
-    <div
-      className={`grid grid-cols-1 gap-6 ${columns === 2 ? 'content-md:grid-cols-2' : ''} ${
-        showLeftMargin ? 'content-md:ml-[120px]' : ''
-      }`}
-    >
+    <div className={roadmapGridClass(columns, showLeftMargin)}>
       {items.map(item => (
         // DOM id + sticky-header scroll offset live ON RoadmapCard's own
         // outer element (no wrapper div). Anchor mirrors
         // `buildDevSectionUrl('roadmap', <id>)` → `#roadmap-<external_id>`;
         // `useScrollToHash` in `roadmap-view.tsx` finds the card by id
         // and scrolls.
-        <RoadmapCard
-          key={item.id}
-          item={item}
-          id={devSectionAnchorId('roadmap', item.id)}
-          userVote={getVote(item.id)}
-          onVote={voteType => onVote(item.id, voteType)}
-          isVoting={votingTasks.has(item.id)}
-        />
+        // `data-loading-item`: how many items a quarter holds is read data (the loading-state gate measures it as a list).
+        <div key={item.id} className="min-w-0" data-loading-item>
+          <RoadmapCard
+            item={item}
+            id={devSectionAnchorId('roadmap', item.id)}
+            userVote={getVote(item.id)}
+            onVote={voteType => onVote(item.id, voteType)}
+            isVoting={votingTasks.has(item.id)}
+          />
+        </div>
       ))}
+    </div>
+  );
+}
+
+/** The quarter list and a quarter's head, read by the grid and by its skeleton. */
+const QUARTER_LIST_CLASS = 'flex flex-col gap-10';
+const QUARTER_HEAD_CLASS = 'flex items-center gap-3';
+/** The quarter's content padding: the grid's `AccordionContent` takes `pt-4`, and pads its children `pb-4` itself. */
+const QUARTER_CONTENT_CLASS = 'pt-4';
+const QUARTER_CONTENT_INNER_CLASS = 'pb-4';
+
+/**
+ * The quarter-grouped grid while its items are read: one quarter, its heading and item count as bars, then the
+ * grid's card skeletons.
+ */
+export function RoadmapGridQuarterSkeleton({
+  showLeftMargin = true,
+  columns = 2,
+  count,
+}: {
+  showLeftMargin?: boolean;
+  columns?: 1 | 2;
+  /** The quarter's skeleton cards. Default the grid skeleton's own. */
+  count?: number;
+}) {
+  return (
+    <div className={QUARTER_LIST_CLASS} aria-hidden>
+      <div className="flex flex-col" data-loading-item>
+        <div className={QUARTER_HEAD_CLASS}>
+          <TextLineSkeleton type="h2" className="w-40" />
+          <TextLineSkeleton type="h6" className="w-16" />
+        </div>
+        {/* The quarter's content box: the `AccordionContent` padding (`pt-4` here, the content's own `pb-4` inside). */}
+        <div className={QUARTER_CONTENT_CLASS}>
+          <div className={QUARTER_CONTENT_INNER_CLASS}>
+            <RoadmapGridSkeleton region={false} count={count} showLeftMargin={showLeftMargin} columns={columns} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -177,9 +224,14 @@ export function RoadmapGrid({
   groupByQuarter = false,
   hasActiveFilters = false,
   quartersToKeepClosed = 2,
+  isLoading = false,
+  skeletonCount,
+  fold,
 }: RoadmapGridProps) {
+  const skeletonCards = skeletonCount ?? fold;
   // ── Voting (shared across all quarters) ──
   const { getVote, toggleVote } = useRoadmapVoting(votingOptions);
+  const inScope = useLoadingScope();
   const [votingTasks, setVotingTasks] = useState<Set<string>>(new Set());
 
   const handleVote = async (taskId: string, voteType: 'up' | 'down') => {
@@ -267,6 +319,16 @@ export function RoadmapGrid({
     );
   }, [hasActiveFilters, sortedQuartersKey, isInitialized, quartersToKeepClosed]);
 
+  // While the page is read, or the host's query runs, the items are not known: the grid is its skeleton, never the
+  // empty state. The page's loading region announces a scope's; a host's own read announces itself.
+  if (inScope || isLoading) {
+    return groupByQuarter ? (
+      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} count={skeletonCards} />
+    ) : (
+      <RoadmapGridSkeleton region={!inScope} count={skeletonCards} showLeftMargin={showLeftMargin} columns={columns} />
+    );
+  }
+
   if (items.length === 0) {
     return (
       <EmptyState
@@ -296,7 +358,7 @@ export function RoadmapGrid({
       type="multiple"
       value={expandedQuarters}
       onValueChange={setExpandedQuarters}
-      className="flex flex-col gap-10"
+      className={QUARTER_LIST_CLASS}
     >
       {sortedQuarters.map(quarter => {
         const itemCount = itemsByQuarter[quarter]?.length || 0;
@@ -307,9 +369,11 @@ export function RoadmapGrid({
             value={quarter}
             id={`quarter-${quarter.replace(/\s+/g, '-').toLowerCase()}`}
             className="border-0"
+            // How many quarters the roadmap spans is read data: a list to the loading-state gate.
+            data-loading-item
           >
             <AccordionTrigger className="w-full p-0 hover:no-underline [&>svg]:ml-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:shrink-0 [&>svg]:text-ods-text-secondary">
-              <div className="flex items-center gap-3">
+              <div className={QUARTER_HEAD_CLASS}>
                 <h3
                   className={cn(
                     'text-ods-text-primary transition-opacity text-h2',

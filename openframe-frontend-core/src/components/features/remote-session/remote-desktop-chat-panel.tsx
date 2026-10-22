@@ -3,8 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '../../../utils/cn';
 import { ChatInput } from '../../chat/chat-input';
-import { RemoteDesktopChatMessageRow } from './remote-desktop-chat-message-row';
+import { LoadingRegion } from '../../loading/loading-region';
+import { RemoteDesktopChatMessageRow, RemoteDesktopChatMessageRowSkeleton } from './remote-desktop-chat-message-row';
 import type { RemoteSessionChatMessage } from './types';
+
+/**
+ * Message rows the panel's loading state draws: a typical count. The panel draws the whole history its host hands it
+ * (no page, no limit), so there is no page size to draw.
+ */
+const CHAT_PANEL_SKELETON_ROWS = 10;
 
 /** Who is typing on the technician's side of the chat: shown on the technician's rows. */
 export interface RemoteDesktopChatTechnician {
@@ -67,10 +74,17 @@ export function RemoteDesktopChatPanel({
     >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex min-h-full flex-col justify-end gap-[var(--spacing-system-xsf)]">
-          {rows.length === 0 ? (
-            <p className="text-center text-ods-text-muted text-h6">
-              {loading ? 'Loading the chat...' : 'No messages yet - say hello to the user.'}
-            </p>
+          {rows.length === 0 && loading ? (
+            // The chat while it is read: a screen of the panel's own message rows, stacked by a one-column grid
+            // (the thread above is already the column flexbox: WEBVIEW-001).
+            <LoadingRegion label="Loading the chat" className="grid grid-cols-1 gap-[var(--spacing-system-xsf)]">
+              {Array.from({ length: CHAT_PANEL_SKELETON_ROWS }, (_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+                <RemoteDesktopChatMessageRowSkeleton key={i} />
+              ))}
+            </LoadingRegion>
+          ) : rows.length === 0 ? (
+            <p className="text-center text-ods-text-muted text-h6">No messages yet - say hello to the user.</p>
           ) : (
             rows.map(message => (
               <RemoteDesktopChatMessageRow

@@ -41,7 +41,10 @@ const DEFAULT_RUNTIME: RichMarkdownRuntime = {
 const RichMarkdownRuntimeContext = createContext<RichMarkdownRuntime>(DEFAULT_RUNTIME);
 
 /**
- * Provider that fills in defaults for any prop the caller didn't pass.
+ * Provider that fills in any prop the caller didn't pass from the provider ABOVE it (the host's, mounted once at the
+ * root), and from the defaults only where there is none. `RichMarkdownRenderer` mounts one of these around every
+ * document; filling from the defaults there replaced the host's runtime with `transformImageSrc: () => null`, so each
+ * in-article image's size probe downloaded the full original file on every markdown page (CU-17tkuw5xp4q).
  * Memoizes the resolved runtime so satellites don't re-render when an
  * unrelated parent state ticks.
  */
@@ -52,14 +55,15 @@ export function RichMarkdownRuntimeProvider({
   transformImageSrc,
   children,
 }: Partial<RichMarkdownRuntime> & { children: ReactNode }) {
+  const outer = useContext(RichMarkdownRuntimeContext);
   const value = useMemo<RichMarkdownRuntime>(
     () => ({
-      redditProxyUrl: redditProxyUrl ?? DEFAULT_RUNTIME.redditProxyUrl,
-      twitterProxyUrl: twitterProxyUrl ?? DEFAULT_RUNTIME.twitterProxyUrl,
-      ogScraperUrl: ogScraperUrl ?? DEFAULT_RUNTIME.ogScraperUrl,
-      transformImageSrc: transformImageSrc ?? DEFAULT_RUNTIME.transformImageSrc,
+      redditProxyUrl: redditProxyUrl ?? outer.redditProxyUrl,
+      twitterProxyUrl: twitterProxyUrl ?? outer.twitterProxyUrl,
+      ogScraperUrl: ogScraperUrl ?? outer.ogScraperUrl,
+      transformImageSrc: transformImageSrc ?? outer.transformImageSrc,
     }),
-    [redditProxyUrl, twitterProxyUrl, ogScraperUrl, transformImageSrc],
+    [redditProxyUrl, twitterProxyUrl, ogScraperUrl, transformImageSrc, outer],
   );
   return <RichMarkdownRuntimeContext.Provider value={value}>{children}</RichMarkdownRuntimeContext.Provider>;
 }

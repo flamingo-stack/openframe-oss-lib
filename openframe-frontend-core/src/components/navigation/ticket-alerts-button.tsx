@@ -29,9 +29,9 @@
  */
 
 import { cn } from '../../utils/cn';
+import { buildTicketOpenHref } from '../../utils/dev-sections/dev-section-param-keys';
 import { LifeBuoyIcon } from '../icons-v2-generated/interface/life-buoy-icon';
 import { useOptionalTicketLive } from '../tickets/ticket-live-provider';
-import { buildTicketOpenHref } from '../tickets/types';
 import { HeaderButton } from './header-button';
 import { UnreadCountBadge } from './unread-dot';
 

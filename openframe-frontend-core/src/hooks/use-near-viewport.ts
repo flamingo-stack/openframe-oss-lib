@@ -126,6 +126,12 @@ export function useNearViewport<T extends Element = HTMLElement>(
 
       elRef.current = node;
       if (!node) return;
+      // No observer (an old browser, a test DOM): draw now. A gate that can never open would hide the content for
+      // good, and every caller's fallback is the content itself.
+      if (typeof IntersectionObserver === 'undefined') {
+        setIsNear(true);
+        return;
+      }
 
       const cb = () => setIsNear(true);
       subscribers.set(node, cb);

@@ -6,7 +6,7 @@
  * stated explicitly — never by a local `toLocale*` call or hand-built string.
  */
 
-import { formatDateWithTimezone } from './format';
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from './format';
 
 /** `mediumDateTime`'s fields, spread so a caller's own options still override. */
 const ZONED_DATE_FIELDS_MEDIUM_DATETIME: Intl.DateTimeFormatOptions = {
@@ -19,7 +19,8 @@ const ZONED_DATE_FIELDS_MEDIUM_DATETIME: Intl.DateTimeFormatOptions = {
 
 /**
  * Relative display label for a ticket timestamp (ISO string).
- * < 1 min → "Just now" | 1-59 min → "X min ago" | 1-23 h → "X hour(s) ago" | 24+ h → "MM/DD/YYYY"
+ * < 1 min → "Just now" | 1-59 min → "X min ago" | 1-23 h → "X hour(s) ago" | 24+ h → the
+ * calendar day as the viewer writes it (`03/20/2026` in en-US, `20/03/2026` in en-AU).
  */
 export function formatTicketRelativeTime(iso: string): string {
   const now = new Date();
@@ -31,17 +32,25 @@ export function formatTicketRelativeTime(iso: string): string {
   if (diffMin < 60) return `${diffMin} min ago`;
   const diffHours = Math.floor(diffMin / 60);
   if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  // UTC-pinned through the one renderer — see `formatDateWithTimezone`.
-  return formatDateWithTimezone(date, null, 'numeric');
+  // The label already depends on the viewer's clock (`now`), so it is client-only
+  // by nature: the day is theirs too, in their zone and locale.
+  return formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric', { viewerLocale: true });
 }
 
 /**
- * Full tooltip timestamp in "MM/DD/YYYY, H:MM AM/PM" format.
+ * Full tooltip timestamp for a ticket — the numeric date and the clock in the
+ * viewer's own zone and locale (`03/20/2026, 1:05 PM` in en-US,
+ * `20/03/2026, 13:05` in en-AU). A ticket's "created at" is read by the person
+ * looking at it, not by a server, so it is not UTC-pinned like content dates.
+ * The locale's own 12/24-hour convention applies — no `hour12` is forced.
  */
 export function formatTicketFullTimestamp(iso: string): string {
-  // UTC-pinned through the one renderer — see `formatDateWithTimezone`. This was
-  // a hand-assembled `MM/DD/YYYY, H:MM AM` built from `getUTC*` getters.
-  return formatDateWithTimezone(iso, null, 'numericDateTime');
+  return formatDateWithTimezone(
+    iso,
+    VIEWER_TIMEZONE,
+    { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit' },
+    { viewerLocale: true },
+  );
 }
 
 /**

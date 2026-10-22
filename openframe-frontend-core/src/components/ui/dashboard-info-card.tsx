@@ -1,10 +1,13 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 /**
@@ -123,10 +126,15 @@ export function DashboardInfoCard({
   valueClassName,
   subValue,
   caption,
-  loading = false,
+  loading: loadingProp = false,
   loadingShowsPercentage = false,
   loadingShowsSubValue = false,
 }: DashboardInfoCardProps) {
+  // In a page's loading state the figure is read: the card is its skeleton (`loading`).
+  const inScope = useLoadingScope();
+  const loading = loadingProp || inScope;
+  // A caption still being read is empty while loading: its two lines are kept whenever one is passed.
+  const hasCaption = loading ? caption != null : Boolean(caption);
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
   const percentageAsTag =
@@ -141,7 +149,7 @@ export function DashboardInfoCard({
         <UnifiedSkeleton className="h-8 w-12 shrink-0 rounded-md" />
       ) : (
         <p className="text-h4">
-          <UnifiedSkeleton as="span" className="block h-[1lh] w-12 rounded" />
+          <TextLineSkeleton type="inherit" as="span" className="w-12" />
         </p>
       );
     }
@@ -249,12 +257,13 @@ export function DashboardInfoCard({
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
           {titleSlot ??
-            (title !== undefined ? (
+            // A title still being read (empty while loading) is a bar of its line, like no title.
+            (title !== undefined && !(loading && !title) ? (
               <p className="truncate text-ods-text-secondary text-h5">{title}</p>
             ) : (
               loading && (
                 <p className="text-h5">
-                  <UnifiedSkeleton as="span" className="block h-[1lh] w-20 rounded" />
+                  <TextLineSkeleton type="inherit" as="span" className="w-20" />
                 </p>
               )
             ))}
@@ -264,12 +273,12 @@ export function DashboardInfoCard({
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
           <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
-            {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-24 rounded" /> : formattedValue}
+            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-24" /> : formattedValue}
           </p>
           {loading
             ? loadingShowsSubValue && (
                 <p className="text-h6">
-                  <UnifiedSkeleton as="span" className="block h-[1lh] w-16 rounded" />
+                  <TextLineSkeleton type="inherit" as="span" className="w-16" />
                 </p>
               )
             : subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
@@ -284,9 +293,9 @@ export function DashboardInfoCard({
         </div>
 
         {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
-        {caption && (
+        {hasCaption && (
           <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
-            {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-32 rounded" /> : caption}
+            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-32" /> : caption}
           </p>
         )}
       </div>
@@ -304,9 +313,10 @@ export function DashboardInfoCard({
     'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-m)] h-16 content-md:h-[104px] flex gap-[var(--spacing-system-s)] content-md:gap-[var(--spacing-system-m)] items-center transition-all';
 
   // A caption is a third line: the fixed stat-tile height would clip it.
-  const captionClassName = caption ? 'h-auto content-md:h-auto' : undefined;
+  const captionClassName = hasCaption ? 'h-auto content-md:h-auto' : undefined;
 
-  if (href) {
+  // While loading the card is not yet a link: a skeleton is never focusable.
+  if (href && !loading) {
     return (
       <Link
         href={href}
@@ -331,4 +341,12 @@ export function DashboardInfoCard({
       {cardContent}
     </div>
   );
+}
+
+/**
+ * A DashboardInfoCard while its figure is read: the same card with `loading` set, so it is the loaded card's box.
+ * The title, title slot, tag and icon it is given are the page's own and draw as they are.
+ */
+export function DashboardInfoCardSkeleton(props: Omit<DashboardInfoCardProps, 'value' | 'loading'>) {
+  return <DashboardInfoCard {...props} value="" loading />;
 }

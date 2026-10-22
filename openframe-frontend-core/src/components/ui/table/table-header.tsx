@@ -12,7 +12,7 @@ import type { TableColumn, TableHeaderProps, TableRowData } from './types';
 
 /** The default header label: wraps inside its cell with a balanced split. */
 const TABLE_HEADER_LABEL_CLASS = 'min-w-0 text-balance uppercase text-ods-text-secondary text-h5';
-import { getHideClasses } from './utils';
+import { getHideClasses, TABLE_ACTIONS_COLUMN_KEY } from './utils';
 
 /** @deprecated Use `DataTableHeader` from `data-table` instead. */
 export function TableHeader<T = TableRowData>({
@@ -94,7 +94,7 @@ export function TableHeader<T = TableRowData>({
       )}
 
       {columns.map(column => {
-        const isActionsColumn = column.key === '__actions__';
+        const isActionsColumn = column.key === TABLE_ACTIONS_COLUMN_KEY;
         const filterable = column.filterable && column.filterOptions && onFilterChange;
 
         // Hide columns on mobile if they are not actions or filterable

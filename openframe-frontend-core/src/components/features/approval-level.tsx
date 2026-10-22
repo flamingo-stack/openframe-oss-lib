@@ -7,7 +7,11 @@ import { HeadsetIcon } from '../icons-v2-generated/audio-and-visual/headset-icon
 import { BannedIcon } from '../icons-v2-generated/security/banned-icon';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { UserIcon } from '../icons-v2-generated/users/user-icon';
-import { ToggleGroup, ToggleGroupItem } from '../toggle-group';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TOGGLE_GROUP_CLASS, ToggleGroup, ToggleGroupItem } from '../toggle-group';
+import { TextHold } from '../ui/layout-hold';
+import { useLoadingScope } from '../ui/loading-scope';
+import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { TouchFriendlyTooltip } from '../ui/touch-friendly-tooltip';
 
@@ -57,6 +61,17 @@ export const APPROVAL_LEVEL_META: Record<ApprovalLevel, ApprovalLevelMeta> = {
 
 const ICON_PX = 16;
 
+/** The view's layout, read by the view and by its skeleton, so the skeleton is the view's size. */
+const READ_ONLY_ROW_CLASS = 'inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]';
+const EDITABLE_ROW_CLASS = 'flex shrink-0 items-center gap-[var(--spacing-system-sf)]';
+const LEVEL_NAME_CLASS = 'whitespace-nowrap text-h6';
+/** An editable level's button: the small toggle with tighter sides. */
+const LEVEL_BUTTON_CLASS = 'px-2';
+/** The longest level name: the skeleton's name bar is exactly its width (the component's own words, unseen). */
+const LONGEST_LEVEL_LABEL = APPROVAL_LEVELS.map(level => APPROVAL_LEVEL_META[level].label).reduce((a, b) =>
+  b.length > a.length ? b : a,
+);
+
 export interface ApprovalLevelViewProps {
   /** The level in force. */
   value: ApprovalLevel;
@@ -78,6 +93,8 @@ export interface ApprovalLevelViewProps {
   showLabel?: boolean;
   /** Editable: the id of the element that names what is being decided (the rule's label). */
   'aria-labelledby'?: string;
+  /** The level is still being read: the view draws its own skeleton (also in a loading scope). */
+  loading?: boolean;
   className?: string;
 }
 
@@ -98,13 +115,16 @@ export function ApprovalLevelView({
   disabled = false,
   showLabel = true,
   'aria-labelledby': labelledBy,
+  loading = false,
   className,
 }: ApprovalLevelViewProps) {
-  const current = APPROVAL_LEVEL_META[value];
   const canEdit = editable ?? onChange !== undefined;
-  const name = showLabel ? (
-    <span className={cn('whitespace-nowrap text-h6', current.toneClassName)}>{current.label}</span>
-  ) : null;
+  // One switch: while the level is read (a prop, or a page's loading scope) the view is its own skeleton.
+  if (useLoadingScope() || loading) {
+    return <ApprovalLevelSkeleton editable={canEdit} showLabel={showLabel} className={className} />;
+  }
+  const current = APPROVAL_LEVEL_META[value];
+  const name = showLabel ? <span className={cn(LEVEL_NAME_CLASS, current.toneClassName)}>{current.label}</span> : null;
 
   if (!canEdit) {
     const icon = (
@@ -114,7 +134,7 @@ export function ApprovalLevelView({
       </span>
     );
     return (
-      <span className={cn('inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]', className)}>
+      <span className={cn(READ_ONLY_ROW_CLASS, className)}>
         {name}
         {showLabel ? (
           icon
@@ -128,7 +148,7 @@ export function ApprovalLevelView({
   }
 
   return (
-    <div className={cn('flex shrink-0 items-center gap-[var(--spacing-system-sf)]', className)}>
+    <div className={cn(EDITABLE_ROW_CLASS, className)}>
       {name}
       <TooltipProvider delayDuration={150}>
         <ToggleGroup
@@ -153,7 +173,7 @@ export function ApprovalLevelView({
                   <ToggleGroupItem
                     value={level}
                     aria-label={label}
-                    className={cn('px-2', level === value && toneClassName)}
+                    className={cn(LEVEL_BUTTON_CLASS, level === value && toneClassName)}
                   >
                     <Icon size={ICON_PX} aria-hidden />
                   </ToggleGroupItem>
@@ -166,6 +186,49 @@ export function ApprovalLevelView({
           })}
         </ToggleGroup>
       </TooltipProvider>
+    </div>
+  );
+}
+
+export interface ApprovalLevelSkeletonProps {
+  /** The editable form (the four levels' group) or the read-only one (the level's icon). */
+  editable?: boolean;
+  /** Whether the level's name is written before the icons (default true, like the view). */
+  showLabel?: boolean;
+  className?: string;
+}
+
+/**
+ * `ApprovalLevelView`'s own skeleton (a level chip, not a whole view): a level while it is read: the view's own row, the name a bar at its type step (the longest name's width), and the
+ * read-only icon's box or the editable group's four small toggle boxes. Inert: nothing in it can be picked.
+ */
+export function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelSkeletonProps) {
+  const name = showLabel ? (
+    <span className={LEVEL_NAME_CLASS}>
+      <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>
+    </span>
+  ) : null;
+  if (!editable) {
+    return (
+      <span aria-hidden className={cn(READ_ONLY_ROW_CLASS, className)}>
+        {name}
+        <UnifiedSkeleton as="span" className="inline-block shrink-0 rounded-sm" width={ICON_PX} height={ICON_PX} />
+      </span>
+    );
+  }
+  return (
+    <div aria-hidden inert className={cn(EDITABLE_ROW_CLASS, className)}>
+      {name}
+      <div className={TOGGLE_GROUP_CLASS}>
+        {APPROVAL_LEVELS.map(level => (
+          <UnifiedSkeleton
+            key={level}
+            // The small toggle's height and its tighter sides around one icon (`box-content`: the padding adds).
+            className={cn(TOGGLE_SIZE_CLASS.sm, LEVEL_BUTTON_CLASS, 'box-content shrink-0 rounded-md')}
+            width={ICON_PX}
+          />
+        ))}
+      </div>
     </div>
   );
 }

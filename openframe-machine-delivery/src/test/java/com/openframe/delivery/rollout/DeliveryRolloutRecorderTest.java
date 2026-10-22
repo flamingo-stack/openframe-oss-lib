@@ -7,7 +7,9 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDeliveryRollout;
 import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
@@ -28,10 +30,13 @@ import static org.mockito.Mockito.when;
 class DeliveryRolloutRecorderTest {
 
     private static final String TARGET_ID = "openframe-client";
+    private static final String TENANT_ID = "t-1";
     private static final int SEQUENCE = 7;
 
     @Mock private MachineDeliveryRolloutRepository repository;
     @Mock private MachineDeliverySequenceRepository sequences;
+    @Mock private TenantIdProvider tenants;
+    @Mock private DeliveryMetrics metrics;
 
     @Captor private ArgumentCaptor<MachineDeliveryRollout> rolloutCaptor;
 
@@ -40,7 +45,7 @@ class DeliveryRolloutRecorderTest {
 
     @BeforeEach
     void setUp() {
-        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new JsonMapper()));
+        recorder = new DeliveryRolloutRecorder(repository, sequences, new DeliveryPayloadJson(new JsonMapper()), tenants, metrics);
         TestPayload payload = new TestPayload();
         payload.setValue("1.5.11");
         payload.setDelivery(new DeliveryRef(DeliveryType.CLIENT_UPDATE, TARGET_ID, "d-rollout"));
@@ -53,8 +58,9 @@ class DeliveryRolloutRecorderTest {
     }
 
     @Test
-    void record_requestForEveryMachine_rolloutSavedAtTheStartWithOneSequence() {
+    void record_requestForEveryMachine_rolloutSavedUnderTheTenantWithOneSequence() {
         // setup
+        when(tenants.getTenantId()).thenReturn(TENANT_ID);
         when(sequences.next()).thenReturn(SEQUENCE);
 
         // execution
@@ -63,7 +69,7 @@ class DeliveryRolloutRecorderTest {
         // verifications
         verify(repository).save(rolloutCaptor.capture());
         MachineDeliveryRollout rollout = rolloutCaptor.getValue();
-        assertThat(rollout.getId()).isEqualTo("CLIENT_UPDATE:openframe-client");
+        assertThat(rollout.getId()).isEqualTo("t-1:CLIENT_UPDATE:openframe-client");
         assertThat(rollout.getType()).isEqualTo(DeliveryType.CLIENT_UPDATE);
         assertThat(rollout.getTargetId()).isEqualTo(TARGET_ID);
         assertThat(rollout.getSequence()).isEqualTo(SEQUENCE);
@@ -72,5 +78,6 @@ class DeliveryRolloutRecorderTest {
         assertThat(rollout.getDispatched()).isZero();
         assertThat(rollout.getStartedAt()).isNotNull();
         assertThat(rollout.getPayloadJson()).contains("1.5.11");
+        verify(metrics).recordRolloutStarted(DeliveryType.CLIENT_UPDATE);
     }
 }

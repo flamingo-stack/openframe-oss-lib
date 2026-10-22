@@ -47,6 +47,7 @@ import { useRouter } from '../../embed-shims/next-navigation';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { cn } from '../../utils/cn';
 import { formatCitationIndices } from '../../utils/source-grouping';
+import { getSourceIconName } from '../../utils/source-icons';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 import {
@@ -88,8 +89,8 @@ import { useChatDialogManager } from './hooks/use-chat-dialog-manager';
 import { useChatIdentity } from './hooks/use-chat-identity';
 import { useCloseOnNavigation } from './hooks/use-close-on-navigation';
 import { useEmptyStateConfig } from './hooks/use-empty-state-config';
-import { fetchSlashCommands, useSlashCommandRegistry, type SlashCommandSummary } from './hooks/use-slash-commands';
-import type { ChatSource, UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
+import { fetchSlashCommands, useSlashCommandRegistry } from './hooks/use-slash-commands';
+import type { UseSseChatAdapterOptions } from './hooks/use-sse-chat-adapter';
 import { useUnifiedChat, type ChatMode, type UseUnifiedChatModes } from './hooks/use-unified-chat';
 import { awaitsDecision, useWhatToAsk, type WhatToAskContent } from './hooks/use-what-to-ask';
 import { MingoArchiveList } from './mingo-archive-list';
@@ -104,9 +105,9 @@ import { NavLinkAnchorViaRuntime } from './nav-link-anchor-via-runtime';
 import { accentFromIdentityIcon, getAgentAccent } from './quick-action-chip';
 import { SourceActionButton } from './source-action-button';
 import { AUTHOR_TYPE, CHAT_APPEARANCE, type ChatAppearance } from './types/chat.types';
-import type { ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
+import type { SlashCommandSummary, ChatInputRef, DialogItem, SlashCommandActionId } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
-import type { MessageSegment, Message } from './types/message.types';
+import type { ChatSource, MessageSegment, Message } from './types/message.types';
 import type {
   ChatDialogCapabilities,
   UnifiedChatState,
@@ -123,7 +124,6 @@ import { mapHostMessage, pruneTimestampCache } from './utils/host-message';
 import { resolveIcon } from './utils/icon-library';
 import { computeIsNewTab, newTabAnchorAttrs } from './utils/nav-anchor-props';
 import { formatSingularLookupInvocation } from './utils/slash-dispatch-utils';
-import { getSourceIconName } from './utils/source-icons';
 import { resolveSourceRowCTA, sourceRowCtxFromRuntime } from './utils/source-row-cta';
 
 /**
@@ -500,9 +500,9 @@ export interface EmbeddableChatProps {
   onWhatToAsk?: () => void;
   /**
    * v2: the "What to ask?" exchange the list's entry shows (when no
-   * `onWhatToAsk` takes it over): added at the end of the open conversation,
-   * or a new chat opens with it. Local - never sent, never stored. Picking a
-   * chip sends its prompt in that chat, like a quick action.
+   * `onWhatToAsk` takes it over): every click opens a new chat holding it,
+   * never the open conversation. Local - never sent, never stored. Picking a
+   * chip sends its prompt in that new chat, like a quick action.
    *
    * A function is called on each click and the exchange appears, whole, once
    * its promise settles (prompts built from live data, e.g. the workspace's
@@ -2315,30 +2315,20 @@ function EmbeddableChatInner({
     (pendingApprovals?.length ?? 0) > 0 ||
     awaitsDecision(hostMessages);
 
-  // "What to ask Mingo?" with `whatToAsk`: the exchange goes at the end of the
-  // open conversation when it can go on right now. Otherwise (none open, an
-  // archived one, one still loading or blocked as above) a new chat opens with
-  // it: adding prompts under a pending approval or a running turn would mix
-  // two conversations. A new chat with nothing sent yet gets another exchange.
-  // `newChat`: asked from a screen with no chat open (the archive list), where
-  // the conversation open before it is not the one the user is looking at.
-  const showWhatToAsk = (content: WhatToAskContent, newChat = false) => {
-    if (!newChat && activeDialogId && hasConversation && !isViewingArchived && !isMessagesLoading && !isChatBlocked) {
-      whatToAsk.ask('current', content);
-      return;
-    }
-    const isUnsentNewChat = activeDialogId == null && hostMessages.length === 0 && !isViewingArchived;
-    if (!isUnsentNewChat) {
-      whatToAsk.clearDraft();
-      resetToNewChat();
-    }
+  // "What to ask Mingo?" with `whatToAsk`: every click opens a new chat with
+  // the exchange - never the open conversation, whatever its state, and not
+  // the new chat already holding one (its exchange is dropped for a fresh
+  // one). The prompts always start a conversation of their own.
+  const showWhatToAsk = (content: WhatToAskContent) => {
+    whatToAsk.clearDraft();
+    resetToNewChat();
     setComposeOpen(true);
     whatToAsk.ask('draft', content);
   };
 
   // A "What to ask?" chip: its prompt goes out on its own, like a quick action
   // (whatever is staged in the composer stays staged), into the chat the chip
-  // sits in - not while that chat is blocked. From a new chat that send
+  // sits in - not while that chat is blocked. The first send from the new chat
   // creates the dialog the exchange moves to.
   useEffect(() => {
     sendPromptRef.current = text => {
@@ -2356,16 +2346,16 @@ function EmbeddableChatInner({
     showWhatToAskRef.current = showWhatToAsk;
   });
   const whatToAskPendingRef = useRef(false);
-  const requestWhatToAsk = (newChat: boolean) => {
+  const requestWhatToAsk = () => {
     if (!whatToAskContent) return;
     if (typeof whatToAskContent !== 'function') {
-      showWhatToAsk(whatToAskContent, newChat);
+      showWhatToAsk(whatToAskContent);
       return;
     }
     if (whatToAskPendingRef.current) return;
     whatToAskPendingRef.current = true;
     whatToAskContent()
-      .then(content => showWhatToAskRef.current(content, newChat))
+      .then(content => showWhatToAskRef.current(content))
       .catch((err: unknown) => console.error('[EmbeddableChat] whatToAsk failed:', err))
       .finally(() => {
         whatToAskPendingRef.current = false;
@@ -2542,11 +2532,8 @@ function EmbeddableChatInner({
     onOpenArchive: headerOnOpenArchive && (archiveOpen ? closeArchive : headerOnOpenArchive),
     archiveActive: archiveOpen,
     // The suggestions a new chat opens on, unless the host has a surface of its own.
-    // From the archive list no chat is on screen, even though the one open
-    // before it is still the active dialog: that click opens a new chat.
     onWhatToAsk: () => {
-      const fromArchive = archiveOpen;
-      leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? () => requestWhatToAsk(fromArchive) : handleNewChat))();
+      leaveArchiveThen(onWhatToAsk ?? (whatToAskContent ? requestWhatToAsk : handleNewChat))();
     },
     statusOf: dialogStatusOf,
     onRequestRename: mingoCaps.canRename ? setRenameTarget : undefined,

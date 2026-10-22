@@ -70,7 +70,8 @@ vi.mock('@mux/mux-player-react', () => {
   return { default: Fake };
 });
 
-import { Video, VIDEO_PLAYBACK_FAILED_EVENT } from '../video';
+import { Video } from '../video';
+import { VIDEO_PLAYBACK_FAILED_EVENT } from '../video-shared';
 
 const YT_ORIGIN = 'https://www.youtube-nocookie.com';
 const ERROR_TEXT = 'This video failed to play.';

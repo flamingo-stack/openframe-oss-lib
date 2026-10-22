@@ -19,8 +19,18 @@ import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collisi
 import { cn } from '../../utils/cn';
 import { SearchIcon } from '../icons-v2-generated';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { HiddenTagsPopup } from './hidden-tags-popup';
 import { Tag } from './tag';
+
+/** A result row's frame, read by the rows and by their loading state. */
+const SEARCH_RESULT_ROW_CLASS = 'flex min-h-10 items-center border-b border-ods-border px-3 last:border-b-0';
+/**
+ * Rows the results' loading state draws when its host states no `loadingRows`: a typical count. A host whose search
+ * answers a limited number of results passes that limit.
+ */
+const SEARCH_RESULTS_LOADING_ROWS = 8;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,6 +71,8 @@ export interface SearchInputProps {
   results?: SearchResult[];
   /** Whether results are loading */
   isLoading?: boolean;
+  /** Result rows drawn while `isLoading`: the results the host's search answers (its limit). Default a typical count. */
+  loadingRows?: number;
   /** Called when a result row is selected.
    *
    *  `modifiers` carries the click event's modifier-key state when the
@@ -165,6 +177,7 @@ export function SearchInput({
   onSubmit,
   results = [],
   isLoading = false,
+  loadingRows = SEARCH_RESULTS_LOADING_ROWS,
   onResultSelect,
   debounceMs = 300,
   renderResult,
@@ -394,7 +407,8 @@ export function SearchInput({
         role="option"
         aria-selected={isHighlighted}
         className={cn(
-          'flex min-h-10 cursor-pointer items-center border-b border-ods-border px-3 transition-colors last:border-b-0',
+          SEARCH_RESULT_ROW_CLASS,
+          'cursor-pointer transition-colors',
           isHighlighted && 'bg-ods-bg-hover',
           !isHighlighted && 'hover:bg-ods-bg-hover',
         )}
@@ -409,7 +423,17 @@ export function SearchInput({
   // ---- Dropdown content ----
   const renderDropdownContent = () => {
     if (isLoading) {
-      return <div className="px-4 py-3 text-ods-text-secondary text-h6">Loading...</div>;
+      // The results while they are read: the dropdown's own rows, a title bar each.
+      return (
+        <LoadingRegion label="Loading results">
+          {Array.from({ length: loadingRows }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
+            <div key={i} className={SEARCH_RESULT_ROW_CLASS} aria-hidden>
+              <TextLineSkeleton type="h6" className="w-2/3" />
+            </div>
+          ))}
+        </LoadingRegion>
+      );
     }
 
     if (flatResults.length === 0) {
@@ -560,7 +584,9 @@ export function SearchInput({
         >
           <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
             <ScrollAreaPrimitive.Viewport className="max-h-[320px] min-h-0 w-full">
-              <div role="listbox">{renderDropdownContent()}</div>
+              {/* A listbox owns options only: while the results are read the box is the loading region's (a status
+                  and hidden rows), with no listbox role around it. */}
+              <div role={isLoading ? undefined : 'listbox'}>{renderDropdownContent()}</div>
             </ScrollAreaPrimitive.Viewport>
             <ScrollAreaPrimitive.Scrollbar className="hidden" orientation="vertical">
               <ScrollAreaPrimitive.Thumb />

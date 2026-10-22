@@ -73,13 +73,17 @@ public class MachineStatusService {
             touchPresence(machine, telemetry, eventTimestamp);
             return;
         }
+        boolean firstConnect = previousStatus == PENDING && (newStatus == ONLINE || newStatus == OFFLINE);
         machine.setStatus(newStatus);
         machine.setTelemetryStatus(telemetry);
         machine.setLastSeen(eventTimestamp);
+        if (firstConnect && machine.getFirstConnectedAt() == null) {
+            machine.setFirstConnectedAt(eventTimestamp);
+        }
         machineRepository.save(machine);
         log.debug("Updated machineId={} to status={} at {}", machine.getMachineId(), newStatus, eventTimestamp);
 
-        if (previousStatus == PENDING && (newStatus == ONLINE || newStatus == OFFLINE)) {
+        if (firstConnect) {
             log.info("Device first connected: machineId={}, transition {} -> {}", machine.getMachineId(), previousStatus, newStatus);
             eventPublisher.publishEvent(new DeviceFirstConnectedEvent(this, machine));
         }

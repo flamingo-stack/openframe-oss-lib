@@ -125,3 +125,20 @@ export function clearDismissCookie(name: string): void {
   fallbackStore(name).clear();
   document.cookie = `${name}=; path=/; max-age=0`;
 }
+
+/**
+ * The inline script that applies a dismissal BEFORE the first paint, for a page
+ * the server renders the same for every visitor (and a CDN may cache), so the
+ * server cannot read the cookie: placed early in `<body>`, it marks the
+ * document root with `attribute` when the cookie holds `id`, and the host's CSS
+ * hides the surface on that attribute. Without it the surface paints and then
+ * collapses once the bundle hydrates: a flash and a layout shift.
+ *
+ * Same match rule as `isDismissedCookieValue` (the id, never mere presence) and
+ * the same encoding `writeDismissCookie` uses. Cookie tier only: a
+ * cookie-averse document (a native shell) is not a cached web page. Any throw
+ * leaves the surface shown, the failing-open side.
+ */
+export function dismissedBeforePaintScript(name: string, id: string, attribute: string): string {
+  return `(function(){try{var n=${JSON.stringify(`${name}=`)},c=document.cookie.split('; ');for(var i=0;i<c.length;i++){if(c[i].indexOf(n)===0&&decodeURIComponent(c[i].slice(n.length))===${JSON.stringify(id)}){document.documentElement.setAttribute(${JSON.stringify(attribute)},'');break}}}catch(e){}})();`;
+}

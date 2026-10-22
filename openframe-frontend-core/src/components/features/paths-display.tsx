@@ -3,6 +3,8 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface PathsDisplayProps {
   /**
@@ -48,6 +50,18 @@ export interface PathsDisplayProps {
   leadingIcon?: React.ReactNode;
 }
 
+/** The list's layout, read by the list and by its skeleton, so the skeleton is the list's size. */
+const PATHS_CLASS = 'flex flex-col gap-3';
+const PATHS_TITLE_CLASS = 'text-ods-text-primary text-h4';
+const PATHS_DESCRIPTION_CLASS = 'text-ods-text-secondary text-h6';
+const PATHS_FRAME_CLASS = 'overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg';
+const PATHS_ROW_CLASS = 'flex items-center gap-4 border-b border-ods-border p-4 last:border-b-0';
+const PATHS_COPY_BUTTON_CLASS =
+  'shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus';
+/** How many rows the skeleton draws when the paths are read with the page. */
+export const PATHS_DISPLAY_SKELETON_ROWS = 2;
+const PATH_SKELETON_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3'] as const;
+
 /**
  * PathsDisplay - Unified component for displaying file/folder paths with copy functionality
  *
@@ -87,17 +101,32 @@ export function PathsDisplay({
   copyIconSize = 'w-6 h-6',
   leadingIcon,
 }: PathsDisplayProps) {
+  // Paths that are read arrive empty in a page's loading state: the list is its skeleton, never left out.
+  // Paths a page states itself (`OPENFRAME_PATHS`) are its own words and draw as they are.
+  const inScope = useLoadingScope();
   if (!paths || paths.length === 0) {
+    if (inScope) {
+      return (
+        <PathsDisplaySkeleton
+          title={title}
+          description={description}
+          showCopyButtons={showCopyButtons && !!onCopyPath}
+          copyIconSize={copyIconSize}
+          leadingIcon={leadingIcon}
+          className={className}
+        />
+      );
+    }
     return null;
   }
 
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
-      {title && <div className="text-ods-text-primary text-h4">{title}</div>}
-      {description && <div className="text-ods-text-secondary text-h6">{description}</div>}
-      <div className="overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg">
+    <div className={cn(PATHS_CLASS, className)}>
+      {title && <div className={PATHS_TITLE_CLASS}>{title}</div>}
+      {description && <div className={PATHS_DESCRIPTION_CLASS}>{description}</div>}
+      <div className={PATHS_FRAME_CLASS}>
         {paths.map(path => (
-          <div key={path} className="flex items-center gap-4 border-b border-ods-border p-4 last:border-b-0">
+          <div key={path} className={PATHS_ROW_CLASS}>
             {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
             <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h4">{path}</span>
             {showCopyButtons && onCopyPath && (
@@ -105,10 +134,51 @@ export function PathsDisplay({
                 type="button"
                 onClick={() => onCopyPath(path)}
                 aria-label={`Copy ${path}`}
-                className="shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+                className={PATHS_COPY_BUTTON_CLASS}
               >
                 <Copy02Icon className={copyIconSize} />
               </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The paths list while its paths are read: the same frame, its title, description, leading icon and copy glyph for
+ * real, and `rows` rows with a bar of a path each.
+ */
+export function PathsDisplaySkeleton({
+  rows = PATHS_DISPLAY_SKELETON_ROWS,
+  title,
+  description,
+  showCopyButtons = true,
+  copyIconSize = 'w-6 h-6',
+  leadingIcon,
+  className,
+}: Pick<
+  PathsDisplayProps,
+  'title' | 'description' | 'showCopyButtons' | 'copyIconSize' | 'leadingIcon' | 'className'
+> & {
+  rows?: number;
+}) {
+  return (
+    <div className={cn(PATHS_CLASS, className)} aria-hidden>
+      {title && <div className={PATHS_TITLE_CLASS}>{title}</div>}
+      {description && <div className={PATHS_DESCRIPTION_CLASS}>{description}</div>}
+      <div className={PATHS_FRAME_CLASS}>
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className={PATHS_ROW_CLASS}>
+            {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
+            <div className="min-w-0 flex-1">
+              <TextLineSkeleton type="h4" className={PATH_SKELETON_WIDTHS[i % PATH_SKELETON_WIDTHS.length]} />
+            </div>
+            {showCopyButtons && (
+              <span className={PATHS_COPY_BUTTON_CLASS}>
+                <Copy02Icon className={copyIconSize} />
+              </span>
             )}
           </div>
         ))}

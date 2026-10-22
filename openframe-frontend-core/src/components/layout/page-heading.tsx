@@ -1,5 +1,6 @@
 import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 
 /**
  * THE page-title style — the ODS `text-h1` token (`--font-size-h1-title` =
@@ -232,6 +233,29 @@ export interface SectionHeadingProps {
 }
 
 /**
+ * THE eyebrow: the small label over a heading (Azeret Mono, uppercase, in the accent).
+ * `SectionHeading` draws it, and so does any heading that is not a `SectionHeading`
+ * (a call-to-action band's label), so a change to the eyebrow lands everywhere.
+ */
+export function SectionEyebrow({
+  children,
+  platform,
+  tone = 'accent',
+  className,
+}: {
+  children: ReactNode;
+  platform?: string | null;
+  tone?: HeadingAccentTone;
+  className?: string;
+}) {
+  return (
+    <span className={['text-h5', headingAccentClass(platform, tone), className].filter(Boolean).join(' ')}>
+      {children}
+    </span>
+  );
+}
+
+/**
  * THE heading block of a page section or hero: an eyebrow, the heading with its
  * accent punctuation, an intro, and an optional action at the end of the row.
  * Every section on every site composes this, so a change to the layout lands
@@ -252,7 +276,11 @@ export function SectionHeading({
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
   const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
-  const eyebrowNode = eyebrow ? <span className={`text-h5 ${accentClassName}`}>{eyebrow}</span> : null;
+  const eyebrowNode = eyebrow ? (
+    <SectionEyebrow platform={platform} tone={tone}>
+      {eyebrow}
+    </SectionEyebrow>
+  ) : null;
   const headingText = (
     <>
       {accentSentenceMarks(title, platform, tone)}
@@ -281,6 +309,73 @@ export function SectionHeading({
       {intro ? (
         <div className={layout.intro} data-section-intro>
           {intro}
+        </div>
+      ) : null}
+    </div>
+  );
+  if (!action) return className ? <div className={className}>{stack}</div> : stack;
+  return (
+    <div
+      className={`flex flex-wrap items-end justify-between gap-[var(--spacing-system-mf)]${className ? ` ${className}` : ''}`}
+    >
+      {stack}
+      {action}
+    </div>
+  );
+}
+
+export interface SectionHeadingSkeletonProps {
+  level?: 'page' | 'section';
+  /** The eyebrow: static copy, drawn as it is. */
+  eyebrow?: ReactNode;
+  /** The title bar's width (a width class). Default `w-2/3`. */
+  titleWidth?: string;
+  /** The intro's lines: `true` is two. Omitted: no intro. */
+  intro?: boolean | 1 | 2 | 3;
+  /** Something at the far end of the row, drawn as given. */
+  action?: ReactNode;
+  platform?: string | null;
+  tone?: HeadingAccentTone;
+  className?: string;
+}
+
+/**
+ * A heading whose title and intro are read data (a category's name and description), while they are read: the same
+ * stack, the eyebrow for real, a one-line bar at the heading's type step and a bar per intro line at the intro's.
+ * No heading element is drawn: the loaded heading is the page's one.
+ */
+export function SectionHeadingSkeleton({
+  level = 'section',
+  eyebrow,
+  titleWidth = 'w-2/3',
+  intro,
+  action,
+  platform,
+  tone = 'accent',
+  className,
+}: SectionHeadingSkeletonProps) {
+  const layout = SECTION_HEADING_LAYOUT[level];
+  const introLines = intro === true ? 2 : intro || 0;
+  const stack = (
+    <div className={layout.stack} aria-hidden>
+      {eyebrow ? (
+        <SectionEyebrow platform={platform} tone={tone}>
+          {eyebrow}
+        </SectionEyebrow>
+      ) : null}
+      <div className={layout.heading}>
+        <TextLineSkeleton type="inherit" className={titleWidth} />
+      </div>
+      {introLines > 0 ? (
+        <div className={layout.intro}>
+          {Array.from({ length: introLines }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton lines never reorder
+            <TextLineSkeleton
+              key={i}
+              type="inherit"
+              className={i === introLines - 1 && introLines > 1 ? 'w-2/3' : 'w-full'}
+            />
+          ))}
         </div>
       ) : null}
     </div>

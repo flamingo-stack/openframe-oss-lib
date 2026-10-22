@@ -5,6 +5,7 @@ import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-cir
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
+import { LIVE_PULSE_CLASS } from '../ui/skeleton-surface';
 import { SquareAvatar as Avatar } from '../ui/square-avatar';
 import { TicketStatusTag, resolveStatusTagProps } from '../ui/ticket-status-tag';
 import { MspOrganizationCard } from './msp-organization-card';
@@ -19,7 +20,7 @@ const ConnectionIndicator: FC<ConnectionIndicatorProps> = ({ status }) => {
       case 'connected':
         return 'bg-ods-success';
       case 'connecting':
-        return 'bg-ods-warning animate-pulse';
+        return `bg-ods-warning ${LIVE_PULSE_CLASS}`;
       case 'disconnected':
         return 'bg-ods-error';
       default:

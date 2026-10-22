@@ -16,13 +16,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
-import type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSummary } from '../types/component.types';
-
-// Re-export so callers can `import { SlashCommandSummary } from
-// '@flamingo-stack/openframe-frontend-core/components/chat/hooks'`
-// without reaching into types. The component.types module is the
-// canonical declaration.
-export type { SlashCommandActionId, SlashCommandSummaryAction, SlashCommandSummary };
+import type { SlashCommandSummary } from '../types/component.types';
 
 /**
  * Fetch slash-command suggestions for the CURRENT deployment platform,

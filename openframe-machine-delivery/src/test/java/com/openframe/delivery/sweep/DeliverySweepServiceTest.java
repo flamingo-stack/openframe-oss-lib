@@ -10,6 +10,7 @@ import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.track.DeliveryCloser;
@@ -43,6 +44,7 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDO
 import static com.openframe.delivery.config.DeliveryTestPolicies.SWEEP_INTERVAL_MILLIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -360,6 +362,51 @@ class DeliverySweepServiceTest {
     }
 
     @Test
+    void retryPendingFast_typeWithFastSweep_itsDueRowsRepublished() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        when(repository.findDue(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(delivery));
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
+
+        // execution
+        service.retryPendingFast();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
+        verify(repository, never()).findDueExcept(any(DeliveryStatus.class), anySet(), any(Instant.class), any(Integer.class));
+    }
+
+    @Test
+    void retryPending_typeWithFastSweep_leftToTheFastPass() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        stubDue();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).findDueExcept(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE));
+    }
+
+    @Test
+    void retryPendingFast_noTypeWithFastSweep_nothingQueried() {
+        // execution
+        service.retryPendingFast();
+
+        // verifications
+        verifyNoInteractions(repository, machineOnlineStatus, publisher);
+    }
+
+    @Test
     void retryPending_nothingDue_machinesNotLookedUp() {
         // setup
         stubDue();
@@ -387,7 +434,7 @@ class DeliverySweepServiceTest {
     }
 
     private void stubDue(MachineDelivery... rows) {
-        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
+        when(repository.findDueExcept(eq(DeliveryStatus.PENDING), anySet(), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
     private void stubMachineOnline() {
