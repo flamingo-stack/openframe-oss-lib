@@ -181,6 +181,9 @@ export interface VideoCommonProps {
    * want a minimal look. No-op for file (MP4/HLS) branches.
    */
   minimalControls?: boolean;
+  /** The record is still being read: the video draws its skeleton (its layout's box) and mounts no player. A loading
+   *  scope does the same while no `url` is given. */
+  loading?: boolean;
 }
 
 /**

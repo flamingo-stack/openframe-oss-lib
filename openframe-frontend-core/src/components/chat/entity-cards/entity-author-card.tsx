@@ -75,6 +75,9 @@ export interface EntityAuthorCardProps {
    *  holds. Defaults to false. */
   renderEmptyAuthor?: boolean;
   className?: string;
+  /** The record is still being read: the card draws its skeleton, its cells the ones the caller asked for (a
+   *  Published cell when `publishedAt` is passed at all, `null` included). A loading scope does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -137,7 +140,7 @@ export function EntityMetadataValueCell({
 }
 
 /** A value cell while its value is read: the label is the page's own words, the value a bar of its line. */
-export function EntityMetadataValueCellSkeleton({ label, className }: { label: string; className?: string }) {
+function EntityMetadataValueCellSkeleton({ label, className }: { label: string; className?: string }) {
   return (
     <div className={cn(VALUE_CELL_CLASS, className)}>
       <div className={CELL_STACK_CLASS}>
@@ -160,13 +163,17 @@ export function EntityMetadataAuthorCell({
   roleLabel = 'Author',
   authorHref,
   className,
+  loading: loadingProp,
 }: {
-  author: NonNullable<EntityAuthorCardProps['author']>;
   roleLabel?: string;
   authorHref?: string;
   className?: string;
-}) {
-  const loading = useLoadingScope();
+} & (
+  | { author: NonNullable<EntityAuthorCardProps['author']>; loading?: boolean }
+  /** The author is still being read: the cell draws its own loading form (also in a loading scope). */
+  | { author?: undefined; loading: true }
+)) {
+  const loading = useLoadingScope() || loadingProp || !author;
   if (loading) return <EntityMetadataAuthorCellSkeleton className={className} />;
   // Trimmed real name gates the LINK — a placeholder/unknown label must
   // never render as a clickable author (an authorHref passed alongside an
@@ -201,7 +208,7 @@ export function EntityMetadataAuthorCell({
 }
 
 /** The author cell while it is read: the avatar's box and a bar for the name and the role (both read data). */
-export function EntityMetadataAuthorCellSkeleton({ className }: { className?: string }) {
+function EntityMetadataAuthorCellSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn(AUTHOR_CELL_CLASS, className)}>
       <UnifiedSkeleton variant="circular" className={cn('shrink-0', AVATAR_SIZE[AUTHOR_AVATAR_SIZE])} />
@@ -213,7 +220,7 @@ export function EntityMetadataAuthorCellSkeleton({ className }: { className?: st
   );
 }
 
-export interface EntityAuthorCardSkeletonProps {
+interface EntityAuthorCardSkeletonProps {
   /** The labels of the extra cells, in order (the page's own words: "Section", "Customer"). */
   extraCellLabels?: string[];
   /** The Published cell's label, or `null` when the card has no Published cell. Defaults to "Published". */
@@ -230,7 +237,7 @@ export interface EntityAuthorCardSkeletonProps {
  * The card while it is read: the same grid, every label real, every value a bar, the author cell an avatar box and
  * two bars. `EntityAuthorCard` draws it in a loading scope.
  */
-export function EntityAuthorCardSkeleton({
+function EntityAuthorCardSkeleton({
   extraCellLabels = [],
   publishedLabel = 'Published',
   optionalCells = 0,
@@ -259,8 +266,9 @@ export function EntityAuthorCard({
   extraCells,
   renderEmptyAuthor = false,
   className,
+  loading: loadingProp,
 }: EntityAuthorCardProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   // In a loading scope the card is its skeleton: its cells are the ones the caller asked for (a Published cell
   // when it passed `publishedAt` at all), never decided by data that is not read yet.
   if (loading) {

@@ -93,6 +93,12 @@ export interface StatusBadgeProps
    * gen badge — do NOT build a parallel component.
    */
   gen?: number;
+  /** The badge's text is still being read: it draws its skeleton (its own padding and type step). A loading scope does
+   *  the same. */
+  loading?: boolean;
+  /** The text is written copy (a content-type chip, "Beta"), not read data: the badge stays real in a loading scope.
+   *  `loading` still switches it. */
+  staticText?: boolean;
 }
 
 /**
@@ -112,8 +118,20 @@ function StatusBadgeSkeleton({ variant, className }: { variant?: 'card' | 'butto
   );
 }
 
-function StatusBadge({ text, variant, colorScheme, className, singleLine, gen, style, ...props }: StatusBadgeProps) {
-  const loading = useLoadingScope();
+function StatusBadge({
+  text,
+  variant,
+  colorScheme,
+  className,
+  singleLine,
+  gen,
+  style,
+  loading: loadingProp,
+  staticText = false,
+  ...props
+}: StatusBadgeProps) {
+  const inScope = useLoadingScope();
+  const loading = (inScope && !staticText) || !!loadingProp;
   if (loading) return <StatusBadgeSkeleton variant={variant} className={className} />;
   // Generation mode: constant full-accent text, progressive-opacity accent bg,
   // SSOT casing (textTransform:none overrides the base `uppercase`). Inline
@@ -164,4 +182,4 @@ function StatusBadge({ text, variant, colorScheme, className, singleLine, gen, s
   );
 }
 
-export { StatusBadge, StatusBadgeSkeleton, statusBadgeVariants };
+export { StatusBadge, statusBadgeVariants };

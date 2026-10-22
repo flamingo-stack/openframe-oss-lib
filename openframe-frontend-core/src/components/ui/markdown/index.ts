@@ -10,11 +10,7 @@ export { MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from '
 export { MarkdownEngine, MarkdownEngineSkeleton, MARKDOWN_SKELETON_LINES, type MarkdownEngineProps } from './engine';
 export { SimpleMarkdownRenderer, type SimpleMarkdownRendererProps } from './simple-markdown-renderer';
 export { type ResolveLinkResult } from '../../../types/doc-source';
-export {
-  RichMarkdownRenderer,
-  RichMarkdownRendererSkeleton,
-  type RichMarkdownRendererProps,
-} from './rich/rich-markdown-renderer';
+export { RichMarkdownRenderer, type RichMarkdownRendererProps } from './rich/rich-markdown-renderer';
 export { processShortcodes } from './rich/shortcodes';
 export {
   SAFE_HTML_TAGS,

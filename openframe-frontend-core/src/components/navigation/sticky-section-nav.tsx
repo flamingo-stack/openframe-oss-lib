@@ -6,6 +6,7 @@ import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollShadow } from '../ui/scroll-fade';
 
@@ -32,7 +33,9 @@ const PILL_CLASS = cn(
 );
 const VERTICAL_NAV_CLASS = 'relative bg-ods-bg';
 const VERTICAL_ROW_CLASS = 'relative flex h-10 w-full items-stretch transition-all duration-200';
-const VERTICAL_BUTTON_CLASS = 'relative flex flex-1 cursor-pointer items-center gap-2 px-3 py-2';
+/** A section's tab in its row; its box is the `tab` kind's, which the skeleton draws too. */
+const VERTICAL_BUTTON_LAYOUT_CLASS = 'flex-1 justify-start';
+const VERTICAL_BUTTON_SKELETON_CLASS = cn(BUTTON_KIND_CLASS.tab, VERTICAL_BUTTON_LAYOUT_CLASS);
 
 export interface StickyNavSection {
   id: string;
@@ -197,24 +200,17 @@ export function StickySectionNav({
           )}
 
           {/* Navigation button */}
-          <button
+          <Button
+            variant="tab"
             onClick={() => onSectionClick(section.id)}
             // The ribbon is the visual; this is the same state for assistive
             // tech (a table of contents marks the reader's current location).
             aria-current={activeSection === section.id ? 'location' : undefined}
-            className={VERTICAL_BUTTON_CLASS}
+            data-state={activeSection === section.id ? 'active' : undefined}
+            className={VERTICAL_BUTTON_LAYOUT_CLASS}
           >
-            <span
-              className={cn(
-                'text-left transition-all duration-200 text-h6',
-                activeSection === section.id
-                  ? 'text-ods-text-primary'
-                  : 'text-ods-text-secondary hover:text-ods-text-primary',
-              )}
-            >
-              {section.label}
-            </span>
-          </button>
+            <span className="text-left text-h6">{section.label}</span>
+          </Button>
         </div>
       ))}
     </nav>
@@ -228,7 +224,7 @@ const SKELETON_LABEL_WIDTHS = ['w-24', 'w-32', 'w-20', 'w-28', 'w-24'] as const;
  * The section navigation while its sections are read: the same bar (horizontal: its brand and action as given,
  * the sections as pill boxes) or list (vertical: its rail, each row a bar of its label).
  */
-export function StickySectionNavSkeleton({
+function StickySectionNavSkeleton({
   orientation = 'vertical',
   count = STICKY_SECTION_NAV_SKELETON_COUNT,
   brand,
@@ -268,7 +264,7 @@ export function StickySectionNavSkeleton({
       />
       {widths.map((width, i) => (
         <div key={i} className={VERTICAL_ROW_CLASS}>
-          <div className={VERTICAL_BUTTON_CLASS}>
+          <div className={VERTICAL_BUTTON_SKELETON_CLASS}>
             <TextLineSkeleton type="h6" className={width} />
           </div>
         </div>

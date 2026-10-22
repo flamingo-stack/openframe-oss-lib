@@ -144,11 +144,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
 
   return (
     <div className="flex w-full flex-col items-start border-b border-ods-border bg-ods-card last:border-b-0">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-sf)] text-left"
-      >
+      <Button variant="row" type="button" onClick={onToggle} aria-expanded={expanded}>
         {/* The tool mark is the grey `currentColor` cut, so the wrapper sets the colour it takes; without it
             the icon inherits the message text's primary (white). Same treatment as ToolBadge. */}
         <div className="flex h-5 w-5 shrink-0 items-center justify-center text-ods-text-secondary">
@@ -172,7 +168,7 @@ function ToolCallRow({ call, expanded, onToggle, batchStatus, execution, showExe
         <div className="flex h-5 w-5 shrink-0 items-center justify-center">
           <ExpandChevron expanded={expanded} />
         </div>
-      </button>
+      </Button>
 
       <div className="w-full" style={containerStyle}>
         <div ref={innerRef}>

@@ -20,7 +20,8 @@
 import type { DeliveryItem } from '../../../types/delivery';
 import { devSectionAnchorId } from '../../../utils/dev-sections/dev-section-param-keys';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
-import { DeliveryRow, DeliveryRowSkeleton } from './delivery-row';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { DeliveryRow } from './delivery-row';
 
 interface DeliveryTableProps {
   items: DeliveryItem[];
@@ -30,19 +31,21 @@ interface DeliveryTableProps {
 /** The card's frame and a row's separator, read by the table and by its skeleton. */
 const TABLE_FRAME_CLASS = `w-full ${CONTENT_CARD_SKELETON_FRAME_CLASS}`;
 const ROW_SEPARATOR_CLASS = 'border-b border-ods-border last:border-b-0';
-/** How many rows the skeleton draws (the table's first fold). */
+/** How many rows the skeleton draws: a typical count, since the delivery lists are read whole (no page size, no limit). */
 export const DELIVERY_TABLE_SKELETON_ROWS = 5;
 
 /** The table while its tasks are read: the same card, `DELIVERY_TABLE_SKELETON_ROWS` row skeletons. */
-export function DeliveryTableSkeleton() {
+function DeliveryTableSkeleton() {
   return (
     <div className={TABLE_FRAME_CLASS} aria-hidden>
       <div className="w-full">
-        {Array.from({ length: DELIVERY_TABLE_SKELETON_ROWS }, (_, i) => (
-          <div key={i} className={ROW_SEPARATOR_CLASS}>
-            <DeliveryRowSkeleton />
-          </div>
-        ))}
+        <LoadingItems count={DELIVERY_TABLE_SKELETON_ROWS}>
+          {() => (
+            <div data-loading-item className={ROW_SEPARATOR_CLASS}>
+              <DeliveryRow loading />
+            </div>
+          )}
+        </LoadingItems>
       </div>
     </div>
   );
@@ -53,8 +56,8 @@ export function DeliveryTableSkeleton() {
  * Displays bug fixes and enhancements with fixed-height rows
  */
 export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) {
-  // Show skeletons while loading
-  if (isLoading) return <DeliveryTableSkeleton />;
+  // ONE switch: a page's loading scope, or the host's read.
+  if (useLoadingScope() || isLoading) return <DeliveryTableSkeleton />;
 
   // Empty state
   if (items.length === 0) {
@@ -74,7 +77,7 @@ export function DeliveryTable({ items, isLoading = false }: DeliveryTableProps) 
           // → `#delivery-<external_id>`; `useScrollToHash` in
           // `delivery-lists.tsx` finds the row by id and scrolls. The
           // outer wrapper here ONLY exists for the row separators.
-          <div key={item.id} className={ROW_SEPARATOR_CLASS}>
+          <div key={item.id} data-loading-item className={ROW_SEPARATOR_CLASS}>
             <DeliveryRow item={item} id={devSectionAnchorId('delivery', item.id)} />
           </div>
         ))}

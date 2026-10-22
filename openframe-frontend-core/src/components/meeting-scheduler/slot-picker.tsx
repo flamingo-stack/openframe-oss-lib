@@ -7,7 +7,7 @@ import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from 
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button, DatePickerCalendar } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -255,7 +255,6 @@ export function monthLabelFor(offset: number): string {
 
 /** Nothing is bookable yet — used while a month is still loading. */
 const DISABLE_EVERY_DAY = () => true;
-const NOOP = () => undefined;
 
 interface DayCalendarProps {
   monthOffset: number;
@@ -323,13 +322,7 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
  * the times column is a skeleton, and it is the same one the loaded picker
  * shows while a month loads, so there is no swap between the two.
  */
-export function SlotPickerSkeleton({
-  monthOffset = 0,
-  layout = 'card',
-}: {
-  monthOffset?: number;
-  layout?: SlotPickerLayout;
-}) {
+function SlotPickerSkeleton({ monthOffset = 0, layout = 'card' }: { monthOffset?: number; layout?: SlotPickerLayout }) {
   const modal = layout === 'modal';
   return (
     <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>
@@ -344,9 +337,9 @@ export function SlotPickerSkeleton({
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         <DayCalendar
           monthOffset={monthOffset}
-          onMonthOffsetChange={NOOP}
+          onMonthOffsetChange={LOADING_NOOP}
           selectedDay={null}
-          onSelectDay={NOOP}
+          onSelectDay={LOADING_NOOP}
           slotsByDay={null}
         />
       </div>
@@ -363,8 +356,11 @@ export function SlotPickerSkeleton({
   );
 }
 
+/** Time chips the loading day draws: enough to fill the visible scroll box at any column count. */
+const SLOT_PICKER_SKELETON_CHIPS = 16;
+
 /** Same-footprint skeleton for the time-chip column. */
-export function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
+function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
   return (
     <>
       {/* The day label is data — but it is held inside the REAL heading line
@@ -376,10 +372,10 @@ export function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayo
         {/* Enough to fill the visible scroll box at any column count — the
             grid's track count follows the card width, so no fixed number
             lands flush and a partial last row is the honest shape anyway. */}
-        {Array.from({ length: 16 }, (_, i) => (
-          // h-11 content-md:h-12 — the loaded chip's own default-size height.
-          <UnifiedSkeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
-        ))}
+        <LoadingItems count={SLOT_PICKER_SKELETON_CHIPS}>
+          {/* h-11 content-md:h-12 — the loaded chip's own default-size height. */}
+          {() => <UnifiedSkeleton data-loading-item className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />}
+        </LoadingItems>
       </div>
     </>
   );
@@ -482,6 +478,7 @@ export function SlotPicker({
                       if (isSubmitting) return;
                       onSelectSlot(ms);
                     }}
+                    data-loading-item
                     className={CHIP_CLASS}
                   >
                     {timeLabelInZone(ms, timezone)}
