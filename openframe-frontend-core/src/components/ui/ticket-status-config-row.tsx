@@ -246,12 +246,7 @@ export function TicketStatusConfigRow({
           {isSystem ? (
             <div className="flex w-11 justify-center content-md:w-12">
               <TouchFriendlyTooltip content={systemTooltip}>
-                <Button
-                  variant="transparent"
-                  size="icon-sm"
-                  type="button"
-                  aria-label={systemTooltip ?? 'System status'}
-                >
+                <Button variant="bare" size="icon-sm" type="button" aria-label={systemTooltip ?? 'System status'}>
                   <InfoCircleIcon size={24} />
                 </Button>
               </TouchFriendlyTooltip>

@@ -104,6 +104,8 @@ function ChatNavSidebarButton({ icon, active, className, children, ...props }: C
       type="button"
       aria-current={active ? 'page' : undefined}
       data-state={active ? 'active' : undefined}
+      // The current entry is marked by the accent text alone: no surface, hovered or selected.
+      data-tone="link"
       className={className}
       {...props}
     >
@@ -191,7 +193,12 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
     );
     if (loading) {
       return (
-        <div aria-hidden className={cn(CHAT_LIST_ITEM_CLASS, className)} {...loadingItemProps(props)}>
+        <div
+          aria-hidden
+          data-tone="accent"
+          className={cn(CHAT_LIST_ITEM_CLASS, className)}
+          {...loadingItemProps(props)}
+        >
           {content}
         </div>
       );
@@ -203,6 +210,8 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
         type="button"
         aria-current={active ? 'true' : undefined}
         data-state={active ? 'active' : undefined}
+        // The selected chat takes the accent's secondary fill, with no hover surface.
+        data-tone="accent"
         className={cn('shrink-0', className)}
         {...props}
       >

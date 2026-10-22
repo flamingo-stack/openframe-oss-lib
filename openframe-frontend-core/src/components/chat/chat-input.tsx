@@ -746,10 +746,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             </div>
 
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               aria-label={isStopMode ? 'Stop generation' : 'Send message'}
+              // Send is armed (the accent) while the editor has focus. Stop stays neutral wherever focus sits.
+              data-state={focused && !isStopMode ? 'active' : undefined}
               onClick={isStopMode ? handleStop : handleSubmit}
               disabled={isStopMode ? isStopping : sendDisabled}
               className="shrink-0"

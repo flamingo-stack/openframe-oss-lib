@@ -233,7 +233,7 @@ export function ModelTokenRatesPopover({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          variant="transparent"
+          variant="bare"
           size="icon-sm"
           type="button"
           aria-label={MODEL_TOKEN_RATES_COPY.trigger}

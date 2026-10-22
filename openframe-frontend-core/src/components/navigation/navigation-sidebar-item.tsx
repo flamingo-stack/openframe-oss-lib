@@ -10,7 +10,7 @@ import { useLoadingScope } from '../ui/loading-scope';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
 
-/** A sidebar row's height: the loaded row (a `row` button or link) and its loading form are one box. */
+/** A sidebar row's height: the loaded row (a `rail` button or link) and its loading form are one box. */
 const NAV_SIDEBAR_ROW_LAYOUT_CLASS = 'h-14';
 
 interface IconProps {
@@ -118,7 +118,7 @@ function LoadedNavigationSidebarItemButton({
     // A row whose route is still committing: announced, never drawn as the current page.
     'aria-busy': isPending || undefined,
   };
-  // The current page's row: the row kind's selected surface.
+  // The current page's entry: the rail kind's accent fill, text and bar (`aria-busy` above holds its hover wash).
   const rowState = isActive && !disabled ? 'active' : undefined;
 
   // An entry with a custom onClick has no destination of its own, and a
@@ -126,7 +126,7 @@ function LoadedNavigationSidebarItemButton({
   if (disabled || !item.path || item.onClick) {
     return (
       <Button
-        variant="row"
+        variant="rail"
         type="button"
         onClick={event => onClick(item, event)}
         disabled={disabled}
@@ -140,7 +140,7 @@ function LoadedNavigationSidebarItemButton({
   }
 
   return (
-    <Button asChild variant="row" data-state={rowState} className={NAV_SIDEBAR_ROW_LAYOUT_CLASS}>
+    <Button asChild variant="rail" data-state={rowState} className={NAV_SIDEBAR_ROW_LAYOUT_CLASS}>
       <Link href={item.path} onClick={event => onClick(item, event)} {...shared}>
         {content}
       </Link>
@@ -160,7 +160,7 @@ function LoadedNavigationSidebarItemButton({
  */
 function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolean }) {
   return (
-    <div className={cn(BUTTON_KIND_CLASS.row, NAV_SIDEBAR_ROW_LAYOUT_CLASS)} aria-hidden="true">
+    <div className={cn(BUTTON_KIND_CLASS.rail, NAV_SIDEBAR_ROW_LAYOUT_CLASS)} aria-hidden="true">
       <div className="relative flex flex-shrink-0 items-center justify-center">
         <UnifiedSkeleton className="h-6 w-6 rounded" />
       </div>

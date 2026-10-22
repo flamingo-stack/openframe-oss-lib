@@ -270,6 +270,8 @@ function NavigationItem({
             <Button
               variant="row"
               data-state={isSelected ? 'active' : undefined}
+              // The open page holds its line's border-grey fill: no hover over it.
+              data-tone="muted"
               className={cn(NAV_ROW_LAYOUT_CLASS, NAV_ROW_HEIGHT.desktop)}
               onClick={() => onNodeClick(node)}
               aria-label={`${isSelected ? 'Selected' : 'Select'} ${node.name}`}
@@ -297,7 +299,7 @@ function NavigationItem({
 
             {hasChildren && (
               <Button
-                variant="transparent"
+                variant="bare"
                 size="icon-sm"
                 className="mr-[var(--spacing-system-xxs)] shrink-0"
                 onClick={e => {
@@ -399,6 +401,8 @@ function MobileNavigationItem({
             <Button
               variant="row"
               data-state={isSelected ? 'active' : undefined}
+              // The open page holds its line's border-grey fill: no hover over it.
+              data-tone="muted"
               className={cn(NAV_ROW_LAYOUT_CLASS, NAV_ROW_HEIGHT.mobile)}
               onClick={() => onNodeClick(node)}
             >
@@ -425,7 +429,7 @@ function MobileNavigationItem({
 
             {hasChildren && (
               <Button
-                variant="transparent"
+                variant="bare"
                 size="icon-sm"
                 className="mr-[var(--spacing-system-xxs)] shrink-0"
                 onClick={e => {

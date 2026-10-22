@@ -76,7 +76,7 @@ function ToastHeader({
 
       {dismissible ? (
         <Button
-          variant="transparent"
+          variant="bare"
           size="icon-sm"
           type="button"
           aria-label="Close"

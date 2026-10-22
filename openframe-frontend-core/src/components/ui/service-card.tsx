@@ -187,7 +187,7 @@ function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow
         <div className={SERVICE_CARD_ACTIONS_CLASS}>
           {actions.reveal && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               disabled={loading}
@@ -205,7 +205,7 @@ function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow
 
           {actions.copy && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               disabled={loading}
@@ -219,7 +219,7 @@ function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow
 
           {actions.open && row.href && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               disabled={loading}

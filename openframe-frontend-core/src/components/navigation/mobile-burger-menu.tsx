@@ -83,6 +83,8 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
         onClick={() => handleItemClick(item)}
         disabled={disabled}
         data-state={isActive && !disabled ? 'active' : undefined}
+        // Every entry is a bordered card; the current page's takes the accent border.
+        data-tone="framed"
         className={isGridItem ? 'min-w-0' : undefined}
         aria-current={isActive ? 'page' : undefined}
         // The same name the sidebar row announces — "Scripts (Beta)" — rather than
@@ -239,7 +241,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
 
           {/* Logout Button */}
           {onLogout && (
-            <Button variant="row" onClick={onLogout} disabled={disabled}>
+            <Button variant="row" data-tone="framed" onClick={onLogout} disabled={disabled}>
               <Logout02Icon className="size-4 text-ods-error" />
               <span className="flex-1 text-left text-ods-text-primary text-h6">Log Out</span>
             </Button>

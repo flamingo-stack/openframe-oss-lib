@@ -67,7 +67,8 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
           </div>
           {attachment.onDelete && (
             <Button
-              variant="transparent"
+              variant="bare"
+              data-tone="danger"
               size="icon-sm"
               type="button"
               onClick={attachment.onDelete}
@@ -79,7 +80,7 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
           )}
           {attachment.onDownload && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               onClick={attachment.onDownload}

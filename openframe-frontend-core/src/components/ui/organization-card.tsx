@@ -189,7 +189,9 @@ export function OrganizationCard({
       {/* Action button (top-right) - only if no device count */}
       {!deviceCount && showActionButton && actionButton && (
         <Button
-          variant={actionButton.variant === 'primary' ? 'accent' : 'transparent'}
+          variant={actionButton.variant === 'primary' ? 'accent' : 'bare'}
+          // The secondary action is a removal: the error colour on hover.
+          data-tone={actionButton.variant === 'primary' ? undefined : 'danger'}
           size="icon-sm"
           type="button"
           className="absolute right-2 top-2 z-10"
