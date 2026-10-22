@@ -13,7 +13,7 @@ use crate::services::{AgentConfigurationService, InitialConfigurationService};
 const ERROR_BODY_CHARS: usize = 200;
 const RETRY_TIMING: RetryTiming = RetryTiming {
     initial: Duration::from_secs(30),
-    max: Duration::from_secs(3600),
+    max: Duration::from_secs(600),
 };
 
 #[derive(Deserialize)]
