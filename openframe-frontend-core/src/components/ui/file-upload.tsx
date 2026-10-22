@@ -417,7 +417,7 @@ export function FileUpload<T extends FileUploadCandidate = File>({
                     </div>
                     {onDownloadManagedFile && entry.status === 'uploaded' && (
                       <Button
-                        variant="transparent"
+                        variant="bare"
                         size="icon-sm"
                         type="button"
                         onClick={() => onDownloadManagedFile(entry.id)}
@@ -429,7 +429,8 @@ export function FileUpload<T extends FileUploadCandidate = File>({
                     )}
                     {!disabled && (
                       <Button
-                        variant="transparent"
+                        variant="bare"
+                        data-tone="error"
                         size="icon-sm"
                         type="button"
                         onClick={() => onRemoveManagedFile?.(entry.id)}
@@ -457,7 +458,8 @@ export function FileUpload<T extends FileUploadCandidate = File>({
                     </div>
                     {!disabled && (
                       <Button
-                        variant="transparent"
+                        variant="bare"
+                        data-tone="error"
                         size="icon-sm"
                         type="button"
                         onClick={() => handleRemoveFile(index)}

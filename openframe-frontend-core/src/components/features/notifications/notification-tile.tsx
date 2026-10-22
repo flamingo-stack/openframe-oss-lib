@@ -255,7 +255,7 @@ function LoadedNotificationTile({
                   },
                 ].map(({ active, label, icon: actionIcon, onClick }) => (
                   <Button
-                    variant="transparent"
+                    variant="bare"
                     size="icon-inline"
                     key={label}
                     type="button"

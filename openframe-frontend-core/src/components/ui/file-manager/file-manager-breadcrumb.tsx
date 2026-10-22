@@ -17,6 +17,7 @@ export function FileManagerBreadcrumb({ items, onItemClick, className }: FileMan
             size="compact"
             noPaddingX
             type="button"
+            data-tone="primary"
             aria-current={index === items.length - 1 ? 'page' : undefined}
             onClick={() => onItemClick?.(item.path)}
             className="shrink-0"

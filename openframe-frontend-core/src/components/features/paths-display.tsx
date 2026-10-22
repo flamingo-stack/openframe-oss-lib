@@ -131,7 +131,7 @@ export function PathsDisplay({
             <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h4">{path}</span>
             {showCopyButtons && onCopyPath && (
               <Button
-                variant="transparent"
+                variant="bare"
                 size="icon-sm"
                 type="button"
                 onClick={() => onCopyPath(path)}

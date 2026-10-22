@@ -109,6 +109,7 @@ function InfoCell({
               size="compact"
               noPaddingX
               type="button"
+              data-tone="primary"
               onClick={onClick}
               className="min-w-0 max-w-full justify-start"
               title={value}

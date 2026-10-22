@@ -306,7 +306,7 @@ export function ScheduleTimingFields({
                   />
                   {field.value && !fieldsDisabled && (
                     <Button
-                      variant="transparent"
+                      variant="bare"
                       size="icon-sm"
                       type="button"
                       onClick={() => field.onChange(null)}

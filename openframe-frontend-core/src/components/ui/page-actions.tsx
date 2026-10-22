@@ -18,10 +18,22 @@ export type PageActionButton = {
   /** Click handler. Optional when `href` or `submenu` is provided. */
   onClick?: () => void;
   icon?: React.ReactNode;
-  /** `overlay` and `glyph` are media chrome and `link` an inline text action; none is a page action, and SplitButton has no divider colour for them. */
+  /** `overlay` and `glyph` are media chrome, `link` an inline text action and `bare` a glyph control; none is a page action, and SplitButton has no divider colour for them. */
   variant?: Exclude<
     ButtonProps['variant'],
-    'overlay' | 'glyph' | 'link' | 'inverted' | 'field' | 'row' | 'tab' | 'chip' | 'card' | 'cell'
+    | 'overlay'
+    | 'glyph'
+    | 'link'
+    | 'bare'
+    | 'inverted'
+    | 'field'
+    | 'row'
+    | 'rail'
+    | 'tab'
+    | 'segment'
+    | 'chip'
+    | 'card'
+    | 'cell'
   >;
   disabled?: boolean;
   /**

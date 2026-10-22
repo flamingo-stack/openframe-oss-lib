@@ -395,9 +395,11 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
           ref={triggerRef as RefObject<HTMLButtonElement>}
           onClick={() => setIsOpen(!isOpen)}
           aria-expanded={isOpen}
+          // Filters applied: the trigger holds the accent. Otherwise the secondary text, the primary on hover.
+          data-state={getActiveFiltersCount() > 0 ? 'active' : undefined}
+          data-tone="neutral"
         >
           <span className="text-h5">{triggerLabel}</span>
-          {getActiveFiltersCount() > 0 && <span className="size-1.5 rounded-full bg-ods-accent" />}
         </Button>
       )}
 
@@ -435,6 +437,7 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                           variant="link"
                           size="compact"
                           noPaddingX
+                          data-tone="neutral"
                           onClick={() => handleSelectAll(section.id, section)}
                         >
                           {allSelected ? 'Deselect All' : 'Select All'}
@@ -461,6 +464,8 @@ export const FiltersDropdown: FC<FiltersDropdownProps> = ({
                             key={`${section.id}-${option.id}-${index}`}
                             onClick={() => handleToggleOption(section.id, option.id, section.type)}
                             data-state={isSelected ? 'active' : undefined}
+                            // A checked option sits on the raised surface; the hover still shows over it.
+                            data-tone="surface"
                           >
                             <FilterCheckbox checked={isSelected} />
                             <span

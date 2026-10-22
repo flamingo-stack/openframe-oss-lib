@@ -75,6 +75,7 @@ export function NotificationDrawer({
               size="compact"
               noPaddingX
               type="button"
+              data-tone="neutral"
               disabled={unreadCount === 0}
               onClick={markAllRead}
               className="self-center"

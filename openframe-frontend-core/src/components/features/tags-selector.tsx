@@ -123,7 +123,7 @@ export function TagsSelector({
               {tag.name}
               {!disabled && (
                 <Button
-                  variant="transparent"
+                  variant="bare"
                   size="icon-inline"
                   type="button"
                   onClick={e => {
