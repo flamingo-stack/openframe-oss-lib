@@ -1,7 +1,7 @@
 package com.openframe.client.controller;
 
-import com.openframe.client.dto.AgentLogKeyResponse;
-import com.openframe.client.service.AgentLogKeyService;
+import com.openframe.core.agentkey.AgentLogKeyResponse;
+import com.openframe.core.agentkey.AgentLogKeyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

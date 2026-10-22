@@ -56,6 +56,7 @@
         <module>openframe-core-crypto</module>
         <module>openframe-data-mongo-common</module>
         <module>openframe-data-mongo-sync</module>
+        <module>openframe-agent-key</module>
         <module>openframe-machine-delivery</module>
         <module>openframe-data-mongo-reactive</module>
         <module>openframe-data-redis</module>
@@ -131,6 +132,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-mongo-sync</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-agent-key</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
