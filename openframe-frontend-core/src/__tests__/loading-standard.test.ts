@@ -26,6 +26,9 @@ function findingsOf(files: Record<string, string>): Finding[] {
   return analyzeProject(project, CONFIGS.frontend);
 }
 
+/** The whole-src scan's limit: the parse took over 5 s (vitest's default) on a GitHub runner. */
+const WHOLE_SRC_SCAN_TIMEOUT_MS = 120_000;
+
 describe('loading-standard engine: one failing and one passing example per rule', () => {
   it('has an example for every rule', () => {
     expect([...new Set(RULE_EXAMPLES.map(e => e.rule))].sort()).toEqual(Object.keys(RULES).sort());
@@ -121,7 +124,8 @@ describe('loading-standard engine: opt-outs', () => {
 });
 
 describe('the loading standard over the lib', () => {
-  it('no component in src/ breaks a rule', () => {
+  // Parses every file of src/: several seconds on a CI runner, so it has its own timeout.
+  it('no component in src/ breaks a rule', { timeout: WHOLE_SRC_SCAN_TIMEOUT_MS }, () => {
     const project = new Project({ trees: [{ dir: SRC, report: true }] });
     const findings = analyzeProject(project, CONFIGS.lib);
     expect(formatFindings(findings)).toEqual([]);
