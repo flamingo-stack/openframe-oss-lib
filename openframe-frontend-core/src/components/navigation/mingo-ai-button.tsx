@@ -7,7 +7,7 @@ import { useVisitorOs } from '../../hooks/ui/use-visitor-os';
 import { cn } from '../../utils';
 import { shortcutLabel, usesCommandKey } from '../../utils/visitor-os';
 import { AgentMark } from '../agent-mark';
-import { ASK_AI_OPEN_EVENT } from '../chat/utils/ask-ai-events';
+import { ASK_AI_OPEN_EVENT, ASK_AI_TRIGGER_ATTRIBUTE } from '../chat/utils/ask-ai-events';
 import { Button } from '../ui/button';
 
 export interface MingoAiButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -132,6 +132,7 @@ export function MingoAiButton({
     <Button
       {...props}
       type="button"
+      {...{ [ASK_AI_TRIGGER_ATTRIBUTE]: '' }}
       variant={field ? 'glyph' : 'transparent'}
       size="wrap"
       font="regular"
