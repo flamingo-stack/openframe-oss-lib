@@ -58,7 +58,7 @@ use crate::models::{
     BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
     SoftwareScriptMessage,
 };
-use crate::platform::binary_hash::running_binary_sha256;
+use crate::platform::binary_hash::running_binary_sha256_or_warn;
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -245,16 +245,7 @@ impl Client {
 
         let local_mode = initial_configuration_service.is_local_mode()?;
 
-        let binary_hash = match running_binary_sha256() {
-            Ok(hash) => {
-                info!("Running binary SHA-256: {}", hash);
-                Some(hash)
-            }
-            Err(e) => {
-                warn!("Failed to hash the running binary: {:#}", e);
-                None
-            }
-        };
+        let binary_hash = running_binary_sha256_or_warn();
 
         let http_client = build_agent_http_client(
             &machine_id,

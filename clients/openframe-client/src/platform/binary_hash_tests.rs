@@ -33,6 +33,14 @@ fn fails_on_missing_file() {
 }
 
 #[test]
+fn running_binary_hash_or_warn_matches_the_fallible_hash() {
+    assert_eq!(
+        running_binary_sha256_or_warn(),
+        Some(running_binary_sha256().unwrap())
+    );
+}
+
+#[test]
 fn hashes_running_binary_as_lowercase_hex() {
     let hash = running_binary_sha256().unwrap();
     assert_eq!(hash.len(), 64);
