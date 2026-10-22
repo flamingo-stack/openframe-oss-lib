@@ -17,4 +17,7 @@ public interface RecreationTracker {
      * Record that a recreation just happened. Counted against the rolling window.
      */
     void record(String baseName);
+
+    // A base recreated again within the window most likely fails because of its offsets, so the next version starts clean.
+    boolean hasRecentRecreation(String baseName);
 }

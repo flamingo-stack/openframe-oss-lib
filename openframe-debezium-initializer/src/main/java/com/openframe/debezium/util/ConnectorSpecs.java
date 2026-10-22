@@ -4,6 +4,7 @@ import com.openframe.data.document.tool.IntegratedTool;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
@@ -18,6 +19,17 @@ public final class ConnectorSpecs {
 
     public static final String KEY_NAME = "name";
     public static final String KEY_CONFIG = "config";
+    public static final String KEY_BACKFILL = "backfill";
+    public static final String KEY_SNAPSHOT_MODE = "snapshot.mode";
+    public static final String KEY_CONNECTOR_CLASS = "connector.class";
+    public static final String KEY_TOPIC_PREFIX = "topic.prefix";
+    public static final String KEY_SIGNAL_TOPIC = "signal.kafka.topic";
+    public static final String KEY_SIGNAL_BOOTSTRAP_SERVERS = "signal.kafka.bootstrap.servers";
+    public static final String KEY_SIGNAL_CHANNELS = "signal.enabled.channels";
+
+    private static final String KEY_INITIAL_STATE = "initial_state";
+    private static final String STATE_STOPPED = "STOPPED";
+    private static final String SNAPSHOT_MODE_NO_DATA = "no_data";
 
     private ConnectorSpecs() {
     }
@@ -38,6 +50,33 @@ public final class ConnectorSpecs {
 
     public static Map<String, Object> configOf(Map<String, Object> spec) {
         return spec == null ? null : asMap(spec.get(KEY_CONFIG));
+    }
+
+    public static Map<String, String> backfillOf(Map<String, Object> spec) {
+        Map<String, Object> raw = spec == null ? null : asMap(spec.get(KEY_BACKFILL));
+        if (raw == null) return Map.of();
+        Map<String, String> filters = new HashMap<>();
+        raw.forEach((collection, filter) -> filters.put(collection, filter == null ? "" : String.valueOf(filter)));
+        return filters;
+    }
+
+    public static String stringOf(Map<String, Object> config, String key) {
+        Object value = config == null ? null : config.get(key);
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    public static List<String> listOf(Map<String, Object> config, String key) {
+        String value = stringOf(config, key);
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .toList();
+    }
+
+    public static Map<String, Object> withoutInitialSnapshot(Map<String, Object> config) {
+        Map<String, Object> copy = config == null ? new HashMap<>() : new HashMap<>(config);
+        copy.put(KEY_SNAPSHOT_MODE, SNAPSHOT_MODE_NO_DATA);
+        return copy;
     }
 
     /**
@@ -71,6 +110,12 @@ public final class ConnectorSpecs {
         Map<String, Object> payload = new HashMap<>();
         payload.put(KEY_NAME, name);
         payload.put(KEY_CONFIG, configWithName(config, name));
+        return payload;
+    }
+
+    public static Map<String, Object> stoppedConnectorPayload(String name, Map<String, Object> config) {
+        Map<String, Object> payload = connectorPayload(name, config);
+        payload.put(KEY_INITIAL_STATE, STATE_STOPPED);
         return payload;
     }
 }
