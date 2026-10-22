@@ -8,6 +8,7 @@ import com.openframe.authz.service.processor.RegistrationProcessor;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.SSOPerTenantConfig;
+import com.openframe.core.exception.AuthFlowException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -30,6 +31,7 @@ import static org.springframework.util.StringUtils.hasText;
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.util.OidcUserUtils.resolveNames;
 import static com.openframe.authz.util.OidcUserUtils.resolvePictureUrl;
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.data.document.user.UserRole.ADMIN;
 import static java.util.Locale.ROOT;
 
@@ -41,8 +43,9 @@ import static java.util.Locale.ROOT;
  * Loading never provisions: the callback may belong to an invitation or registration flow, which
  * creates its own user under its own rules. Plain tenant logins provision through
  * {@link #autoProvisionForTenantLogin}, called once the flow dispatch knows no other flow owns the
- * callback. A refused or failed create blocks that login; only the post-provision side effects
- * (profile refresh, avatar) stay best-effort.
+ * callback. A policy refusal ({@link AuthFlowException}, e.g. the email is already active in another
+ * organization) blocks that login. Any other provisioning failure is logged and the login goes on:
+ * the user may already exist, and a flaky lookup must not lock existing users out.
  */
 @Slf4j
 @Service
@@ -84,28 +87,36 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
             return;
         }
 
-        String normalizedEmail = email.toLowerCase(ROOT);
-        String pictureUrl = resolvePictureUrl(user);
+        try {
+            String normalizedEmail = email.toLowerCase(ROOT);
+            String pictureUrl = resolvePictureUrl(user);
 
-        ssoConfigService
-                .getSSOConfig(tenantId, provider)
-                .filter(SSOPerTenantConfig::isEnabled)
-                .ifPresentOrElse(cfg -> {
-                    if (!cfg.isAutoProvisionUsers()) {
-                        return;
-                    }
-                    if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
-                        provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                    }
-                }, () -> {
-                    String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
-                    globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
-                            .ifPresent(mappedTenantId -> {
-                                if (tenantId.equals(mappedTenantId)) {
-                                    provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
-                                }
-                            });
-                });
+            ssoConfigService
+                    .getSSOConfig(tenantId, provider)
+                    .filter(SSOPerTenantConfig::isEnabled)
+                    .ifPresentOrElse(cfg -> {
+                        if (!cfg.isAutoProvisionUsers()) {
+                            return;
+                        }
+                        if (isEmailAllowedByDomains(cfg.getAllowedDomains(), email)) {
+                            provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
+                        }
+                    }, () -> {
+                        String domain = email.substring(email.lastIndexOf('@') + 1).toLowerCase(ROOT);
+                        globalDomainPolicyLookup.findTenantIdByDomainIfAutoAllowed(domain)
+                                .ifPresent(mappedTenantId -> {
+                                    if (tenantId.equals(mappedTenantId)) {
+                                        provisionOrRefresh(tenantId, email, normalizedEmail, user, provider, pictureUrl);
+                                    }
+                                });
+                    });
+        } catch (AuthFlowException refused) {
+            throw refused;
+        } catch (Exception e) {
+            // Non-blocking, but never silent: if it hit a NEW user, the symptom is a login that then
+            // fails at token issuance because the user does not exist in the tenant.
+            log.warn("SSO auto-provisioning failed. tenantId={}, provider={}: {}", tenantId, provider, e.getMessage(), e);
+        }
     }
 
     private AuthUser provisionOrRefresh(String tenantId,
@@ -120,7 +131,7 @@ public class SsoOidcUserService implements OAuth2UserService<OidcUserRequest, Oi
                     // must too — otherwise a second tenant mints a duplicate that then breaks every
                     // global email lookup (IncorrectResultSizeDataAccessException).
                     if (userService.hasActiveAccountInAnotherTenant(normalizedEmail, tenantId)) {
-                        throw new IllegalStateException(
+                        throw new AuthFlowException(SSO_LOGIN_FAILED,
                                 "This account is already registered under a different organization.");
                     }
                     return registerUser(tenantId, email, user, provider);

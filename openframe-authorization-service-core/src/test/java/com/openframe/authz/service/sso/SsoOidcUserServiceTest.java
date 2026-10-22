@@ -122,10 +122,10 @@ class SsoOidcUserServiceTest {
     }
 
     @Test
-    void shouldFailLoginWhenProvisioningFails() {
+    void shouldNeverFailLoginWhenProvisioningFails() {
         when(ssoConfigService.getSSOConfig(TENANT, "google")).thenThrow(new IllegalStateException("db down"));
 
-        assertThatThrownBy(() -> provisionDuringLogin("google", newcomer)).hasMessage("db down");
+        assertThatCode(() -> provisionDuringLogin("google", newcomer)).doesNotThrowAnyException();
     }
 
     @Test

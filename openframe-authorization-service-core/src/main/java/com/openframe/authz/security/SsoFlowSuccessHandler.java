@@ -63,10 +63,11 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 }
                 // Only a plain login may auto-provision: an invitation or registration callback
                 // creates its own user, and provisioning the IdP email alongside it would mint a
-                // second account that skips that flow's rules (switch-tenant, consent gate).
+                // second account that skips that flow's rules (switch-tenant, consent gate). Only a
+                // policy refusal ends the login here; other provisioning failures are logged inside.
                 try {
                     ssoOidcUserService.autoProvisionForTenantLogin(authentication);
-                } catch (Exception e) {
+                } catch (AuthFlowException e) {
                     authErrorResponder.send(response, request, "sso-login-auto-provision", e, SSO_LOGIN_FAILED);
                     return;
                 }
