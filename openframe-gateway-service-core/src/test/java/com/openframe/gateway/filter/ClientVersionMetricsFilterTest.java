@@ -6,6 +6,8 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
@@ -18,6 +20,7 @@ import reactor.core.publisher.Mono;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.http.HttpHeaders.ORIGIN;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ClientVersionMetricsFilterTest {
@@ -102,9 +105,42 @@ class ClientVersionMetricsFilterTest {
     }
 
     @Test
-    void filter_noClientHeader_notCounted() {
+    void filter_noClientHeaderNoShellOrigin_countedAsNoneWithoutClientSeen(CapturedOutput output) {
         // execution
-        runAs(SUB, MockServerHttpRequest.get(API_PATH));
+        runAs(SUB, MockServerHttpRequest.get(API_PATH).header(TENANT_HEADER, "tenant-a"));
+
+        // verifications
+        assertThat(forwarded).isTrue();
+        assertThat(requests("none", "-", "-")).isEqualTo(1.0);
+        assertThat(output.getOut()).doesNotContain("Client seen:");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "capacitor://localhost, legacy-ios",
+            "https://localhost, legacy-android",
+            "tauri://localhost, legacy-desktop"
+    })
+    void filter_noClientHeaderShellOrigin_countedAsLegacyShell(String origin, String kind, CapturedOutput output) {
+        // execution
+        runAs(SUB, MockServerHttpRequest.get(API_PATH)
+                .header(TENANT_HEADER, "tenant-a")
+                .header(ORIGIN, origin));
+
+        // verifications
+        assertThat(forwarded).isTrue();
+        assertThat(requests(kind, "-", "-")).isEqualTo(1.0);
+        assertThat(output.getOut()).contains("Client seen: tenantId=tenant-a sub=user-1 kind=" + kind + " shell=- bundle=-");
+    }
+
+    @Test
+    void filter_anonymousRequestWithoutClientHeader_notCounted() {
+        // setup
+        MockServerWebExchange exchange = MockServerWebExchange.from(MockServerHttpRequest.get(API_PATH)
+                .header(ORIGIN, "capacitor://localhost"));
+
+        // execution
+        filter.filter(exchange, chain).block();
 
         // verifications
         assertThat(forwarded).isTrue();
