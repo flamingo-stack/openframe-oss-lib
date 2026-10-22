@@ -113,6 +113,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       appearance: appearanceProp,
       authorType: authorTypeProp,
       selfAuthorType,
+      nameEveryTurn = false,
       assistantIcon,
       contextItems,
       resolveContextIcon,
@@ -545,9 +546,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // system line and another person answering (a technician in the end
     // user's thread). Mingo sends the admin's own turns as `admin` too; those
     // are the user's words and draw as such. Every face carries its name for
-    // assistive tech and on hover.
-    const showName = isSystem || isOtherPerson || (authorType === 'admin' && !isUser);
+    // assistive tech and on hover. A thread of several parties names every
+    // turn (`nameEveryTurn`: a ticket, where an end user, the agent and any
+    // number of technicians write): the agent's turn as an incoming one, the
+    // viewer's own bubble with the name beside the face, on the bubble's side.
+    const showName =
+      isSystem || isOtherPerson || (authorType === 'admin' && !isUser) || (nameEveryTurn && role === 'assistant');
+    const showSelfName = nameEveryTurn && isUser && !isSystem;
     const displayName = name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    const nameLabel = <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>;
     const faceBox = 'h-5 w-5 flex-shrink-0';
     const face: ReactNode =
       !showAvatar || isSystem ? null : !isHuman && !avatar && assistantIcon ? (
@@ -615,10 +622,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
             no margin collapsing — visually identical. */}
           <div className={CHAT_MESSAGE_STACK_CLASS}>
-            {(face || showName) && (
+            {(face || showName || showSelfName) && (
               <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>
+                {showSelfName && nameLabel}
                 {face}
-                {showName && <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>}
+                {showName && nameLabel}
                 {showName && timestamp && (
                   <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
                     {formatMessageTimestamp(timestamp)}
@@ -774,6 +782,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.appearance === nextProps.appearance &&
     prevProps.authorType === nextProps.authorType &&
     prevProps.selfAuthorType === nextProps.selfAuthorType &&
+    prevProps.nameEveryTurn === nextProps.nameEveryTurn &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&
     // Reference equality — the host re-uses the same array instance per

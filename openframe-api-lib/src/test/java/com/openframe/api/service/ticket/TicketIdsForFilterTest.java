@@ -1,6 +1,7 @@
 package com.openframe.api.service.ticket;
 
 import com.openframe.api.dto.ticket.TicketFilterInput;
+import com.openframe.api.service.ticket.spi.TicketPendingApprovalProvider;
 import com.openframe.api.service.ticket.spi.TicketUnreadMessagesProvider;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.RecipientType;
@@ -9,9 +10,9 @@ import com.openframe.data.repository.notification.NotificationReadStateRepositor
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -33,8 +34,86 @@ class TicketIdsForFilterTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private ObjectProvider<TicketUnreadMessagesProvider> unreadMessagesProvider;
     @Mock private TicketUnreadMessagesProvider provider;
+    @Mock private ObjectProvider<TicketPendingApprovalProvider> pendingApprovalProvider;
+    @Mock private TicketPendingApprovalProvider approvalProvider;
 
-    @InjectMocks private TicketIdsForFilter ticketIdsForFilter;
+    private TicketIdsForFilter ticketIdsForFilter;
+
+    @BeforeEach
+    void setUp() {
+        ticketIdsForFilter = new TicketIdsForFilter(ticketTagService, readStateRepository, tenantIdProvider,
+                unreadMessagesProvider, pendingApprovalProvider);
+    }
+
+    @Test
+    void resolve_pendingApprovalOnlyWithProvider_ticketsWaitingOnApprovalDecide() {
+        // setup
+        when(pendingApprovalProvider.getIfAvailable()).thenReturn(approvalProvider);
+        when(approvalProvider.ticketIdsWithPendingApproval()).thenReturn(List.of("t-1"));
+        TicketFilterInput filter = TicketFilterInput.builder().hasPendingApproval(true).build();
+
+        // execution
+        List<String> restricted = ticketIdsForFilter.resolve(ADMIN, filter);
+
+        // verifications
+        assertThat(restricted).containsExactly("t-1");
+    }
+
+    // An OSS deployment has no approval requests; the filter then narrows nothing rather than hiding everything.
+    @Test
+    void resolve_pendingApprovalOnlyWithoutProvider_noRestriction() {
+        // setup
+        when(pendingApprovalProvider.getIfAvailable()).thenReturn(null);
+        TicketFilterInput filter = TicketFilterInput.builder().hasPendingApproval(true).build();
+
+        // execution
+        List<String> restricted = ticketIdsForFilter.resolve(ADMIN, filter);
+
+        // verifications
+        assertThat(restricted).isNull();
+    }
+
+    @Test
+    void resolve_tagsAndPendingApproval_intersected() {
+        // setup
+        when(ticketTagService.getTicketIdsByTagIds(List.of("tag-1"))).thenReturn(List.of("t-1", "t-2"));
+        when(pendingApprovalProvider.getIfAvailable()).thenReturn(approvalProvider);
+        when(approvalProvider.ticketIdsWithPendingApproval()).thenReturn(List.of("t-2", "t-3"));
+        TicketFilterInput filter = TicketFilterInput.builder().tagIds(List.of("tag-1")).hasPendingApproval(true).build();
+
+        // execution
+        List<String> restricted = ticketIdsForFilter.resolve(ADMIN, filter);
+
+        // verifications
+        assertThat(restricted).containsExactly("t-2");
+    }
+
+    @Test
+    void resolveExcluded_hasPendingApprovalFalse_ticketsWaitingOnApprovalExcluded() {
+        // setup
+        when(pendingApprovalProvider.getIfAvailable()).thenReturn(approvalProvider);
+        when(approvalProvider.ticketIdsWithPendingApproval()).thenReturn(List.of("t-1"));
+        TicketFilterInput filter = TicketFilterInput.builder().hasPendingApproval(false).build();
+
+        // execution
+        List<String> excluded = ticketIdsForFilter.resolveExcluded(filter);
+
+        // verifications
+        assertThat(excluded).containsExactly("t-1");
+    }
+
+    @Test
+    void resolveExcluded_noApprovalFilter_nothingExcluded() {
+        // setup
+        TicketFilterInput filter = TicketFilterInput.builder().hasPendingApproval(true).build();
+
+        // execution
+        List<String> excluded = ticketIdsForFilter.resolveExcluded(filter);
+
+        // verifications
+        assertThat(excluded).isNull();
+        verifyNoInteractions(pendingApprovalProvider);
+    }
 
     @Test
     void resolve_noFilter_noRestriction() {
