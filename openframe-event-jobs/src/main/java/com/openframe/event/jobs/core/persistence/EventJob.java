@@ -1,5 +1,6 @@
 package com.openframe.event.jobs.core.persistence;
 
+import com.openframe.event.jobs.core.service.EventJobProgress;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,7 +19,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "event_jobs")
-public class EventJob {
+public class EventJob implements EventJobProgress {
 
     private static final int MAX_REPLACED_RUN_IDS = 10;
 

@@ -107,6 +107,16 @@ public final class Widgets {
         }
 
         @Override
+        public long countChanges(PublishedRecord<WidgetEvent> record, int limit) {
+            return 0;
+        }
+
+        @Override
+        public String applyBatch(PublishedRecord<WidgetEvent> record, String lastId, int batchSize) {
+            return null;
+        }
+
+        @Override
         public Class<Widget> projectedClass() {
             return Widget.class;
         }

@@ -1,5 +1,7 @@
 package com.openframe.processing.runner;
 
+import com.openframe.event.jobs.task.service.ProjectionTaskService;
+import com.openframe.processing.config.properties.LargeUpdateProperties;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.mode.ProcessingModes;
@@ -12,6 +14,7 @@ import io.micrometer.core.instrument.Timer;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -28,9 +31,13 @@ public class ProjectionRunner {
     private final Map<String, List<Projection<?, ?>>> projectionsByType;
     private final ProcessingModes modes;
     private final EventProcessingMetrics metrics;
+    // A provider: the projection tasks are openframe-event-jobs' beans, with their own switch.
+    private final ObjectProvider<ProjectionTaskService> projectionTasks;
+    private final int inlineLimit;
 
     // Sorted by name: the projections run, and the first failure is chosen, in the same order on every pod.
-    public ProjectionRunner(AggregateSpecRegistry specRegistry, ProcessingModes modes, EventProcessingMetrics metrics) {
+    public ProjectionRunner(AggregateSpecRegistry specRegistry, ProcessingModes modes, EventProcessingMetrics metrics,
+                            ObjectProvider<ProjectionTaskService> projectionTasks, LargeUpdateProperties largeUpdateProperties) {
         Comparator<Projection<?, ?>> byName = Comparator.comparing(Projection::name);
         Map<String, List<Projection<?, ?>>> byType = new HashMap<>();
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
@@ -44,6 +51,8 @@ public class ProjectionRunner {
         this.projectionsByType = Map.copyOf(byType);
         this.modes = modes;
         this.metrics = metrics;
+        this.projectionTasks = projectionTasks;
+        this.inlineLimit = largeUpdateProperties.getInlineLimit();
     }
 
     public void process(String type, String aggregateId, PublishedRecord<?> record) {
@@ -62,7 +71,7 @@ public class ProjectionRunner {
         List<Projection<?, ?>> projections = projectionsByType.getOrDefault(type, List.of());
         Map<String, Throwable> failures = projections.stream()
             .filter(this::shouldRun)
-            .flatMap(projection -> applyProjection(projection, aggregateId, record).stream())
+            .flatMap(projection -> applyProjection(projection, type, aggregateId, record).stream())
             .collect(Collectors.toMap(
                 ProjectionFailure::getProjectionName,
                 ProjectionFailure::getFailure,
@@ -83,15 +92,21 @@ public class ProjectionRunner {
     }
 
     // Empty on success; Mongo down stops the stream; any Error but a broken JVM (StackOverflowError too) is the projection's.
-    private Optional<ProjectionFailure> applyProjection(Projection<?, ?> projection, String aggregateId,
+    private Optional<ProjectionFailure> applyProjection(Projection<?, ?> projection, String type, String aggregateId,
                                                         PublishedRecord<?> record) {
         String name = projection.name();
         Timer.Sample sample = metrics.start();
         try {
-            applyTyped(projection, record);
-            metrics.recordApplied(sample, name);
-            log.debug("Projection {} applied {} version {} of tenant {}", name, aggregateId, record.getVersion(),
-                record.getTenantId());
+            boolean handedOver = applyOrHandOver(projection, type, aggregateId, record);
+            if (handedOver) {
+                metrics.recordHandedOver(sample, name);
+                log.debug("Projection {} handed {} version {} of tenant {} over to its task", name, aggregateId,
+                    record.getVersion(), record.getTenantId());
+            } else {
+                metrics.recordApplied(sample, name);
+                log.debug("Projection {} applied {} version {} of tenant {}", name, aggregateId, record.getVersion(),
+                    record.getTenantId());
+            }
             return Optional.empty();
         } catch (OutOfMemoryError | InternalError | UnknownError brokenJvm) {
             throw brokenJvm;
@@ -108,10 +123,30 @@ public class ProjectionRunner {
         }
     }
 
+    // Inline below the limit; at it, or while the source has a task, the task takes the event and the record is done once it is saved.
     // An event of the wrong class fails with ClassCastException, which is isolated like any other failure of the projection.
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void applyTyped(Projection projection, PublishedRecord record) {
-        projection.apply(record);
+    private boolean applyOrHandOver(Projection projection, String type, String aggregateId, PublishedRecord record) {
+        String name = projection.name();
+        String tenantId = record.getTenantId();
+        ProjectionTaskService tasks = projectionTasks.getIfAvailable();
+        if (tasks != null && tasks.hasTask(name, tenantId, aggregateId)) {
+            tasks.submit(name, type, aggregateId, record);
+            return true;
+        }
+        long changes = projection.countChanges(record, inlineLimit);
+        if (changes < inlineLimit) {
+            projection.apply(record);
+            return false;
+        }
+        if (tasks == null) {
+            log.warn("Projection {} applies {} version {} of tenant {} inline although it changes {} or more items: "
+                + "projection tasks are off", name, aggregateId, record.getVersion(), tenantId, inlineLimit);
+            projection.apply(record);
+            return false;
+        }
+        tasks.submit(name, type, aggregateId, record);
+        return true;
     }
 
     @Getter

@@ -108,6 +108,33 @@ class OrganizationOnTicketsProjectionTest {
     }
 
     @Test
+    void theChanges_areCountedOnTheTicketsOfItsTenantAndOrganization_upToTheLimit() {
+        // setup
+        PublishedRecord<OrganizationEvent> record = record("tenant-a", "org-1", "New name");
+        when(ticketProjectionRepository.countOutdatedOrganizationNames("tenant-a", "org-1", "New name", 1000)).thenReturn(1000L);
+
+        // execution
+        long changes = projection.countChanges(record, 1000);
+
+        // verifications
+        assertThat(changes).isEqualTo(1000L);
+    }
+
+    @Test
+    void aBatch_setsTheNameAfterTheLastId_andReturnsTheNextLastId() {
+        // setup
+        PublishedRecord<OrganizationEvent> record = record("tenant-a", "org-1", "New name");
+        when(ticketProjectionRepository.updateOrganizationNameBatch("tenant-a", "org-1", "New name", "t5", 5000))
+                .thenReturn("t9");
+
+        // execution
+        String lastId = projection.applyBatch(record, "t5", 5000);
+
+        // verifications
+        assertThat(lastId).isEqualTo("t9");
+    }
+
+    @Test
     void everyViewField_isATicketProperty_storedUnderTheSameName() {
         // setup
         MongoMappingContext mappingContext = new MongoMappingContext();

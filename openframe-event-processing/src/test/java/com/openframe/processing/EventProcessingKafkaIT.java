@@ -319,6 +319,16 @@ class EventProcessingKafkaIT {
         }
 
         @Override
+        public long countChanges(PublishedRecord<OrganizationEvent> record, int limit) {
+            return 0;
+        }
+
+        @Override
+        public String applyBatch(PublishedRecord<OrganizationEvent> record, String lastId, int batchSize) {
+            return null;
+        }
+
+        @Override
         public Class<?> projectedClass() {
             return Object.class;
         }

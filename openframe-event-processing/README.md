@@ -34,6 +34,10 @@ events.organizations ──> PublishedTypeListener             one per spec type
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
 - [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L27) runs each projection on its own, in name order: a
   failed projection does not stop the others.
+- Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
+  writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
+  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. With projection
+  tasks off, a large event is still applied inline, with a WARN.
 
 ## Configuration
 
@@ -66,6 +70,8 @@ openframe:
             partitions: 1
             replication-factor: 2
             config: {cleanup.policy: delete, retention.ms: 2592000000}
+      large-updates:
+        inline-limit: 5000              # default; an event that changes this many items or more goes to a projection task
       projections:
         organization-on-tickets:        # one key per projection name(); an unknown name logs an ERROR
           mode: aspect                  # aspect (default), both or events; a change needs a pod restart
@@ -186,7 +192,7 @@ must still start. That projection, if it exists, stays on `aspect`.
 
 | Metric | Tags | Meaning |
 |---|---|---|
-| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `failed`, `mongo_unavailable` | One per `apply`; the count is the number of events, the total the time spent. |
+| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it. The count is the number of events, the total the time spent. |
 
 ## Debugging
 

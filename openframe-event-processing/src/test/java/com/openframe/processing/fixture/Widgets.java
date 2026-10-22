@@ -48,6 +48,8 @@ public final class Widgets {
         private final String name;
         private final Consumer<WidgetEvent> behaviour;
         public final List<PublishedRecord<WidgetEvent>> records = new CopyOnWriteArrayList<>();
+        // What countChanges returns, before its limit.
+        public volatile long changes;
 
         public RecordingProjection(String name) {
             this(name, event -> { });
@@ -68,6 +70,16 @@ public final class Widgets {
             WidgetEvent event = record.getEvent();
             behaviour.accept(event);
             records.add(record);
+        }
+
+        @Override
+        public long countChanges(PublishedRecord<WidgetEvent> record, int limit) {
+            return Math.min(changes, limit);
+        }
+
+        @Override
+        public String applyBatch(PublishedRecord<WidgetEvent> record, String lastId, int batchSize) {
+            return null;
         }
 
         @Override

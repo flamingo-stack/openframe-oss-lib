@@ -14,7 +14,7 @@
     <packaging>jar</packaging>
 
     <name>OpenFrame Event Jobs</name>
-    <description>Jobs around the published events: the backfill and the reconciliation of copied fields, with their progress.</description>
+    <description>Jobs around the published events: the backfill, the reconciliation of copied fields and the projection tasks, with their progress.</description>
 
     <dependencies>
         <dependency>

@@ -10,7 +10,7 @@ import java.time.Instant;
 
 // Saves the copies EventJob makes; a save throws OptimisticLockingFailureException when another pod saved a newer one.
 @RequiredArgsConstructor
-public class EventJobService {
+public class EventJobService implements EventJobProgressStore<EventJob> {
 
     private final EventJobRepository jobRepository;
     private final Clock clock;
@@ -37,12 +37,14 @@ public class EventJobService {
         return jobRepository.save(progressed);
     }
 
+    @Override
     public EventJob recordFailure(EventJob job, String error) {
         Instant now = clock.instant();
         EventJob failed = job.recordFailure(error, now);
         return jobRepository.save(failed);
     }
 
+    @Override
     public EventJob finishRun(EventJob job, EventJobStatus status) {
         Instant now = clock.instant();
         EventJob finished = job.finishRun(status, now);
