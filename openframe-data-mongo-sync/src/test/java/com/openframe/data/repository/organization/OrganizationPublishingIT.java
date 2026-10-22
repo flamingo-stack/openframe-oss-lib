@@ -68,8 +68,8 @@ class OrganizationPublishingIT {
             assertThat(row.getAggregateType()).isEqualTo("organizations");
             assertThat(row.getAggregateId()).isEqualTo(saved.getId());
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
-            assertThat(row.getVersion()).isZero();
             assertThat(row.getPayload()).containsEntry("tenantId", "tenant-1").containsEntry("deleted", false);
+            assertThat(versionOf(row)).isZero();
             assertThat(eventOf(row)).containsEntry("name", "Acme").containsEntry("organizationId", "org-1")
                     .doesNotContainKeys("notes", "monthlyRevenue");
         });
@@ -81,9 +81,11 @@ class OrganizationPublishingIT {
 
         organizationRepository.delete(saved);
 
-        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OutboxEvent::isDeleted).hasSize(2)
-                .allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L))
-                .anySatisfy(row -> assertThat(row.getPayload()).containsEntry("deleted", true).containsEntry("event", null))
+        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OrganizationPublishingIT::isDeleteRow).hasSize(2)
+                .anySatisfy(row -> {
+                    assertThat(row.getPayload()).containsEntry("deleted", true).containsEntry("event", null);
+                    assertThat(versionOf(row)).isEqualTo(1L);
+                })
                 .anySatisfy(row -> assertThat(row.getPayload()).isNull());
     }
 
@@ -97,7 +99,7 @@ class OrganizationPublishingIT {
         assertThat(mongoTemplate.findAll(OutboxEvent.class)).hasSize(2)
                 .anySatisfy(row -> {
                     assertThat(eventOf(row)).containsEntry("status", "ARCHIVED");
-                    assertThat(row.getVersion()).isEqualTo(1L);
+                    assertThat(versionOf(row)).isEqualTo(1L);
                 });
     }
 
@@ -106,6 +108,16 @@ class OrganizationPublishingIT {
         organizationRepository.save(organization("Acme"));
 
         assertThat(organizationRepository.findOrganizationsWithFilters(null, "Acme")).hasSize(1);
+    }
+
+    // The delete envelope (deleted in its payload) and the tombstone after it (no payload).
+    private static boolean isDeleteRow(OutboxEvent row) {
+        return row.getPayload() == null || Boolean.TRUE.equals(row.getPayload().get("deleted"));
+    }
+
+    private static long versionOf(OutboxEvent row) {
+        Number version = (Number) row.getPayload().get("version");
+        return version.longValue();
     }
 
     @SuppressWarnings("unchecked")
