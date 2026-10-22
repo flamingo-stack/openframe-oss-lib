@@ -12,13 +12,13 @@ public class ProcessingModes {
     private final Map<String, ProcessingMode> modes;
 
     public ProcessingModes(ProcessingModeProperties properties) {
-        Map<String, ProcessingModeProperties.Processor> processors = properties.getProcessors();
-        this.modes = processors.entrySet().stream()
+        Map<String, ProcessingModeProperties.ProjectionSettings> projections = properties.getProjections();
+        this.modes = projections.entrySet().stream()
                 .collect(toUnmodifiableMap(Map.Entry::getKey, entry -> entry.getValue().getMode()));
     }
 
-    public boolean runsProcessor(String processorName) {
-        ProcessingMode mode = modes.getOrDefault(processorName, ProcessingMode.ASPECT);
+    public boolean runsProjection(String projectionName) {
+        ProcessingMode mode = modes.getOrDefault(projectionName, ProcessingMode.ASPECT);
         return mode != ProcessingMode.ASPECT;
     }
 }

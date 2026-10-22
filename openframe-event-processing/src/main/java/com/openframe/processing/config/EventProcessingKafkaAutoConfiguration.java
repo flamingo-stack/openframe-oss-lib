@@ -1,12 +1,12 @@
 package com.openframe.processing.config;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
-import com.openframe.processing.listener.AggregateEventListener;
-import com.openframe.processing.listener.OrganizationEventListener;
-import com.openframe.processing.registry.EventProcessorRegistry;
-import com.openframe.processing.runner.EventProcessingFailedException;
-import com.openframe.processing.runner.EventProcessorRunner;
-import com.openframe.processing.runner.MongoUnavailableException;
+import com.openframe.processing.exception.EventProcessingFailedException;
+import com.openframe.processing.exception.MongoUnavailableException;
+import com.openframe.processing.listener.PublishedEventListeners;
+import com.openframe.processing.runner.ProjectionRunner;
+import com.openframe.processing.topic.EventTopicNames;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -16,7 +16,6 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -33,7 +32,6 @@ import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.JacksonMapperUtils;
-import org.springframework.kafka.support.converter.ByteArrayJacksonJsonMessageConverter;
 import org.springframework.util.backoff.ExponentialBackOff;
 import tools.jackson.databind.cfg.EnumFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -42,19 +40,17 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
-// The processor listeners' own consumer, producer and error handling, from openframe.events.processing.kafka.
+// The projection listeners' own consumer, producer and error handling, from openframe.events.processing.kafka.
 // @EnableKafka here too: the listeners must not depend on Spring Boot's Kafka auto-configuration being present.
 @Slf4j
 @EnableKafka
 @AutoConfiguration(after = EventProcessingAutoConfiguration.class)
-@ConditionalOnBean(EventProcessorRegistry.class)
+@ConditionalOnBean(ProjectionRunner.class)
 public class EventProcessingKafkaAutoConfiguration {
 
     public static final String PROCESSING_CONTAINER_FACTORY = "eventProcessingKafkaListenerContainerFactory";
 
     private static final int ANY_PARTITION = -1;
-
-    private static final String DEAD_LETTER_SUFFIX = "-dlt";
 
     // Not a default candidate, here and on the template: Spring Boot still creates its own, and the context closes this one.
     @Bean(defaultCandidate = false)
@@ -71,7 +67,7 @@ public class EventProcessingKafkaAutoConfiguration {
     // Sends a failed record to its DLT as received: key and value bytes unchanged.
     @Bean(defaultCandidate = false)
     public KafkaTemplate<String, byte[]> eventProcessingKafkaTemplate(
-            @Qualifier("eventProcessingKafkaProducerFactory") DefaultKafkaProducerFactory<String, byte[]> producerFactory) {
+        @Qualifier("eventProcessingKafkaProducerFactory") DefaultKafkaProducerFactory<String, byte[]> producerFactory) {
         return new KafkaTemplate<>(producerFactory);
     }
 
@@ -92,8 +88,6 @@ public class EventProcessingKafkaAutoConfiguration {
 
         ConcurrentKafkaListenerContainerFactory<String, byte[]> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
-        ByteArrayJacksonJsonMessageConverter envelopeConverter = buildEnvelopeConverter();
-        factory.setRecordMessageConverter(envelopeConverter);
         factory.setCommonErrorHandler(errorHandler);
         KafkaProperties.Listener listener = kafka.getListener();
         applyListenerProperties(listener, factory);
@@ -101,23 +95,21 @@ public class EventProcessingKafkaAutoConfiguration {
     }
 
     @Bean
-    public OrganizationEventListener organizationEventListener(EventProcessorRunner eventProcessorRunner) {
-        return new OrganizationEventListener(eventProcessorRunner);
+    public PublishedEventListeners publishedEventListeners(AggregateSpecRegistry specRegistry,
+                                                           ProjectionRunner projectionRunner,
+                                                           EventProcessingKafkaProperties processingKafkaProperties,
+                                                           @Qualifier(PROCESSING_CONTAINER_FACTORY) ConcurrentKafkaListenerContainerFactory<String, byte[]> containerFactory) {
+        JsonMapper envelopeMapper = buildEnvelopeMapper();
+        return new PublishedEventListeners(specRegistry, projectionRunner, processingKafkaProperties, envelopeMapper,
+            containerFactory);
     }
 
-    @Bean
-    public EventListenerStartupCheck eventListenerStartupCheck(EventProcessorRegistry registry,
-                                                               ObjectProvider<AggregateEventListener> listeners) {
-        return new EventListenerStartupCheck(registry, listeners);
-    }
-
-    // Reads the value into the listener's parameter type; an enum value from a newer producer becomes null, not a DLT record.
-    static ByteArrayJacksonJsonMessageConverter buildEnvelopeConverter() {
+    // Spring Kafka's mapper (unknown fields ignored); an enum value from a newer producer becomes null, not a DLT record.
+    public static JsonMapper buildEnvelopeMapper() {
         JsonMapper springKafkaMapper = JacksonMapperUtils.enhancedJsonMapper();
-        JsonMapper envelopeMapper = springKafkaMapper.rebuild()
-                .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
-                .build();
-        return new ByteArrayJacksonJsonMessageConverter(envelopeMapper);
+        return springKafkaMapper.rebuild()
+            .enable(EnumFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
+            .build();
     }
 
     // Spring Boot's own mapping of spring.kafka.listener, which our hand-built factory would otherwise ignore.
@@ -174,7 +166,7 @@ public class EventProcessingKafkaAutoConfiguration {
 
     private static String deadLetterTopicOf(ConsumerRecord<?, ?> record) {
         String topic = record.topic();
-        return topic + DEAD_LETTER_SUFFIX;
+        return EventTopicNames.deadLetterTopicOf(topic);
     }
 
     private ExponentialBackOff buildExponentialBackOff(EventProcessingKafkaProperties.BackOff backOff) {

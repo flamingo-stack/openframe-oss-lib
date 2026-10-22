@@ -7,6 +7,8 @@ import org.springframework.boot.kafka.autoconfigure.KafkaProperties;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 // The processor listeners' own Kafka settings, apart from the service's other clusters (spring.kafka, spring.saas.kafka).
 @Getter
@@ -33,6 +35,8 @@ public class EventProcessingKafkaProperties {
         // Not "retry": KafkaProperties already has a retry section, for retry topics.
         private final BackOff backOff = new BackOff();
 
+        private final Topics topics = new Topics();
+
         public Kafka() {
             // No localhost:9092 default: a service that turns processing on must name the cluster, like the prefixes.
             setBootstrapServers(new ArrayList<>());
@@ -40,6 +44,40 @@ public class EventProcessingKafkaProperties {
             getConsumer().setMaxPollRecords(MAX_POLL_RECORDS);
             // A topic that does not exist yet stops the start, instead of a listener that waits on nothing.
             getListener().setMissingTopicsFatal(true);
+        }
+    }
+
+    // Every published type's topic and DLT, created at startup when create is on; the same settings for every type.
+    @Getter
+    @Setter
+    public static class Topics {
+
+        private static final long SEVEN_DAYS_MS = Duration.ofDays(7).toMillis();
+        private static final long THIRTY_DAYS_MS = Duration.ofDays(30).toMillis();
+
+        // Its own switch: the topics must exist before the connector writes, which can be before processing is on.
+        private boolean create;
+        // Compacted, so a new group reads the latest event of every aggregate; a delete stays readable for 7 days.
+        private final TopicSettings events = new TopicSettings(Map.of(
+                "cleanup.policy", "compact",
+                "min.compaction.lag.ms", String.valueOf(SEVEN_DAYS_MS),
+                "delete.retention.ms", String.valueOf(SEVEN_DAYS_MS)));
+        private final TopicSettings deadLetter = new TopicSettings(Map.of(
+                "cleanup.policy", "delete",
+                "retention.ms", String.valueOf(THIRTY_DAYS_MS)));
+    }
+
+    // Used only when a topic is created; an existing topic is never changed.
+    @Getter
+    @Setter
+    public static class TopicSettings {
+
+        private int partitions = 1;
+        private short replicationFactor = 2;
+        private Map<String, String> config;
+
+        TopicSettings(Map<String, String> defaultConfig) {
+            this.config = new LinkedHashMap<>(defaultConfig);
         }
     }
 
