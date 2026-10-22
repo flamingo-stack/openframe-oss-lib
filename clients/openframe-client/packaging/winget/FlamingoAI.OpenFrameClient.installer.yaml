@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 
 PackageIdentifier: FlamingoAI.OpenFrameClient
-PackageVersion: 1.5.85
+PackageVersion: 1.5.89
 InstallerType: zip
 NestedInstallerType: exe
 NestedInstallerFiles:
@@ -21,7 +21,7 @@ AppsAndFeaturesEntries:
   ProductCode: com.openframe.client
 Installers:
 - Architecture: x64
-  InstallerUrl: https://openframe.ai/v0/api/assets/download?agent=client&platform=windows&version=1.5.85
-  InstallerSha256: F6B3815E45A35021A767D8C340BE12ABE20762D6E6195D5B46AD8F2B20D8B7F8
+  InstallerUrl: https://openframe.ai/v0/api/assets/download?agent=client&platform=windows&version=1.5.89
+  InstallerSha256: 24D63DE77B483B6278F984F2807336F95160C850FB26BF113946176414427BC1
 ManifestType: installer
 ManifestVersion: 1.12.0
