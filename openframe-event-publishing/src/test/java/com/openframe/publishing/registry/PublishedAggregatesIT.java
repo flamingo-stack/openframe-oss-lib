@@ -98,7 +98,7 @@ class PublishedAggregatesIT {
         assertThat(versions.values()).containsOnly(0L);
         List<OutboxEvent> rows = mongoTemplate.findAll(OutboxEvent.class);
         assertThat(rows).extracting(OutboxEvent::getAggregateId).containsExactlyInAnyOrderElementsOf(ids);
-        assertThat(rows).extracting(OutboxEvent::getVersion).containsOnly(0L);
+        assertThat(rows).extracting(PublishedAggregatesIT::versionOf).containsOnly(0L);
     }
 
     @Test
@@ -124,6 +124,11 @@ class PublishedAggregatesIT {
 
         // verifications
         assertThat(publishing).isTrue();
+    }
+
+    private static long versionOf(OutboxEvent row) {
+        Number version = (Number) row.getPayload().get("version");
+        return version.longValue();
     }
 
     // A published document has exactly one repository; this one only satisfies that startup check.

@@ -82,9 +82,8 @@ class PublishingRepositoryIT {
             assertThat(row.getAggregateType()).isEqualTo("organizations");
             assertThat(row.getAggregateId()).isEqualTo(saved.getId());
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
-            assertThat(row.getVersion()).isEqualTo(saved.getVersion());
-            assertThat(row.isDeleted()).isFalse();
             assertThat(row.getPayload()).containsEntry("tenantId", "tenant-1").containsEntry("deleted", false);
+            assertThat(versionOf(row)).isEqualTo(saved.getVersion());
             assertThat(eventOf(row)).containsEntry("name", "Printer");
         });
     }
@@ -144,7 +143,7 @@ class PublishingRepositoryIT {
 
         widgetRepository.save(saved);
 
-        assertThat(rowNamed("Scanner").getVersion()).isEqualTo(1L);
+        assertThat(versionOf(rowNamed("Scanner"))).isEqualTo(1L);
     }
 
     @Test
@@ -177,11 +176,11 @@ class PublishingRepositoryIT {
         widgetRepository.deleteAll(List.of(byEntities));
 
         assertThat(deletedRows()).hasSize(4).allSatisfy(row -> {
-            assertThat(row.getVersion()).isEqualTo(1L);
+            assertThat(versionOf(row)).isEqualTo(1L);
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
             assertThat(row.getPayload()).containsEntry("deleted", true).containsEntry("event", null);
         });
-        assertThat(tombstoneRows()).hasSize(4).allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L));
+        assertThat(tombstoneRows()).hasSize(4).allSatisfy(row -> assertThat(row.getTenantId()).isEqualTo("tenant-1"));
         assertThat(widgetRepository.count()).isZero();
     }
 
@@ -198,10 +197,8 @@ class PublishingRepositoryIT {
 
         assertThat(deletedRows()).singleElement().satisfies(row -> {
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
-            assertThat(row.getVersion()).isEqualTo(deleteVersion);
             assertThat(row.getPayload()).containsEntry("tenantId", "tenant-1");
-            Number envelopeVersion = (Number) row.getPayload().get("version");
-            assertThat(envelopeVersion.longValue()).isEqualTo(deleteVersion);
+            assertThat(versionOf(row)).isEqualTo(deleteVersion);
         });
     }
 
@@ -225,7 +222,7 @@ class PublishingRepositoryIT {
         widgetRepository.deleteAll();
 
         assertThat(widgetRepository.count()).isZero();
-        assertThat(deletedRows()).hasSize(2).allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L));
+        assertThat(deletedRows()).hasSize(2).allSatisfy(row -> assertThat(versionOf(row)).isEqualTo(1L));
         assertThat(tombstoneRows()).hasSize(2);
     }
 
@@ -289,7 +286,7 @@ class PublishingRepositoryIT {
 
         widgetRepository.renameOne(saved.getId(), "Scanner");
 
-        assertThat(rowNamed("Scanner").getVersion()).isEqualTo(1L);
+        assertThat(versionOf(rowNamed("Scanner"))).isEqualTo(1L);
     }
 
     @Test
@@ -299,7 +296,7 @@ class PublishingRepositoryIT {
         long modified = widgetRepository.renameAllOfTenant("tenant-1", "Renamed");
 
         assertThat(modified).isEqualTo(2);
-        assertThat(rowsNamed("Renamed")).hasSize(2).allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L));
+        assertThat(rowsNamed("Renamed")).hasSize(2).allSatisfy(row -> assertThat(versionOf(row)).isEqualTo(1L));
     }
 
     @Test
@@ -370,7 +367,10 @@ class PublishingRepositoryIT {
 
     // The delete envelopes; each has a tombstone row right after it.
     private List<OutboxEvent> deletedRows() {
-        return outboxRows().stream().filter(OutboxEvent::isDeleted).filter(row -> row.getPayload() != null).toList();
+        return outboxRows().stream()
+                .filter(row -> row.getPayload() != null)
+                .filter(PublishingRepositoryIT::isDeleted)
+                .toList();
     }
 
     private List<OutboxEvent> tombstoneRows() {
@@ -379,9 +379,19 @@ class PublishingRepositoryIT {
 
     private List<OutboxEvent> rowsNamed(String name) {
         return outboxRows().stream()
-                .filter(row -> !row.isDeleted())
+                .filter(row -> row.getPayload() != null)
+                .filter(row -> !isDeleted(row))
                 .filter(row -> name.equals(eventOf(row).get("name")))
                 .toList();
+    }
+
+    private static boolean isDeleted(OutboxEvent row) {
+        return Boolean.TRUE.equals(row.getPayload().get("deleted"));
+    }
+
+    private static long versionOf(OutboxEvent row) {
+        Number version = (Number) row.getPayload().get("version");
+        return version.longValue();
     }
 
     @SuppressWarnings("unchecked")
