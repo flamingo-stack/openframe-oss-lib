@@ -111,7 +111,7 @@ class OrganizationOnTicketsProjectionTest {
     void theChanges_areCountedOnTheTicketsOfItsTenantAndOrganization_upToTheLimit() {
         // setup
         PublishedRecord<OrganizationEvent> record = record("tenant-a", "org-1", "New name");
-        when(ticketProjectionRepository.countOutdatedOrganizationNames("tenant-a", "org-1", "New name", 1000)).thenReturn(1000L);
+        when(ticketProjectionRepository.countTicketsToUpdateOrganizationName("tenant-a", "org-1", "New name", 1000)).thenReturn(1000L);
 
         // execution
         long changes = projection.countChanges(record, 1000);

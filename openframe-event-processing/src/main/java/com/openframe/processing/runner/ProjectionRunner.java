@@ -45,8 +45,7 @@ public class ProjectionRunner {
         Map<String, List<Projection<?, ?>>> byType = new HashMap<>();
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String type = spec.getType();
-            List<Projection<?, ?>> sorted = spec.projections().stream()
-                    .<Projection<?, ?>>map(projection -> projection)
+            List<Projection<?, ?>> sorted = specRegistry.getProjections(type).stream()
                     .sorted(byName)
                     .toList();
             byType.put(type, sorted);

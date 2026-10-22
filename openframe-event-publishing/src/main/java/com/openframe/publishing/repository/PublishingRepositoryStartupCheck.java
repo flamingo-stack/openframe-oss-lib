@@ -29,8 +29,8 @@ import java.util.Set;
  * Stops the service at startup when a repository of a published document would publish wrongly or not at all.
  * A repository publishes when its document is the {@code D} of an {@link AggregateSpec}; for each such repository it checks that:
  * <ul>
- *   <li>its document is the only one with that repository: one repository per published document, and every spec's
- *       document has one;</li>
+ *   <li>one repository per published document class, and every spec's document has one; a subclass document, such as
+ *       {@code AuthUser} of {@code User}, publishes with its parent's spec through its own repository;</li>
  *   <li>its document has a {@code @Version} field, because the version orders the events;</li>
  *   <li>{@link PublishingRepositoryInterceptor} is inside the repository's proxy;</li>
  *   <li>it has no {@code @Update} method, which returns no documents to publish;</li>
@@ -66,8 +66,17 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
                 check(factory, information);
             }
         }
+        repositoriesByDocument.forEach(PublishingRepositoryStartupCheck::requireOnlyRepository);
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             requireOneRepository(spec, repositoriesByDocument);
+        }
+    }
+
+    // A subclass document, such as AuthUser of User, may have its own repository, but each document class only one.
+    private static void requireOnlyRepository(Class<?> documentClass, List<String> repositories) {
+        if (repositories.size() > 1) {
+            throw new IllegalStateException(documentClass.getName() + " is published, so it must have exactly one repository, found "
+                    + repositories);
         }
     }
 
