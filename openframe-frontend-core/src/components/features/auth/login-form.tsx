@@ -56,6 +56,11 @@ export interface LoginFormProps {
   ssoDisabled?: boolean;
   /** When set, only these generic providers are clickable; the rest stay disabled. */
   ssoEnabledProviders?: AuthSsoProvider[];
+  /**
+   * The generic providers are still being read: the divider is drawn and the buttons draw their boxes, one per entry
+   * of `ssoProviders` (pass the ones the form may offer), so the block holds its place until they arrive.
+   */
+  ssoLoading?: boolean;
   /** Verb prefix for provider buttons, e.g. "Continue with". */
   ssoActionLabel?: string;
   /** Label on the divider above the generic providers. */
@@ -109,6 +114,7 @@ export function LoginForm({
   onSsoClick,
   ssoDisabled = false,
   ssoEnabledProviders,
+  ssoLoading = false,
   ssoActionLabel = 'Continue with',
   dividerLabel = 'or continue with',
   tenantMethods,
@@ -201,7 +207,7 @@ export function LoginForm({
         </div>
       )}
 
-      {(tenantMethods || ssoProviders.length > 0) && (
+      {(tenantMethods || ssoProviders.length > 0 || ssoLoading) && (
         // One block, so an organization's methods replace the generic set as a whole: the key mounts
         // it anew when they arrive, and every row of it eases in, not only the rows that are new.
         // Going back to the generic set swaps without a transition, as the prototype does.
@@ -235,7 +241,7 @@ export function LoginForm({
             </>
           )}
 
-          {ssoProviders.length > 0 && (
+          {(ssoProviders.length > 0 || ssoLoading) && (
             <>
               {/* Under an organization heading with nothing above it, a second divider would only
                 separate the heading from its own buttons. */}
@@ -248,6 +254,7 @@ export function LoginForm({
                 actionLabel={ssoActionLabel}
                 disabled={providersDisabled}
                 enabledProviders={ssoEnabledProviders}
+                loading={ssoLoading}
               />
             </>
           )}

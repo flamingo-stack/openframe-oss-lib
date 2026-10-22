@@ -43,8 +43,8 @@ export interface SsoProviderButtonsProps {
    * button as the generic one.
    */
   tag?: string;
-  /** The providers are still being read: the buttons draw their boxes (`SSO_PROVIDERS_SKELETON_COUNT`, the typical
-   *  offer). A loading scope does the same. */
+  /** The providers are still being read: the buttons draw their boxes, one per entry of `providers` (the ones the
+   *  form may offer), or `SSO_PROVIDERS_SKELETON_COUNT` when it names none. A loading scope does the same. */
   loading?: boolean;
 }
 
@@ -52,16 +52,16 @@ export interface SsoProviderButtonsProps {
 const SSO_PROVIDER_BUTTONS_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
 
 /**
- * How many provider buttons a form draws while the providers are read: the typical offer, Google and Microsoft
- * (Apple is offered only on Apple devices).
+ * How many provider buttons a form draws while the providers are read when it names none of its own: every provider
+ * the auth forms offer for sign-in (Google, Microsoft and Apple).
  */
-export const SSO_PROVIDERS_SKELETON_COUNT = 2;
+export const SSO_PROVIDERS_SKELETON_COUNT = 3;
 
 /** The provider buttons while the providers are read: full-width boxes of the outline button, in the same column. */
-function SsoProviderButtonsSkeleton() {
+function SsoProviderButtonsSkeleton({ count }: { count: number }) {
   return (
     <div className={SSO_PROVIDER_BUTTONS_CLASS} aria-hidden>
-      <LoadingItems count={SSO_PROVIDERS_SKELETON_COUNT}>
+      <LoadingItems count={count}>
         {() => <InteractiveSkeleton.Button className="w-full" data-loading-item />}
       </LoadingItems>
     </div>
@@ -78,7 +78,8 @@ export function SsoProviderButtons({
   tag,
   loading,
 }: SsoProviderButtonsProps) {
-  if (useLoadingScope() || loading) return <SsoProviderButtonsSkeleton />;
+  if (useLoadingScope() || loading)
+    return <SsoProviderButtonsSkeleton count={providers.length || SSO_PROVIDERS_SKELETON_COUNT} />;
   return (
     <div className={SSO_PROVIDER_BUTTONS_CLASS}>
       {providers.map(provider => {
