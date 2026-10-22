@@ -1,16 +1,16 @@
 package com.openframe.processing;
 
 import com.openframe.data.repository.organization.publishing.OrganizationEvent;
-import com.openframe.processing.api.EventProcessor;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
 import com.openframe.processing.config.EventProcessingKafkaAutoConfiguration;
-import com.openframe.publishing.api.PublishedAggregateType;
-import com.openframe.publishing.api.PublishedRecord;
+import com.openframe.processing.config.EventTopicsAutoConfiguration;
+import com.openframe.publishing.api.model.PublishedRecord;
+import com.openframe.publishing.api.model.ReconciliationResult;
+import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.api.spec.Projection;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -18,7 +18,6 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -33,6 +32,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -57,12 +57,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-// A real broker: record -> listener -> runner -> processor, and the error handler's retry and DLT.
+// A real broker: the module creates its topics, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
 @SpringBootTest(classes = EventProcessingKafkaIT.TestApplication.class,
         properties = {"openframe.events.processing.enabled=true",
                 "openframe.events.processing.kafka.topic-prefix=events.",
                 "openframe.events.processing.kafka.group-prefix=processing-it.",
-                "openframe.events.processing.processors." + EventProcessingKafkaIT.PROCESSOR + ".mode=events",
+                "openframe.events.processing.projections." + EventProcessingKafkaIT.PROJECTION + ".mode=events",
+                "openframe.events.processing.kafka.topics.create=true",
+                "openframe.events.processing.kafka.topics.events.replication-factor=1",
+                "openframe.events.processing.kafka.topics.dead-letter.replication-factor=1",
                 "openframe.events.processing.kafka.back-off.initial-interval=100ms",
                 "openframe.events.processing.kafka.back-off.max-interval=200ms"})
 @Testcontainers
@@ -71,7 +74,7 @@ import static org.awaitility.Awaitility.await;
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
 class EventProcessingKafkaIT {
 
-    static final String PROCESSOR = "widget-on-organizations";
+    static final String PROJECTION = "widget-on-organizations";
 
     private static final String TOPIC = "events.organizations";
     private static final String DEAD_LETTER_TOPIC = "events.organizations-dlt";
@@ -89,30 +92,19 @@ class EventProcessingKafkaIT {
         registry.add("openframe.events.processing.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     }
 
-    @BeforeAll
-    static void createTopics() throws Exception {
-        Map<String, Object> adminProperties = Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
-        try (AdminClient admin = AdminClient.create(adminProperties)) {
-            NewTopic topic = new NewTopic(TOPIC, 1, (short) 1);
-            NewTopic deadLetterTopic = new NewTopic(DEAD_LETTER_TOPIC, 1, (short) 1);
-            List<NewTopic> topics = List.of(topic, deadLetterTopic);
-            admin.createTopics(topics).all().get(30, TimeUnit.SECONDS);
-        }
-    }
-
     @Autowired @Qualifier("eventProcessingKafkaTemplate") private KafkaTemplate<String, byte[]> eventProcessingKafkaTemplate;
-    @Autowired private RecordingProcessor processor;
+    @Autowired private RecordingProjection projection;
 
     @Test
-    void anEnvelope_reachesTheProcessor_withItsEventAndVersion() throws Exception {
+    void anEnvelope_reachesTheProjection_withItsEventAndVersion() throws Exception {
         String organizationId = newOrganizationId();
         String aggregateId = newAggregateId();
         byte[] value = envelope(organizationId, "Acme", 3);
 
         send(aggregateId, value);
 
-        await().atMost(WAIT).until(() -> processor.applied.containsKey(organizationId));
-        assertThat(processor.applied.get(organizationId)).singleElement().satisfies(record -> {
+        await().atMost(WAIT).until(() -> projection.applied.containsKey(organizationId));
+        assertThat(projection.applied.get(organizationId)).singleElement().satisfies(record -> {
             assertThat(record.getVersion()).isEqualTo(3L);
             assertThat(record.getTenantId()).isEqualTo("tenant-1");
             assertThat(record.getEvent().getName()).isEqualTo("Acme");
@@ -120,7 +112,7 @@ class EventProcessingKafkaIT {
     }
 
     @Test
-    void aProcessorsFailure_goesToTheDlt_once_withTheRecordUnchanged() throws Exception {
+    void aProjectionsFailure_goesToTheDlt_once_withTheRecordUnchanged() throws Exception {
         String organizationId = newOrganizationId();
         String aggregateId = newAggregateId();
         byte[] value = envelope(organizationId, FAILING, 1);
@@ -129,8 +121,8 @@ class EventProcessingKafkaIT {
 
         ConsumerRecord<String, byte[]> deadLetter = deadLetterOf(aggregateId);
         assertThat(deadLetter.value()).isEqualTo(value);
-        assertThat(headerOf(deadLetter, KafkaHeaders.DLT_EXCEPTION_MESSAGE)).contains(PROCESSOR);
-        assertThat(processor.attempts.get(organizationId)).hasValue(1);
+        assertThat(headerOf(deadLetter, KafkaHeaders.DLT_EXCEPTION_MESSAGE)).contains(PROJECTION);
+        assertThat(projection.attempts.get(organizationId)).hasValue(1);
     }
 
     @Test
@@ -143,11 +135,11 @@ class EventProcessingKafkaIT {
 
         ConsumerRecord<String, byte[]> deadLetter = deadLetterOf(aggregateId);
         assertThat(deadLetter.value()).isEqualTo(value);
-        assertThat(processor.attempts.get(organizationId)).hasValue(1);
+        assertThat(projection.attempts.get(organizationId)).hasValue(1);
     }
 
     @Test
-    void anEnumValueFromANewerProducer_reachesTheProcessorAsNull_insteadOfTheDlt() throws Exception {
+    void anEnumValueFromANewerProducer_reachesTheProjectionAsNull_insteadOfTheDlt() throws Exception {
         String organizationId = newOrganizationId();
         String aggregateId = newAggregateId();
         String json = """
@@ -158,13 +150,13 @@ class EventProcessingKafkaIT {
 
         send(aggregateId, value);
 
-        await().atMost(WAIT).until(() -> processor.applied.containsKey(organizationId));
-        assertThat(processor.applied.get(organizationId)).singleElement()
+        await().atMost(WAIT).until(() -> projection.applied.containsKey(organizationId));
+        assertThat(projection.applied.get(organizationId)).singleElement()
                 .satisfies(record -> assertThat(record.getEvent().getStatus()).isNull());
     }
 
     @Test
-    void anUnreadableValue_goesToTheDlt_withoutReachingAProcessor_andIsLogged(CapturedOutput output) throws Exception {
+    void anUnreadableValue_goesToTheDlt_withoutReachingAProjection_andIsLogged(CapturedOutput output) throws Exception {
         String aggregateId = newAggregateId();
         byte[] value = "not json".getBytes(StandardCharsets.UTF_8);
 
@@ -172,20 +164,20 @@ class EventProcessingKafkaIT {
 
         ConsumerRecord<String, byte[]> deadLetter = deadLetterOf(aggregateId);
         assertThat(deadLetter.value()).isEqualTo(value);
-        assertThat(headerOf(deadLetter, KafkaHeaders.DLT_EXCEPTION_STACKTRACE)).contains("ConversionException");
+        assertThat(headerOf(deadLetter, KafkaHeaders.DLT_EXCEPTION_STACKTRACE)).contains("PublishedTypeListener");
         assertThat(output).contains("Record " + aggregateId + " of " + TOPIC).contains("goes to " + DEAD_LETTER_TOPIC);
     }
 
     @Test
-    void mongoDown_isRetried_untilTheProcessorSucceeds() throws Exception {
+    void mongoDown_isRetried_untilTheProjectionSucceeds() throws Exception {
         String organizationId = newOrganizationId();
         String aggregateId = newAggregateId();
         byte[] value = envelope(organizationId, MONGO_DOWN, 1);
 
         send(aggregateId, value);
 
-        await().atMost(WAIT).until(() -> processor.applied.containsKey(organizationId));
-        assertThat(processor.attempts.get(organizationId)).hasValue(RecordingProcessor.MONGO_DOWN_ATTEMPTS + 1);
+        await().atMost(WAIT).until(() -> projection.applied.containsKey(organizationId));
+        assertThat(projection.attempts.get(organizationId)).hasValue(RecordingProjection.MONGO_DOWN_ATTEMPTS + 1);
     }
 
     private void send(String key, byte[] value) throws Exception {
@@ -251,7 +243,8 @@ class EventProcessingKafkaIT {
 
     @SpringBootConfiguration
     @ImportAutoConfiguration({PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
-            EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class})
+            EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class, EventTopicsAutoConfiguration.class})
+    @Import(AggregateSpecRegistry.class)
     static class TestApplication {
 
         @Bean
@@ -260,13 +253,43 @@ class EventProcessingKafkaIT {
         }
 
         @Bean
-        RecordingProcessor recordingProcessor() {
-            return new RecordingProcessor();
+        RecordingProjection recordingProjection() {
+            return new RecordingProjection();
+        }
+
+        @Bean
+        OrganizationsSpec organizationsSpec(RecordingProjection recordingProjection) {
+            return new OrganizationsSpec(recordingProjection);
+        }
+    }
+
+    // The organizations topic with the recording projection; the IT needs no Mongo document.
+    static class OrganizationsSpec implements AggregateSpec<Object, OrganizationEvent> {
+
+        private final RecordingProjection projection;
+
+        OrganizationsSpec(RecordingProjection projection) {
+            this.projection = projection;
+        }
+
+        @Override
+        public String getType() {
+            return "organizations";
+        }
+
+        @Override
+        public OrganizationEvent toEvent(Object document) {
+            return new OrganizationEvent();
+        }
+
+        @Override
+        public List<Projection<OrganizationEvent, ?>> projections() {
+            return List.of(projection);
         }
     }
 
     // Fails on the name FAILING, conflicts on CONFLICT; on MONGO_DOWN, throws Mongo down for its first attempts, then applies.
-    static class RecordingProcessor implements EventProcessor<OrganizationEvent> {
+    static class RecordingProjection implements Projection<OrganizationEvent, Object> {
 
         static final int MONGO_DOWN_ATTEMPTS = 2;
 
@@ -275,16 +298,11 @@ class EventProcessingKafkaIT {
 
         @Override
         public String name() {
-            return PROCESSOR;
+            return PROJECTION;
         }
 
         @Override
-        public PublishedAggregateType getType() {
-            return PublishedAggregateType.ORGANIZATIONS;
-        }
-
-        @Override
-        public long process(PublishedRecord<OrganizationEvent> record) {
+        public void apply(PublishedRecord<OrganizationEvent> record) {
             OrganizationEvent event = record.getEvent();
             String organizationId = event.getOrganizationId();
             int attempt = attempts.computeIfAbsent(organizationId, id -> new AtomicInteger()).incrementAndGet();
@@ -298,7 +316,21 @@ class EventProcessingKafkaIT {
                 throw new DataAccessResourceFailureException("Mongo down");
             }
             applied.computeIfAbsent(organizationId, id -> new CopyOnWriteArrayList<>()).add(record);
-            return 1;
+        }
+
+        @Override
+        public Class<?> projectedClass() {
+            return Object.class;
+        }
+
+        @Override
+        public Class<Object> projectedViewClass() {
+            return Object.class;
+        }
+
+        @Override
+        public ReconciliationResult reconcile(List<Object> projectedItems) {
+            return ReconciliationResult.allMatch();
         }
     }
 }

@@ -2,6 +2,9 @@ package com.openframe.publishing.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mongodb.client.result.DeleteResult;
+import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.api.spec.Projection;
+import com.openframe.publishing.api.spec.PublishedEvent;
 import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
@@ -48,7 +51,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class OutboxPublisherTest {
 
-    private static final PublishedAggregateType WIDGETS = PublishedAggregateType.ORGANIZATIONS;
+    private static final String WIDGETS = "organizations";
 
     @Mock private PublishedAggregateTopics topics;
     @Mock private MongoOperations mongoOperations;
@@ -273,9 +276,9 @@ class OutboxPublisherTest {
         private final BigDecimal revenue;
     }
 
-    static class SampleSpec implements PublishedAggregateSpec<Widget, SampleEvent> {
+    static class SampleSpec implements AggregateSpec<Widget, SampleEvent> {
         @Override
-        public PublishedAggregateType getType() {
+        public String getType() {
             return WIDGETS;
         }
 
@@ -283,6 +286,11 @@ class OutboxPublisherTest {
         public SampleEvent toEvent(Widget document) {
             Instant changedAt = Instant.parse("2026-10-20T10:15:30Z");
             return new SampleEvent("Acme", true, Status.ARCHIVED, changedAt, new BigDecimal("12.50"));
+        }
+
+        @Override
+        public List<Projection<SampleEvent, ?>> projections() {
+            return List.of();
         }
     }
 }

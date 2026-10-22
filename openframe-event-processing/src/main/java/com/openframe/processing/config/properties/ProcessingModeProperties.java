@@ -11,11 +11,11 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "openframe.events.processing")
 public class ProcessingModeProperties {
 
-    // Keyed by processor name; EventProcessorStartupCheck refuses a name no processor has.
-    private Map<String, Processor> processors = new LinkedHashMap<>();
+    // Keyed by projection name; ProcessingModeStartupCheck logs an ERROR for a name no projection has.
+    private Map<String, ProjectionSettings> projections = new LinkedHashMap<>();
 
     @Data
-    public static class Processor {
+    public static class ProjectionSettings {
 
         private ProcessingMode mode = ProcessingMode.ASPECT;
     }

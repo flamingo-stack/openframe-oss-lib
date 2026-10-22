@@ -1,6 +1,7 @@
 package com.openframe.publishing.api;
 
 import com.openframe.data.document.TenantScoped;
+import com.openframe.publishing.api.spec.AggregateSpec;
 import org.springframework.core.ResolvableType;
 import org.springframework.data.mapping.PersistentPropertyAccessor;
 import org.springframework.data.mapping.context.MappingContext;
@@ -19,18 +20,24 @@ public class PublishedDocuments {
 
     private final MongoOperations mongoOperations;
 
-    PublishedDocuments(MongoOperations mongoOperations) {
+    public PublishedDocuments(MongoOperations mongoOperations) {
         this.mongoOperations = mongoOperations;
     }
 
-    static Class<?> classOf(PublishedAggregateSpec<?, ?> spec) {
+    public static Class<?> classOf(AggregateSpec<?, ?> spec) {
         Class<?> specClass = ClassUtils.getUserClass(spec);
-        ResolvableType specType = ResolvableType.forClass(specClass).as(PublishedAggregateSpec.class);
+        return classOfSpecClass(specClass);
+    }
+
+    // The document class a spec class names, from its type argument; null when the class does not name it.
+    public static Class<?> classOfSpecClass(Class<?> specClass) {
+        Class<?> userClass = ClassUtils.getUserClass(specClass);
+        ResolvableType specType = ResolvableType.forClass(userClass).as(AggregateSpec.class);
         return specType.getGeneric(DOCUMENT_TYPE_ARGUMENT).resolve();
     }
 
     // Only the fields a tombstone needs: the id, the version and the tenant.
-    void includeDeleteFields(Class<?> documentClass, Query query) {
+    public void includeDeleteFields(Class<?> documentClass, Query query) {
         MongoPersistentEntity<?> entity = entityOf(documentClass);
         String versionField = entity.getRequiredVersionProperty().getFieldName();
         query.fields().include(ID_FIELD, versionField);
@@ -47,13 +54,13 @@ public class PublishedDocuments {
         return entity.getIdentifierAccessor(document).getIdentifier();
     }
 
-    String idOf(Object document) {
+    public String idOf(Object document) {
         Object identifier = identifierOf(document);
         return String.valueOf(identifier);
     }
 
     // The startup check refuses a published document without @Version.
-    long versionOf(Object document) {
+    public long versionOf(Object document) {
         Class<?> documentClass = document.getClass();
         MongoPersistentEntity<?> entity = entityOf(documentClass);
         MongoPersistentProperty versionProperty = entity.getRequiredVersionProperty();

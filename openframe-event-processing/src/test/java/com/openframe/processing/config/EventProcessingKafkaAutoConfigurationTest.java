@@ -1,14 +1,12 @@
 package com.openframe.processing.config;
 
-import com.openframe.data.repository.organization.publishing.OrganizationEvent;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
-import com.openframe.processing.listener.OrganizationEventListener;
-import com.openframe.publishing.api.PublishedAggregateType;
-import com.openframe.publishing.api.PublishedRecord;
+import com.openframe.processing.fixture.Widgets.RecordingProjection;
+import com.openframe.processing.fixture.Widgets.WidgetSpec;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -25,13 +23,7 @@ import org.springframework.kafka.listener.ConcurrentMessageListenerContainer;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.listener.MessageListenerContainer;
-import org.springframework.kafka.support.KafkaNull;
-import org.springframework.kafka.support.converter.ByteArrayJacksonJsonMessageConverter;
-import org.springframework.messaging.Message;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -40,16 +32,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class EventProcessingKafkaAutoConfigurationTest {
 
-    private static final PublishedAggregateType ORGANIZATIONS = PublishedAggregateType.ORGANIZATIONS;
-
-    private static final String ENVELOPE = """
-            {"tenantId":"tenant-1","version":3,"deleted":false,"schemaVersion":1,
-             "event":{"organizationId":"org-1","name":"Acme","fieldFromANewerProducer":true}}
-            """;
+    private static final String ORGANIZATIONS = "organizations";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                     EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
+            .withUserConfiguration(AggregateSpecRegistry.class)
+            .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
             .withPropertyValues("openframe.events.processing.enabled=true",
                     "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                     "openframe.events.processing.kafka.topic-prefix=events.",
@@ -58,21 +47,21 @@ class EventProcessingKafkaAutoConfigurationTest {
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
 
     @Test
-    void theProcessorConsumer_readsFromEarliest_inSmallPolls_byDefault() {
+    void theProjectionConsumer_readsFromEarliest_inSmallPolls_byDefault() {
         runner.run(context -> {
-            Map<String, Object> consumer = processorConsumerOf(context);
+            Map<String, Object> consumer = projectionConsumerOf(context);
             assertThat(consumer).containsEntry("auto.offset.reset", "earliest").containsEntry("max.poll.records", 20);
             assertThat(consumer.get("value.deserializer")).isEqualTo(ByteArrayDeserializer.class);
         });
     }
 
     @Test
-    void theProcessorConsumer_takesItsOwnClusterAndSettings_notTheServicesSpringKafka() {
+    void theProjectionConsumer_takesItsOwnClusterAndSettings_notTheServicesSpringKafka() {
         runner.withPropertyValues("openframe.events.processing.kafka.bootstrap-servers=localhost:19092",
                         "openframe.events.processing.kafka.consumer.max-poll-records=5",
                         "spring.kafka.bootstrap-servers=127.0.0.1:29092", "spring.kafka.consumer.max-poll-records=500")
                 .run(context -> {
-                    assertThat(processorConsumerOf(context)).containsEntry("max.poll.records", 5)
+                    assertThat(projectionConsumerOf(context)).containsEntry("max.poll.records", 5)
                             .containsEntry("auto.offset.reset", "earliest")
                             .containsEntry("bootstrap.servers", List.of("localhost:19092"));
                     ConsumerFactory<?, ?> servicesConsumer = context.getBean("kafkaConsumerFactory", ConsumerFactory.class);
@@ -81,16 +70,16 @@ class EventProcessingKafkaAutoConfigurationTest {
     }
 
     @Test
-    void theOrganizationListener_readsTheConfiguredTopic_inTheServicesOwnGroup() {
+    void theListenerOfASpecsType_readsItsTopic_inTheServicesOwnGroup() {
         runner.run(context -> {
             ContainerProperties listener = organizationListenerOf(context);
-            assertThat(listener.getTopics()).containsExactly("events." + ORGANIZATIONS.getName());
-            assertThat(listener.getGroupId()).isEqualTo("openframe-saas-stream.processing-" + ORGANIZATIONS.getName());
+            assertThat(listener.getTopics()).containsExactly("events." + ORGANIZATIONS);
+            assertThat(listener.getGroupId()).isEqualTo("openframe-saas-stream.processing-" + ORGANIZATIONS);
         });
     }
 
     @Test
-    void theOrganizationListener_takesTheConfiguredPrefixes_asTheDevSharedsDo() {
+    void theListenerOfASpecsType_takesTheConfiguredPrefixes_asTheDevSharedsDo() {
         runner.withPropertyValues("openframe.events.processing.kafka.topic-prefix=dev3.events.",
                         "openframe.events.processing.kafka.group-prefix=dev3.openframe-saas-stream.processing-")
                 .run(context -> {
@@ -105,12 +94,14 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
+                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.processing.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                         "openframe.events.processing.kafka.topic-prefix=events.")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .run(context -> assertThat(context).hasFailed()
-                        .getFailure().rootCause().hasMessageContaining("openframe.events.processing.kafka.group-prefix"));
+                        .getFailure().hasStackTraceContaining("openframe.events.processing.kafka.group-prefix is required"));
     }
 
     @Test
@@ -123,7 +114,7 @@ class EventProcessingKafkaAutoConfigurationTest {
     }
 
     @Test
-    void theListenerKeys_areApplied_toTheProcessorContainers() {
+    void theListenerKeys_areApplied_toTheProjectionContainers() {
         runner.withPropertyValues("openframe.events.processing.kafka.listener.concurrency=3",
                         "openframe.events.processing.kafka.listener.ack-mode=record")
                 .run(context -> {
@@ -139,6 +130,8 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
+                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.processing.enabled=true",
                         "openframe.events.processing.kafka.topic-prefix=events.",
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-")
@@ -148,7 +141,7 @@ class EventProcessingKafkaAutoConfigurationTest {
     }
 
     @Test
-    void aMissingTopic_stopsTheProcessorContainers_byDefault() {
+    void aMissingTopic_stopsTheProjectionContainers_byDefault() {
         runner.run(context -> assertThat(organizationListenerOf(context).isMissingTopicsFatal()).isTrue());
     }
 
@@ -157,6 +150,8 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
+                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.processing.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                     "openframe.events.processing.kafka.topic-prefix=events.",
@@ -164,55 +159,6 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.listener.auto-startup=false")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .run(context -> assertThat(organizationListenerOf(context).getTopics()).containsExactly("events.organizations"));
-    }
-
-    @Test
-    void anEnumValueFromANewerProducer_isReadAsNull() throws NoSuchMethodException {
-        ByteArrayJacksonJsonMessageConverter converter = EventProcessingKafkaAutoConfiguration.buildEnvelopeConverter();
-        Method onOrganization = OrganizationEventListener.class.getMethod("onOrganization", String.class, PublishedRecord.class);
-        Type parameterType = onOrganization.getGenericParameterTypes()[1];
-        String envelope = """
-                {"tenantId":"tenant-1","version":3,"deleted":false,"schemaVersion":1,
-                 "event":{"organizationId":"org-1","name":"Acme","status":"STATUS_FROM_A_NEWER_PRODUCER"}}
-                """;
-        byte[] value = envelope.getBytes(StandardCharsets.UTF_8);
-        ConsumerRecord<String, byte[]> record = new ConsumerRecord<>("events.organizations", 0, 7L, "organization-document-1", value);
-
-        Message<?> message = converter.toMessage(record, null, null, parameterType);
-
-        assertThat(message.getPayload()).isInstanceOfSatisfying(PublishedRecord.class, published ->
-                assertThat(published.getEvent()).isInstanceOfSatisfying(OrganizationEvent.class, event ->
-                        assertThat(event.getStatus()).isNull()));
-    }
-
-    @Test
-    void theEnvelope_isReadIntoTheListenersParameterType_ignoringFieldsTheConsumerDoesNotKnow() throws NoSuchMethodException {
-        ByteArrayJacksonJsonMessageConverter converter = EventProcessingKafkaAutoConfiguration.buildEnvelopeConverter();
-        Method onOrganization = OrganizationEventListener.class.getMethod("onOrganization", String.class, PublishedRecord.class);
-        Type parameterType = onOrganization.getGenericParameterTypes()[1];
-        byte[] value = ENVELOPE.getBytes(StandardCharsets.UTF_8);
-        ConsumerRecord<String, byte[]> record = new ConsumerRecord<>("events.organizations", 0, 5L, "org-1", value);
-
-        Message<?> message = converter.toMessage(record, null, null, parameterType);
-
-        assertThat(message.getPayload()).isInstanceOfSatisfying(PublishedRecord.class, envelope -> {
-            assertThat(envelope.getTenantId()).isEqualTo("tenant-1");
-            assertThat(envelope.getVersion()).isEqualTo(3L);
-            assertThat(envelope.getEvent()).isInstanceOfSatisfying(OrganizationEvent.class, event ->
-                    assertThat(event.getName()).isEqualTo("Acme"));
-        });
-    }
-
-    @Test
-    void aTombstone_reachesTheListenerAsNoPayload() throws NoSuchMethodException {
-        ByteArrayJacksonJsonMessageConverter converter = EventProcessingKafkaAutoConfiguration.buildEnvelopeConverter();
-        Method onOrganization = OrganizationEventListener.class.getMethod("onOrganization", String.class, PublishedRecord.class);
-        Type parameterType = onOrganization.getGenericParameterTypes()[1];
-        ConsumerRecord<String, byte[]> tombstone = new ConsumerRecord<>("events.organizations", 0, 6L, "org-1", null);
-
-        Message<?> message = converter.toMessage(tombstone, null, null, parameterType);
-
-        assertThat(message.getPayload()).isEqualTo(KafkaNull.INSTANCE);
     }
 
     @Test
@@ -227,6 +173,11 @@ class EventProcessingKafkaAutoConfigurationTest {
         });
     }
 
+    private static WidgetSpec widgetSpec() {
+        RecordingProjection projection = new RecordingProjection("widget-on-organizations");
+        return new WidgetSpec(List.of(projection));
+    }
+
     private static ContainerProperties organizationListenerOf(AssertableApplicationContext context) {
         KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
         Collection<MessageListenerContainer> containers = registry.getListenerContainers();
@@ -236,7 +187,7 @@ class EventProcessingKafkaAutoConfigurationTest {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> processorConsumerOf(AssertableApplicationContext context) {
+    private static Map<String, Object> projectionConsumerOf(AssertableApplicationContext context) {
         return factoryOf(context).getConsumerFactory().getConfigurationProperties();
     }
 

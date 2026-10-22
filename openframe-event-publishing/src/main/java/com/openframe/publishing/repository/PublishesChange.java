@@ -6,7 +6,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-// Internal: marks a PublishingMongoRepository method whose returned documents are published as changed.
+// Internal: marks a PublishedRepositoryWrites method whose returned documents are published as changed.
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)

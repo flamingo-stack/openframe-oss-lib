@@ -1,4 +1,4 @@
-package com.openframe.publishing.api;
+package com.openframe.publishing.api.util;
 
 import com.mongodb.MongoException;
 import com.mongodb.MongoNodeIsRecoveringException;

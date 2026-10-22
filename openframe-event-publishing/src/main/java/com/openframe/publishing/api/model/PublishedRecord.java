@@ -1,5 +1,6 @@
-package com.openframe.publishing.api;
+package com.openframe.publishing.api.model;
 
+import com.openframe.publishing.api.spec.PublishedEvent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
