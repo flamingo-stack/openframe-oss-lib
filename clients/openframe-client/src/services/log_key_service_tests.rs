@@ -49,14 +49,14 @@ async fn run_to_completion(fx: &Fixture) {
 }
 
 #[tokio::test]
-async fn present_key_makes_no_call_and_keeps_the_initial_key() {
+async fn present_key_makes_no_call_and_drops_the_initial_key() {
     let server = mock_server_with_body(&[200], r#"{"key":"fresh"}"#).await;
     let fx = fixture(server.url.clone(), "existing").await;
 
     assert!(fx.service.clone().start().is_none());
     assert!(server.requests().is_empty());
     assert_eq!(fx.initial.get_log_key().unwrap(), "existing");
-    assert_eq!(fx.initial.get_initial_key().unwrap(), "enroll");
+    assert_eq!(fx.initial.get_initial_key().unwrap(), "");
 }
 
 #[tokio::test]

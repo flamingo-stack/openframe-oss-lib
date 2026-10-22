@@ -118,6 +118,9 @@ impl InitialConfigurationService {
     pub fn clear_initial_key(&self) -> Result<()> {
         let _guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         let mut config = self.get()?;
+        if config.initial_key.is_empty() {
+            return Ok(());
+        }
         config.initial_key = String::new();
         self.save(&config)
             .context("Failed to save initial configuration to file")?;

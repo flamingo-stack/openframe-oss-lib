@@ -82,21 +82,6 @@ impl AgentRegistrationService {
             )
             .await?;
 
-        // The enrollment key has no use once a registered device holds a log key; stop keeping it on disk.
-        let holds_log_key = self
-            .initial_configuration_service
-            .get_log_key()
-            .map(|key| !key.is_empty())
-            .unwrap_or(false);
-        if holds_log_key {
-            if let Err(e) = self.initial_configuration_service.clear_initial_key() {
-                warn!(
-                    "Failed to clear the initial key after registration: {:#}",
-                    e
-                );
-            }
-        }
-
         Ok(response)
     }
 
@@ -215,3 +200,7 @@ impl AgentRegistrationService {
         Ok(request)
     }
 }
+
+#[cfg(test)]
+#[path = "agent_registration_service_tests.rs"]
+mod tests;

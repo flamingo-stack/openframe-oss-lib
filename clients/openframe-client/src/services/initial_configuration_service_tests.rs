@@ -74,6 +74,7 @@ fn saving_the_log_key_keeps_the_initial_key_and_clearing_it_keeps_the_log_key() 
     assert_eq!(service.get_initial_key().unwrap(), "k");
 
     service.clear_initial_key().unwrap();
+    service.clear_initial_key().unwrap();
     assert_eq!(service.get_initial_key().unwrap(), "");
     assert_eq!(service.get_log_key().unwrap(), "log");
     assert_eq!(service.get_org_id().unwrap(), "org");

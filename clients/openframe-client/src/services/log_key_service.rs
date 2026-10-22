@@ -49,9 +49,10 @@ impl LogKeyService {
         }
     }
 
-    /// Fetches the log key in the background when the config lacks one (older install command or client); no-op otherwise.
+    /// Runs once the device is registered: fetches the log key in the background when the config lacks one (older install command or client).
     pub fn start(self: Arc<Self>) -> Option<JoinHandle<()>> {
         if !self.is_key_missing() {
+            self.drop_initial_key();
             return None;
         }
 
@@ -78,11 +79,15 @@ impl LogKeyService {
     fn store(&self, key: String) -> Result<()> {
         self.initial_config_service.save_log_key(key)?;
         info!("Log key saved");
-        // The device is registered by now, so the enrollment key has no use; stop keeping it on disk.
+        self.drop_initial_key();
+        Ok(())
+    }
+
+    // A registered device holding a log key has no use for the enrollment key; stop keeping it on disk.
+    fn drop_initial_key(&self) {
         if let Err(e) = self.initial_config_service.clear_initial_key() {
             warn!("Failed to clear the initial key: {:#}", e);
         }
-        Ok(())
     }
 
     async fn fetch_log_key(&self) -> Result<String> {
