@@ -125,13 +125,10 @@ export function VideoHoverPreviewSurface({
   }, [gateControlled]);
   // Continuation forces the media + player on regardless of hover/viewport gate.
   const showMedia = continuation || (gateControlled ? playerMounted : isNear);
-  // The hover player (and its script, the Mux player and hls.js: the largest a page can load) mounts on the first
-  // hover, never before: a card that is near the screen but never hovered shows its poster and costs nothing more.
-  // A widget pinned to the screen is always "near", so mounting on proximity loaded that script on every page view
-  // (CU-17tkuw5xp4q). Once mounted it stays, so the next hover plays at once.
-  const [engaged, setEngaged] = useState(false);
-  if ((active || continuation) && !engaged) setEngaged(true);
-  const showPlayer = continuation || engaged;
+  // The player mounts when the card comes near the screen, so a hover plays at once. Mounting it on the first hover
+  // made that hover wait for the player script and the stream (1.3 s measured on flamingo.run's bites strip). It loads
+  // long after the page's first paint, so it costs the page's largest paint nothing.
+  const showPlayer = showMedia;
 
   // Poster resolution — the shared entity-card cover fallback chain: the real
   // thumbnail, dropped on load error. Null → first-frame facade (unless the
