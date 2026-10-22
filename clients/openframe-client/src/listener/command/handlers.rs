@@ -280,10 +280,15 @@ fn reserve_tool(
     if client_update.is_pending() {
         return Begin::Busy(CLIENT_UPDATE_PENDING.to_string());
     }
-    match tool_ops.try_lock(tool_agent_id) {
-        Ok(lock) => Begin::Accepted(lock.mark_busy()),
-        Err(_) => Begin::Busy(TOOL_BUSY.to_string()),
+    let Ok(lock) = tool_ops.try_lock(tool_agent_id) else {
+        return Begin::Busy(TOOL_BUSY.to_string());
+    };
+    let op = lock.mark_busy();
+    // a client update marks pending before it checks for busy tools, so one of the two always backs off
+    if client_update.is_pending() {
+        return Begin::Busy(CLIENT_UPDATE_PENDING.to_string());
     }
+    Begin::Accepted(op)
 }
 
 #[cfg(test)]

@@ -88,19 +88,10 @@ impl OpenFrameClientUpdateService {
         self.apply(message, guard).await
     }
 
-    /// Parks new tool operations, then takes the update slot unless a tool or another update holds it
+    /// Takes the update slot and parks new tool operations, unless another update or a tool holds them
     pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
-
-        self.tool_run_manager.mark_client_update_pending();
-
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
-            return Err(anyhow!(
-                "Tool operation in progress, deferring client update"
-            ));
-        }
 
         // 1. Held until the updater is done with this process, so a redelivery cannot overlap a live script
         let Some(guard) = UpdateGuard::acquire(&self.update_in_progress) else {
@@ -111,6 +102,15 @@ impl OpenFrameClientUpdateService {
             return Err(anyhow!("Update already in progress"));
         };
         info!("Acquired update lock for version: {}", requested_version);
+
+        self.tool_run_manager.mark_client_update_pending();
+
+        if self.tool_ops.any_busy() {
+            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
+            return Err(anyhow!(
+                "Tool operation in progress, deferring client update"
+            ));
+        }
         Ok(guard)
     }
 

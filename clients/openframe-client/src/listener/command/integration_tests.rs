@@ -1011,6 +1011,8 @@ async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ac
     let running: OpenFrameClientUpdateMessage =
         serde_json::from_value(client_update("running", "9.9.8")).unwrap();
     let _running = service.reserve(&running).unwrap();
+    // as after an early updater exit, which clears pending while its watcher still holds the slot
+    agent.tool_run_manager.clear_client_update_pending();
     agent
         .send_to(
             ClientUpdateHandler::subject(MACHINE),
@@ -1018,4 +1020,5 @@ async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ac
         )
         .await;
     agent.expect_silence("u2").await;
+    assert!(!agent.tool_run_manager.is_client_update_pending());
 }
