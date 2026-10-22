@@ -14,6 +14,7 @@ public class MySqlSourceDialect extends SourceDialect {
 
     private static final String CONNECTOR_CLASS = "io.debezium.connector.mysql.MySqlConnector";
     private static final String KEY_TABLES = "table.include.list";
+    private static final String PARTITION_KEY = "server";
     private static final String OFFSET_TIME_KEY = "ts_sec";
     private static final String FROM_PLACEHOLDER = "{from}";
     private static final List<String> HISTORY_LOST_MARKERS = List.of(
@@ -43,6 +44,11 @@ public class MySqlSourceDialect extends SourceDialect {
         return splitList(tables).stream()
                 .map(table -> conditionFor(table, backfill, from))
                 .toList();
+    }
+
+    @Override
+    protected String partitionKey() {
+        return PARTITION_KEY;
     }
 
     @Override

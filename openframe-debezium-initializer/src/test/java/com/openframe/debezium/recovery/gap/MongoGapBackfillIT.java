@@ -94,7 +94,7 @@ class MongoGapBackfillIT {
         Map<String, Object> hostSideConfig = hostSideConfig();
         GapRecoveryProperties signalProperties = new GapRecoveryProperties();
         signalProperties.setBackfillExpiry(Duration.ofHours(2));
-        SnapshotSignalPublisher publisher = new SnapshotSignalPublisher(objectMapper, signalProperties);
+        SnapshotSignalPublisher publisher = new SnapshotSignalPublisher(objectMapper, signalProperties, new SignalKafkaClients());
 
         // execution
         publisher.publishIncrementalSnapshot(hostSideConfig, conditions);

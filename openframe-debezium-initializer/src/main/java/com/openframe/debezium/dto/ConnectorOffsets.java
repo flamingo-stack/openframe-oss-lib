@@ -19,6 +19,7 @@ import java.util.Map;
 public class ConnectorOffsets {
 
     private static final String KEY_OFFSET = "offset";
+    private static final String KEY_PARTITION = "partition";
 
     private List<Map<String, Object>> offsets = new ArrayList<>();
 
@@ -34,9 +35,18 @@ public class ConnectorOffsets {
 
     @JsonIgnore
     public List<Map<String, Object>> sourceOffsets() {
+        return entriesOf(KEY_OFFSET);
+    }
+
+    @JsonIgnore
+    public List<Map<String, Object>> sourcePartitions() {
+        return entriesOf(KEY_PARTITION);
+    }
+
+    private List<Map<String, Object>> entriesOf(String key) {
         if (isEmpty()) return List.of();
         return offsets.stream()
-                .map(entry -> entry.get(KEY_OFFSET))
+                .map(entry -> entry.get(key))
                 .filter(Map.class::isInstance)
                 .map(ConnectorOffsets::asOffsetMap)
                 .toList();

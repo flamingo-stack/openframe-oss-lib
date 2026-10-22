@@ -56,7 +56,7 @@ class SnapshotSignalPublisherIT {
         topicPrefix = "it.prefix." + runId;
         GapRecoveryProperties properties = new GapRecoveryProperties();
         properties.setBackfillExpiry(BACKFILL_EXPIRY);
-        publisher = new SnapshotSignalPublisher(objectMapper, properties);
+        publisher = new SnapshotSignalPublisher(objectMapper, properties, new SignalKafkaClients());
         admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, HOST_KAFKA));
     }
 
