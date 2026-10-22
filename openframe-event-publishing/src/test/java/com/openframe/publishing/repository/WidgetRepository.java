@@ -1,13 +1,12 @@
 package com.openframe.publishing.repository;
 
-import com.openframe.publishing.api.PublishingMongoRepository;
 import com.openframe.publishing.fixture.Widgets.Widget;
-import com.openframe.publishing.fixture.Widgets.WidgetSpec;
+import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
 import java.util.List;
 
-public interface WidgetRepository extends PublishingMongoRepository<Widget, String, WidgetSpec>, WidgetCustomRepository {
+public interface WidgetRepository extends MongoRepository<Widget, String>, WidgetCustomRepository {
 
     List<Widget> deleteByName(String name);
 

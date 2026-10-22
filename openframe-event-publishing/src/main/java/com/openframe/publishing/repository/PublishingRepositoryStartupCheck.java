@@ -1,6 +1,8 @@
 package com.openframe.publishing.repository;
 
-import com.openframe.publishing.api.PublishingMongoRepository;
+import com.openframe.publishing.api.PublishedDocuments;
+import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.Advisor;
@@ -16,22 +18,26 @@ import org.springframework.data.repository.core.support.RepositoryFactoryBeanSup
 import org.springframework.data.repository.core.support.RepositoryFactoryInformation;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * Stops the service at startup when a {@link PublishingMongoRepository} would publish wrongly or not at all.
- * Runs once every singleton exists, for each publishing repository, and checks that:
+ * Stops the service at startup when a repository of a published document would publish wrongly or not at all.
+ * A repository publishes when its document is the {@code D} of an {@link AggregateSpec}; for each such repository it checks that:
  * <ul>
- *   <li>its spec class (the third type argument) is exactly one bean;</li>
+ *   <li>its document is the only one with that repository: one repository per published document, and every spec's
+ *       document has one;</li>
  *   <li>its document has a {@code @Version} field, because the version orders the events;</li>
  *   <li>{@link PublishingRepositoryInterceptor} is inside the repository's proxy;</li>
  *   <li>it has no {@code @Update} method, which returns no documents to publish;</li>
  *   <li>no derived delete returns a count instead of the deleted documents;</li>
  *   <li>no custom method carries {@link PublishesChange} or {@link PublishesDelete};</li>
- *   <li>every Spring Data write method is marked on {@link PublishingMongoRepository}, so a write added by a later
- *       Spring Data version is not silently left out.</li>
+ *   <li>every Spring Data write method is in {@link PublishedRepositoryWrites}, so a write added by a later Spring Data
+ *       version is not silently left out.</li>
  * </ul>
  * Writes outside the repository, such as a plain {@code MongoTemplate} call, are not checked and not published.
  */
@@ -44,24 +50,40 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
     private static final List<String> WRITE_PREFIXES = List.of("save", "insert", "delete", "remove", "update", "upsert", "replace");
 
     private final ListableBeanFactory beanFactory;
-    private final PublishedRepositorySpecs specs;
+    private final AggregateSpecRegistry specRegistry;
 
     @Override
     public void afterSingletonsInstantiated() {
+        Map<Class<?>, List<String>> repositoriesByDocument = new HashMap<>();
         // As Spring Data's Repositories does it: the factory beans themselves carry the repository information.
         for (String factoryName : beanFactory.getBeanNamesForType(RepositoryFactoryInformation.class, false, false)) {
             RepositoryFactoryInformation<?, ?> factory = beanFactory.getBean(factoryName, RepositoryFactoryInformation.class);
-            check(factory);
+            RepositoryInformation information = factory.getRepositoryInformation();
+            Class<?> documentClass = information.getDomainType();
+            if (specRegistry.hasSpecForDocument(documentClass)) {
+                Class<?> repositoryInterface = information.getRepositoryInterface();
+                repositoriesByDocument.computeIfAbsent(documentClass, document -> new ArrayList<>()).add(repositoryInterface.getName());
+                check(factory, information);
+            }
+        }
+        for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
+            requireOneRepository(spec, repositoriesByDocument);
         }
     }
 
-    private void check(RepositoryFactoryInformation<?, ?> factory) {
-        RepositoryInformation information = factory.getRepositoryInformation();
-        Class<?> repositoryInterface = information.getRepositoryInterface();
-        if (!PublishingMongoRepository.class.isAssignableFrom(repositoryInterface)) {
-            return;
+    // The interceptor publishes writes through the repository; none means nothing is published, two means two places to watch.
+    private static void requireOneRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
+        Class<?> documentClass = PublishedDocuments.classOf(spec);
+        List<String> repositories = repositoriesByDocument.getOrDefault(documentClass, List.of());
+        if (repositories.size() != 1) {
+            throw new IllegalStateException("The spec of " + spec.getType() + " publishes " + documentClass.getName()
+                    + ", which must have exactly one repository, found " + repositories);
         }
-        specs.requireSpec(repositoryInterface);
+        log.info("{} publishes {}", repositories.getFirst(), spec.getType());
+    }
+
+    private void check(RepositoryFactoryInformation<?, ?> factory, RepositoryInformation information) {
+        Class<?> repositoryInterface = information.getRepositoryInterface();
         EntityInformation<?, ?> entity = factory.getEntityInformation();
         requireVersioned(entity, repositoryInterface);
         requireInterceptor(factory, repositoryInterface);
@@ -71,11 +93,11 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
         }
         PublishingRepositoryPointcut pointcut = PublishingRepositoryPointcut.of(information);
         for (Method method : repositoryInterface.getMethods()) {
-            requireMarkersOnlyOnPublishingMongoRepository(method);
+            requireNoPublishingMarker(method);
             boolean baseWrite = information.isBaseClassMethod(method) && isWriteNamed(method);
             if (baseWrite && !pointcut.matches(method, repositoryInterface)) {
-                throw new IllegalStateException(method + " is a Spring Data write that PublishingMongoRepository does not mark;"
-                        + " redeclare it there with @PublishesChange or @PublishesDelete");
+                throw new IllegalStateException(method + " is a Spring Data write that PublishedRepositoryWrites does not list;"
+                        + " add it there with @PublishesChange or @PublishesDelete");
             }
         }
         log.debug("Publishing repository {} passed the startup checks", repositoryInterface.getName());
@@ -116,12 +138,12 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
         }
     }
 
-    // The markers say what the interceptor publishes; on a custom method they would publish nothing, so they are refused.
-    private static void requireMarkersOnlyOnPublishingMongoRepository(Method method) {
+    // The markers belong to the library's own table; on a repository method they would publish nothing, so they are refused.
+    private static void requireNoPublishingMarker(Method method) {
         boolean marked = method.isAnnotationPresent(PublishesChange.class) || method.isAnnotationPresent(PublishesDelete.class);
-        if (marked && method.getDeclaringClass() != PublishingMongoRepository.class) {
-            throw new IllegalStateException(method + " carries a publishing marker, which only PublishingMongoRepository's"
-                    + " own methods use; publish a custom write with OutboxPublisher");
+        if (marked) {
+            throw new IllegalStateException(method + " carries a publishing marker, which only the library's own"
+                    + " PublishedRepositoryWrites uses; publish a custom write with OutboxPublisher");
         }
     }
 

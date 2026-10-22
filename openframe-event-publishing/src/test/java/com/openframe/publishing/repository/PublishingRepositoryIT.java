@@ -1,6 +1,5 @@
 package com.openframe.publishing.repository;
 
-import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
@@ -19,12 +18,12 @@ import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -38,6 +37,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,7 +61,6 @@ class PublishingRepositoryIT {
     }
 
     @Autowired private WidgetRepository widgetRepository;
-    @Autowired private PlainWidgetRepository plainWidgetRepository;
     @Autowired private CascadeLikeAspect cascadeLikeAspect;
     @Autowired private MongoTemplate mongoTemplate;
     @MockitoSpyBean private PublishedAggregateTopics publishedAggregateTopics;
@@ -85,7 +84,8 @@ class PublishingRepositoryIT {
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
             assertThat(row.getVersion()).isEqualTo(saved.getVersion());
             assertThat(row.isDeleted()).isFalse();
-            assertThat(row.getPayload()).containsEntry("name", "Printer");
+            assertThat(row.getPayload()).containsEntry("tenantId", "tenant-1").containsEntry("deleted", false);
+            assertThat(eventOf(row)).containsEntry("name", "Printer");
         });
     }
 
@@ -165,7 +165,7 @@ class PublishingRepositoryIT {
     }
 
     @Test
-    void everyBaseDelete_writesATombstoneNewerThanTheStoredVersion() {
+    void everyBaseDelete_writesADeleteEnvelopeThenATombstone_newerThanTheStoredVersion() {
         Widget byId = widgetRepository.save(widget("Printer"));
         Widget byEntity = widgetRepository.save(widget("Scanner"));
         Widget byIds = widgetRepository.save(widget("Router"));
@@ -179,38 +179,59 @@ class PublishingRepositoryIT {
         assertThat(deletedRows()).hasSize(4).allSatisfy(row -> {
             assertThat(row.getVersion()).isEqualTo(1L);
             assertThat(row.getTenantId()).isEqualTo("tenant-1");
-            assertThat(row.getPayload()).isNull();
+            assertThat(row.getPayload()).containsEntry("deleted", true).containsEntry("event", null);
         });
+        assertThat(tombstoneRows()).hasSize(4).allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L));
         assertThat(widgetRepository.count()).isZero();
     }
 
     @Test
-    void theTombstoneRow_storesThePayloadKey_asNull_forDebeziumsRouter() {
+    void aDeleteOfAHandBuiltEntityWithoutATenant_takesTheTenantFromTheDatabase() {
         Widget saved = widgetRepository.save(widget("Printer"));
+        saved.setName("Scanner");
+        Widget renamed = widgetRepository.save(saved);
+        long deleteVersion = renamed.getVersion() + 1;
+        // Spring Data deletes by id and version, so only the tenant can be missing from an entity it accepts.
+        Widget handBuilt = new Widget(renamed.getId(), null, null, null, renamed.getVersion());
 
-        widgetRepository.delete(saved);
+        widgetRepository.delete(handBuilt);
 
-        List<org.bson.Document> rawRows = mongoTemplate.getCollection("outbox").find().into(new ArrayList<>());
-        List<org.bson.Document> rawTombstones = rawRows.stream().filter(row -> row.get("payload") == null).toList();
-        assertThat(rawTombstones).singleElement().satisfies(row -> assertThat(row).containsKey("payload"));
+        assertThat(deletedRows()).singleElement().satisfies(row -> {
+            assertThat(row.getTenantId()).isEqualTo("tenant-1");
+            assertThat(row.getVersion()).isEqualTo(deleteVersion);
+            assertThat(row.getPayload()).containsEntry("tenantId", "tenant-1");
+            Number envelopeVersion = (Number) row.getPayload().get("version");
+            assertThat(envelopeVersion.longValue()).isEqualTo(deleteVersion);
+        });
     }
 
     @Test
-    void deleteAll_deletesEveryDocument_andWritesATombstoneForEach() {
+    void aDelete_writesItsEnvelopeBeforeItsTombstone() {
+        Widget saved = widgetRepository.save(widget("Printer"));
+
+        widgetRepository.deleteById(saved.getId());
+
+        Query inInsertOrder = new Query().with(Sort.by(Sort.Direction.ASC, "_id"));
+        List<OutboxEvent> rows = mongoTemplate.find(inInsertOrder, OutboxEvent.class);
+        assertThat(rows).hasSize(3);
+        assertThat(rows.get(1).getPayload()).containsEntry("deleted", true);
+        assertThat(rows.get(2).getPayload()).isNull();
+    }
+
+    @Test
+    void deleteAll_deletesEveryDocument_andWritesBothDeleteRowsForEach() {
         widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner")));
 
         widgetRepository.deleteAll();
 
         assertThat(widgetRepository.count()).isZero();
-        assertThat(deletedRows()).hasSize(2).allSatisfy(row -> {
-            assertThat(row.getVersion()).isEqualTo(1L);
-            assertThat(row.getPayload()).isNull();
-        });
+        assertThat(deletedRows()).hasSize(2).allSatisfy(row -> assertThat(row.getVersion()).isEqualTo(1L));
+        assertThat(tombstoneRows()).hasSize(2);
     }
 
     @Test
     void deleteAll_withPublishOff_stillDeletes() {
-        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
+        doReturn(false).when(publishedAggregateTopics).isPublishing("organizations");
         widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner")));
 
         widgetRepository.deleteAll();
@@ -230,13 +251,25 @@ class PublishingRepositoryIT {
     }
 
     @Test
+    void theTombstoneRow_storesThePayloadKey_asNull_forDebeziumsRouter() {
+        Widget saved = widgetRepository.save(widget("Printer"));
+
+        widgetRepository.delete(saved);
+
+        List<org.bson.Document> rawRows = mongoTemplate.getCollection("outbox").find().into(new ArrayList<>());
+        List<org.bson.Document> rawTombstones = rawRows.stream().filter(row -> row.get("payload") == null).toList();
+        assertThat(rawTombstones).singleElement().satisfies(row -> assertThat(row).containsKey("payload"));
+    }
+
+    @Test
     void aQueryDeleteReturningTheDocuments_writesADeletedRowForEach() {
         widgetRepository.saveAll(List.of(widget("Printer"), widget("Printer"), widget("Scanner")));
 
         List<Widget> deleted = widgetRepository.purgeByQuery("Printer");
 
         assertThat(deleted).hasSize(2);
-        assertThat(deletedRows()).hasSize(2).allSatisfy(row -> assertThat(row.getPayload()).isNull());
+        assertThat(deletedRows()).hasSize(2).allSatisfy(row -> assertThat(row.getPayload()).containsEntry("event", null));
+        assertThat(tombstoneRows()).hasSize(2);
         assertThat(widgetRepository.count()).isEqualTo(1);
     }
 
@@ -290,7 +323,7 @@ class PublishingRepositoryIT {
 
     @Test
     void publishOff_writesWithoutARow() {
-        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
+        doReturn(false).when(publishedAggregateTopics).isPublishing("organizations");
 
         Widget saved = widgetRepository.save(widget("Printer"));
         widgetRepository.renameOne(saved.getId(), "Scanner");
@@ -301,7 +334,7 @@ class PublishingRepositoryIT {
 
     @Test
     void publishOff_everyOtherWriteAndDelete_runsWithoutARow() {
-        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
+        doReturn(false).when(publishedAggregateTopics).isPublishing("organizations");
         List<Widget> saved = widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner"), widget("Router")));
         widgetRepository.insert(List.of(widget("Printer"), widget("Scanner"), widget("Router")));
 
@@ -327,13 +360,6 @@ class PublishingRepositoryIT {
         assertThat(outboxCount()).isZero();
     }
 
-    @Test
-    void aPlainRepositoryOfTheSameDocument_doesNotPublish() {
-        plainWidgetRepository.save(widget("Printer"));
-
-        assertThat(outboxCount()).isZero();
-    }
-
     private List<OutboxEvent> outboxRows() {
         return mongoTemplate.findAll(OutboxEvent.class);
     }
@@ -342,15 +368,25 @@ class PublishingRepositoryIT {
         return mongoTemplate.count(new Query(), OutboxEvent.class);
     }
 
+    // The delete envelopes; each has a tombstone row right after it.
     private List<OutboxEvent> deletedRows() {
-        return outboxRows().stream().filter(OutboxEvent::isDeleted).toList();
+        return outboxRows().stream().filter(OutboxEvent::isDeleted).filter(row -> row.getPayload() != null).toList();
+    }
+
+    private List<OutboxEvent> tombstoneRows() {
+        return outboxRows().stream().filter(row -> row.getPayload() == null).toList();
     }
 
     private List<OutboxEvent> rowsNamed(String name) {
         return outboxRows().stream()
                 .filter(row -> !row.isDeleted())
-                .filter(row -> name.equals(row.getPayload().get("name")))
+                .filter(row -> name.equals(eventOf(row).get("name")))
                 .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> eventOf(OutboxEvent row) {
+        return (Map<String, Object>) row.getPayload().get("event");
     }
 
     private OutboxEvent rowNamed(String name) {
@@ -367,11 +403,8 @@ class PublishingRepositoryIT {
     @EnableAutoConfiguration
     @EnableMongoRepositories(basePackageClasses = PublishingRepositoryIT.class, considerNestedRepositories = true,
             includeFilters = @Filter(type = FilterType.ASSIGNABLE_TYPE,
-                    classes = {WidgetRepository.class, PlainWidgetRepository.class}))
+                    classes = WidgetRepository.class))
     @Import({WidgetSpec.class, CascadeLikeAspect.class})
     static class TestApplication {
-    }
-
-    interface PlainWidgetRepository extends MongoRepository<Widget, String> {
     }
 }

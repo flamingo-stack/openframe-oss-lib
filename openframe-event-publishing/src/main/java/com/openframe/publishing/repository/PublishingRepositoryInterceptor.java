@@ -1,7 +1,7 @@
 package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.OutboxPublisher;
-import com.openframe.publishing.api.PublishedAggregateSpec;
+import com.openframe.publishing.api.spec.AggregateSpec;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -19,12 +19,12 @@ class PublishingRepositoryInterceptor implements MethodInterceptor {
 
     private final Class<?> repositoryInterface;
     private final PublishingRepositoryPointcut pointcut;
-    private final Supplier<PublishedAggregateSpec<?, ?>> spec;
+    private final Supplier<AggregateSpec<?, ?>> spec;
     private final ObjectProvider<OutboxPublisher> outboxPublisher;
 
     PublishingRepositoryInterceptor(Class<?> repositoryInterface,
                                     PublishingRepositoryPointcut pointcut,
-                                    Supplier<PublishedAggregateSpec<?, ?>> spec,
+                                    Supplier<AggregateSpec<?, ?>> spec,
                                     ObjectProvider<OutboxPublisher> outboxPublisher) {
         this.repositoryInterface = repositoryInterface;
         this.pointcut = pointcut;
@@ -37,11 +37,11 @@ class PublishingRepositoryInterceptor implements MethodInterceptor {
     public Object invoke(MethodInvocation invocation) {
         Method method = invocation.getMethod();
         PublishedWrite write = pointcut.writeOf(method);
-        PublishedAggregateSpec<?, ?> publishedSpec = spec.get();
+        AggregateSpec<?, ?> publishedSpec = spec.get();
         OutboxPublisher publisher = outboxPublisher.getObject();
         Supplier<Object> proceed = () -> proceed(invocation);
         log.debug("{}.{} is a {} write of {}", repositoryInterface.getSimpleName(), method.getName(), write,
-                publishedSpec.getType().getName());
+                publishedSpec.getType());
         return switch (write) {
             case CHANGE -> publisher.publishChanged(publishedSpec, proceed);
             case DERIVED_DELETE -> publisher.publishDeleted(publishedSpec, proceed);
@@ -60,7 +60,7 @@ class PublishingRepositoryInterceptor implements MethodInterceptor {
     // A null argument goes to Spring Data unchanged, which refuses it as it does without publishing.
     private static Object deleteBy(PublishedWrite write,
                                    Object argument,
-                                   PublishedAggregateSpec<?, ?> spec,
+                                   AggregateSpec<?, ?> spec,
                                    OutboxPublisher publisher,
                                    Supplier<Object> proceed) {
         if (argument == null) {

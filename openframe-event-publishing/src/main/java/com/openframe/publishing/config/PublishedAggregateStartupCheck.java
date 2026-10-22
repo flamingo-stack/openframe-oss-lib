@@ -1,32 +1,43 @@
 package com.openframe.publishing.config;
 
-import com.openframe.publishing.api.PublishedAggregateSpec;
-import com.openframe.publishing.api.PublishedAggregateType;
-import com.openframe.publishing.spec.PublishedAggregateSpecRegistry;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
-// publish on for a type no spec covers would silently write nothing; refuse to start instead.
+// publish on for a type no spec covers would silently write nothing; refuse to start. Any other unknown key is only a WARN.
+@Slf4j
 @RequiredArgsConstructor
 public class PublishedAggregateStartupCheck implements SmartInitializingSingleton {
 
     private final EventsProperties properties;
-    private final PublishedAggregateSpecRegistry registry;
+    private final AggregateSpecRegistry registry;
 
     @Override
     public void afterSingletonsInstantiated() {
-        Map<PublishedAggregateType, EventsProperties.Topic> topics = properties.getTopics();
-        List<String> withoutSpec = topics.entrySet().stream()
+        Map<String, EventsProperties.Topic> topics = properties.getTopics();
+        Set<String> types = registry.types();
+        List<String> publishedWithoutSpec = topics.entrySet().stream()
                 .filter(entry -> entry.getValue().isPublish())
                 .map(Map.Entry::getKey)
-                .filter(type -> !registry.hasSpec(type))
-                .map(PublishedAggregateType::getName)
+                .filter(type -> !types.contains(type))
+                .sorted()
                 .toList();
-        if (!withoutSpec.isEmpty()) {
-            throw new IllegalStateException("publish is on for " + withoutSpec + " but no PublishedAggregateSpec covers it");
+        if (!publishedWithoutSpec.isEmpty()) {
+            throw new IllegalStateException("publish is on for " + publishedWithoutSpec + " but no AggregateSpec has that type;"
+                    + " the types are " + types);
+        }
+        List<String> unknown = topics.keySet().stream()
+                .filter(type -> !types.contains(type))
+                .sorted()
+                .toList();
+        if (!unknown.isEmpty()) {
+            log.warn("openframe.events.topics names {}, but no AggregateSpec has that type: a typo, or a config newer than this image",
+                    unknown);
         }
     }
 }

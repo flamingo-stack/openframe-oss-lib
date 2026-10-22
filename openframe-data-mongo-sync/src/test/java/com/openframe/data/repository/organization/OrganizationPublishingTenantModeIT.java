@@ -2,7 +2,9 @@ package com.openframe.data.repository.organization;
 
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
-import com.openframe.data.repository.organization.publishing.OrganizationSpec;
+import com.openframe.data.repository.organization.publishing.OrganizationAggregateSpec;
+import com.openframe.data.repository.organization.publishing.OrganizationOnTicketsProjection;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.persistence.OutboxEvent;
 import org.bson.Document;
@@ -83,7 +85,7 @@ class OrganizationPublishingTenantModeIT {
     }
 
     @Test
-    void deleteAll_deletesOnlyThePodsTenant_andWritesTombstonesOnlyForIt() {
+    void deleteAll_deletesOnlyThePodsTenant_andWritesDeleteRowsOnlyForIt() {
         organizationRepository.save(organization("org-1"));
         Document otherTenant = new Document("_id", "other").append("tenantId", "tenant-2")
                 .append("organizationId", "org-2").append("name", "Other").append("version", 0L);
@@ -92,8 +94,8 @@ class OrganizationPublishingTenantModeIT {
         organizationRepository.deleteAll();
 
         assertThat(mongoTemplate.getCollection("organizations").countDocuments()).isEqualTo(1);
-        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OutboxEvent::isDeleted).singleElement()
-                .satisfies(row -> assertThat(row.getTenantId()).isEqualTo(POD_TENANT));
+        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OutboxEvent::isDeleted).hasSize(2)
+                .allSatisfy(row -> assertThat(row.getTenantId()).isEqualTo(POD_TENANT));
     }
 
     private static Organization organization(String organizationId) {
@@ -101,9 +103,9 @@ class OrganizationPublishingTenantModeIT {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, OutboxAutoConfiguration.class})
+    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = OrganizationRepository.class)
-    @Import(OrganizationSpec.class)
+    @Import({OrganizationAggregateSpec.class, OrganizationOnTicketsProjection.class})
     static class TestApplication {
 
         @Bean

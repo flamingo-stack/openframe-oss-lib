@@ -1,10 +1,10 @@
 package com.openframe.data.repository.organization;
 
 import com.openframe.data.document.organization.Organization;
-import com.openframe.data.repository.organization.publishing.OrganizationSpec;
-import com.openframe.publishing.api.PublishingMongoRepository;
+import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -14,8 +14,7 @@ import java.util.Set;
  * Provides standard CRUD operations and custom queries for organizations.
  */
 @Repository
-public interface OrganizationRepository
-        extends PublishingMongoRepository<Organization, String, OrganizationSpec>, CustomOrganizationRepository {
+public interface OrganizationRepository extends MongoRepository<Organization, String>, CustomOrganizationRepository {
 
     /**
      * Find organization by organizationId
@@ -23,6 +22,8 @@ public interface OrganizationRepository
      * @return Optional containing the organization if found
      */
     Optional<Organization> findByOrganizationId(String organizationId);
+
+    List<Organization> findByTenantIdInAndOrganizationIdIn(Collection<String> tenantIds, Collection<String> organizationIds);
 
     /**
      * Find organization by name

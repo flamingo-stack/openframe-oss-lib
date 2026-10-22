@@ -1,7 +1,7 @@
 package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.OutboxPublisher;
-import com.openframe.publishing.api.PublishingMongoRepository;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.EventsConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.config.OutboxIndexAutoConfiguration;
@@ -11,6 +11,7 @@ import com.openframe.publishing.fixture.Widgets.UnversionedWidgetSpec;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.persistence.OutboxIndexInitializer;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.Advised;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -35,7 +36,7 @@ class PublishingRepositoryStartupTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(MongoAutoConfiguration.class, DataMongoAutoConfiguration.class,
-                    OutboxAutoConfiguration.class))
+                    AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class))
             .withPropertyValues("spring.mongodb.uri=mongodb://localhost:1/startup-test", "spring.data.mongodb.enabled=true",
                     "openframe.events.publishing.enabled=true");
 
@@ -46,7 +47,7 @@ class PublishingRepositoryStartupTest {
                 .run(context -> assertThat(context).hasNotFailed().hasSingleBean(WidgetRepository.class));
     }
 
-    // Shaped like saas-infra: Mongo on, only its own repositories, no PublishingMongoRepository at all.
+    // Shaped like saas-infra: Mongo on, only its own repositories, no spec at all.
     @Test
     void aServiceWithOnlyItsOwnRepositories_starts() {
         runner.withUserConfiguration(OwnRepositoriesOnly.class)
@@ -57,7 +58,8 @@ class PublishingRepositoryStartupTest {
     void publishingSwitchedOff_leavesAPlainRepository_andNoPublishingBeans() {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(MongoAutoConfiguration.class, DataMongoAutoConfiguration.class,
-                        OutboxAutoConfiguration.class, OutboxIndexAutoConfiguration.class))
+                        AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class,
+                        OutboxIndexAutoConfiguration.class))
                 .withPropertyValues("spring.mongodb.uri=mongodb://localhost:1/startup-test", "spring.data.mongodb.enabled=true")
                 .withUserConfiguration(UnversionedWidgetRepositories.class)
                 .run(context -> {
@@ -83,9 +85,38 @@ class PublishingRepositoryStartupTest {
     }
 
     @Test
-    void aSpecClassThatIsNotABean_stopsTheServiceFromStarting() {
+    void aRepositoryWhoseDocumentHasNoSpec_staysAPlainRepository() {
+        runner.withUserConfiguration(OwnRepositoriesOnly.class)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    Object repository = context.getBean(PlainWidgetRepository.class);
+                    assertThat(repository).isInstanceOfSatisfying(Advised.class, advised -> assertThat(advised.getAdvisors())
+                            .noneMatch(advisor -> advisor.getAdvice() instanceof PublishingRepositoryInterceptor));
+                });
+    }
+
+    @Test
+    void aRepositoryWhoseDocumentHasASpec_getsTheInterceptor_withoutAnyMarker() {
         runner.withUserConfiguration(WidgetRepositories.class)
-                .run(failsWith(WidgetSpec.class.getName()));
+                .withBean(WidgetSpec.class)
+                .run(context -> {
+                    Object repository = context.getBean(WidgetRepository.class);
+                    assertThat(repository).isInstanceOfSatisfying(Advised.class, advised -> assertThat(advised.getAdvisors())
+                            .anyMatch(advisor -> advisor.getAdvice() instanceof PublishingRepositoryInterceptor));
+                });
+    }
+
+    @Test
+    void aSpecWhoseDocumentHasNoRepository_stopsTheServiceFromStarting() {
+        runner.withBean(WidgetSpec.class)
+                .run(failsWith("must have exactly one repository, found []"));
+    }
+
+    @Test
+    void twoRepositoriesOfOnePublishedDocument_stopTheServiceFromStarting() {
+        runner.withUserConfiguration(WidgetRepositories.class, OwnRepositoriesOnly.class)
+                .withBean(WidgetSpec.class)
+                .run(failsWith("must have exactly one repository"));
     }
 
     @Test
@@ -134,7 +165,7 @@ class PublishingRepositoryStartupTest {
     // Everything of OutboxAutoConfiguration except PublishingRepositoryPostProcessor.
     @Configuration
     @Import({EventsConfiguration.class, PublishedAggregateTopics.class, OutboxPublisher.class,
-            PublishedRepositorySpecs.class, PublishingRepositoryStartupCheck.class})
+            AggregateSpecRegistry.class, PublishingRepositoryStartupCheck.class})
     static class WithoutPostProcessor {
     }
 
@@ -183,24 +214,24 @@ class PublishingRepositoryStartupTest {
     interface PlainWidgetRepository extends MongoRepository<Widget, String> {
     }
 
-    interface UnversionedWidgetRepository extends PublishingMongoRepository<UnversionedWidget, String, UnversionedWidgetSpec> {
+    interface UnversionedWidgetRepository extends MongoRepository<UnversionedWidget, String> {
     }
 
-    interface UpdateMethodRepository extends PublishingMongoRepository<Widget, String, WidgetSpec> {
+    interface UpdateMethodRepository extends MongoRepository<Widget, String> {
 
         @org.springframework.data.mongodb.repository.Query("{ '_id': ?0 }")
         @Update("{ '$set': { 'name': ?1 } }")
         long renameById(String id, String name);
     }
 
-    interface CountingDeleteRepository extends PublishingMongoRepository<Widget, String, WidgetSpec> {
+    interface CountingDeleteRepository extends MongoRepository<Widget, String> {
 
         long deleteByName(String name);
     }
 
-    interface CustomDeleteRepository extends PublishingMongoRepository<Widget, String, WidgetSpec>, DeleteNamedFragment {
+    interface CustomDeleteRepository extends MongoRepository<Widget, String>, DeleteNamedFragment {
     }
 
-    interface MarkedRepository extends PublishingMongoRepository<Widget, String, WidgetSpec>, MarkedFragment {
+    interface MarkedRepository extends MongoRepository<Widget, String>, MarkedFragment {
     }
 }
