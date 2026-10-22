@@ -165,6 +165,25 @@ class ClientVersionMetricsFilterTest {
         assertThat(output.getOut()).contains("Client seen: tenantId=- sub=user-1 kind=web shell=- bundle=1.0.127");
     }
 
+    @Test
+    void filter_metricsFail_requestStillForwarded(CapturedOutput output) {
+        // setup
+        GatewayTrafficMetrics failingMetrics = new GatewayTrafficMetrics(registry) {
+            @Override
+            public void recordClientRequest(String kind, String shellVersion, String bundleVersion) {
+                throw new IllegalStateException("registry down");
+            }
+        };
+        filter = new ClientVersionMetricsFilter(failingMetrics);
+
+        // execution
+        runAs(SUB, request("ios/1.0.1 bundle/1.0.127"));
+
+        // verifications
+        assertThat(forwarded).isTrue();
+        assertThat(output.getOut()).contains("Client metrics not recorded");
+    }
+
     private MockServerHttpRequest.BaseBuilder<?> request(String client) {
         return MockServerHttpRequest.get(API_PATH)
                 .header(TENANT_HEADER, "tenant-a")

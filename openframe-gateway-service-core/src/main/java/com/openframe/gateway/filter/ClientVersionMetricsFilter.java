@@ -70,8 +70,17 @@ public class ClientVersionMetricsFilter implements GlobalFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
         return authenticatedSub()
-                .doOnNext(sub -> record(request, sub))
+                .doOnNext(sub -> recordSafely(request, sub))
                 .then(Mono.defer(() -> chain.filter(exchange)));
+    }
+
+    // Runs on every authenticated request: a failure here must cost the metric, never the request.
+    private void recordSafely(ServerHttpRequest request, String sub) {
+        try {
+            record(request, sub);
+        } catch (RuntimeException e) {
+            log.warn("Client metrics not recorded: path={} error={}", request.getPath().value(), e.toString());
+        }
     }
 
     private void record(ServerHttpRequest request, String sub) {
