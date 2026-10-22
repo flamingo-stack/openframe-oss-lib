@@ -200,6 +200,37 @@ class TicketProjectionRepositoryIT {
         assertThat(mongoTemplate.findById("r3", Ticket.class).getAssignedName()).isEqualTo("Old");
     }
 
+    @Test
+    void theDeviceHostname_changesOnlyOnTheTicketsOfTheTenantAndDevice_withAnotherHostname_inBatches() {
+        // setup
+        mongoTemplate.insertAll(List.of(
+                deviceTicket("d1", 31, "tenant-a", "machine-1", "host-old"),
+                deviceTicket("d2", 32, "tenant-a", "machine-1", "host-new"),
+                deviceTicket("d3", 33, "tenant-a", "machine-2", "host-old"),
+                deviceTicket("d4", 34, "tenant-b", "machine-1", "host-old"),
+                deviceTicket("d5", 35, "tenant-a", "machine-1", "host-old")));
+
+        // execution
+        long counted = repository.countTicketsToUpdateDeviceHostname("tenant-a", "machine-1", "host-new", 10);
+        String firstLastId = repository.updateDeviceHostnameBatch("tenant-a", "machine-1", "host-new", null, 1);
+        long rest = repository.updateDeviceHostname("tenant-a", "machine-1", "host-new");
+
+        // verifications
+        assertThat(counted).isEqualTo(2);
+        assertThat(firstLastId).isEqualTo("d1");
+        assertThat(rest).isEqualTo(1);
+        assertThat(mongoTemplate.findById("d5", Ticket.class).getDeviceHostname()).isEqualTo("host-new");
+        assertThat(mongoTemplate.findById("d3", Ticket.class).getDeviceHostname()).isEqualTo("host-old");
+        assertThat(mongoTemplate.findById("d4", Ticket.class).getDeviceHostname()).isEqualTo("host-old");
+    }
+
+    private static Ticket deviceTicket(String id, int number, String tenantId, String deviceId, String deviceHostname) {
+        Ticket ticket = ticket(id, number, tenantId, "org-9", "Org");
+        ticket.setDeviceId(deviceId);
+        ticket.setDeviceHostname(deviceHostname);
+        return ticket;
+    }
+
     private static Ticket userTicket(String id, int number, String tenantId, String assignedTo, String assignedName,
                                      String resolvedById, String resolvedByName) {
         Ticket ticket = ticket(id, number, tenantId, "org-9", "Org");

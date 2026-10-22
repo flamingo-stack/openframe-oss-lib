@@ -97,6 +97,35 @@ public class TicketProjectionRepository {
         return batchIds.getLast();
     }
 
+    public long updateDeviceHostname(String tenantId, String machineId, String hostname) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+        Query query = new Query(ticketsToUpdate);
+        Update update = new Update().set(Fields.deviceHostname, hostname);
+        UpdateResult result = mongoOperations.updateMulti(query, update, Ticket.class);
+        return result.getModifiedCount();
+    }
+
+    public long countTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname, int limit) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+        Query query = new Query(ticketsToUpdate).limit(limit);
+        return mongoOperations.count(query, Ticket.class);
+    }
+
+    // One batch in _id order after lastId (null for the first); returns its last _id, or null when none is left.
+    public String updateDeviceHostnameBatch(String tenantId, String machineId, String hostname, String lastId, int batchSize) {
+        Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
+        List<String> batchIds = findIdsAfter(ticketsToUpdate, lastId, batchSize);
+        if (batchIds.isEmpty()) {
+            return null;
+        }
+        Criteria batchTickets = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname)
+                .and(Fields.id).in(batchIds);
+        Query query = new Query(batchTickets);
+        Update update = new Update().set(Fields.deviceHostname, hostname);
+        mongoOperations.updateMulti(query, update, Ticket.class);
+        return batchIds.getLast();
+    }
+
     private List<String> findIdsAfter(Criteria criteria, String lastId, int batchSize) {
         if (lastId != null) {
             criteria.and(Fields.id).gt(lastId);
@@ -113,6 +142,12 @@ public class TicketProjectionRepository {
         return Criteria.where(Fields.tenantId).is(tenantId)
                 .and(Fields.organizationId).is(organizationId)
                 .and(Fields.organizationName).ne(organizationName);
+    }
+
+    private static Criteria matchTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname) {
+        return Criteria.where(Fields.tenantId).is(tenantId)
+                .and(Fields.deviceId).is(machineId)
+                .and(Fields.deviceHostname).ne(hostname);
     }
 
     private static Criteria matchTicketsToUpdateAssignedName(String tenantId, String userId, String userName) {
