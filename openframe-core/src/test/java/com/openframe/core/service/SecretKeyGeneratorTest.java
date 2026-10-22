@@ -8,9 +8,9 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class AgentRegistrationSecretGeneratorTest {
+class SecretKeyGeneratorTest {
 
-    private final AgentRegistrationSecretGenerator generator = new AgentRegistrationSecretGenerator();
+    private final SecretKeyGenerator generator = new SecretKeyGenerator();
 
     @Test
     void generatesAlphanumericKeysOfFixedLength() {
