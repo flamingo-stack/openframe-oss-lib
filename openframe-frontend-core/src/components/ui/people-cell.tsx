@@ -104,7 +104,7 @@ export function PersonCell({
 }
 
 /** The cell while it loads: the SAME avatar box, gap and two lines (the name's type step, then the caption's). */
-export function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['size'] }) {
+function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['size'] }) {
   const scale = PERSON_CELL_SIZE[size];
   return (
     <div className={`${PERSON_ROW_CLASS} ${scale.gap}`} aria-hidden>

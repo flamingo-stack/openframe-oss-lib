@@ -195,7 +195,7 @@ export interface QuickActionChipButtonProps {
 // Skeleton
 // =============================================================================
 
-export interface QuickActionChipSkeletonProps {
+interface QuickActionChipSkeletonProps {
   /** Label placeholder width in `ch` of the chip's own font — vary per item
    *  for a realistic spread. Default 16. */
   labelCh?: number;
@@ -220,7 +220,7 @@ export interface QuickActionChipSkeletonProps {
  * construction. Use anywhere quick actions stream in (chat empty states,
  * marketing walls, deck panels).
  */
-export function QuickActionChipSkeleton({
+function QuickActionChipSkeleton({
   labelCh = 16,
   icon = true,
   lozenge = false,

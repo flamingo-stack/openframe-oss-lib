@@ -48,7 +48,7 @@ import { MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface OnboardingGuideCardProps {
+interface LoadedOnboardingGuideCardProps {
   guide: OnboardingGuide;
   /** Detail URL resolved by the caller. */
   href: string;
@@ -64,6 +64,14 @@ export interface OnboardingGuideCardProps {
   showTypeBadge?: boolean | 'default' | 'sm' | 'portrait';
   className?: string;
 }
+
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope. 
+ */
+export type OnboardingGuideCardProps =
+  | (LoadedOnboardingGuideCardProps & { loading?: boolean })
+  | (Partial<LoadedOnboardingGuideCardProps> & { loading: true; /** `catalog`: the loading card draws its Published cell. Default true. */ published?: boolean });
 
 /** Markdown source → clean one-line preview prose. The guide cards preview
  *  `video_summary || content`, and `content` is raw markdown — without this,
@@ -110,7 +118,7 @@ const HORIZONTAL_SIZE_TOKENS = {
 } as const;
 
 /** A guide card while it is read, one per density; `portrait` is the shared portrait skeleton with the static chip. */
-export function OnboardingGuideCardSkeleton({
+function OnboardingGuideCardSkeleton({
   size = 'default',
   showTypeBadge = true,
   published = true,
@@ -186,7 +194,22 @@ export function OnboardingGuideCardSkeleton({
   );
 }
 
-export function OnboardingGuideCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function OnboardingGuideCard(props: OnboardingGuideCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return (
+      <OnboardingGuideCardSkeleton
+        size={props.size}
+        showTypeBadge={props.showTypeBadge !== false}
+        published={'published' in props ? props.published : props.guide ? props.guide.published_at != null : true}
+        className={props.className}
+      />
+    );
+  }
+  return <LoadedOnboardingGuideCard {...props} />;
+}
+
+function LoadedOnboardingGuideCard({
   guide,
   href,
   target: targetProp,
@@ -196,7 +219,7 @@ export function OnboardingGuideCard({
   size = 'default',
   showTypeBadge = true,
   className,
-}: OnboardingGuideCardProps) {
+}: LoadedOnboardingGuideCardProps) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -208,9 +231,6 @@ export function OnboardingGuideCard({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' ? 'square' : 'wide',
   });
-  if (useLoadingScope()) {
-    return <OnboardingGuideCardSkeleton size={size} showTypeBadge={showTypeBadge !== false} className={className} />;
-  }
 
   if (size === 'portrait') {
     // Rail/strip density — shared <EntityPortraitCard> shell. Same cover

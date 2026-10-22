@@ -125,7 +125,7 @@ function ProgramActionButton({ label, href, newTab }: { label: string; href?: st
   );
 }
 
-export function ProgramCardSkeleton({
+function ProgramCardSkeleton({
   size = 'default',
   eyebrow = true,
   media = 0,
@@ -241,7 +241,7 @@ export function ProgramCardSkeleton({
   );
 }
 
-export interface ProgramCardProps<T extends BaseProgramItem> {
+interface LoadedProgramCardProps<T extends BaseProgramItem> {
   config: ProgramConfig<T>;
   item: T;
   media?: ProgramMedia[];
@@ -271,6 +271,35 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
    */
   priority?: boolean;
   className?: string;
+}
+
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it does
+ * in a loading scope. What a loading card draws is decided by the type's CONFIG (the hosts and gallery rows its cards
+ * always show); with no config it draws neither.
+ */
+export type ProgramCardProps<T extends BaseProgramItem> =
+  | (LoadedProgramCardProps<T> & { loading?: boolean })
+  | (Partial<LoadedProgramCardProps<T>> & { loading: true });
+
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function ProgramCard<T extends BaseProgramItem>(props: ProgramCardProps<T>) {
+  if (useLoadingScope() || props.loading) {
+    const { config, size = 'default', showTypeBadge = true, eyebrow, className } = props;
+    // A tag row is a record's optional part, not drawn.
+    return (
+      <ProgramCardSkeleton
+        size={size}
+        eyebrow={!!eyebrow}
+        media={config?.cardShowsGallery ? PROGRAM_CARD_SKELETON_MEDIA : 0}
+        hosts={config?.cardShowsHosts ? PROGRAM_CARD_SKELETON_HOSTS : 0}
+        typeLabel={config && size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
+        actionLabel={config ? programActionLabel(config.labels.singular) : undefined}
+        className={className}
+      />
+    );
+  }
+  return <LoadedProgramCard {...props} />;
 }
 
 function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string; avatar: string | null }> {
@@ -471,7 +500,7 @@ function ProgramEditorialCard({
   );
 }
 
-export function ProgramCard<T extends BaseProgramItem>({
+function LoadedProgramCard<T extends BaseProgramItem>({
   config,
   item,
   media = [],
@@ -488,7 +517,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   tags = [],
   priority,
   className,
-}: ProgramCardProps<T>) {
+}: LoadedProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -500,21 +529,6 @@ export function ProgramCard<T extends BaseProgramItem>({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' || size === 'row' ? 'square' : 'wide',
   });
-  if (useLoadingScope()) {
-    // What a loading card draws is decided by the type's CONFIG (never by the placeholder record, whose rows are
-    // empty): the hosts and gallery rows its cards always show; a tag row is a record's optional part, not drawn.
-    return (
-      <ProgramCardSkeleton
-        size={size}
-        eyebrow={!!eyebrow}
-        media={config.cardShowsGallery ? PROGRAM_CARD_SKELETON_MEDIA : 0}
-        hosts={config.cardShowsHosts ? PROGRAM_CARD_SKELETON_HOSTS : 0}
-        typeLabel={size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
-        actionLabel={programActionLabel(config.labels.singular)}
-        className={className}
-      />
-    );
-  }
   const coverImage = item.cover_url;
   const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);

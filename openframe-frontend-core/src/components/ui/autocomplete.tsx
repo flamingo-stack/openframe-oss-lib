@@ -184,7 +184,7 @@ const AUTOCOMPLETE_OPTION_ROW_CLASS =
 const AUTOCOMPLETE_LOADING_ROWS = 5;
 const AUTOCOMPLETE_ANCHOR_SHAPE_CLASS = 'rounded-[6px]';
 
-export interface AutocompleteSkeletonProps {
+interface AutocompleteSkeletonProps {
   /** The field's label: the page's own words, drawn as they are. */
   label?: string;
   labelVariant?: 'default' | 'large';
@@ -192,7 +192,7 @@ export interface AutocompleteSkeletonProps {
 }
 
 /** A field while its options are read: its label for real, its control a box of the control's height. */
-export function AutocompleteSkeleton({ label, labelVariant, className }: AutocompleteSkeletonProps) {
+function AutocompleteSkeleton({ label, labelVariant, className }: AutocompleteSkeletonProps) {
   return (
     <FieldWrapper label={label} labelVariant={labelVariant} className={className}>
       <UnifiedSkeleton className={cn('w-full', AUTOCOMPLETE_ANCHOR_SHAPE_CLASS, AUTOCOMPLETE_ANCHOR_HEIGHT_CLASS)} />

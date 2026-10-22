@@ -405,25 +405,6 @@ export function TrustCenterPage({
 }
 
 /**
- * @deprecated Render `<TrustCenterPage>` inside a `LoadingScope`: the page draws its own loading state (this is what
- * it does). Kept so hosts on an older release keep compiling; nothing in the lib uses it. `region` is ignored: the
- * page announces its own loading state.
- */
-export function TrustCenterPageSkeleton({
-  region: _region,
-  ...chrome
-}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'> & {
-  /** Ignored: the page announces its own loading state. */
-  region?: boolean;
-}) {
-  return (
-    <LoadingScope>
-      <TrustCenterPage {...chrome} />
-    </LoadingScope>
-  );
-}
-
-/**
  * The page's chrome, ONE copy for the page and its skeleton: the standalone
  * `PageShell` or the host's padded box (`shell`), and the frozen `PageLayout`
  * header (title, subtitle, back button, actions).

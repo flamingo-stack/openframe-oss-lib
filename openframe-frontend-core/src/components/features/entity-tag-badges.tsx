@@ -76,7 +76,7 @@ const PAST_PHONE_CAP_CLASS = 'hidden content-md:inline-flex';
  * skeleton never hides items per breakpoint). Hosts pass their row's typical count; the default is
  * `ENTITY_TAG_BADGES_SKELETON_COUNT`. `overflow` adds the "+N" badge a row capped by `max` draws after its tags.
  */
-export function EntityTagBadgesSkeleton({
+function EntityTagBadgesSkeleton({
   count = ENTITY_TAG_BADGES_SKELETON_COUNT,
   overflow = false,
   className,

@@ -87,7 +87,7 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
 }
 
 /** An EntityImage while its record is read: a box of the image's own size and corner. */
-export function EntityImageSkeleton({
+function EntityImageSkeleton({
   sizeClassName,
   className,
 }: Pick<EntityImageProps, 'sizeClassName' | 'className'>) {

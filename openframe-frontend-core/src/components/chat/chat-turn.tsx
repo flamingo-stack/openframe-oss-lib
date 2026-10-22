@@ -93,7 +93,7 @@ export function ChatTurn({
   );
 }
 
-export interface ChatTurnSkeletonProps {
+interface ChatTurnSkeletonProps {
   /** The picture's size in px; no picture without it. */
   avatarPx?: number;
   /** The picture's corner, as the caller draws it (a person's round photo by default, a square logo). */
@@ -118,7 +118,7 @@ export interface ChatTurnSkeletonProps {
  * `content-md`, beside it from there, as the turn draws it) and the time at the far end. Read by the turn's
  * skeleton and by every card that draws a turn of its own.
  */
-export function ChatTurnNameSkeleton({
+function ChatTurnNameSkeleton({
   nameSize = 'default',
   meta = false,
   time = false,
@@ -139,7 +139,7 @@ export function ChatTurnNameSkeleton({
 }
 
 /** A turn while it is read: the picture's box, a bar at the name's type step, and a bar per message line. */
-export function ChatTurnSkeleton({
+function ChatTurnSkeleton({
   avatarPx,
   avatarShape = 'round',
   nameSize = 'default',

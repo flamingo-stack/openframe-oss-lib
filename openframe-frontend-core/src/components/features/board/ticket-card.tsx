@@ -620,7 +620,7 @@ function TicketTagRow({ tags }: { tags: string[] }) {
  * the priority and assignee marks, a typical tag row and the number and time line, in the body's order. The board card draws it itself (`ticket={null}` or a
  * loading scope).
  */
-export function TicketCardSkeleton({ className, ...props }: { className?: string; [key: `data-${string}`]: unknown }) {
+function TicketCardSkeleton({ className, ...props }: { className?: string; [key: `data-${string}`]: unknown }) {
   return (
     <div aria-hidden className={cn(TICKET_CARD_SHELL, className)} {...loadingItemProps(props)}>
       <div className="flex items-start gap-[var(--spacing-system-sf)]">

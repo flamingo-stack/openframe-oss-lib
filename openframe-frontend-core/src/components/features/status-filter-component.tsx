@@ -138,7 +138,7 @@ export function StatusFilterComponent({
  * `options` the page states for real, else `pills` option buttons as boxes of the buttons' size. With `showCount`
  * the count is a bar before "items".
  */
-export function StatusFilterComponentSkeleton({
+function StatusFilterComponentSkeleton({
   label = 'Status',
   options,
   pills = STATUS_FILTER_SKELETON_PILLS,

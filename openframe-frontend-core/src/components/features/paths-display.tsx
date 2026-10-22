@@ -150,7 +150,7 @@ export function PathsDisplay({
  * The paths list while its paths are read: the same frame, its title, description, leading icon and copy glyph for
  * real, and `rows` rows with a bar of a path each.
  */
-export function PathsDisplaySkeleton({
+function PathsDisplaySkeleton({
   rows = PATHS_DISPLAY_SKELETON_ROWS,
   title,
   description,

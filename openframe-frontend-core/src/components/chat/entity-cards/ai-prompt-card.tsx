@@ -5,7 +5,6 @@ import {
   EmployeeEntryBadge,
   EmployeeEntryCard,
   type EmployeeEntryCardData,
-  EmployeeEntryCardSkeleton,
 } from './employee-entry-card';
 
 /** Minimal row shape the card renders. Both the hub dashboard entry and the
@@ -18,7 +17,7 @@ export interface AiPromptCardData extends EmployeeEntryCardData {
   step_count?: number | null;
 }
 
-export interface AiPromptCardProps {
+interface LoadedAiPromptCardProps {
   entry: AiPromptCardData;
   /** OG fallback cover. Caller computes it (hub: `useOgPlaceholderUrl`; related
    *  rail: `extras.buildOgPlaceholderUrl`). */
@@ -31,13 +30,18 @@ export interface AiPromptCardProps {
   className?: string;
 }
 
+/** The entry, or `loading` while the host reads it: the card then draws its own loading form (`EmployeeEntryCard`'s). */
+export type AiPromptCardProps = (LoadedAiPromptCardProps & { loading?: boolean }) | (Partial<LoadedAiPromptCardProps> & { loading: true });
+
 /**
  * THE single Squawkbox prompt card: a thin binding over `EmployeeEntryCard`
  * that maps the publish date to the meta date and adds the department and step
  * count badges. Used by the people-hub dashboard (with owner `actions`) and the
  * related-content rail (with `anchorProps`), so the card cannot drift between them.
  */
-export function AiPromptCard({ entry, placeholderUrl, actions, anchorProps, className }: AiPromptCardProps) {
+export function AiPromptCard(props: AiPromptCardProps) {
+  if (props.loading) return <EmployeeEntryCard loading actions={props.actions} className={props.className} />;
+  const { entry, placeholderUrl, actions, anchorProps, className } = props;
   const departmentName = entry.department?.name?.trim();
   const steps = typeof entry.step_count === 'number' ? entry.step_count : 0;
   return (
@@ -61,5 +65,3 @@ export function AiPromptCard({ entry, placeholderUrl, actions, anchorProps, clas
   );
 }
 
-/** Loading skeleton matching AiPromptCard's shape (the shared employee-entry skeleton). */
-export const AiPromptCardSkeleton = EmployeeEntryCardSkeleton;

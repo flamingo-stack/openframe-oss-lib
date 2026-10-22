@@ -1215,8 +1215,6 @@ export {
 
 export {
   MeetingSchedulerDirectory,
-  MeetingSchedulerDirectoryRowSkeleton,
-  MeetingSchedulerDirectorySkeleton,
   MEETING_DIRECTORY_PAGE_SIZE,
   type MeetingSchedulerDirectoryProps,
 } from './directory';

@@ -35,7 +35,7 @@ import { hideOnError } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface CustomerInterviewCardProps {
+interface LoadedCustomerInterviewCardProps {
   interview: CustomerInterview;
   href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
@@ -51,6 +51,14 @@ export interface CustomerInterviewCardProps {
   className?: string;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope. 
+ */
+export type CustomerInterviewCardProps =
+  | (LoadedCustomerInterviewCardProps & { loading?: boolean })
+  | (Partial<LoadedCustomerInterviewCardProps> & { loading: true });
+
 // The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
 const INTERVIEW_CARD_BODY = 'flex flex-col gap-6 p-6';
 const INTERVIEW_CARD_COVER = `relative ${MEDIA_ASPECT.og} w-full shrink-0 overflow-hidden rounded-sm`;
@@ -65,7 +73,7 @@ const INTERVIEW_TYPE_LABEL = 'Customer Interview';
  * summary as three `text-h6` lines, and the person row (48px portrait, name and job-title lines). `portrait` is the
  * shared portrait skeleton with the static chip.
  */
-export function CustomerInterviewCardSkeleton({
+function CustomerInterviewCardSkeleton({
   size = 'default',
   showTypeBadge = true,
   className,
@@ -114,7 +122,17 @@ export function CustomerInterviewCardSkeleton({
   );
 }
 
-export function CustomerInterviewCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function CustomerInterviewCard(props: CustomerInterviewCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return (
+      <CustomerInterviewCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />
+    );
+  }
+  return <LoadedCustomerInterviewCard {...props} />;
+}
+
+function LoadedCustomerInterviewCard({
   interview,
   href,
   target: targetProp,
@@ -124,7 +142,7 @@ export function CustomerInterviewCard({
   size = 'default',
   showTypeBadge = true,
   className,
-}: CustomerInterviewCardProps) {
+}: LoadedCustomerInterviewCardProps) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -137,9 +155,6 @@ export function CustomerInterviewCard({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const thumbnailUrl = interview.featured_image || placeholderUrl || null;
-  if (useLoadingScope()) {
-    return <CustomerInterviewCardSkeleton size={size} showTypeBadge={showTypeBadge} className={className} />;
-  }
 
   if (size === 'sm') {
     return (

@@ -60,7 +60,7 @@ export function UserDisplay({
   );
 }
 
-export interface UserDisplaySkeletonProps {
+interface UserDisplaySkeletonProps {
   /** Avatar size in px (defaults 32). */
   size?: number;
   shape?: 'square' | 'round';
@@ -71,7 +71,7 @@ export interface UserDisplaySkeletonProps {
 }
 
 /** The row while it is read: the avatar's box, a bar for the name and, with `subtitle`, one for the second line. */
-export function UserDisplaySkeleton({
+function UserDisplaySkeleton({
   size = 32,
   shape = 'square',
   compact = false,

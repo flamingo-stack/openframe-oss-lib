@@ -6,7 +6,7 @@ import { useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Badge, BadgeSkeleton } from './badge';
+import { Badge } from './badge';
 import { Button } from './button';
 import { FadePreview } from './fade-preview';
 import { LoadingItems, useLoadingScope } from './loading-scope';
@@ -209,7 +209,7 @@ function ChangelogEntryList({
   );
 }
 
-export interface ReleaseChangelogSectionSkeletonProps {
+interface ReleaseChangelogSectionSkeletonProps {
   /** The section's heading (static copy: drawn for real). */
   title: string;
   isBreaking?: boolean;
@@ -226,7 +226,7 @@ export interface ReleaseChangelogSectionSkeletonProps {
  * A changelog section while it is read: the real icon and heading, the count badge as a chip, the first entry (title
  * line and description lines) as bars, clamped to the preview height with FadePreview's toggle row in preview mode.
  */
-export function ReleaseChangelogSectionSkeleton({
+function ReleaseChangelogSectionSkeleton({
   title,
   isBreaking = false,
   hideTitle = false,
@@ -241,7 +241,7 @@ export function ReleaseChangelogSectionSkeleton({
       {icon}
       {title}
       {/* The count badge's own frame; its text is one or two digits. */}
-      <BadgeSkeleton className={cn(COUNT_BADGE_CLASS, 'w-[2ch]')} />
+      <Badge loading className={cn(COUNT_BADGE_CLASS, 'w-[2ch]')} />
     </h2>
   );
   const inPreviewMode = previewFirst && !collapsible;

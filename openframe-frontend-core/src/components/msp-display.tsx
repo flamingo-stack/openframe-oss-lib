@@ -29,7 +29,7 @@ export function MSPDisplay({ name, logoUrl, size = 40, className }: MSPDisplayPr
 }
 
 /** The row while it is read: the logo's box and a bar on the name's line. */
-export function MSPDisplaySkeleton({ size = 40, className }: { size?: number; className?: string }) {
+function MSPDisplaySkeleton({ size = 40, className }: { size?: number; className?: string }) {
   return (
     <div className={cn(MSP_ROW_CLASS, className)} aria-hidden>
       <SquareAvatar loading sizePx={size} />

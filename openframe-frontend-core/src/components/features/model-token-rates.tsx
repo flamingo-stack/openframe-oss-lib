@@ -339,7 +339,7 @@ export function ModelTokenRatesUnavailable({ className }: { className?: string }
 }
 
 /** The table's loading footprint: the provider tabs, the header and rows of the boxes the loaded rows use. */
-export function ModelTokenRatesSkeleton({
+function ModelTokenRatesSkeleton({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */

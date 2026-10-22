@@ -290,7 +290,7 @@ function CommentDeleteButton({ onClick }: { onClick?: () => void }) {
  * delete button drawn for real (inert), the title as one `text-h3` line, and the body as the tile's three `text-h4`
  * lines (or, read in full, a typical run of `text-h4` lines with no fixed box).
  */
-export function CommentCardSkeleton({
+function CommentCardSkeleton({
   leadWith = 'vendor',
   showTitle = true,
   showDelete = false,

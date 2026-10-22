@@ -108,7 +108,7 @@ export function CategoriesCart({
  * A category card while its category is read: the card's frame, the vendor strip as icon boxes, a bar for the name,
  * the counts line and two description lines, and the arrow box as it is. Not a link: there is no category yet.
  */
-export function CategoriesCartSkeleton({
+function CategoriesCartSkeleton({
   vendors = CATEGORIES_CART_SKELETON_VENDORS,
   className,
 }: {

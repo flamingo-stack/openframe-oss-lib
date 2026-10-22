@@ -274,7 +274,7 @@ export function ConversationCard({
  * own copy (the context's label, the footer's question) and the selection toggle are drawn for real, the toggle inert.
  * Pass the parts the loaded card will have.
  */
-export function ConversationCardSkeleton({
+function ConversationCardSkeleton({
   avatarPx = CONVERSATION_CARD_AVATAR_PX,
   context = false,
   requesterMeta = false,

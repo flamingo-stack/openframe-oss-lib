@@ -111,7 +111,7 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
 }
 
 /** The media strip while it is read: `count` tiles of the strip's own 240×200 size. */
-export function MediaGalleryStripSkeleton({
+function MediaGalleryStripSkeleton({
   count = MEDIA_GALLERY_STRIP_SKELETON_COUNT,
   className,
 }: {

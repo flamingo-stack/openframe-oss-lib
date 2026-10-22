@@ -149,7 +149,7 @@ SquareAvatar.displayName = 'SquareAvatar';
 export { SquareAvatar };
 
 /** A SquareAvatar while its person is read: a box of the avatar's own size and corner. */
-export function SquareAvatarSkeleton({
+function SquareAvatarSkeleton({
   size = 'md',
   sizePx,
   variant = 'square',

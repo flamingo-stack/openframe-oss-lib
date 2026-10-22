@@ -657,7 +657,7 @@ export function FaqSection({
   );
 }
 
-export interface FaqSectionSkeletonProps extends Pick<
+interface FaqSectionSkeletonProps extends Pick<
   FaqSectionProps,
   'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'
 > {
@@ -674,7 +674,7 @@ export interface FaqSectionSkeletonProps extends Pick<
  */
 const DEFAULT_SKELETON_SHAPE: FaqSkeletonShape = [{}];
 
-export function FaqSectionSkeleton({
+function FaqSectionSkeleton({
   heading,
   topic,
   showTopic = false,

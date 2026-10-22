@@ -79,7 +79,7 @@ const slotsWidthStyle = (size: AvatarStackSize, slots?: number) =>
 const AVATAR_STACK_MAX_FACES = 3;
 
 /** A stack while its people are read: `count` overlapped circles of the faces' size. */
-export function AvatarStackSkeleton({
+function AvatarStackSkeleton({
   count = AVATAR_STACK_MAX_FACES,
   size = 'md',
   slots,

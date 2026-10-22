@@ -96,6 +96,6 @@ export function AgentAvatar({ agent, size, className, loading = false }: AgentAv
  * An agent's avatar while the agent is not known yet (the record that names it is read): the avatar's own round
  * frame at the same `size`, so the picture takes its place without moving anything.
  */
-export function AgentAvatarSkeleton({ size, className }: Pick<AgentAvatarProps, 'size' | 'className'>) {
+function AgentAvatarSkeleton({ size, className }: Pick<AgentAvatarProps, 'size' | 'className'>) {
   return <UnifiedSkeleton as="span" className={cn(AGENT_AVATAR_FRAME_CLASS, className)} width={size} height={size} />;
 }

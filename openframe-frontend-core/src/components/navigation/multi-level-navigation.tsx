@@ -127,7 +127,7 @@ function NavigationTreeSkeleton({
 }
 
 /** The documentation tree while it is read: its rows' frames, each with an icon box and a bar of its name. */
-export function MultiLevelNavigationSkeleton({
+function MultiLevelNavigationSkeleton({
   rows = MULTI_LEVEL_NAVIGATION_SKELETON_ROWS,
   className,
 }: {
@@ -145,7 +145,7 @@ export function MultiLevelNavigationSkeleton({
 }
 
 /** The mobile documentation dropdown while it is read: the same rows at the dropdown's height. */
-export function MobileNavigationDropdownSkeleton({
+function MobileNavigationDropdownSkeleton({
   rows = MOBILE_NAVIGATION_SKELETON_ROWS,
   className,
 }: {

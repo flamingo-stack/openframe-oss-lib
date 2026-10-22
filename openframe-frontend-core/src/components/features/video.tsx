@@ -365,7 +365,7 @@ function resolveKind(props: VideoProps, url: string): 'youtube' | 'file' {
  * A video while it is read: the player's box in the player's own layout wrapper (so its size and frame are the
  * player's), drawn as the skeleton's surface. `Video` draws it in a loading scope.
  */
-export function VideoSkeleton({ layout = 'native', className }: { layout?: VideoLayout; className?: string }) {
+function VideoSkeleton({ layout = 'native', className }: { layout?: VideoLayout; className?: string }) {
   return wrapWithLayout(<UnifiedSkeleton variant="rectangular" className={cn('h-full w-full', className)} />, layout);
 }
 

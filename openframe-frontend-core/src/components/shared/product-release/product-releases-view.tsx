@@ -38,7 +38,7 @@ import { LoadingRegion } from '../../loading/loading-region';
 import { LoadError } from '../../ui/error-state';
 import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { UnifiedPagination } from '../../unified-pagination';
-import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
+import { type LoadedProductReleaseCardProps, ProductReleaseCard } from './product-release-card';
 
 const DEFAULT_ENDPOINT = '/api/releases';
 /** Releases a page lists when the host states no `itemsPerPage`: the list's own page size. */
@@ -57,7 +57,7 @@ const DEFAULT_PAGE_PARAM_KEY = 'page';
  *  own data fields minus the ones this view supplies (title/summary/version/
  *  size/nav). `formattedDate` stays required so the spread satisfies the card. */
 export type ProductReleaseCardExtras = Omit<
-  ProductReleaseCardProps,
+  LoadedProductReleaseCardProps,
   'title' | 'summary' | 'version' | 'size' | 'anchorProps' | 'onClick' | 'className'
 >;
 

@@ -1,6 +1,7 @@
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import { AdminContentCard } from './admin-content-card';
@@ -17,7 +18,7 @@ export interface EmployeeEntryCardData {
   author?: { full_name?: string | null; avatar_url?: string | null } | null;
 }
 
-export interface EmployeeEntryCardProps {
+interface LoadedEmployeeEntryCardProps {
   entry: EmployeeEntryCardData;
   /** Already-formatted date shown in the meta row. Bindings own the format so
    *  the UTC-pin convention stays in `utils/format`, not in the card. */
@@ -36,6 +37,15 @@ export interface EmployeeEntryCardProps {
   anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>;
   className?: string;
 }
+
+/**
+ * The entry, or `loading` while the host reads it: the card then draws its own loading form (the admin card's), as it
+ * does in a loading scope. `actions` then says what the actions row shows (a node drawn for real and inert, `true`
+ * button bars, absent none).
+ */
+export type EmployeeEntryCardProps =
+  | (LoadedEmployeeEntryCardProps & { loading?: boolean })
+  | (Partial<LoadedEmployeeEntryCardProps> & { loading: true });
 
 /** Entry lifecycle → the standard badge colour scheme (the same ODS pairs every status badge uses). */
 const STATUS_BADGE_SCHEME: Record<string, NonNullable<StatusBadgeProps['colorScheme']>> = {
@@ -56,6 +66,14 @@ export function EmployeeEntryBadge({ children }: { children: string }) {
   return <StatusBadge text={children} colorScheme="default" variant="button" singleLine />;
 }
 
+/** ONE switch: in a loading scope (or `loading`) the card is the admin card's loading form, box for box. */
+export function EmployeeEntryCard(props: EmployeeEntryCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <AdminContentCard loading title="" className={props.className} actions={props.actions || false} subtitleRow={false} />;
+  }
+  return <LoadedEmployeeEntryCard {...props} />;
+}
+
 /**
  * THE people-hub employee-entry card. Wraps `AdminContentCard` with the canonical
  * mapping (cover = featured_image || main_video_thumbnail, OG placeholder
@@ -65,7 +83,7 @@ export function EmployeeEntryBadge({ children }: { children: string }) {
  * format and which extra badges they add, so the card itself cannot drift
  * between the dashboard and the related-content rail.
  */
-export function EmployeeEntryCard({
+function LoadedEmployeeEntryCard({
   entry,
   dateLabel,
   extraBadges,
@@ -74,7 +92,7 @@ export function EmployeeEntryCard({
   actions,
   anchorProps,
   className,
-}: EmployeeEntryCardProps) {
+}: LoadedEmployeeEntryCardProps) {
   const authorAvatar = useProxiedImageUrl(entry.author?.avatar_url, { directHttps: false });
   const card = (
     <AdminContentCard
@@ -134,14 +152,4 @@ export function EmployeeEntryCard({
   ) : (
     card
   );
-}
-
-/**
- * The employee-entry card's placeholder: THE admin card skeleton, the same
- * component every `AdminContentCard reserveRows` grid uses, so the loading card
- * and the real one are the same box. `actions` matches a card rendered with an
- * owner action row (the dashboards); a read-only card (rails) has none.
- */
-export function EmployeeEntryCardSkeleton({ className, actions = false }: { className?: string; actions?: boolean }) {
-  return <AdminContentCard loading title="" className={className} actions={actions} subtitleRow={false} />;
 }

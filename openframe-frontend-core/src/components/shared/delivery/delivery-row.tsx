@@ -205,7 +205,7 @@ export function DeliveryRow({ item, loading, href, target, caption, id, classNam
  * A delivery row while its task is read: the same row, its caption for real, the title, subtitle and description
  * as bars at their type steps, and the two badges as their skeletons.
  */
-export function DeliveryRowSkeleton({ caption, className }: Pick<DeliveryRowProps, 'caption' | 'className'>) {
+function DeliveryRowSkeleton({ caption, className }: Pick<DeliveryRowProps, 'caption' | 'className'>) {
   return (
     <div className={cn(ROW_BASE_CLASS, 'scroll-mt-24', className)} aria-hidden>
       <div className={ROW_INNER_CLASS}>

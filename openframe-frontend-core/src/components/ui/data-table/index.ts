@@ -7,8 +7,7 @@ import { DataTableEmpty } from './data-table-empty';
 import { DataTableHeader } from './data-table-header';
 import { DataTableInfiniteFooter } from './data-table-infinite-footer';
 import { DataTableRow } from './data-table-row';
-import { DataTableRowCount, DataTableRowCountSkeleton } from './data-table-row-count';
-import { DataTableSkeleton } from './data-table-skeleton';
+import { DataTableRowCount } from './data-table-row-count';
 
 /**
  * Compound table primitive. Use `useDataTable` to build the table instance,
@@ -27,7 +26,6 @@ export const DataTable = Object.assign(DataTableRoot, {
   Header: DataTableHeader,
   Body: DataTableBody,
   Row: DataTableRow,
-  Skeleton: DataTableSkeleton,
   Empty: DataTableEmpty,
   InfiniteFooter: DataTableInfiniteFooter,
   CursorFooter: DataTableCursorFooter,
@@ -40,12 +38,10 @@ export {
   DataTableHeader,
   DataTableBody,
   DataTableRow,
-  DataTableSkeleton,
   DataTableEmpty,
   DataTableInfiniteFooter,
   DataTableCursorFooter,
   DataTableRowCount,
-  DataTableRowCountSkeleton,
 };
 
 export { useDataTableContext } from './data-table';
@@ -65,7 +61,6 @@ export { DATA_TABLE_HEADER_LABEL_CLASS } from './data-table-header';
 export type { DataTableHeaderProps, DataTableSortState } from './data-table-header';
 export type { DataTableBodyProps } from './data-table-body';
 export type { DataTableRowProps } from './data-table-row';
-export type { DataTableSkeletonProps } from './data-table-skeleton';
 export type { DataTableEmptyProps } from './data-table-empty';
 export type { DataTableInfiniteFooterProps } from './data-table-infinite-footer';
 export type { DataTableCursorFooterProps } from './data-table-cursor-footer';

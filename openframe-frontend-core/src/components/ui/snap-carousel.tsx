@@ -19,14 +19,6 @@ export const SNAP_CAROUSEL_TRACK_CLASS = 'scrollbar-hide flex snap-x snap-mandat
 const ARROW_CLASS =
   'grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ods-border text-ods-text-primary outline-none transition-colors hover:bg-ods-card focus-visible:ring-2 focus-visible:ring-ods-focus disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:bg-transparent';
 
-/**
- * @deprecated Render `<SnapCarouselControls loading count={…} />`: the controls draw their own loading form. This
- * draws the row's box (margin and height), empty.
- */
-export function SnapCarouselControlsSkeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn(SNAP_CAROUSEL_CONTROLS_CLASS, 'h-11', className)} />;
-}
-
 /** One slide of the track, in the carousel's own box. A host drawing its slides' loading form uses it too. */
 export function SnapCarouselSlide({
   className,

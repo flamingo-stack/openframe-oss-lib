@@ -233,7 +233,7 @@ export function EntityVideoSection({
  * The video section while its record is read: the centered player box (`Video loading`), under the real static
  * "Full Video" / "Highlights" tab row when `tabs` (a record that has both). Its classes are the section's own.
  */
-export function EntityVideoSectionSkeleton({ tabs = false, className }: { tabs?: boolean; className?: string }) {
+function EntityVideoSectionSkeleton({ tabs = false, className }: { tabs?: boolean; className?: string }) {
   if (!tabs) return <Video loading url="" layout="centered" className={className} />;
   // The real tabs (static labels): TabsTrigger draws its own box in a scope. `inert`: nothing in it can be focused or clicked.
   return (

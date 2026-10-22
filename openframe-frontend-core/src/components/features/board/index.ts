@@ -6,7 +6,7 @@ export { BoardColumn } from './board-column';
 export type { BoardColumnProps } from './board-column';
 export { BoardColumnHeader } from './board-column-header';
 export type { BoardColumnHeaderProps } from './board-column-header';
-export { TicketCard, TicketCardView, TicketCardBody, TicketCardSkeleton } from './ticket-card';
+export { TicketCard, TicketCardView, TicketCardBody } from './ticket-card';
 export type { TicketCardProps, TicketCardViewProps, TicketCardBodyProps } from './ticket-card';
 export { BoardTicketApproval } from './board-ticket-approval';
 export type { BoardTicketApprovalProps } from './board-ticket-approval';

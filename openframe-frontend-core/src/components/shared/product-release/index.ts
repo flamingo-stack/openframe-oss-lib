@@ -1,7 +1,6 @@
 'use client';
 
 export { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
-export { ProductReleaseCardSkeleton, type ProductReleaseCardSkeletonProps } from './product-release-card-skeleton';
 export {
   ProductReleasesView,
   type ProductReleasesViewProps,

@@ -189,7 +189,7 @@ function CaseStudyPersonRowSkeleton() {
  * A case study card while it is read, one per density, in the card's own boxes. Static words (the "Read" link, the
  * portrait chip) are drawn for real; the title, people, metric and summary are bars.
  */
-export function CaseStudyCardSkeleton({
+function CaseStudyCardSkeleton({
   size = 'default',
   showTypeBadge = true,
   className,

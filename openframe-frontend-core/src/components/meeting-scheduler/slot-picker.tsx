@@ -322,7 +322,7 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
  * the times column is a skeleton, and it is the same one the loaded picker
  * shows while a month loads, so there is no swap between the two.
  */
-export function SlotPickerSkeleton({
+function SlotPickerSkeleton({
   monthOffset = 0,
   layout = 'card',
 }: {
@@ -366,7 +366,7 @@ export function SlotPickerSkeleton({
 const SLOT_PICKER_SKELETON_CHIPS = 16;
 
 /** Same-footprint skeleton for the time-chip column. */
-export function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
+function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
   return (
     <>
       {/* The day label is data — but it is held inside the REAL heading line

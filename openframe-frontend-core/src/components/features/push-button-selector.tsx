@@ -175,7 +175,7 @@ function OptionListSkeleton({
   );
 }
 
-export interface PushButtonSelectorSkeletonProps {
+interface PushButtonSelectorSkeletonProps {
   /** How many option rows to draw (the selector's `skeletonCount`). */
   count?: number;
   /** The selector's title and help text: static copy, drawn as they are. */
@@ -194,7 +194,7 @@ export interface PushButtonSelectorSkeletonProps {
  * The selector while its options are read: its title, section headers and help text drawn for real, every option
  * row a skeleton of the row. `PushButtonSelector` draws it while `isLoading` and in a loading scope.
  */
-export function PushButtonSelectorSkeleton({
+function PushButtonSelectorSkeleton({
   count = PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS,
   title,
   helpText,

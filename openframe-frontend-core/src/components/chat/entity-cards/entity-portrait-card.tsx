@@ -225,7 +225,7 @@ export function EntityPortraitCard({
  * is drawn for real; the title (two lines under a chip, three without, at the 24px title leading) and the person
  * (48px avatar, name and subtitle lines) are bars.
  */
-export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel?: string; className?: string }) {
+function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel?: string; className?: string }) {
   return (
     <div className={cn('block h-full', className)} aria-hidden>
       <Card className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, PORTRAIT_BODY)}>

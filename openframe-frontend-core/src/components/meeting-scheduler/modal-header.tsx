@@ -100,7 +100,7 @@ export function SchedulerModalHeader({
 }
 
 /** Same footprint as the loaded header, for the cold load: "Timezone" real, one host and the length as bars. */
-export function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTimezone?: boolean } = {}) {
+function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTimezone?: boolean } = {}) {
   return (
     <>
       <div className={STRIP_CLASS}>

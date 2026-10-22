@@ -122,7 +122,7 @@ const TIMEZONE_WIDE_ONLY_CLASS = 'content-max-lg:hidden';
  * STATIC labels ("Duration", "Timezone") render REAL; only data-driven
  * content (host identity, duration chips, the zone value) is skeleton.
  */
-export function ContextPanelSkeleton({
+function ContextPanelSkeleton({
   className,
   onBack,
   backLabel = 'Back',

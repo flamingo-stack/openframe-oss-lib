@@ -263,4 +263,4 @@ function TextareaSkeleton({ rows, className }: { rows?: number; className?: stri
   );
 }
 
-export { Textarea, TextareaSkeleton };
+export { Textarea };

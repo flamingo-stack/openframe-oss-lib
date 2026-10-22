@@ -3,7 +3,9 @@
 import type { ReactNode } from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 
 /** ODS typography variants. Maps to the `.text-h1`…`.text-h6` utilities. */
 export type TruncateTextVariant = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
@@ -87,6 +89,10 @@ export function TruncateText({
 }: TruncateTextProps) {
   const isMultiLine = lines > 1;
   const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(children, { multiline: isMultiLine });
+  // A text still being read (empty, in a loading scope) is its own bar, at its type step and line count.
+  const loading = useLoadingScope() && !children;
+  if (loading)
+    return <TextLineSkeleton type={variant} lines={lines} as={as} className={cn('w-3/4', triggerClassName)} />;
 
   const clampClass = isMultiLine ? LINE_CLAMP_CLASS[lines as Exclude<typeof lines, 1>] : 'truncate block';
 

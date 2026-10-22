@@ -199,7 +199,7 @@ function CommentThreadRow({
  * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
  * so they are not drawn).
  */
-export function CommentThreadSkeleton({
+function CommentThreadSkeleton({
   count = COMMENT_THREAD_SKELETON_COUNT,
   leadWith = 'commenter',
   showTitle = true,

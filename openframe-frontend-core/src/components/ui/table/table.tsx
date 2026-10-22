@@ -6,7 +6,7 @@ import { Chevron02RightIcon } from '../../icons-v2-generated';
 import { Pagination } from '../../pagination';
 import { Button } from '../button';
 import { CursorPagination } from '../cursor-pagination';
-import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-skeleton';
+import { PlaceholderRows, ReservedEmptyState } from '../data-table/data-table-reserved-rows';
 import { DATA_TABLE_NEXT_PAGE_SKELETON_ROWS } from '../data-table/utils';
 import { useLoadingScope } from '../loading-scope';
 import { TableEmptyState } from './table-empty-state';

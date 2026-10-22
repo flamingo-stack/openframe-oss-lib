@@ -336,7 +336,7 @@ export function FeatureCardGrid({ skeleton, ...props }: FeatureCardGridProps) {
  * A FeatureCardGrid while its items are read: the same grid (its columns, hairlines and item padding), each
  * item's eyebrow, title, subtitle and copy a bar of its own line height, its picture a box.
  */
-export function FeatureCardGridSkeleton({
+function FeatureCardGridSkeleton({
   count,
   eyebrow,
   subtitle,

@@ -89,7 +89,7 @@ export function FilterCheckboxItem({
  * A filter checkbox while its facet is read: the same row and an unchecked box, the label for real when given (else
  * a bar), and with `count` the count as a bar.
  */
-export function FilterCheckboxItemSkeleton({
+function FilterCheckboxItemSkeleton({
   label,
   count = false,
   className,

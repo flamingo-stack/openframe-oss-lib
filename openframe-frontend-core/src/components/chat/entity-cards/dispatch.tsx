@@ -83,8 +83,7 @@ import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/q
 import { TrophyIcon } from '../../icons-v2-generated/sport/trophy-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
-import type { ProductReleaseCardProps } from '../../shared/product-release/product-release-card';
-import { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton';
+import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
@@ -104,10 +103,11 @@ import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
-import { BlogCardSkeleton } from './blog-card';
-import { CaseStudyCardSkeleton } from './case-study-card';
+import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
+import { BlogCard } from './blog-card';
+import { CaseStudyCard } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
-import { CustomerInterviewCardSkeleton } from './customer-interview-card';
+import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
 import {
@@ -116,11 +116,11 @@ import {
   kindLabel as githubKindLabel,
   reviewStateLabel,
 } from './github-activity-card';
-import { InvestorUpdateCardSkeleton } from './investor-update-card';
-import { OnboardingGuideCardSkeleton } from './onboarding-guide-card';
+import { InvestorUpdateCard } from './investor-update-card';
+import { OnboardingGuideCard } from './onboarding-guide-card';
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults';
-import { ProgramCardSkeleton } from './program-card';
-import { RoadmapCardSkeleton } from './roadmap-card';
+import { ProgramCard } from './program-card';
+import { RoadmapCard } from './roadmap-card';
 import { TaskTypeIcon } from './task-type-icon';
 
 // =============================================================================
@@ -217,7 +217,7 @@ export interface ChatCardDispatchExtras {
    *  `lib/utils/product-release-card-props.ts`. */
   buildProductReleaseCardProps?: (
     release: unknown,
-  ) => Omit<ProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>;
+  ) => Omit<LoadedProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>;
   /** Build a branded OG placeholder URL from an entity title. Compact chat-
    *  inline cards (`size='sm'` for blog/case-study/customer-interview/
    *  investor-update/onboarding-guide) pass the result as `placeholderUrl`
@@ -1591,7 +1591,7 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
-    skeleton: () => <ProgramCardSkeleton size="sm" />,
+    skeleton: () => <ProgramCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <ProgramChatCard
         item={item}
@@ -1642,7 +1642,7 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     bareInline: true,
     ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
     ...(cfg.fallbackHref ? { fallbackHref: cfg.fallbackHref } : {}),
-    skeleton: () => <RoadmapCardSkeleton size="sm" />,
+    skeleton: () => <RoadmapCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <RoadmapChatCard
         item={item}
@@ -1748,7 +1748,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Blog post',
     contentRefType: 'blog_post_existing',
     bareInline: true,
-    skeleton: () => <BlogCardSkeleton size="sm" />,
+    skeleton: () => <BlogCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <BlogChatCard
         item={item}
@@ -1764,7 +1764,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
-    skeleton: () => <CaseStudyCardSkeleton size="sm" />,
+    skeleton: () => <CaseStudyCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <CaseStudyChatCard
         item={item}
@@ -1790,7 +1790,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
-    skeleton: () => <CustomerInterviewCardSkeleton size="sm" />,
+    skeleton: () => <CustomerInterviewCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <CustomerInterviewChatCard
         item={item}
@@ -1805,7 +1805,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
-    skeleton: () => <ProductReleaseCardSkeleton size="sm" />,
+    skeleton: () => <ProductReleaseCard loading size="sm" />,
     render: (item, chatRef, opts) => {
       // Embedder-provided builder wins; lib default fills in otherwise
       // (covers `coverImage`, `hasVideoCover`, `formattedDate` — the
@@ -1830,7 +1830,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
-    skeleton: () => <InvestorUpdateCardSkeleton size="sm" />,
+    skeleton: () => <InvestorUpdateCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <InvestorUpdateChatCard
         item={item}
@@ -1847,7 +1847,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     bareInline: true,
     // "Display" affordance (verbatim guide body) instead of "Ask".
     displayAction: true,
-    skeleton: () => <OnboardingGuideCardSkeleton size="sm" />,
+    skeleton: () => <OnboardingGuideCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <OnboardingGuideChatCard
         item={item}

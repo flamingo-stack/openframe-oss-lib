@@ -35,7 +35,7 @@ const ROW_SEPARATOR_CLASS = 'border-b border-ods-border last:border-b-0';
 export const DELIVERY_TABLE_SKELETON_ROWS = 5;
 
 /** The table while its tasks are read: the same card, `DELIVERY_TABLE_SKELETON_ROWS` row skeletons. */
-export function DeliveryTableSkeleton() {
+function DeliveryTableSkeleton() {
   return (
     <div className={TABLE_FRAME_CLASS} aria-hidden>
       <div className="w-full">

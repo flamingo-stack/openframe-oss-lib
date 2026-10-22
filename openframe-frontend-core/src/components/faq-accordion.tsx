@@ -129,7 +129,7 @@ export function FaqAccordion({ items, defaultOpenIds = [], loading: loadingProp,
  * The accordion while its questions are read: the bordered list of `count` closed rows, each question a bar (two
  * lines on a phone, one from `content-md`) inside the row's own `h3`, the chevron real.
  */
-export function FaqAccordionSkeleton({
+function FaqAccordionSkeleton({
   count = FAQ_ACCORDION_SKELETON_ROWS,
   className,
 }: {

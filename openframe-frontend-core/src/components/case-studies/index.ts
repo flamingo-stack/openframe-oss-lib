@@ -2,7 +2,6 @@ export { ShareExperienceSection, type ShareExperienceSectionProps } from './shar
 export { EntityQuotesPanel, EntityQuotesPanelSkeleton, type EntityQuotesPanelProps } from './entity-quotes-panel';
 export {
   QuoteCardTile,
-  QuoteCardTileSkeleton,
   QuoteCardsStrip,
   type QuoteCard,
   type QuoteCardTileProps,

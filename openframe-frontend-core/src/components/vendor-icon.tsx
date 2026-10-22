@@ -62,7 +62,7 @@ const backgroundClasses = {
 };
 
 /** A vendor's logo while it is read: the tile's own box. Carries the icon's `data-*` markers (`loadingItemProps`). */
-export function VendorIconSkeleton({
+function VendorIconSkeleton({
   size = 'md',
   className,
   ...props

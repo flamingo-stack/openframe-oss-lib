@@ -177,7 +177,7 @@ export function AdminContentCard({
  * title, the subtitle line, a two-line `text-h6` summary, the 28px badges row, the meta line and the bordered actions
  * row. The actions are the caller's own controls (static) when it passes them, bars otherwise.
  */
-export function AdminContentCardSkeleton({
+function AdminContentCardSkeleton({
   className,
   actions = true,
   subtitleRow = true,

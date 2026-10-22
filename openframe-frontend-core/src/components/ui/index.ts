@@ -273,4 +273,4 @@ export {
   ORGANIZATION_CARD_FOOTER_CLASS,
   ORGANIZATION_CARD_STATS_CLASS,
   ORGANIZATION_CARD_STAT_CLASS,
-} from '../loading/organization-card-skeleton';
+} from './organization-card';

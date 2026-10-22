@@ -140,7 +140,7 @@ export function EntityMetadataValueCell({
 }
 
 /** A value cell while its value is read: the label is the page's own words, the value a bar of its line. */
-export function EntityMetadataValueCellSkeleton({ label, className }: { label: string; className?: string }) {
+function EntityMetadataValueCellSkeleton({ label, className }: { label: string; className?: string }) {
   return (
     <div className={cn(VALUE_CELL_CLASS, className)}>
       <div className={CELL_STACK_CLASS}>
@@ -216,7 +216,7 @@ export function EntityMetadataAuthorCellSkeleton({ className }: { className?: st
   );
 }
 
-export interface EntityAuthorCardSkeletonProps {
+interface EntityAuthorCardSkeletonProps {
   /** The labels of the extra cells, in order (the page's own words: "Section", "Customer"). */
   extraCellLabels?: string[];
   /** The Published cell's label, or `null` when the card has no Published cell. Defaults to "Published". */
@@ -233,7 +233,7 @@ export interface EntityAuthorCardSkeletonProps {
  * The card while it is read: the same grid, every label real, every value a bar, the author cell an avatar box and
  * two bars. `EntityAuthorCard` draws it in a loading scope.
  */
-export function EntityAuthorCardSkeleton({
+function EntityAuthorCardSkeleton({
   extraCellLabels = [],
   publishedLabel = 'Published',
   optionalCells = 0,

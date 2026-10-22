@@ -3,6 +3,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
+import { LoadingFallback } from '../../loading/loading-fallback';
 import { LoadingRegion } from '../../loading/loading-region';
 import { LoadingItems, useLoadingScope } from '../loading-scope';
 import type { NoDataProps } from '../no-data';
@@ -11,12 +12,18 @@ import { DataTableEmpty } from './data-table-empty';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
 import { DataTableRow } from './data-table-row';
 import { ROW_STACK_CLASSES } from './data-table-row-classes';
-import { PlaceholderRows, ReservedEmptyState } from './data-table-skeleton';
+import { PlaceholderRows, ReservedEmptyState } from './data-table-reserved-rows';
 import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
   loading?: boolean;
+  /**
+   * While loading, the table holds placeholder rows (the host gives `useDataTable` one full page of them) and the body
+   * draws them with their REAL cells in a loading scope: every part of a cell draws its own loading form, so the
+   * loading row is the loaded row's own layout. Without it a loading row is one bar per column.
+   */
+  loadingCells?: boolean;
   /** @deprecated Use `emptyState` instead. Legacy single-line message; mapped to the empty state's title. */
   emptyMessage?: string;
   /** Props for the empty state (NoData) shown when there are no rows. Overrides `emptyMessage`. */
@@ -104,6 +111,7 @@ const getNoRows = () => 0;
  */
 export function DataTableBody<T = unknown>({
   loading: loadingProp,
+  loadingCells = false,
   emptyMessage,
   emptyState,
   skeletonRows: skeletonRowsProp,
@@ -137,6 +145,28 @@ export function DataTableBody<T = unknown>({
   useIsomorphicLayoutEffect(() => (hasRows ? loadMore.registerRowsBody() : undefined), [loadMore, hasRows]);
 
   const skeletonRowClassName = typeof rowClassName === 'string' ? rowClassName : undefined;
+
+  if (loading && loadingCells && hasRows) {
+    return (
+      <LoadingFallback
+        label="Loading results"
+        status={loadingRegion && !inScope}
+        className={cn(ROW_STACK_CLASSES, className)}
+      >
+        {rows.map((row, index) => (
+          <DataTableRow<T>
+            key={row.id}
+            row={row}
+            drawsCells
+            compact={compact}
+            rowHeightClassName={rowHeightClassName}
+            className={typeof rowClassName === 'function' ? rowClassName(row.original, index) : rowClassName}
+            data-loading-item
+          />
+        ))}
+      </LoadingFallback>
+    );
+  }
 
   if (loading && !hasRows) {
     return (

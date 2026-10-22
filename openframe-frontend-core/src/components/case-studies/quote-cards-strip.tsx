@@ -49,7 +49,7 @@ export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteC
 }
 
 /** One quote card while it loads: the same card and the person cell's own skeleton. */
-export function QuoteCardTileSkeleton({ className }: { className?: string }) {
+function QuoteCardTileSkeleton({ className }: { className?: string }) {
   return (
     <Card variant="panel" className={cn(QUOTE_CARD_CLASS, className)}>
       <LoadingRegion label="Loading a customer story">

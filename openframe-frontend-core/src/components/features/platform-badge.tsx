@@ -86,7 +86,7 @@ const PLATFORM_BADGE_SKELETON_SIZE = {
 } as const;
 
 /** A platform badge while its record is read: one shape of the badge's height at its size. */
-export function PlatformBadgeSkeleton({
+function PlatformBadgeSkeleton({
   size = 'sm',
   showLabel = true,
   className,

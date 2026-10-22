@@ -32,8 +32,59 @@ import { EmptyState } from '../../empty-state';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { RoadmapGridSkeleton, roadmapGridClass } from './roadmap-grid-skeleton';
+import { LoadingRegion } from '../../loading/loading-region';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
+
+/**
+ * The grid's loading form: each placeholder is `RoadmapCard`'s own loading form.
+ */
+
+/**
+ * The grid's box, read by `RoadmapGrid` and by its skeleton: one column, two from `content-md` when `columns` is 2,
+ * and the desktop left margin that aligns it with the page hero's title. LITERAL class strings: an interpolated
+ * `content-md:grid-cols-${n}` is invisible to Tailwind's scanner and is never generated.
+ */
+function roadmapGridClass(columns: 1 | 2, showLeftMargin: boolean): string {
+  return `grid grid-cols-1 gap-6 ${columns === 2 ? 'content-md:grid-cols-2' : ''} ${
+    showLeftMargin ? 'content-md:ml-[120px]' : ''
+  }`;
+}
+
+/**
+ * Cards the grid's skeleton draws when its host states no count: a typical count. The roadmap lists every item it
+ * holds (no page, no limit); a host that reads a known number of items passes it as `count`.
+ */
+const ROADMAP_GRID_SKELETON_CARDS = 4;
+
+interface RoadmapGridSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  /** Skeleton cards: the number of items the host reads. Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count. */
+  count?: number;
+  /** Show the desktop left margin (~120px) that aligns the grid with
+   *  the page hero's title block. Default `true`. Related-content rails
+   *  inside narrower surfaces (e.g. the release detail page) pass `false`. */
+  showLeftMargin?: boolean;
+  /** The grid's columns from `content-md` (`RoadmapGrid`'s `columns`). Default `2`. */
+  columns?: 1 | 2;
+}
+
+function RoadmapGridSkeleton({
+  region = true,
+  count = ROADMAP_GRID_SKELETON_CARDS,
+  showLeftMargin = true,
+  columns = 2,
+}: RoadmapGridSkeletonProps) {
+  return (
+    <LoadingRegion label="Loading the roadmap" announce={region} className={roadmapGridClass(columns, showLeftMargin)}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="min-w-0" data-loading-item>
+          <RoadmapCard loading />
+        </div>
+      ))}
+    </LoadingRegion>
+  );
+}
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
 const BACKLOG = 'Backlog';
@@ -186,7 +237,7 @@ const QUARTER_CONTENT_INNER_CLASS = 'pb-4';
  * The quarter-grouped grid while its items are read: one quarter, its heading and item count as bars, then the
  * grid's card skeletons.
  */
-export function RoadmapGridQuarterSkeleton({
+function RoadmapGridQuarterSkeleton({
   showLeftMargin = true,
   columns = 2,
   count,

@@ -71,7 +71,7 @@ const ROADMAP_CARD_FOOTER_END = 'flex min-w-0 items-center gap-2';
  * below), the description as three `text-h4` lines and the vote buttons' 48px box (with `votes`); the assignees and
  * target version are drawn only when an item has them, so the skeleton leaves them out. `sm`: the compact card's rows.
  */
-export function RoadmapCardSkeleton({
+function RoadmapCardSkeleton({
   size = 'default',
   votes = true,
   className,
@@ -126,7 +126,7 @@ export function RoadmapCardSkeleton({
   );
 }
 
-export interface RoadmapCardProps {
+interface LoadedRoadmapCardProps {
   item: RoadmapItem;
   /** Detail URL for the compact branch (`sm`). Used by the parent
    *  wrapper to drive nav. Default-branch cards don't need href —
@@ -153,6 +153,14 @@ export interface RoadmapCardProps {
   isVoting?: boolean;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope. 
+ */
+export type RoadmapCardProps =
+  | (LoadedRoadmapCardProps & { loading?: boolean })
+  | (Partial<LoadedRoadmapCardProps> & { loading: true });
+
 /** Wire assignees → AvatarStack people (name+avatar only on the wire). */
 function assigneePeople(
   assignees: Array<{ id: number; name: string | null; avatarUrl: string | null }> | undefined,
@@ -164,7 +172,15 @@ function assigneePeople(
   }));
 }
 
-export function RoadmapCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function RoadmapCard(props: RoadmapCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <RoadmapCardSkeleton size={props.size} votes={!!props.onVote} className={props.className} />;
+  }
+  return <LoadedRoadmapCard {...props} />;
+}
+
+function LoadedRoadmapCard({
   item,
   href,
 
@@ -178,13 +194,11 @@ export function RoadmapCard({
   userVote,
   onVote,
   isVoting = false,
-}: RoadmapCardProps) {
+}: LoadedRoadmapCardProps) {
   const [showScreenshots, setShowScreenshots] = useState(false);
-  const loading = useLoadingScope();
 
   const logoUrl = item.icon && item.icon.startsWith('http') ? item.icon : null;
   const iconSrc = useProxiedImageUrl(logoUrl) || null;
-  if (loading) return <RoadmapCardSkeleton size={size} votes={!!onVote} className={className} />;
 
   if (size === 'sm') {
     const compactHref = safeHref(href ?? null);

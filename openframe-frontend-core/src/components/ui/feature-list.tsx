@@ -134,7 +134,7 @@ export function FeatureList({
  * A FeatureList while its items are read: the same list, `count` rows. A numbered row keeps its number; a boxed
  * row's icon is a box of the icon's frame; every title and description is a bar of its own line height.
  */
-export function FeatureListSkeleton({
+function FeatureListSkeleton({
   count = FEATURE_LIST_SKELETON_COUNT,
   variant = 'boxed',
   iconBoxSize = 72,

@@ -611,7 +611,7 @@ const TabBar = memo(function TabBarImpl({
   );
 });
 
-export interface TabNavigationSkeletonProps {
+interface TabNavigationSkeletonProps {
   /** How many tabs the strip draws. */
   count: number;
   /** Each tab leads with an avatar: a `TAB_AVATAR_PX` circle before its label. */
@@ -628,7 +628,7 @@ export interface TabNavigationSkeletonProps {
  * The strip while its tabs are read: the same strip, tab padding and gaps, each label a bar at the label's type
  * step, and the strip's bottom border drawn for real. `TabNavigation` draws it in a loading scope.
  */
-export function TabNavigationSkeleton({
+function TabNavigationSkeleton({
   count,
   avatar = false,
   sublabel = false,

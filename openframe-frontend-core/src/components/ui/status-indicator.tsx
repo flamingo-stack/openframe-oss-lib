@@ -55,7 +55,7 @@ export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
 }
 
 /** A StatusIndicator while its status is read: the dot a circle of its size, the label a `text-h6` bar. */
-export function StatusIndicatorSkeleton({ className }: { className?: string }) {
+function StatusIndicatorSkeleton({ className }: { className?: string }) {
   return (
     <div className={`${ROW_CLASS} ${className ?? ''}`} aria-hidden>
       <UnifiedSkeleton variant="circular" className={DOT_CLASS} />

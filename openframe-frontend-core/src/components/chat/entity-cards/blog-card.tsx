@@ -46,7 +46,7 @@ import { useCoverImageFallback } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface BlogCardProps {
+interface LoadedBlogCardProps {
   post: BlogPostSummary;
   /** Detail URL resolved by the caller (e.g. `buildContentURL`). */
   href: string;
@@ -73,6 +73,14 @@ export interface BlogCardProps {
   priority?: boolean;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope. 
+ */
+export type BlogCardProps =
+  | (LoadedBlogCardProps & { loading?: boolean })
+  | (Partial<LoadedBlogCardProps> & { loading: true });
+
 // The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
 const BLOG_CARD_FRAME = 'flex h-full flex-col';
 const BLOG_CARD_COVER = `relative ${MEDIA_ASPECT.og} w-full overflow-hidden`;
@@ -95,7 +103,7 @@ const BLOG_POST_TYPE_LABEL = 'Blog Post';
  * lines; the summary as two `text-h6` lines; the byline's 32px avatar and `text-h6` line; the view count's icon is
  * drawn for real beside its bar). `portrait`: the shared portrait skeleton with the static chip.
  */
-export function BlogCardSkeleton({
+function BlogCardSkeleton({
   size = 'default',
   showTypeBadge = true,
   className,
@@ -145,7 +153,15 @@ export function BlogCardSkeleton({
   );
 }
 
-export function BlogCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function BlogCard(props: BlogCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <BlogCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />;
+  }
+  return <LoadedBlogCard {...props} />;
+}
+
+function LoadedBlogCard({
   post,
   href,
   target: targetProp,
@@ -157,7 +173,7 @@ export function BlogCard({
   className,
   hasEmbeddedVideo = false,
   priority = false,
-}: BlogCardProps) {
+}: LoadedBlogCardProps) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -171,7 +187,6 @@ export function BlogCard({
   });
   // Shared cover → placeholder → hide chain (ONE fallback logic for all cards).
   const { src: displayImage, onError: onImageError } = useCoverImageFallback(post.featured_image, placeholderUrl);
-  if (useLoadingScope()) return <BlogCardSkeleton size={size} showTypeBadge={showTypeBadge} className={className} />;
 
   if (size === 'sm') {
     const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';

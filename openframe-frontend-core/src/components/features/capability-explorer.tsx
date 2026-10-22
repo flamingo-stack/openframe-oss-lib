@@ -277,7 +277,7 @@ const CAPABILITY_EXPLORER_SKELETON_JOBS = 8;
  * first card over the carousel's controls. Every box is the loaded one's, so
  * nothing moves when the jobs arrive.
  */
-export function CapabilityExplorerSkeleton({
+function CapabilityExplorerSkeleton({
   region = true,
   className,
   count = CAPABILITY_EXPLORER_SKELETON_JOBS,

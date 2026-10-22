@@ -72,7 +72,7 @@ const DESIGN_DOC_CARD_FOOTER = 'flex w-full items-center justify-between gap-2';
  * line, the readiness badge's box (beside the title from md, its own row below), the summary as three `text-h4` lines,
  * the sign-off caption as a `text-h6` line and the people as a 24px avatar.
  */
-export function DesignDocCardSkeleton({ className }: { className?: string } = {}) {
+function DesignDocCardSkeleton({ className }: { className?: string } = {}) {
   return (
     <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DESIGN_DOC_CARD_BODY, className)} aria-hidden>
       <div className={DESIGN_DOC_CARD_HEADER}>

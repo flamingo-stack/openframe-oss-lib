@@ -228,7 +228,7 @@ const SKELETON_LABEL_WIDTHS = ['w-24', 'w-32', 'w-20', 'w-28', 'w-24'] as const;
  * The section navigation while its sections are read: the same bar (horizontal: its brand and action as given,
  * the sections as pill boxes) or list (vertical: its rail, each row a bar of its label).
  */
-export function StickySectionNavSkeleton({
+function StickySectionNavSkeleton({
   orientation = 'vertical',
   count = STICKY_SECTION_NAV_SKELETON_COUNT,
   brand,

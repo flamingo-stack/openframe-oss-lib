@@ -229,7 +229,7 @@ export function CommandBox({
  * The command box while its command is read: the same box, its title and action buttons for real (their labels are
  * the box's own words), and the command as a bar `lines` lines tall at the command's type step.
  */
-export function CommandBoxSkeleton({
+function CommandBoxSkeleton({
   title,
   lines = 2,
   visibleLines,

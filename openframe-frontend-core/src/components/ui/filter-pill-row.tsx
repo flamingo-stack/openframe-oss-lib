@@ -118,7 +118,7 @@ const FILTER_PILL_ROW_SKELETON_PILLS = 5;
  * else `pills` boxes of a pill's size, so the filters never pop in under the
  * content. With `count` the count line is a bar.
  */
-export function FilterPillRowSkeleton({
+function FilterPillRowSkeleton({
   label,
   options,
   pills = FILTER_PILL_ROW_SKELETON_PILLS,

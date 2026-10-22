@@ -7,7 +7,7 @@ import { InputTrigger } from '../input-trigger';
 import { LoadingScope } from '../loading-scope';
 import { Select, SelectTrigger, SelectValue } from '../select';
 import { TAGS_INPUT_CLASS, TAGS_INPUT_ROW_CLASS, TagsInput, TagsInputSkeleton } from '../tags-input';
-import { TEXTAREA_BOX_CLASS, Textarea, TextareaSkeleton, textareaBoxHeight } from '../textarea';
+import { TEXTAREA_BOX_CLASS, Textarea, textareaBoxHeight } from '../textarea';
 
 /** Every class a constant names, as a rendered markup's `class` tokens. */
 const classTokensOf = (markup: string) =>
@@ -17,18 +17,28 @@ const expectClasses = (markup: string, constant: string) => {
   for (const cls of constant.split(' ')) expect(tokens).toContain(cls);
 };
 
-describe('TextareaSkeleton', () => {
+describe('Textarea loading form', () => {
   it('is the textarea’s own box, at the height its rows take', () => {
     render(<Textarea rows={3} />);
     for (const cls of TEXTAREA_BOX_CLASS.split(' ')) expect(screen.getByRole('textbox')).toHaveClass(cls);
-    const loading = renderToStaticMarkup(<TextareaSkeleton rows={3} />);
+    const loading = renderToStaticMarkup(
+      <LoadingScope>
+        <Textarea rows={3} />
+      </LoadingScope>,
+    );
     expectClasses(loading, TEXTAREA_BOX_CLASS);
     expect(loading).toContain(`height:${textareaBoxHeight(3)}`);
     expect(loading).toContain('aria-hidden="true"');
   });
 
   it('takes the browser’s default two rows when none are named', () => {
-    expect(renderToStaticMarkup(<TextareaSkeleton />)).toContain(`height:${textareaBoxHeight(2)}`);
+    expect(
+      renderToStaticMarkup(
+        <LoadingScope>
+          <Textarea />
+        </LoadingScope>,
+      ),
+    ).toContain(`height:${textareaBoxHeight(2)}`);
   });
 });
 

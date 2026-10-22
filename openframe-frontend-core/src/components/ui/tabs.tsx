@@ -163,4 +163,4 @@ const TabsContent = forwardRef<
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, TabsTriggerSkeleton, TabsListSkeleton };
+export { Tabs, TabsList, TabsTrigger, TabsContent };

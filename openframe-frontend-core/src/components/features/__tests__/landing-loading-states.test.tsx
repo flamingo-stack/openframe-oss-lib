@@ -6,7 +6,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ConversationCard, ConversationCardSkeleton } from '../conversation-card';
+import { ConversationCard } from '../conversation-card';
 
 describe('ConversationCard selection', () => {
   const speaker = { name: 'Dana', avatar: null };
@@ -37,11 +37,22 @@ describe('ConversationCard selection', () => {
   });
 });
 
-describe('ConversationCardSkeleton', () => {
-  it('renders with or without its optional parts and announces itself as loading', () => {
-    const { rerender } = render(<ConversationCardSkeleton avatarPx={32} />);
+describe('ConversationCard loading form', () => {
+  const speaker = { name: '', avatar: null };
+  it('draws its own loading form, with or without its optional parts, and announces itself as loading', () => {
+    const { rerender } = render(<ConversationCard requester={speaker} request="" responder={speaker} outcome="" loading />);
     expect(screen.getByText('Loading a conversation')).toBeInTheDocument();
-    rerender(<ConversationCardSkeleton avatarPx={32} context footer />);
+    rerender(
+      <ConversationCard
+        requester={speaker}
+        request=""
+        responder={speaker}
+        outcome=""
+        context={{ label: 'Today', text: '' }}
+        footerLabel="Your part"
+        loading
+      />,
+    );
     expect(screen.getByText('Loading a conversation')).toBeInTheDocument();
   });
 });

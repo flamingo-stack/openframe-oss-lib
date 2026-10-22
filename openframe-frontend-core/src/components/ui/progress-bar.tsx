@@ -13,7 +13,7 @@ export const PROGRESS_BAR_HEIGHT = { mobile: 8, desktop: 24 } as const;
 const PROGRESS_BAR_HEIGHT_CLASS = 'h-2 content-md:h-6';
 
 /** The bar while its value is read: one box at the bar's own height, switched at the bar's own step. */
-export function ProgressBarSkeleton({ className }: { className?: string }) {
+function ProgressBarSkeleton({ className }: { className?: string }) {
   return <UnifiedSkeleton className={cn(PROGRESS_BAR_HEIGHT_CLASS, 'w-full rounded', className)} />;
 }
 

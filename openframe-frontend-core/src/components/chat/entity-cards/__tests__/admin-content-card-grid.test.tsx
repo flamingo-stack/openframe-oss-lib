@@ -13,7 +13,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { LoadingScope } from '../../../ui/loading-scope';
 import { AdminContentCard } from '../admin-content-card';
-import { AdminContentCardGrid, AdminContentCardGridSkeleton } from '../admin-content-card-grid';
+import { AdminContentCardGrid } from '../admin-content-card-grid';
 
 type Row = { id: number; name: string };
 const rows = (n: number): Row[] => Array.from({ length: n }, (_, i) => ({ id: i + 1, name: `Row ${i + 1}` }));
@@ -78,18 +78,5 @@ describe('AdminContentCardGrid', () => {
     expect(screen.getByRole('heading', { name: 'Loose' }).className).not.toContain('min-h-[2lh]');
     expect(screen.getByText('Acme').className).not.toContain('min-h-[1lh]');
     expect(screen.getByText('One line.').className).not.toContain('min-h-[2lh]');
-  });
-});
-
-describe('AdminContentCardGridSkeleton', () => {
-  it('draws one page of placeholder cards, the grid loading state on its own', () => {
-    render(<AdminContentCardGridSkeleton count={4} Skeleton={TestSkeleton} />);
-    expect(skeletons()).toHaveLength(4);
-  });
-
-  it('is what the grid draws while loading', () => {
-    const { container: grid } = render(<AdminContentCardGrid {...base} items={[]} loading />);
-    const { container: alone } = render(<AdminContentCardGridSkeleton count={base.pageSize} Skeleton={TestSkeleton} />);
-    expect(grid.innerHTML).toBe(alone.innerHTML);
   });
 });

@@ -199,7 +199,7 @@ function getCellVisibilityClasses(
  * non-filterable cell returned `null`, and the survivors rendered with no width and
  * no alignment. One frame later the real values arrived, so the header visibly
  * filled in and the columns snapped into place — while `DataTableRow` and
- * `DataTableSkeleton`, which have always used plain `hideAt` classes, were correct
+ * its loading rows, which have always used plain `hideAt` classes, were correct
  * from the start. Header and body therefore disagreed about which columns exist and
  * how wide they are for exactly one frame, which is the flicker-and-jump on every
  * table's load.

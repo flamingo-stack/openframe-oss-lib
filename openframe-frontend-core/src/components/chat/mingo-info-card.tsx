@@ -161,7 +161,7 @@ function CardMedia({ imageSrc, imageAlt, icon }: Pick<MingoInfoCardProps, 'image
 /** Loading placeholder matching `MingoInfoCard` geometry (40px media box,
  *  title + description lines, trailing pill slot). Span-only for the same
  *  inside-`<p>` validity reason as the card itself. */
-export function MingoInfoCardSkeleton({ className }: { className?: string }) {
+function MingoInfoCardSkeleton({ className }: { className?: string }) {
   return (
     <span
       className={cn(

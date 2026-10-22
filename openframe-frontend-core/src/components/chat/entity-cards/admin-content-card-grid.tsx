@@ -24,7 +24,7 @@ function loadingCardOf(loadingCard: ReactNode, Skeleton: ComponentType<{ classNa
   return Skeleton ? <Skeleton /> : DEFAULT_LOADING_CARD;
 }
 
-export interface AdminContentCardGridSkeletonProps {
+interface AdminContentCardGridSkeletonProps {
   /**
    * How many placeholder cards: ONE FULL PAGE, the host's page size (the `pageSize` the grid it stands in for
    * loads). A host that pages its grid passes it; the default `12` is the typical admin page, for a host that
@@ -51,7 +51,7 @@ const ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS = 12;
  * item like a loaded one. `AdminContentCardGrid` draws exactly this while it loads; a page that has no grid yet (a
  * Suspense fallback) draws it directly.
  */
-export function AdminContentCardGridSkeleton({
+function AdminContentCardGridSkeleton({
   count = ADMIN_CONTENT_CARD_GRID_SKELETON_CARDS,
   loadingCard,
   Skeleton,

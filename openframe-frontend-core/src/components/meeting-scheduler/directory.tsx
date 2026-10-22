@@ -148,7 +148,7 @@ function DirectoryRow({
  * Same-shell loading row (co-located-skeleton convention): the row's frame, "Next available" and the chevron box
  * real, the title, subtitle, audience chip, hosts and next time as shapes.
  */
-export function MeetingSchedulerDirectoryRowSkeleton(props: { [marker: `data-${string}`]: unknown } = {}) {
+function MeetingSchedulerDirectoryRowSkeleton(props: { [marker: `data-${string}`]: unknown } = {}) {
   return (
     <div className={ROW_FRAME_CLASS} aria-hidden {...loadingItemProps(props)}>
       <div className={ROW_TITLE_COLUMN_CLASS}>
@@ -169,7 +169,7 @@ export function MeetingSchedulerDirectoryRowSkeleton(props: { [marker: `data-${s
 }
 
 /** The directory while its links are read: `pageSize` row skeletons in the reserved rows area, and the pager. */
-export function MeetingSchedulerDirectorySkeleton({
+function MeetingSchedulerDirectorySkeleton({
   pageSize = MEETING_DIRECTORY_PAGE_SIZE,
   className,
 }: {

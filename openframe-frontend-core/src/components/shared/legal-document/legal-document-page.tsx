@@ -112,7 +112,7 @@ export const LEGAL_DOCUMENT_SKELETON_SECTIONS = 3;
  * A legal document's body while it is read: the rich renderer's own skeleton (`RichMarkdownRendererSkeleton`, the
  * `article` type the page renders with), opening with the document's own title row, then its first fold of sections.
  */
-export function LegalDocumentSkeleton({ sections = LEGAL_DOCUMENT_SKELETON_SECTIONS }: { sections?: number }) {
+function LegalDocumentSkeleton({ sections = LEGAL_DOCUMENT_SKELETON_SECTIONS }: { sections?: number }) {
   return (
     <LoadingRegion label="Loading the document" className="w-full">
       <RichMarkdownRendererSkeleton title sections={sections} />

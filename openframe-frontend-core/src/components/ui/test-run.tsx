@@ -44,7 +44,7 @@ const TEST_RESULTS_SKELETON_COLUMNS = 6;
 /** Column-bar skeleton (header cells + one card row): columns `RESULT_COLUMN_MIN_WIDTH` wide (the loaded columns' least
     width) on every breakpoint, scrolling horizontally when they do not fit. The row is the data table's own row card and shell
     (`data-table-row-classes`); each bar a `TextLineSkeleton` of its text's type step. */
-export function TestResultsSkeleton({
+function TestResultsSkeleton({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */

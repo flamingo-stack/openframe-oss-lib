@@ -154,10 +154,3 @@ function ChatMessageRowLoading(markers: { [key: `data-${string}`]: unknown }) {
   );
 }
 
-/**
- * @deprecated Render `<ChatMessageRow loading displayName="" body="" />` (or the row inside a loading scope): the
- * row draws its own loading form.
- */
-export function ChatMessageRowSkeleton(markers: { [key: `data-${string}`]: unknown }) {
-  return <ChatMessageRow loading displayName="" body="" {...loadingItemProps(markers)} />;
-}

@@ -46,6 +46,11 @@ export interface DataTableRowProps<T> {
   loadingIndex?: number;
   /** Classes on the loading row's cell shell (the skeleton's `rowClassName`). */
   cellsClassName?: string;
+  /**
+   * A placeholder row the host put in the table while it loads (`DataTable.Body`'s `loadingCells`): in the loading
+   * scope it draws its REAL cells, each part drawing its own loading form, instead of the row's generic bars.
+   */
+  drawsCells?: boolean;
   /** `data-*` markers (`data-loading-item`: the body marks every row it draws), on the row's root in both forms. */
   [key: `data-${string}`]: unknown;
 }
@@ -56,7 +61,7 @@ export interface DataTableRowProps<T> {
  */
 function DataTableRowSwitch<T>(props: DataTableRowProps<T>) {
   const inScope = useLoadingScope();
-  if (inScope || props.row === null) {
+  if ((inScope || props.row === null) && !(props.drawsCells && props.row)) {
     return (
       <DataTableRowSkeleton
         index={props.loadingIndex ?? 0}
@@ -194,6 +199,7 @@ function DataTableRowImpl<T>({
   rowHeightClassName,
   className,
   subRow,
+  drawsCells: _drawsCells,
   ...props
 }: DataTableRowProps<T> & { row: Row<T> }) {
   const markers = loadingItemProps(props);

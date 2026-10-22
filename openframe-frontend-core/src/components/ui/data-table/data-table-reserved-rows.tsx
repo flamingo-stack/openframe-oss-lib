@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { LoadingItems } from '../loading-scope';
-import { DataTableRow } from './data-table-row';
 import {
   DATA_TABLE_PAD_ROW_FRAME_CLASS,
   ROW_DESKTOP_SHELL_CLASS,
@@ -12,51 +11,6 @@ import {
   ROW_MOBILE_SHELL_CLASS,
   ROW_SHELL_CLASSES,
 } from './data-table-row-classes';
-import { DATA_TABLE_SKELETON_ROWS } from './utils';
-
-export interface DataTableSkeletonProps {
-  rows?: number;
-  className?: string;
-  rowClassName?: string;
-  /**
-   * REPLACES the design row height, for a table whose rows are not that tall.
-   * Sizes the CARD, as a real row does.
-   * Appending a height through `rowClassName` cannot do this: tailwind-merge
-   * drops the plain `h-[66px]` but keeps `content-md:h-[78px]`, so the override held
-   * on a phone and lost on a desktop. See `DataTableBodyProps.rowHeightClassName`.
-   */
-  rowHeightClassName?: string;
-  /** Dense rows, as the loaded table's `compact` rows. */
-  compact?: boolean;
-}
-
-/**
- * @deprecated Render `<DataTable.Body loading />` (or the table in a loading scope): the body draws its loading rows,
- * each a `DataTableRow` drawing itself (`row={null}`). This renders exactly that, `rows` of them.
- */
-export function DataTableSkeleton({
-  rows = DATA_TABLE_SKELETON_ROWS,
-  className,
-  rowClassName,
-  rowHeightClassName,
-  compact,
-}: DataTableSkeletonProps) {
-  return (
-    <LoadingItems count={rows}>
-      {index => (
-        <DataTableRow
-          row={null}
-          loadingIndex={index}
-          compact={compact}
-          rowHeightClassName={rowHeightClassName}
-          className={className}
-          cellsClassName={rowClassName}
-          data-loading-item
-        />
-      )}
-    </LoadingItems>
-  );
-}
 
 /**
  * The empty state, floating centred over a full page's worth of reserved row

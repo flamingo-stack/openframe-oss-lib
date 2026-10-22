@@ -24,7 +24,7 @@ export interface DataTableRowCountProps {
 const ROW_COUNT_CLASS = 'whitespace-nowrap text-ods-text-secondary text-h6';
 
 /** The row count while the rows are read: the same line, the number a bar and the (plural) item name real. */
-export function DataTableRowCountSkeleton({ label, className }: { label: string; className?: string }) {
+function DataTableRowCountSkeleton({ label, className }: { label: string; className?: string }) {
   return (
     <span className={cn(ROW_COUNT_CLASS, className)} aria-hidden>
       <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" /> {label}
