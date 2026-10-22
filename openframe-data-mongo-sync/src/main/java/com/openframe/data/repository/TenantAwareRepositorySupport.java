@@ -4,9 +4,7 @@ import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Base class for all custom repository implementations in tenant-side services.
@@ -39,20 +37,15 @@ public abstract class TenantAwareRepositorySupport {
         return mongoTemplate.tenantId();
     }
 
-    protected static void applyIdRestriction(Query query, List<String> includedIds, List<String> excludedIds) {
-        if (includedIds != null) {
-            Set<String> excluded = excludedIds == null ? Set.of() : new HashSet<>(excludedIds);
-            List<String> included = includedIds.stream()
-                    .filter(id -> !excluded.contains(id))
-                    .toList();
-            Criteria idCriteria = included.isEmpty()
-                    ? Criteria.where(ID_FIELD).is(null)
-                    : Criteria.where(ID_FIELD).in(included);
-            query.addCriteria(idCriteria);
+    // null = no restriction; an empty list matches nothing — callers that applied a filter and found no id
+    // must not collapse into "everything".
+    protected static void applyIdRestriction(Query query, List<String> includedIds) {
+        if (includedIds == null) {
             return;
         }
-        if (excludedIds != null && !excludedIds.isEmpty()) {
-            query.addCriteria(Criteria.where(ID_FIELD).nin(excludedIds));
-        }
+        Criteria idCriteria = includedIds.isEmpty()
+                ? Criteria.where(ID_FIELD).is(null)
+                : Criteria.where(ID_FIELD).in(includedIds);
+        query.addCriteria(idCriteria);
     }
 }

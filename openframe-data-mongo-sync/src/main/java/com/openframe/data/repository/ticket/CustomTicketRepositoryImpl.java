@@ -61,6 +61,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_LAST_ACTIVITY_AT = "lastActivityAt";
     private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
     private static final String FIELD_ESCALATED_BY_USER = "escalatedByUser";
+    private static final String FIELD_HAS_PENDING_APPROVAL = "hasPendingApproval";
 
     private static final String CASE_INSENSITIVE = "i";
 
@@ -101,11 +102,11 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
             applyCreatedAtRange(query, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
             applyActivityCriteria(query, filter.getActivity());
-            applyEscalatedByUser(query, filter.getEscalatedByUser());
+            applyFlag(query, FIELD_ESCALATED_BY_USER, filter.getEscalatedByUser());
+            applyFlag(query, FIELD_HAS_PENDING_APPROVAL, filter.getHasPendingApproval());
         }
 
-        List<String> excludedTicketIds = filter == null ? null : filter.getExcludedTicketIds();
-        applyIdRestriction(query, restrictToTicketIds, excludedTicketIds);
+        applyIdRestriction(query, restrictToTicketIds);
 
         if (ownerMachineId != null) {
             query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerMachineId));
@@ -117,13 +118,14 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
 
     // Inactivity auto-escalations and older tickets carry no value, and the field means false then.
-    private void applyEscalatedByUser(Query query, Boolean escalatedByUser) {
-        if (escalatedByUser == null) {
+    // A false filter also keeps tickets that never carried the flag.
+    private void applyFlag(Query query, String field, Boolean wanted) {
+        if (wanted == null) {
             return;
         }
-        Criteria criteria = escalatedByUser
-                ? Criteria.where(FIELD_ESCALATED_BY_USER).is(true)
-                : Criteria.where(FIELD_ESCALATED_BY_USER).ne(true);
+        Criteria criteria = wanted
+                ? Criteria.where(field).is(true)
+                : Criteria.where(field).ne(true);
         query.addCriteria(criteria);
     }
 
@@ -438,6 +440,13 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         log.info("Reassigned {} tickets to statusId {} (kind {})", modifiedCount, toStatusId, toKind);
 
         return (int) modifiedCount;
+    }
+
+    @Override
+    public void updatePendingApproval(String ticketId, boolean pending) {
+        Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
+        Update update = new Update().set(FIELD_HAS_PENDING_APPROVAL, pending);
+        mongoTemplate.updateFirst(query, update, Ticket.class);
     }
 
     @Override

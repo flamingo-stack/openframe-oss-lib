@@ -409,8 +409,6 @@ public class TicketService {
     private Query buildTicketQuery(AuthPrincipal principal, TicketFilterInput filter,
                                    String search, String ownerMachineId) {
         TicketQueryFilter queryFilter = toQueryFilter(filter);
-        List<String> excludedTicketIds = ticketIdsForFilter.resolveExcluded(filter);
-        queryFilter.setExcludedTicketIds(excludedTicketIds);
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filter);
         return ticketRepository.buildTicketQuery(queryFilter, search, restrictToTicketIds, ownerMachineId);
     }
@@ -426,7 +424,13 @@ public class TicketService {
                 .assigneeIds(filter.getAssigneeIds())
                 .activity(ticketStalenessResolver.resolve(filter.getActivity()))
                 .escalatedByUser(filter.getEscalatedByUser())
+                .hasPendingApproval(filter.getHasPendingApproval())
                 .build();
+    }
+
+    public void setPendingApproval(String ticketId, boolean pending) {
+        ticketRepository.updatePendingApproval(ticketId, pending);
+        log.debug("Ticket {} pending-approval flag set to {}", ticketId, pending);
     }
 
     private PageInfo buildPageInfo(List<Ticket> pageItems, boolean hasNextPage, boolean hasPreviousPage) {

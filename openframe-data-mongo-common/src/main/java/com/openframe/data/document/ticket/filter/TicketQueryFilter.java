@@ -31,5 +31,5 @@ public class TicketQueryFilter {
     private Instant createdAtTo;
     private TicketActivityCriteria activity;
     private Boolean escalatedByUser;
-    private List<String> excludedTicketIds;
+    private Boolean hasPendingApproval;
 }
