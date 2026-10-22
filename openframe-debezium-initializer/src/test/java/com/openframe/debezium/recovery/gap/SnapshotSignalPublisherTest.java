@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SnapshotSignalPublisherTest {
 
     private final SnapshotSignalPublisher publisher =
-            new SnapshotSignalPublisher(new ObjectMapper(), new GapRecoveryProperties());
+            new SnapshotSignalPublisher(new ObjectMapper(), new GapRecoveryProperties(), new SignalKafkaClients());
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {

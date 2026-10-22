@@ -8,6 +8,10 @@ import com.openframe.data.repository.connector.ConnectorCheckpointRepository;
 import com.openframe.debezium.dto.ConnectorOffsets;
 import com.openframe.debezium.dto.ConnectorStatus;
 import com.openframe.debezium.service.DebeziumService;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.http.HttpStatus;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -33,7 +38,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +67,7 @@ class ConnectorRecreatorTest {
 
     private ConnectorRecreator recreator;
     private ConnectorOffsets offsets;
+    private ListAppender<ILoggingEvent> logs;
 
     @BeforeEach
     void setUp() {
@@ -73,12 +78,21 @@ class ConnectorRecreatorTest {
         recreator = new ConnectorRecreator(debeziumService, sourceDialects, checkpointRepository, backfillRepository, properties, gapAlerts);
         Map<String, Object> entry = Map.of("partition", Map.of("server_id", "shared.meshcentral"), "offset", Map.of("sec", 1L));
         offsets = new ConnectorOffsets(List.of(entry));
+        logs = new ListAppender<>();
+        logs.start();
+        recreatorLogger().addAppender(logs);
+    }
+
+    @AfterEach
+    void tearDown() {
+        recreatorLogger().detachAppender(logs);
     }
 
     @Test
     void recreate_offsetsKnown_handedOverWithoutBackfill() {
         // setup
-        when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
+        stubDialect();
+        when(sourceDialect.belongsTo(offsets, CONFIG)).thenReturn(true);
         RecreationRequest request = request(offsets, false);
 
         // execution
@@ -89,7 +103,67 @@ class ConnectorRecreatorTest {
         verify(debeziumService).alterConnectorOffsets(NEW_NAME, offsets);
         verify(debeziumService).resumeConnector(NEW_NAME);
         verify(backfillRepository, never()).save(any(ConnectorBackfill.class));
-        verifyNoInteractions(sourceDialects);
+    }
+
+    @Test
+    void recreate_offsetsOfAnotherTopicPrefix_createdFreshWithBackfill() {
+        // setup
+        stubDialect();
+        when(sourceDialect.belongsTo(offsets, CONFIG)).thenReturn(false);
+        when(sourceDialect.hasSourceTime(offsets)).thenReturn(true);
+        when(sourceDialect.sourceTime(offsets)).thenReturn(LAST_SOURCE_TIME);
+        RecreationRequest request = request(offsets, false);
+
+        // execution
+        recreator.recreate(request);
+
+        // verifications
+        verify(debeziumService).createConnector(NEW_NAME, CONFIG);
+        verify(debeziumService, never()).createStoppedConnector(NEW_NAME, CONFIG);
+        verify(backfillRepository).save(backfillCaptor.capture());
+        assertThat(backfillCaptor.getValue().getGapFrom()).isEqualTo(LAST_SOURCE_TIME.minus(MARGIN));
+    }
+
+    @Test
+    void recreate_backfillCannotBeSaved_newVersionDeletedAndErrorRaised() {
+        // setup
+        stubDialect();
+        when(sourceDialect.hasSourceTime(offsets)).thenReturn(true);
+        when(sourceDialect.sourceTime(offsets)).thenReturn(LAST_SOURCE_TIME);
+        doThrow(new IllegalStateException("mongo down")).when(backfillRepository).save(any(ConnectorBackfill.class));
+        when(debeziumService.getConnectorConfig(NEW_NAME)).thenReturn(null);
+        RecreationRequest request = request(offsets, true);
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> recreator.recreate(request));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Failed to schedule backfill for " + NEW_NAME);
+        verify(debeziumService).deleteConnector(NEW_NAME);
+        assertThat(logs.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .noneMatch(message -> message.contains("Connector left STOPPED"));
+    }
+
+    @Test
+    void recreate_resumeFailsAndDeleteDoesNotRemove_errorRaisedAfterCheckingLeftover() {
+        // setup
+        when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
+        when(sourceDialects.supports(CONFIG)).thenReturn(false);
+        doThrow(new HttpClientErrorException(HttpStatus.CONFLICT)).when(debeziumService).resumeConnector(NEW_NAME);
+        when(debeziumService.getConnectorConfig(NEW_NAME)).thenReturn(CONFIG);
+        RecreationRequest request = request(offsets, false);
+
+        // execution
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> recreator.recreate(request));
+
+        // verifications
+        assertThat(ex.getMessage()).isEqualTo("Failed to resume handed-over connector " + NEW_NAME);
+        verify(debeziumService).deleteConnector(NEW_NAME);
+        assertThat(logs.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(message -> message.contains("[DEBEZIUM] Connector left STOPPED")
+                        && message.contains(NEW_NAME));
     }
 
     @Test
@@ -150,6 +224,7 @@ class ConnectorRecreatorTest {
         stubDialect();
         when(sourceDialect.hasSourceTime(offsets)).thenReturn(true);
         when(sourceDialect.sourceTime(offsets)).thenReturn(LAST_SOURCE_TIME);
+        when(sourceDialect.belongsTo(offsets, CONFIG)).thenReturn(true);
         doThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST))
                 .when(debeziumService).alterConnectorOffsets(NEW_NAME, offsets);
         RecreationRequest request = request(offsets, false);
@@ -185,6 +260,7 @@ class ConnectorRecreatorTest {
     void recreate_resumeAfterHandoverFails_newVersionDeletedAndErrorRaised() {
         // setup
         when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
+        when(sourceDialects.supports(CONFIG)).thenReturn(false);
         doThrow(new HttpClientErrorException(HttpStatus.CONFLICT)).when(debeziumService).resumeConnector(NEW_NAME);
         RecreationRequest request = request(offsets, false);
 
@@ -292,6 +368,7 @@ class ConnectorRecreatorTest {
         // setup
         when(checkpointRepository.findById(BASE)).thenReturn(Optional.of(checkpoint(Instant.now())));
         when(debeziumService.recreationConfig(CONFIG)).thenReturn(CONFIG);
+        when(sourceDialects.supports(CONFIG)).thenReturn(false);
 
         // execution
         recreator.restoreFromCheckpoint(BASE, NEW_NAME, SPEC);
@@ -326,5 +403,9 @@ class ConnectorRecreatorTest {
                 .offsets(offsets.getOffsets())
                 .capturedAt(capturedAt)
                 .build();
+    }
+
+    private static Logger recreatorLogger() {
+        return (Logger) LoggerFactory.getLogger(ConnectorRecreator.class);
     }
 }

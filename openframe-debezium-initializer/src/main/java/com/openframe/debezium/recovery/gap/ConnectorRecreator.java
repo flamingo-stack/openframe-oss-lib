@@ -74,16 +74,26 @@ public class ConnectorRecreator {
     public void recreate(RecreationRequest request) {
         Map<String, Object> config = ConnectorSpecs.configOf(request.getSpec());
         Map<String, Object> recreationConfig = debeziumService.recreationConfig(config);
-        if (canHandOver(request)) {
+        if (canHandOver(request, config)) {
             handOver(request, recreationConfig);
             return;
         }
         debeziumService.createConnector(request.getNewName(), recreationConfig);
-        scheduleBackfill(request, config);
+        scheduleBackfillOrDiscard(request, config);
     }
 
-    private boolean canHandOver(RecreationRequest request) {
-        return !request.isDiscardOffsets() && !request.getLastKnownOffsets().isEmpty();
+    private boolean canHandOver(RecreationRequest request, Map<String, Object> config) {
+        if (request.isDiscardOffsets() || request.getLastKnownOffsets().isEmpty()) return false;
+        if (offsetsBelongTo(request.getLastKnownOffsets(), config)) return true;
+        log.warn("{} Offsets belong to another topic.prefix, recreating without them: base='{}' new='{}'",
+                DebeziumLog.PREFIX, request.getBaseName(), request.getNewName());
+        return false;
+    }
+
+    private boolean offsetsBelongTo(ConnectorOffsets offsets, Map<String, Object> config) {
+        if (!sourceDialects.supports(config)) return true;
+        SourceDialect dialect = sourceDialects.dialectFor(config);
+        return dialect.belongsTo(offsets, config);
     }
 
     private void handOver(RecreationRequest request, Map<String, Object> recreationConfig) {
@@ -96,16 +106,36 @@ public class ConnectorRecreator {
             return;
         }
         Map<String, Object> config = ConnectorSpecs.configOf(request.getSpec());
-        scheduleBackfill(request, config);
+        scheduleBackfillOrDiscard(request, config);
     }
 
     // A version left STOPPED looks healthy to every check, so drop it and let the next tick recreate it.
+    // The recreation slot is already spent, so the retry starts clean with a backfill instead of a handover.
     private void resumeOrDiscard(String connectorName) {
         try {
             debeziumService.resumeConnector(connectorName);
         } catch (Exception e) {
-            debeziumService.deleteConnector(connectorName);
+            discard(connectorName);
             throw new IllegalStateException("Failed to resume handed-over connector " + connectorName, e);
+        }
+    }
+
+    // Without its backfill the new version would run with a silent gap; dropping it makes the next tick retry.
+    private void scheduleBackfillOrDiscard(RecreationRequest request, Map<String, Object> config) {
+        try {
+            scheduleBackfill(request, config);
+        } catch (Exception e) {
+            String newName = request.getNewName();
+            discard(newName);
+            throw new IllegalStateException("Failed to schedule backfill for " + newName, e);
+        }
+    }
+
+    private void discard(String connectorName) {
+        debeziumService.deleteConnector(connectorName);
+        if (debeziumService.getConnectorConfig(connectorName) != null) {
+            log.error("{} Connector left STOPPED or without its backfill, delete it by hand: name='{}'",
+                    DebeziumLog.PREFIX, connectorName);
         }
     }
 

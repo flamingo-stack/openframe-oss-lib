@@ -14,6 +14,7 @@ public class MongoSourceDialect extends SourceDialect {
 
     private static final String CONNECTOR_CLASS = "io.debezium.connector.mongodb.MongoDbConnector";
     private static final String KEY_COLLECTIONS = "collection.include.list";
+    private static final String PARTITION_KEY = "server_id";
     private static final String OFFSET_TIME_KEY = "sec";
     // An ObjectId starts with its creation second, so this bound walks the _id index instead of scanning.
     private static final String ID_FROM_FILTER = "{\"_id\": {\"$gte\": {\"$oid\": \"%08x0000000000000000\"}}}";
@@ -42,6 +43,11 @@ public class MongoSourceDialect extends SourceDialect {
         return splitList(collections).stream()
                 .map(collection -> new SnapshotCondition(collection, filter))
                 .toList();
+    }
+
+    @Override
+    protected String partitionKey() {
+        return PARTITION_KEY;
     }
 
     @Override
