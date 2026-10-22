@@ -5,8 +5,9 @@ import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
 import { Video } from '../features/video';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button';
 import { ImageGalleryModal } from '../ui/image-gallery-modal';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 export interface MediaGalleryStripItem {
   media_type: string;
@@ -23,8 +24,12 @@ function isGalleryImage(mediaType: string): boolean {
 
 /** The strip's layout, read by the strip and by its skeleton, so the skeleton is the strip's size. */
 const STRIP_CLASS = 'flex w-full gap-6 overflow-x-auto';
-const TILE_SIZE_CLASS = 'shrink-0 w-[240px] h-[200px] rounded-md';
-const TILE_CLASS = `${TILE_SIZE_CLASS} overflow-hidden border border-ods-border bg-ods-bg transition-opacity`;
+/** A tile's place and size in the strip (an image tile is a `card` button of this size). */
+const TILE_BOX_CLASS = 'shrink-0 w-[240px] h-[200px]';
+const TILE_SIZE_CLASS = `${TILE_BOX_CLASS} rounded-md`;
+/** A tile's frame: the video tile's box, and the image tile's content inside its button. */
+const TILE_FRAME_CLASS = 'overflow-hidden rounded-md border border-ods-border bg-ods-bg';
+const TILE_CLASS = cn(TILE_SIZE_CLASS, TILE_FRAME_CLASS);
 /** Tiles a skeleton draws when not told how many (a strip's first fold on a wide screen). */
 export const MEDIA_GALLERY_STRIP_SKELETON_COUNT = 4;
 
@@ -67,10 +72,12 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
           // owns its own controls, so their tile stays a plain container.
           if (isGalleryImage(mediaItem.media_type)) {
             return (
-              <button
+              <Button
+                variant="card"
                 key={mediaItem.id || index}
+                data-loading-item
                 type="button"
-                className={`${tileClass} cursor-pointer hover:opacity-80`}
+                className={TILE_BOX_CLASS}
                 aria-label={`Open ${mediaItem.title || `media ${index + 1}`} in gallery`}
                 onClick={() => {
                   // Lightbox position = rank among image-only items (clips skipped).
@@ -78,19 +85,21 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
                   setGalleryOpen(true);
                 }}
               >
-                <Image
-                  src={mediaItem.media_url}
-                  alt={mediaItem.title || `Media ${index + 1}`}
-                  className="h-full w-full object-cover"
-                  width={240}
-                  height={200}
-                  unoptimized
-                />
-              </button>
+                <span className={cn('block h-full w-full', TILE_FRAME_CLASS)}>
+                  <Image
+                    src={mediaItem.media_url}
+                    alt={mediaItem.title || `Media ${index + 1}`}
+                    className="h-full w-full object-cover"
+                    width={240}
+                    height={200}
+                    unoptimized
+                  />
+                </span>
+              </Button>
             );
           }
           return (
-            <div key={mediaItem.id || index} className={tileClass}>
+            <div key={mediaItem.id || index} className={tileClass} data-loading-item>
               <Video url={mediaItem.media_url} layout="native" />
             </div>
           );
@@ -110,7 +119,7 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
 }
 
 /** The media strip while it is read: `count` tiles of the strip's own 240×200 size. */
-export function MediaGalleryStripSkeleton({
+function MediaGalleryStripSkeleton({
   count = MEDIA_GALLERY_STRIP_SKELETON_COUNT,
   className,
 }: {
@@ -119,10 +128,9 @@ export function MediaGalleryStripSkeleton({
 }) {
   return (
     <div className={cn(STRIP_CLASS, 'overflow-hidden', className)} aria-hidden>
-      {Array.from({ length: count }, (_, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tiles never reorder
-        <UnifiedSkeleton key={i} className={TILE_SIZE_CLASS} />
-      ))}
+      <LoadingItems count={count}>
+        {() => <UnifiedSkeleton className={TILE_SIZE_CLASS} data-loading-item />}
+      </LoadingItems>
     </div>
   );
 }

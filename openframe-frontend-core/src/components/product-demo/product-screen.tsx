@@ -1,18 +1,36 @@
 'use client';
 
-import { lazy, type LazyExoticComponent, type ReactNode, Suspense } from 'react';
+import { createElement, type ReactNode, useEffect, useState } from 'react';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { ProductScreenFrame, type ProductScreenFrameProps } from '../ui/product-screen-frame';
 import { PRODUCT_SCREEN_LOADERS } from './registry';
-import { PRODUCT_SCREEN_KEYS, PRODUCT_SCREEN_LABELS, type ProductScreenKey } from './screen-keys';
+import { PRODUCT_SCREEN_LABELS, type ProductScreenKey } from './screen-keys';
 import { PRODUCT_SCREEN_LOADING } from './screen-loading';
 import type { ProductScreenComponent } from './types';
 
-/** One lazy component per screen, made once: a screen's code is fetched the first time it renders. */
-const LAZY_SCREENS = Object.fromEntries(
-  PRODUCT_SCREEN_KEYS.map(key => [key, lazy(PRODUCT_SCREEN_LOADERS[key])]),
-) as Record<ProductScreenKey, LazyExoticComponent<ProductScreenComponent>>;
+/** The screens whose code has arrived, kept for the page's life: a screen shown again renders at once. */
+const LOADED_SCREENS = new Map<ProductScreenKey, ProductScreenComponent>();
+
+/**
+ * Fetches a screen's code outside a loading scope (a page's loading state fetches nothing) and re-renders once it is
+ * here. No Suspense: the frame keeps the SAME loading view mounted until the code arrives, so the loading state is
+ * drawn once and never torn down and mounted again (that was the double loading).
+ */
+function useScreenCode(screen: ProductScreenKey, fetch: boolean): void {
+  const [, setArrived] = useState(0);
+  useEffect(() => {
+    if (!fetch || LOADED_SCREENS.has(screen)) return undefined;
+    let live = true;
+    void PRODUCT_SCREEN_LOADERS[screen]().then(module => {
+      LOADED_SCREENS.set(screen, module.default);
+      if (live) setArrived(count => count + 1);
+    });
+    return () => {
+      live = false;
+    };
+  }, [screen, fetch]);
+}
 
 /** Frame heights of the two renderings: constants, so the loading state and the loaded screen are one box. */
 export const PRODUCT_SCREEN_HEIGHT = 440;
@@ -89,7 +107,13 @@ function ProductScreenShell({
  *  frame's box. */
 function ScreenLoading({ screen, compact }: { screen: ProductScreenKey; compact: boolean }) {
   const Loading = PRODUCT_SCREEN_LOADING[screen];
-  return Loading ? <Loading compact={compact} /> : <UnifiedSkeleton className="h-full w-full" />;
+  // Always in a loading scope: before the frame is measured (its scope) and while the screen's code downloads (the
+  // Suspense fallback) the view is drawn the SAME way, so the first paint and the fallback are one loading state.
+  return (
+    <LoadingScope bare>
+      {Loading ? <Loading compact={compact} /> : <UnifiedSkeleton className="h-full w-full" />}
+    </LoadingScope>
+  );
 }
 
 /**
@@ -99,17 +123,13 @@ function ScreenLoading({ screen, compact }: { screen: ProductScreenKey; compact:
  * nothing.
  */
 export function ProductScreen({ screen, compact = false, ...frame }: ProductScreenProps) {
-  const Screen = LAZY_SCREENS[screen];
   const loading = useLoadingScope();
+  useScreenCode(screen, !loading);
+  const Screen = LOADED_SCREENS.get(screen);
   return (
     <ProductScreenShell screen={screen} compact={compact} {...frame}>
-      {loading ? (
-        <ScreenLoading screen={screen} compact={compact} />
-      ) : (
-        <Suspense fallback={<ScreenLoading screen={screen} compact={compact} />}>
-          <Screen compact={compact} />
-        </Suspense>
-      )}
+      {/* The arrived screen is a module's component, kept in `LOADED_SCREENS`: never created during render. */}
+      {loading || !Screen ? <ScreenLoading screen={screen} compact={compact} /> : createElement(Screen, { compact })}
     </ProductScreenShell>
   );
 }

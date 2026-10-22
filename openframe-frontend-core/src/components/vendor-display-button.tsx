@@ -1,16 +1,17 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
-import { TILE_SIZE } from '../styles/component-sizes';
 import { cn } from '../utils/cn';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
+import { BUTTON_KIND_CLASS, Button } from './ui/button';
 
-/** The default button's frame, without its surface and hover (a skeleton draws the same box). */
-export const VENDOR_DISPLAY_BUTTON_FRAME_CLASS =
-  'flex max-w-full items-center gap-2 overflow-hidden rounded-lg border border-ods-border px-3 py-2';
-/** The default button's logo box. */
-export const VENDOR_DISPLAY_BUTTON_LOGO_CLASS = `flex ${TILE_SIZE.sm} flex-shrink-0 items-center justify-center rounded-lg`;
+/** The default button's place in its row (it never outgrows it). */
+const VENDOR_DISPLAY_BUTTON_LAYOUT_CLASS = 'max-w-full overflow-hidden';
+/** The default button's box: the `chip` kind's, which a skeleton draws too. */
+export const VENDOR_DISPLAY_BUTTON_FRAME_CLASS = cn(BUTTON_KIND_CLASS.chip, VENDOR_DISPLAY_BUTTON_LAYOUT_CLASS);
+/** The default button's logo box (it fits the chip's 32px height). */
+export const VENDOR_DISPLAY_BUTTON_LOGO_CLASS = 'flex size-5 flex-shrink-0 items-center justify-center rounded';
 
 interface VendorDisplayButtonProps {
   vendor: VendorWithMedia;
@@ -40,10 +41,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
   // Compact variant
   if (variant === 'compact') {
     return (
-      <button
-        onClick={handleClick}
-        className="inline-flex items-center gap-2 rounded-full border border-ods-border bg-ods-card px-3 py-1.5 transition-colors hover:border-ods-accent/50"
-      >
+      <Button variant="chip" onClick={handleClick}>
         {logoUrl ? (
           <div className="h-5 w-5 flex-shrink-0 overflow-hidden rounded">
             <Image
@@ -62,19 +60,16 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
           </div>
         )}
         <span className="text-ods-text-primary text-h6">{vendor.title}</span>
-      </button>
+      </Button>
     );
   }
 
   // Default variant
   return (
-    <button
-      onClick={handleClick}
-      className={cn(VENDOR_DISPLAY_BUTTON_FRAME_CLASS, 'bg-ods-card transition-colors hover:border-ods-accent')}
-    >
+    <Button variant="chip" data-tone="accent" onClick={handleClick} className={VENDOR_DISPLAY_BUTTON_LAYOUT_CLASS}>
       {logoUrl ? (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-card')}>
-          <Image src={logoSrc} alt={`${vendor.title} logo`} width={24} height={24} className="rounded object-cover" />
+          <Image src={logoSrc} alt={`${vendor.title} logo`} width={20} height={20} className="rounded object-cover" />
         </div>
       ) : (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-border')}>
@@ -84,6 +79,6 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
       <span className="min-w-0 truncate text-ods-text-primary text-h4" title={vendor.title}>
         {vendor.title}
       </span>
-    </button>
+    </Button>
   );
 }

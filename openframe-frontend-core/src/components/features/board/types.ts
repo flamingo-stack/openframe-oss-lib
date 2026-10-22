@@ -73,6 +73,9 @@ export interface BoardTicket {
   agent?: AgentName;
 }
 
+/** Tickets a lane reads per page when its host names no `pageSize` (its loading form draws this many cards). */
+export const BOARD_COLUMN_PAGE_SIZE = 20;
+
 export interface BoardColumnDef {
   id: string;
   /**
@@ -95,6 +98,9 @@ export interface BoardColumnDef {
   total?: number;
   hasMore?: boolean;
   isLoading?: boolean;
+  /** How many tickets the lane reads per page: its loading form draws that many cards. Default
+   *  {@link BOARD_COLUMN_PAGE_SIZE}. */
+  pageSize?: number;
   isLoadingMore?: boolean;
 
   system?: boolean;

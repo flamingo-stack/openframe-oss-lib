@@ -93,24 +93,16 @@ export * from './shared/delivery';
 // Legal-document shared component (privacy policy, terms of service)
 export * from './shared/legal-document';
 
-// Detail Page Skeleton (deprecated: kept for hosts on an older release)
-export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detail-page-skeleton';
-
 // Author byline card (end-of-article author description) — embeddable via
 // embed-shims + optional-runtime avatar proxying; hosts pass their own
 // fallbackBio copy (the hub uses defaultAuthorFallbackBio()).
-export {
-  ArticleAuthorByline,
-  ArticleAuthorBylineSkeleton,
-  type ArticleAuthorBylineProps,
-} from './shared/article-author-byline';
+export { ArticleAuthorByline, type ArticleAuthorBylineProps } from './shared/article-author-byline';
 
 // Read-only media gallery strip (horizontal scroll; images → lightbox, clips →
 // inline Video). Single source of truth for the detail-page media gallery —
 // used by product-release + What I Shipped detail pages.
 export {
   MediaGalleryStrip,
-  MediaGalleryStripSkeleton,
   MEDIA_GALLERY_STRIP_SKELETON_COUNT,
   type MediaGalleryStripItem,
   type MediaGalleryStripProps,

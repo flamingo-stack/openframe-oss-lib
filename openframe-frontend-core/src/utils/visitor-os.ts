@@ -82,3 +82,15 @@ export function usesCommandKey(os: VisitorOs | null): boolean {
 export function shortcutLabel(os: VisitorOs | null, key: string): string {
   return usesCommandKey(os) ? `⌘${key}` : `Ctrl ${key}`;
 }
+
+/**
+ * The inline script that marks the document with the visitor's DESKTOP system before the first paint
+ * (`attribute` = `mac` | `windows` | `linux`, absent for a phone, a tablet or an unknown system), for a page the
+ * server renders the same for every visitor (and a CDN may cache): it draws every system's variant and the host's
+ * CSS shows the one the attribute names, so the right one is there from the first frame with no hydration
+ * mismatch. The same rule as `detectVisitorOs` (Client Hints platform, then the User-Agent, touch points telling an
+ * iPad from a Mac), held equal to it by the tests. Any throw leaves the attribute off: the host's no-system variant.
+ */
+export function desktopOsBeforePaintScript(attribute: string): string {
+  return `(function(){try{var n=window.navigator,h=n.userAgentData&&n.userAgentData.platform,p=String(h||'').replace(/"/g,'').trim().toLowerCase(),t=(n.maxTouchPoints||0)>1,o=null,m=${JSON.stringify(HINT_PLATFORMS)};if(m[p])o=m[p];else{var u=n.userAgent||'';if(/iPhone|iPad|iPod/i.test(u))o='ios';else if(/Android/i.test(u))o='android';else if(/Windows NT|Win64|Win32/i.test(u))o='windows';else if(/Macintosh|Mac OS X/i.test(u))o='mac';else if(/Linux|X11|CrOS/i.test(u))o='linux'}if(o==='mac'&&t)o='ios';if(o==='mac'||o==='windows'||o==='linux')document.documentElement.setAttribute(${JSON.stringify(attribute)},o)}catch(e){}})();`;
+}

@@ -42,7 +42,7 @@ export function SlackChannelChip({ name, href, className }: SlackChannelChipProp
 }
 
 /** A SlackChannelChip while its channel is read: Slack's mark (static), the channel's name a bar of its line. */
-export function SlackChannelChipSkeleton({ className }: { className?: string }) {
+function SlackChannelChipSkeleton({ className }: { className?: string }) {
   return (
     <span className={cn(CHIP_CLASS, className)} aria-hidden>
       <SlackIcon className={MARK_CLASS} />

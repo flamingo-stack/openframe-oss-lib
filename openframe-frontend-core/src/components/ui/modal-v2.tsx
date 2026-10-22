@@ -5,6 +5,7 @@ import { RemoveScroll } from 'react-remove-scroll';
 import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 import { XmarkIcon } from '../icons-v2-generated';
+import { Button } from './button';
 import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 // Duration of the open/close animation in ms — keep in sync with the
@@ -374,13 +375,16 @@ const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(({ children, cl
     <div ref={ref} className={cn('flex items-center gap-[var(--spacing-system-sf)]', className)}>
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       {onClose && (
-        <button
+        <Button
+          variant="bare"
+          size="icon-sm"
+          type="button"
           onClick={onClose}
-          className="hidden shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary md:flex"
+          className="hidden shrink-0 md:inline-flex"
           aria-label="Close"
         >
-          <XmarkIcon className="size-6" />
-        </button>
+          <XmarkIcon className="text-ods-text-secondary" />
+        </Button>
       )}
     </div>
   );

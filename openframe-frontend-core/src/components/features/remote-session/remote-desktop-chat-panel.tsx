@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react';
 import { cn } from '../../../utils/cn';
 import { ChatInput } from '../../chat/chat-input';
 import { LoadingRegion } from '../../loading/loading-region';
-import { RemoteDesktopChatMessageRow, RemoteDesktopChatMessageRowSkeleton } from './remote-desktop-chat-message-row';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { RemoteDesktopChatMessageRow } from './remote-desktop-chat-message-row';
 import type { RemoteSessionChatMessage } from './types';
 
 /**
@@ -46,7 +47,7 @@ export interface RemoteDesktopChatPanelProps {
  */
 export function RemoteDesktopChatPanel({
   messages,
-  loading,
+  loading: loadingProp,
   technician,
   sending,
   onSend,
@@ -55,6 +56,9 @@ export function RemoteDesktopChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   // System notices (the "joined the chat" line) are the end user's indication only.
   const rows = messages.filter(message => message.author !== 'system');
+  // ONE switch: in a page's loading state (or while the host reads a history it has none of yet) the stream is its
+  // skeleton.
+  const loading = useLoadingScope() || (rows.length === 0 && !!loadingProp);
 
   // Keep the newest message in view as the stream grows.
   useEffect(() => {
@@ -74,14 +78,23 @@ export function RemoteDesktopChatPanel({
     >
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex min-h-full flex-col justify-end gap-[var(--spacing-system-xsf)]">
-          {rows.length === 0 && loading ? (
+          {loading ? (
             // The chat while it is read: a screen of the panel's own message rows, stacked by a one-column grid
             // (the thread above is already the column flexbox: WEBVIEW-001).
             <LoadingRegion label="Loading the chat" className="grid grid-cols-1 gap-[var(--spacing-system-xsf)]">
-              {Array.from({ length: CHAT_PANEL_SKELETON_ROWS }, (_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-                <RemoteDesktopChatMessageRowSkeleton key={i} />
-              ))}
+              <LoadingItems count={CHAT_PANEL_SKELETON_ROWS}>
+                {i => (
+                  // A conversation: the technician and the user take turns.
+                  <RemoteDesktopChatMessageRow
+                    loading
+                    data-loading-item
+                    isTechnician={i % 2 === 1}
+                    authorName=""
+                    sentAt=""
+                    body=""
+                  />
+                )}
+              </LoadingItems>
             </LoadingRegion>
           ) : rows.length === 0 ? (
             <p className="text-center text-ods-text-muted text-h6">No messages yet - say hello to the user.</p>
@@ -89,6 +102,7 @@ export function RemoteDesktopChatPanel({
             rows.map(message => (
               <RemoteDesktopChatMessageRow
                 key={message.id}
+                data-loading-item
                 authorName={
                   message.name ||
                   (message.author === 'technician' ? technician.name : REMOTE_DESKTOP_CHAT_END_USER_NAME)

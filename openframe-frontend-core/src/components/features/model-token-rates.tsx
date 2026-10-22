@@ -24,7 +24,8 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { useLoadingScope } from '../ui/loading-scope';
+import { Label } from '../ui/label';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { Slider } from '../ui/slider';
 import { TabSelector } from '../ui/tab-selector';
 import { PushButtonSelector } from './push-button-selector';
@@ -231,16 +232,15 @@ export function ModelTokenRatesPopover({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
+          variant="bare"
+          size="icon-sm"
           type="button"
           aria-label={MODEL_TOKEN_RATES_COPY.trigger}
-          className={cn(
-            'shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary',
-            triggerClassName,
-          )}
+          className={cn('shrink-0', triggerClassName)}
         >
-          <QuestionCircleIcon className="size-6" />
-        </button>
+          <QuestionCircleIcon />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="border-0 bg-transparent p-0 shadow-none">
         {children ?? <ModelTokenRates {...panel} />}
@@ -299,7 +299,7 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
         {/* Every model of the provider, scrolling under the pinned header. */}
         <div role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
           {group.rates.map(rate => (
-            <div key={rate.modelName} role="row" className={BODY_ROW_CLASS}>
+            <div key={rate.modelName} data-loading-item role="row" className={BODY_ROW_CLASS}>
               <span role="rowheader" className="min-w-0 flex-1 truncate">
                 {rate.displayName || rate.modelName}
               </span>
@@ -339,7 +339,7 @@ export function ModelTokenRatesUnavailable({ className }: { className?: string }
 }
 
 /** The table's loading footprint: the provider tabs, the header and rows of the boxes the loaded rows use. */
-export function ModelTokenRatesSkeleton({
+function ModelTokenRatesSkeleton({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
@@ -356,20 +356,21 @@ export function ModelTokenRatesSkeleton({
         <span className={NUMBER_CELL}>{MODEL_TOKEN_RATES_COPY.input}</span>
         <span className={NUMBER_CELL}>{MODEL_TOKEN_RATES_COPY.output}</span>
       </div>
-      {Array.from({ length: TABLE_SKELETON_ROWS }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholder rows
-        <div key={index} className={BODY_ROW_CLASS}>
-          <span className="min-w-0 flex-1">
-            <TextLineSkeleton type="inherit" as="span" className="w-36 max-w-full" />
-          </span>
-          <span className={NUMBER_CELL}>
-            <TextLineSkeleton type="inherit" as="span" className="ml-auto w-12" />
-          </span>
-          <span className={NUMBER_CELL}>
-            <TextLineSkeleton type="inherit" as="span" className="ml-auto w-12" />
-          </span>
-        </div>
-      ))}
+      <LoadingItems count={TABLE_SKELETON_ROWS}>
+        {() => (
+          <div data-loading-item className={BODY_ROW_CLASS}>
+            <span className="min-w-0 flex-1">
+              <TextLineSkeleton type="inherit" as="span" className="w-36 max-w-full" />
+            </span>
+            <span className={NUMBER_CELL}>
+              <TextLineSkeleton type="inherit" as="span" className="ml-auto w-12" />
+            </span>
+            <span className={NUMBER_CELL}>
+              <TextLineSkeleton type="inherit" as="span" className="ml-auto w-12" />
+            </span>
+          </div>
+        )}
+      </LoadingItems>
     </LoadingRegion>
   );
 }
@@ -459,15 +460,16 @@ function ExchangeFigure({
   loading?: boolean;
   size?: 'hero' | 'plain';
 }) {
+  const drawLoading = useLoadingScope() || loading;
   return (
     <div className="flex min-w-0 flex-col">
       <span
         className={cn('whitespace-nowrap tabular-nums text-ods-text-primary', size === 'hero' ? 'text-h1' : 'text-h2')}
       >
-        {loading ? <TextLineSkeleton type="inherit" as="span" className="w-20" /> : figure}
+        {drawLoading ? <TextLineSkeleton type="inherit" as="span" className="w-20" /> : figure}
       </span>
       <span className="min-h-[2lh] text-ods-text-secondary text-h4">
-        {loading ? <TextLineSkeleton type="inherit" as="span" className="w-full max-w-xs" /> : words}
+        {drawLoading ? <TextLineSkeleton type="inherit" as="span" className="w-full max-w-xs" /> : words}
       </span>
     </div>
   );
@@ -532,7 +534,8 @@ export function ModelTokenExchange({
         <ExchangeFigure figure={balancePrice ?? tokens} words={balancePrice ? copy.buy.words(tokens) : copy.buy.unit} />
         {/* The calculator: move the amount and every figure in step 3 follows. */}
         <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-          <label
+          <Label
+            variant="surface"
             htmlFor={sliderId}
             className="flex items-baseline justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h4"
           >
@@ -540,7 +543,7 @@ export function ModelTokenExchange({
             <output htmlFor={sliderId} className="tabular-nums text-ods-text-primary text-h3">
               {tokens}
             </output>
-          </label>
+          </Label>
           <Slider
             id={sliderId}
             min={amountRange.min}

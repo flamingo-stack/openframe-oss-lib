@@ -86,7 +86,7 @@ export function InfoCardRow({ lead, stats, className }: InfoCardRowProps) {
  * lines bars, each stat's caption a `text-h3` bar under its title (the page's own label, drawn for real when it
  * is given, else a bar).
  */
-export function InfoCardRowSkeleton({
+function InfoCardRowSkeleton({
   leadIcon = true,
   statTitles = ['', ''],
   className,
