@@ -122,10 +122,11 @@ public class ProjectionRunner {
         if (version < storedVersion) {
             return Outcome.SKIPPED;
         }
-        // No projection handles deletes yet; the version is kept, so a late older event after the delete is skipped.
+        // The version is kept after a delete, so a late older event is skipped.
         Outcome outcome;
         if (record.isDeleted()) {
-            outcome = Outcome.DELETE_STORED;
+            projection.applyDelete(tenantId, aggregateId);
+            outcome = Outcome.DELETED;
         } else {
             outcome = applyOrHandOver(projection, type, aggregateId, record);
         }
@@ -138,7 +139,7 @@ public class ProjectionRunner {
             case APPLIED -> metrics.recordApplied(sample, name);
             case HANDED_OVER -> metrics.recordHandedOver(sample, name);
             case SKIPPED -> metrics.recordSkipped(sample, name);
-            case DELETE_STORED -> metrics.recordDeleteStored(sample, name);
+            case DELETED -> metrics.recordDeleted(sample, name);
         }
         log.debug("Projection {}: {} for {} version {} of tenant {}", name, outcome, aggregateId, record.getVersion(),
             record.getTenantId());
@@ -174,7 +175,7 @@ public class ProjectionRunner {
         APPLIED,
         HANDED_OVER,
         SKIPPED,
-        DELETE_STORED
+        DELETED
     }
 
     @Getter

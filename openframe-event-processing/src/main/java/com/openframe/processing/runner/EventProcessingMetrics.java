@@ -21,7 +21,7 @@ public class EventProcessingMetrics {
     static final String OUTCOME_APPLIED = "applied";
     static final String OUTCOME_HANDED_OVER = "handed_over";
     static final String OUTCOME_SKIPPED = "skipped";
-    static final String OUTCOME_DELETE_STORED = "delete_stored";
+    static final String OUTCOME_DELETED = "deleted";
     static final String OUTCOME_FAILED = "failed";
     static final String OUTCOME_MONGO_UNAVAILABLE = "mongo_unavailable";
 
@@ -54,9 +54,9 @@ public class EventProcessingMetrics {
         sample.stop(meters.skipped);
     }
 
-    void recordDeleteStored(Timer.Sample sample, String projectionName) {
+    void recordDeleted(Timer.Sample sample, String projectionName) {
         ProjectionMeters meters = metersByProjection.get(projectionName);
-        sample.stop(meters.deleteStored);
+        sample.stop(meters.deleted);
     }
 
     void recordFailed(Timer.Sample sample, String projectionName) {
@@ -73,10 +73,10 @@ public class EventProcessingMetrics {
         Timer applied = timerOf(projectionName, OUTCOME_APPLIED);
         Timer handedOver = timerOf(projectionName, OUTCOME_HANDED_OVER);
         Timer skipped = timerOf(projectionName, OUTCOME_SKIPPED);
-        Timer deleteStored = timerOf(projectionName, OUTCOME_DELETE_STORED);
+        Timer deleted = timerOf(projectionName, OUTCOME_DELETED);
         Timer failed = timerOf(projectionName, OUTCOME_FAILED);
         Timer mongoUnavailable = timerOf(projectionName, OUTCOME_MONGO_UNAVAILABLE);
-        return new ProjectionMeters(applied, handedOver, skipped, deleteStored, failed, mongoUnavailable);
+        return new ProjectionMeters(applied, handedOver, skipped, deleted, failed, mongoUnavailable);
     }
 
     private Timer timerOf(String projectionName, String outcome) {
@@ -89,7 +89,7 @@ public class EventProcessingMetrics {
         private final Timer applied;
         private final Timer handedOver;
         private final Timer skipped;
-        private final Timer deleteStored;
+        private final Timer deleted;
         private final Timer failed;
         private final Timer mongoUnavailable;
     }
