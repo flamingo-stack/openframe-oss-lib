@@ -41,13 +41,13 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
   ) => {
     return (
       <Button
-        // A selectable option drawn as a field: its accent border marks the picked one.
+        // A selectable option drawn as a field: the picked one (`aria-selected`) takes the accent border on the
+        // accent's light fill.
         variant="field"
         ref={ref}
         type="button"
         role="option"
         aria-selected={selected}
-        data-state={selected ? 'open' : undefined}
         disabled={disabled}
         onClick={onClick}
         className={cn('content-md:h-16', className)}

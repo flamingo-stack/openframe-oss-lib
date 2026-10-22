@@ -54,7 +54,14 @@ export function DevicesGridFilters({
           <FiltersDropdown
             key={column.key}
             triggerElement={
-              <Button variant="link" size="compact" noPaddingX type="button" aria-label={`Filter by ${column.label}`}>
+              <Button
+                variant="link"
+                size="compact"
+                noPaddingX
+                type="button"
+                data-tone="neutral"
+                aria-label={`Filter by ${column.label}`}
+              >
                 <span className="select-none whitespace-nowrap uppercase text-h5">{column.label}</span>
                 <Filter02Icon className={cn(active && 'text-ods-accent')} />
               </Button>

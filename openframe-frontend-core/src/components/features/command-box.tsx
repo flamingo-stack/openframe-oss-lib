@@ -185,7 +185,7 @@ export function CommandBox({
           <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandText}
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               onClick={onCopy}

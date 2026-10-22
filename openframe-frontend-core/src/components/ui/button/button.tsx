@@ -41,11 +41,14 @@ const buttonVariants = cva(
         glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
         link: buttonSurfaceClasses.link,
+        bare: buttonSurfaceClasses.bare,
         // The kinds that are not a plain push button own their whole box (`BUTTON_KIND_CLASS`); resolved
         // before this map is read, so `size` never reaches them. The entries only type the prop.
         field: '',
         row: '',
+        rail: '',
         tab: '',
+        segment: '',
         chip: '',
         card: '',
         cell: '',

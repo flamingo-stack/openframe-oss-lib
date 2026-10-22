@@ -88,7 +88,9 @@ export function TabSelector({
 
           return (
             <Button
-              variant="tab"
+              // A segment of the control: the selected one is filled (the accent in `primary`, the raised surface in
+              // `secondary`), from its `data-state` and `data-tone`.
+              variant="segment"
               key={item.id}
               type="button"
               disabled={isDisabled}
@@ -96,10 +98,10 @@ export function TabSelector({
               aria-label={!item.label ? item.ariaLabel : undefined}
               aria-pressed={isActive}
               data-state={isActive ? 'active' : undefined}
-              data-emphasis={variant === 'primary' ? 'fade' : undefined}
+              data-tone={variant === 'primary' ? 'accent' : undefined}
               // scrollable: intrinsic widths must sum past the container or nothing ever overflows (flex-1's basis-0
               // defeats the scroll).
-              className={cn('h-full whitespace-nowrap', scrollable ? 'flex-none' : 'flex-1')}
+              className={cn('h-full', scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1')}
             >
               {item.icon && (
                 <span className="flex size-4 shrink-0 items-center justify-center content-md:size-6">{item.icon}</span>

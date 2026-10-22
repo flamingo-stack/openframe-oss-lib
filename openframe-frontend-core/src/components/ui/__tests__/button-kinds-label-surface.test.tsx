@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { BUTTON_KIND_CLASS, Button } from '../button';
 import { Label } from '../label';
+import { TabSelector } from '../tab-selector';
 
 /**
  * Every clickable element in the lib is a `Button` and every label a `Label`. A control that is not a plain push
@@ -31,9 +32,77 @@ describe('Button kinds', () => {
   );
 
   it('a row is marked selected through `data-state`, never a site class', () => {
-    expect(BUTTON_KIND_CLASS.row).toContain('data-[state=active]:bg-ods-bg-active');
+    expect(BUTTON_KIND_CLASS.row).toContain('data-[state=active]:bg-ods-bg-hover');
     expect(BUTTON_KIND_CLASS.tab).toContain('data-[state=active]:text-ods-text-primary');
     expect(BUTTON_KIND_CLASS.field).toContain('data-[invalid]:border-ods-error');
+  });
+
+  it('a selected row named with a tone draws that tone, held under the cursor (a chat list)', () => {
+    render(
+      <Button variant="row" type="button" data-state="active" data-tone="accent">
+        Chat
+      </Button>,
+    );
+    const row = screen.getByRole('button', { name: 'Chat' });
+    expect(row.getAttribute('data-tone')).toBe('accent');
+    expect(row.className).toContain('data-[tone=accent]:data-[state=active]:bg-ods-accent-secondary');
+    expect(row.className).toContain('data-[tone=accent]:data-[state=active]:hover:bg-ods-accent-secondary');
+  });
+
+  it('the navigation rail marks the current page with the accent fill, text, glyph and bar', () => {
+    for (const cls of [
+      'data-[state=active]:bg-ods-open-yellow-light',
+      'data-[state=active]:text-ods-accent',
+      'data-[state=active]:[&_svg]:fill-ods-accent',
+      'data-[state=active]:before:bg-ods-accent',
+      'aria-busy:after:opacity-100',
+    ]) {
+      expect(BUTTON_KIND_CLASS.rail).toContain(cls);
+    }
+  });
+
+  it('a field holds its open accent under the cursor and draws a chosen option from `aria-selected`', () => {
+    expect(BUTTON_KIND_CLASS.field).toContain('enabled:data-[state=open]:hover:border-ods-accent');
+    expect(BUTTON_KIND_CLASS.field).toContain('aria-selected:bg-ods-open-yellow-light');
+    expect(BUTTON_KIND_CLASS.field).toContain('data-[invalid]:data-[state=open]:border-ods-error');
+  });
+
+  it('the current header cell takes the pressed surface and the primary text', () => {
+    expect(BUTTON_KIND_CLASS.cell).toContain('data-[state=active]:bg-ods-bg-active');
+    expect(BUTTON_KIND_CLASS.cell).toContain('data-[state=active]:text-ods-text-primary');
+  });
+});
+
+describe('TabSelector segments', () => {
+  const items = [
+    { id: 'signup', label: 'Sign Up' },
+    { id: 'login', label: 'Login' },
+  ];
+
+  it.each([
+    [
+      'primary',
+      'accent',
+      [
+        'data-[tone=accent]:data-[state=active]:bg-ods-accent',
+        'data-[tone=accent]:data-[state=active]:text-ods-text-on-accent',
+      ],
+    ],
+    ['secondary', null, ['data-[state=active]:bg-ods-bg-surface', 'data-[state=active]:text-ods-text-primary']],
+  ] as const)('`%s` fills the selected segment (tone %s)', (variant, tone, fill) => {
+    render(<TabSelector value="login" onValueChange={() => {}} items={items} variant={variant} />);
+    const active = screen.getByRole('button', { name: 'Login' });
+    const idle = screen.getByRole('button', { name: 'Sign Up' });
+    expect(active.getAttribute('data-state')).toBe('active');
+    expect(active.getAttribute('aria-pressed')).toBe('true');
+    expect(active.getAttribute('data-tone')).toBe(tone);
+    expect(idle.getAttribute('data-state')).toBeNull();
+    for (const cls of [...fill, 'rounded-xs', 'p-[var(--spacing-system-xsf)]', 'text-h4', 'hover:bg-ods-bg-hover']) {
+      expect(active.className).toContain(cls);
+    }
+    // The disabled selected segment keeps the raised surface, with secondary text.
+    expect(active.className).toContain('disabled:data-[state=active]:bg-ods-bg-surface');
+    expect(active.className).toContain('disabled:data-[state=active]:text-ods-text-secondary');
   });
 });
 

@@ -110,7 +110,7 @@ export function ChatContextMemoryBar({
       </p>
 
       <Button
-        variant="transparent"
+        variant="bare"
         size="icon-sm"
         type="button"
         aria-label="Show remembered context"
@@ -141,7 +141,7 @@ export function ChatContextMemoryBar({
               </span>
               {onRemove && (
                 <Button
-                  variant="transparent"
+                  variant="bare"
                   size="icon-sm"
                   type="button"
                   onClick={() => onRemove(item)}

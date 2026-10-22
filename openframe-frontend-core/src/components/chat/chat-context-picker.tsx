@@ -91,7 +91,8 @@ export function ChatComposerPlusMenu({
     // aligning the popover to the `+` rather than the input row.
     <span className="relative inline-flex">
       <Button
-        variant="transparent"
+        variant="bare"
+        data-tone="accent"
         size="icon-sm"
         type="button"
         data-context-trigger=""
@@ -375,6 +376,7 @@ export function ChatContextPicker({
                       size="compact"
                       noPaddingX
                       type="button"
+                      data-tone="neutral"
                       onClick={() => {
                         reset();
                         retry();
@@ -482,7 +484,7 @@ export function ChatContextChipStrip({
             </span>
             {onRemove && (
               <Button
-                variant="transparent"
+                variant="bare"
                 size="icon-inline"
                 type="button"
                 onClick={() => onRemove(item)}

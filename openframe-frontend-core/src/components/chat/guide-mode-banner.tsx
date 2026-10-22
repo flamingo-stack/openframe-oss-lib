@@ -42,7 +42,7 @@ export function GuideModeBanner({ label = DEFAULT_LABEL, tooltip = DEFAULT_TOOLT
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="transparent" size="icon-inline" type="button" aria-label="About Guide Mode">
+              <Button variant="bare" size="icon-inline" type="button" aria-label="About Guide Mode">
                 <QuestionCircleIcon size={16} className="text-ods-text-on-accent" />
               </Button>
             </TooltipTrigger>

@@ -69,7 +69,7 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
         {showPager && (
           <div className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               aria-label="Previous question"
@@ -82,7 +82,7 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
               {index + 1} of {cards.length}
             </span>
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               aria-label="Next question"

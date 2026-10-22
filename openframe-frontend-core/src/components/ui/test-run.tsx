@@ -164,7 +164,8 @@ export function TestRunErrorBanner({ error, className }: { error: string; classN
     >
       <p className="min-w-0 break-words text-ods-error text-h4">{error}</p>
       <Button
-        variant="transparent"
+        variant="bare"
+        data-tone="error"
         size="icon-sm"
         type="button"
         aria-label="Copy error message"

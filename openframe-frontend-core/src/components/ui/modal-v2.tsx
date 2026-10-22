@@ -376,7 +376,7 @@ const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(({ children, cl
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       {onClose && (
         <Button
-          variant="transparent"
+          variant="bare"
           size="icon-sm"
           type="button"
           onClick={onClose}

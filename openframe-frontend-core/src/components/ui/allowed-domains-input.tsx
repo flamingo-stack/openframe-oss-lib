@@ -120,6 +120,7 @@ const AllowedDomainsInput = forwardRef<HTMLDivElement, AllowedDomainsInputProps>
           size="compact"
           noPaddingX
           type="button"
+          data-tone="primary"
           onClick={addDomain}
           disabled={disabled}
           leftIcon={<PlusCircle />}

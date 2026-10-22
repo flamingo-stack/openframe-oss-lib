@@ -207,7 +207,9 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
 
       {endIconAsButton ? (
         <Button
-          variant="transparent"
+          // A field adornment: lit in the accent while the field has focus, the error colour while it is invalid.
+          variant="bare"
+          data-tone="field"
           size="icon-sm"
           type="button"
           aria-label={endIconButtonProps?.['aria-label'] ?? 'Submit'}

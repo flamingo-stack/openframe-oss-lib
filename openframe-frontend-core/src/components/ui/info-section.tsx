@@ -87,6 +87,8 @@ function TextValue({ value }: { value: InfoSectionTextValue }) {
           size="compact"
           noPaddingX
           type="button"
+          // The value reads in the primary text and takes the accent on hover.
+          data-tone="primary"
           href={href}
           openInNewTab={openInNewTab}
           onClick={href ? undefined : onClick}

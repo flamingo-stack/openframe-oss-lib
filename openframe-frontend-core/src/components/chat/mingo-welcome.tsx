@@ -304,7 +304,7 @@ export function MingoWelcome({
               </div>
               {/* Plain cross — no button chrome, just a clickable icon. */}
               <Button
-                variant="transparent"
+                variant="bare"
                 size="icon-sm"
                 type="button"
                 onClick={dismissPromo}

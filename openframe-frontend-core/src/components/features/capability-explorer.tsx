@@ -325,7 +325,12 @@ function CapabilityExplorerSkeleton({
         <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
           <LoadingItems count={count}>
             {i => (
-              <div data-loading-item data-state={i === 0 ? 'active' : undefined} className={JOB_TAB_CLASS}>
+              <div
+                data-loading-item
+                data-state={i === 0 ? 'active' : undefined}
+                data-tone="card"
+                className={JOB_TAB_CLASS}
+              >
                 <JobHeadSkeleton />
               </div>
             )}
@@ -514,6 +519,8 @@ export function CapabilityExplorer({
               aria-selected={selected}
               aria-controls={panelId}
               data-state={selected ? 'active' : undefined}
+              // The selected capability is a bordered card; the others keep a transparent border and a hover fill.
+              data-tone="card"
               tabIndex={selected ? 0 : -1}
               onClick={() => onActiveChange(item.id)}
               className={JOB_TAB_LAYOUT_CLASS}

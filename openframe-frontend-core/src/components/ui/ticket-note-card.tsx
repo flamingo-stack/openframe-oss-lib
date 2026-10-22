@@ -66,7 +66,8 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
               <Input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={handleKeyDown} autoFocus />
             </div>
             <Button
-              variant="transparent"
+              variant="bare"
+              data-tone="success"
               size="icon-sm"
               type="button"
               onClick={handleSave}
@@ -77,7 +78,7 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
               <CheckIcon className="text-ods-success" />
             </Button>
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               onClick={handleCancel}
@@ -100,7 +101,8 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
         <div className="flex shrink-0 items-center gap-4">
           {onDelete && (
             <Button
-              variant="transparent"
+              variant="bare"
+              data-tone="danger"
               size="icon-sm"
               type="button"
               onClick={() => onDelete(note.id)}
@@ -111,7 +113,7 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
           )}
           {onEdit && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               onClick={() => setIsEditing(true)}

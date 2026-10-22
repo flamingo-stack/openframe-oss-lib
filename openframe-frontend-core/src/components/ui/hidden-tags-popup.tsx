@@ -51,7 +51,7 @@ export const HiddenTagsPopup = forwardRef(function HiddenTagsPopupImpl(
           </span>
           {!disabled && onRemove && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-sm"
               type="button"
               onClick={e => {

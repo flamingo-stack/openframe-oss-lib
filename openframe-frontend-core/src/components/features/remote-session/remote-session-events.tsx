@@ -35,6 +35,8 @@ export function RemoteSessionEventList({ events, activeEventId, onSelect, classN
               type="button"
               aria-current={event.id === activeEventId || undefined}
               data-state={event.id === activeEventId ? 'active' : undefined}
+              // The current event holds the border-grey fill under the cursor.
+              data-tone="muted"
               onClick={() => onSelect?.(event)}
               className="items-start"
             >

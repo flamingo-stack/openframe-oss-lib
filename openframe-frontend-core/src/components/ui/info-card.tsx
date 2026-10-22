@@ -303,7 +303,7 @@ function InfoCardValueRow({
           {icon}
           {copyable && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon-inline"
               type="button"
               onClick={() => copy(value)}

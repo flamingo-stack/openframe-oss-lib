@@ -95,6 +95,8 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
           <Button
             variant="outline"
             size="icon"
+            // The view action fills with the accent on hover.
+            data-tone="accent"
             className={CATEGORY_CARD_ACTION_LAYOUT_CLASS}
             aria-label={`View ${name}`}
           >

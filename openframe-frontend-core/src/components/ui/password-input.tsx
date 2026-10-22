@@ -23,7 +23,7 @@ const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({ disabl
       className={cn('[&_input]:text-ellipsis', className)}
       endAdornment={
         <Button
-          variant="transparent"
+          variant="bare"
           size="icon-sm"
           type="button"
           tabIndex={-1}

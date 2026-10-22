@@ -211,7 +211,7 @@ export function HoverDropdown({
             const secondaryAction = item.secondaryAction;
             const secondary = secondaryAction ? (
               <Button
-                variant="transparent"
+                variant="bare"
                 size="icon-sm"
                 type="button"
                 onClick={e => {

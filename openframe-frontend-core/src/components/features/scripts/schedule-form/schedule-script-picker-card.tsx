@@ -132,7 +132,7 @@ export function ScheduleScriptPickerCard({
         >
           {dragAndDropEnabled && (
             <Button
-              variant="transparent"
+              variant="bare"
               size="icon"
               type="button"
               {...dragHandleProps}
