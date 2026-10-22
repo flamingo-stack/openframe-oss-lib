@@ -62,4 +62,45 @@ class GatewayTrafficMetricsTest {
                 .counter().count();
         assertThat(count).isEqualTo(2.0);
     }
+
+    @Test
+    void recordClientRequestIncrementsCounterByKindAndVersions() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+
+        double count = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "ios")
+                .tag("shell", "1.0.1")
+                .tag("bundle", "1.0.127")
+                .counter().count();
+        assertThat(count).isEqualTo(2.0);
+    }
+
+    @Test
+    void recordClientRequestCollapsesVersionsBeyondSeriesCap() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+        for (int i = 0; i < GatewayTrafficMetrics.MAX_CLIENT_VERSION_SERIES; i++) {
+            metrics.recordClientRequest("web", "-", "1.0." + i);
+        }
+
+        metrics.recordClientRequest("android", "9.9.9", "9.9.9");
+        metrics.recordClientRequest("web", "-", "1.0.0");
+
+        double overflow = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "android")
+                .tag("shell", GatewayTrafficMetrics.OTHER_VERSION)
+                .tag("bundle", GatewayTrafficMetrics.OTHER_VERSION)
+                .counter().count();
+        double tracked = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "web")
+                .tag("shell", "-")
+                .tag("bundle", "1.0.0")
+                .counter().count();
+        assertThat(overflow).isEqualTo(1.0);
+        assertThat(tracked).isEqualTo(2.0);
+    }
 }

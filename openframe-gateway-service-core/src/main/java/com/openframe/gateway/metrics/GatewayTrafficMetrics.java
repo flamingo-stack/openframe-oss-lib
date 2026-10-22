@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -15,11 +17,15 @@ public class GatewayTrafficMetrics {
     private static final String LOG_PREFIX = "sessionId={} path={} sub={} | ";
     private static final String CLOSED_COUNTER = "openframe.tenant.gateway.websocket.sessions.closed";
     private static final String CLIENT_UPGRADE_REQUIRED_COUNTER = "openframe.tenant.gateway.client.upgrade.required";
+    private static final String CLIENT_REQUESTS_COUNTER = "openframe.tenant.gateway.client.requests";
+    static final String OTHER_VERSION = "other";
+    static final int MAX_CLIENT_VERSION_SERIES = 200;
 
     @Getter
     private final AtomicInteger activeWebSocketConnections = new AtomicInteger(0);
 
     private final MeterRegistry registry;
+    private final Set<String> clientVersionSeries = ConcurrentHashMap.newKeySet();
 
     public GatewayTrafficMetrics(MeterRegistry registry) {
         this.registry = registry;
@@ -41,6 +47,21 @@ public class GatewayTrafficMetrics {
 
     public void recordClientUpgradeRequired(String kind) {
         registry.counter(CLIENT_UPGRADE_REQUIRED_COUNTER, "kind", kind).increment();
+    }
+
+    /**
+     * Counts an authenticated request by the client build in {@code X-OpenFrame-Client}. The versions come
+     * from a header any caller can set, so the number of distinct kind/shell/bundle series is capped: once
+     * the cap is reached, new combinations are counted under {@code other} versions of their kind.
+     */
+    public void recordClientRequest(String kind, String shellVersion, String bundleVersion) {
+        String series = kind + "/" + shellVersion + "/" + bundleVersion;
+        boolean tracked = clientVersionSeries.contains(series)
+                || clientVersionSeries.size() < MAX_CLIENT_VERSION_SERIES && clientVersionSeries.add(series);
+        registry.counter(CLIENT_REQUESTS_COUNTER,
+                "kind", kind,
+                "shell", tracked ? shellVersion : OTHER_VERSION,
+                "bundle", tracked ? bundleVersion : OTHER_VERSION).increment();
     }
 
     public void webSocketOpened(String sessionId, String path, String sub) {
