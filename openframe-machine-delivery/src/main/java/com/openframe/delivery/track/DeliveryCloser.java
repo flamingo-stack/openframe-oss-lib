@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -26,9 +27,18 @@ public class DeliveryCloser {
 
     public void fail(MachineDelivery delivery, DeliveryFailure failure, Set<DeliveryStatus> from, Instant now) {
         DeliveryType type = delivery.getType();
-        Instant expiresAt = expiresAt(type, now);
+        Policy policy = properties.resolve(type);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
+        if (policy.hasRunsLeft(delivery.getReruns())) {
+            Instant dueAt = rerunAt(policy, now);
+            boolean scheduled = repository.scheduleRerun(id, from, dispatchedAt, dueAt);
+            if (scheduled) {
+                rerunScheduled(delivery, failure, dueAt);
+            }
+            return;
+        }
+        Instant expiresAt = expiresAt(type, now);
 
         boolean stillIn = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt);
         if (!stillIn) {
@@ -47,6 +57,18 @@ public class DeliveryCloser {
 
     public void failReported(DeliveryType type, String targetId, String machineId, String dispatchId, String error, Instant now) {
         String id = DeliveryId.of(type, targetId, machineId);
+        Policy policy = properties.resolve(type);
+        Optional<MachineDelivery> current = repository.findByIdOnPrimary(id);
+        if (current.isPresent() && policy.hasRunsLeft(current.get().getReruns())) {
+            Instant dueAt = rerunAt(policy, now);
+            boolean scheduled = repository.scheduleRerun(id, dispatchId, DeliveryStatus.OPEN, dueAt);
+            if (scheduled) {
+                MachineDelivery delivery = current.get();
+                delivery.setError(error);
+                rerunScheduled(delivery, DeliveryFailure.AGENT_ERROR, dueAt);
+            }
+            return;
+        }
         Instant expiresAt = expiresAt(type, now);
         boolean stillOpen = repository.markFailed(id, dispatchId, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, error, now, expiresAt);
         if (!stillOpen) {
@@ -68,6 +90,23 @@ public class DeliveryCloser {
             log.info("Delivery CANCELLED: type={} targetId={} machineId={} reason={}",
                     type, delivery.getTargetId(), delivery.getMachineId(), reason);
         }
+    }
+
+    private void rerunScheduled(MachineDelivery delivery, DeliveryFailure failure, Instant dueAt) {
+        DeliveryType type = delivery.getType();
+        int run = delivery.getReruns() + 2;
+        delivery.setStatus(DeliveryStatus.PENDING);
+        delivery.setAttempts(0);
+        delivery.setReruns(delivery.getReruns() + 1);
+        delivery.setDueAt(dueAt);
+        metrics.recordRerun(type, failure);
+        log.warn("Delivery re-run scheduled: type={} targetId={} machineId={} reason={} error={} run={} dueAt={}",
+                type, delivery.getTargetId(), delivery.getMachineId(), failure, delivery.getError(), run, dueAt);
+    }
+
+    private static Instant rerunAt(Policy policy, Instant now) {
+        long rerunAfterSeconds = policy.getRerunAfterSeconds();
+        return now.plusSeconds(rerunAfterSeconds);
     }
 
     private Instant expiresAt(DeliveryType type, Instant now) {

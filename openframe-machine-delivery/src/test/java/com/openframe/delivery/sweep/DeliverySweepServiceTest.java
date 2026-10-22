@@ -63,6 +63,8 @@ class DeliverySweepServiceTest {
     private static final String TARGET_ID = "fleetmdm-agent";
     private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
     private static final String CORRUPT_JSON = "not-json";
+    private static final String OLD_DISPATCH_ID = "d-0";
+    private static final String RERUN_PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\",\"delivery\":{\"type\":\"TOOL_INSTALLATION\",\"targetId\":\"fleetmdm-agent\",\"dispatchId\":\"d-0\"}}";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long TEN_SECONDS = 10L;
     private static final long FIRST_RETRY_DELAY = (long) (ACK_THRESHOLD * BACKOFF_MULTIPLIER);
@@ -379,6 +381,28 @@ class DeliverySweepServiceTest {
         // verifications
         verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
         verify(repository, never()).findDueExcept(any(DeliveryStatus.class), anySet(), any(Instant.class), any(Integer.class));
+    }
+
+    @Test
+    void retryPending_rerunNotYetPublished_publishedAsANewDispatch() {
+        // setup
+        delivery.setReruns(1);
+        delivery.setPayloadJson(RERUN_PAYLOAD_JSON);
+        stubDue(delivery);
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRerunPublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), any(String.class), any(String.class), any(Instant.class), any(Instant.class))).thenReturn(true);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), payloadCaptor.capture());
+        String dispatchId = payloadCaptor.getValue().getDelivery().getDispatchId();
+        assertThat(dispatchId).isNotEqualTo(OLD_DISPATCH_ID).isNotBlank();
+        verify(repository).markRerunPublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(dispatchId), org.mockito.ArgumentMatchers.contains(dispatchId), any(Instant.class), any(Instant.class));
+        verify(repository, never()).markRepublished(any(), any(), any(), any(Integer.class), any());
+        verify(metrics).recordRetried(DeliveryType.TOOL_INSTALLATION);
     }
 
     @Test

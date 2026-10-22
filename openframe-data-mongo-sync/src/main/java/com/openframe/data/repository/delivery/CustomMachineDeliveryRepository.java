@@ -38,4 +38,10 @@ public interface CustomMachineDeliveryRepository {
     boolean markFailed(String id, Set<DeliveryStatus> from, Instant dispatchedAt, DeliveryFailure failure, Instant finishedAt, Instant expiresAt);
     boolean markFailed(String id, String dispatchId, Set<DeliveryStatus> from, DeliveryFailure failure, String error, Instant finishedAt, Instant expiresAt);
 
+    boolean scheduleRerun(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt);
+
+    boolean scheduleRerun(String id, String dispatchId, Set<DeliveryStatus> from, Instant dueAt);
+
+    boolean markRerunPublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, String dispatchId, String payloadJson, Instant publishedAt, Instant dueAt);
+
 }

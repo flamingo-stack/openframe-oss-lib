@@ -14,11 +14,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
 import java.time.Instant;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.TTL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +34,8 @@ class DeliveryCloserTest {
     private static final String MACHINE_ID = "mach-42";
     private static final String DISPATCH_ID = "d-1";
     private static final String ERROR = "download failed";
+    private static final int MAX_RUNS = 3;
+    private static final long RERUN_AFTER = 10_800L;
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private DeliveryMetrics metrics;
@@ -74,6 +79,63 @@ class DeliveryCloserTest {
         assertThat(delivery.getFinishedAt()).isEqualTo(now);
         assertThat(delivery.getExpiresAt()).isEqualTo(expiresAt);
         verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.EXHAUSTED);
+    }
+
+    @Test
+    void fail_runsLeft_rowScheduledForARerunNotFailed() {
+        // setup
+        DeliveryProperties properties = DeliveryTestPolicies.properties();
+        properties.getDefaults().setMaxRuns(MAX_RUNS);
+        closer = new DeliveryCloser(repository, properties, metrics);
+        when(repository.scheduleRerun(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, now.plusSeconds(RERUN_AFTER))).thenReturn(true);
+
+        // execution
+        closer.fail(delivery, DeliveryFailure.EXHAUSTED, DeliveryStatus.UNACKED, now);
+
+        // verifications
+        verify(repository, never()).markFailed(any(), any(), any(Instant.class), any(), any(), any());
+        verify(metrics).recordRerun(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.EXHAUSTED);
+        verify(metrics, never()).recordFailed(any(), any());
+        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(delivery.getReruns()).isEqualTo(1);
+        assertThat(delivery.getAttempts()).isZero();
+        assertThat(delivery.getDueAt()).isEqualTo(now.plusSeconds(RERUN_AFTER));
+    }
+
+    @Test
+    void fail_lastRunDone_rowFailedAsBefore() {
+        // setup
+        DeliveryProperties properties = DeliveryTestPolicies.properties();
+        properties.getDefaults().setMaxRuns(MAX_RUNS);
+        closer = new DeliveryCloser(repository, properties, metrics);
+        delivery.setReruns(MAX_RUNS - 1);
+        Instant expiresAt = now.plusSeconds(TTL);
+        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.TIMEOUT, now, expiresAt)).thenReturn(true);
+
+        // execution
+        closer.fail(delivery, DeliveryFailure.TIMEOUT, DeliveryStatus.UNACKED, now);
+
+        // verifications
+        verify(repository, never()).scheduleRerun(any(), any(), any(Instant.class), any());
+        verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.TIMEOUT);
+        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.FAILED);
+    }
+
+    @Test
+    void failReported_runsLeft_rowScheduledForARerunByItsDispatch() {
+        // setup
+        DeliveryProperties properties = DeliveryTestPolicies.properties();
+        properties.getDefaults().setMaxRuns(MAX_RUNS);
+        closer = new DeliveryCloser(repository, properties, metrics);
+        when(repository.findByIdOnPrimary(DELIVERY_ID)).thenReturn(Optional.of(delivery));
+        when(repository.scheduleRerun(DELIVERY_ID, DISPATCH_ID, DeliveryStatus.OPEN, now.plusSeconds(RERUN_AFTER))).thenReturn(true);
+
+        // execution
+        closer.failReported(DeliveryType.CLIENT_UNINSTALL, TARGET_ID, MACHINE_ID, DISPATCH_ID, ERROR, now);
+
+        // verifications
+        verify(repository, never()).markFailed(any(), any(), any(), any(), any(), any(), any());
+        verify(metrics).recordRerun(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.AGENT_ERROR);
     }
 
     @Test
