@@ -219,8 +219,6 @@ public class TicketLifecycleService {
 
         String resolvedId = resolved.getId();
         TicketQueryFilter queryFilter = buildArchiveFilter(resolvedId, filterInput);
-        List<String> excludedTicketIds = ticketIdsForFilter.resolveExcluded(filterInput);
-        queryFilter.setExcludedTicketIds(excludedTicketIds);
         List<String> restrictToTicketIds = ticketIdsForFilter.resolve(principal, filterInput);
 
         Query idsQuery = ticketRepository.buildTicketQuery(queryFilter, null, restrictToTicketIds, null);
@@ -397,8 +395,7 @@ public class TicketLifecycleService {
         if (filterInput != null) {
             builder.organizationIds(filterInput.getOrganizationIds())
                     .deviceIds(filterInput.getDeviceIds())
-                    .assigneeIds(filterInput.getAssigneeIds())
-                    .escalatedByUser(filterInput.getEscalatedByUser());
+                    .assigneeIds(filterInput.getAssigneeIds());
         }
         return builder.build();
     }

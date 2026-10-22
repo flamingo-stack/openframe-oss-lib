@@ -73,15 +73,6 @@ class TicketServiceStatusFilterTest {
     }
 
     @Test
-    void getTickets_forwardsEscalatedByUserToTheQuery() {
-        givenRepositoryReturns(List.of(ticket("ticket-1")));
-
-        service.getTickets(admin, TicketFilterInput.builder().escalatedByUser(true).build(), null, null, null);
-
-        assertThat(capturedFilter().getEscalatedByUser()).isTrue();
-    }
-
-    @Test
     void getTickets_withoutFilter_appliesNoStatusNarrowing() {
         givenRepositoryReturns(List.of(ticket("ticket-1")));
 

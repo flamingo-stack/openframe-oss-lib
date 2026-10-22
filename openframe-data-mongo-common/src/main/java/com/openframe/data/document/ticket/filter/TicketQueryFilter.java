@@ -30,6 +30,4 @@ public class TicketQueryFilter {
     private Instant createdAtFrom;
     private Instant createdAtTo;
     private TicketActivityCriteria activity;
-    private Boolean escalatedByUser;
-    private List<String> excludedTicketIds;
 }
