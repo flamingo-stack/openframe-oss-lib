@@ -94,8 +94,13 @@ class OrganizationPublishingTenantModeIT {
         organizationRepository.deleteAll();
 
         assertThat(mongoTemplate.getCollection("organizations").countDocuments()).isEqualTo(1);
-        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OutboxEvent::isDeleted).hasSize(2)
+        assertThat(mongoTemplate.findAll(OutboxEvent.class)).filteredOn(OrganizationPublishingTenantModeIT::isDeleteRow).hasSize(2)
                 .allSatisfy(row -> assertThat(row.getTenantId()).isEqualTo(POD_TENANT));
+    }
+
+    // The delete envelope (deleted in its payload) and the tombstone after it (no payload).
+    private static boolean isDeleteRow(OutboxEvent row) {
+        return row.getPayload() == null || Boolean.TRUE.equals(row.getPayload().get("deleted"));
     }
 
     private static Organization organization(String organizationId) {
