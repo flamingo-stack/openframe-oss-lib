@@ -2,9 +2,9 @@
 
 import { cn } from '../../../utils/cn';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
-import { EntityMetadataAuthorCellSkeleton } from '../../chat/entity-cards/entity-author-card';
+import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
 import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
-import { StatusBadgeSkeleton } from '../../ui/status-badge';
+import { StatusBadge } from '../../ui/status-badge';
 import {
   RELEASE_CARD_CELL_CLASS,
   RELEASE_CARD_CELL_DIVIDER_CLASS,
@@ -83,7 +83,7 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
               <div className={RELEASE_CARD_CELL_STACK_CLASS}>
                 {/* The Type value is a card StatusBadge loaded; the others are a text-h4 line. */}
                 {i === 0 ? (
-                  <StatusBadgeSkeleton variant="card" className="justify-self-start" />
+                  <StatusBadge loading text="" variant="card" className="justify-self-start" />
                 ) : (
                   <p className="text-h4">
                     <TextLineSkeleton type="inherit" as="span" className="w-24" />
@@ -93,7 +93,7 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
               </div>
             </div>
           ))}
-          <EntityMetadataAuthorCellSkeleton />
+          <EntityMetadataAuthorCell loading />
         </div>
       </div>
     );

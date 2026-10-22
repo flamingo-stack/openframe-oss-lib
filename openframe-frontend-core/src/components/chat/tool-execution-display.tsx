@@ -6,6 +6,7 @@ import { cn } from '../../utils/cn';
 import { CheckCircleIcon, DotsLoaderIcon, XmarkCircleIcon } from '../icons-v2-generated';
 import type { ToolType } from '../platform';
 import { ToolIcon } from '../tool-icon';
+import { Button } from '../ui/button';
 import { StatusLine, type StatusLineTone } from '../ui/status-line';
 import { CHAT_BLOCK_FRAME_CLASS } from './chat-block-frame';
 import { ExpandChevron } from './expand-chevron';
@@ -141,13 +142,9 @@ const ToolExecutionDisplay = forwardRef<HTMLDivElement, ToolExecutionDisplayProp
         ) : (
           <>
             {hasBody ? (
-              <button
-                type="button"
-                className="flex w-full cursor-pointer items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left"
-                onClick={() => setExpanded(prev => !prev)}
-              >
+              <Button variant="row" type="button" aria-expanded={expanded} onClick={() => setExpanded(prev => !prev)}>
                 {headerContent}
-              </button>
+              </Button>
             ) : (
               <div className="flex w-full items-start gap-[var(--spacing-system-xs)] p-[var(--spacing-system-s)] text-left">
                 {headerContent}

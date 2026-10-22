@@ -7,9 +7,12 @@ import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/format-date';
 import { Copy02Icon, SearchIcon } from '../icons-v2-generated';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { DataTable } from './data-table';
+import { DATA_TABLE_ROW_FRAME_CLASS, ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table/data-table-row-classes';
 import { useDataTable } from './data-table/use-data-table';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { NoData } from './no-data';
 import type { QueryResultRow } from './query-report-table';
 import { ScrollShadow } from './scroll-fade';
@@ -32,13 +35,17 @@ export function formatTestRunDuration(ms: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** A result column's least width, in px, loaded and loading (the loaded column's class states the same value). */
 const RESULT_COLUMN_MIN_WIDTH = 176;
-const SKELETON_COLUMNS = 6;
+const RESULT_COLUMN_WIDTH_CLASS = 'flex-1 min-w-[176px]';
+/** A result set's columns are read with its rows and have no fixed count: a loading run draws a typical six (the count
+ * this skeleton has always drawn), as header bars and as its one row's cells. */
+const TEST_RESULTS_SKELETON_COLUMNS = 6;
 
-/** Column-bar skeleton (header cells + one card row): fixed 160px columns on
-    every breakpoint, scrolling horizontally when they do not fit. Bars are
-    `UnifiedSkeleton`s, like the table skeletons. */
-export function TestResultsSkeleton({
+/** Column-bar skeleton (header cells + one card row): columns `RESULT_COLUMN_MIN_WIDTH` wide (the loaded columns' least
+    width) on every breakpoint, scrolling horizontally when they do not fit. The row is the data table's own row card and shell
+    (`data-table-row-classes`); each bar a `TextLineSkeleton` of its text's type step. */
+function TestResultsSkeleton({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
@@ -50,22 +57,24 @@ export function TestResultsSkeleton({
         {/* No gap between the header bars and the row card — the real table's
           header and body sit flush. */}
         <div className="flex w-max min-w-full flex-col">
-          <div className="flex items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)]">
-            {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
-              <div key={`skeleton-header-${i}`} className="flex h-12 w-[160px] shrink-0 items-center">
-                <UnifiedSkeleton className="h-4 w-3/4 rounded-sm" />
-              </div>
-            ))}
-          </div>
-          <div className="overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
-            {/* Same INNER row heights as the DataTable (66/78px + the 1px card
-              border on each side = 68/80px total, per design). */}
-            <div className="flex h-[66px] items-center gap-[var(--spacing-system-mf)] px-[var(--spacing-system-mf)] content-md:h-[78px]">
-              {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
-                <div key={`skeleton-cell-${i}`} className="w-[160px] shrink-0">
-                  <UnifiedSkeleton className="h-5 w-3/4 rounded-sm" />
+          <div className={cn('flex', ROW_SHELL_CLASSES)}>
+            <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
+              {() => (
+                <div className="flex h-12 shrink-0 items-center" style={{ width: RESULT_COLUMN_MIN_WIDTH }}>
+                  <TextLineSkeleton type="h5" className="w-3/4" />
                 </div>
-              ))}
+              )}
+            </LoadingItems>
+          </div>
+          <div className={DATA_TABLE_ROW_FRAME_CLASS}>
+            <div className={cn('flex', ROW_SHELL_CLASSES, ROW_HEIGHT_DESKTOP)}>
+              <LoadingItems count={TEST_RESULTS_SKELETON_COLUMNS}>
+                {() => (
+                  <div data-loading-item className="shrink-0" style={{ width: RESULT_COLUMN_MIN_WIDTH }}>
+                    <TextLineSkeleton type="h4" className="w-3/4" />
+                  </div>
+                )}
+              </LoadingItems>
             </div>
           </div>
         </div>
@@ -80,7 +89,8 @@ export function TestResultsSkeleton({
  * from the keys of the returned rows; wide result sets scroll horizontally.
  * Unlike the default tables, headers stay visible on every breakpoint.
  */
-export function TestResultsTable({ rows, loading }: { rows: QueryResultRow[]; loading: boolean }) {
+export function TestResultsTable({ rows, loading: loadingProp }: { rows: QueryResultRow[]; loading: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   const columnKeys = useMemo(() => (rows.length > 0 ? Object.keys(rows[0]) : []), [rows]);
 
   const columns = useMemo<ColumnDef<QueryResultRow>[]>(() => {
@@ -98,11 +108,11 @@ export function TestResultsTable({ rows, loading }: { rows: QueryResultRow[]; lo
         );
       },
       meta: {
-        width: 'flex-1 min-w-[176px]',
+        width: RESULT_COLUMN_WIDTH_CLASS,
         // Show headers on every breakpoint; headerClassName sizes the cells
         // below lg where meta.width is not applied.
         alwaysShowHeader: true,
-        headerClassName: 'flex-1 min-w-[176px]',
+        headerClassName: RESULT_COLUMN_WIDTH_CLASS,
       },
     }));
   }, [columnKeys]);
@@ -153,14 +163,16 @@ export function TestRunErrorBanner({ error, className }: { error: string; classN
       )}
     >
       <p className="min-w-0 break-words text-ods-error text-h4">{error}</p>
-      <button
+      <Button
+        variant="transparent"
+        size="icon-sm"
         type="button"
         aria-label="Copy error message"
         onClick={() => copy(error)}
-        className="shrink-0 rounded-sm text-ods-error transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+        className="shrink-0"
       >
-        <Copy02Icon className="size-5" />
-      </button>
+        <Copy02Icon className="text-ods-error" />
+      </Button>
     </div>
   );
 }

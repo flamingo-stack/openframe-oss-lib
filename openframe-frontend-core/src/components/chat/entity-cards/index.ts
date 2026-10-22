@@ -12,22 +12,13 @@ export {
   EntityAuthorCard,
   EntityMetadataValueCell,
   EntityMetadataAuthorCell,
-  EntityAuthorCardSkeleton,
-  EntityMetadataValueCellSkeleton,
-  EntityMetadataAuthorCellSkeleton,
-  type EntityAuthorCardSkeletonProps,
   EMPTY_AUTHOR_PLACEHOLDER,
   type EntityAuthorCardProps,
 } from './entity-author-card';
 export { BlogImagePlaceholder } from './blog-image-placeholder';
-export {
-  EntityPortraitCard,
-  EntityPortraitCardSkeleton,
-  type EntityPortraitCardProps,
-  type EntityPortraitPerson,
-} from './entity-portrait-card';
+export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPerson } from './entity-portrait-card';
 export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
-export { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
+export { AdminContentCard } from './admin-content-card';
 export {
   CONTENT_CARD_FRAME_CLASS,
   CONTENT_CARD_SKELETON_FRAME_CLASS,
@@ -36,28 +27,21 @@ export {
 } from './content-card-frame';
 export {
   AdminContentCardGrid,
-  AdminContentCardGridSkeleton,
   ADMIN_CONTENT_CARD_GRID_CLASS,
   type AdminContentCardGridProps,
-  type AdminContentCardGridSkeletonProps,
 } from './admin-content-card-grid';
-export { EmployeeEntryCard, EmployeeEntryCardSkeleton, EmployeeEntryBadge } from './employee-entry-card';
+export { EmployeeEntryCard, EmployeeEntryBadge } from './employee-entry-card';
 export type { EmployeeEntryCardData, EmployeeEntryCardProps } from './employee-entry-card';
-export { WhatIShippedCard, WhatIShippedCardSkeleton } from './what-i-shipped-card';
+export { WhatIShippedCard } from './what-i-shipped-card';
 export type { WhatIShippedCardData, WhatIShippedCardProps } from './what-i-shipped-card';
-export { HowIWorkCard, HowIWorkCardSkeleton } from './how-i-work-card';
+export { HowIWorkCard } from './how-i-work-card';
 export type { HowIWorkCardData, HowIWorkCardProps } from './how-i-work-card';
-export { AiPromptCard, AiPromptCardSkeleton } from './ai-prompt-card';
+export { AiPromptCard } from './ai-prompt-card';
 export type { AiPromptCardData, AiPromptCardProps } from './ai-prompt-card';
 
 // Moved-into-subdir flat cards
 export { BlockCard, type BlockCardProps } from './block-card';
-export {
-  ChatTicketItem,
-  ChatTicketItemSkeleton,
-  type ChatTicketItemData,
-  type ChatTicketItemProps,
-} from './chat-ticket-item';
+export { ChatTicketItem, type ChatTicketItemData, type ChatTicketItemProps } from './chat-ticket-item';
 export { ChatVideoEntityCard, type ChatVideoEntityCardProps } from './chat-video-entity-card';
 export {
   ProductReleaseCard,
@@ -65,7 +49,6 @@ export {
   type ProductReleaseCardSize,
   type ProductReleaseCardAnchorProps,
 } from '../../shared/product-release/product-release-card';
-export { ProductReleaseCardSkeleton } from '../../shared/product-release/product-release-card-skeleton';
 // Card-prop builders: `defaultBuildProductReleaseCardProps` (sm chat default) +
 // `buildProductReleaseCardProps` (RICH lg builder — the ProductReleasesView
 // default; lifted from the hub so embedders get the full metadata grid).
@@ -76,64 +59,41 @@ export {
 } from './product-release-card-defaults';
 
 // Refactored pure-presentation cards
-export { BlogCard, BlogCardSkeleton, type BlogCardProps } from './blog-card';
-export { CaseStudyCard, CaseStudyCardSkeleton, type CaseStudyCardProps } from './case-study-card';
-export {
-  CustomerInterviewCard,
-  CustomerInterviewCardSkeleton,
-  type CustomerInterviewCardProps,
-} from './customer-interview-card';
-export { InvestorUpdateCard, InvestorUpdateCardSkeleton, type InvestorUpdateCardProps } from './investor-update-card';
-export {
-  OnboardingGuideCard,
-  OnboardingGuideCardSkeleton,
-  type OnboardingGuideCardProps,
-} from './onboarding-guide-card';
-export { RoadmapCard, RoadmapCardSkeleton, type RoadmapCardProps, type VoteType } from './roadmap-card';
-export {
-  DesignDocCard,
-  DesignDocCardSkeleton,
-  designDocMetaLine,
-  designDocPeople,
-  type DesignDocCardProps,
-} from './design-doc-card';
+export { BlogCard, type BlogCardProps } from './blog-card';
+export { CaseStudyCard, type CaseStudyCardProps } from './case-study-card';
+export { CustomerInterviewCard, type CustomerInterviewCardProps } from './customer-interview-card';
+export { InvestorUpdateCard, type InvestorUpdateCardProps } from './investor-update-card';
+export { OnboardingGuideCard, type OnboardingGuideCardProps } from './onboarding-guide-card';
+export { RoadmapCard, type RoadmapCardProps, type VoteType } from './roadmap-card';
+export { DesignDocCard, designDocMetaLine, designDocPeople, type DesignDocCardProps } from './design-doc-card';
 export { RoadmapVoteButton, type RoadmapVoteButtonProps } from './roadmap-vote-button';
 export { TaskTypeIcon, type TaskTypeIconProps } from './task-type-icon';
 export {
   GitHubActivityCard,
-  GitHubActivityCardSkeleton,
   type GitHubActivityCardProps,
   type GitHubActivityCardAnchorProps,
 } from './github-activity-card';
-export {
-  SlackMessageCard,
-  SlackMessageCardSkeleton,
-  type SlackMessageCardProps,
-  type SlackMessageCardAnchorProps,
-} from './slack-message-card';
+export { SlackMessageCard, type SlackMessageCardProps, type SlackMessageCardAnchorProps } from './slack-message-card';
 export {
   HubspotTicketCard,
-  HubspotTicketCardSkeleton,
   type HubspotTicketCardProps,
   type HubspotTicketCardAnchorProps,
 } from './hubspot-ticket-card';
+export { DataRoomDocCard, type DataRoomDocCardProps, type DataRoomDocCardAnchorProps } from './data-room-doc-card';
 export {
-  DataRoomDocCard,
-  DataRoomDocCardSkeleton,
-  type DataRoomDocCardProps,
-  type DataRoomDocCardAnchorProps,
-} from './data-room-doc-card';
-export { ProgramCard, ProgramCardSkeleton, type ProgramCardProps } from './program-card';
+  PROGRAM_CARD_SKELETON_HOSTS,
+  PROGRAM_CARD_SKELETON_MEDIA,
+  ProgramCard,
+  type ProgramCardProps,
+} from './program-card';
 export {
   CampaignCardAdmin,
-  CampaignCardAdminSkeleton,
   type CampaignCardItem,
   type CampaignCardAdminProps,
   type CampaignCardAdminAnchorProps,
 } from './campaign-card-admin';
 export {
   GenericEntityCard,
-  GenericEntityCardSkeleton,
   type GenericEntityCardItem,
   type GenericEntityCardProps,
   type GenericEntityCardAnchorProps,

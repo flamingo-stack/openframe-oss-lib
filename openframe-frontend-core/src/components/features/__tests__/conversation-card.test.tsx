@@ -36,4 +36,24 @@ describe('ConversationCard', () => {
     rerender(<ConversationCard {...base} selection={{ pressed: false, onToggle }} />);
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'false');
   });
+
+  it('draws its loading form with the page copy and the toggle real, the toggle inert', () => {
+    render(
+      <ConversationCard
+        {...base}
+        loading
+        context={{ label: 'Today', text: 'Tickets keep growing.' }}
+        footerLabel="Your part"
+        footerValue="One tap"
+        selection={{ pressed: true, onToggle: vi.fn() }}
+      />,
+    );
+    expect(screen.getByText('Today')).toBeInTheDocument();
+    expect(screen.getByText('Your part')).toBeInTheDocument();
+    expect(screen.queryByText('Tickets keep growing.')).toBeNull();
+    expect(screen.queryByText('One tap')).toBeNull();
+    // The toggle is drawn for real at its state, hidden from assistive technology (inside an inert wrapper).
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByRole('button', { hidden: true, pressed: true })).toBeInTheDocument();
+  });
 });

@@ -1,14 +1,15 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { useCopyToClipboard } from '../../hooks';
 import { cn } from '../../utils/cn';
 import { CheckIcon } from '../icons-v2-generated';
 import { Copy01Icon } from '../icons-v2-generated/documents';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
-import { ProgressBar, ProgressBarSkeleton } from './progress-bar';
+import { Button } from './button';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
+import { ProgressBar } from './progress-bar';
 
 export interface InfoCardFooterData {
   /** Leading icon next to the text, expected at 24x24 (e.g. <ShieldCheckIcon size={24} />) */
@@ -48,26 +49,47 @@ export interface InfoCardData {
 interface InfoCardProps {
   data: InfoCardData;
   className?: string;
-  /** The shape drawn while the data is read (a page's loading state, where `data.items` is empty). */
+  /**
+   * The shape drawn while the data is read (a page's loading state, where `data.items` is empty). What it leaves out
+   * is taken from `data`: its title and subtitle drawn for real (none without them), its icon, its progress bar and
+   * its footer.
+   */
   skeleton?: InfoCardSkeletonShape;
+  /** The data is still being read: the card keeps its ONE structure in its `skeleton` shape, its copy real and every
+   *  read value a bar. A loading scope does the same while `data.items` is empty. */
+  loading?: boolean;
+  /** `data-*` markers (`data-loading-item` on a read list's card), on the card's root in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
-/** What a loading InfoCard draws: its rows, and whether it carries a head, a progress bar and a footer. */
+/**
+ * What a loading InfoCard draws: its rows, and whether it carries a head, a progress bar and a footer. Static copy
+ * the caller already knows is passed as words and drawn for real; only the read values are bars.
+ */
 export interface InfoCardSkeletonShape {
-  /** Value rows drawn. Default {@link INFO_CARD_SKELETON_ROWS}. */
-  rows?: number;
-  /** A title line. Default `true`. */
-  title?: boolean;
-  /** A subtitle line. */
-  subtitle?: boolean;
+  /**
+   * The value rows. A number draws that many rows, each a label bar and a value bar. A list of labels draws one row
+   * per label, the label real and the value a bar (`null` or `''`: a row with no label, as a multi-value item's
+   * further values are drawn). Default {@link INFO_CARD_SKELETON_ROWS}.
+   */
+  rows?: number | Array<string | null>;
+  /** With a number of `rows`: the rows carry no label (only their value bars). Default `false`. */
+  unlabelledRows?: boolean;
+  /** The title line: `true` a bar, a string the title drawn for real, `false` none. Default `true`. */
+  title?: boolean | string;
+  /** The subtitle line: `true` a bar, a string the subtitle drawn for real. */
+  subtitle?: boolean | string;
   progress?: boolean;
-  footer?: boolean;
+  /** The footer: `true` a bar, the footer's own data drawn for real, `false` none. */
+  footer?: boolean | InfoCardFooterData;
+  /** The head's icon, static, drawn for real beside the title (or the subtitle when there is no title). */
+  icon?: React.ReactNode;
 }
 
-/** Rows a loading card draws when its caller names no count. */
-export const INFO_CARD_SKELETON_ROWS = 3;
+/** Rows a loading card draws when its caller names no count (a typical card's rows). */
+const INFO_CARD_SKELETON_ROWS = 3;
 
-/** The card's frame and groups, read by the card and by its skeleton. */
+/** The card's frame and groups, loaded and loading. */
 const FRAME_CLASS = 'flex w-full flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
 const CONTENT_CLASS = 'flex w-full flex-col items-start gap-[var(--spacing-system-l)] p-[var(--spacing-system-m)]';
 const HEAD_CLASS = 'flex w-full flex-col items-start self-stretch';
@@ -75,79 +97,141 @@ const HEAD_LINE_CLASS = 'flex items-center gap-[var(--spacing-system-xsf)] self-
 const ROWS_CLASS = 'flex w-full flex-col items-start gap-[var(--spacing-system-xs)] self-stretch';
 const VALUE_ROW_CLASS = 'flex h-6 w-full items-center gap-[var(--spacing-system-xs)] self-stretch';
 const DIVIDER_CLASS = 'h-px flex-1 bg-ods-divider';
+const TITLE_TEXT_CLASS = 'min-w-0 truncate text-ods-text-primary text-h4';
+const SUBTITLE_TEXT_CLASS = 'min-w-0 truncate text-ods-text-secondary text-h4';
+const ROW_LABEL_CLASS = 'whitespace-nowrap text-ods-text-primary text-h4';
 const FOOTER_CLASS = 'mt-auto flex w-full flex-col border-t border-ods-border p-[var(--spacing-system-m)]';
 
-export function InfoCard({ data, className = '', skeleton }: InfoCardProps) {
-  // In a page's loading state with no rows yet (they are read) the card is its skeleton.
+export function InfoCard({ data, className = '', skeleton, loading: loadingProp, ...props }: InfoCardProps) {
+  // ONE switch: in a page's loading state with no rows yet (they are read), or while the host reads the data, the
+  // card keeps its structure in its `skeleton` shape: what the shape leaves out is taken from `data`.
   const inScope = useLoadingScope();
-  if (inScope && data.items.length === 0) return <InfoCardSkeleton {...skeleton} className={className} />;
+  const loading = !!loadingProp || (inScope && data.items.length === 0);
+  const shape: InfoCardSkeletonShape & Required<Pick<InfoCardSkeletonShape, 'rows'>> = {
+    rows: INFO_CARD_SKELETON_ROWS,
+    unlabelledRows: false,
+    title: data.title || false,
+    subtitle: data.subtitle || false,
+    icon: data.icon,
+    progress: !!data.progress,
+    footer: data.footer ?? false,
+    ...skeleton,
+  };
+
+  // Each row: its label (real; `null` none; `undefined` a bar while loading), its value, whether it heads its item.
+  const rows: Array<InfoCardValueRowProps & { key: string }> = loading
+    ? (Array.isArray(shape.rows)
+        ? shape.rows.map(label => label || null)
+        : Array.from({ length: shape.rows }, () => (shape.unlabelledRows ? null : undefined))
+      ).map((label, index) => ({
+        key: String(index),
+        label,
+        value: '',
+        showLabel: true,
+        copyAriaLabel: '',
+        loading: true,
+      }))
+    : data.items.flatMap((item, index) => {
+        const values = Array.isArray(item.value) ? item.value : [item.value];
+        return values.map((val, valIndex) => ({
+          key: `${index}-${valIndex}`,
+          label: item.label,
+          value: val,
+          showLabel: valIndex === 0,
+          copyable: item.copyable,
+          icon: valIndex === 0 ? item.icon : undefined,
+          copyAriaLabel: `Copy ${item.label ?? 'value'} ${valIndex + 1}`,
+        }));
+      });
+  const showProgress = loading ? !!shape.progress : !!data.progress;
+  const footer = loading ? shape.footer : (data.footer ?? false);
+
   return (
-    <div className={cn(FRAME_CLASS, className)}>
+    <div className={cn(FRAME_CLASS, className)} aria-hidden={loading || undefined} {...loadingItemProps(props)}>
       {/* Header (title + subtitle) and body (rows + progress) are two groups separated by
           `gap-l`; the title/subtitle stack tightly and the rows use `gap-xs` — matching the ODS
           "Info-card" design. With no title/subtitle, the body is the only group. */}
       <div className={CONTENT_CLASS}>
-        {(data.title || data.subtitle) && (
-          <div className={HEAD_CLASS}>
-            {data.title && (
-              <div className={HEAD_LINE_CLASS}>
-                <span className="min-w-0 truncate text-ods-text-primary text-h4" title={data.title}>
-                  {data.title}
-                </span>
-                {data.icon}
-              </div>
-            )}
-            {data.subtitle && (
-              <div className={HEAD_LINE_CLASS}>
-                <span className="min-w-0 truncate text-ods-text-secondary text-h4" title={data.subtitle}>
-                  {data.subtitle}
-                </span>
-                {/* Icon lives with the title when present; otherwise it falls to the subtitle so
-                    subtitle-only cards still render it. */}
-                {!data.title && data.icon}
-              </div>
-            )}
-          </div>
-        )}
+        <InfoCardHead
+          title={loading ? shape.title : data.title}
+          subtitle={loading ? shape.subtitle : data.subtitle}
+          icon={loading ? shape.icon : data.icon}
+        />
 
-        {(data.items.length > 0 || data.progress) && (
+        {(rows.length > 0 || showProgress) && (
           <div className={ROWS_CLASS}>
-            {/* Info items */}
-            {data.items.map((item, index) => {
-              const values = Array.isArray(item.value) ? item.value : [item.value];
+            {rows.map(({ key, ...row }) => (
+              <InfoCardValueRow key={key} {...row} />
+            ))}
 
-              return (
-                <React.Fragment key={index}>
-                  {values.map((val, valIndex) => (
-                    <InfoCardValueRow
-                      key={`${index}-${valIndex}`}
-                      label={item.label}
-                      value={val}
-                      showLabel={valIndex === 0}
-                      copyable={item.copyable}
-                      icon={valIndex === 0 ? item.icon : undefined}
-                      copyAriaLabel={`Copy ${item.label ?? 'value'} ${valIndex + 1}`}
-                    />
-                  ))}
-                </React.Fragment>
-              );
-            })}
-
-            {/* Progress bar */}
-            {data.progress && (
+            {showProgress && (
               <ProgressBar
-                progress={data.progress.value}
-                warningThreshold={data.progress.warningThreshold}
-                criticalThreshold={data.progress.criticalThreshold}
-                inverted={data.progress.inverted}
+                loading={loading}
+                progress={data.progress?.value ?? 0}
+                warningThreshold={data.progress?.warningThreshold}
+                criticalThreshold={data.progress?.criticalThreshold}
+                inverted={data.progress?.inverted}
               />
             )}
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      {data.footer && <InfoCardFooter footer={data.footer} />}
+      {/* Footer: its data drawn for real (a loading shape may pass it), `true` a bar while read. */}
+      {typeof footer === 'object' ? (
+        <InfoCardFooter footer={footer} />
+      ) : (
+        footer && (
+          <div className={FOOTER_CLASS}>
+            <TextLineSkeleton type="h4" className="w-1/2" />
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/**
+ * The card's head, loaded and loading: the title over the subtitle. A string is drawn for real, `true` is a
+ * `text-h4` bar while it is read, nothing draws no line. The icon lives with the title when there is one; otherwise it
+ * falls to the subtitle so subtitle-only cards still render it.
+ */
+function InfoCardHead({
+  title,
+  subtitle,
+  icon,
+}: {
+  title?: string | boolean;
+  subtitle?: string | boolean;
+  icon?: React.ReactNode;
+}) {
+  if (!title && !subtitle) return null;
+  return (
+    <div className={HEAD_CLASS}>
+      {title && (
+        <div className={HEAD_LINE_CLASS}>
+          {typeof title === 'string' ? (
+            <span className={TITLE_TEXT_CLASS} title={title}>
+              {title}
+            </span>
+          ) : (
+            <TextLineSkeleton type="h4" className="w-1/2" />
+          )}
+          {icon}
+        </div>
+      )}
+      {subtitle && (
+        <div className={HEAD_LINE_CLASS}>
+          {typeof subtitle === 'string' ? (
+            <span className={SUBTITLE_TEXT_CLASS} title={subtitle}>
+              {subtitle}
+            </span>
+          ) : (
+            <TextLineSkeleton type="h4" className="w-1/3" />
+          )}
+          {!title && icon}
+        </div>
+      )}
     </div>
   );
 }
@@ -177,82 +261,57 @@ function InfoCardFooter({ footer }: { footer: InfoCardFooterData }) {
 }
 
 interface InfoCardValueRowProps {
-  label?: string;
+  /** The row's label; while loading, `undefined` is a label not here yet (a bar) and `null` a row with no label. */
+  label?: string | null;
   value: string;
   showLabel: boolean;
   copyable?: boolean;
   icon?: React.ReactNode;
   copyAriaLabel: string;
+  /** The value is still being read: a bar in the value's place, without its icon and copy button. */
+  loading?: boolean;
 }
 
-function InfoCardValueRow({ label, value, showLabel, copyable, icon, copyAriaLabel }: InfoCardValueRowProps) {
+/** One `label —— value` row, loaded and loading (the card decides: its rows are its own read data). */
+function InfoCardValueRow({
+  label,
+  value,
+  showLabel,
+  copyable,
+  icon,
+  copyAriaLabel,
+  loading: loadingProp,
+}: InfoCardValueRowProps) {
   const { copy, copied } = useCopyToClipboard();
+  const loading = useLoadingScope() || loadingProp;
 
   return (
     <div className={VALUE_ROW_CLASS}>
-      <span className="whitespace-nowrap text-ods-text-primary text-h4">{showLabel ? label : ''}</span>
+      {loading && label === undefined ? (
+        <TextLineSkeleton type="h4" className="w-20" />
+      ) : (
+        <span className={ROW_LABEL_CLASS}>{showLabel ? (label ?? '') : ''}</span>
+      )}
       <div className={DIVIDER_CLASS} />
-      <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
-        <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
-          {value}
-        </span>
-        {icon}
-        {copyable && (
-          <button
-            type="button"
-            onClick={() => copy(value)}
-            className={cn(
-              'transition-colors',
-              copied ? 'text-ods-success' : 'text-ods-text-secondary hover:text-ods-text-primary',
-            )}
-            aria-label={copyAriaLabel}
-          >
-            {copied ? <CheckIcon size={16} /> : <Copy01Icon size={16} />}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * An InfoCard while its data is read: the same frame and groups, the title and subtitle `text-h4` bars, each row
- * its label and value bars either side of the row's divider, the progress bar and the footer line boxes of their
- * own height.
- */
-export function InfoCardSkeleton({
-  rows = INFO_CARD_SKELETON_ROWS,
-  title = true,
-  subtitle = false,
-  progress = false,
-  footer = false,
-  className = '',
-}: InfoCardSkeletonShape & { className?: string }) {
-  return (
-    <div className={cn(FRAME_CLASS, className)} aria-hidden>
-      <div className={CONTENT_CLASS}>
-        {(title || subtitle) && (
-          <div className={HEAD_CLASS}>
-            {title && <TextLineSkeleton type="h4" className="w-1/2" />}
-            {subtitle && <TextLineSkeleton type="h4" className="w-1/3" />}
-          </div>
-        )}
-        {(rows > 0 || progress) && (
-          <div className={ROWS_CLASS}>
-            {Array.from({ length: rows }, (_, index) => (
-              <div key={index} className={VALUE_ROW_CLASS}>
-                <TextLineSkeleton type="h4" className="w-20" />
-                <div className={DIVIDER_CLASS} />
-                <TextLineSkeleton type="h4" className="w-24" />
-              </div>
-            ))}
-            {progress && <ProgressBarSkeleton />}
-          </div>
-        )}
-      </div>
-      {footer && (
-        <div className={FOOTER_CLASS}>
-          <TextLineSkeleton type="h4" className="w-1/2" />
+      {loading ? (
+        <TextLineSkeleton type="h4" className="w-24" />
+      ) : (
+        <div className="flex max-w-[60%] items-center gap-[var(--spacing-system-xsf)]">
+          <span className="select-text truncate text-ods-text-primary text-h4" title={value}>
+            {value}
+          </span>
+          {icon}
+          {copyable && (
+            <Button
+              variant="transparent"
+              size="icon-inline"
+              type="button"
+              onClick={() => copy(value)}
+              aria-label={copyAriaLabel}
+            >
+              {copied ? <CheckIcon className="text-ods-success" /> : <Copy01Icon className="text-ods-text-secondary" />}
+            </Button>
+          )}
         </div>
       )}
     </div>

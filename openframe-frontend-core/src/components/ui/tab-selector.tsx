@@ -3,6 +3,7 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { useIsInActionsMenuHeader } from './actions-menu-header-context';
+import { Button } from './button';
 import { Label } from './label';
 
 export interface TabSelectorItem {
@@ -86,37 +87,26 @@ export function TabSelector({
           const isDisabled = disabled || item.disabled;
 
           return (
-            <button
+            <Button
+              variant="tab"
               key={item.id}
               type="button"
               disabled={isDisabled}
               onClick={() => onValueChange(item.id)}
               aria-label={!item.label ? item.ariaLabel : undefined}
-              className={cn(
-                // Bold on BOTH states (text-h3 = DM Sans bold) — a medium↔bold
-                // flip between the active and inactive tabs read as inconsistent
-                // weight (and nudged label widths on every switch).
-                'flex items-center justify-center gap-[var(--spacing-system-xs)] whitespace-nowrap rounded-xs p-[var(--spacing-system-xsf)] transition-colors duration-200 text-h4',
-                // scrollable: intrinsic widths must sum past the container or
-                // nothing ever overflows (flex-1's basis-0 defeats the scroll).
-                scrollable ? 'flex-none shrink-0 basis-auto' : 'flex-1',
-                isDisabled
-                  ? isActive
-                    ? 'cursor-not-allowed bg-ods-bg-surface text-ods-text-secondary'
-                    : 'cursor-not-allowed bg-transparent text-ods-text-secondary'
-                  : isActive
-                    ? variant === 'primary'
-                      ? 'cursor-default bg-ods-accent text-ods-text-on-accent'
-                      : 'cursor-default bg-ods-bg-surface text-ods-text-primary'
-                    : 'cursor-pointer bg-transparent text-ods-text-primary hover:bg-ods-bg-hover',
-              )}
+              aria-pressed={isActive}
+              data-state={isActive ? 'active' : undefined}
+              data-emphasis={variant === 'primary' ? 'fade' : undefined}
+              // scrollable: intrinsic widths must sum past the container or nothing ever overflows (flex-1's basis-0
+              // defeats the scroll).
+              className={cn('h-full whitespace-nowrap', scrollable ? 'flex-none' : 'flex-1')}
             >
               {item.icon && (
                 <span className="flex size-4 shrink-0 items-center justify-center content-md:size-6">{item.icon}</span>
               )}
               {item.label}
               {item.badge && item.badge}
-            </button>
+            </Button>
           );
         })}
       </div>

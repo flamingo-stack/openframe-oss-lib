@@ -59,6 +59,7 @@ import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
 import { defaultTableIdForDocumentType } from '../../../utils/source-icons';
 import type { ChatRef } from '../chat-ref.types';
+import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import { createChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatDialogStore } from '../stream/chat-dialog-store';
 import type { ChatStreamReducerOptions } from '../stream/chat-stream-reducer';
@@ -462,7 +463,7 @@ export function useSseChatAdapter(
     fetchDialogs: fetchActiveDialogs,
     renameDialog: conversationsApi?.renameDialog,
     archiveDialog: conversationsApi?.archiveDialog,
-    pageSize: 20,
+    pageSize: CHAT_HISTORY_PAGE_SIZE,
     search: conversationsApi ? dialogSearch : undefined,
     logTag: '[useSseChatAdapter]',
     // Archiving the OPEN conversation drops back to the draft state (the

@@ -2,6 +2,9 @@
 
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
+import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
 export interface ChatNavSidebarItem {
@@ -96,21 +99,19 @@ interface ChatNavSidebarButtonProps extends ButtonHTMLAttributes<HTMLButtonEleme
 
 function ChatNavSidebarButton({ icon, active, className, children, ...props }: ChatNavSidebarButtonProps) {
   return (
-    <button
+    <Button
+      variant="row"
       type="button"
       aria-current={active ? 'page' : undefined}
-      className={cn(
-        'flex w-full items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left text-h4',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-        '[&_svg]:size-6 [&_svg]:shrink-0',
-        active ? 'text-ods-accent' : 'text-ods-text-primary [&_svg]:text-ods-text-secondary',
-        className,
-      )}
+      data-state={active ? 'active' : undefined}
+      className={className}
       {...props}
     >
-      {icon}
+      <span className={cn('flex shrink-0 [&_svg]:size-6', active ? 'text-ods-accent' : 'text-ods-text-secondary')}>
+        {icon}
+      </span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -124,46 +125,122 @@ export interface ChatListItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonE
   trailing?: ReactNode;
   /** The chat open on screen. */
   active?: boolean;
+  /** The chat is still being read: the row draws its skeleton (as it does in a loading scope). */
+  loading?: boolean;
+  /** The row's place in its list: picks the loading title bar's width, so a page of loading rows reads like a list. */
+  index?: number;
 }
+
+/** A loading chat row's title widths, cycled by index: a believable spread, the same on every load. Shared by every
+ *  chat list's loading rows. */
+export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2', 'w-2/3'];
+
+/** The trailing glyph's 24px box at the row's end, loaded and loading. */
+const TRAILING_CLASS = 'flex shrink-0 items-center [&_svg]:size-6';
+
+/** The row's box, loaded and loading: the lib's list row (`Button variant="row"`), which the loading `div` draws too. */
+const CHAT_LIST_ITEM_CLASS = cn(BUTTON_KIND_CLASS.row, 'shrink-0');
 
 /**
  * One row of the `ChatNavSidebar` list (Figma `chat-list-item`): a one-line
  * title over a caption, an optional mark before the title and a status glyph
  * at the end. The selected row takes the accent's secondary fill, so a tenant
- * accent recolours it with the rest of the brand.
+ * accent recolours it with the rest of the brand. ONE switch (`useLoadingScope() || loading`): while the chat is read
+ * the SAME row (an inert `div`) draws its title and caption as bars and its trailing glyph as an icon box; the `leading`
+ * mark stays.
  */
 const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
-  ({ className, title, subtitle, leading, trailing, active, ...props }, ref) => (
-    <button
-      ref={ref}
-      type="button"
-      aria-current={active ? 'true' : undefined}
-      className={cn(
-        'flex w-full shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-        active && 'bg-ods-accent-secondary',
-        className,
-      )}
-      {...props}
-    >
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
-          {leading && <span className="flex shrink-0 items-center [&_svg]:size-4">{leading}</span>}
-          <span className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}>
-            {title}
+  (
+    { className, title, subtitle, leading, trailing, active, loading: loadingProp = false, index = 0, ...props },
+    ref,
+  ) => {
+    const loading = useLoadingScope() || loadingProp;
+    const content = (
+      <>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex min-w-0 items-center gap-[var(--spacing-system-xxs)]">
+            {leading && <span className="flex shrink-0 items-center [&_svg]:size-4">{leading}</span>}
+            {loading ? (
+              <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[index % SKELETON_TITLE_WIDTHS.length]} />
+            ) : (
+              <span
+                className={cn('min-w-0 flex-1 truncate text-h4', active ? 'text-ods-accent' : 'text-ods-text-primary')}
+              >
+                {title}
+              </span>
+            )}
           </span>
+          {subtitle != null &&
+            (loading ? (
+              <TextLineSkeleton type="h6" className="w-1/3" />
+            ) : (
+              <span className={cn('truncate text-h6', active ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
+                {subtitle}
+              </span>
+            ))}
         </span>
-        {subtitle != null && (
-          <span className={cn('truncate text-h6', active ? 'text-ods-text-primary' : 'text-ods-text-secondary')}>
-            {subtitle}
-          </span>
-        )}
-      </span>
-      {trailing && <span className="flex shrink-0 items-center [&_svg]:size-6">{trailing}</span>}
-    </button>
-  ),
+        {loading
+          ? trailing != null && (
+              // The status glyph's 24px box (`MediaSkeleton.Icon` md), the loaded glyph's size.
+              <span className={TRAILING_CLASS}>
+                <MediaSkeleton.Icon size="md" />
+              </span>
+            )
+          : trailing && <span className={TRAILING_CLASS}>{trailing}</span>}
+      </>
+    );
+    if (loading) {
+      return (
+        <div aria-hidden className={cn(CHAT_LIST_ITEM_CLASS, className)} {...loadingItemProps(props)}>
+          {content}
+        </div>
+      );
+    }
+    return (
+      <Button
+        variant="row"
+        ref={ref}
+        type="button"
+        aria-current={active ? 'true' : undefined}
+        data-state={active ? 'active' : undefined}
+        className={cn('shrink-0', className)}
+        {...props}
+      >
+        {content}
+      </Button>
+    );
+  },
 );
 
 ChatListItem.displayName = 'ChatListItem';
 
-export { ChatNavSidebar, ChatListItem };
+/**
+ * A chat list's first page while it is read: `count` loading {@link ChatListItem} rows (the list's page size), each a
+ * list item, with the caption and trailing parts the list's loaded rows have.
+ */
+function ChatListItemLoadingPage({
+  count,
+  subtitle = false,
+  trailing = false,
+}: {
+  count: number;
+  subtitle?: boolean;
+  trailing?: boolean;
+}) {
+  return (
+    <LoadingItems count={count}>
+      {index => (
+        <ChatListItem
+          loading
+          index={index}
+          title=""
+          subtitle={subtitle ? '' : undefined}
+          trailing={trailing ? '' : undefined}
+          data-loading-item
+        />
+      )}
+    </LoadingItems>
+  );
+}
+
+export { ChatNavSidebar, ChatListItem, ChatListItemLoadingPage };

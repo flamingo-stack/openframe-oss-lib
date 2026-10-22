@@ -8,6 +8,8 @@
  */
 
 import { cn } from '../../utils/cn';
+import { MediaSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { OSTypeBadge } from './os-type-badge';
 
 export interface OSTypeBadgeGroupProps {
@@ -19,6 +21,8 @@ export interface OSTypeBadgeGroupProps {
   iconSize?: string;
   /** Maximum number of badges to display before showing "+N more" */
   maxDisplay?: number;
+  /** Draws its loading state (also inside a `LoadingScope`): one icon's box at `iconSize`. */
+  loading?: boolean;
 }
 
 /**
@@ -30,7 +34,21 @@ export interface OSTypeBadgeGroupProps {
  * <OSTypeBadgeGroup osTypes={['macos', 'linux']} maxDisplay={2} />
  * ```
  */
-export function OSTypeBadgeGroup({ osTypes, className = '', iconSize = 'w-5 h-5', maxDisplay }: OSTypeBadgeGroupProps) {
+export function OSTypeBadgeGroup({
+  osTypes,
+  className = '',
+  iconSize = 'w-5 h-5',
+  maxDisplay,
+  loading,
+}: OSTypeBadgeGroupProps) {
+  if (useLoadingScope() || loading) {
+    // The platforms are read data: one icon's box stands for them (most scripts name one platform).
+    return (
+      <div className={cn('flex flex-wrap items-center gap-2', className)}>
+        <MediaSkeleton.Icon className={iconSize} />
+      </div>
+    );
+  }
   if (!osTypes || osTypes.length === 0) {
     return null;
   }

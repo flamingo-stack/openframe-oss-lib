@@ -2,6 +2,7 @@
 
 import { cn } from '../../../utils/cn';
 import { Filter02Icon } from '../../icons-v2-generated';
+import { Button } from '../../ui/button';
 import { FiltersDropdown } from '../filters-dropdown';
 import type { DeviceFilterColumn } from './devices-table-columns';
 
@@ -53,21 +54,10 @@ export function DevicesGridFilters({
           <FiltersDropdown
             key={column.key}
             triggerElement={
-              <button
-                type="button"
-                className="group inline-flex cursor-pointer select-none items-center gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-sf)]"
-                aria-label={`Filter by ${column.label}`}
-              >
-                <span className="whitespace-nowrap uppercase text-ods-text-secondary transition-colors text-h5 group-hover:text-ods-text-primary">
-                  {column.label}
-                </span>
-                <Filter02Icon
-                  className={cn(
-                    'h-4 w-4 transition-colors',
-                    active ? 'text-ods-accent' : 'text-ods-text-secondary group-hover:text-ods-text-primary',
-                  )}
-                />
-              </button>
+              <Button variant="link" size="compact" noPaddingX type="button" aria-label={`Filter by ${column.label}`}>
+                <span className="select-none whitespace-nowrap uppercase text-h5">{column.label}</span>
+                <Filter02Icon className={cn(active && 'text-ods-accent')} />
+              </Button>
             }
             sections={[
               {

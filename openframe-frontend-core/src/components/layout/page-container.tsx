@@ -183,12 +183,12 @@ const PAGE_CONTAINER_TITLE_CLASS = 'text-ods-text-primary text-h2';
 const PAGE_CONTAINER_SUBTITLE_CLASS = 'text-ods-text-secondary text-h6';
 
 /** A page title that is read, while it is: one bar of the title's line, at its type step. */
-export function PageContainerTitleSkeleton({ className }: { className?: string }) {
+function PageContainerTitleSkeleton({ className }: { className?: string }) {
   return <TextLineSkeleton type="h2" className={cn('w-64 max-w-full', className)} />;
 }
 
 /** A page subtitle that is read, while it is: one bar of the subtitle's line. */
-export function PageContainerSubtitleSkeleton({ className }: { className?: string }) {
+function PageContainerSubtitleSkeleton({ className }: { className?: string }) {
   return <TextLineSkeleton type="h6" className={cn('w-80 max-w-full', className)} />;
 }
 

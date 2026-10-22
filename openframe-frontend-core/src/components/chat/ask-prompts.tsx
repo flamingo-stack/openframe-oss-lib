@@ -4,8 +4,11 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { MingoAiButton, openAskAi } from '../navigation/mingo-ai-button';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { ScrollShadow } from '../ui/scroll-fade';
-import { QuickActionChipButton, QuickActionChipSkeleton, type QuickActionIconSpec } from './quick-action-chip';
+import { ASK_PROMPTS_DEFAULT_COUNT } from './hooks/use-ask-prompts';
+import { QuickActionChipButton, type QuickActionIconSpec } from './quick-action-chip';
+import { ASK_AI_TRIGGER_ATTRIBUTE } from './utils/ask-ai-events';
 
 /** One question a page offers: the chip shows `label` as written, the chat is sent `prompt`. */
 export interface AskPrompt {
@@ -21,7 +24,7 @@ export interface AskPromptsProps {
   /**
    * How many chips the block shows and reserves room for: the same number in
    * the same slots on every load. Default: the prompts given (while `loading`,
-   * when there are none yet, two).
+   * when there are none yet, `ASK_PROMPTS_DEFAULT_COUNT`, the count a surface asks for).
    */
   count?: number;
   /** The questions are still being read: `count` chip skeletons in the chips' own slots. */
@@ -56,11 +59,10 @@ function AssistantGlyph({ icon, className }: { icon?: ReactNode; className: stri
   );
 }
 
-/** How many slots a loading block reserves when its host names no `count`. */
-const DEFAULT_LOADING_SLOTS = 2;
-/** The slots a block shows: the host's `count`; else the prompts it has, or the default while they load. */
+/** The slots a block shows: the host's `count`; else the prompts it has, or the count a surface asks for
+ *  (`ASK_PROMPTS_DEFAULT_COUNT`, the one count source) while they load. */
 const slotCount = (count: number | undefined, loading: boolean, prompts: readonly AskPrompt[]) =>
-  count ?? (loading ? DEFAULT_LOADING_SLOTS : prompts.length);
+  count ?? (loading ? ASK_PROMPTS_DEFAULT_COUNT : prompts.length);
 
 /** A skeleton chip's label width (in `ch`), by slot: a believable spread that is the same on every load. */
 const SKELETON_LABEL_CH = [26, 22, 30, 24, 20, 28] as const;
@@ -99,34 +101,37 @@ function QuestionChips({
   count: number;
   slotClassName?: string;
 }) {
+  // Fixed slots, keyed by position: the slot a chip skeleton holds while loading is the slot its question lands in.
   return (
-    <>
-      {Array.from({ length: count }, (_, slot) => {
+    <LoadingItems count={count}>
+      {slot => {
         const prompt = loading ? undefined : prompts[slot];
         return (
-          <span key={prompt?.id ?? `slot-${slot}`} className={slotClassName ?? CHIP_SLOT_CLASS}>
-            {loading ? (
-              <QuickActionChipSkeleton
-                variant="question"
-                labelCh={SKELETON_LABEL_CH[slot % SKELETON_LABEL_CH.length]}
-              />
-            ) : prompt ? (
+          <span
+            data-loading-item
+            className={slotClassName ?? CHIP_SLOT_CLASS}
+            {...(prompt ? { [ASK_AI_TRIGGER_ATTRIBUTE]: '' } : {})}
+          >
+            {(loading || prompt) && (
               <QuickActionChipButton
+                loading={loading}
                 variant="question"
-                label={prompt.label}
-                icon={prompt.icon}
+                label={prompt?.label ?? ''}
+                icon={prompt?.icon}
+                labelCh={SKELETON_LABEL_CH[slot % SKELETON_LABEL_CH.length]}
                 onSelect={() => {
+                  if (!prompt) return;
                   const request = { prompt: prompt.prompt ?? prompt.label };
                   if (onOpen) onOpen(request);
                   else openAskAi(source, request);
                   onAsk?.(prompt);
                 }}
               />
-            ) : null}
+            )}
           </span>
         );
-      })}
-    </>
+      }}
+    </LoadingItems>
   );
 }
 
@@ -144,7 +149,7 @@ function QuestionChips({
 export function AskPrompts({
   prompts,
   count: countProp,
-  loading = false,
+  loading: loadingProp = false,
   align = 'start',
   source,
   label,
@@ -154,6 +159,8 @@ export function AskPrompts({
   fadeColor,
   className,
 }: AskPromptsProps) {
+  // ONE switch: in a page's loading state (or while the host reads the questions) the slots hold chip skeletons.
+  const loading = useLoadingScope() || loadingProp;
   const count = slotCount(countProp, loading, prompts);
   if (!loading && prompts.length === 0) return null;
   const end = align === 'end';
@@ -199,7 +206,7 @@ export function AskCard({
   description,
   prompts,
   count: countProp,
-  loading = false,
+  loading: loadingProp = false,
   source,
   label,
   icon,
@@ -208,6 +215,8 @@ export function AskCard({
   shortcutHint = true,
   className,
 }: AskCardProps) {
+  // ONE switch: in a page's loading state (or while the host reads the questions) the slots hold chip skeletons.
+  const loading = useLoadingScope() || loadingProp;
   const count = slotCount(countProp, loading, prompts);
   return (
     <div

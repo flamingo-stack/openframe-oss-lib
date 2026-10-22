@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import type { DialogItem } from '../types/component.types';
 import type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
 
@@ -127,7 +128,7 @@ export function useChatDialogManager({
         setArchivedLoading(true);
       }
       try {
-        const result = await fetchArchivedDialogs({ cursor, limit: 20 });
+        const result = await fetchArchivedDialogs({ cursor, limit: CHAT_HISTORY_PAGE_SIZE });
         // A newer request superseded this one — drop the response so overlapping
         // refresh / pagination can't append stale rows or clobber newer results.
         if (!isCurrent()) return;

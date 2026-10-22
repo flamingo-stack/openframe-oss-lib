@@ -171,7 +171,7 @@ export function HubspotTicketCard({ item, variant = 'compact', className, anchor
   );
 }
 
-export function HubspotTicketCardSkeleton({
+function HubspotTicketCardSkeleton({
   variant = 'compact',
   className,
 }: {

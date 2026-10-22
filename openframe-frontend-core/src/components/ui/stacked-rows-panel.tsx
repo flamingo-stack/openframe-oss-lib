@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from './loading-scope';
 
 /**
  * StackedRowsPanel — a single bordered card that stacks rows inside it.
@@ -32,9 +32,11 @@ export interface PanelColumn {
   key: string;
   /** Custom cell content (tag, avatar + text, button…). Takes precedence over `value`/`label`. */
   content?: ReactNode;
-  /** Primary value rendered in the ODS h4 style when `content` is not set. */
+  /** Primary value rendered in the ODS h4 style when `content` is not set. `null` is a value still being read: in a
+   *  loading scope the cell draws it as an `h4` bar (outside one, nothing). */
   value?: ReactNode;
-  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. */
+  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. `null` is a label
+   *  still being read: in a loading scope the cell draws it as an `h6` bar (outside one, nothing). */
   label?: ReactNode;
   /** Let the value AND label WRAP instead of truncating to one line (full names, full sentences). */
   wrap?: boolean;
@@ -69,27 +71,25 @@ export interface StackedRowsPanelProps {
   /** Optional uppercase caption rendered above the card. */
   title?: string;
   className?: string;
-  /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty). */
-  skeleton?: StackedRowsPanelSkeletonShape;
+  /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty): how many rows (default
+   *  3), how many value/label columns each carries (default 1, a full-width title/caption row), and whether each cell
+   *  carries a label under its value (default `true`). */
+  skeleton?: { rows?: number; columns?: number; labels?: boolean };
   /**
-   * The rows are a read list (how many there are is the data's, and a loading state draws a fold of them): every
-   * row carries `data-loading-item`. Default false (a panel of fixed fields).
+   * The rows are a read list (how many there are is the data's; the loading state draws `loadingRows` of them):
+   * every row carries `data-loading-item`, in both forms. Default false (a panel of fixed fields).
    */
   listItems?: boolean;
-}
-
-/** How many rows a loading panel draws, and how many value/label columns each carries. */
-export interface StackedRowsPanelSkeletonShape {
-  /** Rows drawn. Default {@link STACKED_ROWS_SKELETON_COUNT}. */
-  rows?: number;
-  /** Columns per row; one is a full-width title/caption row. Default 1. */
-  columns?: number;
-  /** Each cell carries a label under its value. Default `true`. */
-  labels?: boolean;
+  /** The rows are still being read (a client read): the panel draws its rows' loading form, `rows` is ignored. A
+   *  loading scope does the same while `rows` is empty. */
+  loading?: boolean;
+  /** How many rows the loading form draws: the list's page size, limit or declared typical constant. Default
+   *  `skeleton.rows`, else 3. */
+  loadingRows?: number;
 }
 
 /** Rows a loading panel draws when its caller names no count. */
-export const STACKED_ROWS_SKELETON_COUNT = 3;
+const STACKED_ROWS_SKELETON_COUNT = 3;
 
 const ALIGN_CLASS: Record<PanelColumnAlign, string> = {
   left: 'justify-start items-start',
@@ -122,14 +122,23 @@ const CARD_CLASS = 'flex flex-col overflow-clip rounded-md border border-ods-bor
 const TITLED_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
 const TITLE_CLASS = 'uppercase text-ods-text-secondary text-h5';
 const DEFAULT_WIDTH_CLASS = 'flex-[1_0_0] min-w-0';
+/** A cell's value and label while they are read: one bar each, the same in a loading row and in a loaded row whose
+ *  value or label is still `null`. */
+const CELL_VALUE_BAR_CLASS = 'w-1/2';
+const CELL_LABEL_BAR_CLASS = 'w-3/4';
 
 function CellValue({ column }: { column: PanelColumn }) {
+  // A `null` value or label in a loading scope is read data not here yet: the cell draws its bar in the text's own
+  // box (the value's `h4`, the label's `h6`), so the row keeps its loaded height.
+  const loading = useLoadingScope();
+  const valueBar = loading && column.value === null;
+  const labelBar = loading && column.label === null;
   const valueNode = (
     <div
       className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-primary text-h4')}
       title={typeof column.value === 'string' ? column.value : undefined}
     >
-      {column.value}
+      {valueBar ? <TextLineSkeleton type="inherit" as="span" className={CELL_VALUE_BAR_CLASS} /> : column.value}
     </div>
   );
 
@@ -150,7 +159,11 @@ function CellValue({ column }: { column: PanelColumn }) {
           valueNode
         )}
       </div>
-      {column.label ? (
+      {labelBar ? (
+        <p className="text-h6">
+          <TextLineSkeleton type="inherit" as="span" className={CELL_LABEL_BAR_CLASS} />
+        </p>
+      ) : column.label ? (
         <p className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-secondary text-h6')}>
           {column.label}
         </p>
@@ -187,8 +200,41 @@ function PanelCell({ column }: { column: PanelColumn }) {
   );
 }
 
-function PanelRowView({ row, listItem }: { row: PanelRow; listItem?: boolean }) {
-  const item = listItem ? { 'data-loading-item': '' } : undefined;
+/** The shape a row draws while it is read: how many value/label columns, and whether each cell has a label. */
+interface PanelRowLoadingShape {
+  columns: number;
+  labels: boolean;
+}
+
+/**
+ * One row of the card. ONE structure in both forms: loaded (`row`) its cells; loading (`loading`) the same row frame
+ * with each cell's value a `text-h4` bar over its label's `text-h6` bar. Its `data-*` markers are forwarded in both.
+ */
+function PanelRowView({
+  row,
+  loading,
+  ...props
+}: {
+  row?: PanelRow;
+  loading?: PanelRowLoadingShape;
+  [key: `data-${string}`]: unknown;
+}) {
+  const item = loadingItemProps(props);
+  if (loading) {
+    return (
+      <div className={loading.columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS} {...item}>
+        <LoadingItems count={loading.columns}>
+          {() => (
+            <div className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
+              <TextLineSkeleton type="h4" className={CELL_VALUE_BAR_CLASS} />
+              {loading.labels && <TextLineSkeleton type="h6" className={CELL_LABEL_BAR_CLASS} />}
+            </div>
+          )}
+        </LoadingItems>
+      </div>
+    );
+  }
+  if (!row) return null;
   // Arbitrary content (e.g. a nested table): keep it edge-to-edge unless the caller
   // overrides via `className`. No fixed height — let the content size itself.
   if (row.content !== undefined) {
@@ -215,24 +261,9 @@ function PanelRowView({ row, listItem }: { row: PanelRow; listItem?: boolean }) 
   );
 }
 
-export function StackedRowsPanel({ rows, title, className, skeleton, listItems = false }: StackedRowsPanelProps) {
-  // In a page's loading state with no rows yet (they are read) the panel is its skeleton; rows it is given there
-  // are the page's own copy and draw as they are.
-  const inScope = useLoadingScope();
-  if (inScope && rows.length === 0)
-    return <StackedRowsPanelSkeleton {...skeleton} title={title} className={className} listItems={listItems} />;
-  const card = (
-    <div className={CARD_CLASS}>
-      {rows.map(row => (
-        <PanelRowView key={row.id} row={row} listItem={listItems} />
-      ))}
-    </div>
-  );
-
-  if (!title) {
-    return <div className={className}>{card}</div>;
-  }
-
+/** The panel's frame, loaded and loading: the optional uppercase title (static copy) over the card. */
+function PanelFrame({ title, className, card }: { title?: string; className?: string; card: ReactNode }) {
+  if (!title) return <div className={className}>{card}</div>;
   return (
     <div className={cn(TITLED_CLASS, className)}>
       <p className={TITLE_CLASS}>{title}</p>
@@ -241,41 +272,34 @@ export function StackedRowsPanel({ rows, title, className, skeleton, listItems =
   );
 }
 
-/**
- * A StackedRowsPanel while its rows are read: the same card and row heights, each cell's value a `text-h4` bar
- * over its label's `text-h6` bar. The title above the card is the page's own and draws as it is.
- */
-export function StackedRowsPanelSkeleton({
-  rows = STACKED_ROWS_SKELETON_COUNT,
-  columns = 1,
-  labels = true,
+export function StackedRowsPanel({
+  rows,
   title,
   className,
+  skeleton,
   listItems = false,
-}: StackedRowsPanelSkeletonShape & Pick<StackedRowsPanelProps, 'title' | 'className' | 'listItems'>) {
-  const card = (
+  loading: loadingProp = false,
+  loadingRows,
+}: StackedRowsPanelProps) {
+  // ONE switch: while the host reads the rows (`loading`), or in a page's loading state with no rows yet, the panel
+  // draws its rows' loading form in the same frame; rows it is given in a scope are the page's own copy and draw as
+  // they are.
+  const inScope = useLoadingScope();
+  const loading = loadingProp || (inScope && rows.length === 0);
+  const marker = { 'data-loading-item': listItems || undefined };
+  const shape: PanelRowLoadingShape = { columns: skeleton?.columns ?? 1, labels: skeleton?.labels ?? true };
+  const card = loading ? (
     <div className={CARD_CLASS} aria-hidden>
-      {Array.from({ length: rows }, (_, row) => (
-        <div
-          key={row}
-          className={columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS}
-          {...(listItems ? { 'data-loading-item': '' } : undefined)}
-        >
-          {Array.from({ length: columns }, (_cell, column) => (
-            <div key={column} className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
-              <TextLineSkeleton type="h4" className="w-1/2" />
-              {labels && <TextLineSkeleton type="h6" className="w-3/4" />}
-            </div>
-          ))}
-        </div>
+      <LoadingItems count={loadingRows ?? skeleton?.rows ?? STACKED_ROWS_SKELETON_COUNT}>
+        {() => <PanelRowView loading={shape} {...marker} />}
+      </LoadingItems>
+    </div>
+  ) : (
+    <div className={CARD_CLASS}>
+      {rows.map(row => (
+        <PanelRowView key={row.id} row={row} {...marker} />
       ))}
     </div>
   );
-  if (!title) return <div className={className}>{card}</div>;
-  return (
-    <div className={cn(TITLED_CLASS, className)}>
-      <p className={TITLE_CLASS}>{title}</p>
-      {card}
-    </div>
-  );
+  return <PanelFrame title={title} className={className} card={card} />;
 }

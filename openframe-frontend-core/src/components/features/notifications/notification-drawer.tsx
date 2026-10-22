@@ -9,7 +9,7 @@ import { LoadingRegion } from '../../loading/loading-region';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { useAppLayoutDrawerContainer } from '../../navigation/app-layout-context';
 import { AppLayoutDrawer, AppLayoutDrawerContent } from '../../navigation/app-layout-drawer';
-import { SplitButton } from '../../ui/button';
+import { Button, SplitButton } from '../../ui/button';
 import { Drawer, DrawerContent, DrawerTitle } from '../../ui/drawer';
 import { Switch } from '../../ui/switch';
 import { NotificationTile } from './notification-tile';
@@ -70,14 +70,17 @@ export function NotificationDrawer({
           hideClose
           className="truncate"
           actions={
-            <button
+            <Button
+              variant="link"
+              size="compact"
+              noPaddingX
               type="button"
               disabled={unreadCount === 0}
               onClick={markAllRead}
-              className="self-center text-ods-text-secondary underline transition-colors text-h6 hover:text-ods-text-primary disabled:opacity-40 max-md:focus:outline-none max-md:focus-visible:outline-none"
+              className="self-center"
             >
               Mark All Complete
-            </button>
+            </Button>
           }
         >
           New Notifications
