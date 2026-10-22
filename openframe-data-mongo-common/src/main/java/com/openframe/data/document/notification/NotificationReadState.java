@@ -26,9 +26,6 @@ import java.time.Instant;
         @CompoundIndex(
                 name = "recipient_category_status",
                 def = "{'recipientId': 1, 'recipientType': 1, 'category': 1, 'status': 1}"),
-        @CompoundIndex(
-                name = "recipient_type_status",
-                def = "{'recipientId': 1, 'recipientType': 1, 'type': 1, 'status': 1}"),
         // Never edit a live index def in place — startup dies with IndexOptionsConflict.
         @CompoundIndex(
                 name = "tenant_recipient_entity_status",
@@ -62,10 +59,6 @@ public class NotificationReadState implements TenantScoped {
     private String entityId;
 
     private String title;
-
-    private String type;
-
-    private NotificationSeverity severity;
 
     @CreatedDate
     @Indexed(expireAfterSeconds = NotificationRetention.HISTORY_TTL_SECONDS) // 30-day retention, mirrors Notification

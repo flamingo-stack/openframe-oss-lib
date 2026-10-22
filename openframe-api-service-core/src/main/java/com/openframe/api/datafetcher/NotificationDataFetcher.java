@@ -1,10 +1,9 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import graphql.schema.DataFetchingFieldSelectionSet;
-import com.openframe.api.dto.CountedGenericConnection;
-import com.openframe.api.dto.CountedGenericQueryResult;
+import com.openframe.api.dto.GenericConnection;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
@@ -40,8 +39,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Slf4j
 public class NotificationDataFetcher {
 
-    private static final String FILTERED_COUNT_FIELD = "filteredCount";
-
     private final NotificationService notificationService;
     private final NotificationReadStateService readStateService;
     private final GraphQLNotificationMapper notificationMapper;
@@ -49,15 +46,14 @@ public class NotificationDataFetcher {
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
-    public CountedGenericConnection<GenericEdge<NotificationView>> notifications(
+    public GenericConnection<GenericEdge<NotificationView>> notifications(
             @InputArgument NotificationFilterInput filter,
             @InputArgument String search,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before,
-            @InputArgument SortInput sort,
-            DgsDataFetchingEnvironment dfe) {
+            @InputArgument SortInput sort) {
 
         Recipient r = currentRecipient();
         log.debug("Listing notifications for {} {} (filter={}, search={}, sort={})",
@@ -67,20 +63,12 @@ public class NotificationDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
-        NotificationFilter serviceFilter = filter == null
-                ? new NotificationFilter(null, null, null, null, search)
-                : new NotificationFilter(filter.getRead(), filter.getCategories(), filter.getTypes(),
-                        filter.getSeverities(), search);
+        NotificationFilter serviceFilter = new NotificationFilter(
+                filter == null ? null : filter.getRead(), search);
 
-        boolean countRequested = wantsFilteredCount(dfe);
-        CountedGenericQueryResult<NotificationView> result = notificationService.list(
-                r.id(), r.type(), serviceFilter, pagination, sort, countRequested);
+        GenericQueryResult<NotificationView> result = notificationService.list(
+                r.id(), r.type(), serviceFilter, pagination, sort);
         return notificationMapper.toConnection(result);
-    }
-
-    private static boolean wantsFilteredCount(DgsDataFetchingEnvironment dfe) {
-        DataFetchingFieldSelectionSet selectionSet = dfe != null ? dfe.getSelectionSet() : null;
-        return selectionSet == null || selectionSet.contains(FILTERED_COUNT_FIELD);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")

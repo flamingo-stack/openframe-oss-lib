@@ -73,19 +73,11 @@ type UnreadCategoryCount {
 
 input NotificationFilterInput {
     read: Boolean
-    "Only notifications of these categories; omitted or empty does not narrow."
-    categories: [NotificationCategory!]
-    "Only these notification types, by their persisted name (e.g. TICKET_APPROVAL_REQUEST, MINGO_APPROVAL_REQUEST); omitted or empty does not narrow."
-    types: [String!]
-    "Only these severities; omitted or empty does not narrow."
-    severities: [NotificationSeverity!]
 }
 
 type NotificationConnection {
     edges: [NotificationEdge!]!
     pageInfo: PageInfo!
-    "Number of notifications matching the filter and search, across all pages."
-    filteredCount: Int!
 }
 
 type NotificationEdge {
