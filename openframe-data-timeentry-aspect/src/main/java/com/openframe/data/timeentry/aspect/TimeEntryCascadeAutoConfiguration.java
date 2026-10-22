@@ -2,6 +2,7 @@ package com.openframe.data.timeentry.aspect;
 
 import com.openframe.data.repository.ticket.TicketRepository;
 import com.openframe.data.repository.timetracking.TimeEntryRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -24,7 +25,8 @@ public class TimeEntryCascadeAutoConfiguration {
     @Bean
     public TimeEntryCascadeAspect timeEntryCascadeAspect(
             TimeEntryCascadeService timeEntryCascadeService,
-            TicketRepository ticketRepository) {
-        return new TimeEntryCascadeAspect(timeEntryCascadeService, ticketRepository);
+            TicketRepository ticketRepository,
+            @Value("${openframe.timeentry.cascade.ticket.enabled:true}") boolean ticketCascadeEnabled) {
+        return new TimeEntryCascadeAspect(timeEntryCascadeService, ticketRepository, ticketCascadeEnabled);
     }
 }

@@ -107,16 +107,16 @@ class PublishingRepositoryStartupTest {
     }
 
     @Test
-    void aSpecWhoseDocumentHasNoRepository_stopsTheServiceFromStarting() {
+    void aSpecWhoseDocumentHasNoRepository_starts_asTheSharedStreamDoesWithoutTicketRepository() {
         runner.withBean(WidgetSpec.class)
-                .run(failsWith("must have exactly one repository, found []"));
+                .run(context -> assertThat(context).hasNotFailed());
     }
 
     @Test
     void twoRepositoriesOfOnePublishedDocument_stopTheServiceFromStarting() {
         runner.withUserConfiguration(WidgetRepositories.class, OwnRepositoriesOnly.class)
                 .withBean(WidgetSpec.class)
-                .run(failsWith("must have exactly one repository"));
+                .run(failsWith("must have at most one repository"));
     }
 
     @Test

@@ -11,6 +11,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 
 // The projections' ticket writes. Not TicketRepository: that one is tenant-aware and not created in the shared stream,
@@ -124,6 +125,15 @@ public class TicketProjectionRepository {
         Update update = new Update().set(Fields.deviceHostname, hostname);
         mongoOperations.updateMulti(query, update, Ticket.class);
         return batchIds.getLast();
+    }
+
+    // Only the id, tenant and title of a reconcile batch's tickets, across tenants.
+    public List<Ticket> findTitles(Collection<String> tenantIds, Collection<String> ticketIds) {
+        Criteria batchTickets = Criteria.where(Fields.tenantId).in(tenantIds)
+                .and(Fields.id).in(ticketIds);
+        Query query = new Query(batchTickets);
+        query.fields().include(Fields.id, Fields.tenantId, Fields.title);
+        return mongoOperations.find(query, Ticket.class);
     }
 
     private List<String> findIdsAfter(Criteria criteria, String lastId, int batchSize) {

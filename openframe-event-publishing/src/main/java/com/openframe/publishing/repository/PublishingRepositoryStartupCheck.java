@@ -29,7 +29,8 @@ import java.util.Set;
  * Stops the service at startup when a repository of a published document would publish wrongly or not at all.
  * A repository publishes when its document is the {@code D} of an {@link AggregateSpec}; for each such repository it checks that:
  * <ul>
- *   <li>one repository per published document class, and every spec's document has one; a subclass document, such as
+ *   <li>at most one repository per published document class; none is valid in a service that never writes the document,
+ *       such as the shared stream without the tenant-aware {@code TicketRepository}; a subclass document, such as
  *       {@code AuthUser} of {@code User}, publishes with its parent's spec through its own repository;</li>
  *   <li>its document has a {@code @Version} field, because the version orders the events;</li>
  *   <li>{@link PublishingRepositoryInterceptor} is inside the repository's proxy;</li>
@@ -68,25 +69,25 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
         }
         repositoriesByDocument.forEach(PublishingRepositoryStartupCheck::requireOnlyRepository);
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
-            requireOneRepository(spec, repositoriesByDocument);
+            logRepository(spec, repositoriesByDocument);
         }
     }
 
-    // A subclass document, such as AuthUser of User, may have its own repository, but each document class only one.
+    // Two repositories of one document are two places to watch; a subclass document, such as AuthUser of User, has its own.
     private static void requireOnlyRepository(Class<?> documentClass, List<String> repositories) {
         if (repositories.size() > 1) {
-            throw new IllegalStateException(documentClass.getName() + " is published, so it must have exactly one repository, found "
+            throw new IllegalStateException(documentClass.getName() + " is published, so it must have at most one repository, found "
                     + repositories);
         }
     }
 
-    // The interceptor publishes writes through the repository; none means nothing is published, two means two places to watch.
-    private static void requireOneRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
+    // None is valid: the shared stream has no tenant-aware repository, such as TicketRepository, so it never writes tickets.
+    private static void logRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
         Class<?> documentClass = PublishedDocuments.classOf(spec);
         List<String> repositories = repositoriesByDocument.getOrDefault(documentClass, List.of());
-        if (repositories.size() != 1) {
-            throw new IllegalStateException("The spec of " + spec.getType() + " publishes " + documentClass.getName()
-                    + ", which must have exactly one repository, found " + repositories);
+        if (repositories.isEmpty()) {
+            log.info("No repository of {} in this service, so it publishes no {} writes", documentClass.getName(), spec.getType());
+            return;
         }
         log.info("{} publishes {}", repositories.getFirst(), spec.getType());
     }
