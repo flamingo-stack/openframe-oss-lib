@@ -1,3 +1,4 @@
+pub mod binary_hash;
 pub mod binary_writer;
 pub mod console;
 pub mod detached_process;
