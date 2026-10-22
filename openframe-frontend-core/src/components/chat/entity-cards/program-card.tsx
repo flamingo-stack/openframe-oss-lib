@@ -32,36 +32,32 @@ import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
+import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { formatProgramDate, formatProgramDateRange } from '../../../utils/format';
 import { isImageMedia } from '../../../utils/media-type';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { programItemToStripProfile } from '../../features/video-bites-shared';
 import { CardHoverPlay } from '../../features/video-center-badge';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { Tag } from '../../ui/tag';
-import {
-  programItemToStripProfile,
-  type BaseProgramItem,
-  type ProgramConfig,
-  type ProgramMedia,
-  type ProgramHost,
-} from '../types/entities/program-types';
+import type { BaseProgramItem, ProgramConfig, ProgramMedia, ProgramHost } from '../types/entities/program-types';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS, ContentCardFrame } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
@@ -75,9 +71,9 @@ type CardSize = 'default' | 'sm' | 'portrait' | 'feature' | 'row';
 const EDITORIAL_FRAME = CONTENT_CARD_SKELETON_FRAME_CLASS;
 const EDITORIAL_ROW_GRID =
   'grid grid-cols-[88px_minmax(0,1fr)] items-center gap-[var(--spacing-system-m)] p-[var(--spacing-system-m)] sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-[var(--spacing-system-l)]';
-const EDITORIAL_ROW_THUMB = 'relative block aspect-square w-full overflow-hidden rounded-md';
+const EDITORIAL_ROW_THUMB = `relative block ${MEDIA_ASPECT.square} w-full overflow-hidden rounded-md`;
 const EDITORIAL_ROW_TEXT = 'flex min-w-0 flex-col gap-[var(--spacing-system-xs)]';
-const EDITORIAL_FEATURE_COVER = 'relative block aspect-video w-full overflow-hidden';
+const EDITORIAL_FEATURE_COVER = `relative block ${MEDIA_ASPECT.video} w-full overflow-hidden`;
 const EDITORIAL_FEATURE_BODY = 'flex flex-col gap-[var(--spacing-system-s)] p-[var(--spacing-system-l)]';
 const EDITORIAL_META_ROW =
   'flex h-[1lh] min-w-0 items-center gap-x-[var(--spacing-system-s)] overflow-hidden whitespace-nowrap text-h6';
@@ -102,14 +98,51 @@ const DEFAULT_GALLERY_ROW = 'flex gap-[var(--spacing-system-mf)]';
 const DEFAULT_GALLERY_THUMB =
   'relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg md:h-40 md:w-40 xl:h-[200px] xl:w-[200px]';
 const DEFAULT_FOOTER = 'flex justify-end border-t border-ods-border pt-[var(--spacing-system-lf)]';
+/** The hosts' avatars (32px each): beside the text from md, their own row under it on a phone. */
+const DEFAULT_HOSTS_ROW = 'flex flex-wrap gap-2 md:justify-end';
+/**
+ * The tags a card's skeleton draws when it shows a tag row: a typical count. The loaded row draws every tag the item
+ * carries (no cap), so there is no limit to draw.
+ */
+const DEFAULT_SKELETON_TAGS = 2;
+/** Host avatars a loading card draws for a type whose cards show hosts (`cardShowsHosts`): a typical one. */
+export const PROGRAM_CARD_SKELETON_HOSTS = 1;
+/** Gallery thumbnails a loading card draws for a type whose cards show a gallery (`cardShowsGallery`): the row's
+ *  first fold (the row scrolls past it). */
+export const PROGRAM_CARD_SKELETON_MEDIA = 4;
+/** The person's avatar in the editorial feature card, read by the card and its skeleton. */
+const EDITORIAL_PERSON_AVATAR = { variant: 'round', size: 'sm' } as const;
 
-export function ProgramCardSkeleton({
+/** The default card's action: the config's own words ("View podcast"). */
+const programActionLabel = (singular: string): string => `View ${singular.toLowerCase()}`;
+
+/** The default card's action button (copy), read by the card and by its skeleton. */
+function ProgramActionButton({ label, href, newTab }: { label: string; href?: string; newTab?: boolean }) {
+  return (
+    <Button variant="outline" href={href} openInNewTab={newTab} rightIcon={<ArrowRight className="h-5 w-5" />}>
+      {label}
+    </Button>
+  );
+}
+
+function ProgramCardSkeleton({
   size = 'default',
   eyebrow = true,
   media = 0,
   tags = false,
+  hosts = PROGRAM_CARD_SKELETON_HOSTS,
+  typeLabel,
+  actionLabel,
+  className,
 }: {
+  /** `default` size: the action's words (copy: `View <type>`), drawn for real; else a button of its size. */
+  actionLabel?: string;
+  /** `default` size: how many host avatars the card shows (a row of its own on a phone). 0 = none. */
+  hosts?: number;
   size?: CardSize;
+  /** `portrait` size: the content-type chip (the config's static label), when the card shows one. */
+  typeLabel?: string;
+  className?: string;
   eyebrow?: boolean;
   /** `default` size: how many gallery thumbnails the card shows (`MediaGallery`'s row). 0 = no gallery. */
   media?: number;
@@ -118,99 +151,97 @@ export function ProgramCardSkeleton({
 }) {
   // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
   // that row's line height.
+  if (size === 'portrait')
+    return <EntityPortraitCard loading href="" imageAlt="" title="" typeLabel={typeLabel} className={className} />;
   if (size === 'row') {
     return (
-      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID)}>
+      <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, className)}>
         <UnifiedSkeleton as="span" className={EDITORIAL_ROW_THUMB} />
         <span className={EDITORIAL_ROW_TEXT}>
-          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h3" />
+          <TextLineSkeleton as="span" type="h3" lines={2} className="w-full" />
           <span className={EDITORIAL_META_ROW}>
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
+            <TextLineSkeleton as="span" type="inherit" className="w-40" />
           </span>
-          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h6" />
+          <TextLineSkeleton as="span" type="h6" lines={2} className="w-full" />
         </span>
       </span>
     );
   }
   if (size === 'feature') {
     return (
-      <span className={cn(EDITORIAL_FRAME, 'flex flex-col')}>
+      <span className={cn(EDITORIAL_FRAME, 'flex flex-col', className)}>
         <UnifiedSkeleton as="span" className={cn(EDITORIAL_FEATURE_COVER, 'rounded-none')} />
         <span className={EDITORIAL_FEATURE_BODY}>
-          {eyebrow && <UnifiedSkeleton as="span" className="block h-[1lh] w-28 rounded text-h5" />}
-          <UnifiedSkeleton as="span" className="block h-[2lh] w-full rounded text-h3" />
+          {eyebrow && <TextLineSkeleton as="span" type="h5" className="w-28" />}
+          <TextLineSkeleton as="span" type="h3" lines={2} className="w-full" />
           <span className={EDITORIAL_META_ROW}>
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
+            <TextLineSkeleton as="span" type="inherit" className="w-40" />
           </span>
-          <UnifiedSkeleton as="span" className="block h-[3lh] w-full rounded text-h4" />
+          <TextLineSkeleton as="span" type="h4" lines={3} className="w-full" />
           <span className={EDITORIAL_PERSON_ROW}>
-            <UnifiedSkeleton as="span" className="block h-8 w-8 shrink-0 rounded-full" />
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded text-h6" />
+            <SquareAvatar loading {...EDITORIAL_PERSON_AVATAR} className="shrink-0" />
+            <TextLineSkeleton as="span" type="h6" className="w-40" />
           </span>
         </span>
       </span>
     );
   }
   if (size === 'sm') {
-    return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={COMPACT_CARD_TITLE_ROW}>
-            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-2/5 rounded" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
-          </span>
-        </span>
-        <span className="flex h-5 shrink-0 items-center self-start">
-          <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
-        </span>
-      </span>
-    );
+    return <CompactCardSkeleton trailingIcon className={className} />;
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY)}>
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, DEFAULT_BODY, className)}>
       <div className={DEFAULT_HEADER}>
         <UnifiedSkeleton className={DEFAULT_COVER_FRAME} />
         <div className={DEFAULT_TEXT}>
           <div className={DEFAULT_TITLE}>
-            <UnifiedSkeleton as="span" className="block h-[2lh] w-3/4 rounded" />
+            <TextLineSkeleton as="span" type="inherit" lines={2} className="w-3/4" />
           </div>
           <div className={DEFAULT_META_ROW}>
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-32 rounded" />
-            <UnifiedSkeleton as="span" className="block h-[1lh] w-40 rounded" />
+            <TextLineSkeleton as="span" type="inherit" className="w-32" />
+            <TextLineSkeleton as="span" type="inherit" className="w-40" />
           </div>
           <div className={DEFAULT_DESCRIPTION}>
-            <UnifiedSkeleton as="span" className="block h-[3lh] w-full rounded" />
+            <TextLineSkeleton as="span" type="inherit" lines={3} className="w-full" />
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
-              <UnifiedSkeleton as="span" className="block h-8 w-24 rounded" />
-              <UnifiedSkeleton as="span" className="block h-8 w-24 rounded" />
+              <LoadingItems count={DEFAULT_SKELETON_TAGS}>
+                {() => <Tag loading as="span" label="" variant="outline" data-loading-item />}
+              </LoadingItems>
             </div>
           )}
         </div>
+        {hosts > 0 && (
+          <div className={DEFAULT_HOSTS_ROW}>
+            <LoadingItems count={hosts}>
+              {() => <SquareAvatar loading variant="round" size="sm" data-loading-item />}
+            </LoadingItems>
+          </div>
+        )}
       </div>
       {media > 0 && (
         <div className={DEFAULT_GALLERY_ROW}>
-          {Array.from({ length: media }, (_, i) => (
-            <UnifiedSkeleton key={i} className={DEFAULT_GALLERY_THUMB} />
-          ))}
+          <LoadingItems count={media}>
+            {() => <UnifiedSkeleton className={DEFAULT_GALLERY_THUMB} data-loading-item />}
+          </LoadingItems>
         </div>
       )}
       <div className={DEFAULT_FOOTER}>
-        {/* The action button's own height (44px, 48px from md). */}
-        <UnifiedSkeleton className="h-11 w-40 rounded md:h-12" />
+        {actionLabel ? (
+          // The action's words are copy: the real button, not a control while it loads.
+          <span inert aria-hidden className="flex">
+            <ProgramActionButton label={actionLabel} />
+          </span>
+        ) : (
+          <InteractiveSkeleton.Button size="default" className="w-40" />
+        )}
       </div>
     </div>
   );
 }
 
-export interface ProgramCardProps<T extends BaseProgramItem> {
+interface LoadedProgramCardProps<T extends BaseProgramItem> {
   config: ProgramConfig<T>;
   item: T;
   media?: ProgramMedia[];
@@ -234,7 +265,40 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   eyebrow?: string;
   /** `default` density: the item's tags, drawn under the description. */
   tags?: string[];
+  /**
+   * The card is the first thing a list draws, so its cover is likely the page's largest paint: fetch it at once and
+   * ranked high, instead of lazily (the default for every other card).
+   */
+  priority?: boolean;
   className?: string;
+}
+
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it does
+ * in a loading scope. What a loading card draws is decided by the type's CONFIG (the hosts and gallery rows its cards
+ * always show); with no config it draws neither.
+ */
+export type ProgramCardProps<T extends BaseProgramItem> =
+  (LoadedProgramCardProps<T> & { loading?: boolean }) | (Partial<LoadedProgramCardProps<T>> & { loading: true });
+
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function ProgramCard<T extends BaseProgramItem>(props: ProgramCardProps<T>) {
+  if (useLoadingScope() || props.loading) {
+    const { config, size = 'default', showTypeBadge = true, eyebrow, className } = props;
+    // A tag row is a record's optional part, not drawn.
+    return (
+      <ProgramCardSkeleton
+        size={size}
+        eyebrow={!!eyebrow}
+        media={config?.cardShowsGallery ? PROGRAM_CARD_SKELETON_MEDIA : 0}
+        hosts={config?.cardShowsHosts ? PROGRAM_CARD_SKELETON_HOSTS : 0}
+        typeLabel={config && size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
+        actionLabel={config ? programActionLabel(config.labels.singular) : undefined}
+        className={className}
+      />
+    );
+  }
+  return <LoadedProgramCard {...props} />;
 }
 
 function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string; avatar: string | null }> {
@@ -266,7 +330,7 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
   return [];
 }
 
-function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
+function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; title: string; optional?: boolean }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const openImageModal = (index: number, event?: React.MouseEvent) => {
@@ -280,13 +344,14 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
   };
   return (
     <>
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" data-loading-optional={optional || undefined}>
         <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
           {images.map((mediaItem, index) => (
             <div
               key={mediaItem.id}
               className={cn(DEFAULT_GALLERY_THUMB, 'group/thumb cursor-pointer')}
               onClick={e => openImageModal(index, e)}
+              data-loading-item
             >
               <Image
                 src={mediaItem.media_url}
@@ -330,6 +395,7 @@ function ProgramEditorialCard({
   typeMeta,
   profile,
   playable,
+  priority,
   className,
 }: {
   feature: boolean;
@@ -344,6 +410,7 @@ function ProgramEditorialCard({
   typeMeta: string | null | undefined;
   profile: ReturnType<typeof programItemToStripProfile>;
   playable: boolean;
+  priority?: boolean;
   className?: string;
 }) {
   // The cover is shown WHOLE on its own edge colour: the fill AdminContentCard
@@ -367,7 +434,9 @@ function ProgramEditorialCard({
     return (
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
-          {cover && <Image src={cover} alt="" fill sizes="120px" className="object-cover" unoptimized />}
+          {cover && (
+            <Image src={cover} alt="" fill sizes="120px" className="object-cover" priority={priority} unoptimized />
+          )}
           {playable && cover && <CardHoverPlay size="md" />}
         </span>
         <span className={EDITORIAL_ROW_TEXT}>
@@ -392,6 +461,7 @@ function ProgramEditorialCard({
             fill
             sizes="(min-width: 1024px) 640px, 100vw"
             className="object-contain"
+            priority={priority}
             unoptimized
           />
         )}
@@ -407,15 +477,19 @@ function ProgramEditorialCard({
           {profile && (
             <>
               <SquareAvatar
-                variant="round"
+                {...EDITORIAL_PERSON_AVATAR}
                 src={profile.avatarUrl || undefined}
                 alt={profile.name}
                 fallback={profile.name.charAt(0).toUpperCase()}
-                size="sm"
               />
               <span className="truncate text-h6">
                 <span className="text-ods-text-primary">{profile.name}</span>
-                {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
+                {profile.subtitle && (
+                  <span data-loading-optional className="text-ods-text-secondary">
+                    {' '}
+                    · {profile.subtitle}
+                  </span>
+                )}
               </span>
             </>
           )}
@@ -425,7 +499,7 @@ function ProgramEditorialCard({
   );
 }
 
-export function ProgramCard<T extends BaseProgramItem>({
+function LoadedProgramCard<T extends BaseProgramItem>({
   config,
   item,
   media = [],
@@ -440,8 +514,9 @@ export function ProgramCard<T extends BaseProgramItem>({
   wholeCardClickable = false,
   eyebrow,
   tags = [],
+  priority,
   className,
-}: ProgramCardProps<T>) {
+}: LoadedProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -491,6 +566,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         imageAlt={item.title}
         title={item.title}
         titleClassName="font-['Azeret_Mono'] font-semibold text-lg leading-6"
+        priority={priority}
         person={
           profile
             ? { name: profile.name, avatarUrl: profile.avatarUrl, subtitle: profile.subtitle || dateMeta }
@@ -516,6 +592,7 @@ export function ProgramCard<T extends BaseProgramItem>({
         typeMeta={compactTypeMetaValue}
         profile={programItemToStripProfile(item)}
         playable={isPlayable}
+        priority={priority}
         className={className}
       />
     );
@@ -532,7 +609,15 @@ export function ProgramCard<T extends BaseProgramItem>({
       <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, 'group', className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
-            <Image src={compactCover} alt={item.title} fill sizes="56px" className="object-contain" unoptimized />
+            <Image
+              src={compactCover}
+              alt={item.title}
+              fill
+              sizes="56px"
+              className="object-contain"
+              priority={priority}
+              unoptimized
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-ods-accent">
               {config.type === 'podcast' ? (
@@ -621,6 +706,7 @@ export function ProgramCard<T extends BaseProgramItem>({
             fill
             sizes="(min-width: 1280px) 400px, (min-width: 768px) 320px, 100vw"
             className="object-cover"
+            priority={priority}
             unoptimized
           />
           {isPlayable && <CardHoverPlay size="md" />}
@@ -650,16 +736,19 @@ export function ProgramCard<T extends BaseProgramItem>({
         <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
 
         {tags.length > 0 && (
-          <div className={DEFAULT_TAG_ROW}>
+          // Only some records carry tags: the loading card leaves the row out.
+          <div className={DEFAULT_TAG_ROW} data-loading-optional>
             {tags.map(tag => (
-              <Tag key={tag} as="span" label={tag} variant="outline" />
+              <Tag key={tag} as="span" label={tag} variant="outline" data-loading-item />
             ))}
           </div>
         )}
       </div>
 
       {hosts.length > 0 && (
-        <div className="flex flex-wrap gap-2 md:justify-end">
+        // A type whose cards always show hosts (`cardShowsHosts`) draws them while loading; elsewhere only some
+        // records have hosts, so the row is record-dependent.
+        <div className={DEFAULT_HOSTS_ROW} data-loading-optional={config.cardShowsHosts ? undefined : true}>
           {hosts.map((host, index) => (
             <SquareAvatar
               variant="round"
@@ -668,6 +757,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               alt={host.name}
               fallback={host.name.charAt(0).toUpperCase()}
               size="sm"
+              data-loading-item
             />
           ))}
         </div>
@@ -676,13 +766,13 @@ export function ProgramCard<T extends BaseProgramItem>({
   );
 
   const cardFrameClass = cn(DEFAULT_BODY, className);
-  const actionLabel = `View ${config.labels.singular.toLowerCase()}`;
+  const actionLabel = programActionLabel(config.labels.singular);
 
   if (wholeCardClickable) {
     return (
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cardFrameClass}>
         {cardHeader}
-        {images.length > 0 && <MediaGallery images={images} title={item.title} />}
+        {images.length > 0 && <MediaGallery images={images} title={item.title} optional={!config.cardShowsGallery} />}
         <div className={DEFAULT_FOOTER}>
           <span
             className="inline-flex items-center gap-2 rounded-md border border-ods-border px-4 py-2 text-ods-text-primary text-h4"
@@ -701,16 +791,9 @@ export function ProgramCard<T extends BaseProgramItem>({
       <Link href={href} target={target} rel={rel} className="block">
         {cardHeader}
       </Link>
-      {images.length > 0 && <MediaGallery images={images} title={item.title} />}
+      {images.length > 0 && <MediaGallery images={images} title={item.title} optional={!config.cardShowsGallery} />}
       <div className={DEFAULT_FOOTER}>
-        <Button
-          variant="outline"
-          href={href}
-          openInNewTab={target === '_blank'}
-          rightIcon={<ArrowRight className="h-5 w-5" />}
-        >
-          {actionLabel}
-        </Button>
+        <ProgramActionButton label={actionLabel} href={href} newTab={target === '_blank'} />
       </div>
     </ContentCardFrame>
   );

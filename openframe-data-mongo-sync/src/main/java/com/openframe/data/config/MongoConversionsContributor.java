@@ -2,8 +2,6 @@ package com.openframe.data.config;
 
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions.MongoConverterConfigurationAdapter;
 
-import java.util.function.Consumer;
-
 /**
  * Contributes converters to the single {@link org.springframework.data.mongodb.core.convert.MongoCustomConversions}
  * bean built by {@link MongoCustomConversionsConfig}.
@@ -16,5 +14,7 @@ import java.util.function.Consumer;
  * time as plain scanned configs, where the condition is evaluated too early to see its sibling.
  */
 @FunctionalInterface
-public interface MongoConversionsContributor extends Consumer<MongoConverterConfigurationAdapter> {
+public interface MongoConversionsContributor {
+
+    void configure(MongoConverterConfigurationAdapter adapter);
 }

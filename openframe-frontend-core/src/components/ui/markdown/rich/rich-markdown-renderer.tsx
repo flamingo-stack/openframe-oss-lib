@@ -94,6 +94,8 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
   resolveSource,
   resolveLinkEndpointUrl,
   demoteMarkdownH1ToH2,
+  skeletonSections,
+  skeletonLines,
 }) => {
   const { ogScraperUrl } = useRichMarkdownRuntime();
 
@@ -148,6 +150,8 @@ const RichMarkdownInner: React.FC<InnerProps> = ({
       componentOverrides={componentOverrides}
       textSize="article"
       extraAllowedHtmlTags={RICH_EXTRA_TAGS}
+      skeletonSections={skeletonSections}
+      skeletonLines={skeletonLines}
     />
   );
 };
@@ -162,6 +166,8 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
   resolveSource = 'openframe-docs',
   resolveLinkEndpointUrl = '/api/docs/resolve-link',
   demoteMarkdownH1ToH2 = false,
+  skeletonSections,
+  skeletonLines,
   // Runtime overrides; provider fills the defaults
   redditProxyUrl,
   twitterProxyUrl,
@@ -185,6 +191,8 @@ const RichMarkdownRendererImpl: React.FC<RichMarkdownRendererProps> = ({
         resolveSource={resolveSource}
         resolveLinkEndpointUrl={resolveLinkEndpointUrl}
         demoteMarkdownH1ToH2={demoteMarkdownH1ToH2}
+        skeletonSections={skeletonSections}
+        skeletonLines={skeletonLines}
       />
     </RichMarkdownRuntimeProvider>
   );

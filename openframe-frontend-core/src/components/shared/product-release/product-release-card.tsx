@@ -11,8 +11,30 @@ import {
 } from '../../chat/entity-cards/content-card-frame';
 import { CardHoverPlay } from '../../features/video-center-badge';
 import { InteractiveCard } from '../../ui/interactive-card';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { StatusBadge } from '../../ui/status-badge';
+import {
+  RELEASE_CARD_CELL_CLASS,
+  RELEASE_CARD_CELL_DIVIDER_CLASS,
+  RELEASE_CARD_CELL_LABEL_CLASS,
+  RELEASE_CARD_CELL_LABELS,
+  RELEASE_CARD_CELL_STACK_CLASS,
+  RELEASE_CARD_CHANGELOG_CLASS,
+  RELEASE_CARD_COVER_BOX_CLASS,
+  RELEASE_CARD_COVER_COLUMN_CLASS,
+  RELEASE_CARD_GRID_CLASS,
+  RELEASE_CARD_HERO_CLASS,
+  RELEASE_CARD_LG_FRAME_CLASS,
+  RELEASE_CARD_SUMMARY_BOX_CLASS,
+  RELEASE_CARD_SUMMARY_CLASS,
+  RELEASE_CARD_TEXT_COLUMN_CLASS,
+  RELEASE_CARD_TITLE_BOX_CLASS,
+  RELEASE_CARD_TITLE_CLASS,
+  RELEASE_CARD_VERSION_CLASS,
+  RELEASE_CARD_VERSION_ROW_CLASS,
+} from './product-release-card-classes';
+import { ProductReleaseCardSkeleton } from './product-release-card-skeleton';
 
 /**
  * Card density. Two variants, both actively used across openframe + flamingo
@@ -57,7 +79,7 @@ export interface ProductReleaseCardAnchorProps {
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-export interface ProductReleaseCardProps {
+export interface LoadedProductReleaseCardProps {
   /** Release title */
   title: string;
   /** Release summary/description */
@@ -121,7 +143,20 @@ export interface ProductReleaseCardProps {
   };
 }
 
-export function ProductReleaseCard({
+/** The release, or `loading` while the host reads it: the card then draws its own loading form (also in a scope). */
+export type ProductReleaseCardProps =
+  | (LoadedProductReleaseCardProps & { loading?: boolean })
+  | (Partial<LoadedProductReleaseCardProps> & { loading: true });
+
+/** One switch: while the release is read (a prop, or a page's loading scope) the card is its own loading form. */
+export function ProductReleaseCard(props: ProductReleaseCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <ProductReleaseCardSkeleton size={props.size ?? 'lg'} className={props.className} />;
+  }
+  return <LoadedProductReleaseCard {...props} />;
+}
+
+function LoadedProductReleaseCard({
   title,
   summary,
   version,
@@ -138,7 +173,7 @@ export function ProductReleaseCard({
   viewCount,
   author,
   changelogCounts,
-}: ProductReleaseCardProps) {
+}: LoadedProductReleaseCardProps) {
   // ----- LG branch (rich /releases catalog row + related-content rail) -----
   // The card has THREE zones:
   //   1. Hero — cover image LEFT, version pill + title + summary RIGHT.
@@ -182,25 +217,25 @@ export function ProductReleaseCard({
       releaseType && releaseTypeBadgeColor
         ? {
             value: releaseType.toUpperCase(),
-            label: 'Type',
+            label: RELEASE_CARD_CELL_LABELS[0],
             uppercase: true,
             colorScheme: releaseTypeBadgeColor,
           }
-        : { value: '—', label: 'Type', uppercase: false },
+        : { value: '—', label: RELEASE_CARD_CELL_LABELS[0], uppercase: false },
       releaseStatus
         ? {
             value: releaseStatus.toUpperCase(),
-            label: 'Status',
+            label: RELEASE_CARD_CELL_LABELS[1],
             uppercase: true,
           }
-        : { value: '—', label: 'Status', uppercase: false },
+        : { value: '—', label: RELEASE_CARD_CELL_LABELS[1], uppercase: false },
       formattedDate
         ? {
             value: formattedDate,
-            label: 'Released',
+            label: RELEASE_CARD_CELL_LABELS[2],
             uppercase: false,
           }
-        : { value: '—', label: 'Released', uppercase: false },
+        : { value: '—', label: RELEASE_CARD_CELL_LABELS[2], uppercase: false },
     ];
     // EMPTY_AUTHOR_PLACEHOLDER shape — mirrors the hub's
     // EMPTY_AUTHOR_PLACEHOLDER constant exported from
@@ -212,15 +247,14 @@ export function ProductReleaseCard({
     // skeleton's shape matches the loaded card exactly. The earlier
     // dynamic `gridColsClass` ternary collapsed missing cells and
     // caused 28-56px reflow on resolve.
-    const gridColsClass = 'content-md:grid-cols-4';
-    const dividerClass = 'border-b content-md:border-b-0 content-md:border-r border-ods-border';
+    const dividerClass = RELEASE_CARD_CELL_DIVIDER_CLASS;
 
     // THE shared card frame: interactive (accent border on hover) when the card
     // links or clicks, the static frame when it does neither.
     const interactive = !!anchorProps || !!onClick;
     const frameClass = cn(
       interactive ? CONTENT_CARD_FRAME_CLASS : CONTENT_CARD_SKELETON_FRAME_CLASS,
-      'flex flex-col gap-4 p-6',
+      RELEASE_CARD_LG_FRAME_CLASS,
       'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 focus-visible:ring-offset-ods-bg',
       'no-underline',
       className,
@@ -229,9 +263,9 @@ export function ProductReleaseCard({
     const innerLayout = (
       <>
         {/* HERO ZONE — cover LEFT + version pill + title + summary RIGHT */}
-        <div className="flex flex-col gap-4 content-md:flex-row content-md:gap-6">
-          <div className="w-full flex-shrink-0 content-md:w-[256px]">
-            <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg bg-ods-bg">
+        <div className={RELEASE_CARD_HERO_CLASS}>
+          <div className={RELEASE_CARD_COVER_COLUMN_CLASS}>
+            <div className={cn(RELEASE_CARD_COVER_BOX_CLASS, 'bg-ods-bg')}>
               {coverImage ? (
                 <Image
                   src={coverImage}
@@ -249,29 +283,24 @@ export function ProductReleaseCard({
               {hasVideoCover && coverImage && <CardHoverPlay size="md" />}
             </div>
           </div>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <div className="mb-3 flex items-center gap-3">
-              <span className="truncate font-semibold text-ods-text-primary text-code">v{version}</span>
+          <div className={RELEASE_CARD_TEXT_COLUMN_CLASS}>
+            <div className={RELEASE_CARD_VERSION_ROW_CLASS}>
+              <span className={RELEASE_CARD_VERSION_CLASS}>v{version}</span>
             </div>
             {/* Title — reserve a fixed 2-line height so cards with
                 1-line titles don't shrink and the catalog skeleton-to-
                 content transition is shift-free. Mirrors the
                 onboarding-guide catalog card. */}
-            <div className="mb-3 flex min-h-[60px] items-start content-md:min-h-[72px]">
-              <h3 className="line-clamp-2 font-['Azeret_Mono'] text-xl font-semibold leading-tight text-ods-text-primary content-md:text-2xl">
-                {title}
-              </h3>
+            <div className={RELEASE_CARD_TITLE_BOX_CLASS}>
+              <h3 className={RELEASE_CARD_TITLE_CLASS}>{title}</h3>
             </div>
             {/* Summary — fixed 3-line height. `line-clamp-3` caps long
                 summaries at 3 lines; `min-h` reserves the same vertical
                 space when content is shorter, so the catalog grid stays
-                row-consistent regardless of per-card content length.
-                Heights derived from text-sm content-md:text-base × leading-relaxed
-                (1.625): 14×1.625×3 ≈ 68 px mobile, 16×1.625×3 ≈ 78 px desktop. */}
-            <div className="min-h-[68px] content-md:min-h-[78px]">
-              <p className="line-clamp-3 font-['DM_Sans'] text-sm leading-relaxed text-ods-text-secondary content-md:text-base">
-                {summary ?? ''}
-              </p>
+                row-consistent regardless of per-card content length
+                (three lines of the summary's `text-h4`). */}
+            <div className={RELEASE_CARD_SUMMARY_BOX_CLASS}>
+              <p className={RELEASE_CARD_SUMMARY_CLASS}>{summary ?? ''}</p>
             </div>
           </div>
         </div>
@@ -280,37 +309,40 @@ export function ProductReleaseCard({
             always-on changelog placeholder matches the loaded shape
             (zero reflow on resolve). When `totalChangelog === 0`, an
             empty-state line takes the same vertical space as the
-            populated row. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-ods-border pt-3 text-ods-text-secondary text-h6">
+            populated row. Which counts show is read data, so each one is a
+            read list item (`data-loading-item`): the skeleton draws the first. */}
+        <div className={RELEASE_CARD_CHANGELOG_CLASS}>
           {totalChangelog > 0 && changelogCounts ? (
             <>
               {changelogCounts.features > 0 && (
-                <span className="inline-flex items-center gap-1.5">
+                <span data-loading-item className="inline-flex items-center gap-1.5">
                   <Sparkles className="h-3.5 w-3.5" />
                   {changelogCounts.features} {changelogCounts.features === 1 ? 'feature' : 'features'}
                 </span>
               )}
               {changelogCounts.fixes > 0 && (
-                <span className="inline-flex items-center gap-1.5">
+                <span data-loading-item className="inline-flex items-center gap-1.5">
                   <Wrench className="h-3.5 w-3.5" />
                   {changelogCounts.fixes} {changelogCounts.fixes === 1 ? 'fix' : 'fixes'}
                 </span>
               )}
               {changelogCounts.improvements > 0 && (
-                <span className="inline-flex items-center gap-1.5">
+                <span data-loading-item className="inline-flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5" />
                   {changelogCounts.improvements} {changelogCounts.improvements === 1 ? 'improvement' : 'improvements'}
                 </span>
               )}
               {changelogCounts.breaking > 0 && (
-                <span className="inline-flex items-center gap-1.5 text-ods-warning">
+                <span data-loading-item className="inline-flex items-center gap-1.5 text-ods-warning">
                   <AlertTriangle className="h-3.5 w-3.5" />
                   {changelogCounts.breaking} breaking
                 </span>
               )}
             </>
           ) : (
-            <span className="text-ods-text-secondary">No changelog entries yet</span>
+            <span data-loading-item className="text-ods-text-secondary">
+              No changelog entries yet
+            </span>
           )}
         </div>
 
@@ -320,23 +352,17 @@ export function ProductReleaseCard({
             text, no colored badge — em-dash badges read as broken next
             to populated ones); the Author cell falls back to the
             EMPTY_AUTHOR_PLACEHOLDER shape declared above. */}
-        <div
-          className={cn(
-            'grid grid-cols-1',
-            gridColsClass,
-            'w-full overflow-hidden rounded-md border border-ods-border',
-          )}
-        >
+        <div className={RELEASE_CARD_GRID_CLASS}>
           {valueCells.map((cell, i) => (
-            <div key={`${cell.label}-${i}`} className={cn('flex flex-col gap-3 p-4', dividerClass)}>
-              <div className="flex flex-col gap-0">
+            <div key={`${cell.label}-${i}`} className={cn(RELEASE_CARD_CELL_CLASS, dividerClass)}>
+              <div className={RELEASE_CARD_CELL_STACK_CLASS}>
                 {cell.colorScheme ? (
                   <StatusBadge
                     text={cell.value}
                     variant="card"
                     colorScheme={cell.colorScheme}
                     singleLine
-                    className="self-start"
+                    className="justify-self-start"
                   />
                 ) : (
                   <p
@@ -350,7 +376,7 @@ export function ProductReleaseCard({
                     {cell.uppercase ? cell.value.toLocaleUpperCase() : cell.value}
                   </p>
                 )}
-                <p className="text-ods-text-secondary text-h6">{cell.label}</p>
+                <p className={RELEASE_CARD_CELL_LABEL_CLASS}>{cell.label}</p>
               </div>
             </div>
           ))}

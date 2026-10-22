@@ -3,8 +3,14 @@ import { LayoutGrid, LayoutList, Plus, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { ListPageLayout } from '../components/layout/list-page-layout';
 import { Button } from '../components/ui/button';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  DataTable,
+  type DataTableFilters,
+  useDataTable,
+} from '../components/ui/data-table';
 import type { FilterGroup, SortConfig, SortDirection } from '../components/ui/filter-modal';
-import { Table, type TableColumn, type TableFilters } from '../components/ui/table';
 
 interface Device {
   id: string;
@@ -22,32 +28,86 @@ const sampleDevices: Device[] = [
   { id: '5', name: 'Linux Server', status: 'online', type: 'Server', lastSeen: '2024-01-20' },
 ];
 
-const deviceColumns: TableColumn<Device>[] = [
-  { key: 'name', label: 'Device Name' },
-  {
-    key: 'type',
-    label: 'Type',
-    hideAt: 'lg',
-    filterable: true,
-    filterOptions: [
-      { id: 'laptop', label: 'Laptop', value: 'laptop' },
-      { id: 'mobile', label: 'Mobile', value: 'mobile' },
-      { id: 'desktop', label: 'Desktop', value: 'desktop' },
-      { id: 'tablet', label: 'Tablet', value: 'tablet' },
-      { id: 'server', label: 'Server', value: 'server' },
-    ],
-  },
-  {
-    key: 'status',
-    label: 'Status',
-    filterable: true,
-    filterOptions: [
-      { id: 'online', label: 'Online', value: 'online' },
-      { id: 'offline', label: 'Offline', value: 'offline' },
-      { id: 'pending', label: 'Pending', value: 'pending' },
-    ],
-  },
-  { key: 'lastSeen', label: 'Last Seen' },
+const deviceColumn = createColumnHelper<Device>();
+const deviceColumns: ColumnDef<Device, string>[] = [
+  deviceColumn.accessor('name', { header: 'Device Name' }),
+  deviceColumn.accessor('type', {
+    header: 'Type',
+    meta: {
+      hideAt: 'lg',
+      filter: {
+        options: [
+          { id: 'laptop', label: 'Laptop', value: 'laptop' },
+          { id: 'mobile', label: 'Mobile', value: 'mobile' },
+          { id: 'desktop', label: 'Desktop', value: 'desktop' },
+          { id: 'tablet', label: 'Tablet', value: 'tablet' },
+          { id: 'server', label: 'Server', value: 'server' },
+        ],
+      },
+    },
+  }),
+  deviceColumn.accessor('status', {
+    header: 'Status',
+    meta: {
+      filter: {
+        options: [
+          { id: 'online', label: 'Online', value: 'online' },
+          { id: 'offline', label: 'Offline', value: 'offline' },
+          { id: 'pending', label: 'Pending', value: 'pending' },
+        ],
+      },
+    },
+  }),
+  deviceColumn.accessor('lastSeen', { header: 'Last Seen' }),
+];
+
+/** A story's rows in the lib's `DataTable`: the header, then the rows or the empty message. */
+function StoryTable<T extends { id: string }>({
+  data,
+  columns,
+  emptyMessage,
+}: {
+  data: T[];
+  columns: ColumnDef<T, string>[];
+  emptyMessage?: string;
+}) {
+  const table = useDataTable({ data, columns, getRowId: row => row.id });
+  return (
+    <DataTable table={table}>
+      <DataTable.Header />
+      <DataTable.Body emptyState={emptyMessage ? { title: emptyMessage } : undefined} />
+    </DataTable>
+  );
+}
+
+interface ScriptRow {
+  id: string;
+  name: string;
+  language: string;
+  lastRun: string;
+  status: string;
+}
+const scriptColumn = createColumnHelper<ScriptRow>();
+const scriptColumns: ColumnDef<ScriptRow, string>[] = [
+  scriptColumn.accessor('name', { header: 'Script Name' }),
+  scriptColumn.accessor('language', { header: 'Language' }),
+  scriptColumn.accessor('lastRun', { header: 'Last Run' }),
+  scriptColumn.accessor('status', { header: 'Status' }),
+];
+
+interface LogRow {
+  id: string;
+  timestamp: string;
+  level: string;
+  message: string;
+  source: string;
+}
+const logColumn = createColumnHelper<LogRow>();
+const logColumns: ColumnDef<LogRow, string>[] = [
+  logColumn.accessor('timestamp', { header: 'Timestamp' }),
+  logColumn.accessor('level', { header: 'Level' }),
+  logColumn.accessor('message', { header: 'Message' }),
+  logColumn.accessor('source', { header: 'Source' }),
 ];
 
 const meta = {
@@ -110,7 +170,7 @@ export const Basic: Story = {
     searchPlaceholder: 'Search devices...',
     searchValue: '',
     onSearch: () => {},
-    children: <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />,
+    children: <StoryTable data={sampleDevices} columns={deviceColumns} />,
   },
 };
 
@@ -133,7 +193,7 @@ export const WithHeaderActions: Story = {
     searchPlaceholder: 'Search devices...',
     searchValue: '',
     onSearch: () => {},
-    children: <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />,
+    children: <StoryTable data={sampleDevices} columns={deviceColumns} />,
   },
 };
 
@@ -159,7 +219,7 @@ export const WithViewToggle: Story = {
     searchPlaceholder: 'Search devices...',
     searchValue: '',
     onSearch: () => {},
-    children: <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />,
+    children: <StoryTable data={sampleDevices} columns={deviceColumns} />,
   },
 };
 
@@ -191,9 +251,7 @@ export const WithSearchValue: Story = {
     searchPlaceholder: 'Search devices...',
     searchValue: 'MacBook',
     onSearch: () => {},
-    children: (
-      <Table data={sampleDevices.filter(d => d.name.includes('MacBook'))} columns={deviceColumns} rowKey="id" />
-    ),
+    children: <StoryTable data={sampleDevices.filter(d => d.name.includes('MacBook'))} columns={deviceColumns} />,
   },
 };
 
@@ -212,10 +270,9 @@ export const EmptyState: Story = {
     searchValue: '',
     onSearch: () => {},
     children: (
-      <Table
+      <StoryTable
         data={[]}
         columns={deviceColumns}
-        rowKey="id"
         emptyMessage="No devices found. Add your first device to get started."
       />
     ),
@@ -232,7 +289,7 @@ export const SmallPadding: Story = {
     searchValue: '',
     onSearch: () => {},
     padding: 'sm',
-    children: <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />,
+    children: <StoryTable data={sampleDevices} columns={deviceColumns} />,
   },
 };
 
@@ -246,7 +303,7 @@ export const LargePadding: Story = {
     searchValue: '',
     onSearch: () => {},
     padding: 'lg',
-    children: <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />,
+    children: <StoryTable data={sampleDevices} columns={deviceColumns} />,
   },
 };
 
@@ -260,7 +317,7 @@ export const CardBackground: Story = {
     searchValue: '',
     onSearch: () => {},
     background: 'card',
-    children: <Table data={sampleDevices} columns={deviceColumns} rowKey="id" />,
+    children: <StoryTable data={sampleDevices} columns={deviceColumns} />,
   },
 };
 
@@ -301,10 +358,9 @@ export const Interactive: Story = {
         searchValue={searchValue}
         onSearch={setSearchValue}
       >
-        <Table
+        <StoryTable
           data={filteredDevices}
           columns={deviceColumns}
-          rowKey="id"
           emptyMessage="No devices match your search criteria."
         />
       </ListPageLayout>
@@ -332,21 +388,13 @@ export const ScriptsPageExample: Story = {
     searchValue: '',
     onSearch: () => {},
     children: (
-      <Table
+      <StoryTable
         data={[
           { id: '1', name: 'Deploy Script', language: 'Bash', lastRun: '2024-01-20', status: 'success' },
           { id: '2', name: 'Backup Database', language: 'Python', lastRun: '2024-01-19', status: 'success' },
           { id: '3', name: 'Clear Cache', language: 'PowerShell', lastRun: '2024-01-18', status: 'failed' },
         ]}
-        columns={
-          [
-            { key: 'name', label: 'Script Name' },
-            { key: 'language', label: 'Language' },
-            { key: 'lastRun', label: 'Last Run' },
-            { key: 'status', label: 'Status' },
-          ] as TableColumn<{ id: string; name: string; language: string; lastRun: string; status: string }>[]
-        }
-        rowKey="id"
+        columns={scriptColumns}
       />
     ),
   },
@@ -367,7 +415,7 @@ export const LogsPageExample: Story = {
     searchValue: '',
     onSearch: () => {},
     children: (
-      <Table
+      <StoryTable
         data={[
           {
             id: '1',
@@ -398,15 +446,7 @@ export const LogsPageExample: Story = {
             source: 'cache-service',
           },
         ]}
-        columns={
-          [
-            { key: 'timestamp', label: 'Timestamp' },
-            { key: 'level', label: 'Level' },
-            { key: 'message', label: 'Message' },
-            { key: 'source', label: 'Source' },
-          ] as TableColumn<{ id: string; timestamp: string; level: string; message: string; source: string }>[]
-        }
-        rowKey="id"
+        columns={logColumns}
       />
     ),
   },
@@ -426,7 +466,7 @@ export const WithMobileFilter: Story = {
   },
   render: function WithMobileFilterStory() {
     const [searchValue, setSearchValue] = useState('');
-    const [filters, setFilters] = useState<TableFilters>({});
+    const [filters, setFilters] = useState<DataTableFilters>({});
     const [sortBy, setSortBy] = useState<string | undefined>();
     const [sortDirection, setSortDirection] = useState<SortDirection | undefined>();
 
@@ -525,13 +565,7 @@ export const WithMobileFilter: Story = {
         onMobileSort={handleSort}
         mobileFilterTitle="Sort and Filter"
       >
-        <Table
-          data={sortedDevices}
-          columns={deviceColumns}
-          onFilterChange={setFilters}
-          rowKey="id"
-          emptyMessage="No devices match your criteria."
-        />
+        <StoryTable data={sortedDevices} columns={deviceColumns} emptyMessage="No devices match your criteria." />
       </ListPageLayout>
     );
   },

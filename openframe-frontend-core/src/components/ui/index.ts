@@ -14,6 +14,7 @@ export * from './date-picker';
 export * from './duration-input';
 export * from './field';
 export * from './field-wrapper';
+export * from './field-value-skeleton';
 export * from './honeypot-field';
 export * from './info-hint';
 export * from './json-detail-list';
@@ -65,6 +66,9 @@ export * from './badge';
 export * from './ai-generated-badge';
 export * from './fade-preview';
 export * from './layout-hold';
+export * from './skeleton-surface';
+export * from './input-styles';
+export * from './loading-scope';
 export * from './progress';
 export * from './release-changelog-section';
 export * from './stacked-rows-panel';
@@ -127,6 +131,8 @@ export * from './avatar-stack';
 export * from './people-cell';
 export * from './deleted-user-avatar';
 export * from './square-avatar';
+// THE sizes of the library's components (avatars, icons, tiles, media, text rows).
+export * from '../../styles/component-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';
@@ -136,38 +142,11 @@ export * from './touch-friendly-tooltip';
 export * from './error-state';
 export * from './content-loader';
 
-// Table components
-export {
-  Table,
-  TableCardSkeleton,
-  TableCell,
-  TableDescriptionCell,
-  TableEmptyState,
-  TableHeader,
-  TableRow,
-  TableTimestampCell,
-} from './table';
-
-export type {
-  PagePagination,
-  RowAction,
-  TableCardSkeletonProps,
-  TableCellProps,
-  TableColumn,
-  TableDescriptionCellProps,
-  TableEmptyStateProps,
-  TableHeaderProps,
-  TableProps,
-  TableRowProps,
-  TableTimestampCellProps,
-} from './table';
-
 // Query Report Table (dynamic columns for osquery results)
 export {
   QueryReportTable,
   QueryReportTableHeader,
   QueryReportTableRow,
-  QueryReportTableSkeleton,
   deriveColumns,
   exportToCSV,
 } from './query-report-table';
@@ -176,7 +155,6 @@ export type {
   QueryReportTableProps,
   QueryReportTableHeaderProps,
   QueryReportTableRowProps,
-  QueryReportTableSkeletonProps,
   QueryResultRow,
 } from './query-report-table';
 
@@ -184,7 +162,7 @@ export type {
 export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 
-// DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
+// DataTable (headless, TanStack Table-based): the lib's one table.
 export * from './data-table';
 
 // Password input (show/hide toggle)
@@ -249,6 +227,22 @@ export * from './incident-feed';
 export * from './status-line';
 export * from './snap-carousel';
 export * from './sticky-action-bar';
+export * from './super-user-banner-view';
 export { RequiredMark } from './required-mark';
 export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';
+export type { DateRange } from 'react-day-picker';
+export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from '../layout/title-block';
+export type { TitleBlockProps, TitleSkeletonLines } from '../layout/title-block';
+export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
+export {
+  ORGANIZATION_CARD_RADIUS_CLASS,
+  ORGANIZATION_CARD_LAYOUT_CLASS,
+  ORGANIZATION_CARD_SURFACE_CLASS,
+  ORGANIZATION_CARD_HEADER_CLASS,
+  ORGANIZATION_CARD_TEXT_CLASS,
+  ORGANIZATION_CARD_DESCRIPTION_CLASS,
+  ORGANIZATION_CARD_FOOTER_CLASS,
+  ORGANIZATION_CARD_STATS_CLASS,
+  ORGANIZATION_CARD_STAT_CLASS,
+} from './organization-card';

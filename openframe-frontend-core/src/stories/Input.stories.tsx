@@ -167,12 +167,13 @@ export const SearchInput: Story = {
 };
 
 /**
- * Input with loading spinner.
+ * Input with an action in progress (`pending`): the spinner in the end slot. A field whose value is still being read
+ * is drawn by a loading scope instead.
  */
-export const Loading: Story = {
+export const Pending: Story = {
   args: {
     placeholder: 'Searching...',
-    loading: true,
+    pending: true,
     startAdornment: <SearchIcon size={20} />,
   },
 };

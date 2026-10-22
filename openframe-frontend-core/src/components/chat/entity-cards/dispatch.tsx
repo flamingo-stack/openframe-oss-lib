@@ -56,6 +56,7 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
+import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from '../../../utils/source-icons';
 import { AgentMark } from '../../agent-mark';
 import { EntityIcon } from '../../icon-display';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
@@ -82,13 +83,14 @@ import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/q
 import { TrophyIcon } from '../../icons-v2-generated/sport/trophy-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
+import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
+import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
 import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
-import { MingoInfoCard, MingoInfoCardSkeleton, type MingoInfoCardStatus } from '../mingo-info-card';
-import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime';
+import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card';
 import { SourceActionButton } from '../source-action-button';
 import type { PrReviewState, GitHubActivityKind } from '../types/entities/github-activity';
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
@@ -100,14 +102,12 @@ import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
 import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
-import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from '../utils/source-icons';
 import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
-import { BlogCardSkeleton } from './blog-card';
-import { CampaignCardAdminSkeleton } from './campaign-card-admin';
-import { CaseStudyCardSkeleton } from './case-study-card';
+import { BlogCard } from './blog-card';
+import { CaseStudyCard } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
-import { CustomerInterviewCardSkeleton } from './customer-interview-card';
+import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
 import {
@@ -116,12 +116,11 @@ import {
   kindLabel as githubKindLabel,
   reviewStateLabel,
 } from './github-activity-card';
-import { InvestorUpdateCardSkeleton } from './investor-update-card';
-import { OnboardingGuideCardSkeleton } from './onboarding-guide-card';
-import { ProductReleaseCardSkeleton, type ProductReleaseCardProps } from './product-release-card';
+import { InvestorUpdateCard } from './investor-update-card';
+import { OnboardingGuideCard } from './onboarding-guide-card';
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults';
-import { ProgramCardSkeleton } from './program-card';
-import { RoadmapCardSkeleton } from './roadmap-card';
+import { ProgramCard } from './program-card';
+import { RoadmapCard } from './roadmap-card';
 import { TaskTypeIcon } from './task-type-icon';
 
 // =============================================================================
@@ -218,7 +217,7 @@ export interface ChatCardDispatchExtras {
    *  `lib/utils/product-release-card-props.ts`. */
   buildProductReleaseCardProps?: (
     release: unknown,
-  ) => Omit<ProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>;
+  ) => Omit<LoadedProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>;
   /** Build a branded OG placeholder URL from an entity title. Compact chat-
    *  inline cards (`size='sm'` for blog/case-study/customer-interview/
    *  investor-update/onboarding-guide) pass the result as `placeholderUrl`
@@ -1372,7 +1371,7 @@ function refHydratedEntry(
     contentRefType: docType,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
   };
 }
@@ -1556,7 +1555,7 @@ function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     bareInline: true,
     contentRefType: docType,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <GlyphChatCard
         chatRef={fetchedEmployeeEntryDisplayRef(item, chatRef)}
@@ -1592,7 +1591,7 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
-    skeleton: () => <ProgramCardSkeleton size="sm" />,
+    skeleton: () => <ProgramCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <ProgramChatCard
         item={item}
@@ -1643,7 +1642,7 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     bareInline: true,
     ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
     ...(cfg.fallbackHref ? { fallbackHref: cfg.fallbackHref } : {}),
-    skeleton: () => <RoadmapCardSkeleton size="sm" />,
+    skeleton: () => <RoadmapCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <RoadmapChatCard
         item={item}
@@ -1696,7 +1695,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: 'faq',
     noComposedHref: true,
     fallbackHref: (item: ChatCardItem) => (item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null),
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1711,7 +1710,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
     noComposedHref: true,
     fallbackHref: () => TRUST_CENTER_PAGE_PATH,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1749,7 +1748,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Blog post',
     contentRefType: 'blog_post_existing',
     bareInline: true,
-    skeleton: () => <BlogCardSkeleton size="sm" />,
+    skeleton: () => <BlogCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <BlogChatCard
         item={item}
@@ -1765,7 +1764,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
-    skeleton: () => <CaseStudyCardSkeleton size="sm" />,
+    skeleton: () => <CaseStudyCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <CaseStudyChatCard
         item={item}
@@ -1782,7 +1781,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     bareInline: true,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1791,7 +1790,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
-    skeleton: () => <CustomerInterviewCardSkeleton size="sm" />,
+    skeleton: () => <CustomerInterviewCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <CustomerInterviewChatCard
         item={item}
@@ -1806,7 +1805,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
-    skeleton: () => <ProductReleaseCardSkeleton size="sm" />,
+    skeleton: () => <ProductReleaseCard loading size="sm" />,
     render: (item, chatRef, opts) => {
       // Embedder-provided builder wins; lib default fills in otherwise
       // (covers `coverImage`, `hasVideoCover`, `formattedDate` — the
@@ -1831,7 +1830,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
-    skeleton: () => <InvestorUpdateCardSkeleton size="sm" />,
+    skeleton: () => <InvestorUpdateCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <InvestorUpdateChatCard
         item={item}
@@ -1848,7 +1847,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     bareInline: true,
     // "Display" affordance (verbatim guide body) instead of "Ask".
     displayAction: true,
-    skeleton: () => <OnboardingGuideCardSkeleton size="sm" />,
+    skeleton: () => <OnboardingGuideCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <OnboardingGuideChatCard
         item={item}
@@ -1863,7 +1862,7 @@ export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
-    skeleton: () => <CampaignCardAdminSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     // No public viewer — synthesize the hub-internal admin URL post-fetch
     // so the wrapper + isNewTab computation see the actual destination.
     fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),
@@ -2253,11 +2252,3 @@ export function renderChatInlineEntityCard(
 
   return loader;
 }
-
-// =============================================================================
-// NavLink wiring for callers that need to compose anchors (Task 2 + Task 3)
-// =============================================================================
-
-/** Re-export so call sites can wrap any subtree with chat-runtime
- *  routing in a single import. */
-export { NavLinkAnchorViaRuntime };

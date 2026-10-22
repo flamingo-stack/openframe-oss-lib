@@ -72,6 +72,12 @@ export interface OpenframeDevSection {
     title: string;
     description: string;
   };
+  /**
+   * The section's records are mirrored from another system (ClickUp, HubSpot), so its list states where they are
+   * synced from: the page's sync line is drawn, loading and loaded. `false` for records the host authors itself
+   * (releases, onboarding guides): no line is drawn while loading, so a page that states none never loses a row.
+   */
+  mirrored: boolean;
   /** Inline search bar configuration. */
   search: {
     /** Placeholder text shown in the search input. */
@@ -101,6 +107,7 @@ export interface OpenframeDevSection {
 
 export const OPENFRAME_DEV_SECTIONS = {
   roadmap: {
+    mirrored: true,
     href: '/roadmap',
     icon: MapIcon,
     navigator: {
@@ -121,6 +128,7 @@ export const OPENFRAME_DEV_SECTIONS = {
     },
   },
   delivery: {
+    mirrored: true,
     href: '/bug-fixes-and-enhancements',
     icon: Wrench,
     navigator: {
@@ -141,6 +149,7 @@ export const OPENFRAME_DEV_SECTIONS = {
     },
   },
   releases: {
+    mirrored: false,
     href: '/releases',
     icon: Rocket,
     navigator: {
@@ -161,6 +170,7 @@ export const OPENFRAME_DEV_SECTIONS = {
     },
   },
   onboarding: {
+    mirrored: false,
     href: '/onboarding-guides',
     icon: GraduationCap,
     navigator: {
@@ -183,6 +193,7 @@ export const OPENFRAME_DEV_SECTIONS = {
     filter: null,
   },
   tickets: {
+    mirrored: true,
     href: '/tickets',
     icon: LifeBuoy,
     navigator: {

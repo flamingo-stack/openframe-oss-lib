@@ -12,6 +12,7 @@ import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.spec.DeliveryAudience;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.spec.TestPayload;
+import com.openframe.delivery.sweep.MachineOnlineStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +42,7 @@ class DeliveryRecorderTest {
 
     @Mock private MachineDeliveryRepository repository;
     @Mock private MachineDeliverySequenceRepository sequences;
+    @Mock private MachineOnlineStatus onlineStatus;
 
     @Captor private ArgumentCaptor<MachineDelivery> deliveryCaptor;
 
@@ -60,13 +62,14 @@ class DeliveryRecorderTest {
                 .machineId(MACHINE_ID)
                 .payload(payload)
                 .build();
-        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new JsonMapper()));
+        recorder = new DeliveryRecorder(repository, sequences, DeliveryTestPolicies.properties(), new DeliveryPayloadJson(new JsonMapper()), onlineStatus);
     }
 
     @Test
     void record_sequenceAssignedByARollout_keptAndCounterUntouched() {
         // setup
         payload.getDelivery().setSequence(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
         when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
@@ -94,9 +97,10 @@ class DeliveryRecorderTest {
     }
 
     @Test
-    void record_request_pendingRowUpsertedDueAfterAckThreshold() {
+    void record_machineOnline_pendingRowUpsertedDueAfterAckThreshold() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
         when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
@@ -119,9 +123,30 @@ class DeliveryRecorderTest {
     }
 
     @Test
+    void record_machineNotOnline_rowDueAtOnceAndHeld() {
+        // setup
+        when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(false);
+        when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
+
+        // execution
+        DeliveryRecordOutcome outcome = recorder.record(request);
+
+        // verifications
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.HELD);
+        verify(repository).upsertPending(deliveryCaptor.capture());
+        MachineDelivery saved = deliveryCaptor.getValue();
+        assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
+        assertThat(saved.getAttempts()).isZero();
+        assertThat(saved.getDueAt()).isEqualTo(saved.getDispatchedAt());
+        assertThat(saved.getExpiresAt()).isEqualTo(saved.getDispatchedAt().plusSeconds(TTL));
+    }
+
+    @Test
     void record_request_sequenceStampedIntoThePayloadBeforeItIsStored() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
         when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
         // execution
@@ -138,6 +163,7 @@ class DeliveryRecorderTest {
     void record_rowHeldByANewerDispatch_outrankedNothingElse() {
         // setup
         when(sequences.next()).thenReturn(SEQUENCE);
+        when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
         when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(false);
 
         // execution

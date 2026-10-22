@@ -11,7 +11,13 @@
  * subject of this file.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearDismissCookie, isDismissedCookieValue, readDismissCookie, writeDismissCookie } from '../dismiss-cookie';
+import {
+  clearDismissCookie,
+  dismissedBeforePaintScript,
+  isDismissedCookieValue,
+  readDismissCookie,
+  writeDismissCookie,
+} from '../dismiss-cookie';
 
 const KEY = 'openframe-walkthrough-video-dismissed';
 const nativeUrlDescriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'URL');
@@ -129,5 +135,39 @@ describe('clearing across the tier split', () => {
 
     setDocumentUrl('tauri://localhost/index.html');
     expect(readDismissCookie(KEY)).toBeUndefined();
+  });
+});
+
+describe('the pre-paint script', () => {
+  const ATTR = 'data-test-dismissed';
+  // The script is a string a host inlines; run it the way the page does, as an inline <script>.
+  const run = (id: string) => {
+    const script = document.createElement('script');
+    script.textContent = dismissedBeforePaintScript(KEY, id, ATTR);
+    document.body.appendChild(script);
+    script.remove();
+  };
+
+  beforeEach(() => setDocumentUrl('https://www.flamingo.run/blog/x'));
+  afterEach(() => document.documentElement.removeAttribute(ATTR));
+
+  it('marks the document when the cookie holds this id', () => {
+    writeDismissCookie(KEY, 'ann 1/ü');
+    run('ann 1/ü');
+    expect(document.documentElement.hasAttribute(ATTR)).toBe(true);
+  });
+
+  it('leaves the document alone for another id or no cookie', () => {
+    run('ann-2');
+    expect(document.documentElement.hasAttribute(ATTR)).toBe(false);
+    writeDismissCookie(KEY, 'ann-1');
+    run('ann-2');
+    expect(document.documentElement.hasAttribute(ATTR)).toBe(false);
+  });
+
+  it('fails open on a value it cannot decode', () => {
+    document.cookie = `${KEY}=%E0%A4%A; path=/`;
+    expect(() => run('x')).not.toThrow();
+    expect(document.documentElement.hasAttribute(ATTR)).toBe(false);
   });
 });

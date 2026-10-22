@@ -55,6 +55,7 @@ export function LogsPageView({
       {!hideSearch && (
         <div className="sticky top-0 z-20 -my-[var(--spacing-system-l)] flex items-center gap-[var(--spacing-system-m)] bg-ods-bg py-[var(--spacing-system-l)]">
           <Input
+            userValue
             placeholder="Search for Logs"
             value={search}
             onChange={e => onSearchChange(e.target.value)}

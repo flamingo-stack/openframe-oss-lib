@@ -20,11 +20,13 @@
 import type { ComponentType } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import { cn } from '../../../utils/cn';
 import { FaqSection, pageFaqProps, type PageFaqSlot } from '../../faq/faq-section';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { LoadingRegion } from '../../loading/loading-region';
 import { PageShell, PageLayout } from '../../ui';
 import { DataSyncLine } from '../../ui/data-attribution';
-import { RichMarkdownRenderer } from '../../ui/markdown';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { MarkdownEngine, RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
 import { useLegalDocuments } from './use-legal-documents';
 
@@ -98,6 +100,26 @@ export function legalDocumentStampLabel(
   return parts.length > 0 ? parts.join(' \u00b7 ') : null;
 }
 
+/**
+ * Sections a legal document's skeleton draws: its first fold. One section at the rendered `article` type is about
+ * 290px (a 32px heading with its rule and margins, then a three-line and a two-line paragraph at 20px / 1.6) from
+ * desktop and about 260px on a phone, so three fill the screen under the page title at 1440 and at 390; a long
+ * document is drawn no further.
+ */
+export const LEGAL_DOCUMENT_SKELETON_SECTIONS = 3;
+
+/**
+ * A legal document's body while it is read: the markdown engine's own loading form (`MarkdownEngine loading`, at the
+ * `article` type the page renders with), opening with the document's own title row, then its first fold of sections.
+ */
+function LegalDocumentSkeleton({ sections = LEGAL_DOCUMENT_SKELETON_SECTIONS }: { sections?: number }) {
+  return (
+    <LoadingRegion label="Loading the document" className="w-full">
+      <MarkdownEngine loading content="" skeletonTitle skeletonSections={sections} textSize="article" />
+    </LoadingRegion>
+  );
+}
+
 export function LegalDocumentPage({
   docType,
   title: titleProp,
@@ -115,7 +137,9 @@ export function LegalDocumentPage({
   shell = true,
 }: LegalDocumentPageProps) {
   const router = useRouter();
-  const { data, isLoading, error } = useLegalDocs(docType, { initialData, apiEndpoint });
+  const { data, isLoading: fetching, error } = useLegalDocs(docType, { initialData, apiEndpoint });
+  // In a page's loading state the document is read: the page draws its skeleton (and fetches nothing).
+  const isLoading = useLoadingScope() || fetching;
 
   // Back-button config — mirrors DevSectionPage's `{ label: 'Back to home',
   // onClick: () => router.push('/') }`. Hide entirely when caller passes
@@ -141,31 +165,27 @@ export function LegalDocumentPage({
   // states its own version and effective date shows those (they are what a
   // reader agreed to), else the fallback description. When it was last read from
   // its repository is the shared sync line under the title.
-  const subtitle = legalDocumentStampLabel(data) ?? fallbackDescription;
+  // While it is read the stamp is unknown: its line is held (never the fallback description).
+  const subtitle = isLoading ? undefined : (legalDocumentStampLabel(data) ?? fallbackDescription);
 
   const inner = (
-    <PageLayout title={title} subtitle={subtitle} backButton={backCfg} titleSize="h1" titleWrap>
-      <DataSyncLine sync={data ? { source: 'github', syncedAt: data.lastSynced } : null} loading={isLoading && !data} />
+    <PageLayout
+      title={title}
+      subtitle={subtitle}
+      subtitleRow={isLoading ? 'always' : undefined}
+      backButton={backCfg}
+      titleSize="h1"
+      titleWrap
+    >
+      <DataSyncLine sync={data ? { source: 'github', syncedAt: data.lastSynced } : null} loading={isLoading} />
 
       <div className="flex flex-1 flex-col items-start gap-6 lg:flex-row lg:gap-10">
-        <div className="flex-1">
+        {/* While loading the column has no text to size it (the row is `items-start` on a phone): it takes the row's width. */}
+        <div className={cn('flex-1', isLoading && 'w-full')}>
           <div className="w-full">
             <article className="space-y-2">
               {isLoading ? (
-                // Loading skeleton matching Knowledge Hub pattern
-                <div className="space-y-6">
-                  <UnifiedSkeleton className="h-10 w-3/4 rounded-lg" />
-                  <div className="space-y-4">
-                    <UnifiedSkeleton className="h-4 w-full rounded" />
-                    <UnifiedSkeleton className="h-4 w-full rounded" />
-                    <UnifiedSkeleton className="h-4 w-5/6 rounded" />
-                  </div>
-                  <UnifiedSkeleton className="h-32 rounded-lg border border-ods-border" />
-                  <div className="space-y-4">
-                    <UnifiedSkeleton className="h-4 w-full rounded" />
-                    <UnifiedSkeleton className="h-4 w-4/5 rounded" />
-                  </div>
-                </div>
+                <LegalDocumentSkeleton />
               ) : error ? (
                 <div className="space-y-4 text-center">
                   <div className="rounded-lg border border-ods-error bg-ods-error-secondary p-6">

@@ -9,6 +9,7 @@
 export {
   LegalDocumentPage,
   legalDocumentStampLabel,
+  LEGAL_DOCUMENT_SKELETON_SECTIONS,
   type LegalDocumentPageProps,
   type LegalDocumentMarkdownRendererProps,
 } from './legal-document-page';
