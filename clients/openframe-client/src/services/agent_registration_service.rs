@@ -175,6 +175,7 @@ impl AgentRegistrationService {
             .get_agent_version()
             .unwrap_or_default();
         let os_type = self.device_data_fetcher.get_os_type();
+        let os_version = self.device_data_fetcher.get_os_version();
         let organization_id = self
             .initial_configuration_service
             .get_org_id()
@@ -190,6 +191,8 @@ impl AgentRegistrationService {
             organization_id,
             user_id: user_id.to_string(),
             os_type,
+            os_version: os_version.version,
+            os_build: os_version.build,
             tags,
         };
 
