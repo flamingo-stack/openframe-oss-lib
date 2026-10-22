@@ -1,16 +1,23 @@
 use crate::config::update_config::{CRASH_LOOP_MAX_BOOT_ATTEMPTS, UPDATER_TRANSCRIPTS_KEPT};
 use crate::models::openframe_client_info::ClientUpdateStatus;
 use crate::models::update_state::{UpdatePhase, UpdateState};
+use crate::models::{DeliveryResult, CLIENT_UPDATE_DELIVERY_TYPE};
 use crate::platform::updater_launcher::{self, UpdaterParams};
 use crate::service::FULL_SERVICE_NAME;
 use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
 use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
+use crate::services::result_store::ResultStore;
 use crate::services::update_cleanup_service::UpdateCleanupService;
 use crate::services::update_state_service::UpdateStateService;
 use anyhow::Result;
+use std::sync::Arc;
 use tracing::{info, warn};
+
+const ERROR_INTERRUPTED_BEFORE_LAUNCH: &str =
+    "interrupted by agent restart before the updater started";
+
 #[derive(Clone)]
 pub struct UpdateHandlerService {
     state_service: UpdateStateService,
@@ -19,6 +26,7 @@ pub struct UpdateHandlerService {
     last_known_good_service: LastKnownGoodService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
     config_service: AgentConfigurationService,
+    result_store: Arc<ResultStore>,
 }
 
 impl UpdateHandlerService {
@@ -29,6 +37,7 @@ impl UpdateHandlerService {
         last_known_good_service: LastKnownGoodService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
         config_service: AgentConfigurationService,
+        result_store: Arc<ResultStore>,
     ) -> Self {
         Self {
             state_service,
@@ -37,6 +46,7 @@ impl UpdateHandlerService {
             last_known_good_service,
             installed_agent_publisher,
             config_service,
+            result_store,
         }
     }
 
@@ -119,7 +129,14 @@ impl UpdateHandlerService {
     pub async fn handle_pending_update(&self) -> Result<()> {
         let update_state = match self.state_service.load().await? {
             Some(state) => state,
-            None => return Ok(()),
+            None => {
+                self.report_delivery(
+                    DeliveryResult::Failed,
+                    Some(ERROR_INTERRUPTED_BEFORE_LAUNCH.to_string()),
+                )
+                .await;
+                return Ok(());
+            }
         };
 
         info!(
@@ -183,6 +200,7 @@ impl UpdateHandlerService {
         }
 
         self.send_nats_notification(&state.target_version).await;
+        self.report_delivery(DeliveryResult::Done, None).await;
 
         self.cleanup_service.cleanup_all().await;
         self.last_known_good_service
@@ -216,6 +234,15 @@ impl UpdateHandlerService {
             warn!("Failed to set update status to Failed: {:#}", e);
         }
 
+        let reason = state.last_error.clone().unwrap_or_else(|| {
+            format!(
+                "update to {} failed in phase {:?}",
+                state.target_version, state.phase
+            )
+        });
+        self.report_delivery(DeliveryResult::Failed, Some(reason))
+            .await;
+
         self.cleanup_service.cleanup_all().await;
         self.last_known_good_service
             .prune_transcripts(UPDATER_TRANSCRIPTS_KEPT)
@@ -224,6 +251,64 @@ impl UpdateHandlerService {
 
         info!("Update marked as failed");
         Ok(())
+    }
+
+    // settles a CLIENT_UPDATE delivery waiting for this start; a legacy update has none
+    async fn report_delivery(&self, result: DeliveryResult, error: Option<String>) {
+        let settled = match self
+            .result_store
+            .delivery_settle_awaiting_restart(
+                CLIENT_UPDATE_DELIVERY_TYPE.to_string(),
+                result,
+                error,
+            )
+            .await
+        {
+            Ok(settled) => settled,
+            Err(e) => {
+                warn!(
+                    "Failed to queue the client update delivery result, the backend closes it on timeout: {:#}",
+                    e
+                );
+                return;
+            }
+        };
+        if settled.is_empty() {
+            return;
+        }
+        info!(
+            settled = settled.len(),
+            ?result,
+            "Client update delivery result queued"
+        );
+        if result != DeliveryResult::Done {
+            return;
+        }
+        let machine_id = match self.config_service.get_machine_id() {
+            Ok(machine_id) => machine_id,
+            Err(e) => {
+                warn!(
+                    "Failed to resolve the machine id to record the applied client update: {:#}",
+                    e
+                );
+                return;
+            }
+        };
+        for delivery in settled {
+            let Some(sequence) = delivery.sequence else {
+                continue;
+            };
+            if let Err(e) = self
+                .result_store
+                .record_applied_sequence(&delivery, &machine_id, sequence)
+                .await
+            {
+                warn!(
+                    sequence,
+                    "Failed to record the applied client update sequence: {:#}", e
+                );
+            }
+        }
     }
 
     async fn send_nats_notification(&self, version: &str) {
