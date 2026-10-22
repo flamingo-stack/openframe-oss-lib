@@ -16,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static com.openframe.authz.support.SsoTestFixtures.tenant;
@@ -56,7 +55,7 @@ class TenantRegistrationServiceTest {
         Tenant created = tenant("reserved-id", TenantStatus.ACTIVE);
         AuthUser owner = activeUser("owner-1", "reserved-id", "owner@acme.com");
         when(tenantService.existByDomain("acme")).thenReturn(false);
-        when(userService.findActiveByEmail("owner@acme.com")).thenReturn(Optional.empty());
+        when(userService.existsActiveByEmail("owner@acme.com")).thenReturn(false);
         when(registrationProcessor.reserveTenantIdForRegistration(any())).thenReturn("reserved-id");
         when(tenantService.createTenant("reserved-id", "Acme", "acme")).thenReturn(created);
         when(userService.registerUser("reserved-id", "owner@acme.com", "O", "W", "Str0ng-password!", List.of(UserRole.OWNER)))
@@ -76,7 +75,7 @@ class TenantRegistrationServiceTest {
     void shouldCreateVerifiedOwnerForSsoRegistration() {
         Tenant created = tenant("t", TenantStatus.ACTIVE);
         when(registrationProcessor.reserveTenantIdForRegistration(any())).thenReturn("t");
-        when(userService.findActiveByEmail(anyString())).thenReturn(Optional.empty());
+        when(userService.existsActiveByEmail(anyString())).thenReturn(false);
         when(tenantService.createTenant(any(), any(), any())).thenReturn(created);
         when(userService.registerVerifiedUser(any(), any(), any(), any(), any(), any())).thenReturn(activeUser("o", "t", "owner@acme.com"));
         when(tenantService.save(created)).thenReturn(created);
@@ -97,7 +96,7 @@ class TenantRegistrationServiceTest {
 
     @Test
     void shouldRejectEmailActiveInAnyTenant() {
-        when(userService.findActiveByEmail("owner@acme.com")).thenReturn(Optional.of(activeUser("x", "other", "owner@acme.com")));
+        when(userService.existsActiveByEmail("owner@acme.com")).thenReturn(true);
 
         assertThatThrownBy(() -> service.registerTenant(request(false))).hasMessageContaining("already belongs to another tenant");
         verify(tenantService, never()).createTenant(any(), any(), any());

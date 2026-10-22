@@ -132,7 +132,7 @@ class AppleNativeDiscoveryControllerTest {
     @Test
     void shouldRegisterTenantForNewAppleIdentity() {
         when(verifier.verify("id", "nonce")).thenReturn(identity(Map.of("email", "Tim@NewCo.com", "email_verified", true)));
-        when(userService.findActiveByEmail("tim@newco.com")).thenReturn(Optional.empty());
+        when(userService.existsActiveByEmail("tim@newco.com")).thenReturn(false);
         when(registrationService.registerTenant(any())).thenReturn(tenant("newco", TenantStatus.ACTIVE));
 
         assertThat(controller.register(register("NEWCO")).tenantId()).isEqualTo("newco");
@@ -147,7 +147,7 @@ class AppleNativeDiscoveryControllerTest {
     void shouldRefuseRegistrationOfLinkedOrExistingAccount() {
         when(verifier.verify(any(), any())).thenReturn(identity(Map.of("email", "tim@newco.com")));
         doThrow(new SsoAlreadyLinkedException()).doNothing().when(ssoIdentityService).ensureNotAlreadyLinked(eq("apple"), anyMap());
-        when(userService.findActiveByEmail("tim@newco.com")).thenReturn(Optional.of(activeUser("u", "t", "tim@newco.com")));
+        when(userService.existsActiveByEmail("tim@newco.com")).thenReturn(true);
 
         assertStatus(() -> controller.register(register("newco")), HttpStatus.CONFLICT, "already_linked");
         assertStatus(() -> controller.register(register("newco")), HttpStatus.CONFLICT, "account_exists");
