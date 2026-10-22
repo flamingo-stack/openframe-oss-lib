@@ -1,3 +1,4 @@
+#[cfg(any(target_os = "macos", windows))]
 use tracing::warn;
 
 /// OS version label and build identifier in Fleet's `os_version` / `build` shape; `None` when unknown.
