@@ -1,7 +1,7 @@
 package com.openframe.data.repository.organization.publishing;
 
 import com.openframe.data.document.organization.OrganizationStatus;
-import com.openframe.publishing.api.PublishedEvent;
+import com.openframe.publishing.api.spec.PublishedEvent;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

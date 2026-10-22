@@ -1,24 +1,38 @@
 package com.openframe.publishing.config;
 
-import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
-import com.openframe.publishing.spec.PublishedAggregateSpecRegistry;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 // What the compiler cannot check is checked when the service starts.
+@ExtendWith(OutputCaptureExtension.class)
 class PublishedAggregateConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(EventsConfiguration.class, PublishedAggregateSpecRegistry.class,
+            .withUserConfiguration(EventsConfiguration.class, AggregateSpecRegistry.class,
                     PublishedAggregateStartupCheck.class, PublishedAggregateTopics.class);
 
     @Test
-    void aMistypedTopicKey_stopsTheServiceFromStarting() {
-        runner.withPropertyValues("openframe.events.topics.organisations.publish=true")
-                .run(context -> assertThat(context).hasFailed());
+    void aMistypedTopicKeyWithPublishOn_stopsTheServiceFromStarting() {
+        runner.withBean(WidgetSpec.class)
+                .withPropertyValues("openframe.events.topics.organisations.publish=true")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure().hasMessageContaining("[organisations]").hasMessageContaining("[organizations]"));
+    }
+
+    @Test
+    void aMistypedTopicKeyWithPublishOff_logsAWarn_butStarts_soARolledBackImageStillRuns(CapturedOutput output) {
+        runner.withBean(WidgetSpec.class)
+                .withPropertyValues("openframe.events.topics.organisations.publish=false")
+                .run(context -> assertThat(context).hasNotFailed());
+
+        assertThat(output).contains("WARN").contains("openframe.events.topics names [organisations]");
     }
 
     @Test
@@ -35,7 +49,7 @@ class PublishedAggregateConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
-                    assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isTrue();
+                    assertThat(topics.isPublishing("organizations")).isTrue();
                 });
     }
 
@@ -45,11 +59,11 @@ class PublishedAggregateConfigurationTest {
                 .withPropertyValues("openframe.events.topics.organizations.publish=false")
                 .run(context -> {
                     PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
-                    assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isFalse();
+                    assertThat(topics.isPublishing("organizations")).isFalse();
                 });
         runner.run(context -> {
             PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
-            assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isFalse();
+            assertThat(topics.isPublishing("organizations")).isFalse();
         });
     }
 
@@ -59,10 +73,10 @@ class PublishedAggregateConfigurationTest {
                 .withPropertyValues("openframe.events.topics.organizations.publish=false")
                 .run(context -> {
                     EventsProperties properties = context.getBean(EventsProperties.class);
-                    properties.getTopics().get(PublishedAggregateType.ORGANIZATIONS).setPublish(true);
+                    properties.getTopics().get("organizations").setPublish(true);
 
                     PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
-                    assertThat(topics.isPublishing(PublishedAggregateType.ORGANIZATIONS)).isFalse();
+                    assertThat(topics.isPublishing("organizations")).isFalse();
                 });
     }
 }

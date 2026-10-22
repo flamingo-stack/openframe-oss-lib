@@ -2,20 +2,27 @@ package com.openframe.data.repository.organization.publishing;
 
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
-import com.openframe.publishing.api.PublishedAggregateType;
+import com.openframe.data.repository.organization.OrganizationRepository;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
-class OrganizationSpecTest {
+class OrganizationAggregateSpecTest {
 
-    private final OrganizationSpec spec = new OrganizationSpec();
+    private final OrganizationOnTicketsProjection organizationOnTickets = new OrganizationOnTicketsProjection(mock(OrganizationRepository.class));
+    private final OrganizationAggregateSpec spec = new OrganizationAggregateSpec(organizationOnTickets);
+
+    @Test
+    void theOrganizationIsProjectedOnTickets() {
+        assertThat(spec.projections()).containsExactly(organizationOnTickets);
+    }
 
     @Test
     void publishesUnderTheOrganizationsType() {
-        assertThat(spec.getType()).isEqualTo(PublishedAggregateType.ORGANIZATIONS);
+        assertThat(spec.getType()).isEqualTo("organizations");
     }
 
     @Test

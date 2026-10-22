@@ -1,6 +1,5 @@
 package com.openframe.publishing.repository;
 
-import com.openframe.publishing.api.PublishingMongoRepository;
 import org.springframework.aop.support.StaticMethodMatcherPointcut;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.data.core.PropertyReferenceException;
@@ -16,7 +15,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-// The methods PublishingRepositoryInterceptor publishes: those marked on PublishingMongoRepository, and the repository's derived deletes.
+// The methods PublishingRepositoryInterceptor publishes: those marked on PublishedRepositoryWrites, and the repository's derived deletes.
 class PublishingRepositoryPointcut extends StaticMethodMatcherPointcut {
 
     // By signature, not Method: a caller holding the repository as CrudRepository calls CrudRepository.save, not our redeclaration.
@@ -73,7 +72,7 @@ class PublishingRepositoryPointcut extends StaticMethodMatcherPointcut {
 
     private static Map<String, PublishedWrite> baseWrites() {
         Map<String, PublishedWrite> writes = new HashMap<>();
-        for (Method method : PublishingMongoRepository.class.getDeclaredMethods()) {
+        for (Method method : PublishedRepositoryWrites.class.getDeclaredMethods()) {
             String signature = signatureOf(method);
             PublishesDelete delete = method.getAnnotation(PublishesDelete.class);
             if (method.isAnnotationPresent(PublishesChange.class)) {

@@ -20,10 +20,12 @@ service ──> OrganizationRepository.save(org)
             one Mongo transaction:  1. the write   2. its outbox rows (one per save, two per delete)
 ```
 
-- A repository becomes published by extending `PublishingMongoRepository<D, ID, S>`. `S` is the aggregate's spec,
-  which turns a document into its public event.
-- `PublishingRepositoryPostProcessor` adds the interceptor inside the proxy of every such repository. So aspects on
-  the repository wrap it from outside and never run inside the outbox transaction.
+- A repository publishes when its document is the `D` of an `AggregateSpec<D, E>` bean; the repository itself stays a
+  plain `MongoRepository`. The spec turns a document into its public event.
+- `PublishingRepositoryPostProcessor` adds the interceptor inside the proxy of every such repository, deciding from
+  the spec beans' types without creating them (a spec needs its projections, which may need that repository). So
+  aspects on the repository wrap it from outside and never run inside the outbox transaction. At startup an INFO line
+  `<repository> publishes <type>` names each one.
 - Writes that do not go through the repository (custom methods) publish themselves through `OutboxPublisher`.
 - The service does not start when a published repository is set up wrongly (see [Startup checks](#startup-checks)).
 
@@ -35,13 +37,13 @@ openframe:
     publishing:
       enabled: false      # the whole module (default false); a change needs a pod restart
     topics:
-      organizations:      # one key per PublishedAggregateType; an unknown key stops the service
+      organizations:      # one key per spec's getType(); publish: true for a type no spec has stops the service, any other unknown key logs a WARN
         publish: false    # per aggregate (default false); a change needs a pod restart
 ```
 
 | `publishing.enabled` | `publish` | Result |
 |---|---|---|
-| `false` | any | Nothing of this module exists. A `PublishingMongoRepository` is a plain Spring Data repository, exactly as before. A topic set to `true` gets a WARN at startup. |
+| `false` | any | Nothing of this module exists. Every repository is a plain Spring Data repository, exactly as before. A topic set to `true` gets a WARN at startup. |
 | `true` | `false` | The interceptor and the startup checks run. Writes run without a transaction and without outbox rows. |
 | `true` | `true` | Each write and its outbox rows commit together, or roll back together. |
 
@@ -52,10 +54,8 @@ transactions need one.
 
 Organization is the example; its files are in `openframe-data-mongo-sync`, next to `OrganizationRepository`.
 
-1. Add the type to [`PublishedAggregateType`](src/main/java/com/openframe/publishing/api/PublishedAggregateType.java).
-   Its name is the outbox `aggregateType`, the config key and the topic suffix.
-2. Give the document a `@Version Long version` field. The version orders the events for consumers.
-3. Write the event, only the public fields that consumers need. Never the Mongo document, never secrets:
+1. Give the document a `@Version Long version` field. The version orders the events for consumers.
+2. Write the event, only the public fields that consumers need. Never the Mongo document, never secrets:
 
    ```java
    @Data
@@ -70,34 +70,54 @@ Organization is the example; its files are in `openframe-data-mongo-sync`, next 
    }
    ```
 
-4. Write the spec as a bean:
+3. Write the spec as a bean. `getType()` is the type's name: the outbox `aggregateType`, the config key and the topic
+   suffix. Lower case letters, digits and dashes; two specs with one type stop the service.
 
    ```java
    @Component
-   public class OrganizationSpec implements PublishedAggregateSpec<Organization, OrganizationEvent> {
+   public class OrganizationAggregateSpec implements AggregateSpec<Organization, OrganizationEvent> {
 
        @Override
-       public PublishedAggregateType getType() {
-           return PublishedAggregateType.ORGANIZATIONS;
+       public String getType() {
+           return "organizations";
        }
 
        @Override
        public OrganizationEvent toEvent(Organization organization) {
            ...
        }
+
+       @Override
+       public List<Projection<OrganizationEvent, ?>> projections() {
+           return List.of(organizationOnTickets);        // the organization's projections, see Projections
+       }
    }
    ```
 
-5. Change the repository:
-
-   ```java
-   public interface OrganizationRepository
-           extends PublishingMongoRepository<Organization, String, OrganizationSpec>, CustomOrganizationRepository {
-   ```
-
-6. Find every other write of that collection (custom repository methods, `MongoTemplate` calls, services) and
+   The repository needs no change: it publishes because its document has a spec. One repository per published
+   document; a second one, or none, stops the service.
+4. Find every other write of that collection (custom repository methods, `MongoTemplate` calls, services) and
    publish each one with `OutboxPublisher`, or the change is silently not published.
-7. Add the config key, with `publish: false`, and enable it per environment.
+5. Add the config key, with `publish: false`, and enable it per environment.
+
+## Projections
+
+A projection is data that another collection keeps from a published document, for example `tickets.organizationName`
+(projection `organization-on-tickets`, the only one so far; the directory index's `organizationNameLower` follows once
+it works). The spec lists them in `projections()`, and each one implements
+[`Projection`](src/main/java/com/openframe/publishing/api/spec/Projection.java#L6):
+
+| Method | Who calls it, and when | What it does |
+|---|---|---|
+| `name()` | config, the reconciliation job, metrics | Its own name, for example `organization-on-tickets`: the key of its mode (`openframe.events.processing.projections.<name>.mode`), its reconciliation job id (`reconciliation:<name>`) and the tag of its metrics. Unique. |
+| `apply(record)` | the stream, for every event of the document, when the mode is `both` or `events` | Updates the projection from the event, through its own repository and with the version guard. For example: set `organizationName` on every ticket of that organization. |
+| `projectedClass()` | the nightly reconciliation job | The documents that hold the projection, for example `Ticket.class`. The job reads their collection in `_id` batches, saves its progress and knows when it is done. |
+| `projectedViewClass()` | the nightly reconciliation job | A small class with only the fields `reconcile` needs, for example `TicketOrganizationView` (id, tenant, organization id and name). The job reads only these fields, into this class. Its field names must be property names of `projectedClass()`: an unknown one stays null without an error, so the projection's test checks them. |
+| `reconcile(projectedItems)` | the nightly reconciliation job, once per batch | Gets one batch of projected items (for example tickets' organization fields), reads their source documents (matched by tenant and reference, for example `organizationId`), and returns a [`ReconciliationResult`](src/main/java/com/openframe/publishing/api/model/ReconciliationResult.java#L11) with each projected document that differs from its source or whose source is gone ([`ReconciliationResult.Mismatch`](src/main/java/com/openframe/publishing/api/model/ReconciliationResult.java#L23): tenant, projected item id and a reason for the logs), or `ReconciliationResult.allMatch()`. It writes nothing. |
+
+The interface forces all five methods; what they do is the projection's decision. A projection writes and reads
+only through its own repository methods, never a generic one, and has a contract test. In Mongo, "projection" also
+means the fields a query returns; here it always means the data built from a published document.
 
 ## What is published
 
@@ -110,7 +130,7 @@ Organization is the example; its files are in `openframe-data-mongo-sync`, next 
 | Derived deletes (`deleteByName`, `@Query(delete = true)`) | The two delete rows per returned document. They must return the documents, not a count. |
 | Reads | Nothing. |
 
-Every payload is the envelope [`PublishedRecord`](src/main/java/com/openframe/publishing/api/PublishedRecord.java):
+Every payload is the envelope [`PublishedRecord`](src/main/java/com/openframe/publishing/api/model/PublishedRecord.java):
 `tenantId`, `version`, `deleted`, `schemaVersion` and `event` (the spec's public event, `null` on a delete). The envelope
 is built from the row's own fields, so the two never disagree.
 
@@ -167,17 +187,17 @@ These writes produce no outbox row, and nothing warns about them:
 
 ## Startup checks
 
-`PublishingRepositoryStartupCheck` stops the service when a published repository:
+`PublishingRepositoryStartupCheck` stops the service when a published repository (one whose document has a spec):
 
 | Problem | Fix |
 |---|---|
-| Its spec class is not exactly one bean | Make the spec a `@Component`, once. |
+| The spec's document has no repository, or more than one | Keep exactly one repository per published document. |
 | Its document has no `@Version` field | Add `@Version Long version`. |
 | It has no `PublishingRepositoryInterceptor` | The repository was created outside Spring Data's normal setup; let the auto-configuration create it. |
 | It has an `@Update` method | It returns no documents to publish; write a custom method with `publishChanged` or `publishChangedByIds`. |
 | A derived delete returns a count, `void` or `boolean` | Return the deleted documents, for example as a `List`. |
-| A custom method carries `@PublishesChange` / `@PublishesDelete` | These markers are internal to `PublishingMongoRepository`; use `OutboxPublisher` instead. |
-| A Spring Data write method is not marked on `PublishingMongoRepository` | A new Spring Data version added a write; redeclare it there with a marker. |
+| A repository method carries `@PublishesChange` / `@PublishesDelete` | These markers are internal to the library's `PublishedRepositoryWrites`; use `OutboxPublisher` instead. |
+| A Spring Data write method is not in `PublishedRepositoryWrites` | A new Spring Data version added a write; add it there with a marker. |
 
 `PublishedAggregateStartupCheck` also stops the service when a topic has `publish: true` but no spec bean exists for
 its type.
@@ -240,7 +260,7 @@ What to look for:
 | `… with a null argument goes to Spring Data unpublished` | A base delete got `null`; Spring Data refuses it. |
 
 No `… is a … write` line at all for a repository call means the interceptor is not there: check that
-`openframe.events.publishing.enabled` is `true`.
+`openframe.events.publishing.enabled` is `true`, and that the startup log has `<repository> publishes <type>`.
 
 ## Tests
 

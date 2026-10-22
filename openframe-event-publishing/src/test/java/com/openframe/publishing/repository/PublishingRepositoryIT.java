@@ -1,6 +1,5 @@
 package com.openframe.publishing.repository;
 
-import com.openframe.publishing.api.PublishedAggregateType;
 import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetSpec;
@@ -25,7 +24,6 @@ import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
-import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -63,7 +61,6 @@ class PublishingRepositoryIT {
     }
 
     @Autowired private WidgetRepository widgetRepository;
-    @Autowired private PlainWidgetRepository plainWidgetRepository;
     @Autowired private CascadeLikeAspect cascadeLikeAspect;
     @Autowired private MongoTemplate mongoTemplate;
     @MockitoSpyBean private PublishedAggregateTopics publishedAggregateTopics;
@@ -234,7 +231,7 @@ class PublishingRepositoryIT {
 
     @Test
     void deleteAll_withPublishOff_stillDeletes() {
-        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
+        doReturn(false).when(publishedAggregateTopics).isPublishing("organizations");
         widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner")));
 
         widgetRepository.deleteAll();
@@ -326,7 +323,7 @@ class PublishingRepositoryIT {
 
     @Test
     void publishOff_writesWithoutARow() {
-        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
+        doReturn(false).when(publishedAggregateTopics).isPublishing("organizations");
 
         Widget saved = widgetRepository.save(widget("Printer"));
         widgetRepository.renameOne(saved.getId(), "Scanner");
@@ -337,7 +334,7 @@ class PublishingRepositoryIT {
 
     @Test
     void publishOff_everyOtherWriteAndDelete_runsWithoutARow() {
-        doReturn(false).when(publishedAggregateTopics).isPublishing(PublishedAggregateType.ORGANIZATIONS);
+        doReturn(false).when(publishedAggregateTopics).isPublishing("organizations");
         List<Widget> saved = widgetRepository.saveAll(List.of(widget("Printer"), widget("Scanner"), widget("Router")));
         widgetRepository.insert(List.of(widget("Printer"), widget("Scanner"), widget("Router")));
 
@@ -359,13 +356,6 @@ class PublishingRepositoryIT {
         assertThatThrownBy(() -> widgetRepository.deleteAllById(null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> widgetRepository.delete(null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> widgetRepository.deleteAll((Iterable<Widget>) null)).isInstanceOf(IllegalArgumentException.class);
-
-        assertThat(outboxCount()).isZero();
-    }
-
-    @Test
-    void aPlainRepositoryOfTheSameDocument_doesNotPublish() {
-        plainWidgetRepository.save(widget("Printer"));
 
         assertThat(outboxCount()).isZero();
     }
@@ -413,11 +403,8 @@ class PublishingRepositoryIT {
     @EnableAutoConfiguration
     @EnableMongoRepositories(basePackageClasses = PublishingRepositoryIT.class, considerNestedRepositories = true,
             includeFilters = @Filter(type = FilterType.ASSIGNABLE_TYPE,
-                    classes = {WidgetRepository.class, PlainWidgetRepository.class}))
+                    classes = WidgetRepository.class))
     @Import({WidgetSpec.class, CascadeLikeAspect.class})
     static class TestApplication {
-    }
-
-    interface PlainWidgetRepository extends MongoRepository<Widget, String> {
     }
 }

@@ -2,7 +2,9 @@ package com.openframe.data.repository.organization;
 
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.OrganizationStatus;
-import com.openframe.data.repository.organization.publishing.OrganizationSpec;
+import com.openframe.data.repository.organization.publishing.OrganizationAggregateSpec;
+import com.openframe.data.repository.organization.publishing.OrganizationOnTicketsProjection;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.config.OutboxIndexAutoConfiguration;
 import com.openframe.publishing.persistence.OutboxEvent;
@@ -30,7 +32,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// The real OrganizationRepository, its custom implementation and OrganizationSpec, with the outbox wired as in a service.
+// The real OrganizationRepository, its custom implementation and OrganizationAggregateSpec, with the outbox wired as in a service.
 @SpringBootTest(classes = OrganizationPublishingIT.TestApplication.class,
         properties = {"openframe.events.topics.organizations.publish=true", "spring.data.mongodb.enabled=true",
                 "openframe.events.publishing.enabled=true"})
@@ -122,10 +124,10 @@ class OrganizationPublishingIT {
 
     // Only what a service gets from these modules: not @EnableAutoConfiguration, which would also load MongoSyncConfig.
     @SpringBootConfiguration
-    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, OutboxAutoConfiguration.class,
+    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class,
             OutboxIndexAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = OrganizationRepository.class)
-    @Import(OrganizationSpec.class)
+    @Import({OrganizationAggregateSpec.class, OrganizationOnTicketsProjection.class})
     static class TestApplication {
     }
 }
