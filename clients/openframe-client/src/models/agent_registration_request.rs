@@ -12,6 +12,10 @@ pub struct AgentRegistrationRequest {
     #[serde(skip_serializing_if = "String::is_empty", default)]
     pub user_id: String,
     pub os_type: String,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub os_version: String,
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub os_build: String,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tags: Vec<DeviceTag>,
 }
