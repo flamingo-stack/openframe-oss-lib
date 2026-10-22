@@ -7,7 +7,9 @@ import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
 import { loadingItemProps } from '../loading-scope';
 import {
+  BUTTON_KIND_CLASS,
   BUTTON_SIZE_CLASS,
+  type ButtonKind,
   buttonSurfaceClasses,
   outlineBorderClasses,
   splitDividerColorClasses,
@@ -39,6 +41,14 @@ const buttonVariants = cva(
         glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
         link: buttonSurfaceClasses.link,
+        // The kinds that are not a plain push button own their whole box (`BUTTON_KIND_CLASS`); resolved
+        // before this map is read, so `size` never reaches them. The entries only type the prop.
+        field: '',
+        row: '',
+        tab: '',
+        chip: '',
+        card: '',
+        cell: '',
       },
       size: BUTTON_SIZE_CLASS,
       // Label typography axis (Figma 133-740). `bold` is the classic h3-bold
@@ -70,6 +80,23 @@ const buttonVariants = cva(
     compoundVariants: [
       // The trailing half as an icon button is the design's 40px chevron cell, at every breakpoint.
       { attach: 'end', size: 'icon', class: 'w-10 px-0 md:w-10' },
+      { attach: 'end', size: 'small', class: 'w-6 px-0 md:w-8' },
+      // The seam between two attached halves of a filled button: a 1px darker edge on the trailing half.
+      {
+        attach: 'end',
+        variant: 'accent',
+        class: cn('border-l', splitDividerColorClasses.accent, 'disabled:border-ods-disabled'),
+      },
+      {
+        attach: 'end',
+        variant: 'destructive',
+        class: cn('border-l', splitDividerColorClasses.destructive, 'disabled:border-ods-disabled'),
+      },
+      {
+        attach: 'end',
+        variant: 'warning',
+        class: cn('border-l', splitDividerColorClasses.warning, 'disabled:border-ods-disabled'),
+      },
       { size: 'small', class: '[&_svg]:h-4 [&_svg]:w-4' },
       // Comes after the size classes, so cn()'s tailwind-merge resolves the
       // ods-typography group in favour of text-h4.
@@ -265,10 +292,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
   ref,
 ) {
   const isDisabled = disabled || loading;
+  const kind = variant && variant in BUTTON_KIND_CLASS ? (variant as ButtonKind) : null;
 
   // splitIcon is only supported for default/small sizes. With other sizes
   // (icon, small-legacy) we silently fall back to the normal layout.
-  const useSplitLayout = !!splitIcon && (size === 'default' || size === 'small' || size === undefined);
+  const useSplitLayout = !kind && !!splitIcon && (size === 'default' || size === 'small' || size === undefined);
 
   if (useSplitLayout) {
     const safeSize = size ?? 'default';
@@ -372,7 +400,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     );
   }
 
-  const classes = cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX, attach }), className);
+  const classes = kind
+    ? cn(BUTTON_KIND_CLASS[kind], loading && 'relative', fullWidth && 'w-full', className)
+    : cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX, attach }), className);
 
   // asChild: consumer fully controls the rendered element; we just stamp our classes.
   if (asChild) {

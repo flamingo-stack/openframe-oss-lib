@@ -17,6 +17,7 @@ import {
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from './button';
 import { LOADING_NOOP, LoadingItems, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
@@ -174,8 +175,8 @@ const STRIP_FRAME_CLASS = 'relative w-full';
 const STRIP_ROW_CLASS =
   'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden';
 const ADMIN_TAB_GAP_CLASS = 'gap-[var(--spacing-system-xxs)]';
-const TAB_CLASS =
-  'group relative flex shrink-0 items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]';
+/** A tab's box, loaded and loading: the lib's tab (`Button variant="tab"`), which the loading tab draws too. */
+const TAB_CLASS = BUTTON_KIND_CLASS.tab;
 const TAB_AVATAR_GAP_CLASS = 'gap-[var(--spacing-system-xsf)]';
 /** A tab's avatar, in px: the size a host draws `TabItem.avatar` at, and the circle the skeleton draws for it. */
 export const TAB_AVATAR_PX = 24;
@@ -470,36 +471,21 @@ const TabBar = memo(function TabBarImpl({
           const isActive = activeTab === tab.id;
 
           return (
-            <button
+            <Button
+              variant="tab"
               key={tab.id}
               ref={isActive ? activeTabRef : undefined}
               data-loading-item={itemMarks || undefined}
+              data-state={isActive ? 'active' : undefined}
+              // The admin strip marks its open and hovered tab with the accent fade; the default one by the underline alone.
+              data-emphasis={isAdmin ? 'fade' : undefined}
               type="button"
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
               className={cn(
-                TAB_CLASS,
-                'cursor-pointer',
                 tabAlignClass(tabAlign),
-                // Named rather than `transition-all`: the only thing that moves
-                // here is colour.
-                'border-none bg-transparent outline-none transition-colors duration-200',
-                // `outline-none` above drops the browser's own focus ring, so
-                // put one back or the strip is un-navigable by keyboard — you
-                // can tab through it with nothing to show where you are. Inset,
-                // so it stays within the button and never overlaps a neighbour.
-                'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
                 stretchTabs && TAB_STRETCH_CLASS,
                 tab.avatar && TAB_AVATAR_GAP_CLASS,
-                // `default`: the open tab is marked by the underline alone, no surface
-                // of its own. `admin`: the open and the hovered tab carry an accent
-                // fade. ODS colour vars hold hex values, so Tailwind alpha modifiers
-                // (to-ods-accent/10) silently produce no CSS; color-mix() accepts
-                // hex, so the 10%-alpha stop is derived from the token.
-                isAdmin &&
-                  (isActive
-                    ? 'bg-gradient-to-b from-transparent to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
-                    : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'),
               )}
             >
               {tab.avatar ? (
@@ -564,7 +550,7 @@ const TabBar = memo(function TabBarImpl({
                   className="pointer-events-none my-[calc((var(--font-line-space-h4-body)_-_2rem)/2)] ml-[var(--spacing-system-xxs)] shrink-0"
                 />
               )}
-            </button>
+            </Button>
           );
         })}
 

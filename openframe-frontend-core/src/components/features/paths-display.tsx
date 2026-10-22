@@ -4,6 +4,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button, buttonVariants } from '../ui/button';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 export interface PathsDisplayProps {
@@ -56,8 +57,7 @@ const PATHS_TITLE_CLASS = 'text-ods-text-primary text-h4';
 const PATHS_DESCRIPTION_CLASS = 'text-ods-text-secondary text-h6';
 const PATHS_FRAME_CLASS = 'overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg';
 const PATHS_ROW_CLASS = 'flex items-center gap-4 border-b border-ods-border p-4 last:border-b-0';
-const PATHS_COPY_BUTTON_CLASS =
-  'shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus';
+const PATHS_COPY_BUTTON_LAYOUT = 'shrink-0';
 /** How many rows the skeleton draws when the paths are read with the page. */
 export const PATHS_DISPLAY_SKELETON_ROWS = 2;
 const PATH_SKELETON_WIDTHS = ['w-3/5', 'w-2/5', 'w-1/2', 'w-1/3'] as const;
@@ -130,14 +130,16 @@ export function PathsDisplay({
             {leadingIcon && <span className="shrink-0 text-ods-text-primary">{leadingIcon}</span>}
             <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h4">{path}</span>
             {showCopyButtons && onCopyPath && (
-              <button
+              <Button
+                variant="transparent"
+                size="icon-sm"
                 type="button"
                 onClick={() => onCopyPath(path)}
                 aria-label={`Copy ${path}`}
-                className={PATHS_COPY_BUTTON_CLASS}
+                className={PATHS_COPY_BUTTON_LAYOUT}
               >
                 <Copy02Icon className={copyIconSize} />
-              </button>
+              </Button>
             )}
           </div>
         ))}
@@ -177,7 +179,9 @@ function PathsDisplaySkeleton({
                 <TextLineSkeleton type="h4" className={PATH_SKELETON_WIDTHS[i % PATH_SKELETON_WIDTHS.length]} />
               </div>
               {showCopyButtons && (
-                <span className={PATHS_COPY_BUTTON_CLASS}>
+                <span
+                  className={cn(buttonVariants({ variant: 'transparent', size: 'icon-sm' }), PATHS_COPY_BUTTON_LAYOUT)}
+                >
                   <Copy02Icon className={copyIconSize} />
                 </span>
               )}

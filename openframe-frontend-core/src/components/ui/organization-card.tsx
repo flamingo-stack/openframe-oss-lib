@@ -5,6 +5,7 @@ import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { EntityImage } from './entity-image';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 
@@ -187,19 +188,17 @@ export function OrganizationCard({
 
       {/* Action button (top-right) - only if no device count */}
       {!deviceCount && showActionButton && actionButton && (
-        <button
-          className={cn(
-            'absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded transition-colors',
-            actionButton.variant === 'primary'
-              ? 'bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover'
-              : 'text-ods-text-secondary hover:bg-ods-error-secondary hover:text-ods-error',
-          )}
+        <Button
+          variant={actionButton.variant === 'primary' ? 'accent' : 'transparent'}
+          size="icon-sm"
+          type="button"
+          className="absolute right-2 top-2 z-10"
           onClick={handleActionClick}
           disabled={actionButton.disabled}
           aria-label={actionButton.label}
         >
           {actionButton.icon}
-        </button>
+        </Button>
       )}
 
       {/* Header */}

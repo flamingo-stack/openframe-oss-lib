@@ -6,6 +6,7 @@ import { cn } from '../../utils/cn';
 import { FieldValueSkeleton } from './field-value-skeleton';
 import { FieldWrapper } from './field-wrapper';
 import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
+import { Label } from './label';
 import { useLoadingScope } from './loading-scope';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -107,7 +108,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
   }
 
   const content = (
-    <label
+    <Label
+      variant="surface"
       data-invalid={isInvalid || undefined}
       className={cn(
         // Layout & spacing
@@ -172,7 +174,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
           {endAdornment}
         </span>
       )}
-    </label>
+    </Label>
   );
 
   return (

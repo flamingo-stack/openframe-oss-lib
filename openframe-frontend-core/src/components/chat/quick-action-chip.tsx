@@ -4,6 +4,7 @@ import { type ReactNode, isValidElement } from 'react';
 import { cn } from '../../utils/cn';
 import { EntityIcon, type EntityIconValue } from '../icon-display';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button';
 import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { Tag } from '../ui/tag';
 
@@ -331,7 +332,8 @@ export function QuickActionChipButton({
     );
   }
   return (
-    <button
+    <Button
+      variant="card"
       {...markers}
       type="button"
       onClick={onSelect}
@@ -341,9 +343,8 @@ export function QuickActionChipButton({
       onBlur={onHoverEnd}
       aria-pressed={selected || undefined}
       className={cn(
-        'rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
         // A question may be longer than a narrow column: it shrinks and clips there, read from its start.
-        question ? 'min-w-0 max-w-full text-left' : 'shrink-0',
+        question ? 'w-auto min-w-0 max-w-full' : 'w-auto shrink-0',
         className,
       )}
     >
@@ -354,7 +355,7 @@ export function QuickActionChipButton({
         label={resolvedLabel}
         className={question ? 'max-w-full' : undefined}
       />
-    </button>
+    </Button>
   );
 }
 

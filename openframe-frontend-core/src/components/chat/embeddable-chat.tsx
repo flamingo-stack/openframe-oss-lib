@@ -73,7 +73,6 @@ import { ChatAttachmentChipStrip } from './chat-attachment-bar';
 import { ChatComposer, type ChatComposerLock } from './chat-composer';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { CHAT_BLOCK_MIN_WIDTH, MINGO_V2_RAIL_WIDTH } from './chat-dimensions';
-import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatMessageList } from './chat-message-list';
 import { ChatPanelContext, type ChatPanelHandle } from './chat-panel-context';
@@ -962,14 +961,17 @@ function SourceChips({
             />
           ))}
         {hasOverflow && (
-          <button
+          <Button
+            variant="link"
+            size="compact"
+            noPaddingX
+            type="button"
             onClick={() => setExpanded(!expanded)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded border border-ods-accent bg-ods-card px-2 py-0.5 text-ods-accent transition-colors text-h6 hover:bg-ods-accent/10"
             aria-expanded={expanded}
             aria-label={expanded ? 'Show fewer sources' : `Show ${hiddenCount} additional retrieved sources`}
           >
             {expanded ? 'Show less' : `+${hiddenCount} more retrieved ${hiddenCount === 1 ? 'source' : 'sources'}`}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -2663,7 +2665,10 @@ function EmbeddableChatInner({
                   // single-bar header (no rail search / collapse controls).
                   <div className="flex h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card">
                     {railPresence.mounted && (
-                      <RailSlot active={railPresence.active} innerClassName="flex overflow-hidden">
+                      <RailSlot
+                        active={railPresence.active}
+                        innerClassName="flex divide-x divide-ods-border overflow-hidden"
+                      >
                         {archiveOpen ? (
                           // Archive open in the wide layout — the rail header
                           // turns into a "Chat Archive" back bar (the list itself
@@ -2671,9 +2676,9 @@ function EmbeddableChatInner({
                           // Back is a full-height leading cell, matching the other
                           // header cells (not a small inline chevron).
                           <>
-                            <ChatHeaderIconButton divider="right" onClick={closeArchive} aria-label="Back to chats">
+                            <Button variant="cell" className="w-14" onClick={closeArchive} aria-label="Back to chats">
                               <Chevron02LeftIcon size={24} />
-                            </ChatHeaderIconButton>
+                            </Button>
                             <div className="flex min-w-0 flex-1 items-center px-[var(--spacing-system-mf)]">
                               <span className="min-w-0 flex-1 truncate text-ods-text-primary text-h3">
                                 Chat Archive
@@ -2700,39 +2705,47 @@ function EmbeddableChatInner({
                                   </span>
                                 </div>
                                 {mingoCaps.onSearchChange && (
-                                  <ChatHeaderIconButton
+                                  <Button
+                                    variant="cell"
+                                    className="w-14"
                                     onClick={() => setRailSearchOpen(o => !o)}
                                     aria-label="Search chats"
                                     aria-pressed={railSearchOpen}
                                   >
                                     <SearchIcon size={24} />
-                                  </ChatHeaderIconButton>
+                                  </Button>
                                 )}
                               </>
                             )}
                             {headerOnOpenArchive && (
-                              <ChatHeaderIconButton onClick={headerOnOpenArchive} aria-label="Chat archive">
+                              <Button
+                                variant="cell"
+                                className="w-14"
+                                onClick={headerOnOpenArchive}
+                                aria-label="Chat archive"
+                              >
                                 <ClockHistoryIcon size={24} />
-                              </ChatHeaderIconButton>
+                              </Button>
                             )}
                           </>
                         )}
                       </RailSlot>
                     )}
 
-                    <div className="flex min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-1 divide-x divide-ods-border">
                       {/* Rail collapse / expand toggle — lives on the chat side,
                           at its left edge (Figma 259:90465). Right arrow collapses
                           the list; left arrow brings it back. */}
-                      <button
+                      <Button
+                        variant="cell"
                         type="button"
                         onClick={toggleRailCollapsed}
                         aria-label={splitActive ? 'Collapse chat list' : 'Show chat list'}
                         aria-pressed={!splitActive}
-                        className="flex size-14 shrink-0 items-center justify-center border-r border-ods-border text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                        className="size-14"
                       >
                         {splitActive ? <Arrow02RightIcon size={24} /> : <Arrow02LeftIcon size={24} />}
-                      </button>
+                      </Button>
                       {/* No back cell in the wide layout — the left rail (and
                           its collapse/expand toggle) already provides chat-list
                           navigation, so a back chevron would be redundant. */}
@@ -2761,9 +2774,9 @@ function EmbeddableChatInner({
                       </div>
 
                       {isViewingArchived && headerOnRestore && (
-                        <ChatHeaderIconButton onClick={headerOnRestore} aria-label="Unarchive chat">
+                        <Button variant="cell" className="w-14" onClick={headerOnRestore} aria-label="Unarchive chat">
                           <Refresh01LeftIcon size={24} />
-                        </ChatHeaderIconButton>
+                        </Button>
                       )}
                       {headerShowBack && !isViewingArchived && splitHeaderMenuItems.length > 0 && (
                         <ActionsMenuDropdown
@@ -2771,16 +2784,16 @@ function EmbeddableChatInner({
                           onCloseAutoFocus={e => e.preventDefault()}
                           groups={[{ items: splitHeaderMenuItems }]}
                           customTrigger={
-                            <ChatHeaderIconButton aria-label="Chat actions">
+                            <Button variant="cell" className="w-14" aria-label="Chat actions">
                               <Ellipsis01Icon size={24} />
-                            </ChatHeaderIconButton>
+                            </Button>
                           }
                         />
                       )}
                       {closeControl && (
-                        <ChatHeaderIconButton onClick={closeControl} aria-label="Close">
+                        <Button variant="cell" className="w-14" onClick={closeControl} aria-label="Close">
                           <XmarkIcon size={24} />
-                        </ChatHeaderIconButton>
+                        </Button>
                       )}
                     </div>
                   </div>

@@ -6,6 +6,7 @@ import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 
@@ -177,21 +178,19 @@ function Tag({
       )}
       <TagLabel label={label} labelClassName={labelClassName} />
       {onClose && (
-        <button
+        <Button
+          variant="transparent"
+          size="icon-inline"
           type="button"
           disabled={disabled}
           onClick={e => {
             e.stopPropagation();
             onClose();
           }}
-          className={cn(
-            'flex size-5 shrink-0 items-center justify-center rounded-full opacity-70 transition-opacity',
-            disabled ? 'cursor-not-allowed' : 'hover:opacity-100',
-          )}
           aria-label="Remove"
         >
-          <XmarkCircleIcon className="size-4" />
-        </button>
+          <XmarkCircleIcon />
+        </Button>
       )}
     </Comp>
   );

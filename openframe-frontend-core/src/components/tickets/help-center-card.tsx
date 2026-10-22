@@ -16,12 +16,14 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import { cn } from '../../utils/cn';
 import { formatRelativeTime } from '../../utils/date-utils';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
 import { getStatusColorScheme } from '../chat/utils/agent-status-message';
 import { DevCardRowContent } from '../shared/dev-section/dev-card-row';
 import { StatusBadge, type StatusBadgeProps } from '../ui';
+import { Button } from '../ui/button';
 import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { TicketDetailDrawer, type TicketDetailDrawerProps } from './ticket-detail-drawer';
 import { useOptionalTicketLive } from './ticket-live-provider';
@@ -199,22 +201,24 @@ function HelpCenterCardLoaded({
       aria-busy={optimistic || undefined}
       {...loadingItemProps(props)}
     >
-      <button
+      <Button
+        variant="card"
         type="button"
         onClick={isExpandable ? handleClick : undefined}
         disabled={!isExpandable}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-controls={isExpanded ? `help-center-drawer-${ticket.id}` : undefined}
-        className={`${HELP_CENTER_SUMMARY_PAD_CLASS} text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent disabled:cursor-default`}
       >
-        <DevCardRowContent
-          title={title}
-          subtitle={subtitle}
-          description={description}
-          emptyDescription="No description provided"
-          rightBadges={rightBadges}
-        />
-      </button>
+        <span className={cn('block', HELP_CENTER_SUMMARY_PAD_CLASS)}>
+          <DevCardRowContent
+            title={title}
+            subtitle={subtitle}
+            description={description}
+            emptyDescription="No description provided"
+            rightBadges={rightBadges}
+          />
+        </span>
+      </Button>
 
       {isExpanded && (
         <div id={`help-center-drawer-${ticket.id}`}>

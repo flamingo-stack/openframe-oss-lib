@@ -1,10 +1,10 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { AssigneeDropdown, type AssigneeDropdownProps } from './assignee-dropdown';
+import { Button } from './button';
 import { LoadingWhen, useLoadingScope } from './loading-scope';
 import { SquareAvatar } from './square-avatar';
 import { TicketStatusTag, type TicketStatusTagProps } from './ticket-status-tag';
@@ -76,26 +76,26 @@ function TextValue({ value }: { value: InfoSectionTextValue }) {
   const { text, imageSrc, imageFallback, imageVariant = 'round', icon, onClick, href, openInNewTab } = value;
   const loading = useLoadingScope();
   const hasImage = imageSrc !== undefined || imageFallback !== undefined;
-  const interactiveClass = 'truncate text-left text-h4 text-ods-text-primary transition-colors hover:text-ods-accent';
   return (
     <>
       {icon && <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary">{icon}</span>}
       {loading ? (
         <TextValueSkeleton />
-      ) : href ? (
-        <Link
+      ) : href || onClick ? (
+        <Button
+          variant="link"
+          size="compact"
+          noPaddingX
+          type="button"
           href={href}
-          target={openInNewTab ? '_blank' : undefined}
-          rel={openInNewTab ? 'noopener noreferrer' : undefined}
-          title={text}
-          className={interactiveClass}
+          openInNewTab={openInNewTab}
+          onClick={href ? undefined : onClick}
+          className="min-w-0"
         >
-          {text}
-        </Link>
-      ) : onClick ? (
-        <button type="button" onClick={onClick} title={text} className={interactiveClass}>
-          {text}
-        </button>
+          <span className="truncate" title={text}>
+            {text}
+          </span>
+        </Button>
       ) : (
         <span className="truncate text-ods-text-primary text-h4" title={text}>
           {text}

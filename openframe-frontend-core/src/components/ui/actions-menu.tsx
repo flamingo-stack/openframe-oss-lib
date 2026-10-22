@@ -85,9 +85,8 @@ const ROW_CLASSES =
   'flex flex-1 min-w-0 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer transition-colors bg-ods-bg outline-none';
 const WRAPPER_CLASSES = 'relative flex items-stretch border-b border-ods-border last:border-b-0';
 
-const SECONDARY_ACTION_CLASSES =
-  'flex p-[var(--spacing-system-s)] shrink-0 items-center justify-center self-stretch border-l border-ods-border transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus [&_svg]:w-4 [&_svg]:h-4 md:[&_svg]:w-6 md:[&_svg]:h-6';
-
+// The row's trailing icon action: a cell of the row (its full height, an icon, secondary until hovered), after a
+// hairline divider. One Button for both forms, a link and an action.
 const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ action }) => {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -101,40 +100,26 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
     [action],
   );
 
-  const classes = cn(
-    SECONDARY_ACTION_CLASSES,
-    action.openInNewTab && 'max-md:hidden',
-    action.disabled && 'pointer-events-none cursor-not-allowed opacity-60',
-  );
-
-  if (action.href) {
-    return (
-      <Link
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={cn('w-px shrink-0 self-stretch bg-ods-border', action.openInNewTab && 'max-md:hidden')}
+      />
+      <Button
+        variant="cell"
+        type="button"
         href={action.href}
-        prefetch={false}
-        target={action.openInNewTab ? '_blank' : undefined}
-        rel={action.openInNewTab ? 'noopener noreferrer' : undefined}
+        prefetch={action.href ? false : undefined}
+        openInNewTab={action.openInNewTab}
         aria-label={action['aria-label']}
-        aria-disabled={action.disabled || undefined}
-        tabIndex={action.disabled ? -1 : undefined}
-        className={classes}
+        disabled={action.disabled}
+        className={cn('h-auto self-stretch', action.openInNewTab && 'max-md:hidden')}
         onClick={handleClick}
       >
         {action.icon}
-      </Link>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      aria-label={action['aria-label']}
-      disabled={action.disabled}
-      className={classes}
-      onClick={handleClick}
-    >
-      {action.icon}
-    </button>
+      </Button>
+    </>
   );
 };
 

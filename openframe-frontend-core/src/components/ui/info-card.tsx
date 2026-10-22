@@ -7,6 +7,7 @@ import { cn } from '../../utils/cn';
 import { CheckIcon } from '../icons-v2-generated';
 import { Copy01Icon } from '../icons-v2-generated/documents';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { ProgressBar } from './progress-bar';
 
@@ -301,17 +302,15 @@ function InfoCardValueRow({
           </span>
           {icon}
           {copyable && (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-inline"
               type="button"
               onClick={() => copy(value)}
-              className={cn(
-                'transition-colors',
-                copied ? 'text-ods-success' : 'text-ods-text-secondary hover:text-ods-text-primary',
-              )}
               aria-label={copyAriaLabel}
             >
-              {copied ? <CheckIcon size={16} /> : <Copy01Icon size={16} />}
-            </button>
+              {copied ? <CheckIcon className="text-ods-success" /> : <Copy01Icon className="text-ods-text-secondary" />}
+            </Button>
           )}
         </div>
       )}

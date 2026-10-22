@@ -3,6 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
 import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 
@@ -98,21 +99,19 @@ interface ChatNavSidebarButtonProps extends ButtonHTMLAttributes<HTMLButtonEleme
 
 function ChatNavSidebarButton({ icon, active, className, children, ...props }: ChatNavSidebarButtonProps) {
   return (
-    <button
+    <Button
+      variant="row"
       type="button"
       aria-current={active ? 'page' : undefined}
-      className={cn(
-        'flex w-full items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left text-h4',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-        '[&_svg]:size-6 [&_svg]:shrink-0',
-        active ? 'text-ods-accent' : 'text-ods-text-primary [&_svg]:text-ods-text-secondary',
-        className,
-      )}
+      data-state={active ? 'active' : undefined}
+      className={className}
       {...props}
     >
-      {icon}
+      <span className={cn('flex shrink-0 [&_svg]:size-6', active ? 'text-ods-accent' : 'text-ods-text-secondary')}>
+        {icon}
+      </span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -139,9 +138,8 @@ export const SKELETON_TITLE_WIDTHS = ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4', 'w-1/2
 /** The trailing glyph's 24px box at the row's end, loaded and loading. */
 const TRAILING_CLASS = 'flex shrink-0 items-center [&_svg]:size-6';
 
-/** The row's box, loaded and loading. */
-const CHAT_LIST_ITEM_CLASS =
-  'flex w-full shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-md p-[var(--spacing-system-xs)] text-left';
+/** The row's box, loaded and loading: the lib's list row (`Button variant="row"`), which the loading `div` draws too. */
+const CHAT_LIST_ITEM_CLASS = cn(BUTTON_KIND_CLASS.row, 'shrink-0');
 
 /**
  * One row of the `ChatNavSidebar` list (Figma `chat-list-item`): a one-line
@@ -199,20 +197,17 @@ const ChatListItem = forwardRef<HTMLButtonElement, ChatListItemProps>(
       );
     }
     return (
-      <button
+      <Button
+        variant="row"
         ref={ref}
         type="button"
         aria-current={active ? 'true' : undefined}
-        className={cn(
-          CHAT_LIST_ITEM_CLASS,
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-          active && 'bg-ods-accent-secondary',
-          className,
-        )}
+        data-state={active ? 'active' : undefined}
+        className={cn('shrink-0', className)}
         {...props}
       >
         {content}
-      </button>
+      </Button>
     );
   },
 );

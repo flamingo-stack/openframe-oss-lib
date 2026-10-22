@@ -32,6 +32,7 @@ import {
   UserCheckIcon,
 } from '../../icons-v2-generated';
 import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { Button } from '../../ui/button';
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar';
 import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
@@ -578,13 +579,14 @@ const TicketCardImpl = memo(function TicketCardDraggable({
   return (
     <div {...outerProps}>
       {insertionLine}
-      <button
+      <Button
+        variant="card"
         type="button"
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         aria-label={ticket.title}
         aria-keyshortcuts={keyShortcuts}
-        className="absolute inset-0 z-0 cursor-pointer rounded-md focus-visible:outline-none"
+        className="absolute inset-0 z-0"
       />
       <div className={cn('pointer-events-none', innerWrapperClass)}>{body}</div>
     </div>

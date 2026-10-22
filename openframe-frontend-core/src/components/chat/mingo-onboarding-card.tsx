@@ -3,7 +3,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { InteractiveSkeleton, MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
-import { Button } from '../ui/button';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
 import { InertWhileLoading, LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
 
@@ -178,18 +178,16 @@ export function MingoOnboardingCard({
     </div>
   );
 
-  const baseClass = cn(
-    CARD_BASE_CLASS,
-    isInteractive &&
-      'cursor-pointer transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
-    className,
-  );
+  // A card that is one click target is a list ROW Button; its loading form is the same row box. A card with its own
+  // actions (or none at all) is a static card.
+  const rowCard = !!onClick && !hasActions;
+  const baseClass = cn(rowCard ? BUTTON_KIND_CLASS.row : CARD_BASE_CLASS, className);
 
   if (isInteractive) {
     return (
-      <button type="button" onClick={onClick} className={baseClass} {...itemProps}>
+      <Button variant="row" type="button" onClick={onClick} className={className} {...itemProps}>
         {body}
-      </button>
+      </Button>
     );
   }
 

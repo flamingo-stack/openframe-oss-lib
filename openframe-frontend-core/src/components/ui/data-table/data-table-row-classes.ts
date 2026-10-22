@@ -1,6 +1,6 @@
 /**
  * THE table-row class set: the frame, heights and shells a data-table row is drawn with, loaded and loading. Read by
- * `DataTableRow` (both forms), the pad rows, the legacy `Table`'s skeleton, `TestRun` and the query-report table, so a
+ * `DataTableRow` (both forms), the pad rows, `TestRun` and the query-report table, so a
  * loading row and a loaded one are one box by construction.
  */
 

@@ -122,34 +122,6 @@ export interface ConversationCardProps {
   loading?: boolean;
 }
 
-/** The selection toggle, as the loaded card draws it (a `pressed` state and what a press does). */
-function SelectionToggle({
-  pressed,
-  labelledBy,
-  onToggle,
-}: {
-  pressed: boolean;
-  labelledBy?: string;
-  onToggle?: () => void;
-}) {
-  return (
-    <Button
-      type="button"
-      variant={pressed ? 'accent' : 'outline'}
-      size="icon-sm"
-      aria-pressed={pressed}
-      aria-labelledby={labelledBy}
-      onClick={event => {
-        event.stopPropagation();
-        onToggle?.();
-      }}
-      className={SELECTION_TOGGLE_CLASS}
-    >
-      {pressed ? <CheckIcon /> : <PlusIcon />}
-    </Button>
-  );
-}
-
 /**
  * A request and what was done about it, as two turns and a footer: who asked
  * and what they said, who answered and the result (a command block with its
@@ -218,7 +190,20 @@ export function ConversationCard({
         // The toggle is a regular boxed Button in the card's corner, named by the
         // request; a click anywhere on the card toggles it too (a pointer
         // convenience: the Button is the control keyboards and screen readers use).
-        <SelectionToggle pressed={selection.pressed} labelledBy={requestId} onToggle={selection.onToggle} />
+        <Button
+          type="button"
+          variant={selection.pressed ? 'accent' : 'outline'}
+          size="icon-sm"
+          aria-pressed={selection.pressed}
+          aria-labelledby={requestId}
+          onClick={event => {
+            event.stopPropagation();
+            selection.onToggle();
+          }}
+          className={SELECTION_TOGGLE_CLASS}
+        >
+          {selection.pressed ? <CheckIcon /> : <PlusIcon />}
+        </Button>
       )}
       {/* Every part keeps at least its number of lines, so cards in a row or a carousel line up part by part. */}
       <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
@@ -321,7 +306,15 @@ function ConversationCardSkeleton({
     <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
       {selection && (
         <InertWhileLoading className="contents">
-          <SelectionToggle pressed={selection.pressed} />
+          <Button
+            type="button"
+            variant={selection.pressed ? 'accent' : 'outline'}
+            size="icon-sm"
+            aria-pressed={selection.pressed}
+            className={SELECTION_TOGGLE_CLASS}
+          >
+            {selection.pressed ? <CheckIcon /> : <PlusIcon />}
+          </Button>
         </InertWhileLoading>
       )}
       <ChatTurn

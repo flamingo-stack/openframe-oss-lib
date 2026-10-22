@@ -16,6 +16,7 @@ import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
 import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import type { ChatContextItem } from './types/context-item.types';
 
@@ -25,14 +26,15 @@ const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
 // every level is visually identical and there's one source of truth.
 export const CONTEXT_ROW_CLASS =
   'flex w-full items-center gap-2 border-b border-ods-border bg-ods-bg py-3 pl-4 pr-2 text-left outline-none transition-colors last:border-b-0 hover:bg-ods-bg-hover focus-visible:bg-ods-bg-hover [&_svg]:size-4 md:[&_svg]:size-6';
-export const CONTEXT_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary md:size-6';
+export const CONTEXT_ICON_CLASS =
+  'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary md:size-6 [&_svg]:size-4 md:[&_svg]:size-6';
 export const CONTEXT_LABEL_CLASS = 'flex-1 truncate text-h4 font-medium leading-6 text-ods-text-primary';
-export const CONTEXT_BACK_CLASS =
-  'flex shrink-0 items-center gap-2 border-b border-ods-border bg-ods-bg px-2 py-3 text-left text-h4 font-medium leading-6 text-ods-text-secondary outline-none transition-colors hover:text-ods-text-primary [&_svg]:size-4 md:[&_svg]:size-6';
+/** The bar that pins a level's Back row while the list under it scrolls: its surface keeps rows from showing through. */
+export const CONTEXT_BACK_BAR_CLASS = 'sticky top-0 z-10 shrink-0 bg-ods-bg';
 export const CONTEXT_STATE_CLASS = 'bg-ods-bg px-4 py-3 text-h4 text-ods-text-secondary';
 /** The items list's scroll box, loaded and loading. Capped at 340px but never past ~half the viewport, so on short
  *  screens the list (inside the bottom-anchored picker popover) still fits and scrolls. */
-const CONTEXT_LIST_CLASS = 'max-h-[min(340px,45vh)] overflow-y-auto overscroll-contain';
+const CONTEXT_LIST_CLASS = 'max-h-[min(340px,45vh)] divide-y divide-ods-border overflow-y-auto overscroll-contain';
 
 /** The rows a page of items holds when the host states no page size: the loading list and each next page draw it. */
 const CONTEXT_ITEMS_PAGE_SIZE = 10;
@@ -85,24 +87,24 @@ export function ContextMenuRow({
   );
   if (loading) {
     return (
-      <div aria-hidden className={cn(CONTEXT_ROW_CLASS, 'hover:bg-ods-bg')} {...loadingItemProps(props)}>
+      <div aria-hidden className={BUTTON_KIND_CLASS.row} {...loadingItemProps(props)}>
         {content}
       </div>
     );
   }
   return (
-    <button
+    <Button
+      variant="row"
       type="button"
       role={role}
       aria-selected={role === 'option' ? selected : undefined}
       disabled={disabled}
       onClick={onClick}
       title={title}
-      className={cn(CONTEXT_ROW_CLASS, disabled && 'cursor-not-allowed opacity-40 hover:bg-ods-bg')}
       {...loadingItemProps(props)}
     >
       {content}
-    </button>
+    </Button>
   );
 }
 

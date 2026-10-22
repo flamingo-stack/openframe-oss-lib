@@ -5,6 +5,7 @@ import { type ComponentRef, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Checkbox } from './checkbox';
+import { Label } from './label';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { RequiredMark } from './required-mark';
 
@@ -73,7 +74,8 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
     const loading = useLoadingScope() || !!loadingProp;
     return (
       <div className={cn('relative flex w-full flex-col', className)} {...loadingItemProps(props)}>
-        <label
+        <Label
+          variant="surface"
           htmlFor={id}
           // Same marker every field exposes — it is how a form finds (and scrolls
           // to) the first control that failed validation.
@@ -159,7 +161,7 @@ const CheckboxBlock = forwardRef<ComponentRef<typeof CheckboxPrimitive.Root>, Ch
           {trailing && (
             <div className="flex w-full shrink-0 items-center content-md:ml-auto content-md:w-auto">{trailing}</div>
           )}
-        </label>
+        </Label>
         {error && (
           <p
             className="absolute bottom-0 left-0 right-0 translate-y-full truncate text-ods-error text-h6"

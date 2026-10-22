@@ -303,14 +303,16 @@ export function MingoWelcome({
                 <span className="text-ods-text-secondary text-h6">{resolvedPromo.description}</span>
               </div>
               {/* Plain cross — no button chrome, just a clickable icon. */}
-              <button
+              <Button
+                variant="transparent"
+                size="icon-sm"
                 type="button"
                 onClick={dismissPromo}
                 aria-label="Dismiss"
-                className="absolute right-2 top-2 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                className="absolute right-2 top-2"
               >
                 <XmarkIcon size={16} />
-              </button>
+              </Button>
             </div>
           )}
 

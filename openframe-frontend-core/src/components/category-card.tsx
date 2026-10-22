@@ -3,6 +3,7 @@
 import type React from 'react';
 import { cn } from '../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from './loading/unified-skeleton';
+import { BUTTON_SIZE_CLASS, Button } from './ui/button';
 import { LoadingItems, useLoadingScope } from './ui/loading-scope';
 
 interface CategoryCardSkeletonProps {
@@ -22,7 +23,9 @@ const CATEGORY_CARD_TITLE_CLASS = 'mb-2 text-left text-ods-text-primary text-h2'
 const CATEGORY_CARD_COUNTS_CLASS = 'mb-4 text-left text-ods-text-secondary text-h6';
 const CATEGORY_CARD_DESCRIPTION_ROW_CLASS = 'flex flex-row items-start';
 const CATEGORY_CARD_DESCRIPTION_CLASS = 'flex-1 text-left text-ods-text-primary text-h6';
-const CATEGORY_CARD_ACTION_BOX_CLASS = 'ml-4 h-12 w-12 shrink-0 rounded-[6px]';
+/** The action's place in the row; its box is the `outline` `icon` button's, which the skeleton draws too. */
+const CATEGORY_CARD_ACTION_LAYOUT_CLASS = 'ml-4 shrink-0';
+const CATEGORY_CARD_ACTION_SKELETON_CLASS = cn(BUTTON_SIZE_CLASS.icon, 'rounded-md', CATEGORY_CARD_ACTION_LAYOUT_CLASS);
 
 /** One count of the counts line while it is read: a bar inside the line's real copy. */
 function CountSkeleton() {
@@ -49,7 +52,7 @@ function CategoryCardSkeleton({ className }: CategoryCardSkeletonProps) {
         </div>
         <div className={CATEGORY_CARD_DESCRIPTION_ROW_CLASS}>
           <TextLineSkeleton type="h6" className={cn(CATEGORY_CARD_DESCRIPTION_CLASS, 'w-full')} />
-          <UnifiedSkeleton className={CATEGORY_CARD_ACTION_BOX_CLASS} />
+          <UnifiedSkeleton className={CATEGORY_CARD_ACTION_SKELETON_CLASS} />
         </div>
       </div>
     </article>
@@ -89,17 +92,16 @@ export function CategoryCard({ name, description, categoryCount, productCount, i
         </div>
         <div className={CATEGORY_CARD_DESCRIPTION_ROW_CLASS}>
           <p className={CATEGORY_CARD_DESCRIPTION_CLASS}>{description}</p>
-          <button
-            className={cn(
-              CATEGORY_CARD_ACTION_BOX_CLASS,
-              'flex items-center justify-center border border-ods-border bg-transparent text-ods-text-primary transition-colors hover:bg-ods-accent',
-            )}
+          <Button
+            variant="outline"
+            size="icon"
+            className={CATEGORY_CARD_ACTION_LAYOUT_CLASS}
             aria-label={`View ${name}`}
           >
             <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <path d="M9 18l6-6-6-6" />
             </svg>
-          </button>
+          </Button>
         </div>
       </div>
     </article>

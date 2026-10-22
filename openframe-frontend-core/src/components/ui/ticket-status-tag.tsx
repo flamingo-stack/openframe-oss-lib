@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import { deriveActiveColor, deriveHoverColor, getReadableTextColor } from '../../utils/ods-color-utils';
 import { CheckCircleIcon, Chevron02DownIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown } from './actions-menu';
+import { Button } from './button';
 import { ColorSwatch } from './color-swatch';
 import { useLoadingScope } from './loading-scope';
 import { Tag, type TagProps, tagVariants } from './tag';
@@ -294,32 +295,37 @@ export function TicketStatusTag({
         },
       ]}
       customTrigger={
-        <button
+        // The tag IS the control's look (its status colour), so the button contributes the click, the focus ring and
+        // the menu semantics and no surface of its own (`glyph` + `wrap`).
+        <Button
+          variant="glyph"
+          size="wrap"
           type="button"
           disabled={isPending}
           aria-label="Change status"
-          style={customStyle}
-          className={cn(
-            // Reuse the tag's variant styling, but split into a label section and a
-            // separated chevron section (the common dropdown-button seam).
-            tagVariants({ variant: variant ?? config.variant }),
-            'w-fit shrink-0 items-stretch justify-start gap-0 overflow-hidden p-0',
-            'disabled:cursor-not-allowed disabled:opacity-60',
-            // Custom color: bg/hover/active from the CSS vars set above.
-            customColorClasses,
-            className,
-          )}
+          className={cn('w-fit shrink-0', className)}
         >
-          <span className="flex items-center gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-xsf)]">
-            {showIcon && config.icon && (
-              <span className="flex size-5 shrink-0 items-center justify-center">{config.icon}</span>
+          <span
+            style={customStyle}
+            className={cn(
+              // The tag's variant styling, split into a label section and a separated chevron section (the common
+              // dropdown-button seam). Custom color: bg/hover/active from the CSS vars set above.
+              tagVariants({ variant: variant ?? config.variant }),
+              'items-stretch justify-start gap-0 overflow-hidden p-0',
+              customColorClasses,
             )}
-            <span className="truncate">{label ?? config.label}</span>
+          >
+            <span className="flex items-center gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-xsf)]">
+              {showIcon && config.icon && (
+                <span className="flex size-5 shrink-0 items-center justify-center">{config.icon}</span>
+              )}
+              <span className="truncate">{label ?? config.label}</span>
+            </span>
+            <span className="flex items-center justify-center self-stretch border-l border-ods-border px-[var(--spacing-system-xsf)]">
+              <Chevron02DownIcon className="size-4 shrink-0" />
+            </span>
           </span>
-          <span className="flex items-center justify-center self-stretch border-l border-ods-border px-[var(--spacing-system-xsf)]">
-            <Chevron02DownIcon className="size-4 shrink-0" />
-          </span>
-        </button>
+        </Button>
       }
     />
   );

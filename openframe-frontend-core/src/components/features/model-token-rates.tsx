@@ -24,6 +24,7 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { Label } from '../ui/label';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { Slider } from '../ui/slider';
 import { TabSelector } from '../ui/tab-selector';
@@ -231,16 +232,15 @@ export function ModelTokenRatesPopover({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
+          variant="transparent"
+          size="icon-sm"
           type="button"
           aria-label={MODEL_TOKEN_RATES_COPY.trigger}
-          className={cn(
-            'shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary',
-            triggerClassName,
-          )}
+          className={cn('shrink-0', triggerClassName)}
         >
-          <QuestionCircleIcon className="size-6" />
-        </button>
+          <QuestionCircleIcon />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="border-0 bg-transparent p-0 shadow-none">
         {children ?? <ModelTokenRates {...panel} />}
@@ -534,7 +534,8 @@ export function ModelTokenExchange({
         <ExchangeFigure figure={balancePrice ?? tokens} words={balancePrice ? copy.buy.words(tokens) : copy.buy.unit} />
         {/* The calculator: move the amount and every figure in step 3 follows. */}
         <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-          <label
+          <Label
+            variant="surface"
             htmlFor={sliderId}
             className="flex items-baseline justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h4"
           >
@@ -542,7 +543,7 @@ export function ModelTokenExchange({
             <output htmlFor={sliderId} className="tabular-nums text-ods-text-primary text-h3">
               {tokens}
             </output>
-          </label>
+          </Label>
           <Slider
             id={sliderId}
             min={amountRange.min}

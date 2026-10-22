@@ -790,11 +790,12 @@ function YouTubeFacadeInner({
 
   return (
     <div className={wrapperClass} style={wrapperStyle}>
-      <button
+      <Button
+        variant="card"
         type="button"
         aria-label={`Play: ${title}`}
         onClick={() => setActivated(true)}
-        className="group absolute inset-0 m-0 cursor-pointer overflow-hidden rounded-lg border border-ods-border bg-ods-card p-0"
+        className="group absolute inset-0 h-full overflow-hidden"
       >
         <picture>
           <source type="image/webp" srcSet={posterWebp} />
@@ -824,7 +825,7 @@ function YouTubeFacadeInner({
             className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
           />
         </div>
-      </button>
+      </Button>
     </div>
   );
 }

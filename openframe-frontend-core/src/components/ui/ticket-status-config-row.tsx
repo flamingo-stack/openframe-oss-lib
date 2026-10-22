@@ -125,14 +125,16 @@ export function TicketStatusConfigRow({
           {isSystem ? (
             <DraggerIcon size={24} aria-hidden className="opacity-40" />
           ) : (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               aria-label="Drag to reorder"
-              className="flex size-6 cursor-grab items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ods-focus active:cursor-grabbing"
+              className="shrink-0 cursor-grab"
               {...dragHandleProps}
             >
               <DraggerIcon size={24} />
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -244,13 +246,14 @@ export function TicketStatusConfigRow({
           {isSystem ? (
             <div className="flex w-11 justify-center content-md:w-12">
               <TouchFriendlyTooltip content={systemTooltip}>
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   aria-label={systemTooltip ?? 'System status'}
-                  className="flex size-6 items-center justify-center text-ods-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
                 >
                   <InfoCircleIcon size={24} />
-                </button>
+                </Button>
               </TouchFriendlyTooltip>
             </div>
           ) : (

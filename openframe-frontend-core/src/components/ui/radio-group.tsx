@@ -6,6 +6,7 @@ import { type ComponentPropsWithoutRef, type ComponentRef, type ReactNode, forwa
 import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Label } from './label';
 import { useLoadingScope } from './loading-scope';
 
 const RadioGroup = forwardRef<
@@ -218,7 +219,8 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
               </>
             );
             return (
-              <label
+              <Label
+                variant="surface"
                 key={optionKey}
                 htmlFor={loading ? undefined : itemId}
                 // One option of the list, in the loaded and the loading form alike (the gate compares the two).
@@ -260,7 +262,7 @@ const RadioGroupBlock = forwardRef<ComponentRef<typeof RadioGroupPrimitive.Root>
               >
                 {hasFooter ? <div className="flex w-full items-center gap-[var(--spacing-system-sf)]">{row}</div> : row}
                 {option?.footer}
-              </label>
+              </Label>
             );
           })}
         </RadioGroupPrimitive.Root>

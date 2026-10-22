@@ -8,16 +8,17 @@ import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
 import { LoadingItems } from './loading-scope';
 import { usePortalContainer } from './portal-container';
 
-/** An option's frame (a list row, or a tile in the grid), read by the options and by their loading state. */
-const SELECT_ROW_CLASS =
-  'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left';
-const SELECT_TILE_CLASS =
-  'flex min-w-0 flex-col items-center justify-center gap-[var(--spacing-system-xxs)] border-b border-r border-ods-border p-[var(--spacing-system-xs)]';
+/** An option's frame (a list row, or a tile in the grid): the `row` button kind, read by the options and by their
+ *  loading state so both draw one box. A tile is the row laid out as a column. */
+const SELECT_TILE_LAYOUT = 'min-w-0 flex-col justify-center';
+const SELECT_ROW_CLASS = BUTTON_KIND_CLASS.row;
+const SELECT_TILE_CLASS = cn(BUTTON_KIND_CLASS.row, SELECT_TILE_LAYOUT);
 /**
  * Options the loading state draws (rows, or tiles in the grid layout) when its host states no `loadingRows`: a
  * typical count. A host that reads its options with a limit passes that limit.
@@ -158,37 +159,34 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
   };
 
   const defaultTrigger = (
-    <button
+    <Button
+      variant="field"
       id={triggerId}
       type="button"
       disabled={disabled}
       data-invalid={isInvalid || undefined}
-      className={cn(
-        // Mirrors SelectTrigger so the closed state is indistinguishable from
-        // the regular Select.
-        'flex h-11 w-full items-center justify-between gap-2 rounded-md border px-3 text-left outline-none md:h-12',
-        'border-ods-border bg-ods-card text-h4',
-        selectedOption ? 'text-ods-text-primary' : 'text-ods-text-secondary',
-        'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
-        !isInvalid && 'data-[state=open]:border-ods-accent data-[state=open]:hover:border-ods-accent',
-        'group cursor-pointer transition-colors duration-200 disabled:!cursor-not-allowed disabled:bg-ods-bg',
-        isInvalid &&
-          'border-ods-error enabled:hover:border-ods-error enabled:active:border-ods-error data-[state=open]:border-ods-error',
-        className,
-      )}
+      className={className}
     >
       <span className="flex min-w-0 flex-1 items-center gap-2">
         {selectedOption?.icon}
-        <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+        <span
+          className={cn(
+            'truncate',
+            disabled ? 'text-ods-text-disabled' : selectedOption ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+          )}
+        >
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
       </span>
       <Chevron02DownIcon
         className={cn(
-          'shrink-0 text-ods-text-secondary transition-all duration-200 group-data-[state=open]:rotate-180',
-          isInvalid ? 'text-ods-error' : 'group-data-[state=open]:text-ods-accent',
+          'shrink-0 transition-all duration-200',
+          isOpen && 'rotate-180',
+          isInvalid ? 'text-ods-error' : isOpen ? 'text-ods-accent' : 'text-ods-text-secondary',
         )}
         size={24}
       />
-    </button>
+    </Button>
   );
 
   const triggerElement = <PopoverPrimitive.Trigger asChild>{trigger ?? defaultTrigger}</PopoverPrimitive.Trigger>;
@@ -270,18 +268,16 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
               filtered.map(opt => {
                 const isSelected = value === opt.value;
                 return (
-                  <button
+                  <Button
+                    variant="row"
                     key={opt.value}
                     data-loading-item
                     type="button"
                     role="option"
                     aria-selected={isSelected}
+                    data-state={isSelected ? 'active' : undefined}
                     onClick={() => handleSelect(opt.value)}
-                    className={cn(
-                      'transition-colors hover:bg-ods-bg-hover',
-                      isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS,
-                      isSelected && 'bg-ods-bg-hover',
-                    )}
+                    className={isGrid ? SELECT_TILE_LAYOUT : undefined}
                   >
                     {renderOption ? (
                       renderOption(opt, isSelected)
@@ -307,7 +303,7 @@ export function SearchableSelect(allProps: SearchableSelectProps) {
                         {isSelected && <CheckIcon className="size-4 shrink-0 text-ods-accent" />}
                       </>
                     )}
-                  </button>
+                  </Button>
                 );
               })
             )}

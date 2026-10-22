@@ -711,23 +711,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
   // until there is something to remove; the row count takes the slot back then.
   const bulkAction =
     singleSelect || isCriteria ? null : activeSubTab === 'available' ? (
-      <button
-        type="button"
-        onClick={addAllDevices}
-        disabled={disabled}
-        className="cursor-pointer border-0 bg-transparent text-ods-accent underline text-h6 hover:text-ods-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      <Button variant="link" size="compact" noPaddingX type="button" onClick={addAllDevices} disabled={disabled}>
         Add All Devices
-      </button>
+      </Button>
     ) : selectedCount > 0 ? (
-      <button
-        type="button"
-        onClick={removeAllSelected}
-        disabled={disabled}
-        className="cursor-pointer border-0 bg-transparent text-ods-error underline text-h6 hover:text-ods-error-hover disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      <Button variant="link" size="compact" noPaddingX type="button" onClick={removeAllSelected} disabled={disabled}>
         Remove {server ? (server.totalCount ?? devicesForTable.length) : selectedIds.size} Devices
-      </button>
+      </Button>
     ) : null;
 
   const hasActiveFilter = columnFilters.length > 0 || selectedTags.length > 0 || searchTerm.trim().length > 0;

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { CompassIcon } from '../icons-v2-generated/map-and-travel/compass-icon';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
+import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 const DEFAULT_LABEL = 'Guide Mode Chat';
@@ -41,13 +42,9 @@ export function GuideModeBanner({ label = DEFAULT_LABEL, tooltip = DEFAULT_TOOLT
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label="About Guide Mode"
-                className="shrink-0 rounded-sm text-ods-text-on-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-text-on-accent"
-              >
-                <QuestionCircleIcon size={16} />
-              </button>
+              <Button variant="transparent" size="icon-inline" type="button" aria-label="About Guide Mode">
+                <QuestionCircleIcon size={16} className="text-ods-text-on-accent" />
+              </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" align="end" className="max-w-[280px] normal-case text-h6">
               {tooltip}

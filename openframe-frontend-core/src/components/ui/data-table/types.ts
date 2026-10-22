@@ -22,6 +22,14 @@ export interface DataTableFilterOption {
   count?: number;
 }
 
+/**
+ * The options a filter UI has selected, per column: the option ids `FiltersDropdown` emits, keyed by column id. What
+ * `FilterModal` and `ListPageLayout`'s mobile filters take and hand back.
+ */
+export interface DataTableFilters {
+  [columnKey: string]: string[];
+}
+
 declare module '@tanstack/react-table' {
   interface ColumnMeta<TData extends RowData, TValue> {
     /** Tailwind width class, e.g. `'w-40'`, `'flex-1 min-w-0'`. */

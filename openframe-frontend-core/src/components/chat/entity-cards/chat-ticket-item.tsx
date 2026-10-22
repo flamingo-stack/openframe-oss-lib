@@ -6,6 +6,7 @@ import { TILE_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../../ui/button';
 import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
 import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag';
@@ -60,7 +61,10 @@ export interface ChatTicketItemProps extends Omit<ButtonHTMLAttributes<HTMLButto
 
 const UNREAD_NOTICE = 'You have a new unread message';
 
-const TICKET_ROW = cn('flex h-20 w-full items-center gap-4 px-4', 'border-b border-ods-border bg-ods-card');
+/** The ticket row's box: the lib's list row (`Button variant="row"`) at the row's height. The loading form draws the
+ *  same box as an inert `div`, so the two land on the same pixels. */
+const TICKET_ROW_HEIGHT = 'h-20';
+const TICKET_ROW = cn(BUTTON_KIND_CLASS.row, TICKET_ROW_HEIGHT);
 const TICKET_ROW_TEXT = 'flex min-w-0 flex-1 flex-col justify-center';
 const TICKET_ROW_CHEVRON = `flex ${TILE_SIZE.xl} shrink-0 items-center justify-center rounded-md border`;
 
@@ -160,26 +164,16 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
     }
 
     return (
-      <button
+      <Button
+        variant="row"
         ref={ref}
         type="button"
         onClick={() => onClick?.(ticket.id)}
-        className={cn(
-          TICKET_ROW,
-          'cursor-pointer transition-colors duration-150',
-          'hover:bg-ods-bg-hover',
-          // `focus-visible:` covers keyboard nav AND the post-click state
-          // jsdom/Chromium leave behind. Without it, the global focus
-          // ring (1.5px white) renders as a stray "white border" after
-          // clicking a row.
-          'focus:bg-ods-bg-hover focus:outline-none',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
-          className,
-        )}
+        className={cn(TICKET_ROW_HEIGHT, className)}
         {...props}
       >
         {content}
-      </button>
+      </Button>
     );
   },
 );

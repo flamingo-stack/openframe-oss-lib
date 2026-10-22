@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { DEVICES_GRID_SKELETON_CARDS, DevicesGrid } from '../components/features/devices/devices-grid';
 import { DataTable } from '../components/ui/data-table';
 import { useDataTable } from '../components/ui/data-table/use-data-table';
-import { Table as LegacyTable } from '../components/ui/table/table';
 
 /**
  * A table is a read list: every loaded row and every skeleton row is a `data-loading-item`, so the height gate counts
@@ -44,13 +43,6 @@ describe('DataTable rows are loading items', () => {
   it('every loaded row is an item, and pad rows are not', () => {
     const { container } = render(<Table data={rows(3)} minRows={5} />);
     expect(container.querySelectorAll(ITEM).length).toBe(3);
-  });
-
-  it('the legacy Table marks its loaded rows the same way', () => {
-    const { container } = render(
-      <LegacyTable<Row> data={rows(2)} columns={[{ key: 'name', label: 'Name' }]} rowKey="id" />,
-    );
-    expect(container.querySelectorAll(ITEM).length).toBe(2);
   });
 });
 

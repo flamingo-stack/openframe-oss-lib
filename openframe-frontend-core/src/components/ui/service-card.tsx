@@ -12,6 +12,7 @@ import { EyeOffClassicIcon } from '../icons-v2-generated/interface/eye-off-class
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
 import { loadingItemProps, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
@@ -61,7 +62,6 @@ const SERVICE_CARD_VALUE_BOX_CLASS =
   'flex h-12 min-w-0 flex-1 items-center justify-between rounded-md border border-ods-border bg-ods-bg px-3 content-md:px-4';
 /** The value box's actions (reveal, copy, open), loaded and loading. */
 const SERVICE_CARD_ACTIONS_CLASS = 'flex flex-shrink-0 items-center gap-2 pl-3';
-const SERVICE_CARD_ACTION_CLASS = 'rounded p-2 text-ods-text-secondary';
 
 /** A row's actions: copy by default, open with a link, reveal for a secret, then what the row states. */
 function rowActions(row: ServiceCardRow): ServiceCardRowAction {
@@ -186,46 +186,49 @@ function ServiceCardRowItem({ row, loading: loadingProp }: { row: ServiceCardRow
         )}
         <div className={SERVICE_CARD_ACTIONS_CLASS}>
           {actions.reveal && (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               disabled={loading}
               tabIndex={loading ? -1 : undefined}
               onClick={() => setRevealed(v => !v)}
-              className={cn(SERVICE_CARD_ACTION_CLASS, !loading && 'hover:bg-ods-card')}
               aria-label={revealed ? 'Hide' : 'Reveal'}
             >
-              {revealed ? <EyeOffClassicIcon className="h-5 w-5" /> : <EyeClassicIcon className="h-5 w-5" />}
-            </button>
+              {revealed ? (
+                <EyeOffClassicIcon className="text-ods-text-secondary" />
+              ) : (
+                <EyeClassicIcon className="text-ods-text-secondary" />
+              )}
+            </Button>
           )}
 
           {actions.copy && (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               disabled={loading}
               tabIndex={loading ? -1 : undefined}
               onClick={handleCopy}
-              className={cn(
-                'rounded p-2 transition-colors',
-                !loading && 'hover:bg-ods-card',
-                copied ? 'text-ods-success' : 'text-ods-text-secondary',
-              )}
               aria-label={`Copy ${row.label || 'value'}`}
             >
-              {copied ? <CheckIcon size={20} /> : <Copy01Icon size={20} />}
-            </button>
+              {copied ? <CheckIcon className="text-ods-success" /> : <Copy01Icon className="text-ods-text-secondary" />}
+            </Button>
           )}
 
           {actions.open && row.href && (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               disabled={loading}
               tabIndex={loading ? -1 : undefined}
               onClick={openInNewTab}
-              className={cn(SERVICE_CARD_ACTION_CLASS, !loading && 'hover:bg-ods-card')}
               aria-label={`Open ${row.label || 'link'}`}
             >
-              <ExternalLink className="h-5 w-5" />
-            </button>
+              <ExternalLink className="text-ods-text-secondary" />
+            </Button>
           )}
         </div>
       </div>

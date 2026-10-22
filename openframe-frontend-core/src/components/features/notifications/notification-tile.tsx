@@ -8,6 +8,7 @@ import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { Button } from '../../ui/button';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
 import type { Notification, NotificationSeverity, NotificationVariant } from './types';
@@ -41,8 +42,8 @@ const progressColorByVariant: Record<NotificationVariant, string> = {
   info: 'bg-ods-accent',
 };
 
-const headerControlClass =
-  'absolute inset-0 flex items-center justify-center text-ods-text-secondary transition-opacity duration-200 hover:text-ods-text-primary';
+/** The trailing control sits centred over its 16px slot. */
+const headerControlClass = 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2';
 
 /** The header's icon box and its trailing control's box, read by the tile and by its skeleton. */
 const TILE_ICON_BOX_CLASS = `flex ${ICON_SIZE.sm} shrink-0 items-center justify-center`;
@@ -253,7 +254,9 @@ function LoadedNotificationTile({
                     onClick: () => onComplete(id),
                   },
                 ].map(({ active, label, icon: actionIcon, onClick }) => (
-                  <button
+                  <Button
+                    variant="transparent"
+                    size="icon-inline"
                     key={label}
                     type="button"
                     onClick={onClick}
@@ -261,10 +264,10 @@ function LoadedNotificationTile({
                     aria-hidden={!active}
                     disabled={!active}
                     tabIndex={active ? 0 : -1}
-                    className={cn(headerControlClass, !active && 'pointer-events-none opacity-0')}
+                    className={cn(headerControlClass, !active && 'invisible')}
                   >
                     {actionIcon}
-                  </button>
+                  </Button>
                 ))}
               </span>
             </>

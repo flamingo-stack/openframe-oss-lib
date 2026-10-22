@@ -6,13 +6,13 @@ import { cn } from '../../utils/cn';
 import { Filter02Icon } from '../icons-v2-generated/sort-and-filter/filter-02-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
+import type { DataTableFilters } from './data-table/types';
 import { DateFilterPanel, type DateFilterResult } from './date-picker';
 import { FilterCheckboxItem } from './filter-checkbox-item';
 import { LOADING_NOOP, LoadingItems, LoadingScope } from './loading-scope';
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { ScrollFadeOverlay, useScrollFade } from './scroll-fade';
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item';
-import type { TableFilters } from './table/types';
 import { TagKeyValueFilter, type TagKeyConfig } from './tag-key-value-filter';
 
 export interface FilterModalOption {
@@ -32,8 +32,8 @@ export interface FilterModalProps {
   onClose: () => void;
   title?: string;
   filterGroups: FilterGroup[];
-  onFilterChange: (filters: TableFilters) => void;
-  currentFilters?: TableFilters;
+  onFilterChange: (filters: DataTableFilters) => void;
+  currentFilters?: DataTableFilters;
   resetButtonText?: string;
   applyButtonText?: string;
   className?: string;
@@ -102,7 +102,7 @@ export function FilterModal({
   emptyStateTitle = 'No filters available',
   emptyStateDescription = 'There are no filter options to display at the moment',
 }: FilterModalProps) {
-  const [selectedFilters, setSelectedFilters] = useState<TableFilters>(() => {
+  const [selectedFilters, setSelectedFilters] = useState<DataTableFilters>(() => {
     return { ...currentFilters };
   });
   const [pendingTags, setPendingTags] = useState<string[]>(selectedTags ?? []);
@@ -137,7 +137,7 @@ export function FilterModal({
   }, [isOpen, seedKey]);
 
   const handleFilterToggle = (groupId: string, optionId: string, checked: boolean) => {
-    setSelectedFilters((prev: TableFilters) => {
+    setSelectedFilters((prev: DataTableFilters) => {
       const current = prev[groupId] || [];
       const updated = checked
         ? current.includes(optionId)

@@ -2,8 +2,8 @@
 
 import { Chevron02LeftIcon, BoxArchiveIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
-import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
 import { MingoChatHistory } from './mingo-chat-history';
@@ -85,21 +85,21 @@ export function ChatArchivePage(props: ChatArchivePageProps) {
       )}
 
       {/* Desktop (md+): fixed-height bar with full-height divider action cells —
-          the back chevron is a leading `ChatHeaderIconButton` cell matching the
+          the back chevron is a leading ``Button variant="cell"`` cell matching the
           trailing close cell (not a small inline chevron). */}
       {!props.embedded && (
-        <div className="hidden h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card md:flex">
-          <ChatHeaderIconButton divider="right" onClick={props.onBack} aria-label="Back">
+        <div className="hidden h-14 w-full flex-shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border bg-ods-card md:flex">
+          <Button variant="cell" className="w-14" onClick={props.onBack} aria-label="Back">
             <Chevron02LeftIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
           <div className="flex min-w-0 flex-1 items-center px-[var(--spacing-system-mf)] py-[var(--spacing-system-sf)]">
             <span className="truncate text-ods-text-primary text-h3">Chat Archive</span>
           </div>
 
           {props.onClose && (
-            <ChatHeaderIconButton onClick={props.onClose} aria-label="Close">
+            <Button variant="cell" className="w-14" onClick={props.onClose} aria-label="Close">
               <XmarkIcon size={24} />
-            </ChatHeaderIconButton>
+            </Button>
           )}
         </div>
       )}

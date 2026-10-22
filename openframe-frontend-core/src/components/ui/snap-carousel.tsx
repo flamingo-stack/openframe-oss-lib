@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { useLoadingScope } from './loading-scope';
 
 /** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
@@ -16,9 +17,6 @@ const SNAP_CAROUSEL_CONTROLS_CLASS = 'mt-3 flex items-center gap-2';
 export const SNAP_CAROUSEL_GAP_PX = 12;
 /** The track: one row of slides that snaps and scrolls sideways (read by the carousel and by a host's loading form). */
 export const SNAP_CAROUSEL_TRACK_CLASS = 'scrollbar-hide flex snap-x snap-mandatory overflow-x-auto';
-const ARROW_CLASS =
-  'grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ods-border text-ods-text-primary outline-none transition-colors hover:bg-ods-card focus-visible:ring-2 focus-visible:ring-ods-focus disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:bg-transparent';
-
 /** One slide of the track, in the carousel's own box. A host drawing its slides' loading form uses it too. */
 export function SnapCarouselSlide({
   className,
@@ -119,24 +117,28 @@ export function SnapCarouselControls({
           {index + 1} / {count}
         </span>
       )}
-      <button
+      <Button
+        variant="outline"
+        size="icon"
         type="button"
         aria-label={prevLabel}
         disabled={loading || index === 0}
         onClick={onPrevious}
-        className={ARROW_CLASS}
+        className="shrink-0"
       >
         <Chevron02LeftIcon size={20} />
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
         type="button"
         aria-label={nextLabel}
         disabled={loading || index === count - 1}
         onClick={onNext}
-        className={ARROW_CLASS}
+        className="shrink-0"
       >
         <Chevron02RightIcon size={20} />
-      </button>
+      </Button>
     </div>
   );
 }

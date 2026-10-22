@@ -176,7 +176,9 @@ export function TagSelectDropdown({
                   </span>
                   {isSelected && <CheckIcon className="size-4 shrink-0 text-ods-accent" />}
                   {onDelete && !isSelected && (
-                    <button
+                    <Button
+                      variant="transparent"
+                      size="icon-sm"
                       type="button"
                       aria-label={`Delete tag ${opt.label}`}
                       onClick={e => {
@@ -184,13 +186,10 @@ export function TagSelectDropdown({
                         onDelete(opt.id);
                       }}
                       disabled={isDeleting}
-                      className={cn(
-                        'shrink-0 opacity-0 transition-opacity focus-visible:opacity-100 group-hover/item:opacity-100',
-                        'disabled:pointer-events-none disabled:opacity-50',
-                      )}
+                      className="shrink-0"
                     >
-                      <TrashIcon className="size-4 text-ods-error" />
-                    </button>
+                      <TrashIcon className="text-ods-error" />
+                    </Button>
                   )}
                 </div>
               );
@@ -202,20 +201,12 @@ export function TagSelectDropdown({
                   Maximum {maxCreateLength} characters
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleCreate}
-                  disabled={isCreating}
-                  className={cn(
-                    'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
-                    'transition-colors hover:bg-ods-bg-hover disabled:pointer-events-none disabled:opacity-50',
-                  )}
-                >
+                <Button variant="row" type="button" onClick={handleCreate} disabled={isCreating}>
                   <PlusIcon className="size-4 shrink-0 text-ods-accent" />
                   <span className="flex-1 truncate text-ods-accent text-h4" title={`Create "${query}"`}>
                     Create &ldquo;{query}&rdquo;
                   </span>
-                </button>
+                </Button>
               ))}
 
             {filtered.length === 0 && !showCreate && (

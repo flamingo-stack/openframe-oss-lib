@@ -13,6 +13,7 @@ import {
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
 import { ChatAppearanceContext } from './chat-appearance-context';
@@ -1103,7 +1104,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               move the very bottom it points at. Hidden while at the bottom
               and in passive demo hosts. */}
               {autoScroll && !atBottom && messages.length > 0 && (
-                <button
+                <Button
+                  variant="outline"
+                  size="icon-sm"
                   type="button"
                   onClick={() => {
                     // Clicking IS the intent to return to the live end, so it
@@ -1112,15 +1115,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     void scrollToBottom({ animation: 'smooth' });
                   }}
                   aria-label="Scroll to latest message"
-                  className={cn(
-                    'absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2',
-                    'flex size-9 items-center justify-center rounded-full',
-                    'border border-ods-border bg-ods-card text-ods-text-primary shadow-lg',
-                    'transition-colors hover:bg-ods-bg-hover',
-                  )}
+                  className="absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2"
                 >
                   <Arrow02DownIcon size={16} />
-                </button>
+                </Button>
               )}
             </div>
 

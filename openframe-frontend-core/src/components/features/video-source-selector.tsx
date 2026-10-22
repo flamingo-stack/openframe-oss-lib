@@ -286,15 +286,17 @@ function DefaultVideoPreview({ videoUrl, onDelete, disabled }: DefaultVideoPrevi
       <div className="aspect-video max-h-[300px] w-full">
         <Video kind="file" url={videoUrl} />
       </div>
-      <button
+      <Button
+        variant="overlay"
+        size="icon-sm"
         type="button"
         onClick={onDelete}
         aria-label="Delete video"
-        className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 transition-colors hover:bg-black/80"
+        className="absolute right-2 top-2"
         disabled={disabled}
       >
-        <X className="h-4 w-4 text-ods-text-on-dark" />
-      </button>
+        <X />
+      </Button>
     </div>
   );
 }

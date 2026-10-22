@@ -122,14 +122,15 @@ function LoadedTagsInput({
             <Badge key={tag} className={cn('flex items-center gap-1 py-1 pl-2 pr-1', badgeClassName)}>
               {tag}
               {!disabled && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-inline"
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="rounded p-0.5 transition-colors hover:bg-white/20"
                   aria-label={`Remove ${tag} tag`}
                 >
-                  <X className="h-3 w-3" />
-                </button>
+                  <X />
+                </Button>
               )}
             </Badge>
           ))}

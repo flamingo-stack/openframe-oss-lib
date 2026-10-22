@@ -5,7 +5,9 @@ import { type ButtonHTMLAttributes, type ReactNode, type TextareaHTMLAttributes,
 import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
+import { Label } from './label';
 import { useLoadingScope } from './loading-scope';
 
 /**
@@ -74,7 +76,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
   const isInvalid = invalid || !!error;
   const hasAdornment = !!endIcon || !!startIcon;
 
-  // The adorned layout wraps the field in a `<label>`. Without an explicit
+  // The adorned layout wraps the field in a `<Label variant="surface">`. Without an explicit
   // `htmlFor`, the label's control defaults to its FIRST labelable descendant
   // — which is `startIcon` (e.g. the composer `+` button) when present, so a
   // click anywhere on the field synthesises a click on that button. Bind the
@@ -115,7 +117,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
     );
   }
 
-  // With an end icon we lift border/bg onto a `<label>` wrapper so the icon
+  // With an end icon we lift border/bg onto a `<Label variant="surface">` wrapper so the icon
   // sits visually inside the same field. The textarea becomes a transparent
   // child. Wrapper classes mirror `Input` 1:1 (same items-center, same
   // `has-[:focus]` selectors, same active state, same outline reset) so
@@ -134,7 +136,8 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
     ? 'group-has-[textarea:focus]:text-ods-accent'
     : 'group-has-[:focus]:text-ods-accent';
   const content = (
-    <label
+    <Label
+      variant="surface"
       htmlFor={fieldId}
       data-invalid={isInvalid || undefined}
       className={cn(
@@ -203,27 +206,21 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
       />
 
       {endIconAsButton ? (
-        <button
+        <Button
+          variant="transparent"
+          size="icon-sm"
           type="button"
           aria-label={endIconButtonProps?.['aria-label'] ?? 'Submit'}
           {...endIconButtonProps}
           className={cn(
-            // `h-6` matches the textarea's `leading-6` line box so the icon's
-            // visual center lines up with the text on the first line. Without
-            // it, `items-end` bottom-aligns the smaller mobile icon (size-4)
-            // against the 24px text line and drops it below the text center.
-            'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
-            adornmentAccent,
-            'group-data-[invalid]:text-ods-error',
-            '[&_svg]:size-4 md:[&_svg]:size-6',
-            'cursor-pointer hover:text-ods-text-primary',
-            'focus-visible:text-ods-accent focus-visible:outline-none',
-            'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
+            // The 32px target overhangs the textarea's 24px `leading-6` line box by 4px on each side (`-my-1`), so the
+            // icon's centre stays on the first line's centre.
+            '-my-1 shrink-0',
             endIconButtonProps?.className,
           )}
         >
           {endIcon}
-        </button>
+        </Button>
       ) : (
         <span
           className={cn(
@@ -236,7 +233,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
           {endIcon}
         </span>
       )}
-    </label>
+    </Label>
   );
 
   return (

@@ -14,22 +14,19 @@ import {
 
 /**
  * The empty state, floating centred over a full page's worth of reserved row
- * slots. Both table bodies render this — an empty table is exactly when a
+ * slots. `DataTable.Body` renders this — an empty table is exactly when a
  * collapsing one is most visible (the pagination and everything under it jump
- * the moment a filter matches nothing), and two hand-matched copies of the
- * wrapper would drift the way the two placeholder components already had.
+ * the moment a filter matches nothing), so the body reserves the page's slots.
  */
 export function ReservedEmptyState({
   count,
   gapClassName,
   rowHeightClassName,
-  innerHeightClassName,
   children,
 }: {
   count: number;
   gapClassName: string;
   rowHeightClassName?: string;
-  innerHeightClassName?: string;
   children: ReactNode;
 }) {
   // ONE grid cell holds both layers, so the box is as tall as the TALLER of
@@ -41,11 +38,7 @@ export function ReservedEmptyState({
   return (
     <div className="grid w-full">
       <div className={cn('flex w-full flex-col [grid-area:1/1]', gapClassName)}>
-        <PlaceholderRows
-          count={count}
-          rowHeightClassName={rowHeightClassName}
-          innerHeightClassName={innerHeightClassName}
-        />
+        <PlaceholderRows count={count} rowHeightClassName={rowHeightClassName} />
       </div>
       {/* `sticky left-0` + `w-screen max-w-full`: hosts wrap tables in a
           horizontal scroller with a forced min-width, and an overlay centred on
@@ -63,21 +56,17 @@ export function ReservedEmptyState({
  * Invisible rows that occupy exactly one row slot each.
  *
  * THE height reservation for a table whose page is short or empty — every call
- * site uses it (data-table's pad + empty branches AND the legacy `Table`'s), so
+ * site uses it (`DataTable.Body`'s pad and empty branches), so
  * a padded page and an empty one are the same height by construction rather
  * than by matching guesses in each component.
  */
 export function PlaceholderRows({
   count,
   rowHeightClassName,
-  innerHeightClassName,
 }: {
   count: number;
   /** Height on the CARD, as `DataTableRow` carries it. */
   rowHeightClassName?: string;
-  /** Height on the INNER row instead — the legacy `Table` puts it there and
-   *  lets the card's border add the remaining 2px, so its pad rows must too. */
-  innerHeightClassName?: string;
 }) {
   return (
     // loading-standard-ok(ITEM_MARK): pad slots that reserve a short page's height in the LOADED table, not items
@@ -104,7 +93,7 @@ export function PlaceholderRows({
               ROW_DESKTOP_SHELL_CLASS,
               'py-0',
               ROW_SHELL_CLASSES,
-              innerHeightClassName ?? (rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP),
+              rowHeightClassName ? 'h-full' : ROW_HEIGHT_DESKTOP,
             )}
           />
           <div
@@ -112,7 +101,7 @@ export function PlaceholderRows({
               ROW_MOBILE_SHELL_CLASS,
               'py-0',
               ROW_SHELL_CLASSES,
-              innerHeightClassName ?? (rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE),
+              rowHeightClassName ? 'h-full' : ROW_HEIGHT_MOBILE,
             )}
           />
         </div>

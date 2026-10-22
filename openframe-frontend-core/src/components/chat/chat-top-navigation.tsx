@@ -4,6 +4,7 @@ import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Settings01Icon, SidebarIcon } from '../icons-v2-generated';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 
@@ -29,11 +30,8 @@ export interface ChatTopNavigationProps extends HTMLAttributes<HTMLElement> {
   isLoading?: boolean;
 }
 
-const edgeButtonClass = cn(
-  'flex size-14 shrink-0 items-center justify-center border-ods-border text-ods-text-secondary',
-  'hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-  '[&_svg]:size-6',
-);
+/** An edge button is a bar cell (`Button variant="cell"`), square: the bar's 56px. */
+const EDGE_CELL_CLASS = 'w-14';
 
 /**
  * Top bar of the fae chat v2 layout (Figma `chat-top-navigation`): an optional
@@ -62,17 +60,18 @@ const ChatTopNavigation = forwardRef<HTMLElement, ChatTopNavigationProps>(
     return (
       <header ref={ref} className={cn('flex shrink-0 flex-col bg-ods-bg', className)} {...props}>
         {before}
-        <div className="flex h-14 items-stretch border-b border-ods-border">
+        <div className="flex h-14 items-stretch divide-x divide-ods-border border-b border-ods-border">
           {onToggleSidebar && (
-            <button
+            <Button
+              variant="cell"
               type="button"
               onClick={onToggleSidebar}
               aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
               aria-expanded={sidebarOpen}
-              className={cn(edgeButtonClass, 'border-r')}
+              className={EDGE_CELL_CLASS}
             >
               <SidebarIcon />
-            </button>
+            </Button>
           )}
           <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)]">
             <SquareAvatar
@@ -97,14 +96,15 @@ const ChatTopNavigation = forwardRef<HTMLElement, ChatTopNavigationProps>(
             {actions && <div className="flex shrink-0 items-center gap-[var(--spacing-system-xs)]">{actions}</div>}
           </div>
           {onOpenSettings && (
-            <button
+            <Button
+              variant="cell"
               type="button"
               onClick={onOpenSettings}
               aria-label="Settings"
-              className={cn(edgeButtonClass, 'border-l')}
+              className={EDGE_CELL_CLASS}
             >
               <Settings01Icon />
-            </button>
+            </Button>
           )}
         </div>
       </header>

@@ -47,7 +47,6 @@ export * from './mingo-chat-header';
 export * from './mingo-chat-rail';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
-export * from './chat-header-icon-button';
 export * from './chat-header-search-field';
 export * from './chat-panel-header';
 export * from './chat-composer';

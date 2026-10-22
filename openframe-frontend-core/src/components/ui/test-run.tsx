@@ -8,6 +8,7 @@ import { formatTime } from '../../utils/format-date';
 import { Copy02Icon, SearchIcon } from '../icons-v2-generated';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { DataTable } from './data-table';
 import { DATA_TABLE_ROW_FRAME_CLASS, ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table/data-table-row-classes';
 import { useDataTable } from './data-table/use-data-table';
@@ -162,14 +163,16 @@ export function TestRunErrorBanner({ error, className }: { error: string; classN
       )}
     >
       <p className="min-w-0 break-words text-ods-error text-h4">{error}</p>
-      <button
+      <Button
+        variant="transparent"
+        size="icon-sm"
         type="button"
         aria-label="Copy error message"
         onClick={() => copy(error)}
-        className="shrink-0 rounded-sm text-ods-error transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
+        className="shrink-0"
       >
-        <Copy02Icon className="size-5" />
-      </button>
+        <Copy02Icon className="text-ods-error" />
+      </Button>
     </div>
   );
 }

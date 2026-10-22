@@ -10,6 +10,7 @@ import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-righ
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import {
   SNAP_CAROUSEL_GAP_PX,
@@ -122,8 +123,9 @@ const CARD_SLIDE_CLASS = 'min-w-0 basis-[86%]';
 /** A job's card in the carousel (loaded and loading): its frame, padding and rhythm. */
 const CARD_CLASS =
   'flex w-full min-w-0 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]';
-/** A job's row in the list (loaded tab and loading row): its box. */
-const JOB_TAB_CLASS = 'flex min-w-0 shrink-0 items-center gap-3.5 rounded-lg border px-3.5 py-3';
+/** A job's row in the list (loaded tab and loading row): the lib's list row (`Button variant="row"`), never shrunk. */
+const JOB_TAB_LAYOUT_CLASS = 'min-w-0 shrink-0';
+const JOB_TAB_CLASS = cn(BUTTON_KIND_CLASS.row, JOB_TAB_LAYOUT_CLASS);
 /** A job's icon tile's box (in the list, a card's head and their skeletons). */
 const JOB_ICON_TILE_BOX = `${TILE_SIZE.md} shrink-0 rounded-lg`;
 const JOB_ICON_TILE_CLASS = cn(
@@ -323,10 +325,7 @@ function CapabilityExplorerSkeleton({
         <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
           <LoadingItems count={count}>
             {i => (
-              <div
-                data-loading-item
-                className={cn(JOB_TAB_CLASS, i === 0 ? 'border-ods-border bg-ods-card' : 'border-transparent')}
-              >
+              <div data-loading-item data-state={i === 0 ? 'active' : undefined} className={JOB_TAB_CLASS}>
                 <JobHeadSkeleton />
               </div>
             )}
@@ -505,7 +504,8 @@ export function CapabilityExplorer({
         {items.map((item, index) => {
           const selected = index === activeIndex;
           return (
-            <button
+            <Button
+              variant="row"
               key={item.id}
               data-loading-item
               id={capabilityTabId(item.id)}
@@ -513,13 +513,10 @@ export function CapabilityExplorer({
               role="tab"
               aria-selected={selected}
               aria-controls={panelId}
+              data-state={selected ? 'active' : undefined}
               tabIndex={selected ? 0 : -1}
               onClick={() => onActiveChange(item.id)}
-              className={cn(
-                JOB_TAB_CLASS,
-                'text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-                selected ? 'border-ods-border bg-ods-card' : 'border-transparent hover:bg-ods-bg-hover',
-              )}
+              className={JOB_TAB_LAYOUT_CLASS}
             >
               {item.iconName && (
                 <span
@@ -549,7 +546,7 @@ export function CapabilityExplorer({
                 className={cn('shrink-0', selected ? 'text-ods-flamingo-cyan' : 'invisible')}
                 aria-hidden
               />
-            </button>
+            </Button>
           );
         })}
       </div>

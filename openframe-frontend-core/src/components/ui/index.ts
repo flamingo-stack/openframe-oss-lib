@@ -142,30 +142,6 @@ export * from './touch-friendly-tooltip';
 export * from './error-state';
 export * from './content-loader';
 
-// Table components
-export {
-  Table,
-  TableCell,
-  TableDescriptionCell,
-  TableEmptyState,
-  TableHeader,
-  TableRow,
-  TableTimestampCell,
-} from './table';
-
-export type {
-  PagePagination,
-  RowAction,
-  TableCellProps,
-  TableColumn,
-  TableDescriptionCellProps,
-  TableEmptyStateProps,
-  TableHeaderProps,
-  TableProps,
-  TableRowProps,
-  TableTimestampCellProps,
-} from './table';
-
 // Query Report Table (dynamic columns for osquery results)
 export {
   QueryReportTable,
@@ -186,7 +162,7 @@ export type {
 export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 
-// DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
+// DataTable (headless, TanStack Table-based): the lib's one table.
 export * from './data-table';
 
 // Password input (show/hide toggle)

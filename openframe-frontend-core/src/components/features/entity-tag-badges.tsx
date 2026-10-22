@@ -21,8 +21,6 @@ interface EntityTagBadgesProps {
   /** In a loading state with no `max`: how many tag boxes the row draws, at every width (default
    *  `ENTITY_TAG_BADGES_SKELETON_COUNT`, a typical row). */
   skeletonCount?: number;
-  /** @deprecated Ignored: a loading row draws one count at every width (`skeletonCount`). */
-  skeletonPhoneCount?: number;
   /** In a loading state: a host's typical tag label width (a sizing class) where its tags run longer or shorter than
    *  the default, so its skeleton row wraps where its typical row wraps. */
   skeletonItemClassName?: string;
@@ -83,8 +81,6 @@ function EntityTagBadgesSkeleton({
   itemClassName,
 }: {
   count?: number;
-  /** @deprecated Ignored: the skeleton draws `count` at every width. */
-  phoneCount?: number;
   overflow?: boolean;
   className?: string;
   /** A host's typical tag label width (a sizing class on each badge, in place of the default); the row keeps the

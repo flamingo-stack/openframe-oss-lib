@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon } from '../icons-v2-generated/interface/ellipsis-01-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { Button } from '../ui/button';
 import { CONTEXT_ICON_CLASS, CONTEXT_LABEL_CLASS, CONTEXT_ROW_CLASS } from './context-items-list';
 import type { ChatContextItem } from './types/context-item.types';
 
@@ -108,20 +109,18 @@ export function ChatContextMemoryBar({
         {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
       </p>
 
-      <button
+      <Button
+        variant="transparent"
+        size="icon-sm"
         type="button"
         aria-label="Show remembered context"
         aria-expanded={open}
         title="Show remembered context"
         onClick={() => setOpen(o => !o)}
-        className={cn(
-          'flex size-4 shrink-0 items-center justify-center rounded outline-none transition-colors [&_svg]:size-4',
-          open ? 'text-ods-text-primary' : 'text-ods-text-secondary hover:text-ods-text-primary',
-          'focus-visible:text-ods-text-primary',
-        )}
+        className="shrink-0"
       >
         <Ellipsis01Icon size={16} />
-      </button>
+      </Button>
 
       {open && (
         <div
@@ -141,15 +140,17 @@ export function ChatContextMemoryBar({
                 {item.label}
               </span>
               {onRemove && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   onClick={() => onRemove(item)}
                   disabled={disabled}
                   aria-label={`Remove ${item.label} from context`}
-                  className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary outline-none transition-colors hover:text-ods-text-primary focus-visible:text-ods-text-primary disabled:cursor-not-allowed disabled:opacity-40 md:size-6"
+                  className="shrink-0"
                 >
-                  <XmarkCircleIcon className="size-4 shrink-0 md:size-6" />
-                </button>
+                  <XmarkCircleIcon />
+                </Button>
               )}
             </div>
           ))}

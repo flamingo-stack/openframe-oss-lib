@@ -21,6 +21,7 @@ import { SearchIcon } from '../icons-v2-generated';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { HiddenTagsPopup } from './hidden-tags-popup';
 import { LoadingItems } from './loading-scope';
 import { Tag } from './tag';
@@ -503,23 +504,19 @@ export function SearchInput({
               {/* "+N" overflow badge */}
               {hiddenCount > 0 && (
                 <div ref={hiddenTagsRef} className="shrink-0">
-                  <button
+                  <Button
+                    variant="chip"
                     ref={badgeRef}
                     type="button"
+                    aria-expanded={showHiddenTags}
                     onClick={e => {
                       e.stopPropagation();
                       setShowHiddenTags(prev => !prev);
                     }}
-                    className={cn(
-                      'flex h-8 items-center px-2',
-                      'rounded-[6px] border border-ods-border bg-ods-card',
-                      'text-ods-text-secondary text-h5',
-                      'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-                    )}
                     aria-label={`${hiddenCount} more selected filters`}
                   >
                     {getLimitTagsText(hiddenCount)}
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -544,14 +541,15 @@ export function SearchInput({
             {/* End adornment / Clear — pinned right, shrink-0 */}
             <div className="ml-auto flex shrink-0 items-center gap-1">
               {hasValue && !disabled && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   onClick={handleClear}
-                  className="flex items-center justify-center transition-opacity hover:opacity-70"
                   aria-label="Clear search"
                 >
-                  <XmarkCircleIcon className="text-ods-text-secondary" size={24} />
-                </button>
+                  <XmarkCircleIcon className="text-ods-text-secondary" />
+                </Button>
               )}
               {endAdornment}
             </div>

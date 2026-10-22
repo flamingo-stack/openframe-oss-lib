@@ -98,7 +98,7 @@ export interface AdminContentCardGridProps<T> {
 
 /**
  * A paginated card grid that is ONE height in every state: the card-grid
- * counterpart of the admin `Table`'s `skeletonRows` + `keepHeightWhenEmpty`.
+ * counterpart of `DataTable.Body`'s `skeletonRows` + `minRows`.
  * `AdminContentCard`s rendered in it pass `reserveRows`, so a full page is the
  * height of the reserved one.
  *

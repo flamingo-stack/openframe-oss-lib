@@ -30,9 +30,10 @@ import { Upload02Icon } from '../icons-v2-generated/interface/upload-02-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingSuspense } from '../loading/loading-fallback';
+import { Button } from '../ui/button';
 import { LOADING_NOOP } from '../ui/loading-scope';
 import {
-  CONTEXT_BACK_CLASS,
+  CONTEXT_BACK_BAR_CLASS,
   CONTEXT_STATE_CLASS,
   ContextErrorBoundary,
   ContextItemsList,
@@ -89,7 +90,9 @@ export function ChatComposerPlusMenu({
     // `relative` so the dropdown anchors to the button itself (bottom-full),
     // aligning the popover to the `+` rather than the input row.
     <span className="relative inline-flex">
-      <button
+      <Button
+        variant="transparent"
+        size="icon-sm"
         type="button"
         data-context-trigger=""
         disabled={disabled}
@@ -97,14 +100,10 @@ export function ChatComposerPlusMenu({
         aria-expanded={open}
         title="Add context"
         onClick={onToggle}
-        className={cn(
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded outline-none transition-colors',
-          open ? 'text-ods-accent' : 'text-ods-text-secondary hover:text-ods-text-primary active:text-ods-accent',
-          'focus-visible:text-ods-text-primary disabled:cursor-not-allowed disabled:opacity-40',
-        )}
+        className="shrink-0"
       >
-        <PlusIcon className="h-6 w-6" />
-      </button>
+        <PlusIcon />
+      </Button>
       {dropdown}
     </span>
   );
@@ -308,7 +307,7 @@ export function ChatContextPicker({
     >
       {view === 'root' ? (
         /* Level 0 — Upload File / Assign Item (Figma 31:28312). */
-        <div role="menu" aria-label="Add context">
+        <div role="menu" aria-label="Add context" className="divide-y divide-ods-border">
           {config.onUploadFile && (
             <ContextMenuRow
               icon={<Upload02Icon size={24} />}
@@ -321,17 +320,15 @@ export function ChatContextPicker({
       ) : view === 'types' ? (
         /* Level 1 — Back + entity-type list (Figma 31:28708). Back stays pinned;
            the type list scrolls if it can't fit the capped popover height. */
-        <div role="menu" aria-label="Context types" className="flex flex-col">
-          <button
-            type="button"
-            onClick={() => setView('root')}
-            // Pinned while the popover body scrolls (the root is the scroll
-            // container) — `bg-ods-bg` keeps rows from showing through.
-            className={cn(CONTEXT_BACK_CLASS, 'sticky top-0 z-10')}
-          >
-            <Chevron02LeftIcon size={24} className="shrink-0" />
-            <span className="truncate">Back</span>
-          </button>
+        <div role="menu" aria-label="Context types" className="flex flex-col divide-y divide-ods-border">
+          {/* Pinned while the popover body scrolls (the root is the scroll
+              container) — the bar's `bg-ods-bg` keeps rows from showing through. */}
+          <div className={CONTEXT_BACK_BAR_CLASS}>
+            <Button variant="row" type="button" onClick={() => setView('root')}>
+              <Chevron02LeftIcon size={24} />
+              <span className="truncate">Back</span>
+            </Button>
+          </div>
           {visibleTypes.length === 0 ? (
             <div className={CONTEXT_STATE_CLASS}>No matching types</div>
           ) : (
@@ -343,10 +340,12 @@ export function ChatContextPicker({
       ) : activeType ? (
         /* Level 2 — Back + search + HOST-rendered items (Figma 31:29102). */
         <>
-          <button type="button" onClick={backToTypes} className={cn(CONTEXT_BACK_CLASS, 'sticky top-0 z-10')}>
-            <Chevron02LeftIcon size={24} className="shrink-0" />
-            <span className="truncate">Back</span>
-          </button>
+          <div className={cn(CONTEXT_BACK_BAR_CLASS, 'border-b border-ods-border')}>
+            <Button variant="row" type="button" onClick={backToTypes}>
+              <Chevron02LeftIcon size={24} />
+              <span className="truncate">Back</span>
+            </Button>
+          </div>
 
           <div className="flex shrink-0 items-center gap-2 border-b border-ods-border bg-ods-card p-3">
             <SearchIcon className="size-4 shrink-0 text-ods-text-secondary md:size-6" />
@@ -371,16 +370,19 @@ export function ChatContextPicker({
                 fallback={retry => (
                   <div className="flex items-center justify-between gap-2 bg-ods-bg px-4 py-3 text-ods-attention-red-error text-h4">
                     <span>Failed to load</span>
-                    <button
+                    <Button
+                      variant="link"
+                      size="compact"
+                      noPaddingX
                       type="button"
                       onClick={() => {
                         reset();
                         retry();
                       }}
-                      className="shrink-0 underline outline-none hover:text-ods-text-primary focus-visible:text-ods-text-primary"
+                      className="shrink-0"
                     >
                       Retry
-                    </button>
+                    </Button>
                   </div>
                 )}
               >
@@ -479,15 +481,16 @@ export function ChatContextChipStrip({
               {item.label}
             </span>
             {onRemove && (
-              <button
+              <Button
+                variant="transparent"
+                size="icon-inline"
                 type="button"
                 onClick={() => onRemove(item)}
                 disabled={disabled}
                 aria-label={`Remove ${item.label}`}
-                className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary outline-none transition-colors hover:text-ods-text-primary focus-visible:text-ods-text-primary disabled:cursor-not-allowed disabled:opacity-40 [&_svg]:size-4"
               >
                 <XmarkCircleIcon size={16} />
-              </button>
+              </Button>
             )}
           </div>
         );
