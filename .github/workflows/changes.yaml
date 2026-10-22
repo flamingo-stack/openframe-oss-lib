@@ -35,6 +35,7 @@ jobs:
           filters=$(jq -nc '{
               "java": [
                 "pom.xml",
+                "openframe-agent-key/**",
                 "openframe-api-lib/**",
                 "openframe-api-service-core/**",
                 "openframe-authorization-service-core/**",

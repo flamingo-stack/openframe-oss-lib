@@ -1,6 +1,6 @@
 package com.openframe.management.initializer;
 
-import com.openframe.management.service.AgentLogKeyManagementService;
+import com.openframe.core.agentkey.AgentLogKeyService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -12,13 +12,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AgentLogKeyInitializer implements ApplicationRunner {
 
-    private final AgentLogKeyManagementService logKeyManagementService;
+    private final AgentLogKeyService logKeyService;
 
     @Override
     public void run(ApplicationArguments args) {
         try {
             log.info("Initializing agent log key...");
-            logKeyManagementService.createInitialLogKey();
+            logKeyService.createIfMissing();
             log.info("Agent log key initialization completed successfully");
         } catch (Exception e) {
             // Management must keep starting: the key is re-attempted on the next start.
