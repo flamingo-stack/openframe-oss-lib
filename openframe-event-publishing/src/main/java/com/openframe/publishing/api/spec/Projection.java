@@ -16,6 +16,12 @@ public interface Projection<E extends PublishedEvent, T> {
     /** Updates this projection when the source document changes, for example the organization name on its tickets. */
     void apply(PublishedRecord<E> record);
 
+    /** Counts the items this event would change, stopping at limit; at the limit the update runs in batches instead of apply. */
+    long countChanges(PublishedRecord<E> record, int limit);
+
+    /** Changes up to batchSize items after lastId (null for the first batch), in _id order; returns the last _id changed, or null when none is left. */
+    String applyBatch(PublishedRecord<E> record, String lastId, int batchSize);
+
     /** The documents that hold this projection, for example Ticket.class; the reconciliation job reads their collection in batches. */
     Class<?> projectedClass();
 

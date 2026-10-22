@@ -4,12 +4,16 @@ import com.openframe.event.jobs.backfill.config.BackfillConfiguration;
 import com.openframe.event.jobs.backfill.config.BackfillWithoutPublishingWarning;
 import com.openframe.event.jobs.backfill.config.properties.EventBackfillProperties;
 import com.openframe.event.jobs.core.lock.EventJobLock;
+import com.openframe.event.jobs.core.persistence.EventJob;
 import com.openframe.event.jobs.core.repository.EventJobRepository;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobShutdown;
 import com.openframe.event.jobs.core.service.EventJobTicker;
 import com.openframe.event.jobs.reconciliation.config.ReconciliationConfiguration;
 import com.openframe.event.jobs.reconciliation.config.properties.ReconciliationProperties;
+import com.openframe.event.jobs.task.config.ProjectionTaskConfiguration;
+import com.openframe.event.jobs.task.config.properties.ProjectionTaskProperties;
+import com.openframe.event.jobs.task.repository.ProjectionTaskRepository;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import net.javacrumbs.shedlock.core.LockProvider;
@@ -25,9 +29,10 @@ import java.time.Clock;
 // Off by default; the service that turns it on (openframe-saas-stream) adds @EnableScheduling and a LockProvider.
 @AutoConfiguration(after = {AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class})
 @ConditionalOnBooleanProperty(name = "openframe.events.jobs.enabled")
-@EnableMongoRepositories(basePackageClasses = EventJobRepository.class)
-@EnableConfigurationProperties({EventBackfillProperties.class, ReconciliationProperties.class})
-@Import({BackfillConfiguration.class, BackfillWithoutPublishingWarning.class, ReconciliationConfiguration.class})
+@EnableMongoRepositories(basePackageClasses = {EventJobRepository.class, ProjectionTaskRepository.class})
+@EnableConfigurationProperties({EventBackfillProperties.class, ReconciliationProperties.class, ProjectionTaskProperties.class})
+@Import({BackfillConfiguration.class, BackfillWithoutPublishingWarning.class, ReconciliationConfiguration.class,
+        ProjectionTaskConfiguration.class})
 public class EventJobsAutoConfiguration {
 
     // Ours, not a LockingTaskExecutor bean, so a service's own ShedLock setup stays as it is.
@@ -49,8 +54,8 @@ public class EventJobsAutoConfiguration {
     }
 
     @Bean
-    public EventJobTicker eventJobTicker(EventJobService jobService, EventJobShutdown shutdown) {
+    public EventJobTicker<EventJob> eventJobTicker(EventJobService jobService, EventJobShutdown shutdown) {
         Clock clock = Clock.systemUTC();
-        return new EventJobTicker(jobService, shutdown, clock);
+        return new EventJobTicker<>(jobService, shutdown, clock);
     }
 }

@@ -20,8 +20,9 @@ import java.util.regex.Pattern;
 @Slf4j
 public class AggregateSpecRegistry {
 
-    // A topic suffix and a config key, so no dots, capitals or spaces.
-    private static final Pattern TYPE_NAME = Pattern.compile("[a-z][a-z0-9-]*");
+    // Types and projection names are config keys, topic suffixes, metric tags and parts of ids joined with ":",
+    // so no dots, colons, capitals or spaces.
+    private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9-]*");
 
     private final Map<String, AggregateSpec<?, ?>> byType;
     private final Map<Class<?>, AggregateSpec<?, ?>> byDocument;
@@ -43,7 +44,7 @@ public class AggregateSpecRegistry {
     private static void register(Map<String, AggregateSpec<?, ?>> specs, Map<Class<?>, AggregateSpec<?, ?>> documents,
                                  AggregateSpec<?, ?> spec) {
         String type = spec.getType();
-        if (type == null || !TYPE_NAME.matcher(type).matches()) {
+        if (type == null || !NAME.matcher(type).matches()) {
             String specName = spec.getClass().getName();
             throw new IllegalStateException(specName + " returns the type \"" + type
                     + "\": use lower case letters, digits and dashes, for example organizations");
@@ -87,6 +88,11 @@ public class AggregateSpecRegistry {
             }
             for (Projection<?, ?> projection : projections) {
                 String name = projection.name();
+                if (name == null || !NAME.matcher(name).matches()) {
+                    String projectionName = projection.getClass().getName();
+                    throw new IllegalStateException(projectionName + " is named \"" + name
+                            + "\": use lower case letters, digits and dashes, for example organization-on-tickets");
+                }
                 if (!names.add(name)) {
                     throw new IllegalStateException("Two projections are named " + name);
                 }

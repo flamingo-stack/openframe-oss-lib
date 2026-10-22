@@ -34,6 +34,15 @@ events.organizations ──> PublishedTypeListener             one per spec type
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
 - [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L27) runs each projection on its own, in name order: a
   failed projection does not stop the others.
+- Versions: before a projection runs, the runner reads the version it last stored for that projection, tenant and
+  aggregate in `projection_versions`. An older event is skipped; an equal or newer one is applied (so a backfill, which
+  sends the current version, still repairs drift), then its version is stored with a `$max` upsert. A delete stores
+  its version too, and an event handed over to a projection task is stored when the task is saved. This makes the
+  backfill race, a connector re-snapshot, a DLT replay and a group reset harmless.
+- Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
+  writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
+  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. With projection
+  tasks off, a large event is still applied inline, with a WARN.
 
 ## Configuration
 
@@ -66,6 +75,8 @@ openframe:
             partitions: 1
             replication-factor: 2
             config: {cleanup.policy: delete, retention.ms: 2592000000}
+      large-updates:
+        inline-limit: 5000              # default; an event that changes this many items or more goes to a projection task
       projections:
         organization-on-tickets:        # one key per projection name(); an unknown name logs an ERROR
           mode: aspect                  # aspect (default), both or events; a change needs a pod restart
@@ -186,7 +197,7 @@ must still start. That projection, if it exists, stays on `aspect`.
 
 | Metric | Tags | Meaning |
 |---|---|---|
-| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `failed`, `mongo_unavailable` | One per `apply`; the count is the number of events, the total the time spent. |
+| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `skipped`, `delete_stored`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it, `skipped` that a newer version was already stored. The count is the number of events, the total the time spent. |
 
 ## Debugging
 

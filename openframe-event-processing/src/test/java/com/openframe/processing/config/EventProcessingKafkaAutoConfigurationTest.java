@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoCon
 import org.springframework.boot.kafka.autoconfigure.KafkaAutoConfiguration;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class EventProcessingKafkaAutoConfigurationTest {
 
@@ -44,7 +46,8 @@ class EventProcessingKafkaAutoConfigurationTest {
                     "openframe.events.processing.kafka.topic-prefix=events.",
                     "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
                     "openframe.events.processing.kafka.listener.auto-startup=false")
-            .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+            .withBean(MongoOperations.class, () -> mock(MongoOperations.class));
 
     @Test
     void theProjectionConsumer_readsFromEarliest_inSmallPolls_byDefault() {
@@ -100,6 +103,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                         "openframe.events.processing.kafka.topic-prefix=events.")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().hasStackTraceContaining("openframe.events.processing.kafka.group-prefix is required"));
     }
@@ -136,6 +140,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.topic-prefix=events.",
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().rootCause().hasMessageContaining("bootstrap-servers is required"));
     }
@@ -158,6 +163,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
                         "openframe.events.processing.kafka.listener.auto-startup=false")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
                 .run(context -> assertThat(organizationListenerOf(context).getTopics()).containsExactly("events.organizations"));
     }
 

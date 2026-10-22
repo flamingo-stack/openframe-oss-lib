@@ -6,6 +6,7 @@ import com.openframe.event.jobs.backfill.service.EventBackfillMetrics;
 import com.openframe.event.jobs.backfill.service.EventBackfillRunner;
 import com.openframe.event.jobs.backfill.service.EventBackfillService;
 import com.openframe.event.jobs.core.lock.EventJobLock;
+import com.openframe.event.jobs.core.persistence.EventJob;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobTicker;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
@@ -25,7 +26,7 @@ public class BackfillConfiguration {
 
     @Bean
     public EventBackfillRunner eventBackfillRunner(EventBackfillProperties properties, PublishedAggregates publishedAggregates,
-                                                   EventJobService jobService, EventJobTicker ticker,
+                                                   EventJobService jobService, EventJobTicker<EventJob> ticker,
                                                    EventBackfillMetrics metrics) {
         return new EventBackfillRunner(properties, publishedAggregates, jobService, ticker, metrics);
     }

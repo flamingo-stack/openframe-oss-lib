@@ -25,7 +25,7 @@ public class ReconciliationRunner {
     private final ReconciliationProperties properties;
     private final ProjectedItemRepository itemRepository;
     private final EventJobService jobService;
-    private final EventJobTicker ticker;
+    private final EventJobTicker<EventJob> ticker;
     private final ReconciliationMetrics metrics;
 
     public void checkBatches(Projection<?, ?> projection, EventJob job) {

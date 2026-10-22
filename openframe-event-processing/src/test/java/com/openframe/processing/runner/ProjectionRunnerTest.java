@@ -2,12 +2,14 @@ package com.openframe.processing.runner;
 
 import com.mongodb.MongoNotPrimaryException;
 import com.mongodb.ServerAddress;
+import com.openframe.event.jobs.task.service.ProjectionTaskService;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetEvent;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
+import com.openframe.processing.version.ProjectionVersionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
@@ -26,6 +28,14 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 // Through EventProcessingAutoConfiguration: real spec registry, modes and metrics; projections that record what reached them.
 class ProjectionRunnerTest {
@@ -36,6 +46,7 @@ class ProjectionRunnerTest {
 
     private final RecordingProjection onTickets = new RecordingProjection(ON_TICKETS);
     private final RecordingProjection onIndex = new RecordingProjection(ON_INDEX);
+    private final ProjectionVersionRepository versions = mock(ProjectionVersionRepository.class);
 
     @Test
     void anEvent_reachesEveryProjectionOnEvents_withTheEnvelopesTenantAndVersion() {
@@ -234,15 +245,183 @@ class ProjectionRunnerTest {
                 });
     }
 
+    @Test
+    void anEventBelowTheInlineLimit_isAppliedInline() {
+        onTickets.changes = 4999;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    process(context, record(false));
+
+                    assertThat(onTickets.records).hasSize(1);
+                    verify(tasks, never()).submit(any(), any(), any(), any());
+                    assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_APPLIED)).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void anEventAtTheInlineLimit_goesToAProjectionTask_insteadOfInline() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    PublishedRecord<WidgetEvent> record = record(false);
+                    process(context, record);
+
+                    assertThat(onTickets.records).isEmpty();
+                    verify(tasks).submit(ON_TICKETS, ORGANIZATIONS, "organization-document-1", record);
+                    assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_HANDED_OVER)).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void whileItsSourceHasATask_evenASmallEventGoesToTheTask() {
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        when(tasks.hasTask(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(true);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    process(context, record(false));
+
+                    assertThat(onTickets.records).isEmpty();
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                });
+    }
+
+    @Test
+    void withProjectionTasksOff_aLargeEventIsStillAppliedInline() {
+        onTickets.changes = 10000;
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(false));
+
+            assertThat(onTickets.records).hasSize(1);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_APPLIED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void theInlineLimit_comesFromConfig() {
+        onTickets.changes = 5;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .withPropertyValues(onEvents(ON_TICKETS), "openframe.events.processing.large-updates.inline-limit=5")
+                .run(context -> {
+                    process(context, record(false));
+
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                });
+    }
+
+    @Test
+    void anInlineLimitBelowOne_stopsTheService() {
+        runnerWith(onTickets).withPropertyValues("openframe.events.processing.large-updates.inline-limit=0")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure().hasStackTraceContaining("openframe.events.processing.large-updates")
+                        .hasStackTraceContaining("inlineLimit"));
+    }
+
+    @Test
+    void anEventOlderThanTheStoredVersion_isSkipped() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(false));
+
+            assertThat(onTickets.records).isEmpty();
+            verify(versions, never()).saveVersionIfHigher(any(), any(), any(), anyLong());
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_SKIPPED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void anEventWithTheStoredVersion_isAppliedAgain_soABackfillRepairsDrift() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(3L);
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(false));
+
+            assertThat(onTickets.records).hasSize(1);
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+        });
+    }
+
+    @Test
+    void aNewerEvent_isApplied_thenItsVersionIsStored() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1"))
+                .thenReturn(ProjectionVersionRepository.NO_VERSION);
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(false));
+
+            assertThat(onTickets.records).hasSize(1);
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+        });
+    }
+
+    @Test
+    void aFailedApply_storesNoVersion_soTheRetryAppliesIt() {
+        RecordingProjection failing = new RecordingProjection("widget-failing", event -> {
+            throw new IllegalStateException("bug");
+        });
+        runnerWith(failing).withPropertyValues(onEvents("widget-failing")).run(context -> {
+            assertThatThrownBy(() -> process(context, record(false))).isInstanceOf(EventProcessingFailedException.class);
+
+            verify(versions, never()).saveVersionIfHigher(any(), any(), any(), anyLong());
+        });
+    }
+
+    @Test
+    void anEventHandedOverToATask_storesItsVersion() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    process(context, record(false));
+
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                    verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+                });
+    }
+
+    @Test
+    void anOlderEvent_neverReachesATask() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        when(tasks.hasTask(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(true);
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    process(context, record(false));
+
+                    verify(tasks, never()).submit(any(), any(), any(), any());
+                });
+    }
+
+    @Test
+    void aDelete_storesItsVersion_soALateOlderEventIsSkipped() {
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(true));
+
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_DELETE_STORED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void aProjectionOnAspect_neitherReadsNorStoresAVersion() {
+        runnerWith(onTickets).run(context -> {
+            process(context, record(false));
+
+            verifyNoInteractions(versions);
+        });
+    }
+
     @SafeVarargs
-    private static ApplicationContextRunner runnerWith(Projection<WidgetEvent, ?>... projections) {
+    private ApplicationContextRunner runnerWith(Projection<WidgetEvent, ?>... projections) {
         List<Projection<WidgetEvent, ?>> specProjections = List.of(projections);
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
                 .withUserConfiguration(AggregateSpecRegistry.class)
                 .withPropertyValues("openframe.events.processing.enabled=true")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-                .withBean(WidgetSpec.class, () -> new WidgetSpec(specProjections));
+                .withBean(WidgetSpec.class, () -> new WidgetSpec(specProjections))
+                .withBean(ProjectionVersionRepository.class, () -> versions);
     }
 
     private void process(AssertableApplicationContext context, PublishedRecord<WidgetEvent> record) {

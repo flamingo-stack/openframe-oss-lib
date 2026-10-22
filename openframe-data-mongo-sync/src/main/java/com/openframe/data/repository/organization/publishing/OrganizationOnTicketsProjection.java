@@ -50,6 +50,24 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
     }
 
     @Override
+    public long countChanges(PublishedRecord<OrganizationEvent> record, int limit) {
+        String tenantId = record.getTenantId();
+        OrganizationEvent event = record.getEvent();
+        String organizationId = event.getOrganizationId();
+        String name = event.getName();
+        return ticketProjectionRepository.countOutdatedOrganizationNames(tenantId, organizationId, name, limit);
+    }
+
+    @Override
+    public String applyBatch(PublishedRecord<OrganizationEvent> record, String lastId, int batchSize) {
+        String tenantId = record.getTenantId();
+        OrganizationEvent event = record.getEvent();
+        String organizationId = event.getOrganizationId();
+        String name = event.getName();
+        return ticketProjectionRepository.updateOrganizationNameBatch(tenantId, organizationId, name, lastId, batchSize);
+    }
+
+    @Override
     public Class<Ticket> projectedClass() {
         return Ticket.class;
     }

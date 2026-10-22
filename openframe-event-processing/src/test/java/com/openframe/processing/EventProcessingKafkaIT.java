@@ -4,6 +4,7 @@ import com.openframe.data.repository.organization.publishing.OrganizationEvent;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
 import com.openframe.processing.config.EventProcessingKafkaAutoConfiguration;
 import com.openframe.processing.config.EventTopicsAutoConfiguration;
+import com.openframe.processing.version.ProjectionVersionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.spec.AggregateSpec;
@@ -56,6 +57,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 // A real broker: the module creates its topics, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
 @SpringBootTest(classes = EventProcessingKafkaIT.TestApplication.class,
@@ -252,6 +256,14 @@ class EventProcessingKafkaIT {
             return new SimpleMeterRegistry();
         }
 
+        // The IT has no Mongo: every event is newer than a version never stored.
+        @Bean
+        ProjectionVersionRepository projectionVersionRepository() {
+            ProjectionVersionRepository versions = mock(ProjectionVersionRepository.class);
+            when(versions.findStoredVersion(any(), any(), any())).thenReturn(ProjectionVersionRepository.NO_VERSION);
+            return versions;
+        }
+
         @Bean
         RecordingProjection recordingProjection() {
             return new RecordingProjection();
@@ -316,6 +328,16 @@ class EventProcessingKafkaIT {
                 throw new DataAccessResourceFailureException("Mongo down");
             }
             applied.computeIfAbsent(organizationId, id -> new CopyOnWriteArrayList<>()).add(record);
+        }
+
+        @Override
+        public long countChanges(PublishedRecord<OrganizationEvent> record, int limit) {
+            return 0;
+        }
+
+        @Override
+        public String applyBatch(PublishedRecord<OrganizationEvent> record, String lastId, int batchSize) {
+            return null;
         }
 
         @Override
