@@ -173,23 +173,3 @@ describe('LoginForm methods transition', () => {
     expect(methods()).not.toHaveClass('animate-in');
   });
 });
-
-/**
- * While the providers are read, the block holds its place: the divider is drawn and one button box per provider the
- * form may offer, so the buttons arriving moves nothing.
- */
-describe('LoginForm providers loading', () => {
-  it('draws the divider and one box per offered provider while the providers are read', () => {
-    const { container } = render(<LoginForm {...baseProps} ssoProviders={GENERIC} ssoLoading />);
-    expect(screen.getByText('or continue with')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Continue with/ })).toBeNull();
-    const group = screen.getByRole('group', { name: 'Sign-in methods' });
-    expect(group.querySelectorAll('[data-loading-item]')).toHaveLength(GENERIC.length);
-    expect(container.querySelectorAll('.ods-skeleton').length).toBeGreaterThan(0);
-  });
-
-  it('draws the buttons themselves once the providers are read', () => {
-    render(<LoginForm {...baseProps} ssoProviders={GENERIC} />);
-    expect(screen.getAllByRole('button', { name: /Continue with/ })).toHaveLength(GENERIC.length);
-  });
-});

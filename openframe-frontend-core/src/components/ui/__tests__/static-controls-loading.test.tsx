@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
  */
 import { describe, expect, it } from 'vitest';
 import { CompleteAccountForm } from '../../features/auth/complete-account-form';
+import { LoginForm } from '../../features/auth/login-form';
 import { SSO_PROVIDERS_SKELETON_COUNT, SsoProviderButtons } from '../../features/auth/sso-providers';
 import { OSTypeBadgeGroup } from '../../features/os-type-badge-group';
 import { ActionsMenuDropdown } from '../actions-menu';
@@ -89,6 +90,19 @@ describe('read parts switch themselves', () => {
     view.unmount();
     const { container } = render(<SsoProviderButtons providers={['google', 'microsoft', 'apple']} />);
     expect(container.querySelectorAll('button[data-loading-item]')).toHaveLength(3);
+  });
+
+  it('LoginForm draws its divider and one box per offered provider while the providers are read', () => {
+    const providers = ['google', 'microsoft', 'apple'] as const;
+    const props = { email: '', onEmailChange: noop, ssoProviders: [...providers] };
+    const view = render(<LoginForm {...props} ssoProvidersLoading />);
+    expect(screen.getAllByText('or continue with')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /Continue with/ })).toBeNull();
+    expect(view.container.querySelectorAll('[data-loading-item]')).toHaveLength(providers.length);
+    view.unmount();
+    render(<LoginForm {...props} />);
+    expect(screen.getAllByText('or continue with')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /Continue with/ })).toHaveLength(providers.length);
   });
 
   it('CompleteAccountForm draws one SSO block and one divider in both forms', () => {
