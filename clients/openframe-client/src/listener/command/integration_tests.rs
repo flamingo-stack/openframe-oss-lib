@@ -9,28 +9,37 @@ use tokio::sync::Notify;
 use tokio::time::{timeout, Duration};
 
 use super::{
-    Begin, CommandContext, CommandHandler, CommandListener, FeatureFlagsHandler, Outcome,
-    RestartGate,
+    Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
+    FeatureFlagsHandler, Outcome, RestartGate,
 };
 use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
 use crate::models::{
     DeliveryRef, DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState,
+    OpenFrameClientUpdateMessage,
 };
-use crate::platform::DirectoryManager;
+use crate::platform::{DirectoryManager, DmgExtractor};
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
+use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
+use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
+use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
+use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
-use crate::services::result_store::{DeliveryClaim, ResultStore};
+use crate::services::result_store::{LedgerState, ResultStore};
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::update_cleanup_service::UpdateCleanupService;
+use crate::services::update_handler_service::UpdateHandlerService;
+use crate::services::update_state_service::UpdateStateService;
 use crate::services::{
-    AgentAuthService, AgentConfigurationService, DeactivationService, InitialConfigurationService,
-    InstalledToolsService, MachineIdService, ToolCommandParamsResolver, ToolKillService, ToolOps,
+    AgentAuthService, AgentConfigurationService, DeactivationService, GithubDownloadService,
+    InitialConfigurationService, InstalledToolsService, MachineIdService,
+    ToolCommandParamsResolver, ToolKillService, ToolOps,
 };
 use crate::test_support::NatsServer;
 
@@ -42,12 +51,14 @@ const VERSION: &str = "1.5.1";
 
 struct Agent {
     _server: NatsServer,
-    _dir: TempDir,
+    dir: TempDir,
+    directories: DirectoryManager,
     tester: async_nats::Client,
     results: async_nats::Subscriber,
     unclaimed: Vec<DeliveryResultMessage>,
     manager: NatsConnectionManager,
     config: AgentConfigurationService,
+    tool_ops: ToolOps,
     tool_run_manager: ToolRunManager,
     publisher: NatsMessagePublisher,
     store: Arc<ResultStore>,
@@ -75,11 +86,12 @@ impl Agent {
             .await
             .unwrap();
         let initial = InitialConfigurationService::new(directories.clone()).unwrap();
+        let tool_ops = ToolOps::default();
         let tool_run_manager = ToolRunManager::new(
             InstalledToolsService::new(directories.clone()).unwrap(),
             ToolCommandParamsResolver::new(directories.clone(), initial.clone(), config.clone()),
             ToolKillService::new(),
-            ToolOps::default(),
+            tool_ops.clone(),
         );
         let deactivation = DeactivationService::new(&directories);
         let auth = AgentAuthService::new(
@@ -129,12 +141,14 @@ impl Agent {
             _server: server,
             flags_path: directories.secured_dir().join("feature_flags.json"),
             version: version.to_string(),
-            _dir: dir,
+            dir,
+            directories,
             tester,
             results,
             unclaimed: Vec::new(),
             manager,
             config,
+            tool_ops,
             tool_run_manager,
             publisher,
             store,
@@ -292,6 +306,30 @@ impl Agent {
         })
         .await
         .expect("the outbox never drained");
+    }
+
+    fn client_update_service(&self) -> OpenFrameClientUpdateService {
+        let update_state = UpdateStateService::new(self.directories.clone()).unwrap();
+        let client_info = OpenFrameClientInfoService::new(self.directories.clone()).unwrap();
+        let last_known_good = LastKnownGoodService::new(self.directories.clone()).unwrap();
+        let update_handler = UpdateHandlerService::new(
+            update_state.clone(),
+            client_info.clone(),
+            UpdateCleanupService::for_binary(self.dir.path().join("openframe-client")),
+            last_known_good.clone(),
+            InstalledAgentMessagePublisher::new(self.publisher.clone()),
+            self.config.clone(),
+            self.store.clone(),
+        );
+        OpenFrameClientUpdateService::new(
+            client_info,
+            GithubDownloadService::new(reqwest::Client::new(), DmgExtractor::new()),
+            update_state,
+            last_known_good,
+            self.tool_run_manager.clone(),
+            self.tool_ops.clone(),
+            update_handler,
+        )
     }
 
     fn persisted(&self) -> FeatureFlagsState {
@@ -639,7 +677,7 @@ impl CommandHandler for FakeHandler {
 
     fn begin(&self, _command: &FakeCommand) -> Begin<()> {
         if self.busy.load(Ordering::Acquire) {
-            return Begin::Busy("busy");
+            return Begin::Busy("busy".to_string());
         }
         Begin::Accepted(())
     }
@@ -888,20 +926,96 @@ async fn a_command_cut_short_by_the_last_stop_is_failed_before_a_listener_subscr
     };
     agent
         .store
-        .delivery_claim(subject.clone(), cut.clone())
+        .delivery_accept(subject, cut, LedgerState::InFlight)
         .await
         .unwrap();
 
     let handler = agent.launch_fake().await;
 
-    assert_eq!(
-        agent.store.delivery_claim(subject, cut).await.unwrap(),
-        DeliveryClaim::Resent
-    );
     let failed = agent.expect("cut", DeliveryResult::Failed).await;
     assert_eq!(
         failed.error.as_deref(),
         Some("interrupted by agent restart")
     );
+    assert_eq!(
+        agent.store.delivery_state("cut".to_string()).await.unwrap(),
+        Some(LedgerState::Settled(failed))
+    );
     assert!(handler.runs().is_empty());
+}
+
+fn client_update(dispatch_id: &str, version: &str) -> serde_json::Value {
+    json!({
+        "delivery": {
+            "type": "CLIENT_UPDATE",
+            "targetId": "openframe-client",
+            "dispatchId": dispatch_id,
+            "sequence": 1,
+        },
+        "version": version,
+        "downloadConfigurations": [],
+    })
+}
+
+#[tokio::test]
+async fn a_failed_client_update_is_reported_and_stops_holding_tool_operations() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = ClientUpdateHandler::new(
+        agent.client_update_service(),
+        agent.tool_run_manager.clone(),
+    );
+    agent.launch_command(handler).await;
+
+    agent
+        .send_to(
+            ClientUpdateHandler::subject(MACHINE),
+            client_update("u1", "latest"),
+        )
+        .await;
+
+    agent.expect("u1", DeliveryResult::Acked).await;
+    let failed = agent.expect("u1", DeliveryResult::Failed).await;
+    assert!(
+        failed.error.as_deref().unwrap().contains("Invalid version"),
+        "{failed:?}"
+    );
+    assert!(!agent.tool_run_manager.is_client_update_pending());
+}
+
+#[tokio::test]
+async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ack() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let service = agent.client_update_service();
+    agent
+        .launch_command(ClientUpdateHandler::new(
+            service.clone(),
+            agent.tool_run_manager.clone(),
+        ))
+        .await;
+
+    let busy = agent.tool_ops.lock("mesh").await.mark_busy();
+    agent
+        .send_to(
+            ClientUpdateHandler::subject(MACHINE),
+            client_update("u1", "9.9.9"),
+        )
+        .await;
+    agent.expect_silence("u1").await;
+    assert!(agent.tool_run_manager.is_client_update_pending());
+    drop(busy);
+
+    let running: OpenFrameClientUpdateMessage =
+        serde_json::from_value(client_update("running", "9.9.8")).unwrap();
+    let _running = service.reserve(&running).unwrap();
+    agent
+        .send_to(
+            ClientUpdateHandler::subject(MACHINE),
+            client_update("u2", "9.9.9"),
+        )
+        .await;
+    agent.expect_silence("u2").await;
 }

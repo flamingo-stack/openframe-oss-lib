@@ -11,16 +11,15 @@ use crate::models::{
 use crate::services::deactivation_service::DeactivationService;
 use crate::services::feature_flags_service::{FeatureFlagsService, FlagsApplied};
 use crate::services::openframe_client_update_service::{
-    OpenFrameClientUpdateService, UpdateLaunch,
+    OpenFrameClientUpdateService, UpdateGuard, UpdateLaunch,
 };
 use crate::services::tool_agent_update_service::ToolAgentUpdateService;
 use crate::services::tool_installation_service::ToolInstallationService;
-use crate::services::tool_ops::{ToolLock, ToolOps};
+use crate::services::tool_ops::{ToolOpGuard, ToolOps};
 use crate::services::tool_run_manager::{ClientUpdatePending, ToolRunManager};
 
 const TOOL_BUSY: &str = "tool busy with another operation";
 const CLIENT_UPDATE_PENDING: &str = "client update pending";
-const CLIENT_UPDATE_RUNNING: &str = "client update already running";
 
 #[derive(Clone)]
 pub struct FeatureFlagsHandler {
@@ -101,7 +100,7 @@ impl ToolInstallationHandler {
 
 impl CommandHandler for ToolInstallationHandler {
     type Command = ToolInstallationMessage;
-    type Guard = ToolLock;
+    type Guard = ToolOpGuard;
 
     const KIND: &'static str = "tool-installation";
 
@@ -109,8 +108,8 @@ impl CommandHandler for ToolInstallationHandler {
         format!("machine.{}.tool-installation.v2", machine_id)
     }
 
-    fn begin(&self, command: &Self::Command) -> Begin<ToolLock> {
-        lock_tool(&self.tool_ops, &self.client_update, &command.tool_agent_id)
+    fn begin(&self, command: &Self::Command) -> Begin<ToolOpGuard> {
+        reserve_tool(&self.tool_ops, &self.client_update, &command.tool_agent_id)
     }
 
     async fn run(
@@ -118,9 +117,9 @@ impl CommandHandler for ToolInstallationHandler {
         _machine_id: &str,
         _delivery: &DeliveryRef,
         command: Self::Command,
-        lock: ToolLock,
+        op: ToolOpGuard,
     ) -> Outcome {
-        self.service.install_locked(command, lock).await.into()
+        self.service.install_reserved(command, op).await.into()
     }
 }
 
@@ -147,7 +146,7 @@ impl ToolUpdateHandler {
 
 impl CommandHandler for ToolUpdateHandler {
     type Command = ToolAgentUpdateMessage;
-    type Guard = ToolLock;
+    type Guard = ToolOpGuard;
 
     const KIND: &'static str = "tool-update";
     const SEQUENCED: bool = true;
@@ -156,8 +155,8 @@ impl CommandHandler for ToolUpdateHandler {
         format!("machine.{}.tool-update.v2", machine_id)
     }
 
-    fn begin(&self, command: &Self::Command) -> Begin<ToolLock> {
-        lock_tool(&self.tool_ops, &self.client_update, &command.tool_agent_id)
+    fn begin(&self, command: &Self::Command) -> Begin<ToolOpGuard> {
+        reserve_tool(&self.tool_ops, &self.client_update, &command.tool_agent_id)
     }
 
     async fn run(
@@ -165,31 +164,22 @@ impl CommandHandler for ToolUpdateHandler {
         _machine_id: &str,
         _delivery: &DeliveryRef,
         command: Self::Command,
-        lock: ToolLock,
+        op: ToolOpGuard,
     ) -> Outcome {
-        self.service
-            .process_update_locked(command, lock)
-            .await
-            .into()
+        self.service.process_update_locked(command, op).await.into()
     }
 }
 
 #[derive(Clone)]
 pub struct ClientUpdateHandler {
     service: OpenFrameClientUpdateService,
-    tool_ops: ToolOps,
     tool_run_manager: ToolRunManager,
 }
 
 impl ClientUpdateHandler {
-    pub fn new(
-        service: OpenFrameClientUpdateService,
-        tool_ops: ToolOps,
-        tool_run_manager: ToolRunManager,
-    ) -> Self {
+    pub fn new(service: OpenFrameClientUpdateService, tool_run_manager: ToolRunManager) -> Self {
         Self {
             service,
-            tool_ops,
             tool_run_manager,
         }
     }
@@ -197,7 +187,7 @@ impl ClientUpdateHandler {
 
 impl CommandHandler for ClientUpdateHandler {
     type Command = OpenFrameClientUpdateMessage;
-    type Guard = ();
+    type Guard = UpdateGuard;
 
     const KIND: &'static str = "client-update";
     const SEQUENCED: bool = true;
@@ -207,16 +197,11 @@ impl CommandHandler for ClientUpdateHandler {
         format!("machine.{}.client-update.v2", machine_id)
     }
 
-    // marked before the busy check, as the legacy path does, so new tool operations wait behind the update
-    fn begin(&self, _command: &Self::Command) -> Begin<()> {
-        if self.service.is_update_in_progress() {
-            return Begin::Busy(CLIENT_UPDATE_RUNNING);
+    fn begin(&self, command: &Self::Command) -> Begin<UpdateGuard> {
+        match self.service.reserve(command) {
+            Ok(guard) => Begin::Accepted(guard),
+            Err(e) => Begin::Busy(format!("{e:#}")),
         }
-        self.tool_run_manager.mark_client_update_pending();
-        if self.tool_ops.any_busy() {
-            return Begin::Busy(TOOL_BUSY);
-        }
-        Begin::Accepted(())
     }
 
     async fn run(
@@ -224,12 +209,16 @@ impl CommandHandler for ClientUpdateHandler {
         _machine_id: &str,
         _delivery: &DeliveryRef,
         command: Self::Command,
-        _guard: (),
+        guard: UpdateGuard,
     ) -> Outcome {
-        match self.service.process_update(command).await {
+        match self.service.apply(command, guard).await {
             Ok(UpdateLaunch::Launched) => Outcome::Restarting,
             Ok(UpdateLaunch::Skipped) => Outcome::Done,
-            Err(e) => Outcome::Failed(format!("{e:#}")),
+            Err(e) => {
+                // nothing re-sends a failed command, so tool operations stop waiting behind it
+                self.tool_run_manager.clear_client_update_pending();
+                Outcome::Failed(format!("{e:#}"))
+            }
         }
     }
 }
@@ -282,17 +271,18 @@ impl CommandHandler for ClientUninstallHandler {
     }
 }
 
-fn lock_tool(
+// busy from here on, so a client update arriving before the run already sees the tool taken
+fn reserve_tool(
     tool_ops: &ToolOps,
     client_update: &ClientUpdatePending,
     tool_agent_id: &str,
-) -> Begin<ToolLock> {
+) -> Begin<ToolOpGuard> {
     if client_update.is_pending() {
-        return Begin::Busy(CLIENT_UPDATE_PENDING);
+        return Begin::Busy(CLIENT_UPDATE_PENDING.to_string());
     }
     match tool_ops.try_lock(tool_agent_id) {
-        Ok(lock) => Begin::Accepted(lock),
-        Err(_) => Begin::Busy(TOOL_BUSY),
+        Ok(lock) => Begin::Accepted(lock.mark_busy()),
+        Err(_) => Begin::Busy(TOOL_BUSY.to_string()),
     }
 }
 

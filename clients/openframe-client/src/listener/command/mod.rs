@@ -72,7 +72,7 @@ pub trait CommandHandler: Clone + Send + Sync + 'static {
 
 pub enum Begin<G> {
     Accepted(G),
-    Busy(&'static str),
+    Busy(String),
 }
 
 #[derive(Debug, PartialEq)]

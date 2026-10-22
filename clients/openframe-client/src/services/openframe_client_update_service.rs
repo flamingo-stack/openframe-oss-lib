@@ -28,7 +28,7 @@ pub enum UpdateLaunch {
 }
 
 /// Marks an update as in progress until dropped
-struct UpdateGuard(Arc<AtomicBool>);
+pub struct UpdateGuard(Arc<AtomicBool>);
 
 impl UpdateGuard {
     fn acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
@@ -80,14 +80,16 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    pub fn is_update_in_progress(&self) -> bool {
-        self.update_in_progress.load(Ordering::Acquire)
-    }
-
     pub async fn process_update(
         &self,
         message: OpenFrameClientUpdateMessage,
     ) -> Result<UpdateLaunch> {
+        let guard = self.reserve(&message)?;
+        self.apply(message, guard).await
+    }
+
+    /// Parks new tool operations, then takes the update slot unless a tool or another update holds it
+    pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
 
@@ -109,12 +111,11 @@ impl OpenFrameClientUpdateService {
             return Err(anyhow!("Update already in progress"));
         };
         info!("Acquired update lock for version: {}", requested_version);
-
-        self.process_update_internal(message, guard).await
+        Ok(guard)
     }
 
-    /// Internal update processing with version validation and safety checks
-    async fn process_update_internal(
+    /// Update processing with version validation and safety checks, under a reserved update slot
+    pub async fn apply(
         &self,
         message: OpenFrameClientUpdateMessage,
         guard: UpdateGuard,

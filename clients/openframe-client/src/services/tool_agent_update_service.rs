@@ -6,7 +6,7 @@ use crate::platform::{
     run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_ops::{ToolLock, ToolOps};
+use crate::services::tool_ops::{ToolOpGuard, ToolOps};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -89,10 +89,11 @@ impl ToolAgentUpdateService {
         self.process_update_locked(message, tool_lock).await
     }
 
+    // a ToolLock is marked busy only once there is something to update; a ToolOpGuard already is
     pub async fn process_update_locked(
         &self,
         message: ToolAgentUpdateMessage,
-        tool_lock: ToolLock,
+        tool: impl Into<ToolOpGuard>,
     ) -> Result<()> {
         let tool_agent_id = &message.tool_agent_id;
         let new_version = &message.version;
@@ -215,7 +216,7 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        let _op = tool_lock.mark_busy();
+        let _op: ToolOpGuard = tool.into();
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =

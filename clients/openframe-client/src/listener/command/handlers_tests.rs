@@ -57,26 +57,31 @@ fn the_subjects_are_machine_scoped_and_match_the_backend() {
 }
 
 #[test]
-fn a_tool_command_starts_only_with_the_tool_free_and_no_client_update_pending() {
+fn a_tool_command_reserves_the_tool_as_busy_unless_taken_or_behind_a_client_update() {
     let tool_ops = ToolOps::default();
     let flag = ClientUpdatePendingFlag::default();
 
-    let held = lock_tool(&tool_ops, &flag.view(), "mesh");
-    assert!(matches!(held, Begin::Accepted(_)));
+    let Begin::Accepted(op) = reserve_tool(&tool_ops, &flag.view(), "mesh") else {
+        panic!("a free tool was not reserved");
+    };
+    assert!(tool_ops.is_busy("mesh"), "a client update would not see it");
     assert!(matches!(
-        lock_tool(&tool_ops, &flag.view(), "mesh"),
-        Begin::Busy(TOOL_BUSY)
+        reserve_tool(&tool_ops, &flag.view(), "mesh"),
+        Begin::Busy(reason) if reason == TOOL_BUSY
     ));
     assert!(matches!(
-        lock_tool(&tool_ops, &flag.view(), "fleet"),
+        reserve_tool(&tool_ops, &flag.view(), "fleet"),
         Begin::Accepted(_)
     ));
+    drop(op);
+    assert!(!tool_ops.is_busy("mesh"));
 
     flag.mark();
     assert!(matches!(
-        lock_tool(&tool_ops, &flag.view(), "osquery"),
-        Begin::Busy(CLIENT_UPDATE_PENDING)
+        reserve_tool(&tool_ops, &flag.view(), "osquery"),
+        Begin::Busy(reason) if reason == CLIENT_UPDATE_PENDING
     ));
+    assert!(!tool_ops.is_busy("osquery"));
 }
 
 #[tokio::test]

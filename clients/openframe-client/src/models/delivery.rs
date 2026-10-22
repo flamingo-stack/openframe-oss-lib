@@ -30,6 +30,28 @@ pub struct DeliveryResultMessage {
     pub error: Option<String>,
 }
 
+impl DeliveryResultMessage {
+    pub fn acked(delivery: DeliveryRef) -> Self {
+        Self::new(delivery, DeliveryResult::Acked, None)
+    }
+
+    pub fn done(delivery: DeliveryRef) -> Self {
+        Self::new(delivery, DeliveryResult::Done, None)
+    }
+
+    pub fn failed(delivery: DeliveryRef, reason: impl Into<String>) -> Self {
+        Self::new(delivery, DeliveryResult::Failed, Some(reason.into()))
+    }
+
+    pub fn new(delivery: DeliveryRef, result: DeliveryResult, error: Option<String>) -> Self {
+        Self {
+            delivery,
+            result,
+            error,
+        }
+    }
+}
+
 pub fn delivery_result_subject(machine_id: &str) -> String {
     format!("machine.{}.{}", machine_id, DELIVERY_RESULT_KIND)
 }

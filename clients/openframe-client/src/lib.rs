@@ -616,11 +616,7 @@ impl Client {
             command_context.clone(),
         );
         let client_update_listener = CommandListener::new(
-            ClientUpdateHandler::new(
-                openframe_client_update_service,
-                tool_ops.clone(),
-                tool_run_manager.clone(),
-            ),
+            ClientUpdateHandler::new(openframe_client_update_service, tool_run_manager.clone()),
             command_context.clone(),
         );
         let client_uninstall_listener = CommandListener::new(
