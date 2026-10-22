@@ -9,7 +9,7 @@ use crate::platform::directories::DirectoryManager;
 #[derive(Clone)]
 pub struct InitialConfigurationService {
     config_file_path: PathBuf,
-    // Serializes the read-modify-write clears so two of them can't lose each other's fields.
+    // Serializes the read-modify-write updates so two of them can't lose each other's fields.
     write_lock: Arc<Mutex<()>>,
 }
 
@@ -30,6 +30,19 @@ impl InitialConfigurationService {
     pub fn get_initial_key(&self) -> Result<String> {
         let config = self.get()?;
         Ok(config.initial_key.clone())
+    }
+
+    pub fn get_log_key(&self) -> Result<String> {
+        let config = self.get()?;
+        Ok(config.log_key)
+    }
+
+    pub fn save_log_key(&self, log_key: String) -> Result<()> {
+        let _guard = self.write_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut config = self.get()?;
+        config.log_key = log_key;
+        self.save(&config)
+            .context("Failed to save initial configuration with the log key")
     }
 
     pub fn get_server_url(&self) -> Result<String> {

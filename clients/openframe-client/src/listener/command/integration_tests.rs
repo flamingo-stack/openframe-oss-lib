@@ -65,7 +65,7 @@ impl Agent {
         );
         let config = AgentConfigurationService::new(directories.clone()).unwrap();
         config
-            .save_registration_data(MACHINE.into(), "client".into(), "secret".into(), None)
+            .save_registration_data(MACHINE.into(), "client".into(), "secret".into())
             .await
             .unwrap();
         let initial = InitialConfigurationService::new(directories.clone()).unwrap();

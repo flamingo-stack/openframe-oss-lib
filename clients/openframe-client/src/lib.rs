@@ -735,7 +735,6 @@ impl Client {
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
             &self.agent_configuration_service,
-            self.log_key_service.clone(),
             &self.installed_tools_service,
             &self.directory_manager,
         )?

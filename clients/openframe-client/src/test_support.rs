@@ -91,7 +91,7 @@ pub(crate) fn directories(dir: &TempDir) -> DirectoryManager {
 pub(crate) async fn registered_agent(dm: &DirectoryManager) -> AgentConfigurationService {
     let agent = AgentConfigurationService::new(dm.clone()).unwrap();
     agent
-        .save_registration_data("machine".into(), "client".into(), "secret".into(), None)
+        .save_registration_data("machine".into(), "client".into(), "secret".into())
         .await
         .unwrap();
     agent

@@ -21,7 +21,7 @@ struct LogKeyResponse {
     key: String,
 }
 
-/// Keeps the per-tenant key the logs stream authenticates with, fetched with the agent token.
+/// Fetches the per-tenant logs-stream key, with the agent token, for devices whose install command carried none.
 pub struct LogKeyService {
     http_client: Client,
     base_url: String,
@@ -49,7 +49,7 @@ impl LogKeyService {
         }
     }
 
-    /// Fetches the log key in the background when the config lacks one (registered before log keys existed); no-op otherwise.
+    /// Fetches the log key in the background when the config lacks one (older install command or client); no-op otherwise.
     pub fn start(self: Arc<Self>) -> Option<JoinHandle<()>> {
         if !self.is_key_missing() {
             return None;
@@ -62,30 +62,23 @@ impl LogKeyService {
                 self.fetch_log_key()
             })
             .await;
-            if let Err(e) = self.store(key).await {
+            if let Err(e) = self.store(key) {
                 error!("Failed to save log key: {:#}", e);
             }
         }))
     }
 
-    pub fn stored_key(&self) -> Option<String> {
-        self.agent_config_service
-            .get_log_key()
-            .ok()
-            .filter(|key| !key.is_empty())
-    }
-
     fn is_key_missing(&self) -> bool {
-        self.agent_config_service
+        self.initial_config_service
             .get_log_key()
             .map(|key| key.is_empty())
             .unwrap_or(false)
     }
 
-    async fn store(&self, key: String) -> Result<()> {
-        self.agent_config_service.save_log_key(key).await?;
+    fn store(&self, key: String) -> Result<()> {
+        self.initial_config_service.save_log_key(key)?;
         info!("Log key saved");
-        // The enrollment key has no use once the device holds a log key; stop keeping it on disk.
+        // The device is registered by now, so the enrollment key has no use; stop keeping it on disk.
         if let Err(e) = self.initial_config_service.clear_initial_key() {
             warn!("Failed to clear the initial key: {:#}", e);
         }

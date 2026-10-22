@@ -51,6 +51,35 @@ fn configured_when_server_host_is_present() {
 }
 
 #[test]
+fn a_config_written_before_log_keys_reads_as_empty() {
+    let dir = TempDir::new().unwrap();
+    write_config(
+        &dir,
+        r#"{"server_host":"acme.openframe.ai","initial_key":"k","local_mode":false}"#,
+    );
+    assert_eq!(service_in(&dir).get_log_key().unwrap(), "");
+}
+
+#[test]
+fn saving_the_log_key_keeps_the_initial_key_and_clearing_it_keeps_the_log_key() {
+    let dir = TempDir::new().unwrap();
+    write_config(
+        &dir,
+        r#"{"server_host":"acme.openframe.ai","initial_key":"k","local_mode":false,"org_id":"org"}"#,
+    );
+    let service = service_in(&dir);
+
+    service.save_log_key("log".into()).unwrap();
+    assert_eq!(service.get_log_key().unwrap(), "log");
+    assert_eq!(service.get_initial_key().unwrap(), "k");
+
+    service.clear_initial_key().unwrap();
+    assert_eq!(service.get_initial_key().unwrap(), "");
+    assert_eq!(service.get_log_key().unwrap(), "log");
+    assert_eq!(service.get_org_id().unwrap(), "org");
+}
+
+#[test]
 fn config_without_remote_access_mode_has_none_pending() {
     let dir = TempDir::new().unwrap();
     write_config(

@@ -6,11 +6,4 @@ pub struct AgentRegistrationResponse {
     pub machine_id: String,
     pub client_id: String,
     pub client_secret: String,
-    /// Per-tenant key for the logs stream; absent until the backend hands one out.
-    #[serde(default)]
-    pub log_key: Option<String>,
 }
-
-#[cfg(test)]
-#[path = "agent_registration_response_tests.rs"]
-mod tests;

@@ -74,19 +74,21 @@ impl AgentRegistrationService {
             error!("Failed to persist machine info: {}", e);
         }
 
-        let log_key = response.log_key.clone().filter(|key| !key.is_empty());
-        let log_key_received = log_key.is_some();
         self.config_service
             .save_registration_data(
                 response.machine_id.clone(),
                 response.client_id.clone(),
                 response.client_secret.clone(),
-                log_key,
             )
             .await?;
 
-        // The enrollment key has no use once the device holds a log key; stop keeping it on disk.
-        if log_key_received {
+        // The enrollment key has no use once a registered device holds a log key; stop keeping it on disk.
+        let holds_log_key = self
+            .initial_configuration_service
+            .get_log_key()
+            .map(|key| !key.is_empty())
+            .unwrap_or(false);
+        if holds_log_key {
             if let Err(e) = self.initial_configuration_service.clear_initial_key() {
                 warn!(
                     "Failed to clear the initial key after registration: {:#}",

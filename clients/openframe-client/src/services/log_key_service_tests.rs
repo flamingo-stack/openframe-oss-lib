@@ -5,7 +5,6 @@ use crate::test_support::{directories, mock_server_with_body, registered_agent, 
 struct Fixture {
     _dir: tempfile::TempDir,
     initial: InitialConfigurationService,
-    agent: AgentConfigurationService,
     service: Arc<LogKeyService>,
 }
 
@@ -17,25 +16,22 @@ async fn fixture(base_url: String, log_key: &str) -> Fixture {
         .save(&InitialConfiguration {
             server_host: "acme.openframe.ai".into(),
             initial_key: "enroll".into(),
+            log_key: log_key.into(),
             ..Default::default()
         })
         .unwrap();
     let agent = registered_agent(&dm).await;
-    if !log_key.is_empty() {
-        agent.save_log_key(log_key.into()).await.unwrap();
-    }
     let mut service = LogKeyService::new(
         reqwest::Client::new(),
         base_url,
         initial.clone(),
-        agent.clone(),
+        agent,
         DeactivationService::new(&dm),
     );
     service.timing = FAST;
     Fixture {
         _dir: dir,
         initial,
-        agent,
         service: Arc::new(service),
     }
 }
@@ -59,7 +55,7 @@ async fn present_key_makes_no_call_and_keeps_the_initial_key() {
 
     assert!(fx.service.clone().start().is_none());
     assert!(server.requests().is_empty());
-    assert_eq!(fx.agent.get_log_key().unwrap(), "existing");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "existing");
     assert_eq!(fx.initial.get_initial_key().unwrap(), "enroll");
 }
 
@@ -80,7 +76,7 @@ async fn missing_key_is_fetched_with_the_machine_token_and_saved() {
         .head
         .to_ascii_lowercase()
         .contains("authorization: bearer machine-token"));
-    assert_eq!(fx.agent.get_log_key().unwrap(), "fresh");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "fresh");
     assert_eq!(fx.initial.get_initial_key().unwrap(), "");
 }
 
@@ -92,7 +88,7 @@ async fn failures_are_retried_until_the_key_arrives() {
     run_to_completion(&fx).await;
 
     assert_eq!(server.requests().len(), 3);
-    assert_eq!(fx.agent.get_log_key().unwrap(), "fresh");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "fresh");
 }
 
 #[tokio::test]
@@ -105,7 +101,7 @@ async fn an_empty_key_is_not_saved() {
 
     assert!(!handle.is_finished());
     assert!(server.requests().len() >= 2);
-    assert_eq!(fx.agent.get_log_key().unwrap(), "");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "");
     assert_eq!(fx.initial.get_initial_key().unwrap(), "enroll");
     handle.abort();
 }

@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use async_nats::jetstream;
 use std::path::PathBuf;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
 use tracing::{debug, error, info};
@@ -9,7 +8,7 @@ use tracing::{debug, error, info};
 use crate::platform::DirectoryManager;
 use crate::services::device_data_fetcher::DeviceDataFetcher;
 use crate::services::{
-    AgentConfigurationService, InitialConfigurationService, InstalledToolsService, LogKeyService,
+    AgentConfigurationService, InitialConfigurationService, InstalledToolsService,
     MachineIdService, MACHINE_ID_HEADER,
 };
 
@@ -24,7 +23,7 @@ const KEY_CHECK_INTERVAL_SECS: u64 = 10;
 const SOURCE_DISCOVERY_INTERVAL_SECS: u64 = 30;
 const NATS_SUBJECT: &str = "agents.logs";
 
-/// Credential handed to the logs gateway: the log key, or the enrollment key on devices registered before log keys existed.
+/// Credential handed to the logs gateway: the log key, or the enrollment key until the device holds one.
 #[derive(Debug, PartialEq)]
 pub enum LogStreamKey {
     Log(String),
@@ -151,7 +150,6 @@ pub struct LogStreamingRunManager {
     offset_file_path: PathBuf,
     initial_config_service: InitialConfigurationService,
     agent_config_service: AgentConfigurationService,
-    log_key_service: Arc<LogKeyService>,
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
     machine_id: String,
@@ -161,7 +159,6 @@ impl LogStreamingRunManager {
     pub fn new(
         initial_config_service: &InitialConfigurationService,
         agent_config_service: &AgentConfigurationService,
-        log_key_service: Arc<LogKeyService>,
         installed_tools_service: &InstalledToolsService,
         directory_manager: &DirectoryManager,
     ) -> Result<Self> {
@@ -185,7 +182,6 @@ impl LogStreamingRunManager {
             offset_file_path,
             initial_config_service: initial_config_service.clone(),
             agent_config_service: agent_config_service.clone(),
-            log_key_service,
             installed_tools_service: installed_tools_service.clone(),
             directory_manager: directory_manager.clone(),
             machine_id,
@@ -261,7 +257,7 @@ impl LogStreamingRunManager {
 
     fn stored_key(&self) -> Option<LogStreamKey> {
         choose_key(
-            self.log_key_service.stored_key(),
+            self.initial_config_service.get_log_key().ok(),
             self.initial_config_service.get_initial_key().ok(),
         )
     }
