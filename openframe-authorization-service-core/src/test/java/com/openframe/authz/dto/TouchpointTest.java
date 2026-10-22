@@ -4,12 +4,12 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class RegistrationAttributionTest {
+class TouchpointTest {
 
     private static final String DOWNLOAD_ID = "0b4c5a52-6f0e-4d7b-9a3e-2f1c8d7e6b5a";
 
-    private static RegistrationAttribution everyField(String prefix) {
-        return RegistrationAttribution.builder()
+    private static Touchpoint everyField(String prefix) {
+        return Touchpoint.builder()
                 .fbc(prefix + "01")
                 .fbclid(prefix + "02")
                 .fbp(prefix + "03")
@@ -34,7 +34,7 @@ class RegistrationAttributionTest {
 
     @Test
     void merge_requestHasNoSourceSignal_keepsItsOwnFieldsAndTakesDownloadIdAndSourceFromCookie() {
-        RegistrationAttribution request = RegistrationAttribution.builder()
+        Touchpoint request = Touchpoint.builder()
                 .fbc("fb.1.1700000000.abc")
                 .hutk("hutk-1")
                 .heardFrom("search")
@@ -42,9 +42,9 @@ class RegistrationAttributionTest {
                 .landingUrl("https://openframe.ai/download")
                 .build();
 
-        RegistrationAttribution merged = RegistrationAttribution.merge(request, everyField("cookie"));
+        Touchpoint merged = Touchpoint.merge(request, everyField("cookie"));
 
-        assertThat(merged).isEqualTo(RegistrationAttribution.builder()
+        assertThat(merged).isEqualTo(Touchpoint.builder()
                 .fbc("fb.1.1700000000.abc")
                 .hutk("hutk-1")
                 .heardFrom("search")
@@ -66,20 +66,20 @@ class RegistrationAttributionTest {
 
     @Test
     void merge_requestHasSourceSignal_keepsItsWholeSourceAndTakesOnlyDownloadIdFromCookie() {
-        RegistrationAttribution request = RegistrationAttribution.builder()
+        Touchpoint request = Touchpoint.builder()
                 .utmSource("newsletter")
                 .utmMedium("email")
                 .build();
-        RegistrationAttribution cookie = RegistrationAttribution.builder()
+        Touchpoint cookie = Touchpoint.builder()
                 .utmSource("google")
                 .gclid("g-1")
                 .landingUrl("https://openframe.ai/?gclid=g-1")
                 .downloadId(DOWNLOAD_ID)
                 .build();
 
-        RegistrationAttribution merged = RegistrationAttribution.merge(request, cookie);
+        Touchpoint merged = Touchpoint.merge(request, cookie);
 
-        assertThat(merged).isEqualTo(RegistrationAttribution.builder()
+        assertThat(merged).isEqualTo(Touchpoint.builder()
                 .utmSource("newsletter")
                 .utmMedium("email")
                 .downloadId(DOWNLOAD_ID)
@@ -88,46 +88,46 @@ class RegistrationAttributionTest {
 
     @Test
     void merge_requestHasOnlyGclid_keepsItsOwnSource() {
-        RegistrationAttribution request = RegistrationAttribution.builder().gclid("g-1").downloadId(DOWNLOAD_ID).build();
+        Touchpoint request = Touchpoint.builder().gclid("g-1").downloadId(DOWNLOAD_ID).build();
 
-        assertThat(RegistrationAttribution.merge(request, everyField("cookie"))).isEqualTo(request);
+        assertThat(Touchpoint.merge(request, everyField("cookie"))).isEqualTo(request);
     }
 
     @Test
     void merge_requestHasOnlyRef_keepsItsOwnSource() {
-        RegistrationAttribution request = RegistrationAttribution.builder().ref("acme").downloadId(DOWNLOAD_ID).build();
+        Touchpoint request = Touchpoint.builder().ref("acme").downloadId(DOWNLOAD_ID).build();
 
-        assertThat(RegistrationAttribution.merge(request, everyField("cookie"))).isEqualTo(request);
+        assertThat(Touchpoint.merge(request, everyField("cookie"))).isEqualTo(request);
     }
 
     @Test
     void merge_requestSourceFieldBlank_takesSourceFromCookie() {
-        RegistrationAttribution request = RegistrationAttribution.builder().utmSource("  ").build();
-        RegistrationAttribution cookie = RegistrationAttribution.builder().utmSource("google").gclid("g-1").build();
+        Touchpoint request = Touchpoint.builder().utmSource("  ").build();
+        Touchpoint cookie = Touchpoint.builder().utmSource("google").gclid("g-1").build();
 
-        assertThat(RegistrationAttribution.merge(request, cookie)).isEqualTo(cookie);
+        assertThat(Touchpoint.merge(request, cookie)).isEqualTo(cookie);
     }
 
     @Test
     void merge_requestDownloadIdBlank_takesCookieDownloadId() {
-        RegistrationAttribution request = RegistrationAttribution.builder().downloadId("  ").build();
-        RegistrationAttribution cookie = RegistrationAttribution.builder().downloadId(DOWNLOAD_ID).build();
+        Touchpoint request = Touchpoint.builder().downloadId("  ").build();
+        Touchpoint cookie = Touchpoint.builder().downloadId(DOWNLOAD_ID).build();
 
-        assertThat(RegistrationAttribution.merge(request, cookie).getDownloadId()).isEqualTo(DOWNLOAD_ID);
+        assertThat(Touchpoint.merge(request, cookie).getDownloadId()).isEqualTo(DOWNLOAD_ID);
     }
 
     @Test
     void merge_requestNull_returnsCookie() {
-        RegistrationAttribution cookie = everyField("cookie");
+        Touchpoint cookie = everyField("cookie");
 
-        assertThat(RegistrationAttribution.merge(null, cookie)).isSameAs(cookie);
+        assertThat(Touchpoint.merge(null, cookie)).isSameAs(cookie);
     }
 
     @Test
     void merge_cookieNull_returnsRequest() {
-        RegistrationAttribution request = everyField("request");
+        Touchpoint request = everyField("request");
 
-        assertThat(RegistrationAttribution.merge(request, null)).isSameAs(request);
+        assertThat(Touchpoint.merge(request, null)).isSameAs(request);
     }
 
     @Test
@@ -137,7 +137,7 @@ class RegistrationAttributionTest {
 
     @Test
     void totalLength_someFieldsNull_sumsOnlyTheSetFields() {
-        RegistrationAttribution attribution = RegistrationAttribution.builder()
+        Touchpoint attribution = Touchpoint.builder()
                 .referrer("https://chatgpt.com/")
                 .landingUrl("https://openframe.ai/")
                 .downloadId(DOWNLOAD_ID)

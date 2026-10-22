@@ -1,7 +1,7 @@
 package com.openframe.authz.controller;
 
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.SsoLoginInitRequest;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
@@ -128,7 +128,7 @@ public class SsoLoginController {
     public record SignupTicketCompleteRequest(String ticket,
                                               String tenantName,
                                               String tenantDomain,
-                                              RegistrationAttribution attribution) {}
+                                              Touchpoint attribution) {}
 
     public record SignupTicketCompleteResponse(String tenantId) {}
 
@@ -164,7 +164,7 @@ public class SsoLoginController {
                     .tenantName(signupCompletion.tenantName())
                     .tenantDomain(signupCompletion.tenantDomain().toLowerCase(Locale.ROOT))
                     .emailPreVerified(pendingSignup.emailVerified())
-                    .attribution(RegistrationAttribution.merge(
+                    .attribution(Touchpoint.merge(
                             signupCompletion.attribution(), pendingSignup.attribution()))
                     .build();
 
@@ -195,7 +195,7 @@ public class SsoLoginController {
     @GetMapping(path = "/login/sso/complete")
     public void completeSsoRegistration(@RequestParam("tenantName") String tenantName,
                                         @RequestParam("tenantDomain") String tenantDomain,
-                                        @ModelAttribute RegistrationAttribution attribution,
+                                        @ModelAttribute Touchpoint attribution,
                                         Authentication authentication,
                                         HttpServletRequest httpRequest,
                                         HttpServletResponse httpResponse) throws IOException {

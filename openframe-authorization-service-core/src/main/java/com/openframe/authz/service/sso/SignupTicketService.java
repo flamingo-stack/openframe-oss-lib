@@ -1,6 +1,6 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import lombok.RequiredArgsConstructor;
@@ -41,7 +41,7 @@ public class SignupTicketService {
                                 String subject,
                                 String userId,
                                 String tenantId,
-                                RegistrationAttribution attribution) {
+                                Touchpoint attribution) {
 
         public boolean bound() {
             return userId != null && tenantId != null;
@@ -49,7 +49,7 @@ public class SignupTicketService {
     }
 
     public String create(String email, String firstName, String lastName, String provider,
-                         boolean emailVerified, String subject, RegistrationAttribution attribution) {
+                         boolean emailVerified, String subject, Touchpoint attribution) {
         byte[] raw = new byte[32];
         RANDOM.nextBytes(raw);
         String ticket = Base64.getUrlEncoder().withoutPadding().encodeToString(raw);

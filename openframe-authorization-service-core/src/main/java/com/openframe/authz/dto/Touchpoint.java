@@ -10,13 +10,14 @@ import lombok.NoArgsConstructor;
 import org.springframework.util.StringUtils;
 
 /**
- * Marketing-attribution signals
+ * One visit to our site and where it came from, as the link and browser sent it: UTMs, ad click ids, Meta and HubSpot
+ * cookies. A signup can have two: the download visit and the signup visit; SignupAttribution decides which one counts.
  */
 @Data
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-public class RegistrationAttribution {
+public class Touchpoint {
 
     private String fbc;
 
@@ -75,11 +76,11 @@ public class RegistrationAttribution {
                 .sum();
     }
 
-    public static RegistrationAttribution merge(RegistrationAttribution request, RegistrationAttribution cookie) {
+    public static Touchpoint merge(Touchpoint request, Touchpoint cookie) {
         if (request == null || cookie == null) {
             return request != null ? request : cookie;
         }
-        RegistrationAttribution source = request.hasSourceSignal() ? request : cookie;
+        Touchpoint source = request.hasSourceSignal() ? request : cookie;
         return request.toBuilder()
                 .downloadId(StringUtils.hasText(request.getDownloadId()) ? request.getDownloadId() : cookie.getDownloadId())
                 .fbclid(source.getFbclid())

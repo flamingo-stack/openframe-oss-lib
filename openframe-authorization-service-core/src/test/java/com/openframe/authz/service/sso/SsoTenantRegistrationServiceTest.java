@@ -1,6 +1,6 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.SsoTenantRegistrationInitRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
@@ -44,26 +44,26 @@ class SsoTenantRegistrationServiceTest {
 
     @Test
     void startRegistration_attributionAtCookieLimit_cookieCarriesItWhole() {
-        RegistrationAttribution atLimit = attribution(2048 - REFERRER.length() - LANDING_URL.length());
+        Touchpoint atLimit = attribution(2048 - REFERRER.length() - LANDING_URL.length());
 
         assertThat(cookieAttribution(atLimit)).isEqualTo(atLimit);
     }
 
     @Test
     void startRegistration_attributionFitsOnlyWithoutUrls_dropsReferrerAndLandingUrl() {
-        RegistrationAttribution bounded = cookieAttribution(attribution(2048));
+        Touchpoint bounded = cookieAttribution(attribution(2048));
 
         assertThat(bounded).isEqualTo(withoutUrls(2048));
     }
 
     @Test
     void startRegistration_attributionTooLargeEvenWithoutUrls_dropsIt() {
-        RegistrationAttribution bounded = cookieAttribution(attribution(2049));
+        Touchpoint bounded = cookieAttribution(attribution(2049));
 
         assertThat(bounded).isNull();
     }
 
-    private RegistrationAttribution cookieAttribution(RegistrationAttribution attribution) {
+    private Touchpoint cookieAttribution(Touchpoint attribution) {
         service.startRegistration(new SsoTenantRegistrationInitRequest(
                 "a@acme.com", "Acme", "acme", "google", null, false, attribution));
         ArgumentCaptor<SsoTenantRegCookiePayload> payload = ArgumentCaptor.forClass(SsoTenantRegCookiePayload.class);
@@ -71,15 +71,15 @@ class SsoTenantRegistrationServiceTest {
         return payload.getValue().attribution();
     }
 
-    private static RegistrationAttribution attribution(int lengthWithoutUrls) {
+    private static Touchpoint attribution(int lengthWithoutUrls) {
         return withoutUrls(lengthWithoutUrls).toBuilder()
                 .referrer(REFERRER)
                 .landingUrl(LANDING_URL)
                 .build();
     }
 
-    private static RegistrationAttribution withoutUrls(int length) {
-        return RegistrationAttribution.builder()
+    private static Touchpoint withoutUrls(int length) {
+        return Touchpoint.builder()
                 .utmSource(UTM_SOURCE)
                 .downloadId(DOWNLOAD_ID)
                 .utmCampaign("c".repeat(length - UTM_SOURCE.length() - DOWNLOAD_ID.length()))

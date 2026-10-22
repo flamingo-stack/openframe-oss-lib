@@ -1,6 +1,6 @@
 package com.openframe.authz.web;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -34,14 +34,14 @@ public final class SignupSourceCookie {
     private SignupSourceCookie() {
     }
 
-    public static RegistrationAttribution read(HttpServletRequest request) {
+    public static Touchpoint read(HttpServletRequest request) {
         Cookie cookie = WebUtils.getCookie(request, COOKIE);
         if (cookie == null || !StringUtils.hasText(cookie.getValue())) {
             return null;
         }
         try {
             MultiValueMap<String, String> params = parse(cookie.getValue());
-            return RegistrationAttribution.builder()
+            return Touchpoint.builder()
                     .downloadId(params.getFirst(DOWNLOAD_ID))
                     .utmSource(params.getFirst(UTM_SOURCE))
                     .utmMedium(params.getFirst(UTM_MEDIUM))

@@ -1,6 +1,6 @@
 package com.openframe.authz.controller;
 
- import com.openframe.authz.dto.RegistrationAttribution;
+ import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoFlowCookies;
@@ -303,7 +303,7 @@ class SsoLoginControllerTest {
     @Test
     void completeSsoRegistrationByTicket_appAndTicketCarrySource_registersAppFieldsOverTicketCookie() {
         ticketPeeks(new PendingSignup("Founder@NewCo.com", "Fo", "Under", "google", true, null, null, null,
-                RegistrationAttribution.builder()
+                Touchpoint.builder()
                         .downloadId("download-from-cookie")
                         .utmSource("google")
                         .gclid("gclid-1")
@@ -311,12 +311,12 @@ class SsoLoginControllerTest {
         registrationSucceeds();
 
         controller.completeSsoRegistrationByTicket(new SsoLoginController.SignupTicketCompleteRequest("tk", "New Co", "NewCo",
-                RegistrationAttribution.builder()
+                Touchpoint.builder()
                         .downloadId("download-from-app")
                         .heardFrom("search")
                         .build()));
 
-        assertThat(registeredRequest().getAttribution()).isEqualTo(RegistrationAttribution.builder()
+        assertThat(registeredRequest().getAttribution()).isEqualTo(Touchpoint.builder()
                 .downloadId("download-from-app")
                 .heardFrom("search")
                 .utmSource("google")

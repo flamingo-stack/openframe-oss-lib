@@ -1,7 +1,7 @@
 package com.openframe.authz.security.flow;
 
 import com.openframe.authz.config.oidc.MicrosoftSSOProperties;
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.security.EmailTrustPolicy;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoLoginCookiePayload;
@@ -240,7 +240,7 @@ class LoginSsoHandlerTest {
         when(ssoOidcUserService.autoProvisionTenantForDomain("ada@acme.com")).thenReturn(Optional.empty());
         when(ssoIdentityService.subjectOf(eq("google"), anyMap())).thenReturn(Optional.of("g-1"));
         when(signupTicketService.create("ada@acme.com", "Ada", "", "google", true, "g-1",
-                RegistrationAttribution.builder().downloadId("dl-1").utmSource("producthunt").build()))
+                Touchpoint.builder().downloadId("dl-1").utmSource("producthunt").build()))
                 .thenReturn("ticket/1");
         MockHttpServletRequest request = request("com.openframe.app://auth", true);
         request.setCookies(loginCookie("com.openframe.app://auth", true),

@@ -1,6 +1,6 @@
 package com.openframe.authz.service.sso;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
 import com.openframe.data.redis.OpenframeRedisKeyBuilder;
 import com.openframe.data.redis.OpenframeRedisProperties;
@@ -189,8 +189,8 @@ class SignupTicketServiceTest {
         return service.peek(ticket).orElseThrow();
     }
 
-    private static RegistrationAttribution attribution() {
-        return RegistrationAttribution.builder().utmSource("newsletter").gclid("gclid-1").build();
+    private static Touchpoint attribution() {
+        return Touchpoint.builder().utmSource("newsletter").gclid("gclid-1").build();
     }
 
     private static String keyFor(String ticket) {
