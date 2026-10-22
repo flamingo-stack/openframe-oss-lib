@@ -191,7 +191,7 @@ These writes produce no outbox row, and nothing warns about them:
 
 | Problem | Fix |
 |---|---|
-| The spec's document has no repository, or more than one | Keep exactly one repository per published document. |
+| A published document class has more than one repository | Keep at most one repository per document class. A document with no repository in a service, such as tickets in the shared stream, is fine: that service logs INFO and publishes no writes of it. |
 | Its document has no `@Version` field | Add `@Version Long version`. |
 | It has no `PublishingRepositoryInterceptor` | The repository was created outside Spring Data's normal setup; let the auto-configuration create it. |
 | It has an `@Update` method | It returns no documents to publish; write a custom method with `publishChanged` or `publishChangedByIds`. |

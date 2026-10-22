@@ -55,7 +55,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         OrganizationEvent event = record.getEvent();
         String organizationId = event.getOrganizationId();
         String name = event.getName();
-        return ticketProjectionRepository.countOutdatedOrganizationNames(tenantId, organizationId, name, limit);
+        return ticketProjectionRepository.countTicketsToUpdateOrganizationName(tenantId, organizationId, name, limit);
     }
 
     @Override

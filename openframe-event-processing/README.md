@@ -198,7 +198,7 @@ must still start. That projection, if it exists, stays on `aspect`.
 
 | Metric | Tags | Meaning |
 |---|---|---|
-| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `skipped`, `delete_stored`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it, `skipped` that a newer version was already stored. The count is the number of events, the total the time spent. |
+| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `skipped`, `deleted`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it, `skipped` that a newer version was already stored, `deleted` that the projection removed its copy (or kept it, the default). The count is the number of events, the total the time spent. |
 
 ## Debugging
 

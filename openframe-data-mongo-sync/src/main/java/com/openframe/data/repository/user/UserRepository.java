@@ -23,6 +23,9 @@ public interface UserRepository extends MongoRepository<User, String>, BaseUserR
 
     List<User> findByRolesInAndStatus(Collection<UserRole> roles, UserStatus status);
 
+    // The users of a reconcile batch across tenants; only the shared stream calls it.
+    List<User> findByTenantIdInAndIdIn(Collection<String> tenantIds, Collection<String> ids);
+
     /**
      * Whether a user with the given id is a member of the given tenant. Tenant-first form so the
      * shared/SaaS side (which bypasses the tenant aspect) can scope by tenant explicitly — e.g. to

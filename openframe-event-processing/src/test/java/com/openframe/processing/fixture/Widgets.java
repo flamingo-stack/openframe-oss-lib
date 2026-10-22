@@ -48,6 +48,7 @@ public final class Widgets {
         private final String name;
         private final Consumer<WidgetEvent> behaviour;
         public final List<PublishedRecord<WidgetEvent>> records = new CopyOnWriteArrayList<>();
+        public final List<String> deletedAggregateIds = new CopyOnWriteArrayList<>();
         // What countChanges returns, before its limit.
         public volatile long changes;
 
@@ -70,6 +71,11 @@ public final class Widgets {
             WidgetEvent event = record.getEvent();
             behaviour.accept(event);
             records.add(record);
+        }
+
+        @Override
+        public void applyDelete(String tenantId, String aggregateId) {
+            deletedAggregateIds.add(aggregateId);
         }
 
         @Override

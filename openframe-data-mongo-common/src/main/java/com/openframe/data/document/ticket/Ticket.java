@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.experimental.FieldNameConstants;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -24,6 +25,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@FieldNameConstants
 @Document(collection = "tickets")
 @CompoundIndexes({
         @CompoundIndex(name = "tenant_ticketNumber_idx", def = "{'tenantId':1,'ticketNumber':1}", unique = true),
@@ -64,6 +66,7 @@ public class Ticket implements TenantScoped {
     private Instant lastActivityAt;
     private Instant awaitingClientSince;
     private TicketResolver resolvedBy;
+    @Indexed
     private String resolvedById;
     private String resolvedByName;
     private Integer reopenCount;

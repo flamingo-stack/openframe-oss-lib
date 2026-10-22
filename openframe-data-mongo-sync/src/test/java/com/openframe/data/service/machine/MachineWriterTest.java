@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -38,7 +39,13 @@ class MachineWriterTest {
     @BeforeEach
     void setUp() {
         template = mock(MongoTemplate.class);
-        writer = new MachineWriter(template);
+        writer = new MachineWriter(template, absent(), absent());
+    }
+
+    // Publishing off: no OutboxPublisher bean.
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> absent() {
+        return mock(ObjectProvider.class);
     }
 
     private void storedDocumentIs(Machine machine) {

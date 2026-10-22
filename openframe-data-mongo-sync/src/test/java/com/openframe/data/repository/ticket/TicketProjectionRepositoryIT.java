@@ -94,7 +94,7 @@ class TicketProjectionRepositoryIT {
     @Test
     void theCount_coversOnlyTheOutdatedTicketsOfTheTenantAndOrganization() {
         // execution
-        long count = repository.countOutdatedOrganizationNames("tenant-a", "org-1", "New name", 10);
+        long count = repository.countTicketsToUpdateOrganizationName("tenant-a", "org-1", "New name", 10);
 
         // verifications
         assertThat(count).isEqualTo(1);
@@ -106,7 +106,7 @@ class TicketProjectionRepositoryIT {
         insertOutdatedTickets(5);
 
         // execution
-        long count = repository.countOutdatedOrganizationNames("tenant-c", "org-1", "New name", 3);
+        long count = repository.countTicketsToUpdateOrganizationName("tenant-c", "org-1", "New name", 3);
 
         // verifications
         assertThat(count).isEqualTo(3);
@@ -153,6 +153,92 @@ class TicketProjectionRepositoryIT {
                 .toList();
         mongoTemplate.insertAll(tickets);
         return tickets.stream().map(Ticket::getId).sorted().toList();
+    }
+
+    @Test
+    void bothUserNames_changeOnlyOnTheTicketsOfTheTenantThatNameTheUser_withAnotherName() {
+        // setup
+        mongoTemplate.insertAll(List.of(
+                userTicket("u1", 11, "tenant-a", "user-1", "Old", null, null),
+                userTicket("u2", 12, "tenant-a", "user-2", "Old", "user-1", "Old"),
+                userTicket("u3", 13, "tenant-a", "user-1", "Ada Lovelace", null, null),
+                userTicket("u4", 14, "tenant-b", "user-1", "Old", "user-1", "Old")));
+
+        // execution
+        long counted = repository.countTicketsToUpdateUserName("tenant-a", "user-1", "Ada Lovelace", 10);
+        long updated = repository.updateUserNames("tenant-a", "user-1", "Ada Lovelace");
+
+        // verifications
+        assertThat(counted).isEqualTo(2);
+        assertThat(updated).isEqualTo(2);
+        assertThat(mongoTemplate.findById("u1", Ticket.class).getAssignedName()).isEqualTo("Ada Lovelace");
+        assertThat(mongoTemplate.findById("u2", Ticket.class).getAssignedName()).isEqualTo("Old");
+        assertThat(mongoTemplate.findById("u2", Ticket.class).getResolvedByName()).isEqualTo("Ada Lovelace");
+        assertThat(versionOf("u3")).isZero();
+        assertThat(mongoTemplate.findById("u4", Ticket.class).getAssignedName()).isEqualTo("Old");
+    }
+
+    @Test
+    void userNames_changeInBatches_overTicketsWithEitherNameOutdated() {
+        // setup
+        mongoTemplate.insertAll(List.of(
+                userTicket("r1", 21, "tenant-a", "user-1", "Old", null, null),
+                userTicket("r2", 22, "tenant-a", null, null, "user-1", "Old"),
+                userTicket("r3", 23, "tenant-a", "user-2", "Old", "user-2", "Old")));
+
+        // execution
+        String firstLastId = repository.updateUserNamesBatch("tenant-a", "user-1", "Ada Lovelace", null, 1);
+        String secondLastId = repository.updateUserNamesBatch("tenant-a", "user-1", "Ada Lovelace", firstLastId, 1);
+        String none = repository.updateUserNamesBatch("tenant-a", "user-1", "Ada Lovelace", secondLastId, 1);
+
+        // verifications
+        assertThat(firstLastId).isEqualTo("r1");
+        assertThat(secondLastId).isEqualTo("r2");
+        assertThat(none).isNull();
+        assertThat(mongoTemplate.findById("r1", Ticket.class).getAssignedName()).isEqualTo("Ada Lovelace");
+        assertThat(mongoTemplate.findById("r2", Ticket.class).getResolvedByName()).isEqualTo("Ada Lovelace");
+        assertThat(mongoTemplate.findById("r3", Ticket.class).getAssignedName()).isEqualTo("Old");
+    }
+
+    @Test
+    void theDeviceHostname_changesOnlyOnTheTicketsOfTheTenantAndDevice_withAnotherHostname_inBatches() {
+        // setup
+        mongoTemplate.insertAll(List.of(
+                deviceTicket("d1", 31, "tenant-a", "machine-1", "host-old"),
+                deviceTicket("d2", 32, "tenant-a", "machine-1", "host-new"),
+                deviceTicket("d3", 33, "tenant-a", "machine-2", "host-old"),
+                deviceTicket("d4", 34, "tenant-b", "machine-1", "host-old"),
+                deviceTicket("d5", 35, "tenant-a", "machine-1", "host-old")));
+
+        // execution
+        long counted = repository.countTicketsToUpdateDeviceHostname("tenant-a", "machine-1", "host-new", 10);
+        String firstLastId = repository.updateDeviceHostnameBatch("tenant-a", "machine-1", "host-new", null, 1);
+        long rest = repository.updateDeviceHostname("tenant-a", "machine-1", "host-new");
+
+        // verifications
+        assertThat(counted).isEqualTo(2);
+        assertThat(firstLastId).isEqualTo("d1");
+        assertThat(rest).isEqualTo(1);
+        assertThat(mongoTemplate.findById("d5", Ticket.class).getDeviceHostname()).isEqualTo("host-new");
+        assertThat(mongoTemplate.findById("d3", Ticket.class).getDeviceHostname()).isEqualTo("host-old");
+        assertThat(mongoTemplate.findById("d4", Ticket.class).getDeviceHostname()).isEqualTo("host-old");
+    }
+
+    private static Ticket deviceTicket(String id, int number, String tenantId, String deviceId, String deviceHostname) {
+        Ticket ticket = ticket(id, number, tenantId, "org-9", "Org");
+        ticket.setDeviceId(deviceId);
+        ticket.setDeviceHostname(deviceHostname);
+        return ticket;
+    }
+
+    private static Ticket userTicket(String id, int number, String tenantId, String assignedTo, String assignedName,
+                                     String resolvedById, String resolvedByName) {
+        Ticket ticket = ticket(id, number, tenantId, "org-9", "Org");
+        ticket.setAssignedTo(assignedTo);
+        ticket.setAssignedName(assignedName);
+        ticket.setResolvedById(resolvedById);
+        ticket.setResolvedByName(resolvedByName);
+        return ticket;
     }
 
     private String nameOf(String id) {

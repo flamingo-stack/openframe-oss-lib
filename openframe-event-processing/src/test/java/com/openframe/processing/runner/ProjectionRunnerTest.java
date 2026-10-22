@@ -399,7 +399,27 @@ class ProjectionRunnerTest {
             process(context, record(true));
 
             verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
-            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_DELETE_STORED)).isEqualTo(1);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_DELETED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void aDelete_reachesTheProjection_andNeverApply() {
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(true));
+
+            assertThat(onTickets.deletedAggregateIds).containsExactly("organization-document-1");
+            assertThat(onTickets.records).isEmpty();
+        });
+    }
+
+    @Test
+    void anOlderDelete_isSkipped() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(true));
+
+            assertThat(onTickets.deletedAggregateIds).isEmpty();
         });
     }
 
