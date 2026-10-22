@@ -95,6 +95,19 @@ public class CookieService {
     }
 
     /**
+     * Clears every OAuth state cookie the request carries. Each login attempt writes its own
+     * of_oauth_{state} cookie and only its callback clears it, so retried or abandoned logins
+     * pile up until the Cookie header exceeds the gateway limit (431).
+     */
+    public void addClearStaleOAuthStateCookies(HttpHeaders headers, ServerHttpRequest request) {
+        for (String name : request.getCookies().keySet()) {
+            if (name.startsWith(OAUTH_STATE_COOKIE_PREFIX)) {
+                headers.add(SET_COOKIE, createClearedCookie(name, "/oauth").toString());
+            }
+        }
+    }
+
+    /**
      * Clears the OAuth state cookie for given state.
      */
     public void addClearOAuthStateCookie(HttpHeaders headers, String state) {
