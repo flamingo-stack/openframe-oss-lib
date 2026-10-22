@@ -1983,6 +1983,8 @@ function EmbeddableChatInner({
   // `isOpeningDialog` is false. Keyed on the dialog id being set rather than on
   // any transport: `isMessagesLoading` is only ever about the ACTIVE dialog.
   const isLoadingActiveDialogMessages = activeDialogId != null && isMessagesLoading;
+  // A host block pinned above the composer (`aboveComposer`).
+  const hasAboveComposer = aboveComposer != null && aboveComposer !== false;
   const hasConversation =
     hasMessages ||
     isOpeningDialog ||
@@ -2923,7 +2925,17 @@ function EmbeddableChatInner({
                       />
                     ) : (
                       <>
-                        <div ref={galleryPanelRef} className="flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]">
+                        <div
+                          ref={galleryPanelRef}
+                          data-testid="chat-content-panel"
+                          className={cn(
+                            'flex min-h-0 flex-1 flex-col p-[var(--spacing-system-m)]',
+                            // With a host block above the composer the thread keeps room
+                            // for a line and the working status: the block gives way
+                            // instead (below), so the status never lands on it.
+                            hasAboveComposer && 'min-h-32',
+                          )}
+                        >
                           <div
                             key={contentViewKey}
                             className="flex min-h-0 flex-1 flex-col duration-200 animate-in fade-in-0"
@@ -3123,9 +3135,14 @@ function EmbeddableChatInner({
 
                         {/* Host block pinned above the composer (`aboveComposer`):
                             the thread's own bottom padding separates them, the
-                            composer's horizontal inset is repeated so the two line up. */}
-                        {aboveComposer != null && aboveComposer !== false && (
-                          <div className="shrink-0 px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]">
+                            composer's horizontal inset is repeated so the two line up.
+                            It may shrink: in a short panel the block (which scrolls
+                            its own content, `min-h-0`) yields height to the thread. */}
+                        {hasAboveComposer && (
+                          <div
+                            data-testid="chat-above-composer"
+                            className="flex min-h-0 shrink flex-col px-[var(--spacing-system-m)] pb-[var(--spacing-system-m)]"
+                          >
                             {aboveComposer}
                           </div>
                         )}
