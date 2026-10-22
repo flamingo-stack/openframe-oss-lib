@@ -36,11 +36,14 @@ import { usePageDataSync } from '../../layout/page-data-sync';
 import { ListEmptyState } from '../../list-empty-state';
 import { LoadingRegion } from '../../loading/loading-region';
 import { LoadError } from '../../ui/error-state';
-import { useLoadingScope } from '../../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { UnifiedPagination } from '../../unified-pagination';
-import { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
+import { type LoadedProductReleaseCardProps, ProductReleaseCard } from './product-release-card';
 
 const DEFAULT_ENDPOINT = '/api/releases';
+/** Releases a page lists when the host states no `itemsPerPage`: the list's own page size. */
+const PRODUCT_RELEASES_PAGE_SIZE = 5;
+
 /** The pager's row inside the list's bottom slot: no margin of its own (the slot spaces it), so the loaded pager is
  *  the height of its skeleton. */
 const PAGER_ROW_CLASS = 'flex w-full justify-center';
@@ -54,7 +57,7 @@ const DEFAULT_PAGE_PARAM_KEY = 'page';
  *  own data fields minus the ones this view supplies (title/summary/version/
  *  size/nav). `formattedDate` stays required so the spread satisfies the card. */
 export type ProductReleaseCardExtras = Omit<
-  ProductReleaseCardProps,
+  LoadedProductReleaseCardProps,
   'title' | 'summary' | 'version' | 'size' | 'anchorProps' | 'onClick' | 'className'
 >;
 
@@ -64,7 +67,7 @@ export interface ProductReleasesViewProps {
   endpoint?: string;
   /** Optional SSR hydrate for the first page — skips the initial client fetch. */
   initialData?: ProductReleaseListResponse;
-  /** Page size → fixed slot count + offset math. Default 5. */
+  /** Page size → fixed slot count + offset math. Default `PRODUCT_RELEASES_PAGE_SIZE`. */
   itemsPerPage?: number;
   /** Fallback detail-href prefix when `runtime.composeContentUrl` is not wired
    *  (single-platform embedders). Default `/releases`. */
@@ -140,7 +143,7 @@ function ReleaseRow({
 export function ProductReleasesView({
   endpoint = DEFAULT_ENDPOINT,
   initialData,
-  itemsPerPage = 5,
+  itemsPerPage = PRODUCT_RELEASES_PAGE_SIZE,
   basePath = '/releases',
   buildCardProps = buildProductReleaseCardProps,
   searchParamKey = DEFAULT_SEARCH_PARAM_KEY,
@@ -224,23 +227,25 @@ export function ProductReleasesView({
             {/* ALWAYS render `itemsPerPage` slots — visibility toggles so the
                 list height is stable across loading ↔ loaded. */}
             <LoadingRegion label="Loading releases" announce={isLoading} className="flex flex-col gap-6">
-              {Array.from({ length: itemsPerPage }).map((_, i) => {
-                const release = releases[i];
-                const hasData = !!release;
-                return (
-                  <div
-                    key={release?.id ?? `slot-${i}`}
-                    style={{ visibility: isLoading || hasData ? 'visible' : 'hidden' }}
-                  >
-                    {!isLoading && release ? (
-                      <ReleaseRow release={release} basePath={basePath} buildCardProps={buildCardProps} />
-                    ) : (
-                      // Read, or a hidden slot past the page's last release: the card draws its own skeleton.
-                      <ProductReleaseCard loading size="lg" title="" version="" formattedDate="" />
-                    )}
-                  </div>
-                );
-              })}
+              <LoadingItems count={itemsPerPage}>
+                {i => {
+                  const release = releases[i];
+                  return (
+                    <div
+                      // One slot of the page's list, read or loaded alike.
+                      data-loading-item
+                      style={{ visibility: isLoading || release ? 'visible' : 'hidden' }}
+                    >
+                      {!isLoading && release ? (
+                        <ReleaseRow release={release} basePath={basePath} buildCardProps={buildCardProps} />
+                      ) : (
+                        // Read, or a hidden slot past the page's last release: the card draws its own skeleton.
+                        <ProductReleaseCard loading size="lg" title="" version="" formattedDate="" />
+                      )}
+                    </div>
+                  );
+                }}
+              </LoadingItems>
             </LoadingRegion>
 
             {/* Pagination: always present at the bottom, one row height in every state (its skeleton while the list

@@ -1,7 +1,9 @@
 'use client';
 
 import { requireIcon, type IconComponent } from '../../chat/utils/icon-loading';
+import { InteractiveSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 
 /** SSO providers offered on the auth forms. */
@@ -41,6 +43,29 @@ export interface SsoProviderButtonsProps {
    * button as the generic one.
    */
   tag?: string;
+  /** The providers are still being read: the buttons draw their boxes, one per entry of `providers` (the ones the
+   *  form may offer), or `SSO_PROVIDERS_SKELETON_COUNT` when it names none. A loading scope does the same. */
+  loading?: boolean;
+}
+
+/** The column the provider buttons stack in, read by the buttons and by their skeleton. */
+const SSO_PROVIDER_BUTTONS_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
+
+/**
+ * How many provider buttons a form draws while the providers are read when it names none of its own: every provider
+ * the auth forms offer for sign-in (Google, Microsoft and Apple).
+ */
+export const SSO_PROVIDERS_SKELETON_COUNT = 3;
+
+/** The provider buttons while the providers are read: full-width boxes of the outline button, in the same column. */
+function SsoProviderButtonsSkeleton({ count }: { count: number }) {
+  return (
+    <div className={SSO_PROVIDER_BUTTONS_CLASS} aria-hidden>
+      <LoadingItems count={count}>
+        {() => <InteractiveSkeleton.Button className="w-full" data-loading-item />}
+      </LoadingItems>
+    </div>
+  );
 }
 
 /** Stacked full-width SSO provider buttons shared by the auth forms. */
@@ -51,15 +76,19 @@ export function SsoProviderButtons({
   disabled = false,
   enabledProviders,
   tag,
+  loading,
 }: SsoProviderButtonsProps) {
+  if (useLoadingScope() || loading)
+    return <SsoProviderButtonsSkeleton count={providers.length || SSO_PROVIDERS_SKELETON_COUNT} />;
   return (
-    <div className="flex flex-col gap-[var(--spacing-system-l)]">
+    <div className={SSO_PROVIDER_BUTTONS_CLASS}>
       {providers.map(provider => {
         const meta = PROVIDER_META[provider];
         const Icon = meta.Icon;
         return (
           <Button
             key={provider}
+            data-loading-item
             type="button"
             variant="outline"
             fullWidth

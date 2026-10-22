@@ -11,12 +11,10 @@
 // block and exposed via "./components/faq/json-ld" in package.json#exports.)
 export {
   FaqSection,
-  FaqSectionSkeleton,
   FAQ_SECTION_SKELETON_QUESTIONS,
   PAGE_FAQ_SECTION_ID,
   pageFaqProps,
   type FaqSectionProps,
-  type FaqSectionSkeletonProps,
   type FaqSkeletonGroup,
   type FaqSkeletonShape,
   type PageFaqSlot,

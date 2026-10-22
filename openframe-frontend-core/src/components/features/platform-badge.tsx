@@ -15,6 +15,9 @@ interface PlatformBadgeProps {
   size?: 'xs' | 'sm' | 'md';
   showLabel?: boolean;
   className?: string;
+  /** The record is still being read: the badge draws its skeleton at its size. A loading scope does the same while
+   *  no platform is given. */
+  loading?: boolean;
 }
 
 const sizeClasses = {
@@ -38,10 +41,11 @@ const sizeClasses = {
 /** The chip's frame, read by the badge and by its skeleton, so the skeleton is the badge's size. */
 const PLATFORM_BADGE_FRAME_CLASS = 'inline-flex items-center rounded-full border';
 
-export function PlatformBadge({ platform, size = 'sm', showLabel = true, className }: PlatformBadgeProps) {
+export function PlatformBadge({ platform, size = 'sm', showLabel = true, className, loading }: PlatformBadgeProps) {
   // ONE switch: while the record is read its platform is not known and the badge is its skeleton; a platform it is
   // given in a loading scope is the page's own and is drawn as it is.
-  if (useLoadingScope() && !platform) {
+  const inScope = useLoadingScope();
+  if (loading || (inScope && !platform)) {
     return <PlatformBadgeSkeleton size={size} showLabel={showLabel} className={className} />;
   }
   if (!platform) {
@@ -82,7 +86,7 @@ const PLATFORM_BADGE_SKELETON_SIZE = {
 } as const;
 
 /** A platform badge while its record is read: one shape of the badge's height at its size. */
-export function PlatformBadgeSkeleton({
+function PlatformBadgeSkeleton({
   size = 'sm',
   showLabel = true,
   className,

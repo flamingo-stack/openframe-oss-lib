@@ -289,6 +289,9 @@ export interface ProgramConfig<T extends BaseProgramItem = BaseProgramItem> {
   heroCoverAspect?: 'landscape' | 'square'; // Hero cover image aspect ratio (default: 'landscape')
   /** A card of this type shows its hosts (a webinar presents its speakers): the card's skeleton draws the hosts row. */
   cardShowsHosts?: boolean;
+  /** A card of this type shows its photo gallery (an event's list API serves its photos): the card's skeleton draws
+   *  the gallery row (`PROGRAM_CARD_SKELETON_MEDIA` thumbnails); elsewhere the loaded row is a record's optional part. */
+  cardShowsGallery?: boolean;
 }
 
 // ============================================================================

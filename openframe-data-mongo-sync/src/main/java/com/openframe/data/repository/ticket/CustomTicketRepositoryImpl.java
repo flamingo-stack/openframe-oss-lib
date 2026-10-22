@@ -60,6 +60,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_ORDER = "order";
     private static final String FIELD_LAST_ACTIVITY_AT = "lastActivityAt";
     private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
+    private static final String FIELD_ESCALATED_BY_USER = "escalatedByUser";
 
     private static final String CASE_INSENSITIVE = "i";
 
@@ -100,15 +101,11 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             addCriteriaIfNotEmpty(query, FIELD_CREATION_SOURCE, filter.getCreationSources());
             applyCreatedAtRange(query, filter.getCreatedAtFrom(), filter.getCreatedAtTo());
             applyActivityCriteria(query, filter.getActivity());
+            applyEscalatedByUser(query, filter.getEscalatedByUser());
         }
 
-        if (restrictToTicketIds != null) {
-            if (restrictToTicketIds.isEmpty()) {
-                query.addCriteria(Criteria.where(ID_FIELD).is(null));
-            } else {
-                query.addCriteria(Criteria.where(ID_FIELD).in(restrictToTicketIds));
-            }
-        }
+        List<String> excludedTicketIds = filter == null ? null : filter.getExcludedTicketIds();
+        applyIdRestriction(query, restrictToTicketIds, excludedTicketIds);
 
         if (ownerMachineId != null) {
             query.addCriteria(Criteria.where(FIELD_OWNER_MACHINE_ID).is(ownerMachineId));
@@ -116,6 +113,18 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
 
         applySearchCriteria(query, search);
         return query;
+    }
+
+
+    // Inactivity auto-escalations and older tickets carry no value, and the field means false then.
+    private void applyEscalatedByUser(Query query, Boolean escalatedByUser) {
+        if (escalatedByUser == null) {
+            return;
+        }
+        Criteria criteria = escalatedByUser
+                ? Criteria.where(FIELD_ESCALATED_BY_USER).is(true)
+                : Criteria.where(FIELD_ESCALATED_BY_USER).ne(true);
+        query.addCriteria(criteria);
     }
 
     private void applySearchCriteria(Query query, String search) {

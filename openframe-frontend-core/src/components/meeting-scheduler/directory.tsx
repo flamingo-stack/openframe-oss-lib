@@ -34,7 +34,7 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { PaginationSkeleton } from '../pagination';
 import { PersistentPaginationWrapper } from '../persistent-pagination';
 import { AvatarStack, StatusBadge } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 
 export interface MeetingSchedulerDirectoryProps {
   /** Endpoints prefix, default '' (same-origin `/api/meetings`). */
@@ -106,6 +106,7 @@ function DirectoryRow({
 
   return (
     <Link
+      data-loading-item
       href={`${bookingBasePath}/${link.slug}`}
       prefetch={false}
       className="block rounded-lg text-inherit no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
@@ -147,9 +148,9 @@ function DirectoryRow({
  * Same-shell loading row (co-located-skeleton convention): the row's frame, "Next available" and the chevron box
  * real, the title, subtitle, audience chip, hosts and next time as shapes.
  */
-export function MeetingSchedulerDirectoryRowSkeleton() {
+function MeetingSchedulerDirectoryRowSkeleton(props: { [marker: `data-${string}`]: unknown } = {}) {
   return (
-    <div className={ROW_FRAME_CLASS} aria-hidden>
+    <div className={ROW_FRAME_CLASS} aria-hidden {...loadingItemProps(props)}>
       <div className={ROW_TITLE_COLUMN_CLASS}>
         <TextLineSkeleton type="h3" className="w-1/2" />
         <TextLineSkeleton type="h6" className="w-1/3" />
@@ -168,7 +169,7 @@ export function MeetingSchedulerDirectoryRowSkeleton() {
 }
 
 /** The directory while its links are read: `pageSize` row skeletons in the reserved rows area, and the pager. */
-export function MeetingSchedulerDirectorySkeleton({
+function MeetingSchedulerDirectorySkeleton({
   pageSize = MEETING_DIRECTORY_PAGE_SIZE,
   className,
 }: {
@@ -178,9 +179,7 @@ export function MeetingSchedulerDirectorySkeleton({
   return (
     <div className={cn('flex flex-col', className)} aria-hidden>
       <div className={ROWS_CLASS} style={{ minHeight: directoryRowsMinHeight(pageSize) }}>
-        {Array.from({ length: pageSize }, (_, i) => (
-          <MeetingSchedulerDirectoryRowSkeleton key={i} />
-        ))}
+        <LoadingItems count={pageSize}>{() => <MeetingSchedulerDirectoryRowSkeleton data-loading-item />}</LoadingItems>
       </div>
       <div className={cn(PAGINATION_SLOT_CLASS, PAGINATION_SLOT_H)}>
         <PaginationSkeleton />

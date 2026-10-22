@@ -43,11 +43,11 @@ import { VideoBitesStrip } from '../features/video-bites-strip';
 // the detail block visibly narrower than the rail.
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { LoadingRegion } from '../loading/loading-region';
+import { LoadingFallback } from '../loading/loading-fallback';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ArticleAuthorByline } from '../shared/article-author-byline';
 import { LoadError } from '../ui/error-state';
-import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import { useLoadingScope } from '../ui/loading-scope';
 import { RichMarkdownRenderer } from '../ui/markdown';
 
 export interface OnboardingGuideDetailViewProps {
@@ -356,13 +356,5 @@ export function OnboardingGuideDetailView({
     </PageLayout>
   );
   // The loading state is the page itself in a scope, announced once unless a host's scope already did.
-  return renderShell(
-    loading ? (
-      <LoadingRegion label="Loading the guide" announce={!scoped}>
-        <LoadingScope>{page}</LoadingScope>
-      </LoadingRegion>
-    ) : (
-      page
-    ),
-  );
+  return renderShell(loading ? <LoadingFallback label="Loading the guide">{page}</LoadingFallback> : page);
 }

@@ -219,7 +219,7 @@ function biteMediaStyle(cssAspect: string, height?: number, heightMobile?: numbe
   };
 }
 
-export interface VideoBiteCardSkeletonProps {
+interface VideoBiteCardSkeletonProps {
   /** The bite's aspect ratio ('9:16' portrait by default). */
   aspect?: string;
   /** Fixed card height (strip); omitted, the card fills its cell and the aspect sets the height. */
@@ -232,12 +232,7 @@ export interface VideoBiteCardSkeletonProps {
  * A bite card while it is read: the card's own frame and its media box as the skeleton's surface. The title and
  * the speaker sit in the hover overlay, unseen at rest, so they are not drawn.
  */
-export function VideoBiteCardSkeleton({
-  aspect = '9:16',
-  height,
-  heightMobile,
-  className,
-}: VideoBiteCardSkeletonProps) {
+function VideoBiteCardSkeleton({ aspect = '9:16', height, heightMobile, className }: VideoBiteCardSkeletonProps) {
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(aspect))];
   return (
     <div
@@ -255,7 +250,7 @@ export function VideoBiteCardSkeleton({
   );
 }
 
-export interface VideoBitesStripSkeletonProps {
+interface VideoBitesStripSkeletonProps {
   /** How many cards. Default `VIDEO_BITES_SKELETON_COUNT` (a full line); 0 draws nothing. */
   count?: number;
   /** The bites' aspect ratio ('9:16' by default). */
@@ -273,7 +268,7 @@ export interface VideoBitesStripSkeletonProps {
  * The strip while its bites are read: the same `CardsStrip` (its heading, track, gaps and edge bleed), with no
  * marquee, each card a `VideoBiteCardSkeleton`. `VideoBitesStrip` draws it in a loading scope.
  */
-export function VideoBitesStripSkeleton({
+function VideoBitesStripSkeleton({
   count = VIDEO_BITES_SKELETON_COUNT,
   aspect = '9:16',
   title = DEFAULT_VIDEO_BITES_TITLE,
