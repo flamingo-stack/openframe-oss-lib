@@ -28,16 +28,10 @@ impl DeregistrationService {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize agent configuration service")?;
 
-        // Same identity headers as the running agent; a missing machine ID must not block the uninstall.
+        // Same identity headers as the running agent.
         let machine_id = MachineIdService::new(directory_manager)
             .get_or_create()
-            .unwrap_or_else(|e| {
-                warn!(
-                    "Failed to read the machine ID, deregistering without it: {:#}",
-                    e
-                );
-                String::new()
-            });
+            .context("Failed to get or create machine ID")?;
         let http_client = build_agent_http_client(
             &machine_id,
             running_binary_sha256_or_warn().as_deref(),
