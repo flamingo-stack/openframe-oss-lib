@@ -164,9 +164,9 @@ public class OutboxPublisher {
         for (Object document : changed) {
             PublishedEvent event = eventOf(spec, document);
             long version = documents.versionOf(document);
-            OutboxEvent row = rowOf(spec, document).version(version).build();
-            Map<String, Object> payload = payloadOf(row, event);
-            row.setPayload(payload);
+            String tenantId = PublishedDocuments.tenantOf(document);
+            Map<String, Object> payload = payloadOf(tenantId, version, false, event);
+            OutboxEvent row = rowOf(spec, document).payload(payload).build();
             rows.add(row);
         }
         insertRows(rows);
@@ -177,24 +177,22 @@ public class OutboxPublisher {
         List<OutboxEvent> rows = new ArrayList<>();
         for (Object document : deleted) {
             long version = documents.versionOf(document) + 1;
-            OutboxEvent.OutboxEventBuilder deletedRow = rowOf(spec, document).version(version).deleted(true);
-            OutboxEvent deleteRow = deletedRow.build();
-            Map<String, Object> payload = payloadOf(deleteRow, null);
-            deleteRow.setPayload(payload);
-            OutboxEvent tombstoneRow = deletedRow.build();
+            String tenantId = PublishedDocuments.tenantOf(document);
+            Map<String, Object> payload = payloadOf(tenantId, version, true, null);
+            OutboxEvent deleteRow = rowOf(spec, document).payload(payload).build();
+            OutboxEvent tombstoneRow = rowOf(spec, document).build();
             rows.add(deleteRow);
             rows.add(tombstoneRow);
         }
         insertRows(rows);
     }
 
-    // Built from the row itself, so the envelope and the row's own fields cannot disagree.
-    private static Map<String, Object> payloadOf(OutboxEvent row, PublishedEvent event) {
+    private static Map<String, Object> payloadOf(String tenantId, long version, boolean deleted, PublishedEvent event) {
         PublishedRecord<PublishedEvent> envelope = PublishedRecord.builder()
-                .tenantId(row.getTenantId())
-                .version(row.getVersion())
-                .deleted(row.isDeleted())
-                .schemaVersion(row.getSchemaVersion())
+                .tenantId(tenantId)
+                .version(version)
+                .deleted(deleted)
+                .schemaVersion(PublishedRecord.CURRENT_SCHEMA_VERSION)
                 .event(event)
                 .build();
         return EVENT_MAPPER.convertValue(envelope, PAYLOAD_TYPE);
@@ -208,8 +206,8 @@ public class OutboxPublisher {
         mongoOperations.insert(rows, OutboxEvent.class);
         log.debug("Wrote {} outbox row(s) of {}", rows.size(), rows.getFirst().getAggregateType());
         for (OutboxEvent row : rows) {
-            log.trace("Outbox row: aggregateId={} tenantId={} version={} deleted={}",
-                    row.getAggregateId(), row.getTenantId(), row.getVersion(), row.isDeleted());
+            log.trace("Outbox row: aggregateId={} tenantId={} payload={}",
+                    row.getAggregateId(), row.getTenantId(), row.getPayload());
         }
     }
 
@@ -222,7 +220,6 @@ public class OutboxPublisher {
                 .aggregateType(aggregateType)
                 .aggregateId(id)
                 .tenantId(tenantId)
-                .schemaVersion(PublishedRecord.CURRENT_SCHEMA_VERSION)
                 .occurredAt(now);
     }
 

@@ -26,12 +26,6 @@ public class OutboxEvent implements TenantScoped {
     private String aggregateId;
     private String tenantId;
 
-    // The aggregate's @Version after the write: consumers drop an event older than what they already applied.
-    private Long version;
-
-    private boolean deleted;
-    private int schemaVersion;
-
     // Expires through the TTL index of OutboxIndexInitializer.
     private Instant occurredAt;
 
