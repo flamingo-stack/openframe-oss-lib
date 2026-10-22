@@ -1,6 +1,7 @@
 package com.openframe.debezium.recovery.gap;
 
 import com.openframe.debezium.dto.ConnectorOffsets;
+import com.openframe.debezium.util.ConnectorSpecs;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -20,6 +21,16 @@ public abstract class SourceDialect {
                                                          Instant gapFrom);
 
     protected abstract String offsetTimeKey();
+
+    protected abstract String partitionKey();
+
+    // Offsets are keyed by topic.prefix; carried under another prefix they are ignored and the version starts from now.
+    public boolean belongsTo(ConnectorOffsets offsets, Map<String, Object> config) {
+        String topicPrefix = ConnectorSpecs.stringOf(config, ConnectorSpecs.KEY_TOPIC_PREFIX);
+        List<Map<String, Object>> partitions = offsets.sourcePartitions();
+        return !partitions.isEmpty() && partitions.stream()
+                .allMatch(partition -> topicPrefix.equals(partition.get(partitionKey())));
+    }
 
     public boolean hasSourceTime(ConnectorOffsets offsets) {
         return offsets.sourceOffsets().stream()

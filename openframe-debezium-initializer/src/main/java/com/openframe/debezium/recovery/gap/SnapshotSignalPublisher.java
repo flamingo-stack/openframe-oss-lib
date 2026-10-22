@@ -4,18 +4,16 @@ import com.openframe.debezium.util.ConnectorSpecs;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.AlterConfigOp;
 import org.apache.kafka.clients.admin.ConfigEntry;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.clients.producer.KafkaProducer;
-import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.errors.TopicExistsException;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
@@ -26,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -42,6 +41,7 @@ public class SnapshotSignalPublisher {
 
     private final ObjectMapper objectMapper;
     private final GapRecoveryProperties properties;
+    private final SignalKafkaClients kafkaClients;
 
     public boolean hasSignalChannel(Map<String, Object> config) {
         List<String> channels = ConnectorSpecs.listOf(config, ConnectorSpecs.KEY_SIGNAL_CHANNELS);
@@ -57,9 +57,18 @@ public class SnapshotSignalPublisher {
         IncrementalSnapshotSignal snapshotSignal = new IncrementalSnapshotSignal(conditions);
         String signal = snapshotSignal.toJson(objectMapper);
         ProducerRecord<String, String> signalRecord = new ProducerRecord<>(topic, connectorLogicalName, signal);
-        ensureSignalTopic(bootstrapServers, topic);
+        prepareSignalTopic(bootstrapServers, topic);
         send(bootstrapServers, signalRecord);
         log.info("Incremental snapshot signal sent: topic='{}' key='{}' signal={}", topic, connectorLogicalName, signal);
+    }
+
+    // Best effort: the short retention only guards against replays, so a broker refusing it must not block the backfill.
+    private void prepareSignalTopic(String bootstrapServers, String topic) {
+        try {
+            ensureSignalTopic(bootstrapServers, topic);
+        } catch (RuntimeException e) {
+            log.warn("Could not prepare signal topic '{}', sending the signal anyway", topic, e);
+        }
     }
 
     // A version started without offsets reads the signal topic from the beginning, so a short retention keeps
@@ -69,8 +78,7 @@ public class SnapshotSignalPublisher {
         Map<String, String> topicConfig = Map.of(
                 TopicConfig.RETENTION_MS_CONFIG, retentionMs,
                 TopicConfig.SEGMENT_MS_CONFIG, retentionMs);
-        Map<String, Object> adminConfig = Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        try (Admin admin = Admin.create(adminConfig)) {
+        try (Admin admin = kafkaClients.admin(bootstrapServers)) {
             createTopic(admin, topic, topicConfig);
             enforceTopicConfig(admin, topic, topicConfig);
         }
@@ -111,7 +119,14 @@ public class SnapshotSignalPublisher {
         throw e;
     }
 
-    private static void await(KafkaFuture<Void> future, String action) {
+    private void send(String bootstrapServers, ProducerRecord<String, String> signalRecord) {
+        try (Producer<String, String> producer = kafkaClients.producer(bootstrapServers)) {
+            Future<RecordMetadata> sent = producer.send(signalRecord);
+            await(sent, "send snapshot signal to " + signalRecord.topic());
+        }
+    }
+
+    private static <T> void await(Future<T> future, String action) {
         try {
             future.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
@@ -119,22 +134,6 @@ public class SnapshotSignalPublisher {
             throw new IllegalStateException("Interrupted while trying to " + action, e);
         } catch (ExecutionException | TimeoutException e) {
             throw new IllegalStateException("Failed to " + action, e);
-        }
-    }
-
-    private static void send(String bootstrapServers, ProducerRecord<String, String> signalRecord) {
-        Map<String, Object> producerConfig = Map.of(
-                ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.ACKS_CONFIG, "all");
-        try (KafkaProducer<String, String> producer = new KafkaProducer<>(producerConfig)) {
-            producer.send(signalRecord).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while sending snapshot signal", e);
-        } catch (ExecutionException | TimeoutException e) {
-            throw new IllegalStateException("Failed to send snapshot signal", e);
         }
     }
 }
