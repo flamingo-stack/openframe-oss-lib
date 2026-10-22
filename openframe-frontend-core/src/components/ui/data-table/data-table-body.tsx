@@ -10,9 +10,9 @@ import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
+import { PlaceholderRows, ReservedEmptyState } from './data-table-reserved-rows';
 import { DataTableRow } from './data-table-row';
 import { ROW_STACK_CLASSES } from './data-table-row-classes';
-import { PlaceholderRows, ReservedEmptyState } from './data-table-reserved-rows';
 import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableBodyProps<T = unknown> {

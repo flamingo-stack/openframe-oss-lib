@@ -182,4 +182,4 @@ function StatusBadge({
   );
 }
 
-export { StatusBadge, StatusBadgeSkeleton, statusBadgeVariants };
+export { StatusBadge, statusBadgeVariants };

@@ -41,6 +41,11 @@ export interface TruncateTextProps {
    * trigger is `inline-block` so the inner truncation still measures.
    */
   as?: 'div' | 'span';
+  /**
+   * The text is read data still being read (a cell whose text is DERIVED from the read, so it is never empty): the
+   * text is its own bar. An empty text in a loading scope is one without it.
+   */
+  loading?: boolean;
 }
 
 const VARIANT_CLASS: Record<TruncateTextVariant, string> = {
@@ -86,11 +91,12 @@ export function TruncateText({
   mono = false,
   triggerClassName,
   as = 'div',
+  loading: loadingProp = false,
 }: TruncateTextProps) {
   const isMultiLine = lines > 1;
   const { ref, isTruncated } = useIsTruncated<HTMLSpanElement>(children, { multiline: isMultiLine });
-  // A text still being read (empty, in a loading scope) is its own bar, at its type step and line count.
-  const loading = useLoadingScope() && !children;
+  // A text still being read (empty in a loading scope, or `loading`) is its own bar, at its type step and line count.
+  const loading = (useLoadingScope() && !children) || loadingProp;
   if (loading)
     return <TextLineSkeleton type={variant} lines={lines} as={as} className={cn('w-3/4', triggerClassName)} />;
 

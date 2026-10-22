@@ -4,7 +4,7 @@ import { cn } from '../utils/cn';
 import { formatDateTimeYmd } from '../utils/format';
 import { LoadingRegion } from './loading/loading-region';
 import { TextLineSkeleton } from './loading/unified-skeleton';
-import { LogSeverityDot, LogSeverityDotSkeleton } from './log-severity-dot';
+import { LogSeverityDot } from './log-severity-dot';
 import { ToolIcon } from './tool-icon';
 import { LoadingItems } from './ui/loading-scope';
 
@@ -28,7 +28,7 @@ const LOGS_LIST_SKELETON_ROWS = 6;
 function LogCardSkeleton() {
   return (
     <div className={LOG_ROW_CLASS} aria-hidden data-loading-item>
-      <LogSeverityDotSkeleton size="md" />
+      <LogSeverityDot loading size="md" />
       <div className={LOG_ROW_TEXT_CLASS}>
         <TextLineSkeleton type="h6" className="w-3/4" />
         <div className={LOG_META_ROW_CLASS}>

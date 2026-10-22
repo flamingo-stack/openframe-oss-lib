@@ -226,11 +226,8 @@ function DataTableRowImpl<T>({
   const containerClassName = cn(
     DATA_TABLE_ROW_FRAME_CLASS,
     'text-inherit no-underline',
-    // A row fades in when it MOUNTS — so a loaded page eases in over the
-    // skeleton it replaces instead of snapping, and rows that were already on
-    // screen (keyed by id) do not replay it. Opacity only: nothing that moves
-    // or resizes the slot, which is the whole point of the fixed row height.
-    'duration-200 animate-in fade-in-0 motion-reduce:animate-none',
+    // No entrance fade: a loaded row replaces its loading row in place. A fade from transparent left the slot
+    // empty for a moment between the two (the loading row is gone at once), which read as loading twice.
     // A stated slot height goes HERE, on the card, with the cells flexing to
     // fill whatever the sub-row leaves. `border-box` sizing means the number a
     // caller writes is the number the row occupies, borders included.

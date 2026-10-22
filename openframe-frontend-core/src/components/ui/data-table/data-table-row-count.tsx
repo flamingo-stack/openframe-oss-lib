@@ -18,6 +18,8 @@ export interface DataTableRowCountProps {
   pluralize?: (count: number, itemName: string) => string;
   /** Hide when the count is zero. Default `true`. */
   hideWhenEmpty?: boolean;
+  /** The rows are still being read (a table holding placeholder rows): the number is a bar, as in a loading scope. */
+  loading?: boolean;
   className?: string;
 }
 
@@ -50,11 +52,12 @@ export function DataTableRowCount({
   totalCount,
   pluralize,
   hideWhenEmpty = true,
+  loading = false,
   className,
 }: DataTableRowCountProps) {
   const table = useDataTableContext();
   // While the page is read the count is not known: the number is a bar beside the item name.
-  const inScope = useLoadingScope();
+  const inScope = useLoadingScope() || loading;
   const count = totalCount ?? table.getRowModel().rows.length;
   if (inScope) {
     return <DataTableRowCountSkeleton label={pluralize?.(2, itemName) ?? `${itemName}s`} className={className} />;

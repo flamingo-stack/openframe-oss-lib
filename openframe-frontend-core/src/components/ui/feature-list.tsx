@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
 import { useLoadingScope } from './loading-scope';
-import { NumberedStep, NumberedStepSkeleton } from './numbered-step';
+import { NumberedStep } from './numbered-step';
 
 export interface FeatureListItemData {
   /** Shown in the boxed slot. Not used by the `numbered` variant. */
@@ -151,7 +151,7 @@ function FeatureListSkeleton({
       <ol className={`${NUMBERED_LIST_CLASS} ${className}`} aria-hidden>
         {rows.map(index => (
           <li key={index}>
-            <NumberedStepSkeleton number={index + 1} />
+            <NumberedStep loading number={index + 1} title="" />
           </li>
         ))}
       </ol>

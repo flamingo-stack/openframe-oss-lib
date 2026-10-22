@@ -26,7 +26,7 @@ import { LoadingRegion } from '../../loading/loading-region';
 import { PageShell, PageLayout } from '../../ui';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { RichMarkdownRenderer, RichMarkdownRendererSkeleton } from '../../ui/markdown';
+import { MarkdownEngine, RichMarkdownRenderer } from '../../ui/markdown';
 import { useLegalDocs, type LegalDocument } from './use-legal-docs';
 import { useLegalDocuments } from './use-legal-documents';
 
@@ -109,13 +109,13 @@ export function legalDocumentStampLabel(
 export const LEGAL_DOCUMENT_SKELETON_SECTIONS = 3;
 
 /**
- * A legal document's body while it is read: the rich renderer's own skeleton (`RichMarkdownRendererSkeleton`, the
+ * A legal document's body while it is read: the markdown engine's own loading form (`MarkdownEngine loading`, at the
  * `article` type the page renders with), opening with the document's own title row, then its first fold of sections.
  */
 function LegalDocumentSkeleton({ sections = LEGAL_DOCUMENT_SKELETON_SECTIONS }: { sections?: number }) {
   return (
     <LoadingRegion label="Loading the document" className="w-full">
-      <RichMarkdownRendererSkeleton title sections={sections} />
+      <MarkdownEngine loading content="" skeletonTitle skeletonSections={sections} textSize="article" />
     </LoadingRegion>
   );
 }

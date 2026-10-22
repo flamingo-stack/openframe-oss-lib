@@ -22,7 +22,8 @@ interface LoadedWhatIShippedCardProps {
 }
 
 /** The entry, or `loading` while the host reads it: the card then draws its own loading form (`EmployeeEntryCard`'s). */
-export type WhatIShippedCardProps = (LoadedWhatIShippedCardProps & { loading?: boolean }) | (Partial<LoadedWhatIShippedCardProps> & { loading: true });
+export type WhatIShippedCardProps =
+  (LoadedWhatIShippedCardProps & { loading?: boolean }) | (Partial<LoadedWhatIShippedCardProps> & { loading: true });
 
 /**
  * THE single "What I Shipped" card — a thin binding over `EmployeeEntryCard`
@@ -45,4 +46,3 @@ export function WhatIShippedCard(props: WhatIShippedCardProps) {
     />
   );
 }
-

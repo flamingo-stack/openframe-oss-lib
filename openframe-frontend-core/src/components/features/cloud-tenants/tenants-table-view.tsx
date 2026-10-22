@@ -5,7 +5,8 @@ import { cn } from '../../../utils/cn';
 import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { Button } from '../../ui/button';
-import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
+import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { TenantAccessCell } from './tenant-access-cell';
 import { TenantCell } from './tenant-cell';
 import { TenantCustomerCell } from './tenant-customer-cell';
@@ -15,6 +16,34 @@ import { TENANT_COLUMNS, type TenantsTableColumn } from './tenants-table-columns
 const getRowId = (row: TenantRow) => row.id;
 
 const columnMeta = ({ width, hideAt, align }: TenantsTableColumn) => ({ width, hideAt, align });
+
+/** A tenant still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
+const loadingTenant = (id: string): TenantRow => ({
+  id,
+  name: '',
+  provider: '',
+  customer: { name: '' },
+  accessState: '',
+});
+
+/** The row's open-in-new-tab button: static chrome, drawn real and inert while the row is read. */
+function OpenTenantButton({ href, name }: { href: string; name: string }) {
+  const loading = useLoadingScope();
+  return (
+    // The row itself is the details link; a nested `<a>` is invalid, so this opens the same href.
+    <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
+      <Button
+        onClick={loading ? undefined : openInNewTab(href)}
+        disabled={loading}
+        variant="outline"
+        size="icon"
+        leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
+        aria-label={`Open ${name} in new tab`}
+        className="bg-ods-card"
+      />
+    </div>
+  );
+}
 
 /**
  * Click handler that opens `href` in a new tab. The row is itself the details
@@ -92,17 +121,7 @@ export function TenantsTableView({
       {
         id: TENANT_COLUMNS.open.id,
         cell: ({ row }: { row: Row<TenantRow> }) => (
-          // The row itself is the details link; a nested `<a>` is invalid, so this opens the same href.
-          <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
-            <Button
-              onClick={openInNewTab(getHref(row.original))}
-              variant="outline"
-              size="icon"
-              leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
-              aria-label={`Open ${row.original.name} in new tab`}
-              className="bg-ods-card"
-            />
-          </div>
+          <OpenTenantButton href={getHref(row.original)} name={row.original.name} />
         ),
         enableSorting: false,
         meta: columnMeta(TENANT_COLUMNS.open),
@@ -111,7 +130,13 @@ export function TenantsTableView({
     [getHref, now],
   );
 
-  const table = useDataTable<TenantRow>({ data: rows, columns, getRowId, enableSorting: false });
+  // A page's loading scope: the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loading = useLoadingScope();
+  const loadingRows = useMemo(
+    () => (loading ? dataTableLoadingRows(skeletonRows, loadingTenant) : null),
+    [loading, skeletonRows],
+  );
+  const table = useDataTable<TenantRow>({ data: loadingRows ?? rows, columns, getRowId, enableSorting: false });
 
   return (
     // Dim, don't unmount, the stale rows while a deferred search refetches.
@@ -120,9 +145,10 @@ export function TenantsTableView({
         <DataTable.Header
           stickyHeader={stickyHeaderOffset !== undefined}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={<DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} />}
+          rightSlot={<DataTable.RowCount itemName="result" totalCount={totalCount ?? rows.length} loading={loading} />}
         />
         <DataTable.Body
+          loadingCells
           skeletonRows={skeletonRows}
           emptyState={{
             title: 'No tenants match',

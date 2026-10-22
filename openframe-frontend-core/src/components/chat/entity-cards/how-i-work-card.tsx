@@ -1,10 +1,6 @@
 import type React from 'react';
 import { formatDateUTC } from '../../../utils/format';
-import {
-  EmployeeEntryCard,
-  EmployeeEntryBadge,
-  type EmployeeEntryCardData,
-} from './employee-entry-card';
+import { EmployeeEntryCard, EmployeeEntryBadge, type EmployeeEntryCardData } from './employee-entry-card';
 
 /** Minimal row shape the card renders. Both the hub dashboard entry and the
  *  related-content hydrated row satisfy it structurally. */
@@ -29,7 +25,8 @@ interface LoadedHowIWorkCardProps {
 }
 
 /** The entry, or `loading` while the host reads it: the card then draws its own loading form (`EmployeeEntryCard`'s). */
-export type HowIWorkCardProps = (LoadedHowIWorkCardProps & { loading?: boolean }) | (Partial<LoadedHowIWorkCardProps> & { loading: true });
+export type HowIWorkCardProps =
+  (LoadedHowIWorkCardProps & { loading?: boolean }) | (Partial<LoadedHowIWorkCardProps> & { loading: true });
 
 /** `ops` is an initialism, so the generic capitalize would render it "Ops" —
  *  fine — but `session_date`-style multiword disciplines need the underscore
@@ -65,4 +62,3 @@ export function HowIWorkCard(props: HowIWorkCardProps) {
     />
   );
 }
-

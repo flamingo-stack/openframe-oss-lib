@@ -322,13 +322,7 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
  * the times column is a skeleton, and it is the same one the loaded picker
  * shows while a month loads, so there is no swap between the two.
  */
-function SlotPickerSkeleton({
-  monthOffset = 0,
-  layout = 'card',
-}: {
-  monthOffset?: number;
-  layout?: SlotPickerLayout;
-}) {
+function SlotPickerSkeleton({ monthOffset = 0, layout = 'card' }: { monthOffset?: number; layout?: SlotPickerLayout }) {
   const modal = layout === 'modal';
   return (
     <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>

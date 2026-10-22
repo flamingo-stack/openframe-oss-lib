@@ -12,16 +12,11 @@ export {
   EntityAuthorCard,
   EntityMetadataValueCell,
   EntityMetadataAuthorCell,
-  EntityMetadataAuthorCellSkeleton,
   EMPTY_AUTHOR_PLACEHOLDER,
   type EntityAuthorCardProps,
 } from './entity-author-card';
 export { BlogImagePlaceholder } from './blog-image-placeholder';
-export {
-  EntityPortraitCard,
-  type EntityPortraitCardProps,
-  type EntityPortraitPerson,
-} from './entity-portrait-card';
+export { EntityPortraitCard, type EntityPortraitCardProps, type EntityPortraitPerson } from './entity-portrait-card';
 export { useCoverImageFallback, hideOnError, type CoverImageFallback } from './use-cover-image-fallback';
 export { AdminContentCard } from './admin-content-card';
 export {
@@ -66,22 +61,11 @@ export {
 // Refactored pure-presentation cards
 export { BlogCard, type BlogCardProps } from './blog-card';
 export { CaseStudyCard, type CaseStudyCardProps } from './case-study-card';
-export {
-  CustomerInterviewCard,
-  type CustomerInterviewCardProps,
-} from './customer-interview-card';
+export { CustomerInterviewCard, type CustomerInterviewCardProps } from './customer-interview-card';
 export { InvestorUpdateCard, type InvestorUpdateCardProps } from './investor-update-card';
-export {
-  OnboardingGuideCard,
-  type OnboardingGuideCardProps,
-} from './onboarding-guide-card';
+export { OnboardingGuideCard, type OnboardingGuideCardProps } from './onboarding-guide-card';
 export { RoadmapCard, type RoadmapCardProps, type VoteType } from './roadmap-card';
-export {
-  DesignDocCard,
-  designDocMetaLine,
-  designDocPeople,
-  type DesignDocCardProps,
-} from './design-doc-card';
+export { DesignDocCard, designDocMetaLine, designDocPeople, type DesignDocCardProps } from './design-doc-card';
 export { RoadmapVoteButton, type RoadmapVoteButtonProps } from './roadmap-vote-button';
 export { TaskTypeIcon, type TaskTypeIconProps } from './task-type-icon';
 export {
@@ -89,21 +73,13 @@ export {
   type GitHubActivityCardProps,
   type GitHubActivityCardAnchorProps,
 } from './github-activity-card';
-export {
-  SlackMessageCard,
-  type SlackMessageCardProps,
-  type SlackMessageCardAnchorProps,
-} from './slack-message-card';
+export { SlackMessageCard, type SlackMessageCardProps, type SlackMessageCardAnchorProps } from './slack-message-card';
 export {
   HubspotTicketCard,
   type HubspotTicketCardProps,
   type HubspotTicketCardAnchorProps,
 } from './hubspot-ticket-card';
-export {
-  DataRoomDocCard,
-  type DataRoomDocCardProps,
-  type DataRoomDocCardAnchorProps,
-} from './data-room-doc-card';
+export { DataRoomDocCard, type DataRoomDocCardProps, type DataRoomDocCardAnchorProps } from './data-room-doc-card';
 export {
   PROGRAM_CARD_SKELETON_HOSTS,
   PROGRAM_CARD_SKELETON_MEDIA,

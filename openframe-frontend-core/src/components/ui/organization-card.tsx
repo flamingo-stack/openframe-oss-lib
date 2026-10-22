@@ -96,7 +96,6 @@ function OrganizationCardSkeleton({
   );
 }
 
-
 /** What the description box shows for an organization with no description. */
 const ORGANIZATION_CARD_EMPTY_MARK = '—';
 

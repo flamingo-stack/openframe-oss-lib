@@ -63,6 +63,8 @@ export function ExecutionStatusCell({ status }: { status: string | null | undefi
  * has it. `name` is a node so a host can draw its own empty mark.
  */
 export function ExecutionDeviceCell({ name, organization }: { name: ReactNode; organization?: string | null }) {
+  // While the row is read (a loading scope) the customer line is drawn too: its loading form is a bar.
+  const loading = useLoadingScope();
   return (
     <div className="flex min-w-0 flex-col justify-center gap-1">
       <div className="flex min-w-0 items-center gap-1">
@@ -70,9 +72,9 @@ export function ExecutionDeviceCell({ name, organization }: { name: ReactNode; o
         {/* So the name shrinks and ellipsizes next to the icon. */}
         <div className="min-w-0 flex-1">{typeof name === 'string' ? <TruncateText>{name}</TruncateText> : name}</div>
       </div>
-      {organization && (
+      {(organization || loading) && (
         <TruncateText variant="h6" tone="secondary">
-          {organization}
+          {organization ?? ''}
         </TruncateText>
       )}
     </div>
@@ -118,7 +120,9 @@ export function ExecutionInitiatorCell({
 
 /** The Result column: the first two lines of what the run printed, or the host's empty mark. */
 export function ExecutionResultCell({ result, empty = null }: { result?: string | null; empty?: ReactNode }) {
-  return result ? <TruncateText lines={2}>{result}</TruncateText> : <>{empty}</>;
+  // While the row is read (a loading scope) the output is two bars (`TruncateText`'s own loading form).
+  const loading = useLoadingScope();
+  return result || loading ? <TruncateText lines={2}>{result ?? ''}</TruncateText> : <>{empty}</>;
 }
 
 /**

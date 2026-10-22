@@ -53,7 +53,7 @@ export {
   ROW_SHELL_CLASSES,
   ROW_STACK_CLASSES,
 } from './data-table-row-classes';
-export { alignJustify, getHideClasses, multiSelectFilterFn } from './utils';
+export { alignJustify, dataTableLoadingRows, getHideClasses, multiSelectFilterFn } from './utils';
 
 export type { DataTableFilterOption, TailwindBreakpoint } from './types';
 export type { DataTableProps } from './data-table';

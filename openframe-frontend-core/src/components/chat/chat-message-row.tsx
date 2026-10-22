@@ -153,4 +153,3 @@ function ChatMessageRowLoading(markers: { [key: `data-${string}`]: unknown }) {
     </div>
   );
 }
-

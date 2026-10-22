@@ -21,11 +21,14 @@ export interface QuoteCard {
   href: string;
 }
 
-export interface QuoteCardTileProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
-  quote: QuoteCard;
+interface QuoteCardTileOptions extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   /** The strip's loop clone: it keeps the click but stays out of the a11y tree. */
   decorative?: boolean;
 }
+
+/** The quote, or `loading` while it is read: the card then draws its own loading form (also in a loading scope). */
+export type QuoteCardTileProps = QuoteCardTileOptions &
+  ({ quote: QuoteCard; loading?: boolean } | { quote?: undefined; loading: true });
 
 const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
 
@@ -34,7 +37,9 @@ const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
  * their logo, and the whole card opening the case study it comes from. The
  * strip draws one per quote; a page that shows a single story draws one alone.
  */
-export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteCardTileProps) {
+export function QuoteCardTile({ quote, decorative, className, loading, ...props }: QuoteCardTileProps) {
+  // ONE switch: while the quote is read (`loading`, or a loading scope) the card is its own loading form.
+  if (useLoadingScope() || loading || !quote) return <QuoteCardTileSkeleton className={className} />;
   return (
     <Card
       variant="panel"
@@ -86,7 +91,7 @@ function QuoteCardsStripSkeleton({ count, className }: { count: number; classNam
       autoScroll={false}
       items={Array.from({ length: count }, (_, index) => ({ key: `quote-${index}` }))}
       itemKey={item => item.key}
-      renderCard={(_item, ctx) => <QuoteCardTileSkeleton key={ctx.cardKey} className="shrink-0" />}
+      renderCard={(_item, ctx) => <QuoteCardTile key={ctx.cardKey} loading className="shrink-0" />}
     />
   );
 }

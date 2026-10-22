@@ -5,6 +5,7 @@ import Link from '../../embed-shims/next-link';
 import type { NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { NavigationItemBadge } from './navigation-item-badge';
 import { UnreadDot } from './unread-dot';
 
@@ -13,7 +14,7 @@ interface IconProps {
   className?: string;
 }
 
-export interface NavigationSidebarItemButtonProps {
+interface LoadedNavigationSidebarItemButtonProps {
   item: NavigationSidebarItem;
   /** "You are on this page" — pathname-derived, and the only thing that carries `aria-current`. */
   isActive: boolean;
@@ -29,6 +30,14 @@ export interface NavigationSidebarItemButtonProps {
 }
 
 /**
+ * The entry and its handlers, or `loading` while the navigation is read (`NavigationSidebarConfig.loading`): the
+ * row then draws its own loading form (also in a loading scope). `showLabel` is the sidebar's minimized state.
+ */
+export type NavigationSidebarItemButtonProps =
+  | (LoadedNavigationSidebarItemButtonProps & { loading?: boolean })
+  | (Partial<LoadedNavigationSidebarItemButtonProps> & { loading: true; showLabel: boolean });
+
+/**
  * One sidebar entry.
  *
  * Rendered as a real anchor whenever it has a `path` — which is what buys the
@@ -42,14 +51,22 @@ export interface NavigationSidebarItemButtonProps {
  * destination to link to) and for the disabled state, which an anchor cannot
  * express.
  */
-export const NavigationSidebarItemButton = memo(function NavigationSidebarItemButtonImpl({
+export const NavigationSidebarItemButton = memo(function NavigationSidebarItemButtonSwitch(
+  props: NavigationSidebarItemButtonProps,
+) {
+  // ONE switch: while the navigation is read (`loading`, or a loading scope) the row is its own loading form.
+  if (useLoadingScope() || props.loading) return <NavigationSidebarItemSkeleton showLabel={props.showLabel} />;
+  return <LoadedNavigationSidebarItemButton {...props} />;
+});
+
+function LoadedNavigationSidebarItemButton({
   item,
   isActive,
   isPending,
   showLabel,
   disabled,
   onClick,
-}: NavigationSidebarItemButtonProps) {
+}: LoadedNavigationSidebarItemButtonProps) {
   const unreadCount = item.unreadCount ?? 0;
   const hasUnread = unreadCount > 0;
   // The accessible name carries the stamp — "Devices (Beta)" — because `aria-label`
@@ -149,10 +166,10 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
       {content}
     </Link>
   );
-});
+}
 
 /**
- * One placeholder entry, for `NavigationSidebarConfig.loading`.
+ * One entry's loading form (`NavigationSidebarItemButton loading`, for `NavigationSidebarConfig.loading`).
  *
  * Deliberately in this file, beside `NavigationSidebarItemButton`: the two must
  * agree on `h-14`, the `p-[var(--spacing-system-m)]` inset, the 24px icon box and
@@ -161,7 +178,7 @@ export const NavigationSidebarItemButton = memo(function NavigationSidebarItemBu
  * `showLabel` is the sidebar's own minimized state, so the caller passes what it
  * already passes the real row — no separate width handling.
  */
-export function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolean }) {
+function NavigationSidebarItemSkeleton({ showLabel }: { showLabel: boolean }) {
   return (
     <div className="flex h-14 w-full items-center justify-start p-[var(--spacing-system-m)]" aria-hidden="true">
       <div className="relative flex flex-shrink-0 items-center justify-center">

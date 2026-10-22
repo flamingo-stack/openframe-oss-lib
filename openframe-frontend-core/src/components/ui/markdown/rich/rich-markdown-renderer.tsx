@@ -209,29 +209,3 @@ type InnerProps = Omit<RichMarkdownRendererProps, keyof RichMarkdownRuntime> &
 
 /** Memoized — see the engine's memo rationale. */
 export const RichMarkdownRenderer = memo(RichMarkdownRendererImpl);
-
-/**
- * A RichMarkdownRenderer while its content is read: the engine (`MarkdownEngine loading`) at the `article` type, `sections`
- * sections of a real `<h2>` holding a bar and its paragraphs (the renderer's own heading and paragraph classes).
- */
-export function RichMarkdownRendererSkeleton({
-  sections,
-  title,
-  className,
-}: {
-  sections?: number;
-  /** The body opens with its own `# ` title (`MarkdownEngineSkeleton`'s `title`). */
-  title?: boolean;
-  className?: string;
-}) {
-  return (
-    <MarkdownEngine
-      loading
-      content=""
-      skeletonSections={sections}
-      skeletonTitle={title}
-      textSize="article"
-      className={className}
-    />
-  );
-}

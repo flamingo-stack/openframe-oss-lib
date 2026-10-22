@@ -44,8 +44,7 @@ interface LoadedEmployeeEntryCardProps {
  * button bars, absent none).
  */
 export type EmployeeEntryCardProps =
-  | (LoadedEmployeeEntryCardProps & { loading?: boolean })
-  | (Partial<LoadedEmployeeEntryCardProps> & { loading: true });
+  (LoadedEmployeeEntryCardProps & { loading?: boolean }) | (Partial<LoadedEmployeeEntryCardProps> & { loading: true });
 
 /** Entry lifecycle → the standard badge colour scheme (the same ODS pairs every status badge uses). */
 const STATUS_BADGE_SCHEME: Record<string, NonNullable<StatusBadgeProps['colorScheme']>> = {
@@ -69,7 +68,15 @@ export function EmployeeEntryBadge({ children }: { children: string }) {
 /** ONE switch: in a loading scope (or `loading`) the card is the admin card's loading form, box for box. */
 export function EmployeeEntryCard(props: EmployeeEntryCardProps) {
   if (useLoadingScope() || props.loading) {
-    return <AdminContentCard loading title="" className={props.className} actions={props.actions || false} subtitleRow={false} />;
+    return (
+      <AdminContentCard
+        loading
+        title=""
+        className={props.className}
+        actions={props.actions || false}
+        subtitleRow={false}
+      />
+    );
   }
   return <LoadedEmployeeEntryCard {...props} />;
 }

@@ -40,7 +40,9 @@ describe('ConversationCard selection', () => {
 describe('ConversationCard loading form', () => {
   const speaker = { name: '', avatar: null };
   it('draws its own loading form, with or without its optional parts, and announces itself as loading', () => {
-    const { rerender } = render(<ConversationCard requester={speaker} request="" responder={speaker} outcome="" loading />);
+    const { rerender } = render(
+      <ConversationCard requester={speaker} request="" responder={speaker} outcome="" loading />,
+    );
     expect(screen.getByText('Loading a conversation')).toBeInTheDocument();
     rerender(
       <ConversationCard

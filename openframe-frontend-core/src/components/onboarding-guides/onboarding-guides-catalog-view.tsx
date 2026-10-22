@@ -31,10 +31,10 @@ import { resolveContentHref } from '../../utils/content-href';
 import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import { LoadingFallback } from '../loading/loading-fallback';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { DocSearchBar, useDocSearch } from '../shared/doc-search';
 import { LoadError } from '../ui/error-state';
 import { FilterPillRow } from '../ui/filter-pill-row';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 /** The catalog's layout, read by the loaded view and by its sections' skeleton, so the skeleton is the view's size. */

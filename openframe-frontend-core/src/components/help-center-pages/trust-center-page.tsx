@@ -60,7 +60,7 @@ import { DataAttribution } from '../ui/data-attribution';
 import { DownloadButton } from '../ui/download-button';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
-import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import { useLoadingScope } from '../ui/loading-scope';
 import { StatusIndicator } from '../ui/status-indicator';
 import {
   AiSection,

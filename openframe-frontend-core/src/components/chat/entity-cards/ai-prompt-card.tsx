@@ -1,11 +1,7 @@
 import type React from 'react';
 import { formatDateUTC } from '../../../utils/format';
 import { DepartmentBadge } from '../../ui/department-badge';
-import {
-  EmployeeEntryBadge,
-  EmployeeEntryCard,
-  type EmployeeEntryCardData,
-} from './employee-entry-card';
+import { EmployeeEntryBadge, EmployeeEntryCard, type EmployeeEntryCardData } from './employee-entry-card';
 
 /** Minimal row shape the card renders. Both the hub dashboard entry and the
  *  related-content hydrated row satisfy it structurally. */
@@ -31,7 +27,8 @@ interface LoadedAiPromptCardProps {
 }
 
 /** The entry, or `loading` while the host reads it: the card then draws its own loading form (`EmployeeEntryCard`'s). */
-export type AiPromptCardProps = (LoadedAiPromptCardProps & { loading?: boolean }) | (Partial<LoadedAiPromptCardProps> & { loading: true });
+export type AiPromptCardProps =
+  (LoadedAiPromptCardProps & { loading?: boolean }) | (Partial<LoadedAiPromptCardProps> & { loading: true });
 
 /**
  * THE single Squawkbox prompt card: a thin binding over `EmployeeEntryCard`
@@ -64,4 +61,3 @@ export function AiPromptCard(props: AiPromptCardProps) {
     />
   );
 }
-

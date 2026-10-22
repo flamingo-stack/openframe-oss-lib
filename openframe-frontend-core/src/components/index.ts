@@ -96,10 +96,7 @@ export * from './shared/legal-document';
 // Author byline card (end-of-article author description) — embeddable via
 // embed-shims + optional-runtime avatar proxying; hosts pass their own
 // fallbackBio copy (the hub uses defaultAuthorFallbackBio()).
-export {
-  ArticleAuthorByline,
-  type ArticleAuthorBylineProps,
-} from './shared/article-author-byline';
+export { ArticleAuthorByline, type ArticleAuthorBylineProps } from './shared/article-author-byline';
 
 // Read-only media gallery strip (horizontal scroll; images → lightbox, clips →
 // inline Video). Single source of truth for the detail-page media gallery —

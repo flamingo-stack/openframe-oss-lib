@@ -128,3 +128,12 @@ export function dataTablePageSize(table: {
   const size = table.options.state?.pagination?.pageSize ?? table.options.initialState?.pagination?.pageSize;
   return size && size > 0 ? size : undefined;
 }
+
+/**
+ * One page of rows still being read: the placeholders a table holds while it loads, which `DataTable.Body`'s
+ * `loadingCells` draws with the REAL cells (every part of a cell drawing its own loading form). Each row is `fill(id)`
+ * keyed `loading-<index>`: the fields a row requires, empty, so a cell reads nothing it could show.
+ */
+export function dataTableLoadingRows<T>(count: number, fill: (id: string) => T): T[] {
+  return Array.from({ length: count }, (_, index) => fill(`loading-${index}`));
+}

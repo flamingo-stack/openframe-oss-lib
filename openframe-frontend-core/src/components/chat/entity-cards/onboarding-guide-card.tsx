@@ -67,11 +67,14 @@ interface LoadedOnboardingGuideCardProps {
 
 /**
  * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
- * does in a loading scope. 
+ * does in a loading scope.
  */
 export type OnboardingGuideCardProps =
   | (LoadedOnboardingGuideCardProps & { loading?: boolean })
-  | (Partial<LoadedOnboardingGuideCardProps> & { loading: true; /** `catalog`: the loading card draws its Published cell. Default true. */ published?: boolean });
+  | (Partial<LoadedOnboardingGuideCardProps> & {
+      loading: true;
+      /** `catalog`: the loading card draws its Published cell. Default true. */ published?: boolean;
+    });
 
 /** Markdown source → clean one-line preview prose. The guide cards preview
  *  `video_summary || content`, and `content` is raw markdown — without this,

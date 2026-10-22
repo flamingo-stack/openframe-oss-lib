@@ -1,12 +1,15 @@
 /* A product screen's frame before it is measured (the server's HTML, until hydration).
  *
  * Measured, the frame lays the screen out at its design width and scales it to the frame
- * (`ProductScreenFrame`). Before that, these rules do the same in CSS, so the loading form a first
- * paint shows is the loaded screen's own layout and never the narrow one. The frame is a named
- * inline-size container; the design width rides `--product-screen-design-width`. From the content
- * `md` step (720px, `PRODUCT_SCREEN_SCALE_FROM`) the screen is scaled; `data-scale-always` scales
- * at every width (a compact screen with no narrow layout). Where `100cqw / <length>` is not
- * supported the scale is dropped and the design-width layout is clipped by the frame instead.
+ * (`ProductScreenFrame`) once the frame is at least `scaleFrom` wide; narrower, the screen takes its
+ * own narrow layout. Before that, these rules do the same in CSS from the frame's own numbers, so the
+ * loading form a first paint shows is the measured screen's own layout and size:
+ *   --product-screen-design-width  the design width (px)
+ *   --product-screen-scale-from    the frame width from which it is scaled (px; 0 = always)
+ * The frame is a named inline-size container. `--product-screen-on` is 1 when the frame is at least
+ * `scale-from` wide, else 0 (a step computed from the container width), and the width, height and
+ * scale follow it. Where `<length> / <length>` is not supported the declarations are dropped and the
+ * screen keeps its full-width unscaled layout until it is measured.
  */
 .product-screen-frame {
   container-type: inline-size;
@@ -14,24 +17,16 @@
 }
 
 .product-screen-pending {
+  --product-screen-on: clamp(0, calc((100cqw - var(--product-screen-scale-from) + 0.5px) / 1px), 1);
+  --product-screen-pending-scale: calc(
+    1 - var(--product-screen-on) + var(--product-screen-on) * min(1, calc(100cqw / var(--product-screen-design-width)))
+  );
   width: 100%;
   height: 100%;
   transform: translateZ(0);
-}
-
-@container product-screen-frame (min-width: 720px) {
-  .product-screen-pending {
-    --product-screen-pending-scale: min(1, calc(100cqw / var(--product-screen-design-width)));
-    width: max(var(--product-screen-design-width), 100cqw);
-    height: calc(100% / var(--product-screen-pending-scale));
-    transform: scale(var(--product-screen-pending-scale));
-    transform-origin: top left;
-  }
-}
-
-.product-screen-pending[data-scale-always] {
-  --product-screen-pending-scale: min(1, calc(100cqw / var(--product-screen-design-width)));
-  width: max(var(--product-screen-design-width), 100cqw);
+  width: calc(
+    var(--product-screen-on) * max(var(--product-screen-design-width), 100cqw) + (1 - var(--product-screen-on)) * 100cqw
+  );
   height: calc(100% / var(--product-screen-pending-scale));
   transform: scale(var(--product-screen-pending-scale));
   transform-origin: top left;

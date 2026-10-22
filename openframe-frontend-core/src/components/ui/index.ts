@@ -145,7 +145,6 @@ export * from './content-loader';
 // Table components
 export {
   Table,
-  TableCardSkeleton,
   TableCell,
   TableDescriptionCell,
   TableEmptyState,
@@ -157,7 +156,6 @@ export {
 export type {
   PagePagination,
   RowAction,
-  TableCardSkeletonProps,
   TableCellProps,
   TableColumn,
   TableDescriptionCellProps,
@@ -173,7 +171,6 @@ export {
   QueryReportTable,
   QueryReportTableHeader,
   QueryReportTableRow,
-  QueryReportTableSkeleton,
   deriveColumns,
   exportToCSV,
 } from './query-report-table';
@@ -182,12 +179,11 @@ export type {
   QueryReportTableProps,
   QueryReportTableHeaderProps,
   QueryReportTableRowProps,
-  QueryReportTableSkeletonProps,
   QueryResultRow,
 } from './query-report-table';
 
 // Pagination components
-export { CursorPagination, CursorPaginationSimple, CursorPaginationSkeleton } from './cursor-pagination';
+export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 
 // DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.

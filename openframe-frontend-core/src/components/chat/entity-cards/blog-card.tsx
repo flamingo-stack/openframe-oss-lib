@@ -75,11 +75,10 @@ interface LoadedBlogCardProps {
 
 /**
  * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
- * does in a loading scope. 
+ * does in a loading scope.
  */
 export type BlogCardProps =
-  | (LoadedBlogCardProps & { loading?: boolean })
-  | (Partial<LoadedBlogCardProps> & { loading: true });
+  (LoadedBlogCardProps & { loading?: boolean }) | (Partial<LoadedBlogCardProps> & { loading: true });
 
 // The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
 const BLOG_CARD_FRAME = 'flex h-full flex-col';

@@ -279,8 +279,7 @@ interface LoadedProgramCardProps<T extends BaseProgramItem> {
  * always show); with no config it draws neither.
  */
 export type ProgramCardProps<T extends BaseProgramItem> =
-  | (LoadedProgramCardProps<T> & { loading?: boolean })
-  | (Partial<LoadedProgramCardProps<T>> & { loading: true });
+  (LoadedProgramCardProps<T> & { loading?: boolean }) | (Partial<LoadedProgramCardProps<T>> & { loading: true });
 
 /** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
 export function ProgramCard<T extends BaseProgramItem>(props: ProgramCardProps<T>) {

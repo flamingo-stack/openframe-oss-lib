@@ -232,12 +232,7 @@ interface VideoBiteCardSkeletonProps {
  * A bite card while it is read: the card's own frame and its media box as the skeleton's surface. The title and
  * the speaker sit in the hover overlay, unseen at rest, so they are not drawn.
  */
-function VideoBiteCardSkeleton({
-  aspect = '9:16',
-  height,
-  heightMobile,
-  className,
-}: VideoBiteCardSkeletonProps) {
+function VideoBiteCardSkeleton({ aspect = '9:16', height, heightMobile, className }: VideoBiteCardSkeletonProps) {
   const cssAspect = RATIO_TO_CSS_ASPECT[ratioToCategory(detectAspectRatio(aspect))];
   return (
     <div

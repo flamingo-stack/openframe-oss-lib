@@ -6,7 +6,7 @@ import { Input } from '../input';
 import { InputTrigger } from '../input-trigger';
 import { LoadingScope } from '../loading-scope';
 import { Select, SelectTrigger, SelectValue } from '../select';
-import { TAGS_INPUT_CLASS, TAGS_INPUT_ROW_CLASS, TagsInput, TagsInputSkeleton } from '../tags-input';
+import { TAGS_INPUT_CLASS, TAGS_INPUT_ROW_CLASS, TagsInput } from '../tags-input';
 import { TEXTAREA_BOX_CLASS, Textarea, textareaBoxHeight } from '../textarea';
 
 /** Every class a constant names, as a rendered markup's `class` tokens. */
@@ -42,9 +42,9 @@ describe('Textarea loading form', () => {
   });
 });
 
-describe('TagsInputSkeleton', () => {
+describe('TagsInput loading form', () => {
   it('draws the field’s layout with its label and an inert Add button for real', () => {
-    render(<TagsInputSkeleton label="Specialties" maxTags={10} />);
+    render(<TagsInput label="Specialties" maxTags={10} value={[]} onChange={() => {}} loading />);
     expect(screen.getByText('Specialties')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
     expect(screen.queryByRole('textbox')).toBeNull();
@@ -52,7 +52,7 @@ describe('TagsInputSkeleton', () => {
 
   it('shares the loaded field’s layout', () => {
     const loaded = renderToStaticMarkup(<TagsInput label="Specialties" value={[]} onChange={() => {}} />);
-    const loading = renderToStaticMarkup(<TagsInputSkeleton label="Specialties" />);
+    const loading = renderToStaticMarkup(<TagsInput label="Specialties" value={[]} onChange={() => {}} loading />);
     for (const markup of [loaded, loading]) {
       const tokens = classTokensOf(markup);
       for (const cls of `${TAGS_INPUT_CLASS} ${TAGS_INPUT_ROW_CLASS}`.split(' ')) expect(tokens).toContain(cls);
@@ -60,8 +60,10 @@ describe('TagsInputSkeleton', () => {
   });
 
   it('draws the count line only when the field has a limit', () => {
-    const withLimit = renderToStaticMarkup(<TagsInputSkeleton label="Tags" maxTags={10} />);
-    const without = renderToStaticMarkup(<TagsInputSkeleton label="Tags" />);
+    const withLimit = renderToStaticMarkup(
+      <TagsInput label="Tags" maxTags={10} value={[]} onChange={() => {}} loading />,
+    );
+    const without = renderToStaticMarkup(<TagsInput label="Tags" value={[]} onChange={() => {}} loading />);
     const bars = (markup: string) => markup.split('aria-hidden="true"').length - 1;
     expect(bars(withLimit)).toBeGreaterThan(bars(without));
   });

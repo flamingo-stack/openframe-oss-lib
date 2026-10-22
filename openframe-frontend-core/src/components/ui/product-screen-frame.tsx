@@ -98,7 +98,10 @@ export function ProductScreenFrame({
   // first paint shows is the loaded screen's own layout, never the narrow one.
   const pending = mode === 'pending';
   const screenStyle: CSSProperties = pending
-    ? ({ '--product-screen-design-width': `${designWidth}px` } as CSSProperties)
+    ? ({
+        '--product-screen-design-width': `${designWidth}px`,
+        '--product-screen-scale-from': `${scaleFrom}px`,
+      } as CSSProperties)
     : mode === 'scaled'
       ? {
           width: designWidth,
@@ -126,20 +129,16 @@ export function ProductScreenFrame({
             inert
             aria-hidden
             className={cn('ods-content-area', pending && 'product-screen-pending')}
-            data-scale-always={pending && scaleFrom === 0 ? '' : undefined}
             style={screenStyle}
           >
             <div className="ods-content-scope">
               {/* Until measured (the server's HTML, a page without scripts) the screen is its own loading state: every
                   component in it draws its skeleton, so the window shows the screen's shape instead of nothing, and
                   the unscaled real screen is never painted. */}
-              {mode === 'pending' ? (
-                <LoadingScope bare>
-                  <PagePicture>{children}</PagePicture>
-                </LoadingScope>
-              ) : (
+              {/* One tree whether measured or not: only the scope turns off, so nothing inside is mounted twice. */}
+              <LoadingScope bare active={pending}>
                 <PagePicture>{children}</PagePicture>
-              )}
+              </LoadingScope>
             </div>
             <div ref={setPortalHost} style={{ display: 'contents' }} />
           </div>

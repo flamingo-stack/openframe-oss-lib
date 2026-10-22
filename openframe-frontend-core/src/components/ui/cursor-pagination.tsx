@@ -151,27 +151,6 @@ export function CursorPagination({
   );
 }
 
-/**
- * The pager while its page is read: `<CursorPagination loading />` with no count (the same row, the count line as a bar,
- * the pager's own buttons drawn inert). Takes the pager's configuration; its cursors and counts are not known yet.
- * Kept for hosts that draw a pager's loading form apart from it; prefer rendering `CursorPagination` in the scope.
- */
-export function CursorPaginationSkeleton(
-  props: Pick<
-    CursorPaginationProps,
-    | 'hasPreviousPage'
-    | 'onPrevious'
-    | 'onReset'
-    | 'className'
-    | 'showInfo'
-    | 'compact'
-    | 'resetButtonLabel'
-    | 'resetButtonIcon'
-  >,
-) {
-  return <CursorPagination {...props} hasNextPage={false} loading />;
-}
-
 export function CursorPaginationSimple({
   hasNextPage,
   hasPreviousPage,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircleIcon, MonitorIcon, PlusCircleIcon, TrashIcon } from '../../../icons-v2-generated';
 import {
   Button,
@@ -16,7 +16,8 @@ import {
   TruncateText,
   useDataTable,
 } from '../../../ui';
-import { useLoadingScope } from '../../../ui/loading-scope';
+import { DATA_TABLE_SKELETON_ROWS } from '../../../ui/data-table/utils';
+import { InertWhileLoading, useLoadingScope } from '../../../ui/loading-scope';
 import { OSTypeBadge } from '../../os-type-badge';
 import { formatLastOnline } from '../device-last-online';
 import { getDeviceName } from '../device-name';
@@ -38,6 +39,8 @@ const DEFAULT_GET_DEVICE_KEY = (d: DeviceRow): string | undefined => d.machineId
 
 /** The CUSTOMER cell: the customer's image, name and primary contact. */
 function CustomerCell({ device }: { device: DeviceRow }) {
+  // While the device is read (a loading scope) the contact line is drawn too: its loading form is a bar.
+  const loading = useLoadingScope();
   const fullImageUrl = useDeviceImageUrl(device.organizationImageUrl, device.organizationImageHash);
   return (
     <div className="flex min-w-0 items-center gap-3">
@@ -48,14 +51,51 @@ function CustomerCell({ device }: { device: DeviceRow }) {
       />
       <div className="flex min-w-0 flex-col justify-center">
         <TruncateText>{device.organization || ''}</TruncateText>
-        {device.organizationEmail && (
+        {(device.organizationEmail || loading) && (
           <TruncateText variant="h6" tone="secondary">
-            {device.organizationEmail}
+            {device.organizationEmail ?? ''}
           </TruncateText>
         )}
       </div>
     </div>
   );
+}
+
+/** The DEVICE cell: its type, its name and when it was last online; bars while the device is read. */
+function DeviceCell({ device }: { device: DeviceRow }) {
+  const loading = useLoadingScope();
+  return (
+    <div className="flex h-20 items-center gap-3">
+      <DeviceTypeTile type={device.type} />
+      <div className="flex min-w-0 flex-col">
+        <TruncateText>{getDeviceName(device)}</TruncateText>
+        <TruncateText variant="h6" tone="secondary" loading={loading}>
+          {formatLastOnline(device.last_seen || device.lastSeen)}
+        </TruncateText>
+      </div>
+    </div>
+  );
+}
+
+/** The STATUS cell: the device's status as its tag; the tag's loading form while the device is read. */
+function StatusCell({ status }: { status: string | null | undefined }) {
+  if (useLoadingScope()) return <Tag loading label="" className="w-min" />;
+  const config = getDeviceStatusConfig(status);
+  return <Tag label={config.label} variant={config.variant} className="w-min" />;
+}
+
+/** The add / remove control: static chrome, drawn real and inert while the device is read. */
+function InertInScope({ children }: { children: ReactNode }) {
+  return (
+    <InertWhileLoading loading={useLoadingScope()} className="contents">
+      {children}
+    </InertWhileLoading>
+  );
+}
+
+/** A device still being read: a row the table keys, nothing a cell can show (every cell draws its loading form). */
+function loadingDevices<T extends DeviceRow>(count: number): T[] {
+  return Array.from({ length: count }, (_, index) => ({ id: `loading-${index}`, machineId: '', status: '' }) as T);
 }
 
 /**
@@ -475,21 +515,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         id: 'device',
         accessorKey: 'device',
         header: 'DEVICE',
-        cell: ({ row }: { row: Row<T> }) => {
-          const device = row.original;
-          const lastSeen = device.last_seen || device.lastSeen;
-          return (
-            <div className="flex h-20 items-center gap-3">
-              <DeviceTypeTile type={device.type} />
-              <div className="flex min-w-0 flex-col">
-                <TruncateText>{getDeviceName(device)}</TruncateText>
-                <TruncateText variant="h6" tone="secondary">
-                  {formatLastOnline(lastSeen)}
-                </TruncateText>
-              </div>
-            </div>
-          );
-        },
+        cell: ({ row }: { row: Row<T> }) => <DeviceCell device={row.original} />,
         enableSorting: false,
       },
       {
@@ -521,10 +547,7 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
         id: 'status',
         accessorKey: 'status',
         header: 'STATUS',
-        cell: ({ row }: { row: Row<T> }) => {
-          const config = getDeviceStatusConfig(row.original.status);
-          return <Tag label={config.label} variant={config.variant} className="w-min" />;
-        },
+        cell: ({ row }: { row: Row<T> }) => <StatusCell status={row.original.status} />,
         enableSorting: false,
         meta: {
           width: 'w-auto shrink-0 content-md:w-[160px]',
@@ -533,71 +556,75 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
       },
       {
         id: 'actions',
-        cell: ({ row }: { row: Row<T> }) => {
-          const device = row.original;
-          const disabledReason = isDeviceDisabled?.(device);
+        cell: ({ row }: { row: Row<T> }) => (
+          <InertInScope>
+            {((): ReactNode => {
+              const device = row.original;
+              const disabledReason = isDeviceDisabled?.(device);
 
-          if (disabledReason) {
-            return (
-              <div data-no-row-click className="pointer-events-auto flex w-full items-center justify-end gap-2">
-                <span className="whitespace-pre-line text-right text-ods-text-secondary text-h6 content-max-md:hidden">
-                  {disabledReason}
-                </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  leftIcon={<PlusCircleIcon size={24} />}
-                  className="shrink-0 text-ods-text-secondary"
-                  disabled
-                />
-              </div>
-            );
-          }
+              if (disabledReason) {
+                return (
+                  <div data-no-row-click className="pointer-events-auto flex w-full items-center justify-end gap-2">
+                    <span className="whitespace-pre-line text-right text-ods-text-secondary text-h6 content-max-md:hidden">
+                      {disabledReason}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      leftIcon={<PlusCircleIcon size={24} />}
+                      className="shrink-0 text-ods-text-secondary"
+                      disabled
+                    />
+                  </div>
+                );
+              }
 
-          const key = getDeviceKey(device);
-          if (key === undefined) return null;
-          // Server mode fills `selectedIds` from the connection's own
-          // per-row flag, so "already in?" is answered by the backend rather
-          // than by whichever page the client happens to hold.
-          const isSelected = selectedIds.has(key);
+              const key = getDeviceKey(device);
+              if (key === undefined) return null;
+              // Server mode fills `selectedIds` from the connection's own
+              // per-row flag, so "already in?" is answered by the backend rather
+              // than by whichever page the client happens to hold.
+              const isSelected = selectedIds.has(key);
 
-          if (activeSubTab === 'selected') {
-            return (
-              <div data-no-row-click className="pointer-events-auto flex w-full items-center justify-end">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => toggleDevice(device)}
-                  leftIcon={<TrashIcon size={24} />}
-                  className="text-ods-error hover:opacity-80"
-                  disabled={disabled}
-                />
-              </div>
-            );
-          }
+              if (activeSubTab === 'selected') {
+                return (
+                  <div data-no-row-click className="pointer-events-auto flex w-full items-center justify-end">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => toggleDevice(device)}
+                      leftIcon={<TrashIcon size={24} />}
+                      className="text-ods-error hover:opacity-80"
+                      disabled={disabled}
+                    />
+                  </div>
+                );
+              }
 
-          return (
-            <div data-no-row-click className="pointer-events-auto flex w-full items-center justify-end">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => toggleDevice(device)}
-                leftIcon={isSelected ? <CheckCircleIcon size={24} /> : <PlusCircleIcon size={24} />}
-                // Selected is a STATE, not an affordance: the yellow fill already
-                // says "this one is in", so it holds still under the cursor. The
-                // hover repeats on both bg and border because `variant="outline"`
-                // ships its own `hover:bg-ods-bg-hover` / `hover:border-ods-border-hover`
-                //, restating them at the same value is what neutralizes them.
-                className={
-                  isSelected
-                    ? 'border-ods-accent bg-ods-open-yellow-secondary text-ods-accent hover:border-ods-accent hover:bg-ods-open-yellow-secondary'
-                    : 'text-ods-text-secondary hover:text-ods-text-primary'
-                }
-                disabled={disabled}
-              />
-            </div>
-          );
-        },
+              return (
+                <div data-no-row-click className="pointer-events-auto flex w-full items-center justify-end">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => toggleDevice(device)}
+                    leftIcon={isSelected ? <CheckCircleIcon size={24} /> : <PlusCircleIcon size={24} />}
+                    // Selected is a STATE, not an affordance: the yellow fill already
+                    // says "this one is in", so it holds still under the cursor. The
+                    // hover repeats on both bg and border because `variant="outline"`
+                    // ships its own `hover:bg-ods-bg-hover` / `hover:border-ods-border-hover`
+                    //, restating them at the same value is what neutralizes them.
+                    className={
+                      isSelected
+                        ? 'border-ods-accent bg-ods-open-yellow-secondary text-ods-accent hover:border-ods-accent hover:bg-ods-open-yellow-secondary'
+                        : 'text-ods-text-secondary hover:text-ods-text-primary'
+                    }
+                    disabled={disabled}
+                  />
+                </div>
+              );
+            })()}
+          </InertInScope>
+        ),
         enableSorting: false,
         meta: { width: 'w-12 content-md:w-auto content-md:min-w-[130px] shrink-0 flex-none', align: 'right' },
       },
@@ -622,8 +649,13 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
     return columns.filter(c => !c.id || !hidden.has(c.id));
   }, [columns, hideColumns, isCriteria]);
 
+  // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loadingRows = useMemo(
+    () => (loading ? loadingDevices<T>(skeletonRows ?? DATA_TABLE_SKELETON_ROWS) : null),
+    [loading, skeletonRows],
+  );
   const table = useDataTable<T>({
-    data: devicesForTable,
+    data: loadingRows ?? devicesForTable,
     columns: visibleColumns,
     getRowId: row => String(getDeviceKey(row) ?? row.id),
     enableSorting: false,
@@ -708,12 +740,15 @@ export function DeviceSelector<T extends DeviceRow = DeviceRow>({
       {showHeader && (
         <DataTable.Header
           rightSlot={
-            bulkAction ?? <DataTable.RowCount itemName="device" totalCount={totalCount ?? server?.totalCount} />
+            bulkAction ?? (
+              <DataTable.RowCount itemName="device" totalCount={totalCount ?? server?.totalCount} loading={loading} />
+            )
           }
         />
       )}
       <DataTable.Body
         loading={loading}
+        loadingCells
         loadingRegion={loadingRegion}
         skeletonRows={skeletonRows}
         emptyMessage={

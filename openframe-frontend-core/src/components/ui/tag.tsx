@@ -208,7 +208,7 @@ export { Tag, tagVariants };
  * A tag while its label is read: one skeleton box of the tag's own frame and size (its height and padding), a fixed
  * width standing for the label. Its `data-*` props (the list's `data-loading-item`) are forwarded, like the tag's.
  */
-export function TagSkeleton({
+function TagSkeleton({
   size = 'default',
   className,
   ...props

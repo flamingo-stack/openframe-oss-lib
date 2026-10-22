@@ -208,12 +208,6 @@ export const CONFIGS = {
     rules: ALL_RULES,
     exempt: [
       {
-        why: 'the deprecated whole-view skeletons kept for hosts on older releases: frozen, drawn from the primitives, used nowhere in the lib (each is marked @deprecated, so a host that renders one fails DEPRECATED_SKELETON)',
-        files:
-          /(?:^|\/)(?:detail-page-skeleton|deprecated-layout-skeletons|margin-report-skeleton|category-vendor-selector-skeleton|settings-form-skeleton|msp-profile-form-skeleton)\.tsx$/,
-        rules: ALL_RULES.filter(rule => rule !== 'OPT_OUT'),
-      },
-      {
         why: "the lib's own loading primitives: the one pulse, the scope, the fallback and the Suspense wrapper are built here",
         files:
           /(?:^|\/)components\/(?:loading\/(?:loading-fallback|loading-region|unified-skeleton)|ui\/(?:loading-scope|skeleton[\w-]*|text-line-skeleton))\.tsx?$/,
@@ -265,7 +259,7 @@ const LOADERS = new Set([
 ]);
 /** The lib's skeleton parts: what a `*Skeleton` (or a component's own loading branch) is built from. */
 const PRIMITIVE =
-  /^(?:UnifiedSkeleton|TextLineSkeleton|TextHold|LayoutHold|BadgeSkeleton|StatusBadgeSkeleton|TagSkeleton|CursorPaginationSkeleton|TextareaSkeleton|TagsInputSkeleton|ProgressBarSkeleton|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
+  /^(?:UnifiedSkeleton|TextLineSkeleton|FieldValueSkeleton|TextHold|LayoutHold|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
 /** The lib's loading wrappers (not loading states of a component). */
 const LOADING_WRAPPER = /^(?:Loading(?:Items|When|Fallback|Suspense|Scope|Region)|InertWhileLoading)$/;
 const WHOLE_VIEW =

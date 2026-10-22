@@ -332,37 +332,3 @@ function CommentsBlockHeader({ title, open }: { title: string; open: boolean }) 
     </Button>
   );
 }
-
-/** Comment rows the loading block draws by default: none, the block is collapsed until it is read. */
-const COMMENTS_BLOCK_SKELETON_COMMENTS = 0;
-
-/**
- * The comments section while it is read: its real title, the summary as a bar, `count` comment rows (none: the
- * block is collapsed) and, with `composer`, the root composer's real static controls (inert).
- */
-export function CommentsBlockSkeleton({
-  title,
-  count = COMMENTS_BLOCK_SKELETON_COMMENTS,
-  composer = false,
-  leadWith,
-  showTitle,
-}: {
-  title: string;
-  count?: number;
-  composer?: boolean;
-  leadWith?: 'vendor' | 'commenter';
-  showTitle?: boolean;
-}) {
-  const open = count > 0 || composer;
-  return (
-    <div className={COMMENTS_BLOCK} aria-hidden>
-      <CommentsBlockHeader title={title} open={open} />
-      {count > 0 && <CommentThreadSkeleton count={count} leadWith={leadWith} showTitle={showTitle} />}
-      {composer && (
-        <div inert>
-          <CommentComposer onSubmit={() => false} />
-        </div>
-      )}
-    </div>
-  );
-}

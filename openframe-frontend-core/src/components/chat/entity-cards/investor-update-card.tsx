@@ -51,7 +51,7 @@ interface LoadedInvestorUpdateCardProps {
 
 /**
  * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
- * does in a loading scope. 
+ * does in a loading scope.
  */
 export type InvestorUpdateCardProps =
   | (LoadedInvestorUpdateCardProps & { loading?: boolean })

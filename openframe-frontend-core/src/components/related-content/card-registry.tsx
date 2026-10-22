@@ -63,10 +63,7 @@ import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card'
 import { buildProductReleaseCardProps } from '../chat/entity-cards/product-release-card-defaults';
 import { ProgramCard } from '../chat/entity-cards/program-card';
 import { RoadmapCard } from '../chat/entity-cards/roadmap-card';
-import {
-  WhatIShippedCard,
-  type WhatIShippedCardData,
-} from '../chat/entity-cards/what-i-shipped-card';
+import { WhatIShippedCard, type WhatIShippedCardData } from '../chat/entity-cards/what-i-shipped-card';
 import type { InvestorUpdate } from '../chat/types/entities/investor-update';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import type { BaseProgramItem, ProgramHost, ProgramMedia } from '../chat/types/entities/program-types';

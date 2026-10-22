@@ -29,10 +29,10 @@ import { contentFetch } from '../../../utils/embed-content-fetch';
 import { RoadmapCard } from '../../chat/entity-cards/roadmap-card';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 import { EmptyState } from '../../empty-state';
+import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { LoadingRegion } from '../../loading/loading-region';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 /**

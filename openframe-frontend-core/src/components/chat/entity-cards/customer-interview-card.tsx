@@ -53,7 +53,7 @@ interface LoadedCustomerInterviewCardProps {
 
 /**
  * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
- * does in a loading scope. 
+ * does in a loading scope.
  */
 export type CustomerInterviewCardProps =
   | (LoadedCustomerInterviewCardProps & { loading?: boolean })
@@ -126,7 +126,11 @@ function CustomerInterviewCardSkeleton({
 export function CustomerInterviewCard(props: CustomerInterviewCardProps) {
   if (useLoadingScope() || props.loading) {
     return (
-      <CustomerInterviewCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />
+      <CustomerInterviewCardSkeleton
+        size={props.size}
+        showTypeBadge={props.showTypeBadge}
+        className={props.className}
+      />
     );
   }
   return <LoadedCustomerInterviewCard {...props} />;

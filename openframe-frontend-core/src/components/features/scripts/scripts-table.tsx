@@ -1,7 +1,8 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo } from 'react';
-import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
+import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
+import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { TruncateText } from '../../ui/truncate-text';
@@ -42,6 +43,16 @@ export interface ScriptsTableProps {
 }
 
 const BADGE_ICON = 'h-4 w-4 content-md:h-6 content-md:w-6';
+
+/** A script still being read: a row the table keys, every field a cell shows empty (each cell draws its loading form). */
+const loadingScript = (id: string): ScriptTableRow => ({
+  id,
+  name: '',
+  shellType: '',
+  supportedPlatforms: [],
+  author: { name: '', initials: '' },
+  href: '',
+});
 
 /**
  * The script library as a table: name and description, shell, the operating
@@ -97,18 +108,23 @@ export function ScriptsTable({
     if (renderActions) {
       all.push(cell(SCRIPT_COLUMNS.actions, row => <RowActionsCell>{renderActions(row)}</RowActionsCell>));
     }
-    all.push(cell(SCRIPT_COLUMNS.open, row => (row.href ? <OpenInNewTabCell href={row.href} /> : null)));
+    all.push(cell(SCRIPT_COLUMNS.open, row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null)));
     return hideColumns ? all.filter(column => !hideColumns.includes(column.id ?? '')) : all;
   }, [hideColumns, renderActions]);
 
+  // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loadingRows = useMemo(
+    () => (loading ? dataTableLoadingRows(skeletonRows ?? DATA_TABLE_SKELETON_ROWS, loadingScript) : null),
+    [loading, skeletonRows],
+  );
   const table = useDataTable<ScriptTableRow>({
-    data: rows,
+    data: loadingRows ?? rows,
     columns,
     getRowId: (row: ScriptTableRow) => row.id,
     enableSorting: false,
   });
 
-  const rowHref = useCallback((row: ScriptTableRow) => row.href, []);
+  const rowHref = useCallback((row: ScriptTableRow) => row.href || undefined, []);
   const showHeader = loading || rows.length > 0;
 
   return (
@@ -118,6 +134,7 @@ export function ScriptsTable({
       )}
       <DataTable.Body
         loading={loading}
+        loadingCells
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         rowClassName="mb-1"

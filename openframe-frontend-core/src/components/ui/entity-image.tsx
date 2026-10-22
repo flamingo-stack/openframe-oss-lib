@@ -87,10 +87,7 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
 }
 
 /** An EntityImage while its record is read: a box of the image's own size and corner. */
-function EntityImageSkeleton({
-  sizeClassName,
-  className,
-}: Pick<EntityImageProps, 'sizeClassName' | 'className'>) {
+function EntityImageSkeleton({ sizeClassName, className }: Pick<EntityImageProps, 'sizeClassName' | 'className'>) {
   return (
     <UnifiedSkeleton
       className={cn('shrink-0', ENTITY_IMAGE_RADIUS_CLASS, sizeClassName ?? ENTITY_IMAGE_SIZE, className)}

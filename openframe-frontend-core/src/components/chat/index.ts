@@ -25,7 +25,7 @@ export * from './chat-message-enhanced';
 export * from './chat-message-list';
 export * from './chat-message-row';
 export * from './chat-turn';
-export * from './chat-message-skeleton';
+export { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from './chat-message-skeleton';
 
 export * from './quick-action-chip';
 export * from './ask-prompts';

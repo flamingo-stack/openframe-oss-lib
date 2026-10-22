@@ -35,7 +35,7 @@ import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleto
 import { DeletedUserAvatar } from '../../ui/deleted-user-avatar';
 import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
-import { Tag, TagSkeleton } from '../../ui/tag';
+import { Tag } from '../../ui/tag';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { BoardTicketApproval } from './board-ticket-approval';
 import { useBoardLift, useDropAim } from './drop-aim';
@@ -637,8 +637,8 @@ function TicketCardSkeleton({ className, ...props }: { className?: string; [key:
         </div>
       </div>
       <div className="flex h-8 items-start gap-[var(--spacing-system-xxs)]">
-        <TagSkeleton />
-        <TagSkeleton />
+        <Tag loading label="" />
+        <Tag loading label="" />
       </div>
       <TextLineSkeleton type="h6" className={cn(TICKET_CARD_META_CLASS, 'w-1/3')} />
     </div>

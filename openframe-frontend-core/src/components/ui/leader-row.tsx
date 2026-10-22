@@ -94,36 +94,3 @@ export function LeaderRow(props: LeaderRowProps) {
     </Row>
   );
 }
-
-/**
- * @deprecated Render `<LeaderRow loading … />` (or the row in a loading scope): the row draws its own loading form from
- * its one structure. This alias renders exactly that: the label real when the page states it (else a bar), the
- * hairline real, a bar for the value, a status box when `status`. Every bar is one line of the ROW's type step, so a
- * row sized with `className="text-h6"` keeps its height.
- */
-export function LeaderRowSkeleton({
-  status = false,
-  label,
-  labelTone = 'secondary',
-  as,
-  className,
-}: {
-  status?: boolean;
-  /** The row's label, when the page states it. */
-  label?: ReactNode;
-  labelTone?: LeaderRowLabelTone;
-  as?: 'div' | 'li';
-  className?: string;
-}) {
-  return (
-    <LeaderRow
-      loading
-      label={label}
-      value={null}
-      status={status || undefined}
-      labelTone={labelTone}
-      as={as}
-      className={className}
-    />
-  );
-}

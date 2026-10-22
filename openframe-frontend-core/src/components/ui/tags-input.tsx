@@ -8,8 +8,9 @@ import { Badge } from './badge';
 import { Button } from './button';
 import { Input } from './input';
 import { Label } from './label';
+import { useLoadingScope } from './loading-scope';
 
-/** The field's layout (label, the input with its Add button, the tags, the count), shared with `TagsInputSkeleton`. */
+/** The field's layout (label, the input with its Add button, the tags, the count), shared with its loading form. */
 export const TAGS_INPUT_CLASS = 'space-y-2';
 /** The input and its Add button on one line. */
 export const TAGS_INPUT_ROW_CLASS = 'flex items-center gap-2';
@@ -40,9 +41,19 @@ interface TagsInputProps {
   inputClassName?: string;
   badgeClassName?: string;
   label?: string;
+  /** The tags are still being read: the field draws its own loading form (also inside a loading scope). */
+  loading?: boolean;
 }
 
-export function TagsInput({
+/** A field of tags. ONE switch: while its tags are read (`loading`, or a loading scope) its own loading form. */
+export function TagsInput(props: TagsInputProps) {
+  if (useLoadingScope() || props.loading) {
+    return <TagsInputSkeleton label={props.label} maxTags={props.maxTags} className={props.className} />;
+  }
+  return <LoadedTagsInput {...props} />;
+}
+
+function LoadedTagsInput({
   value = [],
   onChange,
   placeholder = 'Add a tag...',
@@ -138,11 +149,7 @@ export function TagsInput({
  * A `TagsInput` while its tags are read, in the field's own layout: the label and the Add button for real (the button
  * inert), the input's box and the tag count as skeletons. The tags themselves depend on the record and are not drawn.
  */
-export function TagsInputSkeleton({
-  label,
-  maxTags,
-  className,
-}: Pick<TagsInputProps, 'label' | 'maxTags' | 'className'>) {
+function TagsInputSkeleton({ label, maxTags, className }: Pick<TagsInputProps, 'label' | 'maxTags' | 'className'>) {
   return (
     <div className={cn(TAGS_INPUT_CLASS, className)}>
       {label && <Label>{label}</Label>}

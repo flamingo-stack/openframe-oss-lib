@@ -203,7 +203,7 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
         <DataTable.Header
           stickyHeader={!!stickyHeaderOffset}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={<DataTable.RowCount itemName="device" totalCount={totalCount} />}
+          rightSlot={<DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />}
         />
       )}
       <DataTable.Body

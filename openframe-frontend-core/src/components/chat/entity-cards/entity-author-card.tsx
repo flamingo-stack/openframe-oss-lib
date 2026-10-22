@@ -163,13 +163,17 @@ export function EntityMetadataAuthorCell({
   roleLabel = 'Author',
   authorHref,
   className,
+  loading: loadingProp,
 }: {
-  author: NonNullable<EntityAuthorCardProps['author']>;
   roleLabel?: string;
   authorHref?: string;
   className?: string;
-}) {
-  const loading = useLoadingScope();
+} & (
+  | { author: NonNullable<EntityAuthorCardProps['author']>; loading?: boolean }
+  /** The author is still being read: the cell draws its own loading form (also in a loading scope). */
+  | { author?: undefined; loading: true }
+)) {
+  const loading = useLoadingScope() || loadingProp || !author;
   if (loading) return <EntityMetadataAuthorCellSkeleton className={className} />;
   // Trimmed real name gates the LINK — a placeholder/unknown label must
   // never render as a clickable author (an authorHref passed alongside an
@@ -204,7 +208,7 @@ export function EntityMetadataAuthorCell({
 }
 
 /** The author cell while it is read: the avatar's box and a bar for the name and the role (both read data). */
-export function EntityMetadataAuthorCellSkeleton({ className }: { className?: string }) {
+function EntityMetadataAuthorCellSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn(AUTHOR_CELL_CLASS, className)}>
       <UnifiedSkeleton variant="circular" className={cn('shrink-0', AVATAR_SIZE[AUTHOR_AVATAR_SIZE])} />
