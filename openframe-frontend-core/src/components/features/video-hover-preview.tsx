@@ -125,10 +125,6 @@ export function VideoHoverPreviewSurface({
   }, [gateControlled]);
   // Continuation forces the media + player on regardless of hover/viewport gate.
   const showMedia = continuation || (gateControlled ? playerMounted : isNear);
-  // The player mounts when the card comes near the screen, so a hover plays at once. Mounting it on the first hover
-  // made that hover wait for the player script and the stream (1.3 s measured on flamingo.run's bites strip). It loads
-  // long after the page's first paint, so it costs the page's largest paint nothing.
-  const showPlayer = showMedia;
 
   // Poster resolution — the shared entity-card cover fallback chain: the real
   // thumbnail, dropped on load error. Null → first-frame facade (unless the
@@ -163,45 +159,43 @@ export function VideoHoverPreviewSurface({
 
           {badge === 'play' && !active && !continuation && <VideoPlayBadge className="absolute inset-0 z-10 m-auto" />}
 
-          {showPlayer ? (
-            <div
-              className="absolute inset-0"
-              style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
-            >
-              <Video
-                // Remount between modes: `startTime` + autoplay are LOAD-TIME
-                // props (playback-core binds them to one-shot durationchange /
-                // loadstart handlers), so re-propping an already-loaded element
-                // silently drops the seek. Only a Mux preview rewrite changed
-                // `src` before, which is why HLS resumed and plain MP4 did not.
-                key={continuation ? 'continuation' : 'preview'}
-                kind="file"
-                // Rendition-capped in BOTH modes: the cap was only skipped
-                // because changing `src` used to be the sole trigger for the
-                // seek; the explicit key handles that now, and a 320px mini
-                // player should never pull the uncapped manifest.
-                url={previewUrl}
-                poster={posterUrl}
-                {...(continuation
-                  ? {
-                      startTime,
-                      autoPlay: autoPlay && startMuted,
-                      startMuted,
-                      autoPlayUnmuted: autoPlay && !startMuted,
-                    }
-                  : { playWhenHovered: active })}
-                chromeless
-                layout="fill"
-                fit={fit}
-                preload={preload}
-                mutedIntent={mutedIntent}
-                hideMutedBadge={hideMutedBadge}
-                onMutedFallbackChange={onMutedFallbackChange}
-                onEnded={onEnded}
-                playerHandleRef={previewHandleRef}
-              />
-            </div>
-          ) : null}
+          <div
+            className="absolute inset-0"
+            style={{ '--media-background-color': 'transparent' } as React.CSSProperties}
+          >
+            <Video
+              // Remount between modes: `startTime` + autoplay are LOAD-TIME
+              // props (playback-core binds them to one-shot durationchange /
+              // loadstart handlers), so re-propping an already-loaded element
+              // silently drops the seek. Only a Mux preview rewrite changed
+              // `src` before, which is why HLS resumed and plain MP4 did not.
+              key={continuation ? 'continuation' : 'preview'}
+              kind="file"
+              // Rendition-capped in BOTH modes: the cap was only skipped
+              // because changing `src` used to be the sole trigger for the
+              // seek; the explicit key handles that now, and a 320px mini
+              // player should never pull the uncapped manifest.
+              url={previewUrl}
+              poster={posterUrl}
+              {...(continuation
+                ? {
+                    startTime,
+                    autoPlay: autoPlay && startMuted,
+                    startMuted,
+                    autoPlayUnmuted: autoPlay && !startMuted,
+                  }
+                : { playWhenHovered: active })}
+              chromeless
+              layout="fill"
+              fit={fit}
+              preload={preload}
+              mutedIntent={mutedIntent}
+              hideMutedBadge={hideMutedBadge}
+              onMutedFallbackChange={onMutedFallbackChange}
+              onEnded={onEnded}
+              playerHandleRef={previewHandleRef}
+            />
+          </div>
         </>
       ) : (
         <div className="absolute inset-0 bg-ods-card" />
