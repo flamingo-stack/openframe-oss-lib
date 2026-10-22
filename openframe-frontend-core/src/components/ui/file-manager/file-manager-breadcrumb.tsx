@@ -3,6 +3,7 @@
 import { ChevronRight } from 'lucide-react';
 import React from 'react';
 import { cn } from '../../../utils/cn';
+import { Button } from '../button';
 import type { FileManagerBreadcrumbProps } from './types';
 
 export function FileManagerBreadcrumb({ items, onItemClick, className }: FileManagerBreadcrumbProps) {
@@ -11,16 +12,17 @@ export function FileManagerBreadcrumb({ items, onItemClick, className }: FileMan
       {items.map((item, index) => (
         <React.Fragment key={item.path}>
           {index > 0 && <ChevronRight className="h-4 w-4 flex-shrink-0 text-ods-text-tertiary" />}
-          <button
+          <Button
+            variant="link"
+            size="compact"
+            noPaddingX
+            type="button"
+            aria-current={index === items.length - 1 ? 'page' : undefined}
             onClick={() => onItemClick?.(item.path)}
-            className={cn(
-              'shrink-0 rounded px-1 py-0.5 transition-colors hover:bg-ods-bg-hover',
-              'break-all text-left text-ods-text-primary hover:text-ods-accent',
-              index === items.length - 1 && 'font-medium',
-            )}
+            className="shrink-0"
           >
             {item.label}
-          </button>
+          </Button>
         </React.Fragment>
       ))}
     </nav>

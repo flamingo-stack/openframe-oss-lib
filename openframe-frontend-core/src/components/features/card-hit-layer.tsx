@@ -25,6 +25,7 @@
 import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
 
 export interface CardHitLayerProps {
   /** Accessible name. The layer has no content, so this IS its label. */
@@ -72,12 +73,13 @@ export function CardHitLayer({
     );
   }
   return (
-    <button
+    <Button
+      variant="card"
       type="button"
       {...a11y}
       onClick={onClick}
       onPointerDown={onPointerDown}
-      className={cn(HIT_LAYER_BASE, className)}
+      className={cn('absolute inset-0 h-full', className)}
     />
   );
 }

@@ -5,7 +5,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { Copy02Icon } from '../icons-v2-generated/documents/copy-02-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { Button } from '../ui/button';
+import { Button, buttonVariants } from '../ui/button';
 import { FadePreview } from '../ui/fade-preview';
 import { useLoadingScope } from '../ui/loading-scope';
 
@@ -53,6 +53,9 @@ export interface CommandBoxProps {
   onCopy?: () => void;
   /** Accessible label for the corner copy button */
   copyAriaLabel?: string;
+  /** The command is still being read: the box draws its skeleton, as tall as the command, its action labels real. A
+   *  loading scope does the same. */
+  loading?: boolean;
 }
 
 /**
@@ -103,8 +106,7 @@ const COMMAND_BOX_CLASS = 'flex flex-col gap-2';
 const COMMAND_BOX_TITLE_CLASS = 'text-ods-text-primary text-h4';
 const COMMAND_BOX_FRAME_CLASS = 'rounded-[6px] border border-ods-border bg-ods-bg p-4';
 const COMMAND_BOX_COPY_ROW_CLASS = 'flex items-start gap-4';
-const COMMAND_BOX_COPY_BUTTON_CLASS =
-  'shrink-0 rounded-md text-ods-text-secondary transition-colors hover:text-ods-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus';
+const COMMAND_BOX_COPY_BUTTON_LAYOUT = 'shrink-0';
 const COMMAND_BOX_ACTIONS_CLASS = 'mt-4 flex flex-col gap-3 content-md:flex-row content-md:justify-end';
 const COMMAND_BOX_ACTION_CLASS = 'w-full content-md:w-auto';
 /** The fixed-height command area: N rows of the `text-code` line height token. Read by the box and its skeleton. */
@@ -122,10 +124,11 @@ export function CommandBox({
   visibleLines,
   onCopy,
   copyAriaLabel = 'Copy command',
+  loading,
 }: CommandBoxProps) {
   const fixedHeight = visibleLines !== undefined && visibleLines > 0;
   // While the page is read the command is not known: the box is drawn as its skeleton, as tall as the command.
-  if (useLoadingScope()) {
+  if (useLoadingScope() || loading) {
     return (
       <CommandBoxSkeleton
         title={title}
@@ -181,9 +184,16 @@ export function CommandBox({
         {onCopy ? (
           <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandText}
-            <button type="button" onClick={onCopy} aria-label={copyAriaLabel} className={COMMAND_BOX_COPY_BUTTON_CLASS}>
-              <Copy02Icon className="h-5 w-5" />
-            </button>
+            <Button
+              variant="transparent"
+              size="icon-sm"
+              type="button"
+              onClick={onCopy}
+              aria-label={copyAriaLabel}
+              className={COMMAND_BOX_COPY_BUTTON_LAYOUT}
+            >
+              <Copy02Icon />
+            </Button>
           </div>
         ) : (
           commandText
@@ -225,7 +235,7 @@ export function CommandBox({
  * The command box while its command is read: the same box, its title and action buttons for real (their labels are
  * the box's own words), and the command as a bar `lines` lines tall at the command's type step.
  */
-export function CommandBoxSkeleton({
+function CommandBoxSkeleton({
   title,
   lines = 2,
   visibleLines,
@@ -280,8 +290,13 @@ export function CommandBoxSkeleton({
         {showCopy ? (
           <div className={COMMAND_BOX_COPY_ROW_CLASS}>
             {commandLines}
-            <span className={COMMAND_BOX_COPY_BUTTON_CLASS}>
-              <Copy02Icon className="h-5 w-5" />
+            <span
+              className={cn(
+                buttonVariants({ variant: 'transparent', size: 'icon-sm' }),
+                COMMAND_BOX_COPY_BUTTON_LAYOUT,
+              )}
+            >
+              <Copy02Icon />
             </span>
           </div>
         ) : (

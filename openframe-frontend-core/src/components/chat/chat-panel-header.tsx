@@ -11,9 +11,9 @@ import {
 } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
+import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
-import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderSearchField } from './chat-header-search-field';
 import { ChatPanelHeaderMobile } from './chat-panel-header-mobile';
 
@@ -133,16 +133,16 @@ export function ChatPanelHeader({
           bar with full-height divider action cells. */}
       <div
         className={cn(
-          'h-14 w-full flex-shrink-0 overflow-hidden border-b border-ods-border bg-ods-card',
+          'h-14 w-full flex-shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border bg-ods-card',
           compact ? 'flex' : 'hidden md:flex',
         )}
       >
         {/* Back — a full-height leading cell (right divider), the same
-            `ChatHeaderIconButton` primitive as the trailing ⋯ / close cells. */}
+            ``Button variant="cell"`` primitive as the trailing ⋯ / close cells. */}
         {showBack && (
-          <ChatHeaderIconButton divider="right" onClick={onBack} aria-label={backAriaLabel}>
+          <Button variant="cell" className="w-14" onClick={onBack} aria-label={backAriaLabel}>
             <Chevron02LeftIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
         {searchInline ? (
           // Search open — the inline field takes over the title area in place
@@ -176,9 +176,9 @@ export function ChatPanelHeader({
 
         {/* Restore (refresh) — archived chat header (Figma node 7361:425441). */}
         {isArchivedView && onRestore && (
-          <ChatHeaderIconButton onClick={onRestore} aria-label="Unarchive chat">
+          <Button variant="cell" className="w-14" onClick={onRestore} aria-label="Unarchive chat">
             <Refresh01LeftIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
 
         {/* Rename / Archive menu — active (non-archived) conversation only. */}
@@ -188,9 +188,9 @@ export function ChatPanelHeader({
             onCloseAutoFocus={e => e.preventDefault()}
             groups={[{ items: menuItems }]}
             customTrigger={
-              <ChatHeaderIconButton aria-label="Chat actions">
+              <Button variant="cell" className="w-14" aria-label="Chat actions">
                 <Ellipsis01Icon size={24} />
-              </ChatHeaderIconButton>
+              </Button>
             }
           />
         )}
@@ -198,22 +198,28 @@ export function ChatPanelHeader({
         {/* Dialog search toggle — list view only, before the archive entry.
             Hidden while search is open (the inline field owns the magnifier). */}
         {!showBack && !searchInline && onToggleSearch && (
-          <ChatHeaderIconButton onClick={onToggleSearch} aria-label="Search chats" aria-pressed={searchActive}>
+          <Button
+            variant="cell"
+            className="w-14"
+            onClick={onToggleSearch}
+            aria-label="Search chats"
+            aria-pressed={searchActive}
+          >
             <SearchIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
 
         {/* Chat Archive entry (Figma node 7532:225034) — list view only. */}
         {!showBack && onOpenArchive && (
-          <ChatHeaderIconButton onClick={onOpenArchive} aria-label="Chat archive">
+          <Button variant="cell" className="w-14" onClick={onOpenArchive} aria-label="Chat archive">
             <ClockHistoryIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
 
         {onClose && (
-          <ChatHeaderIconButton onClick={onClose} aria-label="Close">
+          <Button variant="cell" className="w-14" onClick={onClose} aria-label="Close">
             <XmarkIcon size={24} />
-          </ChatHeaderIconButton>
+          </Button>
         )}
       </div>
     </>

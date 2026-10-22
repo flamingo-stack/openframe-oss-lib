@@ -1,11 +1,6 @@
 import type React from 'react';
 import { formatDateUTC } from '../../../utils/format';
-import {
-  EmployeeEntryCard,
-  EmployeeEntryCardSkeleton,
-  EmployeeEntryBadge,
-  type EmployeeEntryCardData,
-} from './employee-entry-card';
+import { EmployeeEntryCard, EmployeeEntryBadge, type EmployeeEntryCardData } from './employee-entry-card';
 
 /** Minimal row shape the card renders. Both the hub dashboard entry and the
  *  related-content hydrated row satisfy it structurally. */
@@ -16,7 +11,7 @@ export interface HowIWorkCardData extends EmployeeEntryCardData {
   discipline?: string | null;
 }
 
-export interface HowIWorkCardProps {
+interface LoadedHowIWorkCardProps {
   entry: HowIWorkCardData;
   /** OG fallback cover. Caller computes it (hub: `useOgPlaceholderUrl`; related
    *  rail: `extras.buildOgPlaceholderUrl`). */
@@ -28,6 +23,10 @@ export interface HowIWorkCardProps {
   anchorProps?: React.AnchorHTMLAttributes<HTMLAnchorElement>;
   className?: string;
 }
+
+/** The entry, or `loading` while the host reads it: the card then draws its own loading form (`EmployeeEntryCard`'s). */
+export type HowIWorkCardProps =
+  (LoadedHowIWorkCardProps & { loading?: boolean }) | (Partial<LoadedHowIWorkCardProps> & { loading: true });
 
 /** `ops` is an initialism, so the generic capitalize would render it "Ops" —
  *  fine — but `session_date`-style multiword disciplines need the underscore
@@ -43,7 +42,9 @@ function disciplineLabel(discipline: string): string {
  * related-content rail (with `anchorProps`), so the card cannot drift between
  * the two surfaces.
  */
-export function HowIWorkCard({ entry, placeholderUrl, actions, anchorProps, className }: HowIWorkCardProps) {
+export function HowIWorkCard(props: HowIWorkCardProps) {
+  if (props.loading) return <EmployeeEntryCard loading actions={props.actions} className={props.className} />;
+  const { entry, placeholderUrl, actions, anchorProps, className } = props;
   return (
     <EmployeeEntryCard
       entry={entry}
@@ -61,7 +62,3 @@ export function HowIWorkCard({ entry, placeholderUrl, actions, anchorProps, clas
     />
   );
 }
-
-/** Loading skeleton matching HowIWorkCard's shape. Shared with every other
- *  employee-entry card so the rail's placeholder never diverges from the card. */
-export const HowIWorkCardSkeleton = EmployeeEntryCardSkeleton;

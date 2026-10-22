@@ -8,6 +8,8 @@ import { personInitials } from '../../utils/format';
 import { Ellipsis01Icon } from '../icons-v2-generated';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup } from '../ui/actions-menu';
+import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { tagVariants, type TagProps } from '../ui/tag';
 
 // =============================================================================
@@ -39,9 +41,8 @@ export function MingoInfoCardActionProvider({
   return <MingoInfoCardActionContext.Provider value={action}>{children}</MingoInfoCardActionContext.Provider>;
 }
 
-/** The trailing cell's footprint and press feedback, shared by the "⋯" trigger and a host's action. */
-const TRAILING_BUTTON_CLASS =
-  'flex w-[56px] shrink-0 items-center justify-center self-stretch text-ods-text-secondary transition-colors hover:bg-ods-bg-hover hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent active:bg-ods-bg-active active:text-ods-text-primary md:w-[68px]';
+/** The trailing cell's footprint (a `cell` Button), shared by the "⋯" trigger and a host's action. */
+const TRAILING_CELL_LAYOUT = 'w-[56px] self-stretch md:w-[68px]';
 
 /** A coloured status pill rendered to the right of the title/description. */
 export interface MingoInfoCardStatus {
@@ -91,6 +92,11 @@ export interface MingoInfoCardProps {
    * affordances. The "⋯" button keeps its own independent click target.
    */
   onClick?: () => void;
+  /**
+   * Draws the card's loading form (its `MingoInfoCardSkeleton`): a card whose record is still being read. Inside a
+   * loading scope the card draws it too.
+   */
+  loading?: boolean;
   /** Appended to the root element. */
   className?: string;
 }
@@ -155,7 +161,7 @@ function CardMedia({ imageSrc, imageAlt, icon }: Pick<MingoInfoCardProps, 'image
 /** Loading placeholder matching `MingoInfoCard` geometry (40px media box,
  *  title + description lines, trailing pill slot). Span-only for the same
  *  inside-`<p>` validity reason as the card itself. */
-export function MingoInfoCardSkeleton({ className }: { className?: string }) {
+function MingoInfoCardSkeleton({ className }: { className?: string }) {
   return (
     <span
       className={cn(
@@ -184,10 +190,13 @@ export function MingoInfoCard({
   menuAriaLabel = 'More actions',
   anchorProps,
   onClick,
+  loading: loadingProp = false,
   className,
 }: MingoInfoCardProps) {
+  const loading = useLoadingScope() || loadingProp;
   const hasMedia = !!imageSrc || !!icon;
   const action = useContext(MingoInfoCardActionContext);
+  if (loading) return <MingoInfoCardSkeleton className={className} />;
   const hasMenu = !action && !!menuGroups && menuGroups.length > 0;
   const isAnchor = !!anchorProps;
   const isInteractive = isAnchor || !!onClick;
@@ -213,7 +222,6 @@ export function MingoInfoCard({
 
   const contentClass = cn(
     'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-s)] overflow-hidden p-[var(--spacing-system-s)] text-left',
-    (hasMenu || action) && 'border-r border-ods-border',
     isInteractive &&
       'cursor-pointer transition-colors hover:bg-ods-bg-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent active:bg-ods-bg-active',
   );
@@ -221,7 +229,7 @@ export function MingoInfoCard({
   return (
     <span
       className={cn(
-        'flex w-full items-center overflow-hidden rounded-md border border-ods-border bg-ods-card',
+        'flex w-full items-center divide-x divide-ods-border overflow-hidden rounded-md border border-ods-border bg-ods-card',
         className,
       )}
     >
@@ -230,17 +238,23 @@ export function MingoInfoCard({
           {content}
         </Link>
       ) : onClick ? (
-        <button type="button" onClick={onClick} className={contentClass}>
+        <Button variant="row" type="button" onClick={onClick} className="min-w-0 flex-1 self-stretch">
           {content}
-        </button>
+        </Button>
       ) : (
         <span className={contentClass}>{content}</span>
       )}
 
       {action && (
-        <button type="button" aria-label={action.label} onClick={action.onClick} className={TRAILING_BUTTON_CLASS}>
+        <Button
+          variant="cell"
+          type="button"
+          aria-label={action.label}
+          onClick={action.onClick}
+          className={TRAILING_CELL_LAYOUT}
+        >
           {action.icon}
-        </button>
+        </Button>
       )}
       {hasMenu && (
         <ActionsMenuDropdown
@@ -248,15 +262,9 @@ export function MingoInfoCard({
           triggerAriaLabel={menuAriaLabel}
           onCloseAutoFocus={e => e.preventDefault()}
           customTrigger={
-            <button
-              type="button"
-              aria-label={menuAriaLabel}
-              // Press feedback mirrors `Button` (transparent variant):
-              // `hover:bg-ods-bg-hover` → `active:bg-ods-bg-active`.
-              className={TRAILING_BUTTON_CLASS}
-            >
+            <Button variant="cell" type="button" aria-label={menuAriaLabel} className={TRAILING_CELL_LAYOUT}>
               <Ellipsis01Icon size={24} />
-            </button>
+            </Button>
           }
         />
       )}

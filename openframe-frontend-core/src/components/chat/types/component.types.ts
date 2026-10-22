@@ -260,7 +260,15 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   messages: Message[];
   dialogId?: string;
+  /** The thread is still loading: the list draws its own loading state. Inside a `LoadingScope` it does so whatever
+   *  this says. */
   isLoading?: boolean;
+  /** The reader's limit: how many messages the host reads for the thread, so the loading state draws exactly that
+   *  many rows. Default `CHAT_MESSAGE_LIST_SKELETON_MESSAGES` (a typical thread, for a host that reads with no limit). */
+  pageSize?: number;
+  /** The loading state top-anchors its rows and clips them, so a fixed-height host box reads as "the whole panel is
+   *  loading" and never grows a scrollbar. Default `false` (rows bottom-anchored like the loaded thread). */
+  fill?: boolean;
   isTyping?: boolean;
   /** The line shown beside the pending-turn loader: what the turn is doing right
    *  now ("Searching 28 sources"). Omitted, the loader cycles its generic phrases. */
@@ -670,6 +678,9 @@ export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'o
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  /** The model metadata is still loading: the row draws its own skeleton (with the "tokens used" tail when
+   *  `contextWindow` is known). Inside a `LoadingScope` it does so whatever this says. */
+  loading?: boolean;
   provider?: string;
   modelName?: string;
   displayName?: string;
@@ -753,6 +764,9 @@ export interface ChatSidebarProps extends HTMLAttributes<HTMLDivElement> {
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /** The host's page size: how many skeleton rows the first load (and the next page) draws. Default
+   *  `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
 }
 
 // ========== Dialog List Item Props ==========
@@ -761,4 +775,7 @@ export interface DialogListItemProps extends HTMLAttributes<HTMLDivElement> {
   dialog: DialogItem;
   isActive?: boolean;
   onDialogSelect?: (dialogId: string) => void;
+  /** The dialog is still being read: the row draws its skeleton (as it does in a loading scope), carrying the row's
+   *  `data-*` markers. */
+  loading?: boolean;
 }

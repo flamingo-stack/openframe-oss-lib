@@ -49,7 +49,7 @@ export function ResultsCount({ currentPage, pageSize, totalResults, resultType, 
  * The results count while the list is read: the same row and line, the words its own ("Showing", "of", the result
  * type, the sorting message) and the two numbers as bars.
  */
-export function ResultsCountSkeleton({
+function ResultsCountSkeleton({
   resultType,
   sortingMessage,
 }: Pick<ResultsCountProps, 'resultType' | 'sortingMessage'>) {

@@ -1,7 +1,7 @@
 'use client';
 
 import type { ElementType, HTMLAttributes, ReactNode } from 'react';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingStatus, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * THE container of a loading state: the one thing a screen reader hears while it loads.
@@ -51,11 +51,7 @@ export function LoadingRegion({
   // `announce` that flips at runtime does not remount the content (and drop its state and focus).
   return (
     <Tag aria-busy={announce ? 'true' : undefined} className={className} {...props}>
-      {announce && status && (
-        <span role="status" aria-live="polite" className="sr-only">
-          {label}
-        </span>
-      )}
+      {announce && status && <LoadingStatus label={label} />}
       {children}
     </Tag>
   );

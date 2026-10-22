@@ -197,7 +197,7 @@ const DEFAULT_ROW_CLASS = 'flex items-start gap-3';
  * A link preview while its page is scraped (or drawn in a loading scope): the `compact` (120px row) or `default`
  * (16:9 hero) card's frame, the media box, and bars for the title, description and source line.
  */
-export function OGLinkPreviewSkeleton({
+function OGLinkPreviewSkeleton({
   variant = 'default',
   image = true,
 }: {
@@ -274,7 +274,7 @@ const TILE_SOURCE_ROW_CLASS = 'flex min-w-0 items-center gap-1.5 text-h6';
 const TILE_HEADLINE_CLASS = 'text-h3';
 const TILE_EXCERPT_CLASS = 'text-h6';
 
-export function OGLinkTileSkeleton() {
+function OGLinkTileSkeleton() {
   return (
     <div className={TILE_FRAME_CLASS} aria-hidden>
       <div className={TILE_SOURCE_ROW_CLASS}>

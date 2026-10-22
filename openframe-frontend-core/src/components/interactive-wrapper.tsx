@@ -238,26 +238,6 @@ export const InteractivePresets = {
   )),
 
   /**
-   * Button-like interactive element
-   */
-  Button: forwardRef<HTMLButtonElement, Omit<InteractiveWrapperProps, 'interactive' | 'as'>>((props, ref) => (
-    <InteractiveWrapper
-      ref={ref}
-      as="button"
-      interactive={{
-        enableAnimations: true,
-        enableColorShifts: true,
-        enableAccessibilityEnhancements: true,
-        enableHapticFeedback: true,
-        animations: true,
-      }}
-      className={cn('rounded-md bg-ods-accent px-4 py-2 font-medium text-ods-text-on-accent', props.className)}
-      role="button"
-      {...props}
-    />
-  )),
-
-  /**
    * Navigation item with subtle interactions
    */
   NavItem: forwardRef<HTMLAnchorElement, Omit<InteractiveWrapperProps, 'interactive' | 'as'>>((props, ref) => (
@@ -338,7 +318,6 @@ export const InteractivePresets = {
 
 // Export individual preset components with display names
 InteractivePresets.Card.displayName = 'InteractiveCard';
-InteractivePresets.Button.displayName = 'InteractiveButton';
 InteractivePresets.NavItem.displayName = 'InteractiveNavItem';
 InteractivePresets.Input.displayName = 'InteractiveInput';
 InteractivePresets.Toggle.displayName = 'InteractiveToggle';

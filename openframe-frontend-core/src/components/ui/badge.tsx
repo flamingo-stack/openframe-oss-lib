@@ -5,6 +5,7 @@ import type { HTMLAttributes } from 'react';
 
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 const badgeVariants = cva(
   // Weight from the ODS token. Scale stays at 12px rather than the `text-h6`
@@ -27,9 +28,14 @@ const badgeVariants = cva(
   },
 );
 
-export interface BadgeProps extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+export interface BadgeProps extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {
+  /** The badge's text is still being read: it draws its loading form (also inside a loading scope). */
+  loading?: boolean;
+}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+/** A badge; while its text is read (`loading`, or a loading scope) its own loading form, the badge's box. */
+function Badge({ className, variant, loading, ...props }: BadgeProps) {
+  if (useLoadingScope() || loading) return <BadgeSkeleton className={className} />;
   return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
 }
 
@@ -47,4 +53,4 @@ function BadgeSkeleton({ className }: { className?: string }) {
   );
 }
 
-export { Badge, BadgeSkeleton, badgeVariants };
+export { Badge, badgeVariants };

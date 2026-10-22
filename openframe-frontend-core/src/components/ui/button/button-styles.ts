@@ -125,3 +125,82 @@ export const BUTTON_SIZE_CLASS = {
 } as const;
 
 export type ButtonSizeKey = keyof typeof BUTTON_SIZE_CLASS;
+
+const KIND_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus';
+const KIND_FOCUS_INSET =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus';
+
+/**
+ * The button KINDS that are not a plain push button: each owns its whole box and look, which no `size` changes, and
+ * is reused by every control of its kind. A kind's selected / open / invalid state is read from the element's own
+ * attributes, never from a class at the call site:
+ *
+ *  - `data-state="active"` (Radix's convention): the selected row, tab or chip;
+ *  - `data-state="open"` / `aria-expanded="true"`: the field whose popup is open;
+ *  - `data-invalid`: the field that failed validation (the marker every field exposes);
+ *  - `aria-pressed="true"`: the pressed chip.
+ *
+ * A call site's `className` on a kind is layout only (width, flex, position, margin).
+ */
+export const BUTTON_KIND_CLASS = {
+  // A control drawn as a form field (a date picker's, a searchable select's, a popup's trigger): Input's box, border
+  // and states, the value on the left.
+  field: [
+    'flex w-full items-center gap-[var(--spacing-system-xsf)] border px-[var(--spacing-system-sf)] text-left',
+    'h-11 rounded-[6px] md:h-12',
+    'border-ods-border bg-ods-card text-ods-text-primary text-h4 transition-colors duration-200',
+    'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
+    'data-[state=open]:border-ods-accent aria-expanded:border-ods-accent',
+    'data-[invalid]:border-ods-error enabled:data-[invalid]:hover:border-ods-error',
+    'disabled:cursor-not-allowed disabled:bg-ods-bg disabled:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
+    'outline-none focus-visible:border-ods-accent',
+    '[&_svg]:shrink-0',
+  ].join(' '),
+  // A clickable row of a list, a menu or a navigation: full width, its content on the left, the hover and the
+  // selected surface of the list.
+  row: [
+    'flex w-full items-center gap-[var(--spacing-system-s)] rounded-md px-[var(--spacing-system-m)] py-[var(--spacing-system-s)] text-left',
+    'bg-transparent text-ods-text-primary text-h4 transition-colors duration-150',
+    'hover:bg-ods-bg-hover active:bg-ods-bg-active data-[state=active]:bg-ods-bg-active',
+    'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:hover:bg-transparent',
+    KIND_FOCUS_INSET,
+    '[&_svg]:shrink-0',
+  ].join(' '),
+  // A tab of a tab strip or a tab list: secondary until it is the open one. A strip that marks its open and hovered
+  // tab with the accent fade (the admin strip) says so on each tab with `data-emphasis="fade"`. ODS colour vars hold
+  // hex values, so a Tailwind alpha modifier would produce no CSS; color-mix() derives the 10% stop from the token.
+  tab: [
+    'group relative flex shrink-0 items-center justify-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
+    'bg-transparent text-ods-text-secondary text-h4 transition-colors duration-200',
+    'hover:text-ods-text-primary data-[state=active]:text-ods-text-primary',
+    'data-[emphasis=fade]:data-[state=active]:bg-gradient-to-b data-[emphasis=fade]:data-[state=active]:from-transparent data-[emphasis=fade]:data-[state=active]:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
+    'data-[emphasis=fade]:hover:bg-gradient-to-b data-[emphasis=fade]:hover:from-transparent data-[emphasis=fade]:hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
+    'disabled:cursor-not-allowed disabled:text-ods-text-disabled',
+    KIND_FOCUS_INSET,
+    '[&_svg]:shrink-0',
+  ].join(' '),
+  // A choice drawn as a pill (a filter, a quick question, an answer option): bordered, the accent when picked.
+  chip: [
+    'inline-flex h-8 items-center gap-[var(--spacing-system-xxs)] rounded-full border px-[var(--spacing-system-sf)]',
+    'border-ods-border bg-ods-card text-ods-text-primary text-h6 transition-colors duration-200',
+    'hover:border-ods-border-hover hover:bg-ods-bg-hover',
+    'aria-pressed:border-ods-accent data-[state=active]:border-ods-accent',
+    'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:hover:bg-ods-card',
+    KIND_FOCUS,
+    '[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0',
+  ].join(' '),
+  // A whole card or tile that is one click target (a card's hit area, a media tile, a summary that expands): the
+  // content is the look; the button gives it the click, the keyboard and the focus ring.
+  card: ['relative block w-full rounded-md text-left text-ods-text-primary', KIND_FOCUS].join(' '),
+  // A cell of a bar (a header's or a chat's top bar): the bar's full height, an icon or a short label, secondary
+  // until hovered or pressed.
+  cell: [
+    'flex h-full shrink-0 items-center justify-center gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
+    'bg-transparent text-ods-text-secondary text-h4 transition-colors duration-200',
+    'hover:bg-ods-bg-hover hover:text-ods-text-primary aria-pressed:text-ods-accent aria-expanded:text-ods-text-primary data-[state=active]:text-ods-accent',
+    KIND_FOCUS_INSET,
+    '[&_svg]:h-6 [&_svg]:w-6 [&_svg]:shrink-0',
+  ].join(' '),
+} as const;
+
+export type ButtonKind = keyof typeof BUTTON_KIND_CLASS;

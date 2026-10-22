@@ -2,6 +2,7 @@
 
 import { cn } from '../../utils/cn';
 import { Download02Icon, FileIcon, TrashIcon } from '../icons-v2-generated';
+import { Button } from './button';
 import { SquareAvatar } from './square-avatar';
 
 export interface TicketAttachment {
@@ -65,24 +66,28 @@ export function TicketAttachmentsList({ attachments, className, size = 'default'
             {attachment.fileSize && <p className="text-ods-text-secondary text-h6">{attachment.fileSize}</p>}
           </div>
           {attachment.onDelete && (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               onClick={attachment.onDelete}
-              className="shrink-0 text-ods-text-secondary transition-colors hover:text-ods-error"
+              className="shrink-0"
               aria-label={`Delete ${attachment.fileName}`}
             >
-              <TrashIcon className={compact ? 'size-4' : 'size-5'} />
-            </button>
+              <TrashIcon />
+            </Button>
           )}
           {attachment.onDownload && (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               onClick={attachment.onDownload}
-              className="shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary"
+              className="shrink-0"
               aria-label={`Download ${attachment.fileName}`}
             >
-              <Download02Icon className={compact ? 'size-4' : 'size-6'} />
-            </button>
+              <Download02Icon />
+            </Button>
           )}
         </div>
       ))}
