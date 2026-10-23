@@ -460,7 +460,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public void updatePendingApproval(String ticketId, boolean pending) {
         Query query = new Query(Criteria.where(ID_FIELD).is(ticketId));
-        Update update = new Update().set(FIELD_HAS_PENDING_APPROVAL, pending);
+        // $inc by 0 keeps the version: the flag is derived on every save, so it must not make a concurrent save of the ticket conflict.
+        Update update = new Update().set(FIELD_HAS_PENDING_APPROVAL, pending).inc(FIELD_VERSION, 0);
         mongoTemplate.updateFirst(query, update, Ticket.class);
     }
 
