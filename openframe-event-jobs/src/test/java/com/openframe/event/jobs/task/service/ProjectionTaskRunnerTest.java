@@ -28,7 +28,6 @@ import static com.openframe.event.jobs.task.fixture.Widgets.record;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
@@ -58,7 +57,6 @@ class ProjectionTaskRunnerTest {
         properties.setPause(Duration.ZERO);
         when(projection.name()).thenReturn(PROJECTION);
         when(taskRepository.save(any(ProjectionTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(taskRepository.deleteByIdAndVersion(anyString(), any())).thenReturn(1L);
         AggregateSpecRegistry specRegistry = Widgets.registryWith(projection);
         envelopes = new ProjectionTaskEnvelopes(specRegistry);
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
@@ -70,7 +68,7 @@ class ProjectionTaskRunnerTest {
     }
 
     @Test
-    void theBatches_runInIdOrder_eachSaved_untilNoneIsLeft_thenTheTaskIsDeleted() {
+    void theBatches_runInIdOrder_eachSaved_untilNoneIsLeft_thenTheRunIsKeptDone() {
         // setup
         storedTask(task(PROJECTION));
         when(projection.applyBatch(any(), isNull(), eq(2))).thenReturn("w2");
@@ -83,8 +81,10 @@ class ProjectionTaskRunnerTest {
         // verifications
         ArgumentCaptor<ProjectionTask> saved = ArgumentCaptor.forClass(ProjectionTask.class);
         verify(taskRepository, atLeastOnce()).save(saved.capture());
-        assertThat(saved.getAllValues()).extracting(ProjectionTask::getLastId).containsExactly("w2", "w4");
-        verify(taskRepository).deleteByIdAndVersion(TASK_ID, 3L);
+        assertThat(saved.getAllValues()).extracting(ProjectionTask::getLastId).containsExactly("w2", "w4", "w4");
+        ProjectionTask done = saved.getValue();
+        assertThat(done.getStatus()).isEqualTo(EventJobStatus.DONE);
+        assertThat(done.isCurrent()).isFalse();
     }
 
     @Test

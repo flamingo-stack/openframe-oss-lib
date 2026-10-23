@@ -15,8 +15,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-// Saves the copies ProjectionTask makes; a save throws OptimisticLockingFailureException when another copy is newer.
+// Saves the copies ProjectionTask makes, one document per run; a save throws OptimisticLockingFailureException when
+// another copy is newer.
 @Slf4j
 @RequiredArgsConstructor
 public class ProjectionTaskService implements EventJobProgressStore<ProjectionTask> {
@@ -27,20 +29,22 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
     private final ProjectionTaskEnvelopes envelopes;
     private final Clock clock;
 
-    // A RUNNING or FAILED task: every event of its source goes to it, so an older value never lands after a newer one.
+    // A current run, RUNNING or FAILED: every event of its source goes to the tasks, so an older value never lands after a
+    // newer one.
     public boolean hasTask(String projection, String tenantId, String sourceId) {
-        String id = ProjectionTask.buildId(projection, tenantId, sourceId);
-        return taskRepository.existsById(id);
+        String key = ProjectionTask.buildKey(projection, tenantId, sourceId);
+        return taskRepository.existsByKeyAndCurrentTrue(key);
     }
 
-    // Opens the task, or starts it again with this newer event; a worker's save in between conflicts, so it tries again.
+    // Closes the source's current run, if any, and opens a new one with this event; a worker's save in between conflicts, so
+    // it tries again.
     public void submit(String projection, String type, String sourceId, PublishedRecord<?> record) {
         String tenantId = record.getTenantId();
         long eventVersion = record.getVersion();
         Map<String, Object> envelope = envelopes.toEnvelope(record);
-        Instant now = clock.instant();
-        ProjectionTask opened = ProjectionTask.open(projection, type, tenantId, sourceId, envelope, eventVersion, now);
         for (int attempt = 1; ; attempt++) {
+            Instant now = clock.instant();
+            ProjectionTask opened = ProjectionTask.open(projection, type, tenantId, sourceId, envelope, eventVersion, now);
             try {
                 saveSubmitted(opened);
                 return;
@@ -53,18 +57,18 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
         }
     }
 
-    // A task already there keeps its createdAt and its version, so the save checks it.
+    // The current run's save checks its version; the unique index on a current key stops a second current run.
     private void saveSubmitted(ProjectionTask opened) {
-        String id = opened.getId();
-        Map<String, Object> envelope = opened.getEnvelope();
-        long eventVersion = opened.getEventVersion();
+        String key = opened.getKey();
         Instant now = clock.instant();
-        ProjectionTask submitted = taskRepository.findById(id)
-                .map(existing -> existing.restartWith(envelope, eventVersion, now))
-                .orElse(opened);
-        taskRepository.save(submitted);
-        String change = submitted == opened ? "opened" : "started again";
-        log.info("Projection task {} {} with event version {}", id, change, eventVersion);
+        Optional<ProjectionTask> currentRun = taskRepository.findByKeyAndCurrentTrue(key);
+        if (currentRun.isPresent()) {
+            ProjectionTask closed = currentRun.get().close(now);
+            taskRepository.save(closed);
+            log.info("Projection task {} closed {} for a newer event", closed.getId(), closed.getStatus());
+        }
+        taskRepository.insert(opened);
+        log.info("Projection task {} opened with event version {}", opened.getId(), opened.getEventVersion());
     }
 
     // The task as saved now, or a gone one without status.
@@ -89,7 +93,7 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
         return taskRepository.save(failed);
     }
 
-    // FAILED stays in event_projection_tasks, for the alert and for the next event of the source, which starts it again.
+    // A FAILED run stays current, for the alert and for the next event of the source, which closes it and opens a new run.
     @Override
     public ProjectionTask finishRun(ProjectionTask task, EventJobStatus status) {
         Instant now = clock.instant();
@@ -97,18 +101,19 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
         return taskRepository.save(finished);
     }
 
-    // Deleted only if no newer event started it again meanwhile; then the next tick runs it with that event.
+    // Kept DONE; if a newer event closed the run meanwhile, its save conflicts and the next tick runs the newer run.
     public ProjectionTask finish(ProjectionTask task) {
         String id = task.getId();
-        Long version = task.getVersion();
-        long deleted = taskRepository.deleteByIdAndVersion(id, version);
-        if (deleted == 0) {
-            log.info("Projection task {} has a newer event: it runs again at the next tick", id);
-        } else {
-            log.info("Projection task {} done after {} batch(es), {}", id, task.getBatches(), task.getRunId());
-        }
         Instant now = clock.instant();
-        return task.finish(EventJobStatus.DONE, now);
+        ProjectionTask done = task.finish(EventJobStatus.DONE, now);
+        try {
+            ProjectionTask saved = taskRepository.save(done);
+            log.info("Projection task {} done after {} batch(es), {}", id, task.getBatches(), task.getRunId());
+            return saved;
+        } catch (OptimisticLockingFailureException newerEvent) {
+            log.info("Projection task {} was closed by a newer event: its new run starts at the next tick", id);
+            return done;
+        }
     }
 
     public long countRunning(String projection) {

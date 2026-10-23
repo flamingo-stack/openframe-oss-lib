@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.index.Index;
 public class EventJobRunIndexInitializer implements SmartLifecycle {
 
     // Runs are kept for good, as the jobs' history; this index finds a job's current run, its newest.
-    static final String NEWEST_RUN_INDEX = "event_job_runs_jobId_startedAt";
+    static final String NEWEST_RUN_PER_JOB = "event_job_runs_jobId_startedAt";
 
     private final MongoOperations mongoOperations;
     private volatile boolean running;
@@ -26,15 +26,15 @@ public class EventJobRunIndexInitializer implements SmartLifecycle {
 
     @Override
     public void start() {
-        Index newestRunIndex = new Index()
+        Index newestRunPerJob = new Index()
             .on(EventJob.Fields.jobId, Sort.Direction.ASC)
             .on(EventJob.Fields.startedAt, Sort.Direction.DESC)
-            .named(NEWEST_RUN_INDEX);
+            .named(NEWEST_RUN_PER_JOB);
 
         mongoOperations.indexOps(EventJob.class)
-            .createIndex(newestRunIndex);
+            .createIndex(newestRunPerJob);
 
-        log.debug("Ensured index {} on the job runs", NEWEST_RUN_INDEX);
+        log.debug("Ensured index {} on the job runs", NEWEST_RUN_PER_JOB);
         running = true;
     }
 

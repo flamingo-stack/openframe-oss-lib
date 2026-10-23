@@ -13,6 +13,7 @@ import com.openframe.event.jobs.reconciliation.config.ReconciliationConfiguratio
 import com.openframe.event.jobs.reconciliation.config.properties.ReconciliationProperties;
 import com.openframe.event.jobs.task.config.ProjectionTaskConfiguration;
 import com.openframe.event.jobs.task.config.properties.ProjectionTaskProperties;
+import com.openframe.event.jobs.task.persistence.ProjectionTaskIndexInitializer;
 import com.openframe.event.jobs.task.repository.ProjectionTaskRepository;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
@@ -31,8 +32,8 @@ import java.time.Clock;
 @ConditionalOnBooleanProperty(name = "openframe.events.enabled")
 @EnableMongoRepositories(basePackageClasses = {EventJobRepository.class, ProjectionTaskRepository.class})
 @EnableConfigurationProperties({EventBackfillProperties.class, ReconciliationProperties.class, ProjectionTaskProperties.class})
-@Import({EventJobRunIndexInitializer.class, BackfillConfiguration.class, ReconciliationConfiguration.class,
-        ProjectionTaskConfiguration.class})
+@Import({EventJobRunIndexInitializer.class, ProjectionTaskIndexInitializer.class, BackfillConfiguration.class,
+        ReconciliationConfiguration.class, ProjectionTaskConfiguration.class})
 public class EventJobsAutoConfiguration {
 
     // Ours, not a LockingTaskExecutor bean, so a service's own ShedLock setup stays as it is.

@@ -18,5 +18,7 @@ public interface ProjectionTaskRepository extends MongoRepository<ProjectionTask
 
     Optional<ProjectionTask> findFirstByProjectionAndStatusOrderByStartedAtAsc(String projection, EventJobStatus status);
 
-    long deleteByIdAndVersion(String id, Long version);
+    Optional<ProjectionTask> findByKeyAndCurrentTrue(String key);
+
+    boolean existsByKeyAndCurrentTrue(String key);
 }
