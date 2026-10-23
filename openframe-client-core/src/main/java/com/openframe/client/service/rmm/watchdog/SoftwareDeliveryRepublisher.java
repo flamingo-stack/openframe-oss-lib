@@ -29,7 +29,8 @@ public class SoftwareDeliveryRepublisher implements DeliveryRepublisher {
             ScriptMessage message = objectMapper.readValue(messageJson, ScriptMessage.class);
             softwareNatsPublisher.publishSoftware(machineId, message);
         } catch (Exception e) {
-            log.warn("Failed to re-publish software delivery machineId={}: {}", machineId, e.getMessage());
+            log.warn("Failed to re-publish software delivery machineId={}", machineId, e);
         }
     }
 }
+

@@ -16,6 +16,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Optional;
 
 @Service
@@ -41,7 +42,7 @@ public class IntegrationService {
                     .fragment(uri.getFragment())
                     .build()
                     .toUriString();
-            } catch (Exception e) {
+            } catch (URISyntaxException e) {
                 log.error("Failed to parse URL: {}", originalUrl, e);
                 return originalUrl;
             }
@@ -84,7 +85,7 @@ public class IntegrationService {
                     .retrieve()
                     .bodyToMono(String.class)
                     .doOnSuccess(response -> log.info("Successfully connected to {} integration at {}", tool.getName(), targetUrl))
-                    .doOnError(error -> log.error("Failed to connect to {} integration at {}: {}", tool.getName(), targetUrl, error.getMessage()));
+                    .doOnError(error -> log.error("Failed to connect to {} integration at {}", tool.getName(), targetUrl, error));
             });
     }
 } 

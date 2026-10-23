@@ -112,7 +112,7 @@ public class SsoIdentityService {
             log.warn("event=sso-identity-link-duplicate provider={} subject={} user={} — link already present (concurrent first login, or subject bound to another user)",
                     provider, subject.get(), user.getId());
         } catch (Exception e) {
-            log.warn("Failed to write sso identity link for user {}: {}", user.getId(), e.getMessage());
+            log.warn("Failed to write sso identity link for user {}", user.getId(), e);
         }
     }
 }
