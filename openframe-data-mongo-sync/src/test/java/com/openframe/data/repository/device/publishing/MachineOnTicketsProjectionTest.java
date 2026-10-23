@@ -68,6 +68,7 @@ class MachineOnTicketsProjectionTest {
 
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2", "t3");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-tenant-b", null);
     }
 
     @Test
@@ -101,6 +102,7 @@ class MachineOnTicketsProjectionTest {
 
     private static Machine buildMachine(String tenantId, String machineId, String hostname) {
         Machine machine = new Machine();
+        machine.setId("doc-" + tenantId);
         machine.setTenantId(tenantId);
         machine.setMachineId(machineId);
         machine.setHostname(hostname);

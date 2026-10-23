@@ -9,6 +9,7 @@ import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.config.EventsProperties;
 import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.registry.PublishedAggregates;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ class ReconciliationConfigurationTest {
             .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
             .withBean(AggregateSpecRegistry.class, ReconciliationConfigurationTest::specRegistry)
             .withBean(PublishedAggregateTopics.class, ReconciliationConfigurationTest::organizationsSwitchedOn)
+            .withBean(PublishedAggregates.class, () -> mock(PublishedAggregates.class))
             .withBean(EventJobService.class, () -> mock(EventJobService.class))
             .withBean(EventJobLock.class, () -> mock(EventJobLock.class))
             .withBean(EventJobTicker.class, () -> mock(EventJobTicker.class));

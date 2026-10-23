@@ -13,6 +13,7 @@ import com.openframe.event.jobs.reconciliation.service.ReconciliationService;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.registry.PublishedAggregates;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,8 +38,10 @@ public class ReconciliationConfiguration {
     @Bean
     public ReconciliationRunner reconciliationRunner(ReconciliationProperties properties, ProjectedItemRepository itemRepository,
                                                      EventJobService jobService, EventJobTicker<EventJob> ticker,
-                                                     ReconciliationMetrics metrics) {
-        return new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics);
+                                                     ReconciliationMetrics metrics, AggregateSpecRegistry specRegistry,
+                                                     PublishedAggregates publishedAggregates) {
+        return new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics, specRegistry,
+                publishedAggregates);
     }
 
     @Bean

@@ -57,6 +57,7 @@ class OrganizationOnTicketsProjectionTest {
 
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t1", "t2");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-org-1", null);
         assertThat(result.getMismatches()).extracting(Mismatch::getTenantId).containsOnly("tenant-a");
         assertThat(result.getMismatches().get(0).getReason()).contains("Old name").contains("New name");
         assertThat(result.getMismatches().get(1).getReason()).contains("org-gone").contains("gone");
@@ -162,7 +163,7 @@ class OrganizationOnTicketsProjectionTest {
     }
 
     private static Organization organization(String tenantId, String organizationId, String name) {
-        Organization organization = Organization.builder().organizationId(organizationId).name(name).build();
+        Organization organization = Organization.builder().id("doc-" + organizationId).organizationId(organizationId).name(name).build();
         organization.setTenantId(tenantId);
         return organization;
     }

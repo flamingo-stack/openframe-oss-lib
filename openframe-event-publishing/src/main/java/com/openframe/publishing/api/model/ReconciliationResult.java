@@ -25,6 +25,8 @@ public class ReconciliationResult {
         private final String tenantId;
         // The _id of the projected item that does not match, for example, the ticket's id.
         private final String projectedItemId;
+        // The _id of its source document, which reconciliation publishes again to repair it; null when the source is gone.
+        private final String sourceId;
         private final String reason;
     }
 }

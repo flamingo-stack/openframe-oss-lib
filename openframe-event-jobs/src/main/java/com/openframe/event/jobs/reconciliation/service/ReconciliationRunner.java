@@ -9,6 +9,8 @@ import com.openframe.event.jobs.reconciliation.repository.ProjectedItemRepositor
 import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
 import com.openframe.publishing.api.spec.Projection;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.registry.PublishedAggregates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,8 +18,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
-// Checks one tick of a run: projected items in _id batches, each batch reconciled by its projection and its count saved.
+// Checks one tick of a run: projected items in _id batches, each batch reconciled by its projection, its mismatches repaired
+// and its count saved.
 @Slf4j
 @RequiredArgsConstructor
 public class ReconciliationRunner {
@@ -27,6 +31,8 @@ public class ReconciliationRunner {
     private final EventJobService jobService;
     private final EventJobTicker<EventJob> ticker;
     private final ReconciliationMetrics metrics;
+    private final AggregateSpecRegistry specRegistry;
+    private final PublishedAggregates publishedAggregates;
 
     public void checkBatches(Projection<?, ?> projection, EventJob job) {
         String jobName = "Reconciliation of " + projection.name();
@@ -46,6 +52,7 @@ public class ReconciliationRunner {
         List<Mismatch> suspects = result.getMismatches();
         List<Mismatch> mismatches = confirm(projection, suspects);
         logMismatches(projection, mismatches);
+        republishSources(projection, mismatches);
 
         T lastItem = projectedItems.getLast();
         String batchLastId = itemRepository.idOf(lastItem);
@@ -68,6 +75,22 @@ public class ReconciliationRunner {
         List<T> current = itemRepository.findByIds(projectedClass, projectedViewClass, ids);
         ReconciliationResult confirmed = projection.reconcile(current);
         return confirmed.getMismatches();
+    }
+
+    // The repair: the sources' current state is published again, and the projection re-applies it, as the version store applies
+    // an equal version. A source that is gone has nothing to publish. The run still counts the mismatches it found.
+    private void republishSources(Projection<?, ?> projection, List<Mismatch> mismatches) {
+        List<String> sourceIds = mismatches.stream()
+                .map(Mismatch::getSourceId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (sourceIds.isEmpty()) {
+            return;
+        }
+        String type = specRegistry.resolveType(projection);
+        publishedAggregates.publishCurrent(type, sourceIds);
+        log.info("Reconciliation of {} published {} {} source(s) again to repair them", projection.name(), sourceIds.size(), type);
     }
 
     private void logMismatches(Projection<?, ?> projection, List<Mismatch> mismatches) {

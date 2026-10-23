@@ -68,6 +68,7 @@ class UserOnTicketsProjectionTest {
 
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2", "t3", "t4");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("user-1", "user-1", null);
         assertThat(result.getMismatches().get(2).getReason()).contains("user-gone").contains("gone");
     }
 
