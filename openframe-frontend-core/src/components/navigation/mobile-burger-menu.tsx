@@ -133,22 +133,15 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
     const isActive = item.isActive ?? false;
 
     return (
-      <button
+      <Button
+        variant="row"
         key={item.id}
         onClick={() => handleItemClick(item)}
         disabled={disabled}
-        className={cn(
-          'relative flex items-center gap-1 p-3',
-          'focus:outline-none focus-visible:outline-none',
-          'transition-colors duration-200',
-          'rounded-md border border-ods-border bg-ods-card',
-          !disabled && 'hover:bg-ods-bg-hover',
-          isGridItem ? 'w-full min-w-0' : 'w-full',
-          // Active state
-          isActive && !disabled && 'border-ods-accent',
-          // Disabled state
-          disabled && 'cursor-not-allowed opacity-50',
-        )}
+        data-state={isActive && !disabled ? 'active' : undefined}
+        // Every entry is a bordered card; the current page's takes the accent border.
+        data-tone="framed"
+        className={isGridItem ? 'min-w-0' : undefined}
         aria-current={isActive ? 'page' : undefined}
         // The same name the sidebar row announces — "Scripts (Beta)" — rather than
         // the content read raw, which Chrome hands over as "Scripts BETA".
@@ -177,7 +170,7 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
           </span>
           {item.badge && <NavigationItemBadge compact label={item.badge} />}
         </span>
-      </button>
+      </Button>
     );
   };
 
@@ -241,18 +234,10 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
 
   // Logout button — last in both forms of the menu.
   const logoutButton = onLogout && (
-    <button
-      onClick={onLogout}
-      disabled={disabled}
-      className={cn(
-        'flex w-full items-center gap-1 rounded-md border border-ods-border bg-ods-card p-3 transition-colors',
-        !disabled && 'hover:bg-ods-bg-hover',
-        disabled && 'cursor-not-allowed opacity-50',
-      )}
-    >
+    <Button variant="row" data-tone="framed" onClick={onLogout} disabled={disabled}>
       <Logout02Icon className="size-4 text-ods-error" />
       <span className="flex-1 text-left text-ods-text-primary text-h6">Log Out</span>
-    </button>
+    </Button>
   );
 
   if (grouped) {

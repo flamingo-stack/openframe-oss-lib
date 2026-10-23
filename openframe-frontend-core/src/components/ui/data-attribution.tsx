@@ -64,7 +64,7 @@ export function DataAttribution({ icon, source, lastUpdated, action }: DataAttri
  * words drawn for real, the source and the date bars of the line's height, so the line does not move when it
  * fills in. The source's mark is the one given (a brand glyph is static), else a box of its size.
  */
-export function DataAttributionSkeleton({ icon, action }: Pick<DataAttributionProps, 'icon' | 'action'> = {}) {
+function DataAttributionSkeleton({ icon, action }: Pick<DataAttributionProps, 'icon' | 'action'> = {}) {
   return (
     <div className={LINE_CLASS} aria-hidden="true">
       <div className={ITEM_CLASS}>

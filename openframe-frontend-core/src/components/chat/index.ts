@@ -2,9 +2,8 @@
 
 // Chat components exports
 import { createElement, forwardRef, lazy, Suspense, useEffect, useState } from 'react';
-import { afterPageLoad } from '../../utils/after-page-load';
 import type { EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
-import { ASK_AI_OPEN_EVENTS, holdAskAiOpens } from './utils/ask-ai-events';
+import { ASK_AI_OPEN_EVENTS, askAiOpenIsHeld, holdAskAiOpens, onAskAiIntent } from './utils/ask-ai-events';
 export * from './approval-request-message';
 export * from './approval-batch-message';
 export * from './escalation-offer-message';
@@ -26,7 +25,7 @@ export * from './chat-message-enhanced';
 export * from './chat-message-list';
 export * from './chat-message-row';
 export * from './chat-turn';
-export * from './chat-message-skeleton';
+export { CHAT_MESSAGE_LIST_SKELETON_MESSAGES } from './chat-message-skeleton';
 
 export * from './quick-action-chip';
 export * from './ask-prompts';
@@ -40,11 +39,9 @@ export * from './chat-typing-indicator';
 export * from './tool-execution-display';
 export * from './tool-call-blocks';
 export * from './mingo-onboarding-card';
-export * from './mingo-onboarding-card-skeleton';
 export * from './mingo-welcome';
 export * from './guide-welcome';
 export * from './msp-organization-card';
-export * from './msp-organization-card-skeleton';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
 export * from './mingo-archive-list';
@@ -54,7 +51,6 @@ export * from './mingo-chat-rail';
 export { MingoChatSearchModal, type MingoChatSearchModalProps } from './mingo-chat-history-section';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
-export * from './chat-header-icon-button';
 export * from './chat-header-search-field';
 export * from './chat-panel-header';
 export * from './chat-composer';
@@ -111,11 +107,12 @@ export * from './utils';
 
 // EmbeddableChat — THE chat. Hosts mount it once at the root after providing a
 // <ChatRuntimeContext.Provider>. Its module is loaded on its own (`lazy`), and
-// only once the page has loaded and the browser is idle (`afterPageLoad`), or at
-// once when something asks for it (an open event, `open` or `defaultOpen`): a
-// chat that starts closed must not download and run beside the page's first
-// paint, which is what slowed every page's LCP on phones. An open sent before it
-// has loaded is held and delivered (`ask-ai-events`).
+// only when the visitor shows they want it: a pointer, a touch or the focus on
+// an element that opens it (`onAskAiIntent`, `ASK_AI_TRIGGER_ATTRIBUTE`), or at
+// once when something asks for it (an open event, `open` or `defaultOpen`). A
+// chat that starts closed costs a page nothing: it used to load on every page
+// once the browser was idle, about 650 KB of script most visitors never opened.
+// An open sent before it has loaded is held and delivered (`ask-ai-events`).
 export type { ChatPrefillDraft, EmbeddableChatHandle, EmbeddableChatProps } from './embeddable-chat';
 const LoadedEmbeddableChat = lazy(() =>
   import('./embeddable-chat').then(module => ({ default: module.EmbeddableChat })),
@@ -127,8 +124,10 @@ export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatPro
   useEffect(() => {
     if (load) return undefined;
     const start = () => setLoadRequested(true);
+    // An open sent before this mounted (a deep link, an early click) is waiting: load now to deliver it.
+    if (askAiOpenIsHeld()) queueMicrotask(start);
     for (const name of ASK_AI_OPEN_EVENTS) window.addEventListener(name, start);
-    const cancel = afterPageLoad(start);
+    const cancel = onAskAiIntent(start);
     return () => {
       cancel();
       for (const name of ASK_AI_OPEN_EVENTS) window.removeEventListener(name, start);
@@ -139,6 +138,11 @@ export const EmbeddableChat = forwardRef<EmbeddableChatHandle, EmbeddableChatPro
 });
 EmbeddableChat.displayName = 'EmbeddableChat';
 export { MINGO_V2_RAIL_WIDTH, MINGO_V2_SPLIT_WIDTH } from './chat-dimensions';
-export { ASK_AI_OPEN_EVENT, ASK_AI_OPEN_EVENTS, ASK_AI_OPEN_WITH_REF_EVENT } from './utils/ask-ai-events';
+export {
+  ASK_AI_OPEN_EVENT,
+  ASK_AI_OPEN_EVENTS,
+  ASK_AI_OPEN_WITH_REF_EVENT,
+  ASK_AI_TRIGGER_ATTRIBUTE,
+} from './utils/ask-ai-events';
 export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';

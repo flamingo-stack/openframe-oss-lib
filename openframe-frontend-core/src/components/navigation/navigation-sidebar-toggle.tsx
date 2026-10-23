@@ -2,6 +2,7 @@
 
 import { cn } from '../../utils';
 import { Chevrons03LeftIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 
 export interface NavigationSidebarToggleProps {
   minimized: boolean;
@@ -28,18 +29,16 @@ export function NavigationSidebarToggle({
         compact && 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]',
       )}
     >
-      <button
+      <Button
+        variant="row"
         onClick={onToggle}
         className={cn(
-          'relative flex w-full items-center justify-start',
           // Compact: the tree's row geometry — inset, rounded, the chevron on the
           // rows' icon line in both widths — so the rail's cells are all one kind.
+          // Otherwise the sidebar's row height (its entries are `h-14` too).
           compact
-            ? 'h-11 overflow-hidden rounded-md pl-2.5 pr-0 transition-[padding,background-color] [transition-timing-function:cubic-bezier(0.2,0,0,1)] @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)] motion-reduce:transition-none'
-            : 'h-14 p-[var(--spacing-system-m)] transition-colors',
-          'duration-300',
-          '[&_svg]:transition-colors [&_svg]:duration-300',
-          'text-ods-text-primary hover:bg-ods-bg-hover',
+            ? 'h-11 gap-0 overflow-hidden pl-2.5 pr-0 transition-[padding,background-color] duration-300 [transition-timing-function:cubic-bezier(0.2,0,0,1)] @[140px]/of-nav-sidebar:px-[var(--spacing-system-xsf)] motion-reduce:transition-none'
+            : 'h-14',
         )}
         title={minimized ? 'Hide Menu' : undefined}
         aria-label={'Hide Menu'}
@@ -77,7 +76,7 @@ export function NavigationSidebarToggle({
         >
           Hide Menu
         </span>
-      </button>
+      </Button>
     </div>
   );
 }

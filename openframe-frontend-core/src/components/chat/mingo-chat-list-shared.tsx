@@ -89,8 +89,10 @@ export interface MingoChatListProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
-  /** The first page is still loading. */
+  /** The first page is still loading: the list draws one page of loading rows. */
   isLoadingHistory?: boolean;
+  /** The host's page size: how many rows the loading state draws. Default `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
   /** The list failed to load with nothing cached. */
   loadError?: boolean;
   onRetry?: () => void;

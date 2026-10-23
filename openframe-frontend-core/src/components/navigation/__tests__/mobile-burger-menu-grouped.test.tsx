@@ -115,7 +115,7 @@ describe('MobileBurgerMenu grouped', () => {
       />,
     );
     const nav = screen.getByRole('navigation', { name: 'Primary navigation' });
-    expect(within(nav).getByRole('button', { name: 'Devices' })).toHaveClass('rounded-md', 'border', 'bg-ods-card');
+    expect(within(nav).getByRole('button', { name: 'Devices' })).toHaveAttribute('data-tone', 'framed');
     expect(
       within(nav)
         .getAllByRole('button')

@@ -62,7 +62,7 @@ const INLINE_CLASS = 'flex items-center gap-1 text-ods-text-secondary';
  */
 const CHIP_NAME_TYPICAL_CH = '11ch';
 
-export interface ToolBadgeSkeletonProps {
+interface ToolBadgeSkeletonProps {
   variant?: 'inline' | 'chip';
   /** Whether the badge leads with its mark (default true). */
   icon?: boolean;
@@ -70,7 +70,7 @@ export interface ToolBadgeSkeletonProps {
 }
 
 /** A badge while its tool is read: the chip's own frame (or the inline row), a mark box and a bar for the name. */
-export function ToolBadgeSkeleton({ variant = 'inline', icon = true, className }: ToolBadgeSkeletonProps) {
+function ToolBadgeSkeleton({ variant = 'inline', icon = true, className }: ToolBadgeSkeletonProps) {
   if (variant === 'chip') {
     return (
       <span className={cn(CHIP_CLASS, className)} style={CHIP_STYLE} aria-hidden>

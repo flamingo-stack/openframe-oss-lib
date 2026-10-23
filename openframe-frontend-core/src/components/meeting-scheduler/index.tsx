@@ -59,7 +59,7 @@ import { formatDurationCompact, formatDateWithTimezone } from '../../utils/forma
 import { BackButton } from '../layout/back-button';
 import { LoadingRegion } from '../loading/loading-region';
 import { Alert, AlertDescription, Button } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { BookingForm, DEFAULT_SUBMIT_LABEL, type BookingFieldRow, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel } from './context-panel';
@@ -285,7 +285,7 @@ export const MEETING_SCHEDULER_H = 'content-md:h-[34.375rem] content-lg:h-[23.75
  * question the HubSpot link declares is on the page instead of scrolling inside
  * a card cut off mid-consent. What keeps that from jumping is the form's own
  * footprint discipline: the SSR seed renders the real form on first paint, and
- * the cold-start `BookingFormSkeleton` draws the same rows through the same grid.
+ * the cold-start `BookingForm` (its own loading form) draws the same rows through the same grid.
  *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
@@ -426,7 +426,6 @@ function isNativelyBookable(availability: MeetingAvailability): boolean {
 const MODAL_STACK_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
 const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
 const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
-const NOOP = () => undefined;
 const NOOP_SUBMIT = () => Promise.resolve();
 
 /** The modal's form draws the name pair first and the email under it, as its design does. */
@@ -1049,11 +1048,11 @@ export function HubSpotMeetingScheduler({
                   slots={slots}
                   timezone={timezone}
                   monthOffset={monthOffset}
-                  onMonthOffsetChange={NOOP}
+                  onMonthOffsetChange={LOADING_NOOP}
                   selectedSlot={null}
-                  onSelectSlot={NOOP}
+                  onSelectSlot={LOADING_NOOP}
                   selectedDay={null}
-                  onSelectDay={NOOP}
+                  onSelectDay={LOADING_NOOP}
                 />
               </div>
             )
@@ -1206,7 +1205,6 @@ export function HubSpotMeetingScheduler({
 // package exports `./components/meeting-scheduler`, not the file beneath it).
 export {
   BookingForm,
-  BookingFormSkeleton,
   formFieldOptionLabel,
   type BookingFormProps,
   type BookingFieldRow,
@@ -1217,8 +1215,6 @@ export {
 
 export {
   MeetingSchedulerDirectory,
-  MeetingSchedulerDirectoryRowSkeleton,
-  MeetingSchedulerDirectorySkeleton,
   MEETING_DIRECTORY_PAGE_SIZE,
   type MeetingSchedulerDirectoryProps,
 } from './directory';

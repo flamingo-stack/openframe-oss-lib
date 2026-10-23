@@ -178,21 +178,19 @@ export function RemoteDesktopView({
           width of the card (Figma 2155:109503): the label never competes with the
           device's name for the header's width. Hidden with one display or none. */}
       {displayMenuGroups.length > 0 && (
-        <ActionsMenuDropdown
-          groups={displayMenuGroups}
-          align="start"
-          customTrigger={
-            <button
-              type="button"
-              aria-label="Switch display"
-              className="flex w-full items-center gap-[var(--spacing-system-xs)] border-t border-ods-border p-[var(--spacing-system-sf)] text-left text-ods-text-primary outline-none transition-colors hover:bg-ods-bg-hover focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus"
-            >
-              <MonitorIcon className="h-6 w-6 shrink-0" />
-              <span className="min-w-0 flex-1 truncate text-h4">{currentDisplayLabel}</span>
-              <Chevron02DownIcon className="h-6 w-6 shrink-0" />
-            </button>
-          }
-        />
+        <div className="border-t border-ods-border">
+          <ActionsMenuDropdown
+            groups={displayMenuGroups}
+            align="start"
+            customTrigger={
+              <Button variant="row" type="button" aria-label="Switch display">
+                <MonitorIcon className="h-6 w-6" />
+                <span className="min-w-0 flex-1 truncate">{currentDisplayLabel}</span>
+                <Chevron02DownIcon className="h-6 w-6" />
+              </Button>
+            }
+          />
+        </div>
       )}
     </div>
   );

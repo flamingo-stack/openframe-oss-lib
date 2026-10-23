@@ -98,7 +98,8 @@ export interface DashboardInfoCardProps {
   /**
    * While `loading`: hold the percentage's box (plain "(NN%)" text, or a `Tag` when
    * `percentageDisplay` / `progressVariant` would draw one), because the loaded card will show
-   * a percentage. Default `false`.
+   * a percentage. Default: `showProgress` or a percentage drawn as a tag (`percentageDisplay="tag"`, or a
+   * `warning`/`error` `progressVariant`), the cards that show one.
    */
   loadingShowsPercentage?: boolean;
   /**
@@ -106,7 +107,20 @@ export interface DashboardInfoCardProps {
    * whose loaded state will carry one. Default `false`.
    */
   loadingShowsSubValue?: boolean;
+  /**
+   * While `loading`: the title is read too, so its line is a bar even when a `title` is passed (an empty `title`
+   * already draws the bar). `titleSlot` and `titleTag` are left as given. Default `false`.
+   */
+  titleLoading?: boolean;
+  /**
+   * While `loading`: the icon is read too (it depends on the figure), so the icon slot is a skeleton of the slot's
+   * own box, whether or not an `icon` is passed. Default `false`.
+   */
+  iconLoading?: boolean;
 }
+
+/** The icon slot's box (Figma "icon" variant): 32px on mobile, 56px from `md` up. Read by the slot and its skeleton. */
+const DASHBOARD_INFO_CARD_ICON_BOX_CLASS = 'size-8 shrink-0 rounded-sm content-md:size-14';
 
 export function DashboardInfoCard({
   title,
@@ -127,8 +141,10 @@ export function DashboardInfoCard({
   subValue,
   caption,
   loading: loadingProp = false,
-  loadingShowsPercentage = false,
+  loadingShowsPercentage: loadingShowsPercentageProp,
   loadingShowsSubValue = false,
+  titleLoading = false,
+  iconLoading = false,
 }: DashboardInfoCardProps) {
   // In a page's loading state the figure is read: the card is its skeleton (`loading`).
   const inScope = useLoadingScope();
@@ -140,13 +156,15 @@ export function DashboardInfoCard({
   const percentageAsTag =
     percentageDisplay === 'tag' ||
     (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
+  // A card that draws a progress ring or a percentage tag shows a percentage once loaded: its box is held by default.
+  const loadingShowsPercentage = loadingShowsPercentageProp ?? (showProgress || percentageAsTag);
 
   const renderPercentage = () => {
     if (loading) {
       if (!loadingShowsPercentage) return null;
       // The box the loaded percentage takes: a `Tag` (h-8) or one `text-h4` line.
       return percentageAsTag ? (
-        <UnifiedSkeleton className="h-8 w-12 shrink-0 rounded-md" />
+        <Tag loading label="" className="w-12" />
       ) : (
         <p className="text-h4">
           <TextLineSkeleton type="inherit" as="span" className="w-12" />
@@ -246,10 +264,19 @@ export function DashboardInfoCard({
     <>
       {/* Icon slot (Figma "icon" variant): 32px box / 16px content on mobile,
           56px box / 24px content from `md` up. */}
-      {icon && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary content-md:size-14">
-          <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
-        </div>
+      {loading && iconLoading ? (
+        <UnifiedSkeleton className={DASHBOARD_INFO_CARD_ICON_BOX_CLASS} />
+      ) : (
+        icon && (
+          <div
+            className={cn(
+              DASHBOARD_INFO_CARD_ICON_BOX_CLASS,
+              'flex items-center justify-center border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary',
+            )}
+          >
+            <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
+          </div>
+        )
       )}
 
       {/* Content section */}
@@ -258,7 +285,7 @@ export function DashboardInfoCard({
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
           {titleSlot ??
             // A title still being read (empty while loading) is a bar of its line, like no title.
-            (title !== undefined && !(loading && !title) ? (
+            (title !== undefined && !(loading && (!title || titleLoading)) ? (
               <p className="truncate text-ods-text-secondary text-h5">{title}</p>
             ) : (
               loading && (
@@ -341,12 +368,4 @@ export function DashboardInfoCard({
       {cardContent}
     </div>
   );
-}
-
-/**
- * A DashboardInfoCard while its figure is read: the same card with `loading` set, so it is the loaded card's box.
- * The title, title slot, tag and icon it is given are the page's own and draw as they are.
- */
-export function DashboardInfoCardSkeleton(props: Omit<DashboardInfoCardProps, 'value' | 'loading'>) {
-  return <DashboardInfoCard {...props} value="" loading />;
 }

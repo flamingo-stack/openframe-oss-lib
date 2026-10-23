@@ -2,6 +2,7 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
 import { UnreadDot } from './unread-dot';
 
 export interface HeaderButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -36,28 +37,20 @@ export function HeaderButton({
 }: HeaderButtonProps) {
   const compact = size === 'compact';
   return (
-    <button
+    <Button
+      variant="cell"
+      data-state={isActive ? 'active' : undefined}
       className={cn(
-        'flex shrink-0 items-center justify-center',
-        'transition-colors duration-200',
         compact
           ? cn(
-              'h-11 w-full rounded-md @[140px]/of-nav-sidebar:size-8',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-              'disabled:cursor-not-allowed disabled:opacity-50',
+              // A row's cell of the sidebar rail, a 32px rounded icon button from 140px; its 20px glyph kept.
+              'h-11 w-full rounded-md px-0 @[140px]/of-nav-sidebar:size-8 [&_svg]:h-5 [&_svg]:w-5',
+              'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
             )
           : // Square cell width follows the TopNavigation size (56px small /
             // 72px big) via the shell's --top-nav-cell var; 56px fallback for
             // standalone use.
-            'h-full w-[var(--top-nav-cell,3.5rem)]',
-        isActive
-          ? 'bg-ods-bg-active text-ods-text-primary'
-          : // Transparent at rest so the cell inherits the bar's background
-            // (TopNavigation `backgroundClassName` can differ per platform).
-            cn(
-              'bg-transparent text-ods-text-secondary hover:bg-ods-bg-hover',
-              compact && 'hover:text-ods-text-primary disabled:hover:bg-transparent',
-            ),
+            'w-[var(--top-nav-cell,3.5rem)]',
         className,
       )}
       {...props}
@@ -71,7 +64,7 @@ export function HeaderButton({
       ) : (
         icon
       )}
-    </button>
+    </Button>
   );
 }
 

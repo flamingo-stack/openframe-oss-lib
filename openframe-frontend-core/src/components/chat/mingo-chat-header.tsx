@@ -4,8 +4,8 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { Arrow02RightIcon, Ellipsis01Icon, Refresh01LeftIcon, SidebarIcon, XmarkIcon } from '../icons-v2-generated';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from '../ui/actions-menu';
+import { Button } from '../ui/button';
 import { SquareAvatar } from '../ui/square-avatar';
-import { ChatHeaderIconButton } from './chat-header-icon-button';
 import { ChatHeaderRenameField } from './chat-header-rename-field';
 
 /** An icon cell at the header's end, after the ⋯ (e.g. "Open as full chat", "Back to page"). */
@@ -102,16 +102,17 @@ export function MingoChatHeader({
   );
 
   return (
-    <div className="flex h-14 w-full shrink-0 overflow-hidden border-b border-ods-border">
+    <div className="flex h-14 w-full shrink-0 divide-x divide-ods-border overflow-hidden border-b border-ods-border">
       {!isPage && onToggleList && (
-        <ChatHeaderIconButton
-          divider="right"
+        <Button
+          variant="cell"
+          className="w-14"
           onClick={onToggleList}
           aria-label={listOpen ? 'Hide chat list' : 'Show chat list'}
           aria-pressed={listOpen}
         >
           <SidebarIcon size={24} />
-        </ChatHeaderIconButton>
+        </Button>
       )}
 
       {isPage ? (
@@ -144,9 +145,9 @@ export function MingoChatHeader({
       )}
 
       {onRestore && (
-        <ChatHeaderIconButton onClick={onRestore} aria-label="Unarchive chat">
+        <Button variant="cell" className="w-14" onClick={onRestore} aria-label="Unarchive chat">
           <Refresh01LeftIcon size={24} />
-        </ChatHeaderIconButton>
+        </Button>
       )}
       {menuGroups.length > 0 && (
         <ActionsMenuDropdown
@@ -154,26 +155,33 @@ export function MingoChatHeader({
           onCloseAutoFocus={e => e.preventDefault()}
           groups={menuGroups}
           customTrigger={
-            <ChatHeaderIconButton aria-label="Chat actions">
+            <Button variant="cell" className="w-14" aria-label="Chat actions">
               <Ellipsis01Icon size={24} />
-            </ChatHeaderIconButton>
+            </Button>
           }
         />
       )}
       {actions.map(action => (
-        <ChatHeaderIconButton key={action.id} onClick={action.onClick} aria-label={action.label} title={action.label}>
+        <Button
+          key={action.id}
+          variant="cell"
+          className="w-14"
+          onClick={action.onClick}
+          aria-label={action.label}
+          title={action.label}
+        >
           {action.icon}
-        </ChatHeaderIconButton>
+        </Button>
       ))}
       {!isPage && onCollapse && (
-        <ChatHeaderIconButton onClick={onCollapse} aria-label="Collapse chat">
+        <Button variant="cell" className="w-14" onClick={onCollapse} aria-label="Collapse chat">
           <Arrow02RightIcon size={24} />
-        </ChatHeaderIconButton>
+        </Button>
       )}
       {!isPage && onClose && (
-        <ChatHeaderIconButton onClick={onClose} aria-label="Close">
+        <Button variant="cell" className="w-14" onClick={onClose} aria-label="Close">
           <XmarkIcon size={24} />
-        </ChatHeaderIconButton>
+        </Button>
       )}
     </div>
   );

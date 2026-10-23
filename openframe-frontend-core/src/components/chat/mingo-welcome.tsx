@@ -7,10 +7,12 @@ import { AgentMark } from '../agent-mark';
 import { CompassIcon, Arrow01DownIcon, AlertCircleIcon, Refresh01RightIcon } from '../icons-v2-generated';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
-import { MingoChatHistorySkeleton } from './mingo-chat-history';
+import { MingoChatHistory } from './mingo-chat-history';
 import { MingoQuickActionWall } from './mingo-quick-action-wall';
 import { QuickActionChipButton } from './quick-action-chip';
+import type { DialogItem } from './types/component.types';
 
 // =============================================================================
 // Types
@@ -72,6 +74,9 @@ export interface MingoWelcomeProps {
    *  flash the new-user layout before the list arrives. Ignored once
    *  `dialogHistory` is provided. */
   isLoadingHistory?: boolean;
+  /** The host's dialog page size: how many rows the history's loading state draws
+   *  (`isLoadingHistory`). Default `CHAT_HISTORY_PAGE_SIZE`. */
+  historyPageSize?: number;
   /** The dialog-list load FAILED (e.g. backend down) and there's nothing
    *  cached. Renders an error + retry block in place of the new-user empty
    *  state (which would otherwise misleadingly advertise Guide). Takes
@@ -104,6 +109,9 @@ const DEFAULT_PROMO: MingoWelcomePromo = {
 
 const DEFAULT_PROMO_STORAGE_KEY = 'mingo-welcome:promo-dismissed';
 
+/** No dialogs yet: what the history's loading state is rendered with. */
+const NO_DIALOGS: ReadonlyArray<DialogItem> = [];
+
 // =============================================================================
 // Component
 // =============================================================================
@@ -134,6 +142,7 @@ export function MingoWelcome({
   hasExistingChats = false,
   dialogHistory,
   isLoadingHistory = false,
+  historyPageSize,
   loadError = false,
   onRetry,
   onStartGuideChat,
@@ -143,6 +152,8 @@ export function MingoWelcome({
   // Greeting never weaves the user's name in — always the plain "Hey, I'm
   // Mingo" (design node 113:69208). A host `title` override still wins.
   const heading = title ?? "Hey, I'm Mingo";
+  // ONE switch: in a page's loading state, or while the first history page is read, the history draws its loading rows.
+  const historyLoading = useLoadingScope() || isLoadingHistory;
 
   // `promo` omitted → fall back to the OpenFrame default, but only when guide
   // mode exists to advertise (otherwise the notification points nowhere).
@@ -200,7 +211,7 @@ export function MingoWelcome({
   // history skeleton both clutters the loading frame and pre-judges the user as
   // new. They return once a resolved state (history, or the new-user greeting)
   // renders. `dialogHistory` always wins — a returning user keeps the chips.
-  const showPinnedRegion = !!dialogHistory || (!isLoadingHistory && !loadError);
+  const showPinnedRegion = !!dialogHistory || (!historyLoading && !loadError);
 
   return (
     <div
@@ -233,8 +244,10 @@ export function MingoWelcome({
               </Button>
             )}
           </div>
-        ) : isLoadingHistory ? (
-          <MingoChatHistorySkeleton />
+        ) : historyLoading ? (
+          // The history draws its own loading state (one page of rows) until the
+          // first page tells new and returning users apart.
+          <MingoChatHistory dialogs={NO_DIALOGS} loading pageSize={historyPageSize} />
         ) : (
           <>
             {/* Scrollable region — only the greeting + grid scroll; the notification
@@ -290,14 +303,16 @@ export function MingoWelcome({
                 <span className="text-ods-text-secondary text-h6">{resolvedPromo.description}</span>
               </div>
               {/* Plain cross — no button chrome, just a clickable icon. */}
-              <button
+              <Button
+                variant="bare"
+                size="icon-sm"
                 type="button"
                 onClick={dismissPromo}
                 aria-label="Dismiss"
-                className="absolute right-2 top-2 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
+                className="absolute right-2 top-2"
               >
                 <XmarkIcon size={16} />
-              </button>
+              </Button>
             </div>
           )}
 

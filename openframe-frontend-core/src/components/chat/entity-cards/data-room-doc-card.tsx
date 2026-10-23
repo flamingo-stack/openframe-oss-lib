@@ -101,7 +101,7 @@ export function DataRoomDocCard({ item, className, badgeText, anchorProps }: Dat
   );
 }
 
-export function DataRoomDocCardSkeleton({ className }: { className?: string }) {
+function DataRoomDocCardSkeleton({ className }: { className?: string }) {
   return (
     <CompactCardSkeleton
       slot={false}

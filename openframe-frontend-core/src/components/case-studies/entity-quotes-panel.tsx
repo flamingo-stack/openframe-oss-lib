@@ -2,7 +2,6 @@
 
 import type { EntityQuote } from '../../types/video-processing';
 import { ENTITY_QUOTES_TITLE } from '../../types/video-processing';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { StackedRowsPanel } from '../ui';
 import { useLoadingScope } from '../ui/loading-scope';
 
@@ -21,8 +20,6 @@ export interface EntityQuotesPanelProps {
 const QUOTE_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
 const QUOTE_TEXT_CLASS = 'text-ods-text-primary text-h4';
 const QUOTE_SPEAKER_CLASS = 'text-ods-text-secondary text-h4';
-/** Quote rows the skeleton draws: the panel shows every quote (no fold), so the panel's own default count. */
-const QUOTES_SKELETON_ROWS = 3;
 
 export function EntityQuotesPanel({ quotes, className }: EntityQuotesPanelProps) {
   // Quotes are optional per record: a loading state cannot know a panel will be there, so it draws none (the
@@ -52,36 +49,5 @@ export function EntityQuotesPanel({ quotes, className }: EntityQuotesPanelProps)
         }))}
       />
     </div>
-  );
-}
-
-/**
- * The quotes while they are read: the real "Key Quotes" caption (its count is read data, so it is left out) over
- * the panel's rows, each a quote's two lines and its speaker line as bars in the quote's own elements.
- */
-export function EntityQuotesPanelSkeleton({ className }: { className?: string }) {
-  return (
-    <StackedRowsPanel
-      className={className}
-      title={ENTITY_QUOTES_TITLE}
-      rows={Array.from({ length: QUOTES_SKELETON_ROWS }, (_, i) => ({
-        id: `skeleton-${i}`,
-        columns: [
-          {
-            key: 'quote',
-            content: (
-              <div className={QUOTE_CLASS} aria-hidden>
-                <p className={QUOTE_TEXT_CLASS}>
-                  <TextLineSkeleton type="inherit" as="span" lines={2} className="w-full" />
-                </p>
-                <p className={QUOTE_SPEAKER_CLASS}>
-                  <TextLineSkeleton type="inherit" as="span" className="w-40" />
-                </p>
-              </div>
-            ),
-          },
-        ],
-      }))}
-    />
   );
 }

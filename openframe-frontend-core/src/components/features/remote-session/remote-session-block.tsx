@@ -40,19 +40,17 @@ export const RemoteSessionBlockFrame = forwardRef<HTMLDivElement, RemoteSessionB
         )}
       >
         {children}
-        <button
-          type="button"
-          className="flex h-12 w-full shrink-0 items-center gap-[var(--spacing-system-xs)] border-t border-ods-border bg-ods-card px-[var(--spacing-system-m)]"
-          onClick={onHide}
-        >
-          <Chevrons03RightIcon size={24} />
-          <span className="min-w-0 flex-1 truncate text-left text-ods-text-secondary text-h4">Hide this Block</span>
-          <OpenframeLogoIcon
-            color="var(--color-text-on-accent)"
-            secondaryColor="var(--color-text-primary)"
-            className="size-6 shrink-0"
-          />
-        </button>
+        <div className="shrink-0 border-t border-ods-border bg-ods-card">
+          <Button variant="row" type="button" className="h-12" onClick={onHide}>
+            <Chevrons03RightIcon size={24} />
+            <span className="min-w-0 flex-1 truncate text-ods-text-secondary">Hide this Block</span>
+            <OpenframeLogoIcon
+              color="var(--color-text-on-accent)"
+              secondaryColor="var(--color-text-primary)"
+              className="size-6"
+            />
+          </Button>
+        </div>
       </div>
     );
   },
@@ -153,36 +151,36 @@ export const RemoteSessionMinimizedChip = forwardRef<HTMLButtonElement, RemoteSe
   ({ party, onExpand, dragHandlers }, ref) => {
     const technician = party.technicianName;
     return (
-      <button
+      <Button
+        variant="card"
         ref={ref}
         type="button"
         aria-label="Show session block"
-        className={cn(
-          'flex shrink-0 flex-col overflow-hidden rounded-md border border-ods-border',
-          dragHandlers && REMOTE_SESSION_DRAG_HANDLE_CLASS,
-        )}
+        className={cn('w-auto shrink-0', dragHandlers && REMOTE_SESSION_DRAG_HANDLE_CLASS)}
         onClick={onExpand}
         {...dragHandlers}
       >
-        {technician ? (
-          <SquareAvatar
-            sizePx={48}
-            src={party.technicianAvatarUrl ?? undefined}
-            fallback={technician}
-            className="rounded-none"
-          />
-        ) : (
-          <RemoteSessionOrgLogo
-            name={party.organizationName}
-            logoUrl={party.organizationLogoUrl}
-            sizePx={48}
-            className="rounded-none border-0"
-          />
-        )}
-        <span className="flex h-9 w-12 items-center justify-center border-t border-ods-border bg-ods-card">
-          <Chevrons03LeftIcon size={24} />
+        <span className="flex flex-col overflow-hidden rounded-md border border-ods-border">
+          {technician ? (
+            <SquareAvatar
+              sizePx={48}
+              src={party.technicianAvatarUrl ?? undefined}
+              fallback={technician}
+              className="rounded-none"
+            />
+          ) : (
+            <RemoteSessionOrgLogo
+              name={party.organizationName}
+              logoUrl={party.organizationLogoUrl}
+              sizePx={48}
+              className="rounded-none border-0"
+            />
+          )}
+          <span className="flex h-9 w-12 items-center justify-center border-t border-ods-border bg-ods-card">
+            <Chevrons03LeftIcon size={24} />
+          </span>
         </span>
-      </button>
+      </Button>
     );
   },
 );

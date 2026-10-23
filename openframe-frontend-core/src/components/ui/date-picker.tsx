@@ -623,31 +623,6 @@ export function DatePickerCalendar({
   );
 }
 
-// ============================================================================
-// Trigger button styles (shared)
-// ============================================================================
-
-const triggerButtonStyles = cn(
-  // Layout
-  'flex w-full items-center gap-2',
-  'h-11 rounded-[6px] border px-3 md:h-12',
-  // Colors
-  'border-ods-border bg-ods-card',
-  // Typography
-  'text-h4',
-  // Hover & active (not disabled)
-  'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
-  'focus:outline-none',
-  // Disabled - match Input exactly. The value/placeholder span inside sets its
-  // own colour, so the child rule (higher specificity) greys it too. Scoped to
-  // DIRECT children like every other field, so nested content that owns its
-  // colour keeps it.
-  'disabled:!cursor-not-allowed disabled:bg-ods-bg',
-  'disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
-  // Animation
-  'transition-colors duration-200',
-);
-
 const timeSelectTriggerStyles = cn(
   'flex items-center justify-between gap-1',
   'h-11 min-h-0 rounded-[6px] border px-3 md:h-12',
@@ -723,30 +698,25 @@ export function DatePicker(props: DatePickerProps) {
   const picker = (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
-        <button
+        <Button
+          variant="field"
           type="button"
           disabled={disabled}
           // Same marker Input/Textarea/Select expose — it is how a form finds
           // (and scrolls to) the first field that failed validation.
           data-invalid={isInvalid || undefined}
-          className={cn(
-            triggerButtonStyles,
-            'group',
-            open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
-            isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
-            className,
-          )}
+          className={className}
         >
           <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
           <span
             className={cn(
               'flex-1 truncate text-left',
-              displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+              disabled ? 'text-ods-text-disabled' : displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
             )}
           >
             {displayValue || placeholder}
           </span>
-        </button>
+        </Button>
       </Popover.Trigger>
 
       <Popover.Portal container={portalContainer ?? undefined}>
@@ -910,30 +880,29 @@ export function DatePickerInput(props: DatePickerInputProps) {
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
-          <button
+          <Button
+            variant="field"
             type="button"
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
             data-invalid={isInvalid || undefined}
-            className={cn(
-              triggerButtonStyles,
-              'group',
-              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
-              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
-              'flex-1',
-            )}
+            className="flex-1"
           >
             <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
               className={cn(
                 'flex-1 truncate text-left',
-                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                disabled
+                  ? 'text-ods-text-disabled'
+                  : displayValue
+                    ? 'text-ods-text-primary'
+                    : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
             </span>
-          </button>
+          </Button>
         </Popover.Trigger>
 
         <Popover.Portal container={portalContainer ?? undefined}>
@@ -1140,30 +1109,29 @@ export function DatePickerInputSimple(props: DatePickerInputSimpleProps) {
       {/* Date Picker */}
       <Popover.Root open={open} onOpenChange={setOpen}>
         <Popover.Trigger asChild>
-          <button
+          <Button
+            variant="field"
             type="button"
             disabled={disabled}
             // Same marker Input/Textarea/Select expose — it is how a form finds
             // (and scrolls to) the first field that failed validation.
             data-invalid={isInvalid || undefined}
-            className={cn(
-              triggerButtonStyles,
-              'group',
-              open && !isInvalid && 'border-ods-accent enabled:hover:border-ods-accent enabled:hover:bg-ods-card',
-              isInvalid && 'border-ods-error enabled:hover:border-ods-error enabled:hover:bg-ods-card',
-              'flex-1',
-            )}
+            className="flex-1"
           >
             <Calendar className="size-6 shrink-0 text-ods-text-secondary" />
             <span
               className={cn(
                 'flex-1 truncate text-left',
-                displayValue ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                disabled
+                  ? 'text-ods-text-disabled'
+                  : displayValue
+                    ? 'text-ods-text-primary'
+                    : 'text-ods-text-secondary',
               )}
             >
               {displayValue || placeholder}
             </span>
-          </button>
+          </Button>
         </Popover.Trigger>
 
         <Popover.Portal container={portalContainer ?? undefined}>

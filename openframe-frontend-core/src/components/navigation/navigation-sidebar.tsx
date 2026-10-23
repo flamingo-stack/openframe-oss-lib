@@ -15,7 +15,7 @@ import {
   useOpenNavigationGroup,
 } from './navigation-sidebar-grouped';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
-import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item';
+import { NavigationSidebarItemButton } from './navigation-sidebar-item';
 import { resolveNavigationActive } from './navigation-sidebar-match';
 import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
@@ -475,7 +475,7 @@ export function NavigationSidebar({
         grouped ? (
           <NavigationSidebarGroupedSkeleton key={key} />
         ) : (
-          <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />
+          <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
         ),
       );
     }

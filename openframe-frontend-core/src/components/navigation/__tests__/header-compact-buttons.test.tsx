@@ -65,7 +65,7 @@ describe('HeaderButton size="compact"', () => {
     expect(button.innerHTML).toMatch(/class="[^"]*\bbg-ods-warning h-2 w-2\b/);
 
     rerender(<HeaderButton size="compact" aria-label="Thing" icon={<svg />} isActive />);
-    expect(screen.getByRole('button', { name: 'Thing' })).toHaveClass('bg-ods-bg-active');
+    expect(screen.getByRole('button', { name: 'Thing' })).toHaveAttribute('data-state', 'active');
   });
 
   it('keeps the bar cell by default', () => {
@@ -89,7 +89,7 @@ describe('NotificationsBellButton variant="compact"', () => {
 
     fireEvent.click(bell);
     const close = screen.getByRole('button', { name: 'Close notifications' });
-    expect(close).toHaveClass('bg-ods-bg-active');
+    expect(close).toHaveAttribute('data-state', 'active');
     expect(hasDot(close)).toBe(false);
   });
 });
@@ -115,7 +115,7 @@ describe('TimeTrackerHeaderButton variant="compact"', () => {
       </TimeTrackerProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Time tracker' }));
-    expect(screen.getByRole('button', { name: 'Time tracker' })).toHaveClass('bg-ods-bg-active');
+    expect(screen.getByRole('button', { name: 'Time tracker' })).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('keeps the wide cell by default', () => {

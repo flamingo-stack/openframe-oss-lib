@@ -51,6 +51,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
 import type { ChatRef } from '../chat-ref.types';
+import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import { createChatDialogStore, DEFAULT_DIALOG_SIDE } from '../stream/chat-dialog-store';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
 import type {
@@ -402,7 +403,7 @@ export function useNatsChatAdapter(
     stopGeneration: stopGenerationCallback,
     assistantName = 'Mingo',
     chatTypeFilter,
-    dialogsPageSize = 20,
+    dialogsPageSize = CHAT_HISTORY_PAGE_SIZE,
     messagesPageSize = 50,
     modelProvider = null,
     modelLabel = null,

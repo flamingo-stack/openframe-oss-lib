@@ -8,6 +8,8 @@ import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { XmarkIcon } from '../../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { Button } from '../../ui/button';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { dotColorByVariant, progressColorByVariant as toastProgressColorByVariant } from '../../ui/toaster';
 import type { Notification, NotificationSeverity, NotificationVariant } from './types';
 
@@ -40,22 +42,15 @@ const progressColorByVariant: Record<NotificationVariant, string> = {
   info: 'bg-ods-accent',
 };
 
-const headerControlClass =
-  'absolute inset-0 flex items-center justify-center text-ods-text-secondary transition-opacity duration-200 hover:text-ods-text-primary';
+/** The trailing control sits centred over its 16px slot. */
+const headerControlClass = 'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2';
 
 /** The header's icon box and its trailing control's box, read by the tile and by its skeleton. */
 const TILE_ICON_BOX_CLASS = `flex ${ICON_SIZE.sm} shrink-0 items-center justify-center`;
 const TILE_CONTROL_BOX_CLASS = `relative ${ICON_SIZE.sm} shrink-0`;
 
-export interface NotificationTileProps {
-  notification: Notification;
+interface NotificationTileOptions {
   liveDurationMs?: number;
-  /**
-   * The ✓ "Mark notification complete" control once the tile is no longer
-   * live. Omit it for a tile with no notification behind it (an approval card
-   * built from a chat or a ticket): no ✓ is drawn.
-   */
-  onComplete?: (id: string) => void;
   onSettle?: (id: string) => void;
   className?: string;
   /** Action row rendered below the body inside the padded section (e.g. approval buttons). */
@@ -87,9 +82,51 @@ export interface NotificationTileProps {
    * on screen: its notifications have just arrived for as long as it plays.
    */
   timeLabel?: string;
+  /** The loading form's description lines (default two). */
+  descriptionLines?: number;
 }
 
-export function NotificationTile({
+/**
+ * The notification and what dismisses it, or `loading` while the host reads it: the tile then draws its own loading
+ * form, as it does in a loading scope (an approval tile, one given `actions`, draws its button row too).
+ *
+ * `onComplete` is the ✓ "Mark notification complete" control once the tile is no longer live. Omit it for a tile with
+ * no notification behind it (an approval card built from a chat or a ticket): no ✓ is drawn.
+ */
+export type NotificationTileProps = NotificationTileOptions &
+  (
+    | { notification: Notification; onComplete?: (id: string) => void; loading?: boolean }
+    | {
+        loading: true;
+        notification?: undefined;
+        onComplete?: undefined;
+        /** `approval`: the loading form draws the approval button row. Default: `approval` when `actions` is given. */
+        variant?: 'default' | 'approval';
+      }
+  );
+
+type LoadedNotificationTileProps = NotificationTileOptions & {
+  notification: Notification;
+  onComplete?: (id: string) => void;
+};
+
+/** A notification as a tile; ONE switch: in a loading scope (or `loading`) its own loading form. */
+export function NotificationTile(props: NotificationTileProps) {
+  if (useLoadingScope() || props.loading) {
+    const variant = ('variant' in props && props.variant) || (props.actions ? 'approval' : 'default');
+    return (
+      <NotificationTileSkeleton
+        variant={variant}
+        presentation={props.presentation}
+        descriptionLines={props.descriptionLines}
+        className={props.className}
+      />
+    );
+  }
+  return <LoadedNotificationTile {...props} />;
+}
+
+function LoadedNotificationTile({
   notification,
   liveDurationMs = 4000,
   onComplete,
@@ -101,7 +138,7 @@ export function NotificationTile({
   titleLines = 1,
   presentation = 'card',
   timeLabel,
-}: NotificationTileProps) {
+}: LoadedNotificationTileProps) {
   const lockscreen = presentation === 'lockscreen';
   const {
     id,
@@ -225,7 +262,9 @@ export function NotificationTile({
                       ]
                     : []),
                 ].map(({ active, label, icon: actionIcon, onClick }) => (
-                  <button
+                  <Button
+                    variant="bare"
+                    size="icon-inline"
                     key={label}
                     type="button"
                     onClick={onClick}
@@ -233,10 +272,10 @@ export function NotificationTile({
                     aria-hidden={!active}
                     disabled={!active}
                     tabIndex={active ? 0 : -1}
-                    className={cn(headerControlClass, !active && 'pointer-events-none opacity-0')}
+                    className={cn(headerControlClass, !active && 'invisible')}
                   >
                     {actionIcon}
-                  </button>
+                  </Button>
                 ))}
               </span>
             </>
@@ -301,7 +340,7 @@ export const APPROVAL_BUTTON_CLASS = 'w-20';
 /** The card approval tile's trailing toggle (the command section's chevron). Shared by the tile and its skeleton. */
 export const APPROVAL_TOGGLE_BUTTON_CLASS = 'ml-auto w-6 shrink-0 px-0 md:w-8';
 
-export interface NotificationTileSkeletonProps {
+interface NotificationTileSkeletonProps {
   /** `approval`: the approval tile, which adds a row of small buttons under the body. */
   variant?: 'default' | 'approval';
   /** The tile's `presentation`: a lock screen has no trailing control and its approval buttons are compact. */
@@ -326,7 +365,7 @@ function TileSquare({ box, bar }: { box: string; bar: string }) {
  * Each text row is its text's own line box (`TextLineSkeleton` at the tile's type steps), so the skeleton is the
  * loaded tile's height at every breakpoint.
  */
-export function NotificationTileSkeleton({
+function NotificationTileSkeleton({
   variant = 'default',
   presentation = 'card',
   descriptionLines = 2,

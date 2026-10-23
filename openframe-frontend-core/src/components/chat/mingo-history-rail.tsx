@@ -4,9 +4,10 @@ import { cn } from '../../utils/cn';
 import { ChatsIcon } from '../icons-v2-generated/communication/chats-icon';
 import { PlusCircleIcon } from '../icons-v2-generated/signs-and-symbols/plus-circle-icon';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { TabSelector } from '../ui/tab-selector';
 import { ChatListEmptyState } from './chat-list-empty-state';
-import { MingoChatHistory, MingoChatHistorySkeleton } from './mingo-chat-history';
+import { MingoChatHistory } from './mingo-chat-history';
 import { ChatListLoadError, type MingoHistoryScope } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
@@ -50,9 +51,12 @@ export interface MingoHistoryRailProps {
   isLoadingMore?: boolean;
   /** Fetch the next page. */
   onLoadMore?: () => void;
-  /** True while the FIRST page of dialogs is still loading. Renders a skeleton
-   *  so the rail doesn't flash the empty state before the list arrives. */
+  /** True while the FIRST page of dialogs is still loading. The list draws its
+   *  own loading state so the rail doesn't flash the empty state before the list arrives. */
   isLoadingHistory?: boolean;
+  /** The host's page size: how many rows the list's loading state draws. Default
+   *  `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
   /** The dialog-list load FAILED with nothing cached — renders an error + retry
    *  block instead of the empty state. */
   loadError?: boolean;
@@ -94,10 +98,12 @@ export function MingoHistoryRail({
   isLoadingMore = false,
   onLoadMore,
   isLoadingHistory = false,
+  pageSize,
   loadError = false,
   onRetry,
   className,
 }: MingoHistoryRailProps) {
+  const loading = useLoadingScope() || isLoadingHistory;
   const hasSearch = !!searchQuery?.trim();
   // The list (vs. the empty state) shows whenever there are chats OR an active
   // search is running — a no-match query must keep the search bar mounted
@@ -147,10 +153,10 @@ export function MingoHistoryRail({
 
       {loadError ? (
         <ChatListLoadError onRetry={onRetry} className="min-h-0 flex-1 justify-center" />
-      ) : isLoadingHistory ? (
-        <MingoChatHistorySkeleton />
-      ) : hasList ? (
+      ) : loading || hasList ? (
         <MingoChatHistory
+          loading={loading}
+          pageSize={pageSize}
           dialogs={dialogs}
           activeDialogId={activeDialogId}
           onSelectDialog={onSelectDialog}

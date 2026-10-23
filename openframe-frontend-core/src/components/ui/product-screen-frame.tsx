@@ -93,8 +93,16 @@ export function ProductScreenFrame({
     return () => observer.disconnect();
   }, [designWidth, scaleFrom]);
 
-  const screenStyle: CSSProperties =
-    mode === 'scaled'
+  // Before the frame is measured (the server's HTML, until hydration) the stylesheet lays the screen out the way the
+  // measure will (`styles/product-screen-frame.css`): at the design width, scaled to the frame. So the loading form a
+  // first paint shows is the loaded screen's own layout, never the narrow one.
+  const pending = mode === 'pending';
+  const screenStyle: CSSProperties = pending
+    ? ({
+        '--product-screen-design-width': `${designWidth}px`,
+        '--product-screen-scale-from': `${scaleFrom}px`,
+      } as CSSProperties)
+    : mode === 'scaled'
       ? {
           width: designWidth,
           // The crop is in frame pixels, so the unscaled box is taller by the same factor.
@@ -112,23 +120,25 @@ export function ProductScreenFrame({
       role="img"
       aria-label={label}
       data-app-type={appType}
-      className={cn('relative overflow-hidden', className)}
+      className={cn('product-screen-frame relative overflow-hidden', className)}
       style={{ height }}
     >
       <PortalContainerContext.Provider value={portalHost}>
         <CollisionBoundaryContext.Provider value={frame}>
-          <div inert aria-hidden className="ods-content-area" style={screenStyle}>
+          <div
+            inert
+            aria-hidden
+            className={cn('ods-content-area', pending && 'product-screen-pending')}
+            style={screenStyle}
+          >
             <div className="ods-content-scope">
               {/* Until measured (the server's HTML, a page without scripts) the screen is its own loading state: every
                   component in it draws its skeleton, so the window shows the screen's shape instead of nothing, and
                   the unscaled real screen is never painted. */}
-              {mode === 'pending' ? (
-                <LoadingScope bare>
-                  <PagePicture>{children}</PagePicture>
-                </LoadingScope>
-              ) : (
+              {/* One tree whether measured or not: only the scope turns off, so nothing inside is mounted twice. */}
+              <LoadingScope bare active={pending}>
                 <PagePicture>{children}</PagePicture>
-              )}
+              </LoadingScope>
             </div>
             <div ref={setPortalHost} style={{ display: 'contents' }} />
           </div>

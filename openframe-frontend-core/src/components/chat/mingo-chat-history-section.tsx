@@ -20,6 +20,7 @@ import { LoadingRegion } from '../loading/loading-region';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ModalV2, ModalV2Header, ModalV2Title } from '../ui/modal-v2';
 import { SearchInput } from '../ui/search-input';
 import { SquareAvatar } from '../ui/square-avatar';
@@ -123,11 +124,13 @@ function HistoryList({
   // modal) clips the sentinel, and the viewport sees nothing in a closed drawer
   // or a collapsed rail.
   const sentinelRef = useLoadMoreSentinel({ hasMore, isLoadingMore, onLoadMore, itemCount: dialogs.length });
+  // The page's loading state draws the list's own, as the first page loading does.
+  const loading = useLoadingScope() || isLoadingHistory;
 
   if (loadError) {
     return <ChatListLoadError onRetry={onRetry} className="justify-center p-[var(--spacing-system-l)]" />;
   }
-  if (isLoadingHistory) return <HistorySkeleton />;
+  if (loading) return <HistorySkeleton />;
   if (dialogs.length === 0 && !draftTitle) {
     return hasSearch ? (
       <ChatListEmptyState

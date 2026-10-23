@@ -15,6 +15,7 @@ import { ImagePlusIcon } from '../icons-v2-generated/audio-and-visual/image-plus
 import { FileIcon } from '../icons-v2-generated/documents/file-icon';
 import { Download02Icon } from '../icons-v2-generated/interface/download-02-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
+import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 
 /** A managed file entry for async upload workflows (e.g. presigned URL uploads) */
@@ -415,24 +416,29 @@ export function FileUpload<T extends FileUploadCandidate = File>({
                       </div>
                     </div>
                     {onDownloadManagedFile && entry.status === 'uploaded' && (
-                      <button
+                      <Button
+                        variant="bare"
+                        size="icon-sm"
                         type="button"
                         onClick={() => onDownloadManagedFile(entry.id)}
-                        className="shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary"
+                        className="shrink-0"
                         aria-label={`Download ${entry.fileName}`}
                       >
-                        <Download02Icon className="size-6" />
-                      </button>
+                        <Download02Icon />
+                      </Button>
                     )}
                     {!disabled && (
-                      <button
+                      <Button
+                        variant="bare"
+                        data-tone="error"
+                        size="icon-sm"
                         type="button"
                         onClick={() => onRemoveManagedFile?.(entry.id)}
-                        className="shrink-0 text-ods-error transition-opacity hover:opacity-80"
+                        className="shrink-0"
                         aria-label={`Remove ${entry.fileName}`}
                       >
-                        <TrashIcon className="size-6" />
-                      </button>
+                        <TrashIcon className="text-ods-error" />
+                      </Button>
                     )}
                   </div>
                 ))
@@ -451,14 +457,17 @@ export function FileUpload<T extends FileUploadCandidate = File>({
                       <p className="text-ods-text-secondary text-h6">{formatFileSize(file.size)}</p>
                     </div>
                     {!disabled && (
-                      <button
+                      <Button
+                        variant="bare"
+                        data-tone="error"
+                        size="icon-sm"
                         type="button"
                         onClick={() => handleRemoveFile(index)}
-                        className="shrink-0 text-ods-error transition-opacity hover:opacity-80"
+                        className="shrink-0"
                         aria-label={`Remove ${file.name}`}
                       >
-                        <TrashIcon className="size-6" />
-                      </button>
+                        <TrashIcon className="text-ods-error" />
+                      </Button>
                     )}
                   </div>
                 ))}
@@ -466,31 +475,35 @@ export function FileUpload<T extends FileUploadCandidate = File>({
         )}
 
         {showDropzone && (
-          <button
+          <Button
+            variant="card"
             type="button"
+            data-state={dragActive ? 'active' : undefined}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={openDialog}
             disabled={disabled}
-            className={cn(
-              'flex w-full cursor-pointer items-center gap-[var(--spacing-system-xsf)] rounded-[6px] border border-dashed p-[var(--spacing-system-sf)] text-left',
-              'transition-colors duration-200',
-              'border-ods-border bg-ods-card',
-              dragActive && 'border-ods-accent bg-ods-accent/5',
-              !dragActive && 'hover:border-ods-accent/30',
-              disabled && 'cursor-not-allowed opacity-50 hover:border-ods-border',
-            )}
           >
-            <div className="flex shrink-0 items-center rounded-full border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
-              {icon || <ImagePlusIcon className="size-6 text-ods-text-primary" />}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-ods-text-primary text-h4">{label}</span>
-              <span className="text-ods-text-secondary text-h6">{description}</span>
-            </div>
-          </button>
+            {/* The drop zone is the card's content: a dashed box that takes the accent while a file is dragged over it. */}
+            <span
+              className={cn(
+                'flex items-center gap-[var(--spacing-system-xsf)] rounded-[6px] border border-dashed p-[var(--spacing-system-sf)]',
+                'bg-ods-card transition-colors duration-200',
+                dragActive ? 'border-ods-accent' : 'border-ods-border',
+                disabled && 'opacity-50',
+              )}
+            >
+              <span className="flex shrink-0 items-center rounded-full border border-ods-border bg-ods-card p-[var(--spacing-system-sf)]">
+                {icon || <ImagePlusIcon className="size-6 text-ods-text-primary" />}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="text-ods-text-primary text-h4">{label}</span>
+                <span className="text-ods-text-secondary text-h6">{description}</span>
+              </span>
+            </span>
+          </Button>
         )}
       </div>
     </FieldWrapper>

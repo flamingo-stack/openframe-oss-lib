@@ -27,11 +27,11 @@ import {
 import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
 import { PageShell } from '../../layout/article-detail-layout';
 import { PageLayout } from '../../layout/page-layout';
-import { LoadingRegion } from '../../loading/loading-region';
+import { LoadingFallback } from '../../loading/loading-fallback';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Card, CardContent } from '../../ui/card';
 import { FadePreview } from '../../ui/fade-preview';
-import { LoadingScope, useLoadingScope } from '../../ui/loading-scope';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { RichMarkdownRenderer } from '../../ui/markdown';
 import { ReleaseChangelogSection } from '../../ui/release-changelog-section';
 import { MediaGalleryStrip } from '../media-gallery-strip';
@@ -718,13 +718,5 @@ export function ReleaseDetailPage({
     </PageLayout>
   );
   // The loading state is the page itself in a scope, announced once unless a host's scope already did.
-  return renderShell(
-    loading ? (
-      <LoadingRegion label="Loading the release" announce={!scoped}>
-        <LoadingScope>{page}</LoadingScope>
-      </LoadingRegion>
-    ) : (
-      page
-    ),
-  );
+  return renderShell(loading ? <LoadingFallback label="Loading the release">{page}</LoadingFallback> : page);
 }
