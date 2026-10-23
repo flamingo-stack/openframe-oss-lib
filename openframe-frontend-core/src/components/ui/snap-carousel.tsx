@@ -5,10 +5,8 @@ import { useAutoplay } from '../../hooks/ui/use-autoplay';
 import { useInView } from '../../hooks/ui/use-in-view';
 import { useResumableTimeout } from '../../hooks/ui/use-resumable-timeout';
 import { cn } from '../../utils/cn';
-import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
-import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { Button } from './button';
+import { CarouselStepButton } from './carousel-step-button';
 import { useLoadingScope } from './loading-scope';
 
 /** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
@@ -117,28 +115,18 @@ export function SnapCarouselControls({
           {index + 1} / {count}
         </span>
       )}
-      <Button
-        variant="outline"
-        size="icon"
-        type="button"
+      <CarouselStepButton
+        direction="previous"
         aria-label={prevLabel}
         disabled={loading || index === 0}
         onClick={onPrevious}
-        className="shrink-0"
-      >
-        <Chevron02LeftIcon size={20} />
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        type="button"
+      />
+      <CarouselStepButton
+        direction="next"
         aria-label={nextLabel}
         disabled={loading || index === count - 1}
         onClick={onNext}
-        className="shrink-0"
-      >
-        <Chevron02RightIcon size={20} />
-      </Button>
+      />
     </div>
   );
 }

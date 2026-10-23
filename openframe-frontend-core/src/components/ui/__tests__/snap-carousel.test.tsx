@@ -67,6 +67,17 @@ describe('SnapCarousel', () => {
     );
   });
 
+  it("draws its arrows as the carousel's step buttons: round, no fill, never the strip's outline icon button", () => {
+    renderCarousel();
+    for (const name of ['Previous', 'Next']) {
+      const arrow = screen.getByLabelText(name);
+      expect(arrow.classList.contains('rounded-full')).toBe(true);
+      expect(arrow.classList.contains('bg-transparent')).toBe(true);
+      expect(arrow.classList.contains('bg-ods-card')).toBe(false);
+      expect(arrow.classList.contains('rounded-md')).toBe(false);
+    }
+  });
+
   it('advances every 5s only while it is in view, and wraps', () => {
     renderCarousel();
     act(() => {

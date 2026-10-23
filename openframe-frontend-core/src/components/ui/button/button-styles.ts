@@ -302,6 +302,16 @@ export const BUTTON_KIND_CLASS = {
     KIND_FOCUS_INSET,
     '[&_svg]:h-6 [&_svg]:w-6 [&_svg]:shrink-0',
   ].join(' '),
+  // A carousel's step arrow (previous / next under a carousel's track): a round outline with no fill, the card fill on
+  // hover, faded at either end of the track. Drawn through `CarouselStepButton`, never set at a call site.
+  stepper: [
+    'grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ods-border',
+    'bg-transparent text-ods-text-primary transition-colors duration-200',
+    'hover:bg-ods-card',
+    'disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:bg-transparent',
+    KIND_FOCUS,
+    '[&_svg]:h-5 [&_svg]:w-5 [&_svg]:shrink-0',
+  ].join(' '),
 } as const;
 
 export type ButtonKind = keyof typeof BUTTON_KIND_CLASS;
