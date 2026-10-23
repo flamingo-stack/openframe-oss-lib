@@ -7,10 +7,8 @@ import com.openframe.data.repository.timetracking.TimeEntryProjectionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
+import com.openframe.publishing.api.model.TenantScopedId;
 import com.openframe.publishing.api.spec.Projection;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,8 +21,7 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
-// The ticket title every time entry keeps (ticketTitle, by ticketId); TimeEntryCascadeAspect writes it until the mode is
-// events.
+// The ticket title every time entry keeps (ticketTitle, by ticketId); TimeEntryCascadeAspect writes it until the mode is events.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -90,7 +87,7 @@ public class TicketOnTimeEntriesProjection implements Projection<TicketEvent, Ti
 
         Set<String> tenantIds = withTicket.stream().map(TimeEntryTicketView::getTenantId).collect(toSet());
         Set<String> ticketIds = withTicket.stream().map(TimeEntryTicketView::getTicketId).collect(toSet());
-        Map<TenantTicket, String> titles = findTitles(tenantIds, ticketIds);
+        Map<TenantScopedId, String> titles = findTitles(tenantIds, ticketIds);
 
         List<Mismatch> mismatches = withTicket.stream()
             .map(timeEntry -> toMismatch(timeEntry, titles))
@@ -100,12 +97,12 @@ public class TicketOnTimeEntriesProjection implements Projection<TicketEvent, Ti
     }
 
     // The current title of every ticket of the batch, in one query.
-    private Map<TenantTicket, String> findTitles(Set<String> tenantIds, Set<String> ticketIds) {
-        Map<TenantTicket, String> titles = new HashMap<>();
+    private Map<TenantScopedId, String> findTitles(Set<String> tenantIds, Set<String> ticketIds) {
+        Map<TenantScopedId, String> titles = new HashMap<>();
         for (Ticket ticket : ticketProjectionRepository.findTitles(tenantIds, ticketIds)) {
             String tenantId = ticket.getTenantId();
             String ticketId = ticket.getId();
-            TenantTicket key = new TenantTicket(tenantId, ticketId);
+            TenantScopedId key = new TenantScopedId(tenantId, ticketId);
             String title = ticket.getTitle();
             titles.put(key, title);
         }
@@ -113,11 +110,11 @@ public class TicketOnTimeEntriesProjection implements Projection<TicketEvent, Ti
     }
 
     // Null when the copy matches its ticket.
-    private static Mismatch toMismatch(TimeEntryTicketView timeEntry, Map<TenantTicket, String> titles) {
+    private static Mismatch toMismatch(TimeEntryTicketView timeEntry, Map<TenantScopedId, String> titles) {
         String tenantId = timeEntry.getTenantId();
         String timeEntryId = timeEntry.getId();
         String ticketId = timeEntry.getTicketId();
-        TenantTicket key = new TenantTicket(tenantId, ticketId);
+        TenantScopedId key = new TenantScopedId(tenantId, ticketId);
         if (!titles.containsKey(key)) {
             return new Mismatch(tenantId, timeEntryId, "ticket " + ticketId + " is gone");
         }
@@ -127,15 +124,5 @@ public class TicketOnTimeEntriesProjection implements Projection<TicketEvent, Ti
             return null;
         }
         return new Mismatch(tenantId, timeEntryId, "title \"" + copiedTitle + "\" differs from ticket's \"" + sourceTitle + "\"");
-    }
-
-    // A tenant's ticket: the reconcile reads tickets across tenants.
-    @Getter
-    @EqualsAndHashCode
-    @AllArgsConstructor
-    private static final class TenantTicket {
-
-        private final String tenantId;
-        private final String ticketId;
     }
 }

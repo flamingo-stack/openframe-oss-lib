@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.openframe.data.service.machine.MachineFields.UPDATED_AT;
@@ -28,6 +29,10 @@ public class MachineWriter {
 
     private static final String MACHINE_ID_FIELD = "machineId";
     private static final String ID_FIELD = "_id";
+    // The machine fields MachineEvent carries; a write of any other field changes no projection, so it is not published.
+    private static final String HOSTNAME_PATH = MachineFields.HOSTNAME.path();
+    private static final String NICKNAME_PATH = MachineFields.NICKNAME.path();
+    static final Set<String> EVENT_PATHS = Set.of(HOSTNAME_PATH, NICKNAME_PATH);
 
     private final MongoTemplate mongoTemplate;
     // Present only while publishing is on: a write here must reach the projections like a MachineRepository save.
@@ -54,7 +59,7 @@ public class MachineWriter {
         Update mongoUpdate = update.toMongoUpdate();
         FindAndModifyOptions returnOld = FindAndModifyOptions.options().returnNew(false);
         Supplier<Machine> write = () -> mongoTemplate.findAndModify(query, mongoUpdate, returnOld, Machine.class);
-        Machine before = runPublishing(machineId, write);
+        Machine before = runPublishingIfEventFields(machineId, update, write);
 
         if (before == null) {
             log.info("Machine update matched nothing, skipping: machineId={}, fields={}",
@@ -67,6 +72,16 @@ public class MachineWriter {
 
         log.debug("Updated machineId={}, fields={}", machineId, update.paths());
         return Optional.of(new MachineWriteResult(before, after));
+    }
+
+    // Status and heartbeat writes stay outside a transaction, so they neither publish nor meet a write conflict.
+    private Machine runPublishingIfEventFields(String machineId, MachineUpdate update, Supplier<Machine> write) {
+        Set<String> paths = update.paths();
+        boolean changesEvent = paths.stream().anyMatch(EVENT_PATHS::contains);
+        if (!changesEvent) {
+            return write.get();
+        }
+        return runPublishing(machineId, write);
     }
 
     // The write returns the old document, so the publisher reads the machine again after it, in the same transaction.

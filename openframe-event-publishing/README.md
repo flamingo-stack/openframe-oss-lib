@@ -159,6 +159,7 @@ lambda and runs it with its rows in one transaction:
 |---|---|
 | `publishChanged(spec, write)` | A write that returns the new state: `findAndModify` with `returnNew`, `save`. |
 | `publishChangedByIds(spec, ids, write)` | A write that returns only a count, such as `updateMulti`: the documents are read again after it. |
+| `republishByIds(spec, ids, write)` | A write beside the documents that changes what their projections read, such as a directory link. Raises their version in the same transaction, then publishes their current state. |
 | `publishDeleted(spec, write)` | A write that returns what it removed: `findAndRemove`, `findAllAndRemove`. |
 | `publishDeleted(spec, stored, write)` | A delete that returns nothing, when the documents are known before it. Their tenant and version are read again by id. |
 | `publishDeletedByIds(spec, ids, write)` | A delete by ids that returns nothing. |

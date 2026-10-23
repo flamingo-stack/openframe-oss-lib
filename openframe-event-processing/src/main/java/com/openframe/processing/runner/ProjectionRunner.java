@@ -137,6 +137,7 @@ public class ProjectionRunner {
     private void recordOutcome(Timer.Sample sample, String name, Outcome outcome, String aggregateId, PublishedRecord<?> record) {
         switch (outcome) {
             case APPLIED -> metrics.recordApplied(sample, name);
+            case UNCHANGED -> metrics.recordUnchanged(sample, name);
             case HANDED_OVER -> metrics.recordHandedOver(sample, name);
             case SKIPPED -> metrics.recordSkipped(sample, name);
             case DELETED -> metrics.recordDeleted(sample, name);
@@ -157,6 +158,10 @@ public class ProjectionRunner {
             return Outcome.HANDED_OVER;
         }
         long changes = projection.countChanges(record, inlineLimit);
+        // Most events change no copy, such as a save that kept the name; their version is still stored.
+        if (changes == 0) {
+            return Outcome.UNCHANGED;
+        }
         if (changes < inlineLimit) {
             projection.apply(record);
             return Outcome.APPLIED;
@@ -173,6 +178,7 @@ public class ProjectionRunner {
 
     private enum Outcome {
         APPLIED,
+        UNCHANGED,
         HANDED_OVER,
         SKIPPED,
         DELETED

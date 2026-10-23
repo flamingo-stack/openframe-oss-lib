@@ -111,7 +111,12 @@ public class AggregateSpecRegistry {
         for (AggregateSpec<?, ?> spec : byType.values()) {
             String type = spec.getType();
             Class<?> eventClass = PublishedDocuments.eventClassOf(spec);
-            typeByEvent.put(eventClass, type);
+            String typeWithSameEvent = typeByEvent.putIfAbsent(eventClass, type);
+            if (typeWithSameEvent != null) {
+                String eventName = eventClass.getName();
+                throw new IllegalStateException("The specs of " + typeWithSameEvent + " and " + type + " have the same event class "
+                        + eventName + ", so a Projection bean of it would not know its type");
+            }
             List<Projection<?, ?>> own = new ArrayList<>(spec.projections());
             byTypeName.put(type, own);
         }

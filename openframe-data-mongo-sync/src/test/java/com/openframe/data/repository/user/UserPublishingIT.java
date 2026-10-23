@@ -32,6 +32,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -100,6 +101,21 @@ class UserPublishingIT {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> readEvent(OutboxEvent row) {
         return (Map<String, Object>) row.getPayload().get("event");
+    }
+
+    // The reconcile reads only the names, not whole users.
+    @Test
+    void theReconcileRead_returnsTheNamesOnly() {
+        User saved = userRepository.save(user("Ada", "Lovelace"));
+        Set<String> tenantIds = Set.of("tenant-1");
+        Set<String> userIds = Set.of(saved.getId());
+
+        List<User> found = userRepository.findByTenantIdInAndIdIn(tenantIds, userIds);
+
+        assertThat(found).singleElement().satisfies(user -> {
+            assertThat(user.getFirstName()).isEqualTo("Ada");
+            assertThat(user.getEmail()).isNull();
+        });
     }
 
     private static User user(String firstName, String lastName) {

@@ -4,6 +4,7 @@ import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.config.EventsConfiguration;
 import com.openframe.publishing.config.PublishedAggregateStartupCheck;
+import com.openframe.publishing.fixture.Widgets.UnversionedWidgetSpec;
 import com.openframe.publishing.fixture.Widgets.Widget;
 import com.openframe.publishing.fixture.Widgets.WidgetEvent;
 import com.openframe.publishing.fixture.Widgets.WidgetProjection;
@@ -105,6 +106,20 @@ class AggregateSpecRegistryTest {
         assertThatThrownBy(() -> new AggregateSpecRegistry(provider(new WidgetSpec(), new WidgetSpec()), projectionBeans()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Two specs have the type organizations");
+    }
+
+    @Test
+    void twoSpecsWithOneEventClass_failAtStartup() {
+        UnversionedWidgetSpec gadgets = new UnversionedWidgetSpec() {
+            @Override
+            public String getType() {
+                return "gadgets";
+            }
+        };
+
+        assertThatThrownBy(() -> new AggregateSpecRegistry(provider(new WidgetSpec(), gadgets), projectionBeans()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("have the same event class");
     }
 
     @Test

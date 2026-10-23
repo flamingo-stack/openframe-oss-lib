@@ -1,6 +1,5 @@
 package com.openframe.data.repository.ticket;
 
-import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
@@ -15,6 +14,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -453,15 +453,21 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 .set(FIELD_TITLE, title)
                 .set(FIELD_UPDATED_AT, Instant.now());
 
-        Supplier<UpdateResult> write = () -> mongoTemplate.updateFirst(query, update, Ticket.class);
+        FindAndModifyOptions returnNew = FindAndModifyOptions.options().returnNew(true);
+        Supplier<Ticket> write = () -> mongoTemplate.findAndModify(query, update, returnNew, Ticket.class);
         OutboxPublisher publisher = outboxPublisher.getIfAvailable();
         TicketAggregateSpec spec = ticketSpec.getIfAvailable();
         if (publisher == null || spec == null) {
             write.get();
             return;
         }
-        List<String> ids = List.of(ticketId);
-        publisher.publishChangedByIds(spec, ids, write);
+        try {
+            publisher.publishChanged(spec, write);
+        } catch (OptimisticLockingFailureException conflict) {
+            // A ticket save committed during the transaction; the title is a plain $set, so writing it again is safe.
+            log.info("Title write of ticket {} met a concurrent save, writing it again", ticketId);
+            publisher.publishChanged(spec, write);
+        }
     }
 
     @Override

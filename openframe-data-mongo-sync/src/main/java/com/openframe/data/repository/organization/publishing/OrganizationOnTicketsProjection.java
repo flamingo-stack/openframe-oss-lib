@@ -7,10 +7,8 @@ import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
 import com.openframe.publishing.api.model.ReconciliationResult;
+import com.openframe.publishing.api.model.TenantScopedId;
 import com.openframe.publishing.api.spec.Projection;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -87,7 +85,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
             return ReconciliationResult.allMatch();
         }
 
-        Map<TenantOrganization, String> organizationNames = organizationNames(withOrganization);
+        Map<TenantScopedId, String> organizationNames = organizationNames(withOrganization);
 
         List<Mismatch> mismatches = withOrganization.stream()
             .map(ticket -> mismatchOf(ticket, organizationNames))
@@ -97,7 +95,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
     }
 
     // The current name of every organization of the batch, in one query.
-    private Map<TenantOrganization, String> organizationNames(List<TicketOrganizationView> tickets) {
+    private Map<TenantScopedId, String> organizationNames(List<TicketOrganizationView> tickets) {
         Set<String> tenantIds = tickets.stream().map(TicketOrganizationView::getTenantId).collect(toSet());
         Set<String> organizationIds = tickets.stream().map(TicketOrganizationView::getOrganizationId).collect(toSet());
 
@@ -110,17 +108,17 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
                 HashMap::putAll);
     }
 
-    private static TenantOrganization buildTenantOrganization(Organization organization) {
+    private static TenantScopedId buildTenantOrganization(Organization organization) {
         String tenantId = organization.getTenantId();
         String organizationId = organization.getOrganizationId();
-        return new TenantOrganization(tenantId, organizationId);
+        return new TenantScopedId(tenantId, organizationId);
     }
 
-    private static Mismatch mismatchOf(TicketOrganizationView ticket, Map<TenantOrganization, String> organizationNames) {
+    private static Mismatch mismatchOf(TicketOrganizationView ticket, Map<TenantScopedId, String> organizationNames) {
         String tenantId = ticket.getTenantId();
         String organizationId = ticket.getOrganizationId();
         String ticketId = ticket.getId();
-        TenantOrganization key = new TenantOrganization(tenantId, organizationId);
+        TenantScopedId key = new TenantScopedId(tenantId, organizationId);
         if (!organizationNames.containsKey(key)) {
             return new Mismatch(tenantId, ticketId, "organization " + organizationId + " is gone");
         }
@@ -130,15 +128,5 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
             return null;
         }
         return new Mismatch(tenantId, ticketId, "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
-    }
-
-    // A tenant's organization: an organizationId is unique only inside its tenant.
-    @Getter
-    @EqualsAndHashCode
-    @AllArgsConstructor
-    private static final class TenantOrganization {
-
-        private final String tenantId;
-        private final String organizationId;
     }
 }

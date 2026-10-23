@@ -13,8 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
-// The projections' time entry writes. Not TimeEntryRepository: that one is tenant-aware and not created in the shared
-// stream, where the projections run, so every write here names its tenant.
+// The projections' time entry writes; TimeEntryRepository is tenant-aware and absent in the stream, so each names the tenant.
 @Repository
 @RequiredArgsConstructor
 public class TimeEntryProjectionRepository {
