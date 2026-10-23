@@ -662,7 +662,7 @@ const TRUST_PANEL_SHAPES: Record<
   compliance: { mark: 'logo', action: 'badge', lines: { phone: 4, wide: 1 } },
   documents: { mark: 'glyph', action: 'button', lines: { phone: 1, wide: 1 } },
   subprocessors: { mark: 'glyph', action: 'none', lines: { phone: 1, wide: 1 } },
-  ai: { mark: 'glyph', action: 'none', lines: { phone: 6, wide: 2 } },
+  ai: { mark: 'glyph', action: 'none', lines: { phone: 7, wide: 2 } },
 };
 
 /**
