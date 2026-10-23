@@ -69,6 +69,9 @@ interface RoadmapGridSkeletonProps {
   columns?: 1 | 2;
 }
 
+/** The loading cards' vote handler: they draw the vote row and take no vote. */
+const NO_VOTE = () => {};
+
 function RoadmapGridSkeleton({
   region = true,
   count = ROADMAP_GRID_SKELETON_CARDS,
@@ -79,7 +82,8 @@ function RoadmapGridSkeleton({
     <LoadingRegion label="Loading the roadmap" announce={region} className={roadmapGridClass(columns, showLeftMargin)}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="min-w-0" data-loading-item>
-          <RoadmapCard loading />
+          {/* With its vote row, as every card of the loaded grid has (the grid always passes `onVote`). */}
+          <RoadmapCard loading onVote={NO_VOTE} />
         </div>
       ))}
     </LoadingRegion>
