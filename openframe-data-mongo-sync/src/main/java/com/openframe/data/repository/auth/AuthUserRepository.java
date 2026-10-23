@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
+public interface AuthUserRepository extends MongoRepository<AuthUser, String>, CustomAuthUserRepository {
 
     /**
      * Find single ACTIVE user by email

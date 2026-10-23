@@ -13,6 +13,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,7 @@ import static com.openframe.authz.support.SsoTestFixtures.activeUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -148,5 +150,13 @@ class UserServiceTest {
         when(repository.findById("ghost")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updatePassword("ghost", "p")).hasMessageContaining("User not found");
+    }
+
+    @Test
+    void shouldStampLastLoginWithATargetedUpdateInsteadOfASave() {
+        service.touchLastLogin(" Ada@Acme.com ", "t");
+
+        verify(repository).updateLastLogin(eq("ada@acme.com"), eq("t"), any(Instant.class));
+        verify(repository, never()).save(any(AuthUser.class));
     }
 }

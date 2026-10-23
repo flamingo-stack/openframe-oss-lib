@@ -4,16 +4,22 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.service.machine.MachineUpdate;
+import com.openframe.data.service.machine.MachineWriter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.List;
+
+import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
+import static com.openframe.data.service.machine.MachineFields.STATUS;
+import static com.openframe.data.service.machine.MachineFields.TELEMETRY_STATUS;
+import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +27,7 @@ import java.util.List;
 public class DeviceHeartbeatOfflineDetectionService {
 
     private final MachineRepository machineRepository;
+    private final MachineWriter machineWriter;
 
     @Value("${openframe.device.heartbeat.offline-threshold-seconds:130}")
     private long offlineThresholdSeconds;
@@ -39,17 +46,24 @@ public class DeviceHeartbeatOfflineDetectionService {
             return;
         }
         log.info("Found {} stale online device(s) with no heartbeat since {}s ago, marking as OFFLINE", stale.size(), offlineThresholdSeconds);
-        List<Machine> staleMachines = new ArrayList<>(stale.values());
-        staleMachines.forEach(this::markDeviceAsOffline);
-        machineRepository.saveAll(staleMachines);
-        log.info("Successfully marked {} device(s) as OFFLINE", staleMachines.size());
+        long marked = stale.values().stream()
+                .filter(machine -> markDeviceAsOffline(machine, threshold))
+                .count();
+        log.info("Successfully marked {} device(s) as OFFLINE", marked);
     }
 
-    private void markDeviceAsOffline(Machine machine) {
-        machine.setTelemetryStatus(TelemetryStatus.OFFLINE);
+    // The guard re-checks the read in Mongo, so a heartbeat that lands meanwhile is never overwritten and no write conflicts.
+    private boolean markDeviceAsOffline(Machine machine, Instant threshold) {
+        MachineUpdate update = machineUpdate().set(TELEMETRY_STATUS, TelemetryStatus.OFFLINE);
+        Criteria guard = Criteria.where(LAST_SEEN.path()).lt(threshold);
         if (machine.getStatus() == DeviceStatus.ONLINE) {
-            machine.setStatus(DeviceStatus.OFFLINE);
+            update.set(STATUS, DeviceStatus.OFFLINE);
+            guard.and(STATUS.path()).is(DeviceStatus.ONLINE);
+        } else {
+            guard.and(TELEMETRY_STATUS.path()).is(TelemetryStatus.ONLINE);
         }
-        log.info("Marking device {} as OFFLINE (status={}, lastSeen={})", machine.getMachineId(), machine.getStatus(), machine.getLastSeen());
+        String machineId = machine.getMachineId();
+        log.info("Marking device {} as OFFLINE (status={}, lastSeen={})", machineId, machine.getStatus(), machine.getLastSeen());
+        return machineWriter.update(machineId, guard, update).isPresent();
     }
 }
