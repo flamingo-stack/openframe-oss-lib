@@ -47,6 +47,7 @@ public class GenericJsonMessageProcessor {
         if (deserializedKafkaMessage == null || Boolean.TRUE.equals(deserializedKafkaMessage.getSkipProcessing())) {
             return;
         }
+        deserializedKafkaMessage.setMessageType(type);
         IntegratedToolEnrichedData enrichedData = getExtraParams(deserializedKafkaMessage, type);
         Map<Destination, MessageHandler> handlersForType =
                 handlers.getOrDefault(type.getEventHandlerType(), Map.of());
