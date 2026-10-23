@@ -6,14 +6,11 @@ import com.openframe.api.mapper.ScriptFilterOptionMapper;
 import com.openframe.data.document.rmm.filter.ExecutionFacetField;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
 import com.openframe.data.document.rmm.filter.ScriptExecutionQueryFilter;
-import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 import java.util.Map;
 
@@ -36,7 +33,7 @@ public class ScriptExecutionFilterService {
                                                       ScriptExecutionFilterInput input,
                                                       String search) {
         String tenantId = tenantIdProvider.getTenantId();
-        ScriptExecutionQueryFilter filter = toQueryFilter(input);
+        ScriptExecutionQueryFilter filter = ScriptExecutionHistoryFilter.of(input);
 
         Map<String, Integer> initiators = scriptExecutionRepository.facet(tenantId, owner, filter, search, ExecutionFacetField.INITIATOR);
         Map<String, Integer> statuses = scriptExecutionRepository.facet(tenantId, owner, filter, search, ExecutionFacetField.STATUS);
@@ -48,24 +45,6 @@ public class ScriptExecutionFilterService {
                 .statuses(optionMapper.selfLabeled(statuses))
                 .machines(optionMapper.machineLabeled(machines))
                 .filteredCount((int) filteredCount)
-                .build();
-    }
-
-    // History is a user-facing view — platform bootstrap runs are never part of it
-    private static final List<ExecutionSource> HIDDEN_SOURCES = List.of(ExecutionSource.SYSTEM_BOOTSTRAP);
-
-    private static ScriptExecutionQueryFilter toQueryFilter(ScriptExecutionFilterInput input) {
-        ScriptExecutionQueryFilter.ScriptExecutionQueryFilterBuilder builder =
-                ScriptExecutionQueryFilter.builder().excludedSources(HIDDEN_SOURCES);
-        if (input == null) {
-            return builder.build();
-        }
-        return builder
-                .statuses(input.getStatuses())
-                .initiatedByIds(input.getInitiatorIds())
-                .machineIds(input.getMachineIds())
-                .dispatchedAtFrom(input.getDispatchedAtFrom())
-                .dispatchedAtTo(input.getDispatchedAtTo())
                 .build();
     }
 }
