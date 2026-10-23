@@ -13,6 +13,7 @@ import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
+import com.openframe.authz.web.SignupSourceCookie;
 import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
@@ -195,7 +196,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
             String[] names = resolveNames(request, authentication, user);
             String ticket = signupTicketService.create(email, names[0], names[1], provider,
                     OidcUserUtils.emailVerifiedClaimAllows(user),
-                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null));
+                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null),
+                    SignupSourceCookie.read(request));
             log.info("event=sso-login-continue-registration-mobile provider={}", provider);
             foundAtRoot(response, "/oauth/signup-continue?signupTicket=" + urlEncode(ticket)
                     + "&redirectTo=" + urlEncode(payload.redirectTo()));
