@@ -10,6 +10,8 @@ public interface EmailService {
     void sendOwnershipTransferEmail(String toEmail);
 
     void sendAccountDeletedEmail(String toEmail);
+
+    void sendDownloadLinkEmail(String toEmail, String downloadId);
 }
 
 

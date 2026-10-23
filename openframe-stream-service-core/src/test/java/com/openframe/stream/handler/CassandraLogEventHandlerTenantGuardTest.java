@@ -1,17 +1,19 @@
 package com.openframe.stream.handler;
 
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.config.ToolEventProperties;
+import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -24,16 +26,17 @@ import static org.mockito.Mockito.verifyNoInteractions;
  * stamped team_id, or a MeshCentral event with an unknown domain) is DROPPED, never written with
  * a NULL tenant_id into the tenant-keyed unified_logs primary key.
  */
-class DebeziumCassandraMessageHandlerTenantGuardTest {
+class CassandraLogEventHandlerTenantGuardTest {
 
-    private UnifiedLogEventRepository repository;
-    private DebeziumCassandraMessageHandler handler;
+    private CassandraLogEventRepository repository;
+    private CassandraLogEventHandler handler;
 
     @BeforeEach
     void setUp() {
-        repository = mock(UnifiedLogEventRepository.class);
-        handler = new DebeziumCassandraMessageHandler(
-                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator());
+        repository = mock(CassandraLogEventRepository.class);
+        handler = new CassandraLogEventHandler(
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
+                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
     }
 
     private static DeserializedDebeziumMessage message(String tenantId) {
@@ -65,6 +68,6 @@ class DebeziumCassandraMessageHandlerTenantGuardTest {
         IntegratedToolEnrichedData enriched = new IntegratedToolEnrichedData();
         enriched.setTenantId("tenant-a");
         handler.handle(message("tenant-a"), enriched);
-        verify(repository).save(any(UnifiedLogEvent.class));
+        verify(repository).save(any(CassandraLogEvent.class));
     }
 }
