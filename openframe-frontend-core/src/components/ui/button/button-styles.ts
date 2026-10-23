@@ -288,11 +288,14 @@ export const BUTTON_KIND_CLASS = {
   // A whole card or tile that is one click target (a card's hit area, a media tile, a summary that expands): the
   // content is the look; the button gives it the click, the keyboard and the focus ring.
   card: ['relative block w-full rounded-md text-left text-ods-text-primary', KIND_FOCUS].join(' '),
-  // A cell of a bar (a header's or a chat's top bar): the bar's full height, an icon or a short label, secondary
-  // until hovered. The current cell (`data-state="active"`: the header's open section) takes the pressed surface and
-  // the primary text.
+  // A cell of a bar (a header's or a chat's top bar) or of a card row: the row's full height, an icon or a short
+  // label, secondary until hovered. The current cell (`data-state="active"`: the header's open section) takes the
+  // pressed surface and the primary text. Full height is `self-stretch` + `min-h-full`, never `h-full`: a set
+  // `height: 100%` turns off `align-self: stretch`, so in a row with no fixed height (a chat entity card) the cell
+  // fell to the row's top with a divider only as tall as its icon. `min-h-full` keeps a bar's height in a parent
+  // that is not a flex row.
   cell: [
-    'flex h-full shrink-0 items-center justify-center gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
+    'flex min-h-full shrink-0 items-center justify-center self-stretch gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
     'bg-transparent text-ods-text-secondary text-h4 transition-colors duration-200',
     'hover:bg-ods-bg-hover hover:text-ods-text-primary aria-expanded:text-ods-text-primary',
     'data-[state=active]:bg-ods-bg-active data-[state=active]:text-ods-text-primary',
