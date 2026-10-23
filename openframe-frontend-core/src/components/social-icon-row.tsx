@@ -20,6 +20,11 @@ interface SocialIconRowProps {
    *  presentation-only here — the caller must still gate which links it passes
    *  server-side. Default false keeps a single flat row. */
   groupByVisibility?: boolean;
+  /**
+   * The links are a read list (a person's profiles, whose number is the data's): every button carries
+   * `data-loading-item`, as the caller's loading state's buttons do. Default false (a fixed set, e.g. the defaults).
+   */
+  listItems?: boolean;
 }
 
 const defaultLinks: SocialIconLink[] = [
@@ -93,6 +98,7 @@ export function SocialIconRow({
   variant,
   compact = false,
   groupByVisibility = false,
+  listItems = false,
 }: SocialIconRowProps) {
   // ── Compact design rationale ──────────────────────────────────────────
   // Page-level identity/share rows read as METADATA, not CTAs. The major
@@ -110,6 +116,7 @@ export function SocialIconRow({
   // stretch untouched.
   const resolvedVariant = variant !== undefined ? variant : compact ? 'transparent' : 'outline';
 
+  const marker = { 'data-loading-item': listItems || undefined };
   const renderButton = (link: SocialIconLink, index: number) => {
     const ariaLabel = link.label || link.platform;
     return link.onClick ? (
@@ -120,6 +127,7 @@ export function SocialIconRow({
         {...socialIconButtonProps(compact)}
         aria-label={ariaLabel}
         onClick={link.onClick}
+        {...marker}
       >
         {renderSocialIcon(link.platform)}
       </Button>
@@ -134,6 +142,7 @@ export function SocialIconRow({
         href={link.href}
         openInNewTab
         aria-label={ariaLabel}
+        {...marker}
       >
         {renderSocialIcon(link.platform)}
       </Button>

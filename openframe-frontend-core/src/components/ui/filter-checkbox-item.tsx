@@ -6,7 +6,7 @@ import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 
 /** The item's row, box and text, read by the item and by its skeleton, so the skeleton is the item's size. */
 const ITEM_ROW_CLASS = 'flex items-center gap-3 border-b border-ods-border bg-ods-card last:border-b-0';
@@ -36,7 +36,10 @@ export function FilterCheckboxItem({
   count,
   disabled,
   className,
+  ...props
 }: FilterCheckboxItemProps) {
+  // A list's markers (`data-loading-item`) ride on the row in both forms.
+  const markers = loadingItemProps(props);
   // In a page's loading state the item is its skeleton: a label the page states is drawn for real, a read one
   // ('' there) and the count are bars.
   if (useLoadingScope()) {
@@ -45,11 +48,13 @@ export function FilterCheckboxItem({
         label={typeof label === 'string' ? label || undefined : label}
         count={count !== undefined}
         className={className}
+        {...markers}
       />
     );
   }
   return (
     <div
+      {...markers}
       className={cn(
         ITEM_ROW_CLASS,
         disabled ? 'cursor-wait opacity-70' : 'cursor-pointer transition-colors hover:bg-ods-bg-hover',
@@ -84,17 +89,18 @@ export function FilterCheckboxItem({
  * A filter checkbox while its facet is read: the same row and an unchecked box, the label for real when given (else
  * a bar), and with `count` the count as a bar.
  */
-export function FilterCheckboxItemSkeleton({
+function FilterCheckboxItemSkeleton({
   label,
   count = false,
   className,
+  ...props
 }: {
   label?: ReactNode;
   count?: boolean;
   className?: string;
 }) {
   return (
-    <div className={cn(ITEM_ROW_CLASS, itemPaddingClass(count), className)} aria-hidden>
+    <div className={cn(ITEM_ROW_CLASS, itemPaddingClass(count), className)} aria-hidden {...loadingItemProps(props)}>
       <span className={cn(ITEM_BOX_CLASS, 'border-ods-text-secondary bg-ods-card')} />
       {label ? (
         <span className={ITEM_LABEL_CLASS}>{label}</span>

@@ -14,7 +14,7 @@ export interface DataTableCursorFooterProps extends Omit<CursorPaginationProps, 
 
 /**
  * Cursor-based prev/next footer for a `DataTable`. Place after `<DataTable.Body>`.
- * Thin wrapper around `<CursorPagination>` with a border-top separator to match the legacy `Table` look.
+ * Thin wrapper around `<CursorPagination>` with a border-top separator above it.
  */
 export function DataTableCursorFooter({ className, currentCount, showInfo, ...rest }: DataTableCursorFooterProps) {
   const table = useDataTableContext();

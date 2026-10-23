@@ -3,23 +3,35 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
+import { LoadingFallback } from '../../loading/loading-fallback';
 import { LoadingRegion } from '../../loading/loading-region';
-import { useLoadingScope } from '../loading-scope';
+import { LoadingItems, useLoadingScope } from '../loading-scope';
 import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
 import { useDataTableLoadMoreStore } from './data-table-load-more';
+import { PlaceholderRows, ReservedEmptyState } from './data-table-reserved-rows';
 import { DataTableRow } from './data-table-row';
-import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState, ROW_STACK_CLASSES } from './data-table-skeleton';
+import { ROW_STACK_CLASSES } from './data-table-row-classes';
+import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
   loading?: boolean;
+  /**
+   * While loading, the table holds placeholder rows (the host gives `useDataTable` one full page of them) and the body
+   * draws them with their REAL cells in a loading scope: every part of a cell draws its own loading form, so the
+   * loading row is the loaded row's own layout. Without it a loading row is one bar per column.
+   */
+  loadingCells?: boolean;
   /** @deprecated Use `emptyState` instead. Legacy single-line message; mapped to the empty state's title. */
   emptyMessage?: string;
   /** Props for the empty state (NoData) shown when there are no rows. Overrides `emptyMessage`. */
   emptyState?: NoDataProps;
-  /** Skeleton row count when loading. Default `10`. */
+  /**
+   * Skeleton rows while loading: ONE FULL PAGE. Default the table's page size (`state.pagination.pageSize`), else
+   * `minRows`, else `DATA_TABLE_SKELETON_ROWS` (a typical count for an unpaged table).
+   */
   skeletonRows?: number;
   /**
    * The loading state announces itself (`LoadingRegion`: aria-busy plus one "Loading results" status).
@@ -99,9 +111,10 @@ const getNoRows = () => 0;
  */
 export function DataTableBody<T = unknown>({
   loading: loadingProp,
+  loadingCells = false,
   emptyMessage,
   emptyState,
-  skeletonRows = 10,
+  skeletonRows: skeletonRowsProp,
   loadingRegion = true,
   className,
   rowClassName,
@@ -113,6 +126,8 @@ export function DataTableBody<T = unknown>({
   renderSubRow,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>();
+  const skeletonRows =
+    skeletonRowsProp ?? dataTablePageSize(table) ?? (minRows && minRows > 0 ? minRows : DATA_TABLE_SKELETON_ROWS);
   // In a page's loading state the body is loading: its rows are the row skeletons.
   const inScope = useLoadingScope();
   const loading = inScope || loadingProp;
@@ -125,10 +140,33 @@ export function DataTableBody<T = unknown>({
   // has rows to continue takes them over; an empty or loading one leaves the
   // footer drawing its own, as before.
   const loadMore = useDataTableLoadMoreStore();
-  const loadMoreRows = useSyncExternalStore(loadMore.subscribe, loadMore.getSkeletonRows, getNoRows);
+  // The next page the footer is reading: its page size, drawn as that many loading rows.
+  const loadMorePageSize = useSyncExternalStore(loadMore.subscribe, loadMore.getSkeletonRows, getNoRows);
   useIsomorphicLayoutEffect(() => (hasRows ? loadMore.registerRowsBody() : undefined), [loadMore, hasRows]);
 
   const skeletonRowClassName = typeof rowClassName === 'string' ? rowClassName : undefined;
+
+  if (loading && loadingCells && hasRows) {
+    return (
+      <LoadingFallback
+        label="Loading results"
+        status={loadingRegion && !inScope}
+        className={cn(ROW_STACK_CLASSES, className)}
+      >
+        {rows.map((row, index) => (
+          <DataTableRow<T>
+            key={row.id}
+            row={row}
+            drawsCells
+            compact={compact}
+            rowHeightClassName={rowHeightClassName}
+            className={typeof rowClassName === 'function' ? rowClassName(row.original, index) : rowClassName}
+            data-loading-item
+          />
+        ))}
+      </LoadingFallback>
+    );
+  }
 
   if (loading && !hasRows) {
     return (
@@ -138,11 +176,18 @@ export function DataTableBody<T = unknown>({
         announce={loadingRegion && !inScope}
         className={cn(ROW_STACK_CLASSES, className)}
       >
-        <DataTableSkeleton
-          rows={skeletonRows}
-          className={skeletonRowClassName}
-          rowHeightClassName={rowHeightClassName}
-        />
+        <LoadingItems count={skeletonRows}>
+          {index => (
+            <DataTableRow
+              row={null}
+              loadingIndex={index}
+              compact={compact}
+              className={skeletonRowClassName}
+              rowHeightClassName={rowHeightClassName}
+              data-loading-item
+            />
+          )}
+        </LoadingItems>
       </LoadingRegion>
     );
   }
@@ -176,7 +221,7 @@ export function DataTableBody<T = unknown>({
   }
 
   // Load-more rows are row slots too, so they count against `minRows`.
-  const padCount = minRows ? Math.max(0, minRows - rows.length - loadMoreRows) : 0;
+  const padCount = minRows ? Math.max(0, minRows - rows.length - loadMorePageSize) : 0;
 
   return (
     <div className={cn(ROW_STACK_CLASSES, className)}>
@@ -194,15 +239,23 @@ export function DataTableBody<T = unknown>({
             rowHeightClassName={rowHeightClassName}
             className={cls}
             subRow={renderSubRow?.(item)}
+            data-loading-item
           />
         );
       })}
-      {loadMoreRows > 0 && (
-        <DataTableSkeleton
-          rows={loadMoreRows}
-          className={skeletonRowClassName}
-          rowHeightClassName={rowHeightClassName}
-        />
+      {loadMorePageSize > 0 && (
+        <LoadingItems count={loadMorePageSize}>
+          {index => (
+            <DataTableRow
+              row={null}
+              loadingIndex={index}
+              compact={compact}
+              className={skeletonRowClassName}
+              rowHeightClassName={rowHeightClassName}
+              data-loading-item
+            />
+          )}
+        </LoadingItems>
       )}
       {padCount > 0 && <PlaceholderRows count={padCount} rowHeightClassName={rowHeightClassName} />}
     </div>

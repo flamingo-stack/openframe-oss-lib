@@ -35,7 +35,7 @@ import type { PluggableList } from 'unified';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { useLoadingScope } from '../loading-scope';
+import { LoadingItems, useLoadingScope } from '../loading-scope';
 import { buildBaseComponents, MARKDOWN_H1_CLASS, MARKDOWN_H2_CLASS, MARKDOWN_PARAGRAPH_CLASS } from './base-components';
 import { HeadingIdMapContext, HeadingLineOffsetContext, useHeadingIdMap, type HeadingSection } from './heading-ids';
 import {
@@ -186,6 +186,11 @@ export interface MarkdownEngineProps {
   skeletonSections?: number;
   /** Lines of the one paragraph a loading body draws when it names no sections. Default 3. */
   skeletonLines?: number;
+  /** A loading body opens with its own `# ` title (a legal document's): its title row is drawn first. */
+  skeletonTitle?: boolean;
+  /** The content is still being read: the body draws its skeleton (the `skeleton*` shape). A loading scope does the
+   *  same while `content` is empty. */
+  loading?: boolean;
 }
 
 /** Lines a loading body draws when its caller names no shape. */
@@ -204,7 +209,12 @@ const SKELETON_LEAD_LINES = { phone: 5, wide: 3 } as const;
 export const MARKDOWN_RENDERER_CLASS = 'simple-markdown-renderer';
 const RENDERER_CLASS = MARKDOWN_RENDERER_CLASS;
 const CONTENT_WRAPPER_CLASS = 'content-wrapper max-w-none';
-const ARTICLE_CLASS = 'prose prose-lg max-w-none';
+/**
+ * The rendered body. `[&>*:last-child]:mb-0`: the last block never pushes what follows the document further down.
+ * Prose's own last-child reset has zero specificity, so a block that sets its own margin (a table's `my-6`) kept it,
+ * and a document's distance to the next section depended on which block it ended with.
+ */
+const ARTICLE_CLASS = 'prose prose-lg max-w-none [&>*:last-child]:mb-0';
 
 /**
  * One memoized completed block of a streaming message. Parent-level memos
@@ -419,11 +429,12 @@ export const MarkdownEngine = memo(function MarkdownEngineGate(props: MarkdownEn
   // In a page's loading state with no content yet (it is read) the body is its skeleton; content it is given
   // there is the page's own and renders as it is.
   const inScope = useLoadingScope();
-  if (inScope && !props.content) {
+  if ((inScope && !props.content) || props.loading) {
     return (
       <MarkdownEngineSkeleton
         sections={props.skeletonSections}
         lines={props.skeletonLines}
+        title={props.skeletonTitle}
         textSize={props.textSize}
         className={props.className}
       />
@@ -496,16 +507,19 @@ export function MarkdownEngineSkeleton({
             </div>
           ) : null}
           {sections ? (
-            Array.from({ length: sections }, (_, section) => (
-              <div key={section}>
-                <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
-                  <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
-                </h2>
-                {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
-                  <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
-                ))}
-              </div>
-            ))
+            // loading-standard-ok(ITEM_MARK): a document's sections are its markdown text; the loaded body has no items to mark
+            <LoadingItems count={sections}>
+              {() => (
+                <div>
+                  <h2 className={cn(MARKDOWN_H2_CLASS, textSizes.h2)}>
+                    <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
+                  </h2>
+                  {SKELETON_SECTION_PARAGRAPHS.map((paragraphLines, index) => (
+                    <ParagraphBar key={index} lines={paragraphLines} className={paragraphClass} />
+                  ))}
+                </div>
+              )}
+            </LoadingItems>
           ) : (
             <ParagraphBar lines={lines} className={paragraphClass} />
           )}

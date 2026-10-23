@@ -7,7 +7,7 @@ import { CardsStrip } from '../features/cards-strip';
 import { LoadingRegion } from '../loading/loading-region';
 import { Card } from '../ui/card';
 import { useLoadingScope } from '../ui/loading-scope';
-import { PersonCell, PersonCellSkeleton } from '../ui/people-cell';
+import { PersonCell } from '../ui/people-cell';
 
 /** One customer quote chip: the line, who said it, their logo, and the case study it opens. */
 export interface QuoteCard {
@@ -21,11 +21,14 @@ export interface QuoteCard {
   href: string;
 }
 
-export interface QuoteCardTileProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
-  quote: QuoteCard;
+interface QuoteCardTileOptions extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   /** The strip's loop clone: it keeps the click but stays out of the a11y tree. */
   decorative?: boolean;
 }
+
+/** The quote, or `loading` while it is read: the card then draws its own loading form (also in a loading scope). */
+export type QuoteCardTileProps = QuoteCardTileOptions &
+  ({ quote: QuoteCard; loading?: boolean } | { quote?: undefined; loading: true });
 
 const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
 
@@ -34,7 +37,9 @@ const QUOTE_CARD_CLASS = 'relative p-[var(--spacing-system-sf)]';
  * their logo, and the whole card opening the case study it comes from. The
  * strip draws one per quote; a page that shows a single story draws one alone.
  */
-export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteCardTileProps) {
+export function QuoteCardTile({ quote, decorative, className, loading, ...props }: QuoteCardTileProps) {
+  // ONE switch: while the quote is read (`loading`, or a loading scope) the card is its own loading form.
+  if (useLoadingScope() || loading || !quote) return <QuoteCardTileSkeleton className={className} />;
   return (
     <Card
       variant="panel"
@@ -49,11 +54,11 @@ export function QuoteCardTile({ quote, decorative, className, ...props }: QuoteC
 }
 
 /** One quote card while it loads: the same card and the person cell's own skeleton. */
-export function QuoteCardTileSkeleton({ className }: { className?: string }) {
+function QuoteCardTileSkeleton({ className }: { className?: string }) {
   return (
     <Card variant="panel" className={cn(QUOTE_CARD_CLASS, className)}>
       <LoadingRegion label="Loading a customer story">
-        <PersonCellSkeleton size="lg" />
+        <PersonCell loading size="lg" />
       </LoadingRegion>
     </Card>
   );
@@ -63,25 +68,30 @@ export interface QuoteCardsStripProps {
   quotes: readonly QuoteCard[];
   /** The quotes are being read (the host's query runs): the strip draws its own skeleton. A page's loading scope does too. */
   loading?: boolean;
-  /** The quote cards the skeleton draws: one screen of the host's strip. */
+  /**
+   * The quote cards the skeleton draws: the number of quotes the host reads (its limit). Default
+   * `QUOTE_STRIP_SKELETON_CARDS`, a typical count for a host that states none.
+   */
+  skeletonCount?: number;
+  /** @deprecated Ignored: the skeleton draws `skeletonCount` (a list draws its full count, never a fold). */
   fold?: number;
   className?: string;
 }
 
-/** The quote cards a strip's skeleton draws when its host names none: a chip is about a third of a wide page's row. */
-const QUOTE_STRIP_FOLD = 4;
+/** The quote cards a strip's skeleton draws when its host names no count: a typical count. */
+const QUOTE_STRIP_SKELETON_CARDS = 4;
 
 /** The strip while its quotes are read: the same strip engine, still, with the quote card's own skeleton. */
-function QuoteCardsStripSkeleton({ fold, className }: { fold: number; className?: string }) {
+function QuoteCardsStripSkeleton({ count, className }: { count: number; className?: string }) {
   return (
     <CardsStrip
       className={className}
       showTitle={false}
       showChevrons={false}
       autoScroll={false}
-      items={Array.from({ length: fold }, (_, index) => ({ key: `quote-${index}` }))}
+      items={Array.from({ length: count }, (_, index) => ({ key: `quote-${index}` }))}
       itemKey={item => item.key}
-      renderCard={(_item, ctx) => <QuoteCardTileSkeleton key={ctx.cardKey} className="shrink-0" />}
+      renderCard={(_item, ctx) => <QuoteCardTile key={ctx.cardKey} loading className="shrink-0" />}
     />
   );
 }
@@ -93,9 +103,11 @@ function QuoteCardsStripSkeleton({ fold, className }: { fold: number; className?
  * keeps the click but stays out of the a11y tree. While its quotes are read (a page's loading scope with none handed
  * over, or `loading`) it is its own skeleton; read and empty, it renders nothing.
  */
-export function QuoteCardsStrip({ quotes, loading = false, fold = QUOTE_STRIP_FOLD, className }: QuoteCardsStripProps) {
+export function QuoteCardsStrip({ quotes, loading = false, skeletonCount, className }: QuoteCardsStripProps) {
   const scoped = useLoadingScope();
-  if ((scoped && quotes.length === 0) || loading) return <QuoteCardsStripSkeleton fold={fold} className={className} />;
+  if ((scoped && quotes.length === 0) || loading) {
+    return <QuoteCardsStripSkeleton count={skeletonCount ?? QUOTE_STRIP_SKELETON_CARDS} className={className} />;
+  }
   if (quotes.length === 0) return null;
   return (
     <CardsStrip

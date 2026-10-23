@@ -230,6 +230,13 @@ export interface SectionHeadingProps {
   tone?: HeadingAccentTone;
   /** Extra classes on the outer row. */
   className?: string;
+  /**
+   * The title and intro are read data still being read: the heading draws its own loading form (the eyebrow and the
+   * action for real, a bar at the heading's type step, `intro` lines at the intro's). `true` draws the title alone;
+   * an object also says how many intro lines the loaded heading has and the title bar's width. The heading renders on
+   * the server and cannot read a loading scope: a host passes its own switch (`useLoadingScope() || loading`).
+   */
+  loading?: boolean | { intro?: boolean | 1 | 2 | 3; titleWidth?: string };
 }
 
 /**
@@ -272,7 +279,24 @@ export function SectionHeading({
   platform,
   tone = 'accent',
   className,
+  loading,
 }: SectionHeadingProps) {
+  // loading-standard-ok(PROP_ONLY_SWITCH): a server component cannot read the scope; the host passes its own switch
+  if (loading) {
+    const shape = loading === true ? {} : loading;
+    return (
+      <SectionHeadingSkeleton
+        level={level}
+        eyebrow={eyebrow}
+        titleWidth={shape.titleWidth}
+        intro={shape.intro}
+        action={action}
+        platform={platform}
+        tone={tone}
+        className={className}
+      />
+    );
+  }
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
   const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
@@ -324,7 +348,7 @@ export function SectionHeading({
   );
 }
 
-export interface SectionHeadingSkeletonProps {
+interface SectionHeadingSkeletonProps {
   level?: 'page' | 'section';
   /** The eyebrow: static copy, drawn as it is. */
   eyebrow?: ReactNode;
@@ -344,7 +368,7 @@ export interface SectionHeadingSkeletonProps {
  * stack, the eyebrow for real, a one-line bar at the heading's type step and a bar per intro line at the intro's.
  * No heading element is drawn: the loaded heading is the page's one.
  */
-export function SectionHeadingSkeleton({
+function SectionHeadingSkeleton({
   level = 'section',
   eyebrow,
   titleWidth = 'w-2/3',

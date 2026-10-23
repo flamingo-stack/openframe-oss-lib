@@ -32,7 +32,7 @@ import { cn } from '../../../utils/cn';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack } from '../../ui/avatar-stack';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge, StatusBadgeSkeleton } from '../../ui/status-badge';
+import { StatusBadge } from '../../ui/status-badge';
 
 /** Same heuristic as DeliveryTable's local helper. Inlined so the row
  *  primitive owns its complete rendering contract. */
@@ -51,8 +51,7 @@ function getRelativeTime(timestamp: number): string {
   return 'today';
 }
 
-export interface DeliveryRowProps {
-  item: DeliveryItem;
+interface DeliveryRowBaseProps {
   /** When set, the row becomes a clickable anchor. The ticket-side
    *  linked-card composes this from `buildDevSectionUrl('delivery', id)`
    *  which carries `?search=<id>` — the delivery list filters to that
@@ -76,6 +75,11 @@ export interface DeliveryRowProps {
   className?: string;
 }
 
+/** A row of a task (`item`), or, while the task is read, `loading` with no task: the row draws its skeleton. A loading
+ *  scope does the same. */
+export type DeliveryRowProps = DeliveryRowBaseProps &
+  ({ item: DeliveryItem; loading?: false } | { item?: undefined; loading: true });
+
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
 const ROW_INNER_CLASS =
   'flex w-full flex-col items-start justify-between gap-[12px] content-md:flex-row content-md:gap-[16px]';
@@ -88,9 +92,10 @@ const ROW_META_CLASS =
   'flex w-full flex-shrink-0 flex-row items-center gap-2 self-stretch content-md:w-auto content-md:flex-col content-md:items-end content-md:self-start';
 const ROW_BASE_CLASS = 'block p-[12px] text-inherit no-underline transition-colors duration-150 content-md:p-[16px]';
 
-export function DeliveryRow({ item, href, target, caption, id, className }: DeliveryRowProps) {
-  // While the page is read the task is not known: the row is its skeleton.
-  if (useLoadingScope()) return <DeliveryRowSkeleton caption={caption} className={className} />;
+export function DeliveryRow({ item, loading, href, target, caption, id, className }: DeliveryRowProps) {
+  // While the page is read (or the host reads the task) the task is not known: the row is its skeleton.
+  const inScope = useLoadingScope();
+  if (inScope || loading) return <DeliveryRowSkeleton caption={caption} className={className} />;
   const taskType = item.taskType as keyof typeof TASK_TYPE_LABELS;
   const typeBadgeLabel = TASK_TYPE_LABELS[taskType] || 'TASK';
   const typeBadgeTextColor = TASK_TYPE_TEXT_COLORS[taskType] || '';
@@ -200,7 +205,7 @@ export function DeliveryRow({ item, href, target, caption, id, className }: Deli
  * A delivery row while its task is read: the same row, its caption for real, the title, subtitle and description
  * as bars at their type steps, and the two badges as their skeletons.
  */
-export function DeliveryRowSkeleton({ caption, className }: Pick<DeliveryRowProps, 'caption' | 'className'>) {
+function DeliveryRowSkeleton({ caption, className }: Pick<DeliveryRowProps, 'caption' | 'className'>) {
   return (
     <div className={cn(ROW_BASE_CLASS, 'scroll-mt-24', className)} aria-hidden>
       <div className={ROW_INNER_CLASS}>
@@ -217,8 +222,8 @@ export function DeliveryRowSkeleton({ caption, className }: Pick<DeliveryRowProp
           </div>
         </div>
         <div className={ROW_META_CLASS}>
-          <StatusBadgeSkeleton variant="card" />
-          <StatusBadgeSkeleton variant="card" />
+          <StatusBadge loading text="" variant="card" />
+          <StatusBadge loading text="" variant="card" />
         </div>
       </div>
     </div>

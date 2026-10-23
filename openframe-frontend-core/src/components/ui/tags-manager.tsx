@@ -17,6 +17,7 @@ import {
 import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
+import { Label } from './label';
 import { Tag } from './tag';
 
 export interface TagItem {
@@ -167,7 +168,8 @@ export function TagsManager({
         <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
           {/* Anchor container */}
           <PopoverPrimitive.Anchor asChild>
-            <label
+            <Label
+              variant="surface"
               className={cn(
                 'flex min-h-11 w-full cursor-text flex-wrap items-center gap-2 rounded-[6px] border px-3 py-1 content-md:min-h-12',
                 'transition-colors duration-200',
@@ -234,16 +236,18 @@ export function TagsManager({
 
               {/* Clear all button — shown when tags are selected */}
               {selectedTags.length > 0 && !disabled && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   onClick={handleClearAll}
-                  className="flex flex-shrink-0 items-center justify-center transition-opacity hover:opacity-70 [&_svg]:size-4 content-md:[&_svg]:size-6"
+                  className="shrink-0"
                   aria-label="Clear all tags"
                 >
                   <XmarkCircleIcon className="text-ods-text-secondary" />
-                </button>
+                </Button>
               )}
-            </label>
+            </Label>
           </PopoverPrimitive.Anchor>
 
           {/* Dropdown */}
@@ -287,6 +291,7 @@ export function TagsManager({
                           className="flex items-center gap-1 border-b border-ods-border px-2 py-1 last:border-b-0"
                         >
                           <Input
+                            userValue
                             ref={editInputRef}
                             value={editingName}
                             onChange={e => setEditingName(e.target.value)}

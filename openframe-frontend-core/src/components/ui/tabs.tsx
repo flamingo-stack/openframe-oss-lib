@@ -118,35 +118,6 @@ function TabsTriggerSkeleton({
   );
 }
 
-/**
- * A tab list whose tabs are not known until a read: the list's own frame (the bordered rail for `admin-rail`) and
- * `count` trigger skeletons.
- */
-function TabsListSkeleton({
-  variant = 'default',
-  count,
-  labels,
-  className,
-}: {
-  variant?: TabsVariant;
-  /** How many tabs, when their names are read. */
-  count?: number;
-  /** The tabs' names, when the page states them (drawn as they are). */
-  labels?: string[];
-  className?: string;
-}) {
-  const tabs: Array<string | undefined> = labels ?? Array.from({ length: count ?? 0 }, () => undefined);
-  const list = (
-    <div aria-hidden className={cn(tabsListVariantClasses[variant], className)}>
-      {tabs.map((label, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tabs never reorder
-        <TabsTriggerSkeleton key={i} variant={variant} label={label} />
-      ))}
-    </div>
-  );
-  return variant === 'admin-rail' ? <div className={ADMIN_RAIL_WRAPPER_CLASS}>{list}</div> : list;
-}
-
 /** @deprecated Use `TabNavigation` from `components/ui/tab-navigation`. See {@link Tabs}. */
 const TabsContent = forwardRef<
   ElementRef<typeof TabsPrimitive.Content>,
@@ -163,4 +134,4 @@ const TabsContent = forwardRef<
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, TabsTriggerSkeleton, TabsListSkeleton };
+export { Tabs, TabsList, TabsTrigger, TabsContent };

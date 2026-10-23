@@ -4,7 +4,8 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -49,6 +50,11 @@ const formatTokenCount = (count: number): string => {
 const hasAnyBreakdownRow = (breakdown?: ModelUsageBreakdown): breakdown is ModelUsageBreakdown =>
   !!breakdown && !!(breakdown.haikuRewriter || breakdown.haikuClassifier || breakdown.haikuSummarizer);
 
+/** The inline row, loaded and loading. */
+const MODEL_DISPLAY_ROW_CLASS = 'flex items-center gap-1 text-h6';
+/** The provider's mark: 16px, as the loaded icons. */
+const PROVIDER_ICON_BOX_CLASS = 'flex shrink-0 items-center justify-center';
+
 const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
   (
     {
@@ -62,15 +68,34 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       hitRatePct,
       inputTokens,
       outputTokens,
+      loading = false,
       ...props
     },
     ref,
   ) => {
+    // ONE switch: while the model metadata loads (or in the page's loading state) the SAME row draws the provider's
+    // mark box (only when the provider has a mark), the name as a bar, and the "tokens used" tail as a bar when the
+    // loaded row would draw it (once the context window is known).
+    const isLoading = useLoadingScope() || loading;
     const icon = getProviderIcon(provider);
     const name = displayName || modelName;
     // v2 spells the counts out ("372 / 50,000 tokens used"); classic keeps them short.
     const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     const formatCount = (count: number) => (isV2 ? count.toLocaleString('en-US') : formatTokenCount(count));
+
+    if (isLoading) {
+      return (
+        <div ref={ref} aria-hidden className={cn(MODEL_DISPLAY_ROW_CLASS, className)} {...props}>
+          {icon && (
+            <span className={PROVIDER_ICON_BOX_CLASS}>
+              <MediaSkeleton.Icon size="sm" />
+            </span>
+          )}
+          <TextLineSkeleton type="h6" className="w-24" />
+          {contextWindow != null && <TextLineSkeleton type="h6" className="ml-auto w-32" />}
+        </div>
+      );
+    }
 
     // Inline pill: provider icon + model name + "X / Y tokens used".
     // The "tokens used" tail renders as soon as `contextWindow` is known
@@ -79,8 +104,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // usage frame. Showing "— / 200K tokens used" early gives users the
     // model's capacity context without waiting for the first byte.
     const inline = (
-      <div ref={ref} className={cn('flex items-center gap-1 text-ods-text-secondary', 'text-h6', className)} {...props}>
-        {icon && <span className="flex items-center justify-center">{icon}</span>}
+      <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
+        {icon && <span className={PROVIDER_ICON_BOX_CLASS}>{icon}</span>}
         <span className="font-body">{name}</span>
         {contextWindow != null && (
           <span className="ml-auto opacity-70 text-h6">
@@ -167,33 +192,4 @@ function BreakdownRow({
 
 ModelDisplay.displayName = 'ModelDisplay';
 
-export interface ModelDisplaySkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
-  /** Also render the right-aligned "tokens used" tail placeholder. The token
-   *  tail only appears once `contextWindow` is known, so the default skeleton
-   *  shows just the left part (provider icon + model name). */
-  showTokens?: boolean;
-}
-
-/**
- * Loading placeholder for the {@link ModelDisplay} inline pill. Mirrors its
- * layout (provider icon + model name) so the footer doesn't shift when the
- * real model metadata resolves. The "tokens used" tail is opt-in via
- * `showTokens`, matching ModelDisplay (which only renders it once the context
- * window is known).
- */
-const ModelDisplaySkeleton = React.forwardRef<HTMLDivElement, ModelDisplaySkeletonProps>(
-  ({ className, showTokens = false, ...props }, ref) => (
-    <div ref={ref} aria-hidden className={cn('flex items-center gap-1 text-h6', className)} {...props}>
-      {/* provider icon */}
-      <UnifiedSkeleton className="h-5 w-4 shrink-0 rounded-sm" />
-      {/* model name */}
-      <UnifiedSkeleton className="h-5 w-24" />
-      {/* "X / Y tokens used" tail — only when tokens are expected */}
-      {showTokens && <UnifiedSkeleton className="ml-auto h-3 w-32" />}
-    </div>
-  ),
-);
-
-ModelDisplaySkeleton.displayName = 'ModelDisplaySkeleton';
-
-export { ModelDisplay, ModelDisplaySkeleton };
+export { ModelDisplay };

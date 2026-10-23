@@ -18,13 +18,15 @@ export interface DataTableRowCountProps {
   pluralize?: (count: number, itemName: string) => string;
   /** Hide when the count is zero. Default `true`. */
   hideWhenEmpty?: boolean;
+  /** The rows are still being read (a table holding placeholder rows): the number is a bar, as in a loading scope. */
+  loading?: boolean;
   className?: string;
 }
 
 const ROW_COUNT_CLASS = 'whitespace-nowrap text-ods-text-secondary text-h6';
 
 /** The row count while the rows are read: the same line, the number a bar and the (plural) item name real. */
-export function DataTableRowCountSkeleton({ label, className }: { label: string; className?: string }) {
+function DataTableRowCountSkeleton({ label, className }: { label: string; className?: string }) {
   return (
     <span className={cn(ROW_COUNT_CLASS, className)} aria-hidden>
       <TextLineSkeleton type="inherit" as="span" className="inline-block w-6 align-top" /> {label}
@@ -50,11 +52,12 @@ export function DataTableRowCount({
   totalCount,
   pluralize,
   hideWhenEmpty = true,
+  loading = false,
   className,
 }: DataTableRowCountProps) {
   const table = useDataTableContext();
   // While the page is read the count is not known: the number is a bar beside the item name.
-  const inScope = useLoadingScope();
+  const inScope = useLoadingScope() || loading;
   const count = totalCount ?? table.getRowModel().rows.length;
   if (inScope) {
     return <DataTableRowCountSkeleton label={pluralize?.(2, itemName) ?? `${itemName}s`} className={className} />;

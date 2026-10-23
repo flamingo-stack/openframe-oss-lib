@@ -3,6 +3,7 @@
 import { type KeyboardEvent, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Send03Icon } from '../icons-v2-generated';
+import { Button } from './button';
 import { Input } from './input';
 import { type TicketNote, TicketNoteCard } from './ticket-note-card';
 
@@ -57,20 +58,17 @@ export function TicketNotesSection({
               disabled={isAddingNote}
             />
           </div>
-          <button
+          <Button
+            variant="outline"
+            size="icon"
             type="button"
             onClick={handleSend}
             disabled={!noteText.trim() || isAddingNote}
-            className={cn(
-              'flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] content-md:h-12 content-md:w-12',
-              'border border-ods-border bg-ods-card',
-              'transition-colors hover:bg-ods-bg-hover',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-            )}
+            className="shrink-0"
             aria-label="Send note"
           >
-            <Send03Icon className="size-6 text-ods-text-secondary" />
-          </button>
+            <Send03Icon />
+          </Button>
         </div>
       )}
     </div>

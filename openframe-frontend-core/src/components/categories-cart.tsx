@@ -6,8 +6,8 @@ import { ICON_SIZE } from '../styles/component-sizes';
 import type { RealCategoryCardProps } from '../types/category';
 import { cn } from '../utils/cn';
 import { TextLineSkeleton } from './loading/unified-skeleton';
-import { useLoadingScope } from './ui/loading-scope';
-import { VendorIcon, VendorIconSkeleton } from './vendor-icon';
+import { LoadingItems, useLoadingScope } from './ui/loading-scope';
+import { VendorIcon } from './vendor-icon';
 
 /** The card's layout, read by the card and by its skeleton, so the skeleton is the card's size. */
 const CARD_SHELL_CLASS = 'group relative block rounded-lg border border-ods-border bg-ods-card p-3 pb-4 md:p-4 md:pb-6';
@@ -16,6 +16,8 @@ const ICON_STRIP_CLASS = 'relative h-8 w-full overflow-hidden md:h-10';
 const ICON_ROW_CLASS = 'flex w-full gap-2 md:gap-3';
 /** The strip's vendor icons: one size and frame for the loaded icon and its skeleton. */
 const VENDOR_ICON_SIZE = 'md';
+/** The vendor a loading icon is handed: none is read yet. */
+const EMPTY_VENDOR = { title: '' };
 const VENDOR_ICON_CLASS = 'overflow-hidden rounded opacity-60 grayscale filter';
 /** The inner stacks only stack: a one-column grid, not another column flexbox (WEBVIEW-001). */
 const INFO_STACK_CLASS = 'grid grid-cols-1 gap-2';
@@ -24,8 +26,11 @@ const FOOT_ROW_CLASS = 'flex items-start justify-between gap-4 md:items-end md:g
 const ARROW_BOX_CLASS =
   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md border border-ods-border bg-transparent transition-colors md:h-12 md:w-12';
 const ARROW_ICON_CLASS = `${ICON_SIZE.step} text-ods-text-primary transition-colors`;
-/** As many icon boxes as the widest strip shows (the strip clips the rest). */
-const ICON_STRIP_FOLD = 20;
+/**
+ * Vendor icons the loading card draws when its host states no `vendorLimit`: a typical read (the OpenMSP home page
+ * reads 14 vendors per category). The strip clips what does not fit, loaded and loading alike.
+ */
+export const CATEGORIES_CART_SKELETON_VENDORS = 14;
 
 /** The strip's fades at both ends, into the card's own surface. */
 function StripFades() {
@@ -44,9 +49,10 @@ export function CategoriesCart({
   vendorCount = 0,
   subcategoryCount = 0,
   isLoading = false,
+  vendorLimit,
   className = '',
 }: RealCategoryCardProps) {
-  if (useLoadingScope() || isLoading) return <CategoriesCartSkeleton className={className} />;
+  if (useLoadingScope() || isLoading) return <CategoriesCartSkeleton vendors={vendorLimit} className={className} />;
   return (
     <Link
       href={`/vendors?category=${category.slug}`}
@@ -58,7 +64,13 @@ export function CategoriesCart({
           <div className={ICON_ROW_CLASS}>
             {/* A category with no vendors leaves the strip empty: it keeps its height, and draws no stand-in icons. */}
             {vendors.map(vendor => (
-              <VendorIcon key={vendor.id} vendor={vendor} size={VENDOR_ICON_SIZE} className={VENDOR_ICON_CLASS} />
+              <VendorIcon
+                key={vendor.id}
+                data-loading-item
+                vendor={vendor}
+                size={VENDOR_ICON_SIZE}
+                className={VENDOR_ICON_CLASS}
+              />
             ))}
           </div>
           <StripFades />
@@ -96,16 +108,30 @@ export function CategoriesCart({
  * A category card while its category is read: the card's frame, the vendor strip as icon boxes, a bar for the name,
  * the counts line and two description lines, and the arrow box as it is. Not a link: there is no category yet.
  */
-export function CategoriesCartSkeleton({ className }: { className?: string }) {
+function CategoriesCartSkeleton({
+  vendors = CATEGORIES_CART_SKELETON_VENDORS,
+  className,
+}: {
+  /** Vendor icons to draw: the vendors the host reads per category. Default `CATEGORIES_CART_SKELETON_VENDORS`. */
+  vendors?: number;
+  className?: string;
+}) {
   return (
     <div className={cn(CARD_SHELL_CLASS, className)} aria-hidden>
       <div className={CARD_STACK_CLASS}>
         <div className={ICON_STRIP_CLASS}>
           <div className={ICON_ROW_CLASS}>
-            {Array.from({ length: ICON_STRIP_FOLD }, (_, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton icons never reorder
-              <VendorIconSkeleton key={index} size={VENDOR_ICON_SIZE} className="rounded" />
-            ))}
+            <LoadingItems count={vendors}>
+              {() => (
+                <VendorIcon
+                  data-loading-item
+                  loading
+                  vendor={EMPTY_VENDOR}
+                  size={VENDOR_ICON_SIZE}
+                  className="rounded"
+                />
+              )}
+            </LoadingItems>
           </div>
           <StripFades />
         </div>

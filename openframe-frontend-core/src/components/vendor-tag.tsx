@@ -7,6 +7,7 @@ import { formatClassification } from '../utils/format';
 import { type VendorClassificationIconConfig, vendorClassificationCopy } from '../utils/vendor-classification';
 import { resolveIcon } from './chat/utils/icon-library';
 import { MediaSkeleton, TextLineSkeleton } from './loading/unified-skeleton';
+import { useLoadingScope } from './ui/loading-scope';
 
 export interface VendorTagProps {
   type:
@@ -108,7 +109,7 @@ const VENDOR_TAG_SIZE_CLASS = { sm: 'px-2 py-1', md: 'px-2.5 py-1.5' } as const;
 const VENDOR_TAG_LABEL_TYPE = 'h5';
 
 /** A vendor's tag while it is read: the tag's own frame, an icon box and a bar at the label's type step. */
-export function VendorTagSkeleton({ size = 'md', className }: { size?: 'sm' | 'md'; className?: string }) {
+function VendorTagSkeleton({ size = 'md', className }: { size?: 'sm' | 'md'; className?: string }) {
   return (
     <div aria-hidden className={cn(VENDOR_TAG_FRAME_CLASS, VENDOR_TAG_SIZE_CLASS[size], className)}>
       <MediaSkeleton.Icon size="sm" className="shrink-0 rounded-sm" />
@@ -118,6 +119,8 @@ export function VendorTagSkeleton({ size = 'md', className }: { size?: 'sm' | 'm
 }
 
 export function VendorTag({ type, text, className = '', hidden = false, size = 'md', accentColor }: VendorTagProps) {
+  // ONE switch: while the vendor is read (a loading scope) the tag is its own loading form.
+  const loading = useLoadingScope();
   // Base classes for the tag container
   const baseClasses = cn(VENDOR_TAG_FRAME_CLASS, VENDOR_TAG_SIZE_CLASS[size]);
 
@@ -254,6 +257,7 @@ export function VendorTag({ type, text, className = '', hidden = false, size = '
     }
   };
 
+  if (loading) return <VendorTagSkeleton size={size} className={cn(className, hidden && 'invisible')} />;
   const { text: displayText, icon, textColor } = getTagContent();
 
   return (
