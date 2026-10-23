@@ -74,6 +74,22 @@ class AggregateSpecRegistryTest {
     }
 
     @Test
+    void resolveType_namesTheTypeOfAProjection_andRefusesAnUnknownOne() {
+        WidgetProjection projection = new WidgetProjection("widget-copies");
+        WidgetSpec spec = new WidgetSpec() {
+            @Override
+            public List<Projection<WidgetEvent, ?>> projections() {
+                return List.of(projection);
+            }
+        };
+        AggregateSpecRegistry registry = new AggregateSpecRegistry(provider(spec), projectionBeans());
+        WidgetProjection unknown = new WidgetProjection("widget-elsewhere");
+
+        assertThat(registry.resolveType(projection)).isEqualTo(spec.getType());
+        assertThatThrownBy(() -> registry.resolveType(unknown)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void twoProjectionsWithOneName_failAtStartup() {
         WidgetSpec twoCopiesWithOneName = new WidgetSpec() {
             @Override

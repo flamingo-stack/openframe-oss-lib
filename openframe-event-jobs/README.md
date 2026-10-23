@@ -5,7 +5,7 @@ Three scheduled jobs around the published events:
 - the **backfill** writes the current state of every document of a published type to the outbox, so its compacted
   topic holds the latest event of each one;
 - the **reconciliation** asks every projection of a type switched on, such as the organization name on tickets,
-  which of its projected items differ from their source, and reports them. It repairs nothing; a new backfill run does;
+  which of its projected items differ from their source, reports them, and publishes those sources again to repair them;
 - the **projection tasks** apply the large updates of a projection, for example a new organization name on 50,000
   tickets, in batches instead of inside one Kafka record. One task per projection, tenant and source document, in
   `projection_tasks`; a newer event of that source starts its task again from the first item.
@@ -155,8 +155,11 @@ tenant is removed, its items may count as missing sources until its cleanup dele
 Reconciliation of organization-on-tickets in tenant <id>: 3 mismatch(es), for example [<ticket id>: name "Old" differs from organization's "New", ...]
 ```
 
-**Repair**: while the aspects write the projection, a mismatch is a missed aspect write; fix the aspect or the items.
-Once the projection applies events (stage 6), a new backfill run of the source type brings every item up to date.
+**Repair** is automatic: after the second read, the job publishes the current state of each confirmed mismatch's source
+again (`PublishedAggregates.publishCurrent`, each source once per batch), and the projection re-applies it, since the
+version store applies an equal version. The run still counts what it found, so the gauge shows the drift before the
+repair, and the next run should find none. A mismatch whose source is gone (`sourceId` null) has nothing to publish. A
+new backfill run of the type is still the way to repair everything at once.
 
 **Add a projection**: return it from its spec's `projections()` and implement `reconcile`; the job picks it up at the
 next start. Its `name()` is the job id (`reconciliation:<name>`) and the metric tag.

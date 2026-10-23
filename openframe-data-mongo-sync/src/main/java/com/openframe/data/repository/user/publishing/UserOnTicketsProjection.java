@@ -138,12 +138,12 @@ public class UserOnTicketsProjection implements Projection<UserEvent, TicketUser
                                        Map<TenantScopedId, String> names) {
         TenantScopedId key = new TenantScopedId(tenantId, userId);
         if (!names.containsKey(key)) {
-            return new Mismatch(tenantId, ticketId, "user " + userId + " is gone");
+            return new Mismatch(tenantId, ticketId, null, "user " + userId + " is gone");
         }
         String sourceName = names.get(key);
         if (sourceName.isEmpty() || Objects.equals(sourceName, copiedName)) {
             return null;
         }
-        return new Mismatch(tenantId, ticketId, "name \"" + copiedName + "\" differs from user's \"" + sourceName + "\"");
+        return new Mismatch(tenantId, ticketId, userId, "name \"" + copiedName + "\" differs from user's \"" + sourceName + "\"");
     }
 }

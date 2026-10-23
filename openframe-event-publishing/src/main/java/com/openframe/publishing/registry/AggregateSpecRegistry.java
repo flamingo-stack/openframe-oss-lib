@@ -104,6 +104,16 @@ public class AggregateSpecRegistry {
         return projectionsByType.getOrDefault(type, List.of());
     }
 
+    // The type whose events the projection applies.
+    public String resolveType(Projection<?, ?> projection) {
+        for (Map.Entry<String, List<Projection<?, ?>>> entry : projectionsByType.entrySet()) {
+            if (entry.getValue().contains(projection)) {
+                return entry.getKey();
+            }
+        }
+        throw new IllegalArgumentException("No spec has the projection " + projection.name());
+    }
+
     // The same projection can be both in projections() and a bean; it counts once. A bean of an event no spec has is a mistake.
     private Map<String, List<Projection<?, ?>>> collectProjections(List<Projection<?, ?>> beans) {
         Map<Class<?>, String> typeByEvent = new HashMap<>();

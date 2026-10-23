@@ -68,6 +68,7 @@ class TicketOnTimeEntriesProjectionTest {
 
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("e2", "e3");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("ticket-1", null);
     }
 
     @Test
