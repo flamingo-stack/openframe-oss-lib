@@ -2,6 +2,7 @@
 
 import { cn } from '../../../utils/cn';
 import { MonitorOffIcon } from '../../icons-v2-generated';
+import { Button } from '../../ui/button';
 
 /*
  * The always-visible "your screen is being controlled" indicator: a border
@@ -21,13 +22,9 @@ export function RemoteSessionBorder({ className }: { className?: string }) {
  */
 export function RemoteSessionPill({ onEndSession }: { onEndSession: () => void }) {
   return (
-    <button
-      type="button"
-      className="flex items-center gap-[var(--spacing-system-xsf)] rounded-b-md bg-ods-warning px-[var(--spacing-system-m)] py-[var(--spacing-system-xs)] text-ods-text-on-accent"
-      onClick={onEndSession}
-    >
+    <Button variant="warning" type="button" onClick={onEndSession}>
       <MonitorOffIcon size={24} color="currentColor" />
-      <span className="whitespace-nowrap text-h3">End Session</span>
-    </button>
+      <span className="whitespace-nowrap">End Session</span>
+    </Button>
   );
 }

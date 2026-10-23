@@ -4,6 +4,7 @@ import type React from 'react';
 import { type MouseEvent, type ReactNode, useMemo } from 'react';
 import { formatDate, formatTime } from '../../../utils/format-date';
 import { ArrowRightUpIcon } from '../../icons-v2-generated';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import {
   Button,
   type ColumnDef,
@@ -16,7 +17,9 @@ import {
   Tag,
   TruncateText,
   useDataTable,
+  useLoadingScope,
 } from '../../ui';
+import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { OSTypeBadge } from '../os-type-badge';
 import { getDeviceName } from './device-name';
 import { getDeviceStatusConfig } from './device-status';
@@ -69,7 +72,9 @@ export function getDeviceActionsColumn<T extends DeviceRow = DeviceRow>(
 /** Opens the device's page in a new tab. A button, because the row is itself a link and a link cannot hold a link. */
 function OpenDeviceButton({ device }: { device: DeviceRow }) {
   const { getDeviceHref } = useDevicesViewConfig();
-  const href = getDeviceHref?.(device);
+  // The button is static chrome: drawn real while the row is read, and inert.
+  const loading = useLoadingScope();
+  const href = loading ? undefined : getDeviceHref?.(device);
   const open = (event: MouseEvent) => {
     event.preventDefault();
     if (href) window.open(href, '_blank', 'noopener,noreferrer');
@@ -83,6 +88,7 @@ function OpenDeviceButton({ device }: { device: DeviceRow }) {
         leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
         aria-label="Open in new tab"
         className="bg-ods-card"
+        disabled={loading}
       />
     </div>
   );
@@ -138,13 +144,19 @@ export interface DevicesTableBodyProps<T extends DeviceRow = DeviceRow> {
   showHeader?: boolean;
 }
 
+/** One page of rows still being read: an id each, and nothing a cell can show (every cell draws its loading form). */
+function deviceLoadingRows<T extends DeviceRow>(count: number): T[] {
+  // A row the table can key: the fields a device row requires, empty. The cells read nothing else.
+  return Array.from({ length: count }, (_, index) => ({ id: `loading-${index}`, machineId: '', status: '' }) as T);
+}
+
 export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
   devices,
   isLoading,
   loadingRegion,
   emptyState,
   emptyMessage = 'No devices found.',
-  skeletonRows = 10,
+  skeletonRows,
   stickyHeaderOffset,
   footerSlot,
   deviceFilters,
@@ -168,8 +180,15 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
     return actionsColumn ? [...base, actionsColumn, open] : [...base, open];
   }, [deviceFilters, filtersPending, actionsColumn, hideColumns, disableColumnFilters]);
 
+  // While loading the table holds one page of empty rows, drawn with the real cells: every part of a row draws its
+  // own loading form (`DataTable.Body`'s `loadingCells`), so a loading row is the loaded row's own layout.
+  const loadingRows = useMemo(
+    () => (isLoading ? deviceLoadingRows<T>(skeletonRows ?? DATA_TABLE_SKELETON_ROWS) : null),
+    [isLoading, skeletonRows],
+  );
+
   const table = useDataTable<T>({
-    data: devices,
+    data: loadingRows ?? devices,
     columns,
     // `machineId` is EMPTY (not absent) while the agent is not connected: those rows key on their id.
     getRowId: row => String(row.machineId || row.id),
@@ -184,11 +203,12 @@ export function DevicesTableBody<T extends DeviceRow = DeviceRow>({
         <DataTable.Header
           stickyHeader={!!stickyHeaderOffset}
           stickyHeaderOffset={stickyHeaderOffset}
-          rightSlot={<DataTable.RowCount itemName="device" totalCount={totalCount} />}
+          rightSlot={<DataTable.RowCount itemName="device" totalCount={totalCount} loading={isLoading} />}
         />
       )}
       <DataTable.Body
         loading={isLoading}
+        loadingCells
         loadingRegion={loadingRegion}
         skeletonRows={skeletonRows}
         emptyState={emptyState}
@@ -208,9 +228,25 @@ function OrganizationCell({ device }: { device: DeviceRow }) {
     <div className="flex items-center gap-3">
       <EntityImage src={fullImageUrl} alt={device.organization || 'Customer'} className="size-12 content-md:size-12" />
       <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <span className="break-words text-ods-text-primary text-h4">{device.organization || ''}</span>
+        <OrganizationName name={device.organization} />
       </div>
     </div>
+  );
+}
+
+/** The customer's name; a bar while the row is read. */
+function OrganizationName({ name }: { name: string | undefined }) {
+  if (useLoadingScope() && !name) return <TextLineSkeleton type="h4" className="w-3/4" />;
+  return <span className="break-words text-ods-text-primary text-h4">{name || ''}</span>;
+}
+
+/** When the device was last seen, under its status; a bar while the row is read. */
+function DeviceLastSeen({ lastSeen }: { lastSeen: string | undefined }) {
+  if (useLoadingScope() && !lastSeen) return <TextLineSkeleton type="h6" className="hidden w-24 content-md:block" />;
+  return (
+    <span className="hidden text-ods-text-secondary text-h6 content-md:flex">
+      {lastSeen ? formatDateTime(lastSeen) : 'Never'}
+    </span>
   );
 }
 
@@ -316,9 +352,7 @@ export function getDeviceTableColumns<T extends DeviceRow = DeviceRow>(
             <div className="inline-flex">
               <Tag label={statusConfig.label} variant={statusConfig.variant} />
             </div>
-            <span className="hidden text-ods-text-secondary text-h6 content-md:flex">
-              {device.last_seen ? formatDateTime(device.last_seen) : 'Never'}
-            </span>
+            <DeviceLastSeen lastSeen={device.last_seen} />
           </div>
         );
       },

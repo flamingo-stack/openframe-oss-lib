@@ -21,7 +21,9 @@ import { SearchIcon } from '../icons-v2-generated';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { HiddenTagsPopup } from './hidden-tags-popup';
+import { LoadingItems } from './loading-scope';
 import { Tag } from './tag';
 
 /** A result row's frame, read by the rows and by their loading state. */
@@ -404,6 +406,7 @@ export function SearchInput({
     return (
       <div
         key={result.id}
+        data-loading-item
         role="option"
         aria-selected={isHighlighted}
         className={cn(
@@ -426,12 +429,13 @@ export function SearchInput({
       // The results while they are read: the dropdown's own rows, a title bar each.
       return (
         <LoadingRegion label="Loading results">
-          {Array.from({ length: loadingRows }, (_, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-            <div key={i} className={SEARCH_RESULT_ROW_CLASS} aria-hidden>
-              <TextLineSkeleton type="h6" className="w-2/3" />
-            </div>
-          ))}
+          <LoadingItems count={loadingRows}>
+            {() => (
+              <div className={SEARCH_RESULT_ROW_CLASS} aria-hidden data-loading-item>
+                <TextLineSkeleton type="h6" className="w-2/3" />
+              </div>
+            )}
+          </LoadingItems>
         </LoadingRegion>
       );
     }
@@ -500,23 +504,19 @@ export function SearchInput({
               {/* "+N" overflow badge */}
               {hiddenCount > 0 && (
                 <div ref={hiddenTagsRef} className="shrink-0">
-                  <button
+                  <Button
+                    variant="chip"
                     ref={badgeRef}
                     type="button"
+                    aria-expanded={showHiddenTags}
                     onClick={e => {
                       e.stopPropagation();
                       setShowHiddenTags(prev => !prev);
                     }}
-                    className={cn(
-                      'flex h-8 items-center px-2',
-                      'rounded-[6px] border border-ods-border bg-ods-card',
-                      'text-ods-text-secondary text-h5',
-                      'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-                    )}
                     aria-label={`${hiddenCount} more selected filters`}
                   >
                     {getLimitTagsText(hiddenCount)}
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -541,14 +541,15 @@ export function SearchInput({
             {/* End adornment / Clear — pinned right, shrink-0 */}
             <div className="ml-auto flex shrink-0 items-center gap-1">
               {hasValue && !disabled && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   onClick={handleClear}
-                  className="flex items-center justify-center transition-opacity hover:opacity-70"
                   aria-label="Clear search"
                 >
-                  <XmarkCircleIcon className="text-ods-text-secondary" size={24} />
-                </button>
+                  <XmarkCircleIcon className="text-ods-text-secondary" />
+                </Button>
               )}
               {endAdornment}
             </div>

@@ -9,6 +9,7 @@ import { fileMediaType, IMAGE_FILE_ACCEPT } from '../../utils/media-type';
 import { ImagePlusIcon } from '../icons-v2-generated/audio-and-visual/image-plus-icon';
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02-vr-icon';
+import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 
 export interface ImageUploaderProps {
@@ -233,11 +234,11 @@ export function ImageUploader({
 
             <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-4">
               <ActionIconButton onClick={openDialog} disabled={!interactive} ariaLabel="Replace image">
-                <Refresh02VrIcon className="size-6" />
+                <Refresh02VrIcon />
               </ActionIconButton>
               {onRemove && (
                 <ActionIconButton onClick={onRemove} disabled={!interactive} ariaLabel="Remove image">
-                  <TrashIcon className="size-6" />
+                  <TrashIcon />
                 </ActionIconButton>
               )}
             </div>
@@ -276,7 +277,9 @@ interface ActionIconButtonProps {
 
 function ActionIconButton({ onClick, disabled, ariaLabel, children }: ActionIconButtonProps) {
   return (
-    <button
+    <Button
+      variant="overlay"
+      size="icon-sm"
       type="button"
       onClick={e => {
         e.stopPropagation();
@@ -284,17 +287,9 @@ function ActionIconButton({ onClick, disabled, ariaLabel, children }: ActionIcon
       }}
       disabled={disabled}
       aria-label={ariaLabel}
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-md p-3',
-        'bg-[var(--ods-system-greys-white)] text-ods-text-on-accent',
-        'transition-colors duration-150',
-        'hover:bg-[var(--ods-system-greys-white-hover)]',
-        'active:bg-[var(--ods-system-greys-white-action)]',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ods-accent',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-      )}
+      className="shrink-0"
     >
       {children}
-    </button>
+    </Button>
   );
 }

@@ -35,6 +35,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CommandDispatchServiceTest {
@@ -48,6 +49,8 @@ class CommandDispatchServiceTest {
     private DeviceService deviceService;
     @Mock
     private CommandExecutionService commandExecutionService;
+    @Mock
+    private TestRunPolicy testRunPolicy;
 
     @InjectMocks
     private CommandDispatchService commandDispatchService;
@@ -69,7 +72,7 @@ class CommandDispatchServiceTest {
         doThrow(new DeviceNotFoundException("Machine not found: " + MACHINE_ID))
                 .when(deviceService).verifyDispatchable(MACHINE_ID);
 
-        assertThatThrownBy(() -> commandDispatchService.runCommand(input))
+        assertThatThrownBy(() -> commandDispatchService.runCommand(input, INITIATED_BY))
                 .isInstanceOf(DeviceNotFoundException.class);
 
         verifyNoInteractions(commandNatsPublisher);
@@ -82,7 +85,7 @@ class CommandDispatchServiceTest {
                 "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + MACHINE_ID))
                 .when(deviceService).verifyDispatchable(MACHINE_ID);
 
-        assertThatThrownBy(() -> commandDispatchService.runCommand(input))
+        assertThatThrownBy(() -> commandDispatchService.runCommand(input, INITIATED_BY))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("dispatchable state");
 
@@ -92,7 +95,7 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("runCommand: generates a non-blank executionId, publishes to the target machine with the agent-shaped payload, and returns the same executionId")
     void runCommand_publishesAndReturnsExecutionId() {
-        DispatchResponse response = commandDispatchService.runCommand(input);
+        DispatchResponse response = commandDispatchService.runCommand(input, INITIATED_BY);
 
         assertThat(response.getExecutionId()).isNotBlank();
 
@@ -107,11 +110,33 @@ class CommandDispatchServiceTest {
     }
 
     @Test
+    @DisplayName("runCommand: a regular run stays pure transport — no execution row is recorded")
+    void runCommand_regularRunPersistsNothing() {
+        commandDispatchService.runCommand(input, INITIATED_BY);
+
+        verifyNoInteractions(commandExecutionService);
+    }
+
+    @Test
+    @DisplayName("runCommand: a test run records its row under the published executionId, so its result can be kept out of the logs")
+    void runCommand_testRunRecordsRowUnderPublishedExecutionId() {
+        when(testRunPolicy.isTestRun()).thenReturn(true);
+
+        DispatchResponse response = commandDispatchService.runCommand(input, INITIATED_BY);
+
+        verify(commandExecutionService).createBatch(response.getExecutionId(), "df -h", ScriptShell.BASH,
+                List.of(MACHINE_ID), PrivilegeLevel.ADMIN, null, INITIATED_BY);
+        ArgumentCaptor<CommandMessage> captor = ArgumentCaptor.forClass(CommandMessage.class);
+        verify(commandNatsPublisher).publishCommand(eq(MACHINE_ID), captor.capture());
+        assertThat(captor.getValue().getExecutionId()).isEqualTo(response.getExecutionId());
+    }
+
+    @Test
     @DisplayName("runCommand: forwards the privilegeLevel (USER vs ADMIN) verbatim — the wire payload reflects exactly what the dashboard declared, not a backend default")
     void runCommand_forwardsPrivilegeLevelVerbatim() {
         input.setPrivilegeLevel(PrivilegeLevel.USER);
 
-        commandDispatchService.runCommand(input);
+        commandDispatchService.runCommand(input, INITIATED_BY);
 
         ArgumentCaptor<CommandMessage> captor = ArgumentCaptor.forClass(CommandMessage.class);
         verify(commandNatsPublisher).publishCommand(eq(MACHINE_ID), captor.capture());
@@ -125,7 +150,7 @@ class CommandDispatchServiceTest {
     void runCommand_forwardsOptionalFieldsVerbatim() {
         input.setTimeoutSeconds(90);
 
-        commandDispatchService.runCommand(input);
+        commandDispatchService.runCommand(input, INITIATED_BY);
 
         ArgumentCaptor<CommandMessage> captor = ArgumentCaptor.forClass(CommandMessage.class);
         verify(commandNatsPublisher).publishCommand(eq(MACHINE_ID), captor.capture());
@@ -136,9 +161,9 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("runCommand: each invocation generates a distinct executionId (no global state leakage)")
     void runCommand_generatesDistinctExecutionIds() {
-        String firstId = commandDispatchService.runCommand(input).getExecutionId();
-        String secondId = commandDispatchService.runCommand(input).getExecutionId();
-        String thirdId = commandDispatchService.runCommand(input).getExecutionId();
+        String firstId = commandDispatchService.runCommand(input, INITIATED_BY).getExecutionId();
+        String secondId = commandDispatchService.runCommand(input, INITIATED_BY).getExecutionId();
+        String thirdId = commandDispatchService.runCommand(input, INITIATED_BY).getExecutionId();
 
         assertThat(List.of(firstId, secondId, thirdId)).doesNotHaveDuplicates();
         verify(commandNatsPublisher, times(3))

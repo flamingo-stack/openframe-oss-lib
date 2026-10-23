@@ -5,7 +5,10 @@ import { type ButtonHTMLAttributes, type ReactNode, type TextareaHTMLAttributes,
 import { CONTROL_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
+import { Label } from './label';
+import { useLoadingScope } from './loading-scope';
 
 /**
  * The plain textarea's box: its type step (which sets the line height its rows are counted in), padding, 1px border,
@@ -73,7 +76,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
   const isInvalid = invalid || !!error;
   const hasAdornment = !!endIcon || !!startIcon;
 
-  // The adorned layout wraps the field in a `<label>`. Without an explicit
+  // The adorned layout wraps the field in a `<Label variant="surface">`. Without an explicit
   // `htmlFor`, the label's control defaults to its FIRST labelable descendant
   // — which is `startIcon` (e.g. the composer `+` button) when present, so a
   // click anywhere on the field synthesises a click on that button. Bind the
@@ -81,12 +84,19 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
   const reactId = useId();
   const fieldId = props.id ?? reactId;
 
+  // ONE switch: in a page's loading state the plain field draws its label for real and its box as `TextareaSkeleton`
+  // (sized by the caller's classes or its `rows`). The textarea stays mounted, hidden, so nothing re-registers when the
+  // scope ends.
+  const inScope = useLoadingScope();
+
   // Without any adornment we keep the historical layout: bare textarea, the
   // border/bg/hover all live on the textarea itself.
   if (!hasAdornment) {
     return (
       <FieldWrapper label={label} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
+        {inScope && <TextareaSkeleton rows={props.rows} className={className} />}
         <textarea
+          hidden={inScope || props.hidden}
           className={cn(
             TEXTAREA_BOX_CLASS,
             'focus:border-ods-accent focus-visible:outline-none',
@@ -107,7 +117,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
     );
   }
 
-  // With an end icon we lift border/bg onto a `<label>` wrapper so the icon
+  // With an end icon we lift border/bg onto a `<Label variant="surface">` wrapper so the icon
   // sits visually inside the same field. The textarea becomes a transparent
   // child. Wrapper classes mirror `Input` 1:1 (same items-center, same
   // `has-[:focus]` selectors, same active state, same outline reset) so
@@ -126,7 +136,8 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
     ? 'group-has-[textarea:focus]:text-ods-accent'
     : 'group-has-[:focus]:text-ods-accent';
   const content = (
-    <label
+    <Label
+      variant="surface"
       htmlFor={fieldId}
       data-invalid={isInvalid || undefined}
       className={cn(
@@ -195,27 +206,23 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
       />
 
       {endIconAsButton ? (
-        <button
+        <Button
+          // A field adornment: lit in the accent while the field has focus, the error colour while it is invalid.
+          variant="bare"
+          data-tone="field"
+          size="icon-sm"
           type="button"
           aria-label={endIconButtonProps?.['aria-label'] ?? 'Submit'}
           {...endIconButtonProps}
           className={cn(
-            // `h-6` matches the textarea's `leading-6` line box so the icon's
-            // visual center lines up with the text on the first line. Without
-            // it, `items-end` bottom-aligns the smaller mobile icon (size-4)
-            // against the 24px text line and drops it below the text center.
-            'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
-            adornmentAccent,
-            'group-data-[invalid]:text-ods-error',
-            '[&_svg]:size-4 md:[&_svg]:size-6',
-            'cursor-pointer hover:text-ods-text-primary',
-            'focus-visible:text-ods-accent focus-visible:outline-none',
-            'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
+            // The 32px target overhangs the textarea's 24px `leading-6` line box by 4px on each side (`-my-1`), so the
+            // icon's centre stays on the first line's centre.
+            '-my-1 shrink-0',
             endIconButtonProps?.className,
           )}
         >
           {endIcon}
-        </button>
+        </Button>
       ) : (
         <span
           className={cn(
@@ -228,7 +235,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>((allProps, ref) 
           {endIcon}
         </span>
       )}
-    </label>
+    </Label>
   );
 
   return (
@@ -244,13 +251,15 @@ Textarea.displayName = 'Textarea';
  * take, never under its minimum. The border is transparent so the one skeleton surface fills the whole box. The label
  * is the host's: it is static copy and renders for real.
  */
-function TextareaSkeleton({ rows = TEXTAREA_DEFAULT_ROWS, className }: { rows?: number; className?: string }) {
+function TextareaSkeleton({ rows, className }: { rows?: number; className?: string }) {
+  // A field sized by its caller's classes (a growing message box) takes their height; else the height its rows take.
+  const sizedByClasses = rows === undefined && !!className;
   return (
     <UnifiedSkeleton
       className={cn(TEXTAREA_BOX_CLASS, 'border-transparent', className)}
-      style={{ height: textareaBoxHeight(rows) }}
+      style={sizedByClasses ? undefined : { height: textareaBoxHeight(rows ?? TEXTAREA_DEFAULT_ROWS) }}
     />
   );
 }
 
-export { Textarea, TextareaSkeleton };
+export { Textarea };

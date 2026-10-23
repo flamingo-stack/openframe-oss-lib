@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { NoDataProps } from '../no-data';
 
 export type QueryResultRow = Record<string, string | number | null>;
 
@@ -17,8 +18,11 @@ export interface QueryReportTableProps {
   skeletonRows?: number;
   /** Number of skeleton columns to display (default: 6) */
   skeletonColumns?: number;
-  /** Message shown when data is empty */
+  /** @deprecated Use `emptyState` instead. Legacy single-line message; mapped to the empty state's title. */
   emptyMessage?: string;
+  /** Props for the empty state (NoData) shown when there are no rows, as `DataTable.Body` takes them. Overrides
+   *  `emptyMessage`. */
+  emptyState?: NoDataProps;
   /** Fixed width for each column in pixels (default: 160) */
   columnWidth?: number;
   /** Explicit column ordering — keys not listed are appended at the end */

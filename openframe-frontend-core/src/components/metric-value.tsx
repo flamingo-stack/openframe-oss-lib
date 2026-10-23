@@ -29,7 +29,7 @@ export function MetricValue({ value, label, className }: MetricValueProps) {
 }
 
 /** A value while it is read: a bar at the value's type step, the label (the page's own words) drawn as it is. */
-export function MetricValueSkeleton({ label, className }: { label: string; className?: string }) {
+function MetricValueSkeleton({ label, className }: { label: string; className?: string }) {
   return (
     <div className={cn(METRIC_VALUE_CLASS, className)}>
       <TextLineSkeleton type="h4" className="w-10" />

@@ -9,7 +9,6 @@
 export {
   LegalDocumentPage,
   legalDocumentStampLabel,
-  LegalDocumentSkeleton,
   LEGAL_DOCUMENT_SKELETON_SECTIONS,
   type LegalDocumentPageProps,
   type LegalDocumentMarkdownRendererProps,
