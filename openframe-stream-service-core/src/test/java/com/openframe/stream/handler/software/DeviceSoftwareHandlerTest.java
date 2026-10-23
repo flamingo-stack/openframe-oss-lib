@@ -1,10 +1,10 @@
 package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
 import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import org.junit.jupiter.api.Test;
@@ -17,11 +17,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -33,7 +34,7 @@ class DeviceSoftwareHandlerTest {
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
     @Mock private FleetHostResolver fleetHostResolver;
-    @Mock private FleetSoftwareRepository fleetSoftwareRepository;
+    @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjector softwareProjector;
 
@@ -53,48 +54,61 @@ class DeviceSoftwareHandlerTest {
         return MAPPER.createObjectNode();
     }
 
+    private HostSoftwareTitle title(long id, String name, String source, String... versions) {
+        HostSoftwareTitle t = new HostSoftwareTitle();
+        t.setId(id);
+        t.setName(name);
+        t.setSource(source);
+        t.setInstalledVersions(java.util.Arrays.stream(versions).map(v -> {
+            HostSoftwareInstalledVersion iv = new HostSoftwareInstalledVersion();
+            iv.setVersion(v);
+            return iv;
+        }).toList());
+        return t;
+    }
+
     @Test
     void handle_nullPayload_isNoOp() {
         DeserializedDebeziumMessage m = new DeserializedDebeziumMessage();
         m.setPayload(null);
         handler.handle(m, null);
-        verifyNoInteractions(fleetHostResolver, fleetSoftwareRepository, deviceSoftwareRepository);
+        verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository);
     }
 
     @Test
     void handle_nullRow_isNoOp() {
         handler.handle(msg("c", null, null), null);
-        verifyNoInteractions(fleetHostResolver, fleetSoftwareRepository, deviceSoftwareRepository);
+        verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository);
     }
 
     @Test
-    void handle_missingIds_isNoOp() {
-        handler.handle(msg("c", null, row().put("host_id", 100)), null);  // no software_id
-        verifyNoInteractions(fleetHostResolver, fleetSoftwareRepository, deviceSoftwareRepository);
+    void handle_missingHostId_isNoOp() {
+        handler.handle(msg("c", null, row().put("software_id", 200)), null);
+        verifyNoInteractions(fleetHostResolver, fleetHostSoftwareCache, deviceSoftwareRepository);
     }
 
     @Test
     void handle_unresolvedHost_skips() {
         when(fleetHostResolver.resolve("100")).thenReturn(null);
 
-        handler.handle(msg("c", null, row().put("host_id", 100).put("software_id", 200)), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
-        verifyNoInteractions(fleetSoftwareRepository);
-        verify(deviceSoftwareRepository, never()).save(any());
-        verify(deviceSoftwareRepository, never()).deleteByTenantIdAndMachineIdAndSoftwareId(any(), any(), any());
+        verifyNoInteractions(fleetHostSoftwareCache, deviceSoftwareRepository, softwareProjector);
     }
 
     @Test
-    void handle_create_upsertsWithCatalogFields() {
-        ObjectNode after = row().put("host_id", 100).put("software_id", 200)
-                .put("last_opened_at", "2024-05-01T10:00:00Z");
+    void handle_reconcile_upsertsSnapshotTitlesDeletesStaleAndProjects() {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareId("t1", "m1", 200L))
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L)).thenReturn(List.of(
+                title(42L, "Google Chrome", "apps", "1.0", "2.0")));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
                 .thenReturn(Optional.empty());
-        when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.of(
-                FleetSoftware.builder().softwareTitleId(42L).name("Chrome").version("1.0").source("apps").build()));
+        // stale row for a title no longer present in the snapshot
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
+                DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(42L).build(),
+                DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(99L).build()));
 
-        handler.handle(msg("c", null, after), null);
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
 
         ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
         verify(deviceSoftwareRepository).save(captor.capture());
@@ -102,46 +116,32 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getTenantId()).isEqualTo("t1");
         assertThat(saved.getMachineId()).isEqualTo("m1");
         assertThat(saved.getHostId()).isEqualTo(100L);
-        assertThat(saved.getSoftwareId()).isEqualTo(200L);
         assertThat(saved.getSoftwareTitleId()).isEqualTo(42L);
-        assertThat(saved.getName()).isEqualTo("Chrome");
-        assertThat(saved.getVersion()).isEqualTo("1.0");
+        assertThat(saved.getName()).isEqualTo("Google Chrome");
         assertThat(saved.getSource()).isEqualTo("apps");
-        assertThat(saved.getLastSeenAt()).isEqualTo(Instant.parse("2024-05-01T10:00:00Z"));
+        assertThat(saved.getVersions()).containsExactly("1.0", "2.0");
+        assertThat(saved.getLastSeenAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
+
+        ArgumentCaptor<DeviceSoftware> deleted = ArgumentCaptor.forClass(DeviceSoftware.class);
+        verify(deviceSoftwareRepository).delete(deleted.capture());
+        assertThat(deleted.getValue().getSoftwareTitleId()).isEqualTo(99L);
+
         verify(softwareProjector).project("t1", 42L);
+        verify(softwareProjector).project("t1", 99L);
     }
 
     @Test
-    void handle_create_withCatalogMissing_savesCoreFieldsOnly() {
-        ObjectNode after = row().put("host_id", 100).put("software_id", 200);
+    void handle_deleteEvent_reReconcilesFromSnapshot() {
         when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareId("t1", "m1", 200L))
-                .thenReturn(Optional.empty());
-        when(fleetSoftwareRepository.findBySoftwareId(200L)).thenReturn(Optional.empty());
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L)).thenReturn(List.of());
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of(
+                DeviceSoftware.builder().tenantId("t1").machineId("m1").softwareTitleId(42L).build()));
 
-        handler.handle(msg("c", null, after), null);
+        handler.handle(msg("d", row().put("host_id", 100), null), null);
 
-        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
-        verify(deviceSoftwareRepository).save(captor.capture());
-        DeviceSoftware saved = captor.getValue();
-        assertThat(saved.getSoftwareId()).isEqualTo(200L);
-        assertThat(saved.getSoftwareTitleId()).isNull();
-        assertThat(saved.getName()).isNull();
-        assertThat(saved.getVersion()).isNull();
-        verify(softwareProjector).project("t1", null);
-    }
-
-    @Test
-    void handle_delete_removesRowWithoutSaving() {
-        ObjectNode before = row().put("host_id", 100).put("software_id", 200);
-        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
-
-        handler.handle(msg("d", before, null), null);
-
-        verify(deviceSoftwareRepository).deleteByTenantIdAndMachineIdAndSoftwareId("t1", "m1", 200L);
         verify(deviceSoftwareRepository, never()).save(any());
-        verify(softwareProjector).project("t1", null);
-        verifyNoInteractions(fleetSoftwareRepository);
+        verify(deviceSoftwareRepository).delete(any(DeviceSoftware.class));
+        verify(softwareProjector).project(eq("t1"), eq(42L));
     }
 }

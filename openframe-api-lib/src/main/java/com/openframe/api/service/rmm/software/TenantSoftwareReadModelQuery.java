@@ -145,9 +145,14 @@ public class TenantSoftwareReadModelQuery {
         }
         return SoftwareOnDeviceResponse.builder()
                 .device(machine)
-                .softwareVersion(installation.getVersion())
+                .softwareVersion(firstVersion(installation))
                 .status(null) // UP_TO_DATE comparison not available yet; null so a status filter matches nothing.
                 .build();
+    }
+
+    private static String firstVersion(Software.Installation installation) {
+        List<String> versions = installation.getVersions();
+        return versions == null || versions.isEmpty() ? null : versions.getFirst();
     }
 
     private boolean matchesStatusFilter(SoftwareOnDeviceResponse row, SoftwareOnDeviceFilterInput filter) {

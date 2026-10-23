@@ -13,13 +13,13 @@ public class DeviceCveWriter {
 
     private final DeviceCveRepository deviceCveRepository;
 
-    public void upsert(String tenantId, String machineId, Long hostId, String cve, Long softwareId,
-                       Long softwareTitleId, String installedVersion, String resolvedInVersion) {
+    public void upsert(String tenantId, String machineId, Long hostId, String cve,
+                       Long softwareTitleId, String name, String installedVersion) {
         if (tenantId == null || machineId == null) {
             return;
         }
         DeviceCve deviceCve = deviceCveRepository
-                .findByTenantIdAndMachineIdAndCveIdAndSoftwareId(tenantId, machineId, cve, softwareId)
+                .findByTenantIdAndMachineIdAndCveIdAndSoftwareTitleId(tenantId, machineId, cve, softwareTitleId)
                 .orElseGet(DeviceCve::new);
         boolean isNew = deviceCve.getId() == null;
         Instant now = Instant.now();
@@ -27,10 +27,9 @@ public class DeviceCveWriter {
         deviceCve.setMachineId(machineId);
         deviceCve.setHostId(hostId);
         deviceCve.setCveId(cve);
-        deviceCve.setSoftwareId(softwareId);
         deviceCve.setSoftwareTitleId(softwareTitleId);
+        deviceCve.setName(name);
         deviceCve.setInstalledVersion(installedVersion);
-        deviceCve.setResolvedInVersion(resolvedInVersion);
         if (isNew || deviceCve.getDiscoveredAt() == null) {
             deviceCve.setDiscoveredAt(now);
         }

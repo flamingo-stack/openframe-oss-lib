@@ -21,7 +21,6 @@ import java.util.List;
 @CompoundIndex(name = "tenant_name", def = "{'tenantId': 1, 'nameLower': 1}")
 @CompoundIndex(name = "tenant_devices", def = "{'tenantId': 1, 'devicesCount': -1}")
 @CompoundIndex(name = "tenant_cveCount", def = "{'tenantId': 1, 'cveCount': -1}")
-@CompoundIndex(name = "installations_software", def = "{'installations.softwareId': 1}")
 @CompoundIndex(name = "installations_machine", def = "{'tenantId': 1, 'installations.machineId': 1}")
 public class Software implements TenantScoped {
 
@@ -59,8 +58,7 @@ public class Software implements TenantScoped {
     public static class Installation {
         private String machineId;
         private Long hostId;
-        private Long softwareId;
-        private String version;
+        private List<String> versions;
         private Instant lastSeenAt;
     }
 }

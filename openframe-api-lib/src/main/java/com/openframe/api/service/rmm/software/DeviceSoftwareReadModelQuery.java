@@ -48,7 +48,9 @@ public class DeviceSoftwareReadModelQuery {
         }
         return sw.getInstallations().stream()
                 .filter(i -> machineId.equals(i.getMachineId()))
-                .map(Software.Installation::getVersion)
+                .map(Software.Installation::getVersions)
+                .filter(v -> v != null && !v.isEmpty())
+                .map(List::getFirst)
                 .findFirst().orElse(null);
     }
 

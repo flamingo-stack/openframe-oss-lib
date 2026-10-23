@@ -10,14 +10,10 @@ import java.util.Optional;
 @Repository
 public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware, String> {
 
-    Optional<DeviceSoftware> findByTenantIdAndMachineIdAndSoftwareId(
-            String tenantId, String machineId, Long softwareId);
-
-    long deleteByTenantIdAndMachineIdAndSoftwareId(String tenantId, String machineId, Long softwareId);
-
-    List<DeviceSoftware> findBySoftwareId(Long softwareId);
-
     Optional<DeviceSoftware> findByTenantIdAndMachineIdAndSoftwareTitleId(
+            String tenantId, String machineId, Long softwareTitleId);
+
+    long deleteByTenantIdAndMachineIdAndSoftwareTitleId(
             String tenantId, String machineId, Long softwareTitleId);
 
     List<DeviceSoftware> findByTenantIdAndMachineId(String tenantId, String machineId);
@@ -25,9 +21,6 @@ public interface DeviceSoftwareRepository extends MongoRepository<DeviceSoftware
     List<DeviceSoftware> findByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
 
     long countByTenantIdAndSoftwareTitleId(String tenantId, Long softwareTitleId);
-
-    long deleteByTenantIdAndMachineIdAndSoftwareTitleId(
-            String tenantId, String machineId, Long softwareTitleId);
 
     long deleteByTenantIdAndMachineId(String tenantId, String machineId);
 }

@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @Builder
@@ -17,8 +18,8 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "device_software")
 @CompoundIndex(
-        name = "tenant_machine_software",
-        def = "{'tenantId': 1, 'machineId': 1, 'softwareId': 1}",
+        name = "tenant_machine_title",
+        def = "{'tenantId': 1, 'machineId': 1, 'softwareTitleId': 1}",
         unique = true)
 @CompoundIndex(
         name = "tenant_machine",
@@ -39,11 +40,9 @@ public class DeviceSoftware implements TenantScoped {
 
     private Long softwareTitleId;
 
-    private Long softwareId;
-
     private String name;
 
-    private String version;
+    private List<String> versions;
 
     private String source;
 

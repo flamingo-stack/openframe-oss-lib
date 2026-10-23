@@ -1,12 +1,12 @@
 package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.FleetSoftware;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
 import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
@@ -17,8 +17,11 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
-import static com.openframe.stream.handler.software.FleetRowFields.instantOrNull;
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 
@@ -28,7 +31,7 @@ import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private final FleetHostResolver fleetHostResolver;
-    private final FleetSoftwareRepository fleetSoftwareRepository;
+    private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjector softwareProjector;
 
@@ -48,56 +51,69 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         if (payload == null) {
             return;
         }
-        boolean delete = isDelete(payload.getOperation());
-        JsonNode row = delete ? payload.getBefore() : payload.getAfter();
+        JsonNode row = isDelete(payload.getOperation()) ? payload.getBefore() : payload.getAfter();
         if (row == null) {
             return;
         }
         Long hostId = longOrNull(row, "host_id");
-        Long softwareId = longOrNull(row, "software_id");
-        if (hostId == null || softwareId == null) {
+        if (hostId == null) {
             return;
         }
-
         FleetHostRef host = fleetHostResolver.resolve(String.valueOf(hostId));
         if (host == null) {
-            log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping (software {})",
-                    hostId, softwareId);
+            log.debug("[software-cdc] host_software for unresolved Fleet host {} — skipping", hostId);
             return;
         }
-
-        if (delete) {
-            Long titleId = deviceSoftwareRepository
-                    .findByTenantIdAndMachineIdAndSoftwareId(host.tenantId(), host.machineId(), softwareId)
-                    .map(DeviceSoftware::getSoftwareTitleId).orElse(null);
-            deviceSoftwareRepository.deleteByTenantIdAndMachineIdAndSoftwareId(
-                    host.tenantId(), host.machineId(), softwareId);
-            softwareProjector.project(host.tenantId(), titleId);
-            return;
-        }
-
-        DeviceSoftware deviceSoftware = deviceSoftwareRepository
-                .findByTenantIdAndMachineIdAndSoftwareId(host.tenantId(), host.machineId(), softwareId)
-                .orElseGet(DeviceSoftware::new);
-        deviceSoftware.setTenantId(host.tenantId());
-        deviceSoftware.setMachineId(host.machineId());
-        deviceSoftware.setHostId(hostId);
-        deviceSoftware.setSoftwareId(softwareId);
-        deviceSoftware.setLastSeenAt(instantOrNull(row, "last_opened_at"));
-        applyCatalog(deviceSoftware, softwareId);
-        deviceSoftware.setUpdatedAt(Instant.now());
-        deviceSoftwareRepository.save(deviceSoftware);
-        softwareProjector.project(host.tenantId(), deviceSoftware.getSoftwareTitleId());
+        reconcile(host, hostId);
     }
 
-    private void applyCatalog(DeviceSoftware deviceSoftware, Long softwareId) {
-        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
-        if (software == null) {
-            return;
+    private void reconcile(FleetHostRef host, Long hostId) {
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId);
+        Instant now = Instant.now();
+        Set<Long> present = new HashSet<>();
+        Set<Long> affected = new HashSet<>();
+
+        for (HostSoftwareTitle title : titles) {
+            Long titleId = title.getId();
+            if (titleId == null) {
+                continue;
+            }
+            present.add(titleId);
+            DeviceSoftware deviceSoftware = deviceSoftwareRepository
+                    .findByTenantIdAndMachineIdAndSoftwareTitleId(host.tenantId(), host.machineId(), titleId)
+                    .orElseGet(DeviceSoftware::new);
+            deviceSoftware.setTenantId(host.tenantId());
+            deviceSoftware.setMachineId(host.machineId());
+            deviceSoftware.setHostId(hostId);
+            deviceSoftware.setSoftwareTitleId(titleId);
+            deviceSoftware.setName(title.getName());
+            deviceSoftware.setSource(title.getSource());
+            deviceSoftware.setVersions(versionsOf(title));
+            deviceSoftware.setLastSeenAt(now);
+            deviceSoftware.setUpdatedAt(now);
+            deviceSoftwareRepository.save(deviceSoftware);
+            affected.add(titleId);
         }
-        deviceSoftware.setSoftwareTitleId(software.getSoftwareTitleId());
-        deviceSoftware.setName(software.getName());
-        deviceSoftware.setVersion(software.getVersion());
-        deviceSoftware.setSource(software.getSource());
+
+        for (DeviceSoftware existing : deviceSoftwareRepository
+                .findByTenantIdAndMachineId(host.tenantId(), host.machineId())) {
+            if (!present.contains(existing.getSoftwareTitleId())) {
+                deviceSoftwareRepository.delete(existing);
+                affected.add(existing.getSoftwareTitleId());
+            }
+        }
+
+        affected.forEach(titleId -> softwareProjector.project(host.tenantId(), titleId));
+    }
+
+    private static List<String> versionsOf(HostSoftwareTitle title) {
+        if (title.getInstalledVersions() == null) {
+            return List.of();
+        }
+        return title.getInstalledVersions().stream()
+                .map(HostSoftwareInstalledVersion::getVersion)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 }

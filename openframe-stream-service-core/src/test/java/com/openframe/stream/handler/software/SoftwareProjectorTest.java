@@ -2,11 +2,9 @@ package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.DeviceCve;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
-import com.openframe.data.document.rmm.software.FleetSoftwareTitle;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.FleetSoftwareTitleRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +30,6 @@ class SoftwareProjectorTest {
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private DeviceCveRepository deviceCveRepository;
-    @Mock private FleetSoftwareTitleRepository fleetSoftwareTitleRepository;
 
     @InjectMocks private SoftwareProjector projector;
 
@@ -55,21 +52,16 @@ class SoftwareProjectorTest {
     }
 
     @Test
-    void project_withInstalls_buildsAggregateWithCatalogAndDistinctDevices() {
+    void project_withInstalls_buildsAggregateFromEdgesWithDistinctDevices() {
         when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").hostId(100L).softwareId(200L)
-                        .version("1.0").name("chrome").source("apps").build(),
-                DeviceSoftware.builder().machineId("m1").hostId(100L).softwareId(201L)
-                        .version("2.0").name("chrome").source("apps").build(),   // same machine, newer version
-                DeviceSoftware.builder().machineId("m2").hostId(101L).softwareId(202L)
-                        .version("1.5").name("chrome").source("apps").build()));
+                DeviceSoftware.builder().machineId("m1").hostId(100L)
+                        .versions(List.of("1.0", "2.0")).name("Google Chrome").source("apps").build(),
+                DeviceSoftware.builder().machineId("m2").hostId(101L)
+                        .versions(List.of("1.5")).name("Google Chrome").source("apps").build()));
         when(deviceCveRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
                 DeviceCve.builder().cveId("CVE-1").build(),
                 DeviceCve.builder().cveId("CVE-1").build(),   // duplicate across machines
                 DeviceCve.builder().cveId("CVE-2").build()));
-        when(fleetSoftwareTitleRepository.findBySoftwareTitleId(42L)).thenReturn(Optional.of(
-                FleetSoftwareTitle.builder().softwareTitleId(42L).name("Google Chrome")
-                        .nameLower("google chrome").source("apps").browser("").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
         projector.project("t1", 42L);
@@ -79,23 +71,24 @@ class SoftwareProjectorTest {
         Software saved = captor.getValue();
         assertThat(saved.getTenantId()).isEqualTo("t1");
         assertThat(saved.getSoftwareTitleId()).isEqualTo(42L);
-        assertThat(saved.getName()).isEqualTo("Google Chrome");          // catalog overrides edge
+        assertThat(saved.getName()).isEqualTo("Google Chrome");          // from the device edge
         assertThat(saved.getNameLower()).isEqualTo("google chrome");
-        assertThat(saved.getLatestVersion()).isEqualTo("2.0");
-        assertThat(saved.getInstallations()).hasSize(3);
-        assertThat(saved.getDevicesCount()).isEqualTo(2);                 // m1, m2 distinct
+        assertThat(saved.getSource()).isEqualTo("apps");
+        assertThat(saved.getLatestVersion()).isEqualTo("2.0");           // max across all installed versions
+        assertThat(saved.getInstallations()).hasSize(2);
+        assertThat(saved.getInstallations().get(0).getVersions()).containsExactly("1.0", "2.0");
+        assertThat(saved.getDevicesCount()).isEqualTo(2);                // m1, m2 distinct
         assertThat(saved.getCveIds()).containsExactlyInAnyOrder("CVE-1", "CVE-2");
         assertThat(saved.getCveCount()).isEqualTo(2);
         assertThat(saved.getUpdatedAt()).isNotNull();
     }
 
     @Test
-    void project_withInstallsButNoCatalog_fallsBackToEdgeName() {
+    void project_withInstallsNoCves_zeroCveCount() {
         when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").softwareId(200L).version("1.0")
+                DeviceSoftware.builder().machineId("m1").versions(List.of("1.0"))
                         .name("Custom App").source("programs").build()));
         when(deviceCveRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of());
-        when(fleetSoftwareTitleRepository.findBySoftwareTitleId(42L)).thenReturn(Optional.empty());
         lenient().when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
         projector.project("t1", 42L);

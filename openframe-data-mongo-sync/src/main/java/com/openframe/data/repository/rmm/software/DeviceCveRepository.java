@@ -10,15 +10,10 @@ import java.util.Optional;
 @Repository
 public interface DeviceCveRepository extends MongoRepository<DeviceCve, String> {
 
-    Optional<DeviceCve> findByTenantIdAndMachineIdAndCveIdAndSoftwareId(
-            String tenantId, String machineId, String cveId, Long softwareId);
+    Optional<DeviceCve> findByTenantIdAndMachineIdAndCveIdAndSoftwareTitleId(
+            String tenantId, String machineId, String cveId, Long softwareTitleId);
 
-    long deleteByTenantIdAndMachineIdAndCveIdAndSoftwareId(
-            String tenantId, String machineId, String cveId, Long softwareId);
-
-    long deleteByTenantIdAndMachineIdAndSoftwareId(String tenantId, String machineId, Long softwareId);
-
-    List<DeviceCve> findByTenantIdAndMachineIdAndSoftwareId(String tenantId, String machineId, Long softwareId);
+    List<DeviceCve> findByTenantIdAndMachineId(String tenantId, String machineId);
 
     List<DeviceCve> findByTenantIdAndCveId(String tenantId, String cveId);
 

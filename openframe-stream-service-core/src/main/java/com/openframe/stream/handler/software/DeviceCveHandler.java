@@ -1,15 +1,12 @@
 package com.openframe.stream.handler.software;
 
 import com.openframe.data.document.rmm.software.DeviceCve;
-import com.openframe.data.document.rmm.software.FleetSoftware;
-import com.openframe.data.document.rmm.software.FleetSoftwareCve;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
-import com.openframe.data.model.enums.MessageType;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
-import com.openframe.data.repository.rmm.software.FleetSoftwareCveRepository;
-import com.openframe.data.repository.rmm.software.FleetSoftwareRepository;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareInstalledVersion;
+import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
 import com.openframe.stream.handler.MessageHandler;
 import com.openframe.stream.handler.software.FleetHostResolver.FleetHostRef;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
@@ -19,13 +16,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
-import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
-import static com.openframe.stream.handler.software.FleetRowFields.str;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @RequiredArgsConstructor
@@ -33,13 +30,11 @@ import static com.openframe.stream.handler.software.FleetRowFields.str;
 public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
 
     private final FleetHostResolver fleetHostResolver;
-    private final FleetSoftwareCveRepository fleetSoftwareCveRepository;
-    private final FleetSoftwareRepository fleetSoftwareRepository;
+    private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceCveRepository deviceCveRepository;
     private final DeviceCveWriter deviceCveWriter;
     private final SoftwareProjector softwareProjector;
     private final VulnerabilityProjector vulnerabilityProjector;
-    private final SoftwareCascadeSyncService cascadeSyncService;
 
     @Override
     public EventHandlerType getType() {
@@ -54,84 +49,68 @@ public class DeviceCveHandler implements MessageHandler<DeserializedDebeziumMess
     @Override
     public void handle(DeserializedDebeziumMessage message, IntegratedToolEnrichedData extraParams) {
         DebeziumMessage.Payload<JsonNode> payload = message.getPayload();
-        MessageType type = message.getMessageType();
-        if (payload == null || type == null) {
+        if (payload == null) {
             return;
         }
-        switch (type) {
-            case FLEET_MDM_HOST_SOFTWARE_EVENT -> handleHostSoftware(payload);
-            case FLEET_MDM_SOFTWARE_CVE_EVENT -> handleSoftwareCve(payload);
-            default -> { }
-        }
-    }
-
-    private void handleHostSoftware(DebeziumMessage.Payload<JsonNode> payload) {
-        boolean delete = isDelete(payload.getOperation());
-        JsonNode row = delete ? payload.getBefore() : payload.getAfter();
+        JsonNode row = isDelete(payload.getOperation()) ? payload.getBefore() : payload.getAfter();
         if (row == null) {
             return;
         }
         Long hostId = longOrNull(row, "host_id");
-        Long softwareId = longOrNull(row, "software_id");
-        if (hostId == null || softwareId == null) {
+        if (hostId == null) {
             return;
         }
         FleetHostRef host = fleetHostResolver.resolve(String.valueOf(hostId));
         if (host == null) {
-            log.debug("[software-cdc] device_cve: unresolved Fleet host {} — skipping (software {})", hostId, softwareId);
+            log.debug("[software-cdc] host_software (cve) for unresolved Fleet host {} — skipping", hostId);
             return;
         }
-        FleetSoftware software = fleetSoftwareRepository.findBySoftwareId(softwareId).orElse(null);
-        Long titleId = software == null ? null : software.getSoftwareTitleId();
-        if (delete) {
-            List<String> removedCves = deviceCveRepository
-                    .findByTenantIdAndMachineIdAndSoftwareId(host.tenantId(), host.machineId(), softwareId).stream()
-                    .map(DeviceCve::getCveId).filter(Objects::nonNull).distinct().toList();
-            deviceCveRepository.deleteByTenantIdAndMachineIdAndSoftwareId(host.tenantId(), host.machineId(), softwareId);
-            softwareProjector.project(host.tenantId(), titleId);
-            removedCves.forEach(cve -> vulnerabilityProjector.project(host.tenantId(), cve));
-            return;
-        }
-        List<FleetSoftwareCve> cves = fleetSoftwareCveRepository.findBySoftwareId(softwareId);
-        if (cves.isEmpty()) {
-            // No CVE known for this software yet; a later software_cve event fans it in.
-            return;
-        }
-        String version = software == null ? null : software.getVersion();
-        for (FleetSoftwareCve sc : cves) {
-            deviceCveWriter.upsert(host.tenantId(), host.machineId(), hostId, sc.getCve(), softwareId, titleId, version,
-                    sc.getResolvedInVersion());
-        }
-        softwareProjector.project(host.tenantId(), titleId);
-        cves.forEach(sc -> vulnerabilityProjector.project(host.tenantId(), sc.getCve()));
+        reconcile(host, hostId);
     }
 
-    private void handleSoftwareCve(DebeziumMessage.Payload<JsonNode> payload) {
-        boolean delete = isDelete(payload.getOperation());
-        JsonNode row = delete ? payload.getBefore() : payload.getAfter();
-        if (row == null) {
-            return;
+    private void reconcile(FleetHostRef host, Long hostId) {
+        List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId);
+        Set<String> presentKeys = new HashSet<>();
+        Set<String> affectedCves = new HashSet<>();
+        Set<Long> affectedTitles = new HashSet<>();
+
+        for (HostSoftwareTitle title : titles) {
+            Long titleId = title.getId();
+            if (titleId == null || title.getInstalledVersions() == null) {
+                continue;
+            }
+            for (HostSoftwareInstalledVersion version : title.getInstalledVersions()) {
+                if (version.getVulnerabilities() == null) {
+                    continue;
+                }
+                for (String cve : version.getVulnerabilities()) {
+                    if (isBlank(cve)) {
+                        continue;
+                    }
+                    deviceCveWriter.upsert(host.tenantId(), host.machineId(), hostId, cve,
+                            titleId, title.getName(), version.getVersion());
+                    presentKeys.add(key(cve, titleId));
+                    affectedCves.add(cve);
+                    affectedTitles.add(titleId);
+                }
+            }
         }
-        Long softwareId = longOrNull(row, "software_id");
-        String cve = str(row, "cve");
-        if (softwareId == null || cve == null || cve.isBlank()) {
-            return;
+
+        for (DeviceCve existing : deviceCveRepository.findByTenantIdAndMachineId(host.tenantId(), host.machineId())) {
+            if (!presentKeys.contains(key(existing.getCveId(), existing.getSoftwareTitleId()))) {
+                deviceCveRepository.delete(existing);
+                affectedCves.add(existing.getCveId());
+                if (existing.getSoftwareTitleId() != null) {
+                    affectedTitles.add(existing.getSoftwareTitleId());
+                }
+            }
         }
-        if (delete) {
-            fleetSoftwareCveRepository.deleteBySoftwareIdAndCve(softwareId, cve);
-        } else {
-            upsertCatalog(softwareId, cve, str(row, "resolved_in_version"));
-        }
-        cascadeSyncService.enqueueSoftwareCve(softwareId);
+
+        affectedTitles.forEach(titleId -> softwareProjector.project(host.tenantId(), titleId));
+        affectedCves.forEach(cve -> vulnerabilityProjector.project(host.tenantId(), cve));
     }
 
-    private void upsertCatalog(Long softwareId, String cve, String resolvedInVersion) {
-        FleetSoftwareCve entry = fleetSoftwareCveRepository.findBySoftwareIdAndCve(softwareId, cve)
-                .orElseGet(FleetSoftwareCve::new);
-        entry.setSoftwareId(softwareId);
-        entry.setCve(cve);
-        entry.setResolvedInVersion(resolvedInVersion);
-        entry.setUpdatedAt(Instant.now());
-        fleetSoftwareCveRepository.save(entry);
+    private static String key(String cve, Long titleId) {
+        return cve + "|" + titleId;
     }
 }

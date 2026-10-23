@@ -17,8 +17,8 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "device_cve")
 @CompoundIndex(
-        name = "tenant_machine_cve_software",
-        def = "{'tenantId': 1, 'machineId': 1, 'cveId': 1, 'softwareId': 1}",
+        name = "tenant_machine_cve_title",
+        def = "{'tenantId': 1, 'machineId': 1, 'cveId': 1, 'softwareTitleId': 1}",
         unique = true)
 @CompoundIndex(name = "tenant_cve", def = "{'tenantId': 1, 'cveId': 1}")
 @CompoundIndex(name = "tenant_title", def = "{'tenantId': 1, 'softwareTitleId': 1}")
@@ -38,7 +38,7 @@ public class DeviceCve implements TenantScoped {
 
     private Long softwareTitleId;
 
-    private Long softwareId;
+    private String name;
 
     private String installedVersion;
 

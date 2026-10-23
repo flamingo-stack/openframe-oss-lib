@@ -5,7 +5,6 @@ import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Software;
 import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
-import com.openframe.data.repository.rmm.software.FleetSoftwareTitleRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +25,6 @@ public class SoftwareProjector {
     private final SoftwareRepository softwareRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final DeviceCveRepository deviceCveRepository;
-    private final FleetSoftwareTitleRepository fleetSoftwareTitleRepository;
 
     public void project(String tenantId, Long softwareTitleId) {
         if (tenantId == null || softwareTitleId == null) {
@@ -42,8 +40,8 @@ public class SoftwareProjector {
 
         List<Software.Installation> installations = installed.stream()
                 .map(ds -> Software.Installation.builder()
-                        .machineId(ds.getMachineId()).hostId(ds.getHostId()).softwareId(ds.getSoftwareId())
-                        .version(ds.getVersion()).lastSeenAt(ds.getLastSeenAt()).build())
+                        .machineId(ds.getMachineId()).hostId(ds.getHostId())
+                        .versions(ds.getVersions()).lastSeenAt(ds.getLastSeenAt()).build())
                 .toList();
         int devicesCount = (int) installations.stream()
                 .map(Software.Installation::getMachineId).filter(Objects::nonNull).distinct().count();
@@ -52,7 +50,7 @@ public class SoftwareProjector {
                 .orElseGet(Software::new);
         software.setTenantId(tenantId);
         software.setSoftwareTitleId(softwareTitleId);
-        applyTitle(software, softwareTitleId, installed.get(0));
+        applyName(software, installed.get(0));
         software.setLatestVersion(latestVersion(installed));
         software.setInstallations(installations);
         software.setCveIds(List.copyOf(cveIds));
@@ -62,20 +60,16 @@ public class SoftwareProjector {
         softwareRepository.save(software);
     }
 
-    private void applyTitle(Software software, Long softwareTitleId, DeviceSoftware sample) {
+    private void applyName(Software software, DeviceSoftware sample) {
         software.setName(sample.getName());
         software.setNameLower(sample.getName() == null ? null : sample.getName().toLowerCase());
         software.setSource(sample.getSource());
-        fleetSoftwareTitleRepository.findBySoftwareTitleId(softwareTitleId).ifPresent(title -> {
-            software.setName(title.getName());
-            software.setNameLower(title.getNameLower());
-            software.setSource(title.getSource());
-            software.setBrowser(title.getBrowser());
-        });
     }
 
     private String latestVersion(List<DeviceSoftware> installed) {
-        return installed.stream().map(DeviceSoftware::getVersion).filter(Objects::nonNull)
+        return installed.stream()
+                .map(DeviceSoftware::getVersions).filter(Objects::nonNull)
+                .flatMap(List::stream).filter(Objects::nonNull)
                 .max(Comparator.naturalOrder()).orElse(null);
     }
 }
