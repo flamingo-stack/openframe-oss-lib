@@ -51,6 +51,8 @@ public class DeviceSoftware implements TenantScoped {
 
     private String source;
 
+    private boolean isConnected;
+
     private Instant lastSeenAt;
 
     private Instant updatedAt;
