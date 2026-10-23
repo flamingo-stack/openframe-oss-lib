@@ -5,6 +5,7 @@ import com.openframe.api.dto.command.CancelExecutionInput;
 import com.openframe.api.dto.command.RunCommandInput;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.service.device.DeviceService;
+import com.openframe.api.service.rmm.TestRunPolicy;
 import com.openframe.data.nats.rmm.model.CancelMessage;
 import com.openframe.data.nats.rmm.model.CommandMessage;
 import com.openframe.data.nats.rmm.publisher.CommandNatsPublisher;
@@ -16,17 +17,6 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Dispatches ad-hoc shell commands from the dashboard to the target agent(s)
- * over <b>core NATS</b> (fire-and-forget), not JetStream.
- *
- * <p>Single {@link #runCommand} and {@link #cancelExecution} are pure transport
- * — nothing is persisted. {@link #batchRunCommand} differs: it records one
- * RUNNING {@code CommandExecution} row per target machine before dispatch (via
- * {@link CommandExecutionService#createBatch}), so a fan-out is never in flight
- * without a durable record, and the agent's result frame later transitions each
- * row to SUCCESS / FAILED in place — same lifecycle as {@code ScriptExecution}.
- */
 @Slf4j
 @Service
 @ConditionalOnProperty("spring.cloud.stream.enabled")
@@ -36,11 +26,17 @@ public class CommandDispatchService {
     private final CommandNatsPublisher commandNatsPublisher;
     private final DeviceService deviceService;
     private final CommandExecutionService commandExecutionService;
+    private final TestRunPolicy testRunPolicy;
 
-    public DispatchResponse runCommand(RunCommandInput input) {
+    public DispatchResponse runCommand(RunCommandInput input, String initiatedBy) {
         deviceService.verifyDispatchable(input.getMachineId());
 
         String executionId = UUID.randomUUID().toString();
+
+        if (testRunPolicy.isTestRun()) {
+            commandExecutionService.createBatch(executionId, input.getCommand(), input.getShell(),
+                    List.of(input.getMachineId()), input.getPrivilegeLevel(), input.getTimeoutSeconds(), initiatedBy);
+        }
 
         CommandMessage message = CommandMessage.builder()
                 .executionId(executionId)
