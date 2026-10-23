@@ -19,19 +19,28 @@ interface Row {
 
 const columnHelper = createColumnHelper<Row>();
 
-function Table({ onEdit, stopPropagation }: { onEdit: () => void; stopPropagation: boolean }) {
+function Table({
+  onEdit,
+  stopPropagation,
+  marked = true,
+}: {
+  onEdit: () => void;
+  stopPropagation: boolean;
+  marked?: boolean;
+}) {
   const columns = [
     columnHelper.accessor('name', { id: 'name', header: 'Name' }),
     columnHelper.display({
       id: 'actions',
       header: '',
       cell: () => (
-        <div data-no-row-click>
+        <div data-no-row-click={marked ? true : undefined}>
           <div onClick={stopPropagation ? e => e.stopPropagation() : undefined}>
             <button type="button" onClick={onEdit}>
               Edit
             </button>
           </div>
+          <a href="https://example.com/elsewhere">Elsewhere</a>
         </div>
       ),
     }),
@@ -59,8 +68,26 @@ describe('DataTable row link: controls inside it', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it.each([false, true])(
+    'a button without data-no-row-click does not follow the link either (stopPropagation: %s)',
+    stopPropagation => {
+      const onEdit = vi.fn();
+      render(<Table onEdit={onEdit} stopPropagation={stopPropagation} marked={false} />);
+      const event = clickEdit();
+      expect(onEdit).toHaveBeenCalledTimes(1);
+      expect(event.defaultPrevented).toBe(true);
+    },
+  );
+
+  it('leaves a link nested in a cell to follow its own address', () => {
+    render(<Table onEdit={vi.fn()} stopPropagation={false} marked={false} />);
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true });
+    fireEvent(screen.getByRole('link', { name: 'Elsewhere' }), event);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   it('keeps the row a link to its page', () => {
     render(<Table onEdit={vi.fn()} stopPropagation={false} />);
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/docs/1');
+    expect(screen.getByRole('link', { name: /Doc/ })).toHaveAttribute('href', '/docs/1');
   });
 });
