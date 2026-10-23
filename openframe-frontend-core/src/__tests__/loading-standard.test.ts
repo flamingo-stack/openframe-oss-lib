@@ -43,6 +43,31 @@ describe('loading-standard engine: one failing and one passing example per rule'
   });
 });
 
+describe('loading-standard engine: skeleton primitives', () => {
+  /** A component that switches on the scope and draws `bars` as its loading form. */
+  const switching = (bars: string) => ({
+    'components/title/title.tsx': `export function Title({ title }: { title: string }) {
+  return useLoadingScope() ? ${bars} : <h2>{title}</h2>;
+}
+`,
+  });
+
+  it('takes the per-breakpoint text bars as a primitive (a wrapping title draws them on its own switch)', () => {
+    const findings = findingsOf(switching('<TextLinesByBreakpointSkeleton lines={{ phone: 2, md: 1, lg: 1 }} />'));
+    expect(findings.filter(f => f.rule === 'NO_SCOPE_SWITCH')).toEqual([]);
+  });
+
+  it('still refuses a skeleton with no component of its own that is not a primitive', () => {
+    // Declared in a module of its own with no `HeadingBars` beside it: the shape the per-breakpoint bars have.
+    const findings = findingsOf({
+      'components/bars/bars.tsx': 'export function HeadingBarsSkeleton() { return <i />; }\n',
+      'components/title/title.tsx': `import { HeadingBarsSkeleton } from '../bars/bars';
+${switching('<HeadingBarsSkeleton />')['components/title/title.tsx']}`,
+    });
+    expect(findings.map(f => f.rule)).toContain('NO_SCOPE_SWITCH');
+  });
+});
+
 describe('loading-standard engine: the round-5 review fixtures', () => {
   it('fails every reviewer fixture, at every hole they proved', () => {
     const found = [...new Set(findingsOf(REVIEW_FIXTURES).map(f => `${f.file}:${f.line} ${f.rule}`))].sort();

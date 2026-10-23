@@ -257,9 +257,13 @@ const LOADERS = new Set([
   'OpenmspHeartbeatLoader',
   'Spinner',
 ]);
-/** The lib's skeleton parts: what a `*Skeleton` (or a component's own loading branch) is built from. */
+/**
+ * The lib's skeleton parts: what a `*Skeleton` (or a component's own loading branch) is built from.
+ * `TextLinesByBreakpointSkeleton` is `TextLineSkeleton` at a line count per width (a wrapping title or paragraph):
+ * bars with no component of their own, like the rest of the list.
+ */
 const PRIMITIVE =
-  /^(?:UnifiedSkeleton|TextLineSkeleton|FieldValueSkeleton|TextHold|LayoutHold|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
+  /^(?:UnifiedSkeleton|TextLineSkeleton|TextLinesByBreakpointSkeleton|FieldValueSkeleton|TextHold|LayoutHold|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
 /** The lib's loading wrappers (not loading states of a component). */
 const LOADING_WRAPPER = /^(?:Loading(?:Items|When|Fallback|Suspense|Scope|Region)|InertWhileLoading)$/;
 const WHOLE_VIEW =
