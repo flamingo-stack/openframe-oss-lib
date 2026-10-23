@@ -1,6 +1,7 @@
 import { render, fireEvent, screen } from '@testing-library/react';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { mockPush, mockReplace, setMockSearchParams } from '../../../../vitest.setup';
+import { mockPush, mockReplace, mockSearchParams, setMockSearchParams } from '../../../../vitest.setup';
+import { registerNavigation } from '../../../embed-shims/next-navigation';
 import {
   TabNavigation,
   TabNavigationVariantProvider,
@@ -266,8 +267,8 @@ describe('TabNavigation with urlSync', () => {
       render(<TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} />);
 
       const { open, other, otherIcon } = strip();
-      expect(open.className).not.toContain('bg-gradient-to-b');
-      expect(other.className).not.toContain('bg-gradient-to-b');
+      expect(open).not.toHaveAttribute('data-emphasis');
+      expect(other).not.toHaveAttribute('data-emphasis');
       expect(otherIcon.getAttribute('class')).toContain('group-hover:text-ods-text-primary');
     });
 
@@ -278,8 +279,11 @@ describe('TabNavigation with urlSync', () => {
       render(<TabNavigation tabs={ICON_TABS} activeTab="list" onTabChange={() => {}} variant="admin" />);
 
       const { open, other, otherIcon } = strip();
-      expect(open.className).toContain('bg-gradient-to-b');
-      expect(other.className).toContain('hover:bg-gradient-to-b');
+      // The fade is the tab variant's, drawn for a tab marked `data-emphasis="fade"`: open, and hovered.
+      expect(open.getAttribute('data-emphasis')).toBe('fade');
+      expect(other.getAttribute('data-emphasis')).toBe('fade');
+      expect(open.className).toContain('data-[emphasis=fade]:data-[state=active]:bg-gradient-to-b');
+      expect(other.className).toContain('data-[emphasis=fade]:hover:bg-gradient-to-b');
       expect(otherIcon.getAttribute('class')).not.toContain('group-hover:');
     });
 
@@ -296,8 +300,26 @@ describe('TabNavigation with urlSync', () => {
         </TabNavigationVariantProvider>,
       );
 
-      expect(strip().open.className).toContain('bg-gradient-to-b');
-      expect(screen.getByRole('button', { name: 'Own Variant' }).className).not.toContain('bg-gradient-to-b');
+      expect(strip().open.getAttribute('data-emphasis')).toBe('fade');
+      expect(screen.getByRole('button', { name: 'Own Variant' })).not.toHaveAttribute('data-emphasis');
     });
+  });
+});
+
+describe('which bars read the URL', () => {
+  // A bar that reads the URL makes Next render its whole page in the browser when the page is prerendered, so a
+  // page with a plain controlled tab strip could not be served from a CDN (CU-17tkuw5xp4q).
+  it('only a URL-synced bar calls useSearchParams', () => {
+    const read = vi.fn(() => mockSearchParams);
+    registerNavigation({ useSearchParams: read });
+    try {
+      const { unmount } = render(<TabNavigation tabs={TABS} activeTab="general" onTabChange={() => {}} />);
+      expect(read).not.toHaveBeenCalled();
+      unmount();
+      render(<TabNavigation tabs={TABS} urlSync />);
+      expect(read).toHaveBeenCalled();
+    } finally {
+      registerNavigation({ useSearchParams: () => mockSearchParams });
+    }
   });
 });

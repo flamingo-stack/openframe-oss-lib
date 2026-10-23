@@ -46,7 +46,9 @@ use crate::config::update_config::{
 };
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::command::{
-    CommandContext, CommandListener, FeatureFlagsHandler, PackageUpdateHandler, RestartGate,
+    ClientUninstallHandler, ClientUpdateHandler, CommandContext, CommandListener,
+    FeatureFlagsHandler, PackageUpdateHandler, RestartGate, ToolInstallationHandler,
+    ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::openframe_client_update_listener::OpenFrameClientUpdateListener;
@@ -107,7 +109,7 @@ use crate::services::{
     ToolRunManager, ToolUrlParamsResolver,
 };
 use crate::services::{
-    InitialKeyService, LastKnownGoodService, UpdateCleanupService, UpdateHandlerService,
+    LastKnownGoodService, LogKeyService, UpdateCleanupService, UpdateHandlerService,
     UpdateStateService,
 };
 use crate::utils::in_progress::InProgress;
@@ -192,6 +194,10 @@ pub struct Client {
     client_uninstall_message_listener: ClientUninstallMessageListener,
     remote_access_message_listener: RemoteAccessMessageListener,
     feature_flags_listener: CommandListener<FeatureFlagsHandler>,
+    tool_installation_listener: CommandListener<ToolInstallationHandler>,
+    tool_update_listener: CommandListener<ToolUpdateHandler>,
+    client_update_listener: CommandListener<ClientUpdateHandler>,
+    client_uninstall_listener: CommandListener<ClientUninstallHandler>,
     package_update: Option<PackageUpdate>,
     restart_gate: RestartGate,
     command_execution_listener: ExecutionListener<CommandMessage>,
@@ -216,7 +222,7 @@ pub struct Client {
     initial_configuration_service: InitialConfigurationService,
     agent_configuration_service: AgentConfigurationService,
     installed_tools_service: InstalledToolsService,
-    initial_key_service: Arc<InitialKeyService>,
+    log_key_service: Arc<LogKeyService>,
     remote_access_mode_service: Arc<RemoteAccessModeService>,
     deactivation_service: Arc<DeactivationService>,
 }
@@ -345,7 +351,7 @@ impl Client {
             config_service.clone(),
         );
 
-        let initial_key_service = Arc::new(InitialKeyService::new(
+        let log_key_service = Arc::new(LogKeyService::new(
             http_client.clone(),
             http_url.clone(),
             initial_configuration_service.clone(),
@@ -465,6 +471,13 @@ impl Client {
         let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
             .context("Failed to initialize last-known-good service")?;
 
+        let result_store = Arc::new(ResultStore::open_or_degrade(
+            directory_manager
+                .secured_dir()
+                .join("scheduled_outbox.redb"),
+        ));
+        let flush_notify = Arc::new(tokio::sync::Notify::new());
+
         // Initialize update handler service (boot-time and in-process failure handling)
         let update_handler_service = UpdateHandlerService::new(
             update_state_service.clone(),
@@ -473,6 +486,7 @@ impl Client {
             last_known_good_service.clone(),
             installed_agent_message_publisher.clone(),
             config_service.clone(),
+            result_store.clone(),
         );
 
         // Initialize tool installation service
@@ -519,7 +533,7 @@ impl Client {
         // Initialize tool installation message listener
         let tool_installation_message_listener = ToolInstallationMessageListener::new(
             nats_connection_manager.clone(),
-            tool_installation_service,
+            tool_installation_service.clone(),
             config_service.clone(),
             tool_run_manager.clone(),
         );
@@ -549,14 +563,14 @@ impl Client {
         // Initialize OpenFrame client update listener
         let openframe_client_update_listener = OpenFrameClientUpdateListener::new(
             nats_connection_manager.clone(),
-            openframe_client_update_service,
+            openframe_client_update_service.clone(),
             config_service.clone(),
         );
 
         // Initialize tool agent update listener
         let tool_agent_update_listener = ToolAgentUpdateListener::new(
             nats_connection_manager.clone(),
-            tool_agent_update_service,
+            tool_agent_update_service.clone(),
             config_service.clone(),
             tool_run_manager.clone(),
         );
@@ -577,12 +591,6 @@ impl Client {
 
         let execution_service = ExecutionService::new();
 
-        let result_store = Arc::new(ResultStore::open_or_degrade(
-            directory_manager
-                .secured_dir()
-                .join("scheduled_outbox.redb"),
-        ));
-        let flush_notify = Arc::new(tokio::sync::Notify::new());
         let result_outbox_run_manager = ResultOutboxRunManager::new(
             result_store.clone(),
             Arc::new(nats_message_publisher.clone()),
@@ -632,6 +640,30 @@ impl Client {
         });
         let feature_flags_listener = CommandListener::new(
             FeatureFlagsHandler::new(feature_flags_service),
+            command_context.clone(),
+        );
+        let tool_installation_listener = CommandListener::new(
+            ToolInstallationHandler::new(
+                tool_installation_service,
+                tool_ops.clone(),
+                tool_run_manager.client_update_pending(),
+            ),
+            command_context.clone(),
+        );
+        let tool_update_listener = CommandListener::new(
+            ToolUpdateHandler::new(
+                tool_agent_update_service,
+                tool_ops.clone(),
+                tool_run_manager.client_update_pending(),
+            ),
+            command_context.clone(),
+        );
+        let client_update_listener = CommandListener::new(
+            ClientUpdateHandler::new(openframe_client_update_service, tool_run_manager.clone()),
+            command_context.clone(),
+        );
+        let client_uninstall_listener = CommandListener::new(
+            ClientUninstallHandler::new(deactivation_service.clone()),
             command_context,
         );
 
@@ -716,6 +748,10 @@ impl Client {
             client_uninstall_message_listener,
             remote_access_message_listener,
             feature_flags_listener,
+            tool_installation_listener,
+            tool_update_listener,
+            client_update_listener,
+            client_uninstall_listener,
             package_update,
             restart_gate,
             command_execution_listener,
@@ -739,7 +775,7 @@ impl Client {
             initial_configuration_service,
             agent_configuration_service: config_service,
             installed_tools_service,
-            initial_key_service,
+            log_key_service,
             remote_access_mode_service,
             deactivation_service,
         })
@@ -774,8 +810,6 @@ impl Client {
             error!("Failed to record boot attempt: {:#}", e);
         }
 
-        self.initial_key_service.clone().start();
-
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
             &self.agent_configuration_service,
@@ -788,6 +822,9 @@ impl Client {
 
         self.registration_processor.process().await?;
         self.auth_processor.process().await?;
+
+        // Needs the agent token, so only after authentication.
+        self.log_key_service.clone().start();
 
         self.token_refresh_run_manager.start();
 
@@ -883,6 +920,12 @@ impl Client {
 
         // Start client uninstall listener in background
         self.client_uninstall_message_listener.start().await?;
+
+        // Delivery-engine counterparts of the JetStream listeners above; the backend picks one path per type
+        self.tool_installation_listener.start().await?;
+        self.tool_update_listener.start().await?;
+        self.client_update_listener.start().await?;
+        self.client_uninstall_listener.start().await?;
 
         self.remote_access_message_listener.start().await?;
 

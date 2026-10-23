@@ -85,7 +85,12 @@ export interface EntityPortraitCardProps {
   /** Typography override for the title (entity identity), zone box unchanged. */
   titleClassName?: string;
   person?: EntityPortraitPerson | null;
+  /** The card's picture is likely the page's largest paint: fetch it at once and ranked high, not lazily. */
+  priority?: boolean;
   className?: string;
+  /** The record is still being read: the card draws its skeleton (the same three zones, the chip real). A loading
+   *  scope does the same. */
+  loading?: boolean;
 }
 
 export function EntityPortraitCard({
@@ -99,9 +104,11 @@ export function EntityPortraitCard({
   title,
   titleClassName,
   person,
+  priority,
   className,
+  loading: loadingProp,
 }: EntityPortraitCardProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   const { src, onError: onMediaError } = useCoverImageFallback(imageUrl, placeholderUrl);
   // null = unknown (assume wide until the image reports its natural size).
   // The measurement carries the src it was taken from, so re-detection when the
@@ -140,6 +147,7 @@ export function EntityPortraitCard({
               className={cn('h-full w-full', isWide === false ? 'object-contain' : 'object-cover')}
               sizes="(min-width: 800px) 400px, 100vw"
               fill
+              priority={priority}
               unoptimized
               onLoad={onMediaLoad}
               onError={onMediaError}
@@ -156,6 +164,7 @@ export function EntityPortraitCard({
               variant="button"
               colorScheme="accentBorder"
               singleLine
+              staticText
               text={typeLabel}
               className="self-start"
             />
@@ -184,7 +193,10 @@ export function EntityPortraitCard({
                   </div>
                 )}
                 {person.iconOverlayUrl && (
-                  <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg">
+                  <div
+                    data-loading-optional
+                    className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-ods-text-primary ring-1 ring-ods-bg"
+                  >
                     <Image
                       src={person.iconOverlayUrl}
                       alt=""
@@ -213,7 +225,7 @@ export function EntityPortraitCard({
  * is drawn for real; the title (two lines under a chip, three without, at the 24px title leading) and the person
  * (48px avatar, name and subtitle lines) are bars.
  */
-export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel?: string; className?: string }) {
+function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel?: string; className?: string }) {
   return (
     <div className={cn('block h-full', className)} aria-hidden>
       <Card className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, PORTRAIT_BODY)}>
@@ -224,6 +236,7 @@ export function EntityPortraitCardSkeleton({ typeLabel, className }: { typeLabel
               variant="button"
               colorScheme="accentBorder"
               singleLine
+              staticText
               text={typeLabel}
               className="self-start"
             />

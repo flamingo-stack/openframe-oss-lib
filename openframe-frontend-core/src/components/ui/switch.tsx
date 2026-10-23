@@ -1,36 +1,48 @@
 'use client';
 
 import * as SwitchPrimitives from '@radix-ui/react-switch';
-import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, useEffect, useState } from 'react';
+import { type ComponentPropsWithoutRef, type ElementRef, forwardRef, useState } from 'react';
 
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
+
+/** The switch's box (its track), read by the switch and by its skeleton. */
+const SWITCH_SIZE_CLASS = 'h-4 w-6';
+
+/** A switch while its value is read: one box of the switch's own size and shape. */
+function SwitchSkeleton({ className }: { className?: string }) {
+  return <UnifiedSkeleton as="span" className={cn(SWITCH_SIZE_CLASS, 'shrink-0 rounded-full', className)} />;
+}
 
 const Switch = forwardRef<
   ElementRef<typeof SwitchPrimitives.Root>,
   ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> & {
     checked?: boolean;
     onCheckedChange?: (checked: boolean) => void;
+    /** The value is still being read: the switch draws its skeleton (`SwitchSkeleton`). A loading scope does the
+     *  same. */
+    loading?: boolean;
   }
->(({ className, checked, onCheckedChange, ...props }, ref) => {
-  // Use local state if not controlled
-  const [isChecked, setIsChecked] = useState(checked || false);
-
-  // Update local state when controlled prop changes
-  useEffect(() => {
-    if (checked !== undefined) {
-      setIsChecked(checked);
-    }
-  }, [checked]);
+>(({ className, checked, onCheckedChange, loading: loadingProp, ...props }, ref) => {
+  // ONE switch: in a page's loading state (or while the host reads the value) the switch is its skeleton.
+  const loading = useLoadingScope() || !!loadingProp;
+  // Local state when uncontrolled; a controlled `checked` always wins (derived, never copied in an effect).
+  const [localChecked, setLocalChecked] = useState(false);
+  const isChecked = checked ?? localChecked;
 
   const handleCheckedChange = (newChecked: boolean) => {
-    setIsChecked(newChecked);
+    setLocalChecked(newChecked);
     onCheckedChange?.(newChecked);
   };
+
+  if (loading) return <SwitchSkeleton className={className} />;
 
   return (
     <SwitchPrimitives.Root
       className={cn(
-        'peer inline-flex h-4 w-6 shrink-0 cursor-pointer items-center rounded-full border-2 bg-ods-card px-0.5 transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-ods-bg-active disabled:cursor-not-allowed disabled:opacity-50',
+        SWITCH_SIZE_CLASS,
+        'peer inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 bg-ods-card px-0.5 transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background active:bg-ods-bg-active disabled:cursor-not-allowed disabled:opacity-50',
         isChecked ? 'border-ods-accent hover:border-ods-accent-hover' : 'border-ods-text-secondary',
         className,
       )}

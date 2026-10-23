@@ -11,6 +11,7 @@ import { Button } from './button';
 import { ColorPresetSelect, ColorPickerInput } from './color-preset-select';
 import { Input } from './input';
 import { Label } from './label';
+import { InertWhileLoading, LOADING_NOOP, LoadingWhen, useLoadingScope } from './loading-scope';
 import type { TagProps } from './tag';
 import { TicketStatusTag } from './ticket-status-tag';
 import { TouchFriendlyTooltip } from './touch-friendly-tooltip';
@@ -42,7 +43,15 @@ export interface TicketStatusConfigRowProps {
    * Rendered beside the delete button; the drag rail is hidden on touch anyway.
    */
   moveButtons?: ReactNode;
+  /**
+   * The status is still being read: the row keeps its layout, its labels and its delete button (real, inert), and
+   * every read part (the name, the color, the chip) draws its own loading form. A loading scope does the same.
+   */
+  loading?: boolean;
 }
+
+/** The delete button's box, read by the button and its skeleton. */
+const DELETE_BUTTON_SIZE_CLASS = 'size-11 content-md:size-12';
 
 export function TicketStatusConfigRow({
   variant,
@@ -60,7 +69,10 @@ export function TicketStatusConfigRow({
   dragHandleProps,
   isDragging,
   moveButtons,
+  loading: loadingProp,
 }: TicketStatusConfigRowProps) {
+  // ONE switch: in a page's loading state (or while the host reads the status) the read parts are skeletons.
+  const loading = useLoadingScope() || !!loadingProp;
   // Standalone system rows render outside any SortableList, so the row answers
   // "is there a drag rail at all?" itself — same media gate the list uses.
   const dragAndDropEnabled = useDragAndDropEnabled();
@@ -68,7 +80,8 @@ export function TicketStatusConfigRow({
   const isSystem = variant === 'system';
   const isCustomColor = !isSystem && presetKey === undefined;
   const previewColor = isSystem ? undefined : color;
-  const showColorPicker = !isSystem && onColorChange && color !== undefined;
+  // A row the host lets recolor has the Color column; while its color is read the column is a field skeleton.
+  const showColorPicker = !isSystem && !!onColorChange && (color !== undefined || loading);
   // Custom rows render as filled pills (no border); system rows take the
   // page-configured variant (outline/primary). text-h5 already uppercases.
   const previewVariant: SystemTagVariant | undefined = systemTagVariant ?? (isSystem ? undefined : 'primary');
@@ -78,8 +91,11 @@ export function TicketStatusConfigRow({
   // exactly its height: the h4 line + the label's mb-1.
   const fieldRowOffset = 'mt-[calc(var(--font-line-space-h4-body)+0.25rem)]';
 
+  // The chip, the name field and the color select draw their own loading forms (the chip its tag skeleton, each
+  // field its box with a bar for the value).
   const chip = (
     <TicketStatusTag
+      loading={loading}
       status={statusKey}
       label={name || ' '}
       color={previewColor}
@@ -109,14 +125,16 @@ export function TicketStatusConfigRow({
           {isSystem ? (
             <DraggerIcon size={24} aria-hidden className="opacity-40" />
           ) : (
-            <button
+            <Button
+              variant="transparent"
+              size="icon-sm"
               type="button"
               aria-label="Drag to reorder"
-              className="flex size-6 cursor-grab items-center justify-center rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ods-focus active:cursor-grabbing"
+              className="shrink-0 cursor-grab"
               {...dragHandleProps}
             >
               <DraggerIcon size={24} />
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -147,25 +165,34 @@ export function TicketStatusConfigRow({
           <Label variant="large" htmlFor={nameInputId}>
             Status Name
           </Label>
-          <Input
-            id={nameInputId}
-            value={name}
-            onChange={e => onNameChange?.(e.target.value)}
-            disabled={isSystem}
-            readOnly={isSystem}
-            maxLength={50}
-          />
+          <LoadingWhen loading={loading}>
+            <Input
+              id={nameInputId}
+              value={name}
+              onChange={e => onNameChange?.(e.target.value)}
+              disabled={isSystem}
+              readOnly={isSystem}
+              maxLength={50}
+            />
+          </LoadingWhen>
         </div>
 
         {showColorPicker ? (
           <div className="order-3 flex min-w-0 grow basis-full flex-col gap-[var(--spacing-system-xxs)] content-md:order-2 content-md:basis-0">
             <Label variant="large">Color</Label>
-            <ColorPresetSelect value={color} presetKey={presetKey} onChange={onColorChange} />
+            <LoadingWhen loading={loading || !onColorChange || color === undefined}>
+              <ColorPresetSelect value={color ?? ''} presetKey={presetKey} onChange={onColorChange ?? LOADING_NOOP} />
+            </LoadingWhen>
             {/* Custom hex: a second field row inside the Color column, directly
-                under the select (per design). */}
-            {isCustomColor && (
+                under the select (per design). Drawn for a row whose color is known to be custom; the field draws its
+                own loading form. */}
+            {onColorChange && color !== undefined && isCustomColor && (
               <div className="mt-[var(--spacing-system-xxs)] flex min-w-0">
-                <ColorPickerInput value={color} onChange={next => onColorChange({ color: next, preset: undefined })} />
+                <ColorPickerInput
+                  value={color}
+                  onChange={next => onColorChange({ color: next, preset: undefined })}
+                  loading={loading}
+                />
               </div>
             )}
           </div>
@@ -219,31 +246,30 @@ export function TicketStatusConfigRow({
           {isSystem ? (
             <div className="flex w-11 justify-center content-md:w-12">
               <TouchFriendlyTooltip content={systemTooltip}>
-                <button
-                  type="button"
-                  aria-label={systemTooltip ?? 'System status'}
-                  className="flex size-6 items-center justify-center text-ods-text-secondary outline-none focus-visible:ring-2 focus-visible:ring-ods-focus"
-                >
+                <Button variant="bare" size="icon-sm" type="button" aria-label={systemTooltip ?? 'System status'}>
                   <InfoCircleIcon size={24} />
-                </button>
+                </Button>
               </TouchFriendlyTooltip>
             </div>
           ) : (
-            <TouchFriendlyTooltip content={deleteDisabled ? deleteDisabledReason : undefined}>
-              <span className="inline-flex">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  aria-label="Delete status"
-                  disabled={deleteDisabled}
-                  onClick={deleteDisabled ? undefined : onDelete}
-                  className={cn('size-11 content-md:size-12', deleteDisabled && 'pointer-events-none')}
-                >
-                  <TrashIcon className="text-ods-error" />
-                </Button>
-              </span>
-            </TouchFriendlyTooltip>
+            // The delete button is a static control: drawn for real in both forms, inert while the status is read.
+            <InertWhileLoading loading={loading} className="inline-flex">
+              <TouchFriendlyTooltip content={deleteDisabled && !loading ? deleteDisabledReason : undefined}>
+                <span className="inline-flex">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Delete status"
+                    disabled={deleteDisabled}
+                    onClick={deleteDisabled ? undefined : onDelete}
+                    className={cn(DELETE_BUTTON_SIZE_CLASS, deleteDisabled && 'pointer-events-none')}
+                  >
+                    <TrashIcon className="text-ods-error" />
+                  </Button>
+                </span>
+              </TouchFriendlyTooltip>
+            </InertWhileLoading>
           )}
         </div>
       </div>

@@ -30,6 +30,8 @@ import static org.mockito.Mockito.when;
 class WebSocketServiceSecurityDecoratorTest {
 
     private static final String MESH_REQUEST_PATH = "/ws/tools/agent/meshcentral-server/agent.ashx";
+    private static final String CONTROL_REQUEST_PATH = "/ws/tools/meshcentral-server/control.ashx";
+    private static final String RELAY_REQUEST_PATH = "/ws/tools/meshcentral-server/meshrelay.ashx";
 
     @Test
     void wrapsClientSessionForFrameLogging_whenRequestPathMatchesFramePrefix() {
@@ -65,13 +67,64 @@ class WebSocketServiceSecurityDecoratorTest {
         assertThat(WebSocketServiceSecurityDecorator.toolFromPath("/ws/other")).isEqualTo("other");
     }
 
+    @Test
+    void wrapsTheControlChannelWithTheCommandFilter_whenTheAllowlistIsOn() {
+        WebSocketSession proxied = handleAndCaptureProxiedSession(noFrameLogging(), allowlistOn(), CONTROL_REQUEST_PATH);
+
+        assertThat(proxied).isInstanceOf(MeshControlFilteringWebSocketSessionDecorator.class);
+    }
+
+    @Test
+    void doesNotWrapTunnelsOrAgentTrafficWithTheCommandFilter() {
+        // meshrelay carries the desktop, terminal and file manager; agent.ashx is the agents
+        // themselves. Filtering either would break the feature instead of bounding a command.
+        assertThat(handleAndCaptureProxiedSession(noFrameLogging(), allowlistOn(), RELAY_REQUEST_PATH))
+                .isNotInstanceOf(MeshControlFilteringWebSocketSessionDecorator.class);
+        assertThat(handleAndCaptureProxiedSession(noFrameLogging(), allowlistOn(), MESH_REQUEST_PATH))
+                .isNotInstanceOf(MeshControlFilteringWebSocketSessionDecorator.class);
+    }
+
+    @Test
+    void doesNotWrapAnythingWhenTheAllowlistIsOff() {
+        assertThat(handleAndCaptureProxiedSession(noFrameLogging(), new MeshControlCommandProperties(), CONTROL_REQUEST_PATH))
+                .isNotInstanceOf(MeshControlFilteringWebSocketSessionDecorator.class);
+    }
+
+    @Test
+    void filtersBeforeLogging_soTheLogRecordsWhatReachesTheTool() {
+        WebSocketLoggingProperties logging = new WebSocketLoggingProperties();
+        logging.setFramePayloadLoggingEnabled(true);
+        logging.setFramePathPrefixes(List.of("/ws/tools/meshcentral-server/"));
+
+        WebSocketSession proxied = handleAndCaptureProxiedSession(logging, allowlistOn(), CONTROL_REQUEST_PATH);
+
+        assertThat(proxied).isInstanceOf(LoggingWebSocketSessionDecorator.class);
+    }
+
+    private static WebSocketLoggingProperties noFrameLogging() {
+        return new WebSocketLoggingProperties();
+    }
+
+    private static MeshControlCommandProperties allowlistOn() {
+        MeshControlCommandProperties props = new MeshControlCommandProperties();
+        props.setEnabled(true);
+        return props;
+    }
+
     private WebSocketSession handleAndCaptureProxiedSession(WebSocketLoggingProperties props, String requestPath) {
+        return handleAndCaptureProxiedSession(props, new MeshControlCommandProperties(), requestPath);
+    }
+
+    private WebSocketSession handleAndCaptureProxiedSession(WebSocketLoggingProperties props,
+                                                            MeshControlCommandProperties meshProps, String requestPath) {
         WebSocketService defaultService = mock(WebSocketService.class);
         RequestJwtClaimsReader jwtReader = mock(RequestJwtClaimsReader.class);
         GatewayTrafficMetrics metrics = mock(GatewayTrafficMetrics.class);
 
+        // Command filtering off: these cases cover the logging tap, not the allowlist.
         WebSocketServiceSecurityDecorator decorator =
-                new WebSocketServiceSecurityDecorator(defaultService, jwtReader, metrics, props);
+                new WebSocketServiceSecurityDecorator(defaultService, jwtReader, metrics, props,
+                        meshProps, new tools.jackson.databind.ObjectMapper());
 
         ServerWebExchange exchange = exchangeWithPath(requestPath);
         when(jwtReader.getSubject(exchange)).thenReturn(Optional.of("agent_x"));

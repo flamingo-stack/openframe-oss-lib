@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, RotateCcw, Home } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
+import { useLoadingScope } from './loading-scope';
 
 export interface CursorPaginationProps {
   hasNextPage: boolean;
@@ -16,6 +17,10 @@ export interface CursorPaginationProps {
   totalCount?: number | null;
   itemName?: string;
 
+  /**
+   * The pager's page is being read: every button is disabled. Before the first count is known (no `currentCount`), and
+   * inside a loading scope, the pager draws its skeleton: the count line a bar, its own buttons real and inert.
+   */
   loading?: boolean;
 
   onNext?: (cursor: string) => void;
@@ -27,8 +32,6 @@ export interface CursorPaginationProps {
   compact?: boolean;
   resetButtonLabel?: string;
   resetButtonIcon?: 'home' | 'rotate';
-  /** @internal The skeleton's state: the count line a bar, the buttons drawn but inert. */
-  skeleton?: boolean;
 }
 
 export function CursorPagination({
@@ -40,7 +43,7 @@ export function CursorPagination({
   currentCount,
   totalCount,
   itemName = 'items',
-  loading = false,
+  loading: loadingProp = false,
   onNext,
   onPrevious,
   onReset,
@@ -49,8 +52,11 @@ export function CursorPagination({
   compact = false,
   resetButtonLabel = 'First',
   resetButtonIcon = 'home',
-  skeleton = false,
 }: CursorPaginationProps) {
+  const loading = useLoadingScope() || loadingProp;
+  // Its data is the count: until the first one is known, the pager draws its skeleton (a page read with a count shown
+  // keeps the count and only disables the buttons).
+  const skeleton = loading && !currentCount;
   const handleNext = () => {
     if (hasNextPage && endCursor && onNext) {
       onNext(endCursor);
@@ -143,26 +149,6 @@ export function CursorPagination({
       </div>
     </div>
   );
-}
-
-/**
- * The pager while its page is read: the same row, the count line as a bar, and the pager's own buttons (their labels
- * are the pager's words) drawn inert. Takes the pager's configuration; its cursors and counts are not known yet.
- */
-export function CursorPaginationSkeleton(
-  props: Pick<
-    CursorPaginationProps,
-    | 'hasPreviousPage'
-    | 'onPrevious'
-    | 'onReset'
-    | 'className'
-    | 'showInfo'
-    | 'compact'
-    | 'resetButtonLabel'
-    | 'resetButtonIcon'
-  >,
-) {
-  return <CursorPagination {...props} hasNextPage={false} skeleton />;
 }
 
 export function CursorPaginationSimple({

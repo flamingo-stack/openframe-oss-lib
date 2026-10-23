@@ -76,6 +76,7 @@ async fn an_order_is_stored_and_done_at_once() {
             MACHINE,
             &delivery(Some(1)),
             order("req-1", "WAIT", None, "ADMIN"),
+            (),
         )
         .await;
 
@@ -96,6 +97,7 @@ async fn an_order_without_a_sequence_fails() {
             MACHINE,
             &delivery(None),
             order("req-1", "WAIT", None, "ADMIN"),
+            (),
         )
         .await;
 
@@ -114,7 +116,10 @@ async fn an_unsupported_manager_is_refused_and_dropped() {
     }))
     .unwrap();
 
-    let outcome = f.handler.run(MACHINE, &delivery(Some(1)), command).await;
+    let outcome = f
+        .handler
+        .run(MACHINE, &delivery(Some(1)), command, ())
+        .await;
 
     assert!(matches!(outcome, Outcome::Failed(_)));
     assert!(f.orders.pending(MACHINE).is_empty());
@@ -128,6 +133,7 @@ async fn a_stale_sequence_is_done_without_changing_the_order() {
             MACHINE,
             &delivery(Some(5)),
             order("req-1", "WAIT", None, "ADMIN"),
+            (),
         )
         .await;
 
@@ -137,6 +143,7 @@ async fn a_stale_sequence_is_done_without_changing_the_order() {
             MACHINE,
             &delivery(Some(4)),
             order("req-1", "FORCE", Some(60), "ADMIN"),
+            (),
         )
         .await;
 
@@ -152,6 +159,7 @@ async fn a_superseded_order_is_reported_as_failed() {
             MACHINE,
             &delivery(Some(1)),
             order("req-1", "WAIT", None, "ADMIN"),
+            (),
         )
         .await;
 
@@ -161,6 +169,7 @@ async fn a_superseded_order_is_reported_as_failed() {
             MACHINE,
             &delivery(Some(1)),
             order("req-2", "WAIT", None, "ADMIN"),
+            (),
         )
         .await;
 

@@ -2,15 +2,15 @@
 
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { CommentCard, CommentCardSkeleton, type CommentCardComment } from './comment-card';
+import { CommentCard, type CommentCardComment } from './comment-card';
 import { CommentComposer } from './comment-composer';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { Button } from './ui/button';
-import { useLoadingScope } from './ui/loading-scope';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from './ui/loading-scope';
 
 /**
- * The comment cards a thread's skeleton draws: its first fold (about three root cards fill a section's screen). Never
- * the number of comments held: in a loading scope those are not read.
+ * The comment cards a thread draws while it is read: a typical count (a thread with comments usually holds a few root
+ * comments; it has no page size). Never the number of comments held: in a loading scope those are not read.
  */
 export const COMMENT_THREAD_SKELETON_COUNT = 3;
 // The thread's and the block's boxes, read by them AND their skeletons.
@@ -46,6 +46,12 @@ export interface CommentThreadProps {
   /** Which header each ROOT card leads with; replies always lead with the commenter. */
   leadWith?: 'vendor' | 'commenter';
   onViewProduct?: (vendorSlug: string) => void;
+  /**
+   * Whether the thread's comments carry a title line (titled vendor reviews), for the rows the thread draws while it
+   * is read; a design-doc or prompt thread's comments have none. Loaded cards draw a title when their comment has one.
+   * Default true.
+   */
+  showTitle?: boolean;
 }
 
 /**
@@ -69,9 +75,19 @@ export function CommentThread({
   pending = false,
   leadWith,
   onViewProduct,
+  showTitle = true,
 }: CommentThreadProps) {
   if (useLoadingScope()) {
-    return <CommentThreadSkeleton count={COMMENT_THREAD_SKELETON_COUNT} leadWith={leadWith} reply={Boolean(onReply)} />;
+    return (
+      <CommentThreadSkeleton
+        count={COMMENT_THREAD_SKELETON_COUNT}
+        leadWith={leadWith}
+        showTitle={showTitle}
+        reply={Boolean(onReply)}
+        deletable={Boolean(onDelete)}
+        footerSlots={Boolean(renderActions || renderBadges)}
+      />
+    );
   }
   if (comments.length === 0) {
     return emptyLabel ? <p className="text-ods-text-secondary text-h6">{emptyLabel}</p> : null;
@@ -115,7 +131,7 @@ function CommentThreadRow({
   pending,
   leadWith,
   onViewProduct,
-}: Omit<CommentThreadProps, 'comments' | 'emptyLabel'> & { comment: ThreadComment }) {
+}: Omit<CommentThreadProps, 'comments' | 'emptyLabel' | 'showTitle'> & { comment: ThreadComment }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const replies = comment.replies ?? [];
   const actions = renderActions?.(comment);
@@ -140,6 +156,7 @@ function CommentThreadRow({
     <CommentCard
       fullBody
       comment={comment}
+      data-loading-item
       leadWith={leadWith}
       onViewProduct={onViewProduct}
       onDeleteComment={onDelete ? id => void onDelete(id) : undefined}
@@ -178,15 +195,17 @@ function CommentThreadRow({
 }
 
 /**
- * A thread while it is read: `count` comment rows, each `CommentCardSkeleton` in the thread's own list, with the
+ * A thread while it is read: `count` comment rows, each `CommentCard loading` in the thread's own list, with the
  * root's Reply button drawn for real when the thread takes replies (a root's reply count, badges and actions are read,
  * so they are not drawn).
  */
-export function CommentThreadSkeleton({
+function CommentThreadSkeleton({
   count = COMMENT_THREAD_SKELETON_COUNT,
   leadWith = 'commenter',
   showTitle = true,
   reply = false,
+  deletable = false,
+  footerSlots = false,
 }: {
   count?: number;
   leadWith?: 'vendor' | 'commenter';
@@ -194,17 +213,38 @@ export function CommentThreadSkeleton({
   showTitle?: boolean;
   /** The thread takes replies (`CommentThread`'s `onReply`): each root's footer carries its Reply button. */
   reply?: boolean;
+  /** The thread deletes comments (`CommentThread`'s `onDelete`): each row holds its delete button, inert. */
+  deletable?: boolean;
+  /** The thread's roots carry badges or actions (`renderBadges` / `renderActions`): the footer row is drawn, their
+   *  read content one bar. */
+  footerSlots?: boolean;
 }) {
-  const footer = reply ? (
-    <span className={COMMENT_THREAD_ACTIONS}>
-      <ReplyButton />
-    </span>
-  ) : undefined;
+  const footer =
+    reply || footerSlots ? (
+      <>
+        {footerSlots && <TextLineSkeleton type="h6" className="w-20" />}
+        {reply && (
+          <span className={COMMENT_THREAD_ACTIONS}>
+            <ReplyButton />
+          </span>
+        )}
+      </>
+    ) : undefined;
   return (
     <div className={COMMENT_THREAD_LIST} aria-hidden="true" inert>
-      {Array.from({ length: count }, (_, i) => (
-        <CommentCardSkeleton key={i} leadWith={leadWith} showTitle={showTitle} showDelete={false} footer={footer} />
-      ))}
+      <LoadingItems count={count}>
+        {() => (
+          <CommentCard
+            loading
+            fullBody
+            data-loading-item
+            leadWith={leadWith}
+            titleRow={showTitle}
+            footer={footer}
+            onDeleteComment={deletable ? LOADING_NOOP : undefined}
+          />
+        )}
+      </LoadingItems>
     </div>
   );
 }
@@ -290,36 +330,5 @@ function CommentsBlockHeader({ title, open }: { title: string; open: boolean }) 
       {`${title} · `}
       <TextLineSkeleton as="span" type="h6" className="inline-block w-20 align-middle" />
     </Button>
-  );
-}
-
-/**
- * The comments section while it is read: its real title, the summary as a bar, `count` comment rows (none: the
- * block is collapsed) and, with `composer`, the root composer's real static controls (inert).
- */
-export function CommentsBlockSkeleton({
-  title,
-  count = 0,
-  composer = false,
-  leadWith,
-  showTitle,
-}: {
-  title: string;
-  count?: number;
-  composer?: boolean;
-  leadWith?: 'vendor' | 'commenter';
-  showTitle?: boolean;
-}) {
-  const open = count > 0 || composer;
-  return (
-    <div className={COMMENTS_BLOCK} aria-hidden>
-      <CommentsBlockHeader title={title} open={open} />
-      {count > 0 && <CommentThreadSkeleton count={count} leadWith={leadWith} showTitle={showTitle} />}
-      {composer && (
-        <div inert>
-          <CommentComposer onSubmit={() => false} />
-        </div>
-      )}
-    </div>
   );
 }

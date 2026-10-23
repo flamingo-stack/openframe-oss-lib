@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tracing::{info, warn};
 
-use super::{CommandHandler, Outcome};
+use super::{Begin, CommandHandler, Outcome};
 use crate::models::{DeliveryRef, PackageUpdateMessage, UpdateMode, PACKAGE_UPDATE_KIND};
 use crate::services::package_manager::package_update::{OrderStore, StatusReporter, Submitted};
 use crate::services::package_manager::{is_supported, ManagerId};
@@ -27,6 +27,7 @@ impl PackageUpdateHandler {
 
 impl CommandHandler for PackageUpdateHandler {
     type Command = PackageUpdateMessage;
+    type Guard = ();
 
     const KIND: &'static str = PACKAGE_UPDATE_KIND;
 
@@ -34,11 +35,16 @@ impl CommandHandler for PackageUpdateHandler {
         format!("machine.{}.{}", machine_id, PACKAGE_UPDATE_KIND)
     }
 
+    fn begin(&self, _command: &Self::Command) -> Begin<()> {
+        Begin::Accepted(())
+    }
+
     async fn run(
         &self,
         machine_id: &str,
         delivery: &DeliveryRef,
         command: Self::Command,
+        _guard: (),
     ) -> Outcome {
         let Some(sequence) = delivery.sequence else {
             return Outcome::Failed("package update without a sequence".to_string());

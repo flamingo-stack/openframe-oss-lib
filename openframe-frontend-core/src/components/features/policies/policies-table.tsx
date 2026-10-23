@@ -3,8 +3,18 @@
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
-import { type ColumnDef, DataTable, type Row, type SortingState, useDataTable } from '../../ui/data-table';
+import {
+  type ColumnDef,
+  DataTable,
+  dataTableLoadingRows,
+  type Row,
+  type SortingState,
+  useDataTable,
+} from '../../ui/data-table';
+import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { MoreActionsMenu } from '../../ui/more-actions-menu';
 import type { NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
@@ -21,6 +31,40 @@ const EMPTY_COLUMN_FILTERS: never[] = [];
 // An empty platform list means the policy applies to every OS, so we render the
 // full set of OS icons rather than a plain-text "All" label.
 const ALL_PLATFORMS = ['windows', 'darwin', 'linux'];
+
+/** A policy still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
+const loadingPolicy = (id: string): PolicyTableRow => ({
+  id,
+  name: '',
+  critical: false,
+  severityLabel: '',
+  status: { label: '', variant: 'grey' },
+  href: '',
+});
+
+/** The Severity cell; a bar while the row is read. */
+function PolicySeverity({ label }: { label: string }) {
+  if (useLoadingScope() && !label) return <TextLineSkeleton type="h6" className="w-16" />;
+  return <span className="text-ods-text-primary text-h6">{label}</span>;
+}
+
+/** The row's open button: static chrome, drawn real and inert while the row is read. */
+function OpenPolicyButton({ href, name }: { href: string; name: string }) {
+  const loading = useLoadingScope();
+  return (
+    <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
+      <Button
+        onClick={loading ? undefined : openInNewTab(href)}
+        disabled={loading}
+        variant="outline"
+        size="icon"
+        leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
+        aria-label={`Open ${name}`}
+        className="bg-ods-card"
+      />
+    </div>
+  );
+}
 
 const NOTE_TONE_CLASS = {
   error: 'text-ods-error',
@@ -68,17 +112,20 @@ export function PoliciesTable({
   stickyHeader = false,
   stickyHeaderOffset,
   rightSlot,
-  skeletonRows = 10,
+  skeletonRows,
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
 }: PoliciesTableProps) {
+  // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header, the reserved columns and
+  // the body's skeleton rows alike.
+  const loading = useLoadingScope() || isLoading;
   const [sorting, setSorting] = useState<SortingState>([]);
 
   // Reserve the actions column while loading so the column count stays stable across
   // skeleton, loading and loaded (otherwise it appears once rows arrive and shifts every
   // column, the "jitter"). Loaded rows in every caller carry actions.
-  const hasActions = useMemo(() => isLoading || rows.some(r => r.actions && r.actions.length > 0), [isLoading, rows]);
+  const hasActions = useMemo(() => loading || rows.some(r => r.actions && r.actions.length > 0), [loading, rows]);
 
   const columns = useMemo<ColumnDef<PolicyTableRow>[]>(() => {
     const cols: ColumnDef<PolicyTableRow>[] = [
@@ -101,9 +148,7 @@ export function PoliciesTable({
         id: 'severity',
         accessorFn: (row: PolicyTableRow) => (row.critical ? 1 : 0),
         header: 'SEVERITY',
-        cell: ({ row }: { row: Row<PolicyTableRow> }) => (
-          <span className="text-ods-text-primary text-h6">{row.original.severityLabel}</span>
-        ),
+        cell: ({ row }: { row: Row<PolicyTableRow> }) => <PolicySeverity label={row.original.severityLabel} />,
         enableSorting: sortable,
         meta: { width: 'w-[100px]', sortable, hideAt: 'md' },
       },
@@ -158,18 +203,7 @@ export function PoliciesTable({
       id: 'open',
       header: '',
       cell: ({ row }: { row: Row<PolicyTableRow> }) =>
-        row.original.href ? (
-          <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
-            <Button
-              onClick={openInNewTab(row.original.href)}
-              variant="outline"
-              size="icon"
-              leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
-              aria-label={`Open ${row.original.name}`}
-              className="bg-ods-card"
-            />
-          </div>
-        ) : null,
+        row.original.href !== undefined ? <OpenPolicyButton href={row.original.href} name={row.original.name} /> : null,
       enableSorting: false,
       meta: { width: 'w-12 shrink-0 flex-none', hideAt: 'md', align: 'right' },
     });
@@ -177,8 +211,13 @@ export function PoliciesTable({
     return cols;
   }, [showPlatform, sortable, hasActions]);
 
+  // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loadingRows = useMemo(
+    () => (loading ? dataTableLoadingRows(skeletonRows ?? DATA_TABLE_SKELETON_ROWS, loadingPolicy) : null),
+    [loading, skeletonRows],
+  );
   const table = useDataTable<PolicyTableRow>({
-    data: rows,
+    data: loadingRows ?? rows,
     columns,
     getRowId: (row: PolicyTableRow) => row.id,
     clientSideSorting: sortable,
@@ -201,7 +240,7 @@ export function PoliciesTable({
 
   // Hide the column header on the empty state: only show it while loading (skeleton rows)
   // or when there are real rows.
-  const showHeader = isLoading || rows.length > 0;
+  const showHeader = loading || rows.length > 0;
 
   return (
     <DataTable table={table}>
@@ -215,7 +254,8 @@ export function PoliciesTable({
         />
       )}
       <DataTable.Body
-        loading={isLoading}
+        loading={loading}
+        loadingCells
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         emptyState={emptyState}
@@ -223,12 +263,7 @@ export function PoliciesTable({
         rowHref={rowHref}
       />
       {hasMore && onLoadMore && (
-        <DataTable.InfiniteFooter
-          hasNextPage
-          isFetchingNextPage={isLoadingMore}
-          onLoadMore={onLoadMore}
-          skeletonRows={2}
-        />
+        <DataTable.InfiniteFooter hasNextPage isFetchingNextPage={isLoadingMore} onLoadMore={onLoadMore} />
       )}
     </DataTable>
   );

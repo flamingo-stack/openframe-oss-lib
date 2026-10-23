@@ -9,7 +9,7 @@ import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query';
 import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
-import { NavigationSidebarItemButton, NavigationSidebarItemSkeleton } from './navigation-sidebar-item';
+import { NavigationSidebarItemButton } from './navigation-sidebar-item';
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
 const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
@@ -376,7 +376,9 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
                 and each placeholder row is already `aria-hidden`. */}
             <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
               {loadingRows
-                ? loadingRows.primary.map(key => <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />)
+                ? loadingRows.primary.map(key => (
+                    <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
+                  ))
                 : primaryItems.map(item => (
                     <NavigationSidebarItemButton
                       key={item.id}
@@ -394,7 +396,9 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
             <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
               {loadingRows
-                ? loadingRows.secondary.map(key => <NavigationSidebarItemSkeleton key={key} showLabel={showLabel} />)
+                ? loadingRows.secondary.map(key => (
+                    <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
+                  ))
                 : secondaryItems.map(item => (
                     <NavigationSidebarItemButton
                       key={item.id}

@@ -43,7 +43,7 @@ pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
 pub use delivery::{
     delivery_result_subject, DeliveryRef, DeliveryResult, DeliveryResultMessage,
-    DELIVERY_RESULT_KIND,
+    CLIENT_UPDATE_DELIVERY_TYPE, DELIVERY_RESULT_KIND,
 };
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};

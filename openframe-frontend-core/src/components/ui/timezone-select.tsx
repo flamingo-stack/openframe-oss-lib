@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Autocomplete } from './autocomplete';
+import { useLoadingScope } from './loading-scope';
 
 /** An IANA zone as people read it: "Europe/Rome (GMT+2)". */
 export function timezoneLabel(tz: string): string {
@@ -42,7 +43,8 @@ export interface TimezoneSelectProps {
   clearable?: boolean;
   placeholder?: string;
   className?: string;
-  /** The zone is still being resolved or read: the field draws its skeleton (`Autocomplete`'s `fieldLoading`). */
+  /** The zone is still being resolved or read: the field draws its skeleton (`Autocomplete`'s `fieldLoading`), the
+   *  picker's own box. In a loading scope it does the same. */
   loading?: boolean;
 }
 
@@ -58,8 +60,10 @@ export function TimezoneSelect({
   clearable = false,
   placeholder = 'Search timezone…',
   className,
-  loading = false,
+  loading: loadingProp = false,
 }: TimezoneSelectProps) {
+  // ONE switch: in a page's loading state, or while the zone is resolved, the picker draws its own skeleton.
+  const loading = useLoadingScope() || loadingProp;
   const options = useMemo(() => timezoneOptions(value), [value]);
   return (
     <Autocomplete

@@ -27,4 +27,6 @@ public class RunningExecutionRows {
 
     String softwareBundleId;
     String softwareScheduleId;
+
+    boolean testRun;
 }

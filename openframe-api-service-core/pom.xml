@@ -28,6 +28,10 @@
         </dependency>
         <dependency>
             <groupId>com.openframe.oss</groupId>
+            <artifactId>openframe-agent-key</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openframe.oss</groupId>
             <artifactId>openframe-api-lib</artifactId>
         </dependency>
         <dependency>

@@ -4,7 +4,7 @@ import { cn } from '../utils/cn';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 import { TextLineSkeleton } from './loading/unified-skeleton';
 import { useLoadingScope } from './ui/loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from './ui/square-avatar';
+import { SquareAvatar } from './ui/square-avatar';
 
 interface MSPDisplayProps {
   name: string;
@@ -29,10 +29,10 @@ export function MSPDisplay({ name, logoUrl, size = 40, className }: MSPDisplayPr
 }
 
 /** The row while it is read: the logo's box and a bar on the name's line. */
-export function MSPDisplaySkeleton({ size = 40, className }: { size?: number; className?: string }) {
+function MSPDisplaySkeleton({ size = 40, className }: { size?: number; className?: string }) {
   return (
     <div className={cn(MSP_ROW_CLASS, className)} aria-hidden>
-      <SquareAvatarSkeleton sizePx={size} />
+      <SquareAvatar loading sizePx={size} />
       <div className={MSP_NAME_CLASS}>
         <TextLineSkeleton type="inherit" as="span" className="inline-block w-32 align-top" />
       </div>

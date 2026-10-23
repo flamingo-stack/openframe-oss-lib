@@ -118,10 +118,10 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         readStateService.createForAudience(n2.getId(), NotificationCategory.TICKETS, "title", U, Set.of(ALICE));
         readStateService.markRead(ALICE, U, n1.getId());
 
-        var readPage = notificationService.list(ALICE, U, new NotificationFilter(true, null), page10());
+        var readPage = notificationService.list(ALICE, U, new NotificationFilter(true, null, null, null, null), page10());
         assertThat(readPage.getItems()).extracting(NotificationView::id).containsExactly(n1.getId());
 
-        var unreadPage = notificationService.list(ALICE, U, new NotificationFilter(false, null), page10());
+        var unreadPage = notificationService.list(ALICE, U, new NotificationFilter(false, null, null, null, null), page10());
         assertThat(unreadPage.getItems()).extracting(NotificationView::id).containsExactly(n2.getId());
     }
 
@@ -133,7 +133,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         readStateService.createForAudience(welcome.getId(), NotificationCategory.TICKETS, "title", U, Set.of(ALICE));
         readStateService.createForAudience(alert.getId(), NotificationCategory.TICKETS, "title", U, Set.of(ALICE));
 
-        var page = notificationService.list(ALICE, U, new NotificationFilter(null, "a"), page10());
+        var page = notificationService.list(ALICE, U, new NotificationFilter(null, null, null, null, "a"), page10());
 
         assertThat(page.getItems()).extracting(NotificationView::id)
                 .containsExactlyInAnyOrder(welcome.getId(), alert.getId());
@@ -145,7 +145,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         Notification n = mongoTemplate.save(NotificationFixtures.basic("welcome"));
         readStateService.createForAudience(n.getId(), NotificationCategory.TICKETS, "title", U, Set.of(ALICE));
 
-        var page = notificationService.list(ALICE, U, new NotificationFilter(null, "   "), page10());
+        var page = notificationService.list(ALICE, U, new NotificationFilter(null, null, null, null, "   "), page10());
 
         assertThat(page.getItems()).hasSize(1);
     }
@@ -168,7 +168,7 @@ class NotificationServiceIT extends BaseMongoIntegrationTest {
         mongoTemplate.insert(rows, NotificationReadState.class);
 
         GenericQueryResult<NotificationView> result = notificationService.list(
-                ALICE, U, new NotificationFilter(null, "doesnotmatch"), page10());
+                ALICE, U, new NotificationFilter(null, null, null, null, "doesnotmatch"), page10());
 
         assertThat(result.getItems()).isEmpty();
         assertThat(result.getPageInfo().isHasNextPage()).isFalse();

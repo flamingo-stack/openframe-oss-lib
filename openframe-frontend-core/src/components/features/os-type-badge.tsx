@@ -10,6 +10,8 @@
 import type React from 'react';
 import { cn } from '../../utils/cn';
 import { getOSIcon, getOSLabel, normalizeOSType } from '../../utils/os-utils';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 
 export interface OSTypeBadgeProps {
   /** OS type string (case-insensitive, handles aliases) */
@@ -47,6 +49,17 @@ export const OSTypeBadge: React.FC<OSTypeBadgeProps> = ({
   labelOnly = false,
   rightIcon = null,
 }) => {
+  // The OS is still being read: its icon (at the loaded size) and its label as bars.
+  if (useLoadingScope() && !osType) {
+    if (iconOnly) return <UnifiedSkeleton className={cn(iconSize, className)} />;
+    if (labelOnly) return <TextLineSkeleton type="inherit" as="span" className={cn('w-16', className)} />;
+    return (
+      <div className={cn('flex items-center gap-1 text-h4', className)}>
+        <UnifiedSkeleton className={iconSize} />
+        <TextLineSkeleton type="h4" className="w-16" />
+      </div>
+    );
+  }
   if (!osType) {
     return labelOnly ? <span className={cn('text-ods-text-secondary', className)}>Unknown</span> : null;
   }

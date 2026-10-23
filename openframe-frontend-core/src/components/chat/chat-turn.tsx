@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { SquareAvatar } from '../ui/square-avatar';
 
 export interface ChatTurnProps {
   /** Rendered as given, at the size the caller draws it (a person's picture, an agent's mark). */
@@ -17,9 +17,11 @@ export interface ChatTurnProps {
   /** What was said. A string is drawn as the message text; a node is drawn as given. */
   children?: ReactNode;
   className?: string;
+  /** Draw the turn's loading form outside a loading scope too (`useLoadingScope() || loading`). */
+  loading?: boolean;
   /**
    * The loading state a loading scope draws, the turn's own skeleton: the picture's size in px (none without it),
-   * the message's line count (1 by default) and whether a time is shown.
+   * the message's line count (1 by default) or its own loading form (`body`), and whether a time and a meta are shown.
    */
   skeleton?: Omit<ChatTurnSkeletonProps, 'nameSize' | 'className'>;
 }
@@ -55,9 +57,11 @@ export function ChatTurn({
   time,
   children,
   className,
+  loading: loadingProp,
   skeleton,
 }: ChatTurnProps) {
-  if (useLoadingScope()) {
+  const loading = useLoadingScope() || loadingProp;
+  if (loading) {
     return (
       <ChatTurnSkeleton
         nameSize={nameSize}
@@ -65,7 +69,9 @@ export function ChatTurn({
         time={skeleton?.time ?? time != null}
         meta={skeleton?.meta ?? !!meta}
         lines={skeleton?.lines}
+        body={skeleton?.body}
         avatarPx={skeleton?.avatarPx}
+        avatarShape={skeleton?.avatarShape}
         className={className}
       />
     );
@@ -87,7 +93,7 @@ export function ChatTurn({
   );
 }
 
-export interface ChatTurnSkeletonProps {
+interface ChatTurnSkeletonProps {
   /** The picture's size in px; no picture without it. */
   avatarPx?: number;
   /** The picture's corner, as the caller draws it (a person's round photo by default, a square logo). */
@@ -95,6 +101,11 @@ export interface ChatTurnSkeletonProps {
   nameSize?: 'default' | 'quiet';
   /** How many lines the message takes. */
   lines?: 1 | 2 | 3;
+  /**
+   * The message's own loading form, drawn in place of the line bars (a card whose message is a block of its own:
+   * a quote at its line count, an outcome row with its check).
+   */
+  body?: ReactNode;
   /** Whether the name row carries a time at its far end. */
   time?: boolean;
   /** Whether the name carries a meta line; a string is static copy, drawn for real. */
@@ -107,7 +118,7 @@ export interface ChatTurnSkeletonProps {
  * `content-md`, beside it from there, as the turn draws it) and the time at the far end. Read by the turn's
  * skeleton and by every card that draws a turn of its own.
  */
-export function ChatTurnNameSkeleton({
+function ChatTurnNameSkeleton({
   nameSize = 'default',
   meta = false,
   time = false,
@@ -128,30 +139,22 @@ export function ChatTurnNameSkeleton({
 }
 
 /** A turn while it is read: the picture's box, a bar at the name's type step, and a bar per message line. */
-export function ChatTurnSkeleton({
+function ChatTurnSkeleton({
   avatarPx,
   avatarShape = 'round',
   nameSize = 'default',
   lines = 1,
+  body,
   time = false,
   meta = false,
   className,
 }: ChatTurnSkeletonProps) {
   return (
     <div className={cn(TURN_ROW_CLASS, className)} aria-hidden>
-      {avatarPx ? <SquareAvatarSkeleton sizePx={avatarPx} variant={avatarShape} /> : null}
+      {avatarPx ? <SquareAvatar loading sizePx={avatarPx} variant={avatarShape} /> : null}
       <div className={TURN_BODY_CLASS}>
         <ChatTurnNameSkeleton nameSize={nameSize} meta={meta} time={time} />
-        <div>
-          {Array.from({ length: lines }, (_, i) => (
-            <TextLineSkeleton
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton lines never reorder
-              key={i}
-              type="h4"
-              className={i === lines - 1 && lines > 1 ? 'w-2/3' : 'w-full'}
-            />
-          ))}
-        </div>
+        {body ?? <TextLineSkeleton lines={lines} type="h4" />}
       </div>
     </div>
   );

@@ -1,12 +1,83 @@
 'use client';
 
 import type React from 'react';
-import { forwardRef, type HTMLAttributes } from 'react';
+import { forwardRef, useEffect, useSyncExternalStore, type HTMLAttributes } from 'react';
 import type { NavGroup, NavMenu } from '../../types/navigation';
+import { afterPageLoad } from '../../utils/after-page-load';
 import { cn } from '../../utils/cn';
-import { CaseStudyCard } from '../chat/entity-cards/case-study-card';
+import type { CaseStudyCard as CaseStudyCardComponent } from '../chat/entity-cards/case-study-card';
 import { NavItemRow } from './nav-item-row';
 import { defaultRenderSiteNavLink, type SiteNavLinkRenderer } from './site-nav-link';
+
+/**
+ * The featured cards' component (a case study card, with its video hover preview), fetched once the page has loaded,
+ * or at once when a menu opens first. The panel is on every page, closed, so a static import put the card and its video
+ * code in every page's first-load script, ahead of the page's largest paint (CU-17tkuw5xp4q). The server and the first
+ * draw show the closed panel without the cards; they are there before a visitor can open it.
+ */
+type FeatureCardComponent = typeof CaseStudyCardComponent;
+let featureCard: FeatureCardComponent | null = null;
+let featureCardLoad: Promise<void> | null = null;
+const featureCardListeners = new Set<() => void>();
+
+function loadFeatureCard(): void {
+  if (featureCard || featureCardLoad) return;
+  featureCardLoad = import('../chat/entity-cards/case-study-card')
+    .then(module => {
+      featureCard = module.CaseStudyCard;
+      for (const listener of featureCardListeners) listener();
+    })
+    // A failed load is forgotten, so the next open asks again.
+    .catch(() => undefined)
+    .finally(() => {
+      featureCardLoad = null;
+    });
+}
+
+function subscribeToFeatureCard(listener: () => void): () => void {
+  featureCardListeners.add(listener);
+  const cancel = afterPageLoad(loadFeatureCard);
+  return () => {
+    featureCardListeners.delete(listener);
+    cancel();
+  };
+}
+
+const loadedFeatureCard = () => featureCard;
+const noFeatureCard = () => null;
+
+/** A menu's featured cards, drawn once their component has arrived. */
+function FeatureCards({
+  features,
+  open,
+  onNavigate,
+}: {
+  features: NonNullable<NavMenu['features']>;
+  open: boolean;
+  onNavigate?: () => void;
+}) {
+  const Card = useSyncExternalStore(subscribeToFeatureCard, loadedFeatureCard, noFeatureCard);
+  useEffect(() => {
+    if (open) loadFeatureCard();
+  }, [open]);
+  if (!Card) return null;
+  return (
+    <>
+      {features.map(feature => (
+        <div key={feature.id} className="min-h-0 min-w-0 overflow-hidden">
+          <Card
+            size="menu"
+            study={feature.study}
+            href={feature.href}
+            mediaMounted={open}
+            onNavigate={onNavigate}
+            className="h-full"
+          />
+        </div>
+      ))}
+    </>
+  );
+}
 
 /** A column with more links than this lays them out in two columns. */
 const TWO_COLUMN_OVER = 4;
@@ -143,18 +214,7 @@ export const NavPanel = forwardRef<HTMLDivElement, NavPanelProps>(function NavPa
               // One row of cards, as many as the bar's width holds: a card that
               // would wrap lands on a zero-height row, where its cell clips it.
               <div className="grid min-w-0 flex-[3] auto-rows-[0px] grid-cols-[repeat(auto-fit,minmax(240px,1fr))] grid-rows-[minmax(0,1fr)] gap-x-[var(--spacing-system-mf)]">
-                {menu.features.map(feature => (
-                  <div key={feature.id} className="min-h-0 min-w-0 overflow-hidden">
-                    <CaseStudyCard
-                      size="menu"
-                      study={feature.study}
-                      href={feature.href}
-                      mediaMounted={open}
-                      onNavigate={onNavigate}
-                      className="h-full"
-                    />
-                  </div>
-                ))}
+                <FeatureCards features={menu.features} open={open} onNavigate={onNavigate} />
               </div>
             )}
             {!!menu.sideLinks?.length && (
