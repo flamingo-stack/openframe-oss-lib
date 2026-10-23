@@ -1,9 +1,7 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.DeviceCve;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Software;
-import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import org.junit.jupiter.api.Test;
@@ -29,7 +27,6 @@ class SoftwareProjectorTest {
 
     @Mock private SoftwareRepository softwareRepository;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
-    @Mock private DeviceCveRepository deviceCveRepository;
 
     @InjectMocks private SoftwareProjector projector;
 
@@ -37,7 +34,7 @@ class SoftwareProjectorTest {
     void project_nullTenantOrTitle_isNoOp() {
         projector.project(null, 42L);
         projector.project("t1", null);
-        verifyNoInteractions(softwareRepository, deviceSoftwareRepository, deviceCveRepository);
+        verifyNoInteractions(softwareRepository, deviceSoftwareRepository);
     }
 
     @Test
@@ -48,20 +45,17 @@ class SoftwareProjectorTest {
 
         verify(softwareRepository).deleteByTenantIdAndSoftwareTitleId("t1", 42L);
         verify(softwareRepository, never()).save(any());
-        verifyNoInteractions(deviceCveRepository);
     }
 
     @Test
     void project_withInstalls_buildsAggregateFromEdgesWithDistinctDevices() {
         when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
                 DeviceSoftware.builder().machineId("m1").hostId(100L)
-                        .versions(List.of("1.0", "2.0")).name("Google Chrome").source("apps").build(),
+                        .versions(List.of("1.0", "2.0")).vulnerabilities(List.of("CVE-1", "CVE-2"))
+                        .name("Google Chrome").source("apps").build(),
                 DeviceSoftware.builder().machineId("m2").hostId(101L)
-                        .versions(List.of("1.5")).name("Google Chrome").source("apps").build()));
-        when(deviceCveRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
-                DeviceCve.builder().cveId("CVE-1").build(),
-                DeviceCve.builder().cveId("CVE-1").build(),   // duplicate across machines
-                DeviceCve.builder().cveId("CVE-2").build()));
+                        .versions(List.of("1.5")).vulnerabilities(List.of("CVE-1"))  // duplicate across machines
+                        .name("Google Chrome").source("apps").build()));
         when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
         projector.project("t1", 42L);
@@ -86,9 +80,8 @@ class SoftwareProjectorTest {
     @Test
     void project_withInstallsNoCves_zeroCveCount() {
         when(deviceSoftwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of(
-                DeviceSoftware.builder().machineId("m1").versions(List.of("1.0"))
+                DeviceSoftware.builder().machineId("m1").versions(List.of("1.0")).vulnerabilities(List.of())
                         .name("Custom App").source("programs").build()));
-        when(deviceCveRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(List.of());
         lenient().when(softwareRepository.findByTenantIdAndSoftwareTitleId("t1", 42L)).thenReturn(Optional.empty());
 
         projector.project("t1", 42L);

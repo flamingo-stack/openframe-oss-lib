@@ -24,6 +24,7 @@ import java.util.Set;
 
 import static com.openframe.stream.handler.software.FleetRowFields.isDelete;
 import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
 @RequiredArgsConstructor
@@ -34,6 +35,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
     private final FleetHostSoftwareCache fleetHostSoftwareCache;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
     private final SoftwareProjector softwareProjector;
+    private final VulnerabilityProjector vulnerabilityProjector;
 
     @Override
     public EventHandlerType getType() {
@@ -71,7 +73,16 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         List<HostSoftwareTitle> titles = fleetHostSoftwareCache.hostSoftware(host.tenantId(), hostId);
         Instant now = Instant.now();
         Set<Long> present = new HashSet<>();
-        Set<Long> affected = new HashSet<>();
+        Set<Long> affectedTitles = new HashSet<>();
+        Set<String> affectedCves = new HashSet<>();
+
+        List<DeviceSoftware> existingRows = deviceSoftwareRepository
+                .findByTenantIdAndMachineId(host.tenantId(), host.machineId());
+        for (DeviceSoftware existing : existingRows) {
+            if (existing.getVulnerabilities() != null) {
+                affectedCves.addAll(existing.getVulnerabilities());
+            }
+        }
 
         for (HostSoftwareTitle title : titles) {
             Long titleId = title.getId();
@@ -79,6 +90,7 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
                 continue;
             }
             present.add(titleId);
+            List<String> vulnerabilities = vulnerabilitiesOf(title);
             DeviceSoftware deviceSoftware = deviceSoftwareRepository
                     .findByTenantIdAndMachineIdAndSoftwareTitleId(host.tenantId(), host.machineId(), titleId)
                     .orElseGet(DeviceSoftware::new);
@@ -89,21 +101,23 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setName(title.getName());
             deviceSoftware.setSource(title.getSource());
             deviceSoftware.setVersions(versionsOf(title));
+            deviceSoftware.setVulnerabilities(vulnerabilities);
             deviceSoftware.setLastSeenAt(now);
             deviceSoftware.setUpdatedAt(now);
             deviceSoftwareRepository.save(deviceSoftware);
-            affected.add(titleId);
+            affectedTitles.add(titleId);
+            affectedCves.addAll(vulnerabilities);
         }
 
-        for (DeviceSoftware existing : deviceSoftwareRepository
-                .findByTenantIdAndMachineId(host.tenantId(), host.machineId())) {
+        for (DeviceSoftware existing : existingRows) {
             if (!present.contains(existing.getSoftwareTitleId())) {
                 deviceSoftwareRepository.delete(existing);
-                affected.add(existing.getSoftwareTitleId());
+                affectedTitles.add(existing.getSoftwareTitleId());
             }
         }
 
-        affected.forEach(titleId -> softwareProjector.project(host.tenantId(), titleId));
+        affectedTitles.forEach(titleId -> softwareProjector.project(host.tenantId(), titleId));
+        affectedCves.forEach(cve -> vulnerabilityProjector.project(host.tenantId(), cve));
     }
 
     private static List<String> versionsOf(HostSoftwareTitle title) {
@@ -113,6 +127,19 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
         return title.getInstalledVersions().stream()
                 .map(HostSoftwareInstalledVersion::getVersion)
                 .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    private static List<String> vulnerabilitiesOf(HostSoftwareTitle title) {
+        if (title.getInstalledVersions() == null) {
+            return List.of();
+        }
+        return title.getInstalledVersions().stream()
+                .map(HostSoftwareInstalledVersion::getVulnerabilities)
+                .filter(Objects::nonNull)
+                .flatMap(List::stream)
+                .filter(cve -> !isBlank(cve))
                 .distinct()
                 .toList();
     }

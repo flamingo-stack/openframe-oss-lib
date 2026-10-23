@@ -38,7 +38,7 @@ public enum MessageType {
             List.of(Destination.MONGO_CVE_METADATA), EventHandlerType.COMMON_TYPE),
 
     FLEET_MDM_HOST_SOFTWARE_EVENT(IntegratedToolType.FLEET, DataEnrichmentServiceType.INTEGRATED_TOOLS_EVENTS,
-            List.of(Destination.MONGO_DEVICE_SOFTWARE, Destination.MONGO_DEVICE_CVE), EventHandlerType.COMMON_TYPE);
+            List.of(Destination.MONGO_DEVICE_SOFTWARE), EventHandlerType.COMMON_TYPE);
 
     private final IntegratedToolType integratedToolType;
 

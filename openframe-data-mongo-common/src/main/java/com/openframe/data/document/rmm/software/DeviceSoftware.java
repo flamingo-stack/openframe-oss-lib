@@ -27,6 +27,9 @@ import java.util.List;
 @CompoundIndex(
         name = "tenant_title",
         def = "{'tenantId': 1, 'softwareTitleId': 1}")
+@CompoundIndex(
+        name = "tenant_vuln",
+        def = "{'tenantId': 1, 'vulnerabilities': 1}")
 public class DeviceSoftware implements TenantScoped {
 
     @Id
@@ -43,6 +46,8 @@ public class DeviceSoftware implements TenantScoped {
     private String name;
 
     private List<String> versions;
+
+    private List<String> vulnerabilities;
 
     private String source;
 

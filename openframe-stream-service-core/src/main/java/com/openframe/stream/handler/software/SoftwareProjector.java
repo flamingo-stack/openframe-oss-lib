@@ -1,9 +1,7 @@
 package com.openframe.stream.handler.software;
 
-import com.openframe.data.document.rmm.software.DeviceCve;
 import com.openframe.data.document.rmm.software.DeviceSoftware;
 import com.openframe.data.document.rmm.software.Software;
-import com.openframe.data.repository.rmm.software.DeviceCveRepository;
 import com.openframe.data.repository.rmm.software.DeviceSoftwareRepository;
 import com.openframe.data.repository.rmm.software.SoftwareRepository;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -24,7 +23,6 @@ public class SoftwareProjector {
 
     private final SoftwareRepository softwareRepository;
     private final DeviceSoftwareRepository deviceSoftwareRepository;
-    private final DeviceCveRepository deviceCveRepository;
 
     public void project(String tenantId, Long softwareTitleId) {
         if (tenantId == null || softwareTitleId == null) {
@@ -35,8 +33,10 @@ public class SoftwareProjector {
             softwareRepository.deleteByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId);
             return;
         }
-        Set<String> cveIds = deviceCveRepository.findByTenantIdAndSoftwareTitleId(tenantId, softwareTitleId).stream()
-                .map(DeviceCve::getCveId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<String> cveIds = installed.stream()
+                .map(DeviceSoftware::getVulnerabilities).filter(Objects::nonNull)
+                .flatMap(List::stream).filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
         List<Software.Installation> installations = installed.stream()
                 .map(ds -> Software.Installation.builder()

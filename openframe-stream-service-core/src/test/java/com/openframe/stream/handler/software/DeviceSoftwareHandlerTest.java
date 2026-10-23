@@ -37,6 +37,7 @@ class DeviceSoftwareHandlerTest {
     @Mock private FleetHostSoftwareCache fleetHostSoftwareCache;
     @Mock private DeviceSoftwareRepository deviceSoftwareRepository;
     @Mock private SoftwareProjector softwareProjector;
+    @Mock private VulnerabilityProjector vulnerabilityProjector;
 
     @InjectMocks private DeviceSoftwareHandler handler;
 
@@ -64,6 +65,12 @@ class DeviceSoftwareHandlerTest {
             iv.setVersion(v);
             return iv;
         }).toList());
+        return t;
+    }
+
+    private HostSoftwareTitle titleWithCves(long id, String name, String version, String... cves) {
+        HostSoftwareTitle t = title(id, name, "apps", version);
+        t.getInstalledVersions().get(0).setVulnerabilities(List.of(cves));
         return t;
     }
 
@@ -129,6 +136,26 @@ class DeviceSoftwareHandlerTest {
 
         verify(softwareProjector).project("t1", 42L);
         verify(softwareProjector).project("t1", 99L);
+    }
+
+    @Test
+    void handle_reconcile_setsVulnerabilitiesAndProjectsAffectedCves() {
+        when(fleetHostResolver.resolve("100")).thenReturn(new FleetHostRef("t1", "m1"));
+        when(fleetHostSoftwareCache.hostSoftware("t1", 100L)).thenReturn(List.of(
+                titleWithCves(42L, "Google Chrome", "1.0", "CVE-1", "CVE-2")));
+        when(deviceSoftwareRepository.findByTenantIdAndMachineIdAndSoftwareTitleId("t1", "m1", 42L))
+                .thenReturn(Optional.empty());
+        when(deviceSoftwareRepository.findByTenantIdAndMachineId("t1", "m1")).thenReturn(List.of());
+
+        handler.handle(msg("c", null, row().put("host_id", 100)), null);
+
+        ArgumentCaptor<DeviceSoftware> captor = ArgumentCaptor.forClass(DeviceSoftware.class);
+        verify(deviceSoftwareRepository).save(captor.capture());
+        assertThat(captor.getValue().getVulnerabilities()).containsExactly("CVE-1", "CVE-2");
+
+        verify(softwareProjector).project("t1", 42L);
+        verify(vulnerabilityProjector).project("t1", "CVE-1");
+        verify(vulnerabilityProjector).project("t1", "CVE-2");
     }
 
     @Test
