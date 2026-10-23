@@ -16,7 +16,8 @@ import { AssistantRuntimeContext, type AssistantRuntime } from '../../../context
 import type { Faq } from '../../../types/faq';
 import { AssistantAskPrompts } from '../../chat/assistant-ask-prompts';
 import { buildAskPromptsUrl, resetAskSurfaces } from '../../chat/hooks/use-ask-prompts';
-import { ASK_AI_OPEN_EVENT, MingoAiButton } from '../../navigation/mingo-ai-button';
+import { ASK_AI_OPEN_EVENT } from '../../chat/utils/ask-ai-events';
+import { MingoAiButton } from '../../navigation/mingo-ai-button';
 import { FaqSection } from '../faq-section';
 
 const FAQS = [{ id: 1, question: 'What is OpenFrame?', answer: 'A platform.', section: null }] as unknown as Faq[];

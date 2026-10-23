@@ -7,17 +7,140 @@ import { useResumableTimeout } from '../../hooks/ui/use-resumable-timeout';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
+import { useLoadingScope } from './loading-scope';
 
 /** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
 const SNAP_CAROUSEL_CONTROLS_CLASS = 'mt-3 flex items-center gap-2';
+/** The gap between two slides, in px (the track's and the step's). */
+export const SNAP_CAROUSEL_GAP_PX = 12;
+/** The track: one row of slides that snaps and scrolls sideways (read by the carousel and by a host's loading form). */
+export const SNAP_CAROUSEL_TRACK_CLASS = 'scrollbar-hide flex snap-x snap-mandatory overflow-x-auto';
+/** One slide of the track, in the carousel's own box. A host drawing its slides' loading form uses it too. */
+export function SnapCarouselSlide({
+  className,
+  readItem = false,
+  children,
+  ...aria
+}: {
+  className?: string;
+  /** The slide is an item of ONE read list (`data-loading-item`). */
+  readItem?: boolean;
+  children: ReactNode;
+  'aria-label'?: string;
+  'aria-current'?: 'true';
+}) {
+  return (
+    <div
+      role="group"
+      aria-roledescription="slide"
+      {...aria}
+      className={cn('flex shrink-0 grow-0 snap-start', className)}
+      data-loading-item={readItem || undefined}
+    >
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+export interface SnapCarouselControlsProps {
+  /** How many slides the track holds (one dot each). */
+  count: number;
+  /** The slide in view. Default 0. */
+  index?: number;
+  prevLabel?: string;
+  nextLabel?: string;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  /** The carousel advances by itself: the active dot fills over the wait. */
+  wait?: { durationMs: number; ranMs: number; running: boolean } | null;
+  /** The counter is announced (`aria-live`); off while the carousel plays by itself. Default true. */
+  announce?: boolean;
+  /** The slides are read: the row draws its loading form (the dots and arrows real and inert, the counter a bar). In a
+   *  loading scope it does the same. */
+  loading?: boolean;
+  className?: string;
+}
 
 /**
- * The carousel's controls row while its slides load: the same box (margin and
- * height), empty. A skeleton of a carousel is its slides' skeleton over this,
- * so the block keeps its height when the slides land.
+ * The row under a carousel's track: a dot per slide, the counter ("2 / 5") and the two arrows. Loading, it is the
+ * same row, inert: the dots and arrows as they are (static controls), the counter (read data) a bar.
  */
-export function SnapCarouselControlsSkeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn(SNAP_CAROUSEL_CONTROLS_CLASS, 'h-11', className)} />;
+export function SnapCarouselControls({
+  count,
+  index = 0,
+  prevLabel = 'Previous',
+  nextLabel = 'Next',
+  onPrevious,
+  onNext,
+  wait = null,
+  announce = true,
+  loading: loadingProp = false,
+  className,
+}: SnapCarouselControlsProps) {
+  // ONE switch: in a page's loading state, or while the slides are read, the row is inert and its counter a bar.
+  const loading = useLoadingScope() || loadingProp;
+  return (
+    <div
+      className={cn(SNAP_CAROUSEL_CONTROLS_CLASS, className)}
+      aria-hidden={loading || undefined}
+      inert={loading || undefined}
+    >
+      <span className="flex gap-1.5" aria-hidden>
+        {Array.from({ length: count }, (_, dotIndex) => (
+          <span
+            key={dotIndex}
+            className={cn(
+              'relative h-1.5 overflow-hidden rounded-full transition-[width] duration-200 motion-reduce:transition-none',
+              dotIndex === index ? 'w-6' : 'w-1.5',
+              // A carousel that never advances by itself marks its slide with a whole dot.
+              dotIndex === index && !wait ? 'bg-ods-text-primary' : 'bg-ods-border',
+            )}
+          >
+            {dotIndex === index && wait && (
+              // Re-keyed per slide so a NEW slide starts from empty; a pause keeps its place.
+              <DotFill key={index} durationMs={wait.durationMs} ranMs={wait.ranMs} running={wait.running} />
+            )}
+          </span>
+        ))}
+      </span>
+      {loading ? (
+        <span className="ml-auto mr-1">
+          <TextLineSkeleton type="h5" className="w-10" />
+        </span>
+      ) : (
+        <span
+          className="ml-auto mr-1 whitespace-nowrap text-ods-text-secondary text-h5"
+          aria-live={announce ? 'polite' : 'off'}
+        >
+          {index + 1} / {count}
+        </span>
+      )}
+      <Button
+        variant="outline"
+        size="icon"
+        type="button"
+        aria-label={prevLabel}
+        disabled={loading || index === 0}
+        onClick={onPrevious}
+        className="shrink-0"
+      >
+        <Chevron02LeftIcon size={20} />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        type="button"
+        aria-label={nextLabel}
+        disabled={loading || index === count - 1}
+        onClick={onNext}
+        className="shrink-0"
+      >
+        <Chevron02RightIcon size={20} />
+      </Button>
+    </div>
+  );
 }
 
 export interface SnapCarouselProps<T> {
@@ -34,10 +157,11 @@ export interface SnapCarouselProps<T> {
   nextLabel?: string;
   /** A slide to bring into view whenever this value changes (a link that names it). Only the track moves, never the page. */
   focusIndex?: number;
+  /** The slides are read data (a list whose length is the record's): each slide is marked an item of ONE read list
+   *  (`data-loading-item`), so a loading state drawn with the same carousel has the same structure as the loaded one. */
+  readItems?: boolean;
   className?: string;
 }
-
-const GAP_PX = 12;
 
 /**
  * The active dot's fill: how much of the slide's wait has been run. It starts
@@ -90,6 +214,7 @@ export function SnapCarousel<T>({
   prevLabel = 'Previous',
   nextLabel = 'Next',
   focusIndex,
+  readItems = false,
   className,
 }: SnapCarouselProps<T>) {
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -100,7 +225,7 @@ export function SnapCarousel<T>({
 
   const slideStep = useCallback(() => {
     const first = trackRef.current?.firstElementChild as HTMLElement | null;
-    return first ? first.offsetWidth + GAP_PX : 0;
+    return first ? first.offsetWidth + SNAP_CAROUSEL_GAP_PX : 0;
   }, []);
 
   const goTo = useCallback(
@@ -162,67 +287,32 @@ export function SnapCarousel<T>({
         role="group"
         aria-roledescription="carousel"
         aria-label={label}
-        className="scrollbar-hide flex snap-x snap-mandatory overflow-x-auto"
-        style={{ gap: GAP_PX }}
+        className={SNAP_CAROUSEL_TRACK_CLASS}
+        style={{ gap: SNAP_CAROUSEL_GAP_PX }}
       >
         {items.map((item, itemIndex) => (
-          <div
+          <SnapCarouselSlide
             key={getKey ? getKey(item, itemIndex) : itemIndex}
-            role="group"
-            aria-roledescription="slide"
             aria-label={`${itemIndex + 1} / ${count}`}
             // Never `aria-hidden`: the neighbouring slides are on screen and their links take focus.
             aria-current={itemIndex === index ? 'true' : undefined}
-            className={cn('flex shrink-0 grow-0 snap-start', slideClassName)}
+            className={slideClassName}
+            readItem={readItems}
           >
-            <div className="min-w-0 flex-1">{renderItem(item, itemIndex)}</div>
-          </div>
+            {renderItem(item, itemIndex)}
+          </SnapCarouselSlide>
         ))}
       </div>
-      <div className={SNAP_CAROUSEL_CONTROLS_CLASS}>
-        <span className="flex gap-1.5" aria-hidden>
-          {items.map((_, dotIndex) => (
-            <span
-              key={dotIndex}
-              className={cn(
-                'relative h-1.5 overflow-hidden rounded-full transition-[width] duration-200 motion-reduce:transition-none',
-                dotIndex === index ? 'w-6' : 'w-1.5',
-                // A carousel that never advances by itself marks its slide with a whole dot.
-                dotIndex === index && !showsWait ? 'bg-ods-text-primary' : 'bg-ods-border',
-              )}
-            >
-              {dotIndex === index && showsWait && (
-                // Re-keyed per slide so a NEW slide starts from empty; a pause keeps its place.
-                <DotFill key={index} durationMs={autoAdvanceMs} ranMs={ranMs} running={playing} />
-              )}
-            </span>
-          ))}
-        </span>
-        <span
-          className="ml-auto mr-1 whitespace-nowrap text-ods-text-secondary text-h5"
-          aria-live={playing ? 'off' : 'polite'}
-        >
-          {index + 1} / {count}
-        </span>
-        <button
-          type="button"
-          aria-label={prevLabel}
-          disabled={index === 0}
-          onClick={() => goTo(index - 1)}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ods-border text-ods-text-primary outline-none transition-colors hover:bg-ods-card focus-visible:ring-2 focus-visible:ring-ods-focus disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:bg-transparent"
-        >
-          <Chevron02LeftIcon size={20} />
-        </button>
-        <button
-          type="button"
-          aria-label={nextLabel}
-          disabled={index === count - 1}
-          onClick={() => goTo(index + 1)}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ods-border text-ods-text-primary outline-none transition-colors hover:bg-ods-card focus-visible:ring-2 focus-visible:ring-ods-focus disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:bg-transparent"
-        >
-          <Chevron02RightIcon size={20} />
-        </button>
-      </div>
+      <SnapCarouselControls
+        count={count}
+        index={index}
+        prevLabel={prevLabel}
+        nextLabel={nextLabel}
+        onPrevious={() => goTo(index - 1)}
+        onNext={() => goTo(index + 1)}
+        wait={showsWait ? { durationMs: autoAdvanceMs, ranMs, running: playing } : null}
+        announce={!playing}
+      />
     </div>
   );
 }

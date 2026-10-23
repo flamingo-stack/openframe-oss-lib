@@ -10,6 +10,7 @@ import com.openframe.api.dataloader.OrganizationDataLoader;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
+import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.dto.device.DeviceFilterCriteria;
 import com.openframe.api.dto.device.DeviceFilterInput;
 import com.openframe.api.dto.device.DeviceFilterFacet;
@@ -157,6 +158,14 @@ public class DeviceDataFetcher {
         DataLoader<String, List<ToolConnection>> dataLoader = dfe.getDataLoader("toolConnectionDataLoader");
         Machine machine = dfe.getSource();
         return dataLoader.load(machine.getMachineId());
+    }
+
+    @DgsData(parentType = "Machine")
+    public CompletableFuture<DeviceEnrollmentResponse> enrollment(DgsDataFetchingEnvironment dfe) {
+        DataLoader<String, List<ToolConnection>> dataLoader = dfe.getDataLoader("toolConnectionDataLoader");
+        Machine machine = dfe.getSource();
+        return dataLoader.load(machine.getMachineId())
+                .thenApply(toolConnections -> mapper.toEnrollment(machine, toolConnections));
     }
 
     @DgsData(parentType = "Machine")

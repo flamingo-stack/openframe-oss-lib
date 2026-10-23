@@ -60,19 +60,23 @@ export interface IncidentFeedProps {
   className?: string;
 }
 
+/** The feed's frame and its open item. */
+const FEED_CLASS = 'flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 md:px-5';
+const FEED_BOTTOM_CLASS = 'justify-end [mask-image:linear-gradient(180deg,transparent_0,#000_48px)]';
+const OPEN_ITEM_CLASS = 'flex flex-col gap-1.5 rounded-md border border-ods-border bg-ods-bg px-4 py-3.5';
+const META_CLASS = 'flex items-center justify-between gap-3';
+const SOURCE_TAG_CLASS =
+  'inline-flex shrink-0 rounded-md border border-ods-border px-2 py-1 text-ods-text-secondary text-h5';
+
 function SourceTag({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex shrink-0 rounded-md border border-ods-border px-2 py-1 text-ods-text-secondary text-h5">
-      {children}
-    </span>
-  );
+  return <span className={SOURCE_TAG_CLASS}>{children}</span>;
 }
 
 /** The row above an item's title: where it was found and when. Nothing to show: no row. */
 function ItemMeta({ item }: { item: IncidentFeedItem }) {
   if (!item.source && !item.time) return null;
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className={META_CLASS}>
       {item.source ? <SourceTag>{item.source}</SourceTag> : <span />}
       {item.time && <span className="shrink-0 text-ods-text-secondary text-h6">{item.time}</span>}
     </div>
@@ -88,13 +92,7 @@ function ItemMeta({ item }: { item: IncidentFeedItem }) {
 export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', className }: IncidentFeedProps) {
   const lastIndex = items.length - 1;
   return (
-    <div
-      className={cn(
-        'flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-4 md:px-5',
-        anchor === 'bottom' && 'justify-end [mask-image:linear-gradient(180deg,transparent_0,#000_48px)]',
-        className,
-      )}
-    >
+    <div className={cn(FEED_CLASS, anchor === 'bottom' && FEED_BOTTOM_CLASS, className)}>
       {items.length === 0 && emptyLabel && <AnalyzingState label={emptyLabel} className="m-auto" />}
       {items.map((item, index) => {
         const open = index === lastIndex || item.status === 'waiting';
@@ -115,7 +113,7 @@ export function IncidentFeed({ items, statusLabels, emptyLabel, anchor = 'top', 
         return (
           <div
             key={item.id}
-            className="flex flex-col gap-1.5 rounded-md border border-ods-border bg-ods-bg px-4 py-3.5 duration-300 animate-in fade-in motion-reduce:animate-none"
+            className={cn(OPEN_ITEM_CLASS, 'duration-300 animate-in fade-in motion-reduce:animate-none')}
           >
             <ItemMeta item={item} />
             <span className="flex items-start gap-2.5">

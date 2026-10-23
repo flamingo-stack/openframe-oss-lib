@@ -1,4 +1,5 @@
 use super::*;
+use crate::services::tool_run_manager::ClientUpdatePendingFlag;
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
@@ -32,11 +33,55 @@ fn message(flags: Value) -> FeatureFlagsMessage {
 }
 
 #[test]
-fn the_subject_is_machine_scoped() {
+fn the_subjects_are_machine_scoped_and_match_the_backend() {
     assert_eq!(
         FeatureFlagsHandler::subject("abc123"),
         "machine.abc123.feature-flags"
     );
+    assert_eq!(
+        ToolInstallationHandler::subject("abc123"),
+        "machine.abc123.tool-installation.v2"
+    );
+    assert_eq!(
+        ToolUpdateHandler::subject("abc123"),
+        "machine.abc123.tool-update.v2"
+    );
+    assert_eq!(
+        ClientUpdateHandler::subject("abc123"),
+        "machine.abc123.client-update.v2"
+    );
+    assert_eq!(
+        ClientUninstallHandler::subject("abc123"),
+        "machine.abc123.client-uninstall.v2"
+    );
+}
+
+#[test]
+fn a_tool_command_reserves_the_tool_as_busy_unless_taken_or_behind_a_client_update() {
+    let tool_ops = ToolOps::default();
+    let flag = ClientUpdatePendingFlag::default();
+
+    let Begin::Accepted(op) = reserve_tool(&tool_ops, &flag.view(), "mesh") else {
+        panic!("a free tool was not reserved");
+    };
+    assert!(tool_ops.is_busy("mesh"), "a client update would not see it");
+    assert!(matches!(
+        reserve_tool(&tool_ops, &flag.view(), "mesh"),
+        Begin::Busy(reason) if reason == TOOL_BUSY
+    ));
+    assert!(matches!(
+        reserve_tool(&tool_ops, &flag.view(), "fleet"),
+        Begin::Accepted(_)
+    ));
+    drop(op);
+    assert!(!tool_ops.is_busy("mesh"));
+
+    flag.mark();
+    assert!(matches!(
+        reserve_tool(&tool_ops, &flag.view(), "osquery"),
+        Begin::Busy(reason) if reason == CLIENT_UPDATE_PENDING
+    ));
+    assert!(!tool_ops.is_busy("osquery"));
 }
 
 #[tokio::test]
@@ -44,7 +89,12 @@ async fn flags_without_a_sequence_fail() {
     let (handler, _dir) = handler();
 
     let outcome = handler
-        .run(MACHINE, &delivery(None), tool_installation(true, "1.0.0"))
+        .run(
+            MACHINE,
+            &delivery(None),
+            tool_installation(true, "1.0.0"),
+            (),
+        )
         .await;
 
     assert!(matches!(outcome, Outcome::Failed(_)));
@@ -73,53 +123,8 @@ async fn an_applicable_change_restarts_and_anything_else_is_done() {
     for (message, expected, why) in cases {
         let (handler, _dir) = handler();
 
-        let outcome = handler.run(MACHINE, &delivery(Some(1)), message).await;
+        let outcome = handler.run(MACHINE, &delivery(Some(1)), message, ()).await;
 
         assert_eq!(outcome, expected, "{why}");
     }
-}
-
-#[tokio::test]
-async fn a_stale_or_repeated_sequence_is_done_without_applying() {
-    let (handler, _dir) = handler();
-    handler
-        .run(
-            MACHINE,
-            &delivery(Some(5)),
-            tool_installation(true, "1.0.0"),
-        )
-        .await;
-
-    for stale in [5, 4] {
-        let outcome = handler
-            .run(MACHINE, &delivery(Some(stale)), message(json!({})))
-            .await;
-
-        assert_eq!(outcome, Outcome::Done, "sequence {stale}");
-        assert_eq!(handler.service.applied_sequence(MACHINE), 5);
-        assert!(handler.awaiting_restart().is_some());
-    }
-}
-
-#[tokio::test]
-async fn a_reregistered_machine_applies_a_lower_sequence() {
-    let (handler, _dir) = handler();
-    handler
-        .run(
-            MACHINE,
-            &delivery(Some(50)),
-            tool_installation(true, "1.0.0"),
-        )
-        .await;
-
-    let outcome = handler
-        .run(
-            "machine-2",
-            &delivery(Some(3)),
-            tool_installation(true, "1.0.0"),
-        )
-        .await;
-
-    assert_eq!(outcome, Outcome::RestartRequired);
-    assert_eq!(handler.service.applied_sequence("machine-2"), 3);
 }

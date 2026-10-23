@@ -60,7 +60,7 @@ openframe:
           initial-interval: 1s
           multiplier: 2
           max-interval: 30s
-        topics:                         # its own switch, apart from enabled: see Topics
+        topics:                         # needs enabled: true too; see Topics
           create: false                 # default; creates every published type's topic and DLT at startup
           events:                       # used only when a topic is created
             partitions: 1
@@ -87,11 +87,12 @@ openframe:
 
 ## Topics
 
-With `kafka.topics.create: true`,
+With `enabled: true` and `kafka.topics.create: true`,
 [`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L31) creates
 `<topic-prefix><type>` and `<topic-prefix><type>-dlt` for every spec at startup, before the listeners start, so a new
-published type needs no topic config. It runs apart from `enabled`, because the topics must exist before the outbox
-connector writes, and that can be before processing is on.
+published type needs no topic config. With processing off, nothing is created: off means no infrastructure. So the
+rollout enables processing (every processor on `aspect`) before the outbox connector is registered, and the topics
+exist before the connector writes.
 
 - It creates only what is missing and never changes an existing topic, not even its partitions. Another pod creating
   the same topic at the same moment is fine.

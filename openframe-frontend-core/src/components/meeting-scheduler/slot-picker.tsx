@@ -5,8 +5,9 @@ import { useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button, DatePickerCalendar } from '../ui';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -59,8 +60,8 @@ export interface SlotPickerProps {
   slots: number[];
   /** Column layout; `card` unless the host says otherwise. */
   layout?: SlotPickerLayout;
-  /** IANA zone every label renders in (parent resolves post-mount). */
-  timezone: string;
+  /** IANA zone every label renders in (parent resolves post-mount; null until then, which draws the skeleton). */
+  timezone: string | null;
   monthOffset: number;
   onMonthOffsetChange: (offset: number) => void;
   selectedSlot: number | null;
@@ -76,6 +77,11 @@ export interface SlotPickerProps {
    * the visitor can see WHICH time is being booked.
    */
   isSubmitting?: boolean;
+  /**
+   * The availability (or the duration and zone it is read for) has not arrived: the whole picker draws its
+   * skeleton, as in a loading scope. DISTINCT from `isLoading`, a month refetch under a mounted picker.
+   */
+  loading?: boolean;
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -249,7 +255,6 @@ export function monthLabelFor(offset: number): string {
 
 /** Nothing is bookable yet — used while a month is still loading. */
 const DISABLE_EVERY_DAY = () => true;
-const NOOP = () => undefined;
 
 interface DayCalendarProps {
   monthOffset: number;
@@ -317,13 +322,7 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
  * the times column is a skeleton, and it is the same one the loaded picker
  * shows while a month loads, so there is no swap between the two.
  */
-export function SlotPickerSkeleton({
-  monthOffset = 0,
-  layout = 'card',
-}: {
-  monthOffset?: number;
-  layout?: SlotPickerLayout;
-}) {
+function SlotPickerSkeleton({ monthOffset = 0, layout = 'card' }: { monthOffset?: number; layout?: SlotPickerLayout }) {
   const modal = layout === 'modal';
   return (
     <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>
@@ -338,9 +337,9 @@ export function SlotPickerSkeleton({
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         <DayCalendar
           monthOffset={monthOffset}
-          onMonthOffsetChange={NOOP}
+          onMonthOffsetChange={LOADING_NOOP}
           selectedDay={null}
-          onSelectDay={NOOP}
+          onSelectDay={LOADING_NOOP}
           slotsByDay={null}
         />
       </div>
@@ -351,29 +350,32 @@ export function SlotPickerSkeleton({
             : cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 content-md:flex-1')
         }
       >
-        <TimeChipsSkeleton />
+        <TimeChipsSkeleton layout={layout} />
       </div>
     </div>
   );
 }
 
+/** Time chips the loading day draws: enough to fill the visible scroll box at any column count. */
+const SLOT_PICKER_SKELETON_CHIPS = 16;
+
 /** Same-footprint skeleton for the time-chip column. */
-export function TimeChipsSkeleton() {
+function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
   return (
     <>
       {/* The day label is data — but it is held inside the REAL heading line
           box, so the skeleton's first row sits exactly where the label lands. */}
       <div className={COLUMN_HEADING_CLASS}>
-        <UnifiedSkeleton className="inline-block h-4 w-40 align-middle" />
+        <TextLineSkeleton type="h4" className="w-40" />
       </div>
-      <div className={CHIP_GRID_CLASS}>
+      <div className={layout === 'modal' ? MODAL_CHIP_GRID_CLASS : CHIP_GRID_CLASS}>
         {/* Enough to fill the visible scroll box at any column count — the
             grid's track count follows the card width, so no fixed number
             lands flush and a partial last row is the honest shape anyway. */}
-        {Array.from({ length: 16 }, (_, i) => (
-          // h-11 content-md:h-12 — the loaded chip's own default-size height.
-          <UnifiedSkeleton key={i} className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />
-        ))}
+        <LoadingItems count={SLOT_PICKER_SKELETON_CHIPS}>
+          {/* h-11 content-md:h-12 — the loaded chip's own default-size height. */}
+          {() => <UnifiedSkeleton data-loading-item className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />}
+        </LoadingItems>
       </div>
     </>
   );
@@ -391,9 +393,12 @@ export function SlotPicker({
   onSelectDay,
   isLoading = false,
   isSubmitting = false,
+  loading = false,
 }: SlotPickerProps) {
+  const inScope = useLoadingScope() || loading;
   const slotsByDay = useMemo(() => {
     const map = new Map<string, number[]>();
+    if (timezone == null) return map;
     for (const ms of slots) {
       const key = dayKeyInZone(ms, timezone);
       const list = map.get(key) ?? [];
@@ -418,6 +423,9 @@ export function SlotPicker({
   const monthHasSlots = [...slotsByDay.keys()].some(key => key.startsWith(monthPrefix));
 
   const modal = layout === 'modal';
+  // While the availability (or the zone it is shown in) is read the picker is its skeleton: the calendar real, the
+  // times as chip boxes.
+  if (inScope || timezone == null) return <SlotPickerSkeleton monthOffset={monthOffset} layout={layout} />;
   return (
     <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>
       <div
@@ -446,7 +454,7 @@ export function SlotPicker({
         }
       >
         {isLoading ? (
-          <TimeChipsSkeleton />
+          <TimeChipsSkeleton layout={layout} />
         ) : selectedDay ? (
           <>
             <p className={COLUMN_HEADING_CLASS}>
@@ -470,6 +478,7 @@ export function SlotPicker({
                       if (isSubmitting) return;
                       onSelectSlot(ms);
                     }}
+                    data-loading-item
                     className={CHIP_CLASS}
                   >
                     {timeLabelInZone(ms, timezone)}

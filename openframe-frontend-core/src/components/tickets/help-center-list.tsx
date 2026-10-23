@@ -27,26 +27,30 @@
  */
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims';
 import { useScrollToHash } from '../../hooks/use-scroll-to-hash';
 import { toast as defaultToast } from '../../hooks/use-toast';
-import { DEV_SECTION_PARAM_KEYS, devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
+import {
+  DEV_SECTION_PARAM_KEYS,
+  devSectionAnchorId,
+  TICKET_OPEN_PARAM,
+} from '../../utils/dev-sections/dev-section-param-keys';
 import { STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { positiveInt } from '../../utils/search-params';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
 import { ListEmptyState } from '../list-empty-state';
 import { DevSectionPage } from '../shared/dev-section';
-import { DevCardRowSkeletonList } from '../shared/dev-section/dev-card-row';
 import { Button } from '../ui';
+import { LoadingItems } from '../ui/loading-scope';
 import { UnifiedPagination } from '../unified-pagination';
 import { HelpCenterCard } from './help-center-card';
-import { HelpCenterCreateForm, HelpCenterCreateFormSkeleton } from './help-center-create-form';
+import { HelpCenterCreateForm } from './help-center-create-form';
 import { useTicketActions } from './hooks/use-ticket-actions';
-import { useTicketsList } from './hooks/use-tickets-list';
+import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
 import type { AnyTicket, OptimisticTicket, TicketsCacheSlot } from './types';
-import { isOptimistic, TICKET_OPEN_PARAM } from './types';
+import { isOptimistic } from './types';
 
 export interface HelpCenterListProps {
   /** Toast override (test-friendly). Defaults to the lib's shared
@@ -99,9 +103,13 @@ export function HelpCenterList({ toast = defaultToast, backButton, title, shell 
         backButton={backButton}
         title={title}
         shell={shell}
-        preControls={<HelpCenterCreateFormSkeleton />}
+        preControls={<HelpCenterCreateForm loading />}
       >
-        <DevCardRowSkeletonList />
+        <HelpCenterRowsFrame>
+          <LoadingItems count={TICKETS_PAGE_SIZE}>
+            {() => <HelpCenterCard ticket={null} data-loading-item />}
+          </LoadingItems>
+        </HelpCenterRowsFrame>
       </DevSectionPage>
     );
   }
@@ -202,7 +210,7 @@ function HelpCenterListAuthed({
     [searchParams, router, pathname],
   );
 
-  const { tickets, isLoading, isFetching, error, refetch, totalPages } = useTicketsList({
+  const { tickets, isLoading, isFetching, error, refetch, totalPages, pageSize } = useTicketsList({
     // `sessionEmail` is drilled in from the parent — see the same
     // pattern + race-cause rationale documented in
     // `HelpCenterCreateForm.sessionName/sessionEmail`. Calling
@@ -325,15 +333,13 @@ function HelpCenterListAuthed({
 
       {!error && (
         <div className="w-full">
-          {isLoading ? (
-            <DevCardRowSkeletonList />
-          ) : !hasResults && isFetching ? (
-            // Bridge state — background refetch in flight and the
-            // optimistic placeholder was just removed by the mutation
-            // callback. Without this branch "No tickets yet" would flash
-            // for ~50ms between `removeOptimistic` and the server
-            // response landing.
-            <DevCardRowSkeletonList rows={1} />
+          {/* Loading, or the bridge state (a background refetch in flight right after the mutation callback removed
+              the optimistic placeholder: without it "No tickets yet" would flash for ~50ms): one page of rows, each
+              drawing itself. */}
+          {isLoading || (!hasResults && isFetching) ? (
+            <HelpCenterRowsFrame>
+              <LoadingItems count={pageSize}>{() => <HelpCenterCard ticket={null} data-loading-item />}</LoadingItems>
+            </HelpCenterRowsFrame>
           ) : !hasResults ? (
             <ListEmptyState
               isFiltered={hasActiveFilters}
@@ -354,18 +360,11 @@ function HelpCenterListAuthed({
               }}
             />
           ) : (
-            // `overflow-clip` (NOT `overflow-hidden`) — both visually
-            // clip the rounded corners, but `hidden` makes the element
-            // a "scroll container" per CSSOM spec, which causes
-            // `scrollIntoView` calls inside (`<HelpCenterCard>` click
-            // handlers) to try scrolling THIS div (can't, overflow
-            // hidden) instead of bubbling up to the window. `clip`
-            // keeps the visual clip but NOT the scroll-container
-            // status, so click-to-scroll actually moves the page.
-            <div className="w-full overflow-clip rounded-[6px] border border-ods-border bg-ods-card">
+            <HelpCenterRowsFrame>
               {merged.map(ticket => (
                 <HelpCenterCard
                   key={ticket.id}
+                  data-loading-item
                   id={devSectionAnchorId('ticket', ticket.external_id)}
                   ticket={ticket}
                   expanded={expandedTicketId === ticket.id}
@@ -380,7 +379,7 @@ function HelpCenterListAuthed({
                   onClearReplyError={() => actions.clearReplyError(ticket.external_id)}
                 />
               ))}
-            </div>
+            </HelpCenterRowsFrame>
           )}
         </div>
       )}
@@ -399,4 +398,11 @@ function HelpCenterListAuthed({
       {body}
     </DevSectionPage>
   );
+}
+
+/** The bordered card the rows sit in, loaded and loading. `overflow-clip` (NOT `overflow-hidden`): both clip the
+ *  rounded corners, but `hidden` makes the element a scroll container, so a row's `scrollIntoView` would try to scroll
+ *  THIS div instead of the page. */
+function HelpCenterRowsFrame({ children }: { children: ReactNode }) {
+  return <div className="w-full overflow-clip rounded-[6px] border border-ods-border bg-ods-card">{children}</div>;
 }

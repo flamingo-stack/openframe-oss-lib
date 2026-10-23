@@ -93,9 +93,6 @@ export * from './shared/delivery';
 // Legal-document shared component (privacy policy, terms of service)
 export * from './shared/legal-document';
 
-// Detail Page Skeleton
-export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detail-page-skeleton';
-
 // Author byline card (end-of-article author description) — embeddable via
 // embed-shims + optional-runtime avatar proxying; hosts pass their own
 // fallbackBio copy (the hub uses defaultAuthorFallbackBio()).
@@ -106,6 +103,7 @@ export { ArticleAuthorByline, type ArticleAuthorBylineProps } from './shared/art
 // used by product-release + What I Shipped detail pages.
 export {
   MediaGalleryStrip,
+  MEDIA_GALLERY_STRIP_SKELETON_COUNT,
   type MediaGalleryStripItem,
   type MediaGalleryStripProps,
 } from './shared/media-gallery-strip';
@@ -122,3 +120,6 @@ export { EntityIcon, type EntityIconValue } from './icon-display';
 // An icon stated as DATA (its name, and a mark's own colours) and loaded when it is drawn: what a table keyed by a
 // string (a platform, a provider, a job) holds in place of imported icon components.
 export { NamedIcon, PlatformMark, type IconRef } from './chat/utils/icon-loading';
+export { AGENT_IDENTITIES_API_PATH } from '../hooks/use-agent-identities';
+export type { AgentIdentityIcon, AgentIdentityIcons } from '../hooks/use-agent-identities';
+export type { SocialIconLink } from '../utils/social-platforms';

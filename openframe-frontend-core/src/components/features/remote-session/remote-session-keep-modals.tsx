@@ -181,7 +181,8 @@ export function ReleaseKeepingModal({
         <ModalV2Title>Release Keeping</ModalV2Title>
       </ModalV2Header>
 
-      <div className="flex w-full flex-col gap-[var(--spacing-system-xsf)] text-ods-text-primary text-h4">
+      {/* break-words: a free-text reason ("Other") can be one long word, which ran past the modal's edge. */}
+      <div className="flex w-full flex-col gap-[var(--spacing-system-xsf)] break-words text-ods-text-primary text-h4">
         <p>
           Kept by {keptBy} on {keptOn} for {reason}.
         </p>

@@ -25,8 +25,6 @@ export interface OnboardingStepConfig {
   checkComplete?: () => boolean | Promise<boolean>;
 }
 
-export type { OnboardingState };
-
 /**
  * Hook for managing onboarding state with localStorage persistence
  * Uses simple storage utilities for atomic updates and reliable re-renders

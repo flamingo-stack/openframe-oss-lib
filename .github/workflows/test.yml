@@ -30,6 +30,24 @@ jobs:
     if: github.event_name == 'merge_group' || (github.event.pull_request.state == 'open' && !github.event.pull_request.draft)
 
 
+  lint:
+    name: "Lint"
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    permissions:
+      pull-requests: read
+    steps:
+      # Squash commits take the PR title; read live so a re-run picks up an edited title or the no-task label.
+      - name: Check PR title
+        if: github.event.pull_request.user.type == 'User' && !startsWith(github.head_ref, 'renovate/')  # Renovate runs as a user
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr view "$PR" --json title,labels -q '.title + if any(.labels[]; .name == "no-task") then " CU-notask" else "" end' \
+            | grep -qE "^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\(.+\))?!?: .+ CU-[0-9a-z]+$" \
+            || { echo "::error::Expected 'fix(armor): exclude billing action CU-17tkuw5x3yh' (no-task label drops CU-); fix the title and re-run"; exit 1; }
+
   scan:
     name: "Scan Code: ${{ matrix.target.name }}"
     runs-on: ubuntu-latest
@@ -289,7 +307,7 @@ jobs:
 
   all-checks:
     name: "All Checks"
-    needs: [changes, test-java, test-node, test-node-cycles, test-rust]
+    needs: [changes, test-java, test-node, test-node-cycles, test-rust, lint]
     runs-on: ubuntu-latest
     if: |
       always() &&

@@ -2,13 +2,24 @@
 
 import { type KeyboardEvent, type ReactNode, useRef } from 'react';
 import { useContentLgUp } from '../../hooks/ui/use-content-breakpoint';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
+import { AgentAvatar } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { SnapCarousel, SnapCarouselControlsSkeleton } from '../ui/snap-carousel';
+import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
+import {
+  SNAP_CAROUSEL_GAP_PX,
+  SNAP_CAROUSEL_TRACK_CLASS,
+  SnapCarousel,
+  SnapCarouselControls,
+  SnapCarouselSlide,
+} from '../ui/snap-carousel';
+import { SquareAvatar } from '../ui/square-avatar';
 import { TruncateText } from '../ui/truncate-text';
 
 /** One job the product does, as the explorer shows it. Every field is the host's data. */
@@ -79,9 +90,24 @@ export interface CapabilityExplorerProps {
   /** The marks beside the two turns of an example that names nobody of its own. */
   requesterMark?: ReactNode;
   responderMark?: ReactNode;
+  /** The jobs are being read (the host's query runs): the explorer draws its own skeleton. A page's loading scope does too. */
+  loading?: boolean;
+  /**
+   * The jobs the skeleton's list draws: the number of jobs the host reads (its limit). Default
+   * `CAPABILITY_EXPLORER_SKELETON_JOBS`, a typical count for a host that states none.
+   */
+  skeletonCount?: number;
+  /** @deprecated Ignored: the skeleton draws `skeletonCount` (a list draws its full count, never a fold). */
+  fold?: number;
   className?: string;
 }
 
+/** Boxes the loaded explorer and its skeleton both draw (one box in both forms). */
+const PANEL_BODY_CLASS =
+  'flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7';
+const PANEL_INTRO_CLASS = 'flex min-w-0 flex-col overflow-hidden';
+const HIGHLIGHT_ROW_CLASS = 'flex min-w-0 items-center gap-2.5';
+const CARD_HEAD_ROW_CLASS = 'flex min-w-0 items-center gap-3';
 /**
  * Heights are constants so the panel never moves between jobs and the
  * skeleton is the loaded box: every text is clamped to fit them.
@@ -92,17 +118,38 @@ const PANEL_TOP_HEIGHT_CLASS = 'h-[256px]';
 const PANEL_SCREEN_HEIGHT_CLASS = 'h-[420px]';
 const PANEL_FOOTER_HEIGHT_CLASS = 'h-[52px]';
 const CARD_HEIGHT_CLASS = 'h-[700px]';
+/** One card's slide in the carousel: most of the width, so the next card peeks beside it (loaded and loading). */
+const CARD_SLIDE_CLASS = 'min-w-0 basis-[86%]';
+/** A job's card in the carousel (loaded and loading): its frame, padding and rhythm. */
+const CARD_CLASS =
+  'flex w-full min-w-0 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]';
+/** A job's row in the list (loaded tab and loading row): the lib's list row (`Button variant="row"`), never shrunk. */
+const JOB_TAB_LAYOUT_CLASS = 'min-w-0 shrink-0';
+const JOB_TAB_CLASS = cn(BUTTON_KIND_CLASS.row, JOB_TAB_LAYOUT_CLASS);
+/** A job's icon tile's box (in the list, a card's head and their skeletons). */
+const JOB_ICON_TILE_BOX = `${TILE_SIZE.md} shrink-0 rounded-lg`;
+const JOB_ICON_TILE_CLASS = cn(
+  JOB_ICON_TILE_BOX,
+  'flex items-center justify-center border border-ods-border bg-ods-bg',
+);
+/** The mark beside each turn of an example (the host's avatar is drawn at this size). */
+const EXAMPLE_MARK_PX = 24;
 
 /** The element id of a job's tab (never the job's own id: that is the host's anchor). */
 export const capabilityTabId = (id: string): string => `${id}-tab`;
+
+/** A highlight's check mark: `MediaSkeleton.Icon size="sm"` (16px) while loading. */
+const HIGHLIGHT_ICON_PX = 16;
+/** The most highlights a job shows (its first ones): the limit of the list, and the rows its skeleton draws. */
+const HIGHLIGHTS_LIMIT = 3;
 
 function Highlights({ items, className }: { items: readonly string[]; className?: string }) {
   if (items.length === 0) return null;
   return (
     <ul className={cn('grid grid-cols-1 gap-2', className)}>
-      {items.slice(0, 3).map(text => (
-        <li key={text} className="flex min-w-0 items-center gap-2.5">
-          <CheckIcon size={16} className="shrink-0 text-ods-flamingo-cyan" />
+      {items.slice(0, HIGHLIGHTS_LIMIT).map(text => (
+        <li key={text} data-loading-item className={HIGHLIGHT_ROW_CLASS}>
+          <CheckIcon size={HIGHLIGHT_ICON_PX} className="shrink-0 text-ods-flamingo-cyan" />
           <TruncateText variant="h6" triggerClassName="flex-1">
             {text}
           </TruncateText>
@@ -133,7 +180,14 @@ function Example({
   );
   // The mark is the host's own avatar: its shape says who it is (a person who uses a computer, one who runs it, an agent), so it is never clipped here.
   const mark = (node: ReactNode) =>
-    node ? <span className="flex size-6 shrink-0 items-center justify-center">{node}</span> : null;
+    node ? (
+      <span
+        className="flex shrink-0 items-center justify-center"
+        style={{ width: EXAMPLE_MARK_PX, height: EXAMPLE_MARK_PX }}
+      >
+        {node}
+      </span>
+    ) : null;
   const requester = example.requester;
   const responder = example.responder;
   return (
@@ -168,28 +222,21 @@ function Example({
   );
 }
 
-/**
- * A text placeholder in its line's own box (`text-h…` on the line, the bar inline in it), so a
- * placeholder line is the loaded line's height.
- */
-const LINE_SKELETON_CLASS = 'inline-block h-[0.7em] rounded align-middle';
-
 /** The example's two turns, in the loaded example's own box. */
 function ExampleSkeleton({ className }: { className?: string }) {
+  // Who asks is a person (the host's avatar), who answers the agent.
   const turn = (first: boolean) => (
     <div className={cn('flex min-w-0 gap-2.5', !first && 'border-t border-ods-border pt-3')}>
-      <UnifiedSkeleton className="size-6 shrink-0 rounded-full" />
+      {first ? (
+        <SquareAvatar loading variant="round" sizePx={EXAMPLE_MARK_PX} className="shrink-0" />
+      ) : (
+        <AgentAvatar loading agent="" size={EXAMPLE_MARK_PX} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="text-h6">
-          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-28')} />
-        </div>
+        <TextLineSkeleton type="h6" className="w-28" />
         <div className="min-h-[2lh] text-h4">
-          <div className="text-h4">
-            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
-          </div>
-          <div className="text-h4">
-            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-2/3')} />
-          </div>
+          <TextLineSkeleton type="h4" className="w-full" />
+          <TextLineSkeleton type="h4" className="w-2/3" />
         </div>
       </div>
     </div>
@@ -211,20 +258,19 @@ function ExampleSkeleton({ className }: { className?: string }) {
 function JobHeadSkeleton() {
   return (
     <>
-      <UnifiedSkeleton className="size-9 shrink-0 rounded-lg" />
+      <UnifiedSkeleton className={JOB_ICON_TILE_BOX} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="text-h4">
-          <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-32')} />
-        </div>
+        <TextLineSkeleton type="h4" className="w-32" />
         <div className="mt-0.5">
-          <div className="text-h6">
-            <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-40')} />
-          </div>
+          <TextLineSkeleton type="h6" className="w-40" />
         </div>
       </div>
     </>
   );
 }
+
+/** The jobs the explorer's skeleton lists when its host states no count: a typical count. */
+const CAPABILITY_EXPLORER_SKELETON_JOBS = 8;
 
 /**
  * The explorer while its data loads, drawn as both layouts in their own boxes
@@ -233,42 +279,41 @@ function JobHeadSkeleton() {
  * first card over the carousel's controls. Every box is the loaded one's, so
  * nothing moves when the jobs arrive.
  */
-export function CapabilityExplorerSkeleton({
+function CapabilityExplorerSkeleton({
   region = true,
   className,
-  count = 8,
+  count = CAPABILITY_EXPLORER_SKELETON_JOBS,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
   className?: string;
+  /** The jobs the list draws: the jobs the host reads. Default a typical count. */
   count?: number;
 }) {
   return (
     <LoadingRegion label="Loading capabilities" announce={region} className={className}>
+      {/* The carousel's own track and slides: the first card, the next one peeking beside it, then the controls. */}
       <div className="content-lg:hidden">
-        <div className="flex gap-[var(--spacing-system-sf)] overflow-hidden">
-          <div
-            className={cn(
-              'flex min-w-0 shrink-0 basis-[86%] flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
-              CARD_HEIGHT_CLASS,
+        <div className={SNAP_CAROUSEL_TRACK_CLASS} style={{ gap: SNAP_CAROUSEL_GAP_PX }}>
+          <LoadingItems count={count}>
+            {() => (
+              <SnapCarouselSlide className={CARD_SLIDE_CLASS} readItem>
+                <div className={cn(CARD_CLASS, CARD_HEIGHT_CLASS)}>
+                  <div className={CARD_HEAD_ROW_CLASS}>
+                    <JobHeadSkeleton />
+                  </div>
+                  <div className="min-h-[3lh] text-h6">
+                    <TextLineSkeleton type="h6" className="w-full" />
+                    <TextLineSkeleton type="h6" className="w-5/6" />
+                  </div>
+                  <UnifiedSkeleton className="h-[300px] shrink-0 rounded-lg" />
+                  <ExampleSkeleton className="shrink-0" />
+                </div>
+              </SnapCarouselSlide>
             )}
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <JobHeadSkeleton />
-            </div>
-            <div className="min-h-[3lh] text-h6">
-              <div className="text-h6">
-                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
-              </div>
-              <div className="text-h6">
-                <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-5/6')} />
-              </div>
-            </div>
-            <UnifiedSkeleton className="h-[300px] shrink-0 rounded-lg" />
-            <ExampleSkeleton className="shrink-0" />
-          </div>
+          </LoadingItems>
         </div>
-        <SnapCarouselControlsSkeleton />
+        <SnapCarouselControls loading count={count} />
       </div>
 
       <div
@@ -278,59 +323,44 @@ export function CapabilityExplorerSkeleton({
         )}
       >
         <div className="flex min-h-0 flex-col gap-1 overflow-hidden">
-          {Array.from({ length: count }, (_, i) => (
-            <div
-              key={i}
-              className={cn(
-                'flex min-w-0 shrink-0 items-center gap-3.5 rounded-lg border px-3.5 py-3',
-                i === 0 ? 'border-ods-border bg-ods-card' : 'border-transparent',
-              )}
-            >
-              <JobHeadSkeleton />
-            </div>
-          ))}
+          <LoadingItems count={count}>
+            {i => (
+              <div
+                data-loading-item
+                data-state={i === 0 ? 'active' : undefined}
+                data-tone="card"
+                className={JOB_TAB_CLASS}
+              >
+                <JobHeadSkeleton />
+              </div>
+            )}
+          </LoadingItems>
         </div>
-        <div className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7">
+        <div className={PANEL_BODY_CLASS}>
           <div className={cn('grid shrink-0 grid-cols-[minmax(0,1fr)_minmax(0,380px)] gap-8', PANEL_TOP_HEIGHT_CLASS)}>
-            <div className="flex min-w-0 flex-col overflow-hidden">
+            <div className={PANEL_INTRO_CLASS}>
               <div className="mb-2">
-                <div className="text-h2">
-                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-64')} />
-                </div>
+                <TextLineSkeleton type="h2" className="w-64" />
               </div>
               <div className="min-h-[3lh] text-h4">
-                <div className="text-h4">
-                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-full')} />
-                </div>
-                <div className="text-h4">
-                  <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-4/5')} />
-                </div>
+                <TextLineSkeleton type="h4" className="w-full" />
+                <TextLineSkeleton type="h4" className="w-4/5" />
               </div>
               <div className="mt-auto grid grid-cols-1 gap-2">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="flex min-w-0 items-center gap-2.5">
-                    <UnifiedSkeleton className="size-4 shrink-0 rounded-full" />
-                    <div className="text-h6">
-                      <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, i === 1 ? 'w-56' : 'w-48')} />
+                <LoadingItems count={HIGHLIGHTS_LIMIT}>
+                  {i => (
+                    <div data-loading-item className={HIGHLIGHT_ROW_CLASS}>
+                      <MediaSkeleton.Icon size="sm" className="shrink-0" />
+                      <TextLineSkeleton type="h6" className={i === 1 ? 'w-56' : 'w-48'} />
                     </div>
-                  </div>
-                ))}
+                  )}
+                </LoadingItems>
               </div>
             </div>
             <ExampleSkeleton />
           </div>
+          {/* The footer is the job's own (not every job has one) and the panel is one height: not drawn. */}
           <UnifiedSkeleton className={cn('shrink-0 rounded-xl', PANEL_SCREEN_HEIGHT_CLASS)} />
-          <div
-            className={cn(
-              'flex min-w-0 shrink-0 items-center gap-[var(--spacing-system-sf)]',
-              PANEL_FOOTER_HEIGHT_CLASS,
-            )}
-          >
-            <div className="text-h5">
-              <UnifiedSkeleton as="span" className={cn(LINE_SKELETON_CLASS, 'w-16')} />
-            </div>
-            <UnifiedSkeleton className="h-7 w-36 rounded-md" />
-          </div>
         </div>
       </div>
     </LoadingRegion>
@@ -361,14 +391,22 @@ export function CapabilityExplorer({
   renderScreen,
   requesterMark,
   responderMark,
+  loading = false,
+  skeletonCount,
   className,
 }: CapabilityExplorerProps) {
   const wide = useContentLgUp();
   const listRef = useRef<HTMLDivElement>(null);
+  const inScope = useLoadingScope();
 
+  // While the page is read its jobs are not known (none in a loading state): the explorer is its skeleton, never
+  // left out. The page's loading region announces it, so this one does not; a host's own read does.
+  if (inScope || loading) {
+    return <CapabilityExplorerSkeleton region={!inScope} count={skeletonCount} className={className} />;
+  }
   if (items.length === 0) return null;
   // Unknown until measured: one box, so neither layout's ids are in the page twice.
-  if (wide === undefined) return <CapabilityExplorerSkeleton className={className} />;
+  if (wide === undefined) return <CapabilityExplorerSkeleton count={items.length} className={className} />;
 
   if (!wide) {
     return (
@@ -380,17 +418,13 @@ export function CapabilityExplorer({
         nextLabel={labels.next}
         getKey={item => item.id}
         focusIndex={items.findIndex(item => item.id === activeId)}
-        slideClassName="min-w-0 basis-[86%]"
+        slideClassName={CARD_SLIDE_CLASS}
+        readItems
         renderItem={item => (
-          <article
-            className={cn(
-              'flex w-full min-w-0 flex-col gap-[var(--spacing-system-sf)] overflow-hidden rounded-xl border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
-              CARD_HEIGHT_CLASS,
-            )}
-          >
-            <div className="flex min-w-0 items-center gap-3">
+          <article className={cn(CARD_CLASS, CARD_HEIGHT_CLASS)}>
+            <div className={CARD_HEAD_ROW_CLASS}>
               {item.iconName && (
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg text-ods-flamingo-cyan">
+                <span className={cn(JOB_ICON_TILE_CLASS, 'text-ods-flamingo-cyan')}>
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
                 </span>
               )}
@@ -423,6 +457,7 @@ export function CapabilityExplorer({
                 className="shrink-0"
               />
             )}
+            {/* Inside the card's fixed height: the footer moves nothing, so it is not optional to the loading state. */}
             {item.footer && <div className="mt-auto min-w-0 shrink-0 overflow-hidden">{item.footer}</div>}
           </article>
         )}
@@ -474,26 +509,25 @@ export function CapabilityExplorer({
         {items.map((item, index) => {
           const selected = index === activeIndex;
           return (
-            <button
+            <Button
+              variant="row"
               key={item.id}
+              data-loading-item
               id={capabilityTabId(item.id)}
               type="button"
               role="tab"
               aria-selected={selected}
               aria-controls={panelId}
+              data-state={selected ? 'active' : undefined}
+              // The selected capability is a bordered card; the others keep a transparent border and a hover fill.
+              data-tone="card"
               tabIndex={selected ? 0 : -1}
               onClick={() => onActiveChange(item.id)}
-              className={cn(
-                'flex min-w-0 shrink-0 items-center gap-3.5 rounded-lg border px-3.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-                selected ? 'border-ods-border bg-ods-card' : 'border-transparent hover:bg-ods-bg-hover',
-              )}
+              className={JOB_TAB_LAYOUT_CLASS}
             >
               {item.iconName && (
                 <span
-                  className={cn(
-                    'flex size-9 shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg',
-                    selected ? 'text-ods-flamingo-cyan' : 'text-ods-text-secondary',
-                  )}
+                  className={cn(JOB_ICON_TILE_CLASS, selected ? 'text-ods-flamingo-cyan' : 'text-ods-text-secondary')}
                 >
                   <EntityIcon icon={{ name: item.iconName }} size={18} />
                 </span>
@@ -519,17 +553,12 @@ export function CapabilityExplorer({
                 className={cn('shrink-0', selected ? 'text-ods-flamingo-cyan' : 'invisible')}
                 aria-hidden
               />
-            </button>
+            </Button>
           );
         })}
       </div>
 
-      <div
-        id={panelId}
-        role="tabpanel"
-        aria-labelledby={capabilityTabId(active.id)}
-        className="flex min-h-0 min-w-0 flex-col gap-5 overflow-hidden rounded-xl border border-ods-border bg-ods-card px-8 py-7"
-      >
+      <div id={panelId} role="tabpanel" aria-labelledby={capabilityTabId(active.id)} className={PANEL_BODY_CLASS}>
         <div
           className={cn(
             'grid shrink-0 gap-8',
@@ -538,7 +567,7 @@ export function CapabilityExplorer({
             PANEL_TOP_HEIGHT_CLASS,
           )}
         >
-          <div className="flex min-w-0 flex-col overflow-hidden">
+          <div className={PANEL_INTRO_CLASS}>
             <TruncateText lines={2} variant="h2" className="mb-2">
               {active.title}
             </TruncateText>
@@ -559,8 +588,13 @@ export function CapabilityExplorer({
         <div className={cn('shrink-0 overflow-hidden rounded-xl border border-ods-border', PANEL_SCREEN_HEIGHT_CLASS)}>
           {renderScreen(active, { compact: false })}
         </div>
+        {/* Only some jobs have a footer, and the skeleton draws none: optional (inside the panel's fixed height, it
+            moves nothing). */}
         {active.footer && (
-          <div className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}>
+          <div
+            data-loading-optional
+            className={cn('flex min-w-0 shrink-0 items-center overflow-hidden', PANEL_FOOTER_HEIGHT_CLASS)}
+          >
             {active.footer}
           </div>
         )}

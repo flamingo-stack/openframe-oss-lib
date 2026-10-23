@@ -1,8 +1,9 @@
 'use client';
 
 import type React from 'react';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Card } from './card';
+import { useLoadingScope } from './loading-scope';
 import { StatusBadge } from './status-badge';
 
 export interface FeatureCardItem {
@@ -57,7 +58,32 @@ export interface FeatureCardGridProps {
   subtitleClassName?: string;
   /** The subtitle's colour. Defaults to the platform accent. */
   accentClassName?: string;
+  /**
+   * The shape of the grid while its items are read (a page's loading state, where `items` is empty): how many
+   * items, and which of their parts they carry. Defaults to one row of title-only items.
+   */
+  skeleton?: FeatureCardGridSkeletonShape;
 }
+
+/** The parts each item of a loading grid carries; every read word is a bar of its own line height. */
+export interface FeatureCardGridSkeletonShape {
+  /** Items drawn. Defaults to one row (`columns`). */
+  count?: number;
+  /** An eyebrow above the title: a bar, or `'index'` for the item's own number ("01", "02"), drawn for real. */
+  eyebrow?: boolean | 'index';
+  /** A subtitle under the title. */
+  subtitle?: boolean;
+  /** A picture beside the title block: the classes of its box (its size and radius), drawn as a box. */
+  media?: string;
+  /** Lines of body copy under the title. */
+  contentLines?: 1 | 2 | 3;
+  /** The type step of that copy. Defaults to `h4`. */
+  contentType?: 'h4' | 'h6';
+}
+
+/** Items a loading grid draws when it is told neither a count nor its columns: one row of the grid's default three
+ *  columns (`FeatureCardGridView`'s `columns`). */
+const FEATURE_CARD_GRID_SKELETON_ITEMS = 3;
 
 const GRID_COLUMNS = {
   2: 'grid-cols-1 content-md:grid-cols-2',
@@ -83,7 +109,7 @@ function fourColumnBorders(index: number, count: number): string {
   return ` ${classes.join(' ')}`;
 }
 
-export function FeatureCardGrid({
+function FeatureCardGridView({
   items,
   columns = 3,
   className = '',
@@ -98,7 +124,11 @@ export function FeatureCardGrid({
   titleClassName = '',
   subtitleClassName = '',
   accentClassName = 'text-ods-accent',
-}: FeatureCardGridProps) {
+  loadingKeepsEyebrow = false,
+}: Omit<FeatureCardGridProps, 'skeleton'> & {
+  /** While `loading`: the eyebrow is the item's own number, drawn for real. */
+  loadingKeepsEyebrow?: boolean;
+}) {
   const gridCols = GRID_COLUMNS[columns];
   const itemsPerRow = columns;
   const rows = Math.ceil(items.length / itemsPerRow);
@@ -226,24 +256,20 @@ export function FeatureCardGrid({
                         <div className="flex min-w-0 flex-1 flex-col gap-[var(--spacing-system-xsf)]">
                           {item.eyebrow && (
                             <span className="text-ods-text-secondary text-h5">
-                              {loading ? (
-                                <UnifiedSkeleton as="span" className="block h-[1lh] w-6 rounded" />
+                              {loading && !loadingKeepsEyebrow ? (
+                                <TextLineSkeleton type="inherit" as="span" className="w-6" />
                               ) : (
                                 item.eyebrow
                               )}
                             </span>
                           )}
                           <h3 className={`text-ods-text-primary text-h2 ${titleClassName}`}>
-                            {loading ? (
-                              <UnifiedSkeleton as="span" className="block h-[1lh] w-1/2 rounded" />
-                            ) : (
-                              item.title
-                            )}
+                            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-1/2" /> : item.title}
                           </h3>
                           {item.subtitle && (
                             <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
                               {loading ? (
-                                <UnifiedSkeleton as="span" className="block h-[1lh] w-3/4 rounded" />
+                                <TextLineSkeleton type="inherit" as="span" className="w-3/4" />
                               ) : (
                                 item.subtitle
                               )}
@@ -256,28 +282,26 @@ export function FeatureCardGrid({
                       <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
                         {item.eyebrow && (
                           <span className="text-ods-text-secondary text-h5">
-                            {loading ? (
-                              <UnifiedSkeleton as="span" className="block h-[1lh] w-6 rounded" />
+                            {loading && !loadingKeepsEyebrow ? (
+                              <TextLineSkeleton type="inherit" as="span" className="w-6" />
                             ) : (
                               item.eyebrow
                             )}
                           </span>
                         )}
                         <h3 className={`whitespace-pre-line text-ods-text-primary text-h2 ${titleClassName}`}>
-                          {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-1/2 rounded" /> : item.title}
+                          {loading ? <TextLineSkeleton type="inherit" as="span" className="w-1/2" /> : item.title}
                         </h3>
                         {item.subtitle && (
                           <p className={`text-h4 ${accentClassName} ${subtitleClassName}`}>
-                            {loading ? (
-                              <UnifiedSkeleton as="span" className="block h-[1lh] w-3/4 rounded" />
-                            ) : (
-                              item.subtitle
-                            )}
+                            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-3/4" /> : item.subtitle}
                           </p>
                         )}
                       </div>
                     ) : (
-                      <h3 className="whitespace-pre-line text-ods-text-primary text-h2">{item.title}</h3>
+                      <h3 className="whitespace-pre-line text-ods-text-primary text-h2">
+                        {loading ? <TextLineSkeleton type="inherit" as="span" className="w-1/2" /> : item.title}
+                      </h3>
                     )}
 
                     {!item.media && item.content}
@@ -292,4 +316,44 @@ export function FeatureCardGrid({
       })}
     </Card>
   );
+}
+
+/**
+ * FeatureCardGrid: a grid of items split by hairlines. In a page's loading state with no items yet (they are
+ * read) it draws its skeleton, `FeatureCardGridSkeleton` of `skeleton`'s shape; items it is given there are the
+ * page's own copy and draw as they are.
+ */
+export function FeatureCardGrid({ skeleton, ...props }: FeatureCardGridProps) {
+  const inScope = useLoadingScope();
+  if (inScope && props.items.length === 0) {
+    const { items: _items, loading: _loading, ...grid } = props;
+    return <FeatureCardGridSkeleton {...grid} {...skeleton} />;
+  }
+  return <FeatureCardGridView {...props} />;
+}
+
+/**
+ * A FeatureCardGrid while its items are read: the same grid (its columns, hairlines and item padding), each
+ * item's eyebrow, title, subtitle and copy a bar of its own line height, its picture a box.
+ */
+function FeatureCardGridSkeleton({
+  count,
+  eyebrow,
+  subtitle,
+  media,
+  contentLines,
+  contentType = 'h4',
+  ...grid
+}: Omit<FeatureCardGridProps, 'items' | 'loading' | 'skeleton'> & FeatureCardGridSkeletonShape) {
+  const items: FeatureCardItem[] = Array.from(
+    { length: count ?? grid.columns ?? FEATURE_CARD_GRID_SKELETON_ITEMS },
+    (_, index) => ({
+      title: '',
+      eyebrow: eyebrow ? String(index + 1).padStart(2, '0') : undefined,
+      subtitle: subtitle ? '-' : undefined,
+      media: media ? <UnifiedSkeleton className={media} /> : undefined,
+      content: contentLines ? <TextLineSkeleton type={contentType} lines={contentLines} className="w-full" /> : null,
+    }),
+  );
+  return <FeatureCardGridView {...grid} items={items} loading loadingKeepsEyebrow={eyebrow === 'index'} />;
 }

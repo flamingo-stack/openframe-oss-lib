@@ -6,7 +6,10 @@ import Image from '../../embed-shims/next-image';
 import Link from '../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../hooks';
 import { useOgPlaceholderUrl } from '../../hooks/use-og-placeholder-url';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { ICON_SIZE, MEDIA_ASPECT, TILE_SIZE } from '../../styles/component-sizes';
+import { cn } from '../../utils/cn';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { TruncateText } from '../ui/truncate-text';
 
 /**
@@ -169,22 +172,122 @@ const Favicon = ({ src, size = 'w-6 h-6' }: { src: string; size?: string }) => (
   />
 );
 
+/** The cards' layout, read by the cards and by their skeleton, so the skeleton is the card's size. */
+const COMPACT_OUTER_CLASS = 'my-4';
+const COMPACT_FRAME_CLASS = 'flex h-[120px] flex-row overflow-hidden rounded-lg border border-ods-border bg-ods-card';
+const COMPACT_MEDIA_CLASS = 'h-full w-[200px] flex-shrink-0';
+const COMPACT_BODY_CLASS = 'flex min-w-0 flex-1 flex-col justify-center p-3';
+/** The compact card with no image: one row of a favicon box, the title and description lines, the link mark. */
+const COMPACT_ROW_CLASS =
+  'flex flex-row items-center gap-3 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-4 py-3';
+const COMPACT_ICON_BOX_CLASS = `flex ${TILE_SIZE.sm} flex-shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface`;
+/** The no-image compact row's favicon, read by the row and by its skeleton. */
+const COMPACT_FAVICON_CLASS = 'w-5 h-5';
+/** The default card's publication logo beside the title, read by the card and by its skeleton. */
+const DEFAULT_LOGO_CLASS = `mt-0.5 ${ICON_SIZE.lg} flex-shrink-0 rounded`;
+const COMPACT_ROW_TEXT_CLASS = 'min-w-0 flex-1';
+const COMPACT_ROW_LINE_CLASS = 'truncate text-h6';
+const DEFAULT_OUTER_CLASS = 'my-6 flex flex-1 flex-col';
+const DEFAULT_FRAME_CLASS = 'flex flex-1 flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card';
+const DEFAULT_MEDIA_CLASS = `${MEDIA_ASPECT.video} w-full flex-none rounded-lg`;
+const DEFAULT_BODY_CLASS = 'flex-1 p-4';
+const DEFAULT_ROW_CLASS = 'flex items-start gap-3';
+
+/**
+ * A link preview while its page is scraped (or drawn in a loading scope): the `compact` (120px row) or `default`
+ * (16:9 hero) card's frame, the media box, and bars for the title, description and source line.
+ */
+function OGLinkPreviewSkeleton({
+  variant = 'default',
+  image = true,
+}: {
+  variant?: 'compact' | 'default';
+  /** `false`: the compact card's no-image row (a curated title with no curated image). */
+  image?: boolean;
+}) {
+  if (variant === 'compact' && !image)
+    return (
+      <div className={COMPACT_OUTER_CLASS} aria-hidden>
+        <div className={COMPACT_ROW_CLASS}>
+          <div className={COMPACT_ICON_BOX_CLASS}>
+            <UnifiedSkeleton className={cn(COMPACT_FAVICON_CLASS, 'rounded')} />
+          </div>
+          <div className={COMPACT_ROW_TEXT_CLASS}>
+            <p className={COMPACT_ROW_LINE_CLASS}>
+              <TextLineSkeleton type="inherit" as="span" className="w-2/3" />
+            </p>
+            <p className={COMPACT_ROW_LINE_CLASS}>
+              <TextLineSkeleton type="inherit" as="span" className="w-1/2" />
+            </p>
+          </div>
+          <ExternalLinkIcon size={14} />
+        </div>
+      </div>
+    );
+  if (variant === 'compact')
+    return (
+      <div className={COMPACT_OUTER_CLASS} aria-hidden>
+        <div className={COMPACT_FRAME_CLASS}>
+          <UnifiedSkeleton className={cn(COMPACT_MEDIA_CLASS, 'rounded-lg')} />
+          <div className={COMPACT_BODY_CLASS}>
+            {/* The tile's own lines: a one-line `text-h6` title, a two-line description, the source line. */}
+            <TextLineSkeleton type="h6" className="w-3/4" />
+            <TextLineSkeleton type="h6" lines={2} className="mt-1 w-full" />
+            <TextLineSkeleton type="h6" className="mt-1 w-1/3" />
+          </div>
+        </div>
+      </div>
+    );
+  return (
+    <div className={DEFAULT_OUTER_CLASS} aria-hidden>
+      <div className={DEFAULT_FRAME_CLASS}>
+        <UnifiedSkeleton className={DEFAULT_MEDIA_CLASS} />
+        <div className={DEFAULT_BODY_CLASS}>
+          <div className={DEFAULT_ROW_CLASS}>
+            <UnifiedSkeleton className={DEFAULT_LOGO_CLASS} />
+            <div className="min-w-0 flex-1">
+              {/* The title and the description each reserve two `text-h4` lines (the loaded `TruncateText`s). */}
+              <TextLineSkeleton type="h4" lines={2} className="mb-2 w-full" />
+              <TextLineSkeleton type="h4" lines={2} className="mb-2 w-5/6" />
+              {/* The source line: the site name and the domain, at the line's own type. */}
+              <div className="flex min-h-[var(--font-line-space-h4-body)] items-center gap-2 text-h6">
+                <TextLineSkeleton type="inherit" as="span" className="w-24" />
+                <TextLineSkeleton type="inherit" as="span" className="w-20" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The `tile` card while its list loads: the tile's exact geometry (the `p-3`
  * card, the source row with a favicon dot, two headline lines, the excerpt
  * line), owned here so the tile and its loading state cannot drift apart.
  */
-export function OGLinkTileSkeleton() {
+/** The tile's layout, read by the tile and by its skeleton. */
+const TILE_FRAME_CLASS = 'flex min-w-0 flex-col gap-1.5 rounded-lg border border-ods-border bg-ods-card p-3';
+const TILE_SOURCE_ROW_CLASS = 'flex min-w-0 items-center gap-1.5 text-h6';
+/** The headline's and the excerpt's type (the loaded `TruncateText`s take them as their `variant`). */
+const TILE_HEADLINE_CLASS = 'text-h3';
+const TILE_EXCERPT_CLASS = 'text-h6';
+
+function OGLinkTileSkeleton() {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-ods-border bg-ods-card p-3">
-      <div className="flex items-center gap-1.5">
+    <div className={TILE_FRAME_CLASS} aria-hidden>
+      <div className={TILE_SOURCE_ROW_CLASS}>
         <UnifiedSkeleton className="h-4 w-4 flex-shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-20 rounded" />
-        <UnifiedSkeleton className="ml-auto h-3 w-9 rounded" />
+        <TextLineSkeleton type="inherit" as="span" className="w-20" />
+        <TextLineSkeleton type="inherit" as="span" className="ml-auto w-9" />
       </div>
-      <UnifiedSkeleton className="h-3.5 w-full rounded" />
-      <UnifiedSkeleton className="h-3.5 w-3/4 rounded" />
-      <UnifiedSkeleton className="h-3 w-5/6 rounded" />
+      <div className={TILE_HEADLINE_CLASS}>
+        <TextLineSkeleton type="inherit" lines={2} className="w-full" />
+      </div>
+      <div className={TILE_EXCERPT_CLASS}>
+        <TextLineSkeleton type="inherit" className="w-5/6" />
+      </div>
     </div>
   );
 }
@@ -261,10 +364,12 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   }
 
   const isTile = variant === 'tile';
+  // In a loading scope the preview is not scraped: it stays its own loading state.
+  const held = useLoadingScope();
 
   useEffect(() => {
     // A tile is drawn from its props alone: no scrape.
-    if (!isValidUrl || isLocalhost || isTile) return undefined;
+    if (!isValidUrl || isLocalhost || isTile || held) return undefined;
 
     // A `url` change starts a second fetch while the first is still in flight.
     // Without this guard the SUPERSEDED response can land last and paint the
@@ -323,7 +428,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [url, isValidUrl, isLocalhost, isTile, apiBaseUrl, ogEndpointPath]);
+  }, [url, isValidUrl, isLocalhost, isTile, held, apiBaseUrl, ogEndpointPath]);
 
   const isCompact = variant === 'compact';
   const domain = getDomain(url);
@@ -375,51 +480,16 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   const isPlaceholder = resolvedImage?.source === 'placeholder';
   const bgColor = useImageEdgeColor(resolvedImageUrl ?? null, 'var(--color-bg-surface)');
 
-  const renderSkeleton = () =>
-    isCompact ? (
-      <div className="my-4">
-        <div className="flex h-[120px] flex-row overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-          <UnifiedSkeleton className="h-full w-[200px] flex-shrink-0" />
-          <div className="flex flex-1 flex-col justify-center p-3">
-            <UnifiedSkeleton className="mb-2 h-4 w-3/4 rounded" />
-            <UnifiedSkeleton className="mb-1 h-3 w-full rounded" />
-            <UnifiedSkeleton className="mb-2 h-3 w-2/3 rounded" />
-            <UnifiedSkeleton className="h-3 w-1/3 rounded" />
-          </div>
-        </div>
-      </div>
-    ) : (
-      <div className="my-6">
-        <div className="block overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-          <UnifiedSkeleton className="relative aspect-video w-full overflow-hidden rounded-none" />
-          <div className="p-4">
-            <div className="flex items-start gap-3">
-              <UnifiedSkeleton className="mt-0.5 h-6 w-6 flex-shrink-0 rounded" />
-              <div className="min-w-0 flex-1">
-                {/* Two rows of exactly one h4 line each (the bar centred inside), the
-                    height of the loaded card's two-line title and description. */}
-                {[
-                  ['w-full', 'w-3/4'],
-                  ['w-full', 'w-5/6'],
-                ].map(widths => (
-                  <div key={widths[1]} className="mb-2">
-                    {widths.map(width => (
-                      <div key={width} className="flex h-[var(--font-line-space-h4-body)] items-center">
-                        <UnifiedSkeleton className={`h-4 ${width} rounded`} />
-                      </div>
-                    ))}
-                  </div>
-                ))}
-                <div className="flex min-h-[var(--font-line-space-h4-body)] items-center gap-2">
-                  <UnifiedSkeleton width="6rem" height="0.75rem" className="rounded" />
-                  <UnifiedSkeleton width="5rem" height="0.75rem" className="rounded" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const renderSkeleton = () => (
+    <OGLinkPreviewSkeleton
+      variant={isCompact ? 'compact' : 'default'}
+      // A curated title with no curated image paints the no-image row while the scrape refines it.
+      image={!(curatedTitle && !curatedImage)}
+    />
+  );
+
+  // In a loading scope the card is its skeleton (a tile: the tile's own).
+  if (held) return isTile ? <OGLinkTileSkeleton /> : renderSkeleton();
 
   if (isTile) {
     const name = publicationName || domainToTitle(domain);
@@ -428,11 +498,11 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="group flex min-w-0 flex-col gap-1.5 rounded-lg border border-ods-border bg-ods-card p-3 transition-colors hover:border-ods-accent"
+        className={cn(TILE_FRAME_CLASS, 'group transition-colors hover:border-ods-accent')}
       >
-        <div className="flex min-w-0 items-center gap-1.5 text-xs">
+        <div className={TILE_SOURCE_ROW_CLASS}>
           <Favicon src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`} size="w-4 h-4" />
-          <TruncateText as="span" className="font-sans text-xs font-medium">
+          <TruncateText as="span" variant="h6" className="text-current">
             {name}
           </TruncateText>
           {meta != null && (
@@ -440,22 +510,20 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
           )}
         </div>
         {kicker != null && (
-          <div
-            className="overflow-hidden font-sans text-xs font-bold uppercase tracking-wide text-ods-accent"
-            style={lineClamp(1)}
-          >
+          <div className="overflow-hidden text-ods-accent text-h5" style={lineClamp(1)}>
             {kicker}
           </div>
         )}
         <TruncateText
           lines={2}
-          className="font-sans text-[15px] font-semibold leading-snug transition-colors group-hover:text-ods-accent"
+          variant="h3"
+          className="transition-colors group-hover:text-ods-accent"
           triggerClassName="-mt-0.5"
         >
           {curatedTitle || domainToTitle(domain)}
         </TruncateText>
         {curatedDescription && (
-          <TruncateText lines={2} tone="secondary" className="font-sans text-xs leading-normal">
+          <TruncateText lines={2} variant="h6" tone="secondary">
             {curatedDescription}
           </TruncateText>
         )}
@@ -536,17 +604,17 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   if (isCompact) {
     if (!hasImage) {
       return (
-        <div className="my-4">
+        <div className={COMPACT_OUTER_CLASS}>
           <Link
             href={effectiveData.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex flex-row items-center gap-3 overflow-hidden rounded-lg border border-ods-border bg-ods-card px-4 py-3 transition-all duration-200 hover:border-ods-accent"
+            className={cn(COMPACT_ROW_CLASS, 'group transition-all duration-200 hover:border-ods-accent')}
           >
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ods-bg-surface">
-              <Favicon src={faviconSrc} size="w-5 h-5" />
+            <div className={COMPACT_ICON_BOX_CLASS}>
+              <Favicon src={faviconSrc} size={COMPACT_FAVICON_CLASS} />
             </div>
-            <div className="min-w-0 flex-1">
+            <div className={COMPACT_ROW_TEXT_CLASS}>
               <h3 className="truncate font-semibold text-ods-text-primary transition-colors text-h6 group-hover:text-ods-accent">
                 {title}
               </h3>
@@ -563,15 +631,18 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
           href={effectiveData.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="group flex h-[120px] flex-row overflow-hidden rounded-lg border border-ods-border bg-ods-card transition-colors hover:border-ods-accent"
+          className={cn(COMPACT_FRAME_CLASS, 'group transition-colors hover:border-ods-accent')}
         >
           <div
-            className="relative flex h-full w-[200px] flex-shrink-0 items-center justify-center overflow-hidden rounded-lg transition-colors duration-300"
+            className={cn(
+              COMPACT_MEDIA_CLASS,
+              'relative flex items-center justify-center overflow-hidden rounded-lg transition-colors duration-300',
+            )}
             style={{ backgroundColor: bgColor }}
           >
             {renderImage()}
           </div>
-          <div className="flex min-w-0 flex-1 flex-col justify-center p-3">
+          <div className={COMPACT_BODY_CLASS}>
             <h3
               className="overflow-hidden font-semibold text-ods-text-primary transition-colors text-h6 group-hover:text-ods-accent"
               style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
@@ -618,25 +689,28 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
   return (
     // `flex-1` lets the card stretch when the caller places it in a flex column
     // inside a stretching grid (equal row heights); inert in block flow.
-    <div className="my-6 flex flex-1 flex-col">
+    <div className={DEFAULT_OUTER_CLASS}>
       <Link
         href={effectiveData.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="group flex flex-1 flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card transition-colors hover:border-ods-accent"
+        className={cn(DEFAULT_FRAME_CLASS, 'group transition-colors hover:border-ods-accent')}
       >
         <div
-          className="relative flex aspect-video w-full flex-none items-center justify-center overflow-hidden rounded-lg transition-colors duration-300"
+          className={cn(
+            DEFAULT_MEDIA_CLASS,
+            'relative flex items-center justify-center overflow-hidden transition-colors duration-300',
+          )}
           style={{ backgroundColor: bgColor }}
         >
           {renderImage()}
         </div>
-        <div className="flex-1 p-4">
-          <div className="flex items-start gap-3">
+        <div className={DEFAULT_BODY_CLASS}>
+          <div className={DEFAULT_ROW_CLASS}>
             <Image
               src={logoSrc}
               alt={publicationName || ''}
-              className="mt-0.5 h-6 w-6 flex-shrink-0 rounded object-contain"
+              className={cn(DEFAULT_LOGO_CLASS, 'object-contain')}
               width={24}
               height={24}
               unoptimized
@@ -663,12 +737,12 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
               >
                 {description}
               </TruncateText>
-              <div className="flex min-w-0 items-center gap-2 text-xs text-ods-text-secondary">
-                <TruncateText as="span" className="text-xs font-medium text-current">
+              <div className="flex min-w-0 items-center gap-2 text-ods-text-secondary text-h6">
+                <TruncateText as="span" variant="h6" className="text-current">
                   {effectiveData.siteName}
                 </TruncateText>
                 <span>•</span>
-                <TruncateText as="span" className="text-xs text-current">
+                <TruncateText as="span" variant="h6" className="text-current">
                   {ogDomain}
                 </TruncateText>
                 {meta}

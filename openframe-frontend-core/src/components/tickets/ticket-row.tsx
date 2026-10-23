@@ -23,11 +23,18 @@ import { formatRelativeTime } from '../../utils/date-utils';
 import { scrollElementIntoView } from '../../utils/scroll-into-view';
 import { ChatTicketItem, type ChatTicketItemData } from '../chat/entity-cards/chat-ticket-item';
 import { Collapsible, CollapsibleContent } from '../collapsible';
+import { loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { TicketDetailDrawer, type TicketDetailDrawerProps } from './ticket-detail-drawer';
 import type { AnyTicket } from './types';
 import { isOptimistic } from './types';
 
-export interface TicketRowProps {
+/** The row's frame (its bottom rule), read by the loaded row and its loading form. */
+const TICKET_ROW_FRAME_CLASS = 'border-b border-ods-border last:border-b-0';
+/** The row's outer element: the deep-link target, offset under a sticky header. */
+const TICKET_ROW_OUTER_CLASS = 'scroll-mt-24';
+
+/** A read ticket's row. */
+export interface TicketRowLoadedProps {
   ticket: AnyTicket;
   expanded: boolean;
   onToggle: (ticketId: string) => void;
@@ -44,9 +51,38 @@ export interface TicketRowProps {
    *  resolves it. `scroll-mt-24` is already baked into the outer
    *  element regardless. */
   id?: string;
+  loading?: false;
 }
 
-export function TicketRow({
+/** A row while its ticket is read: the same frame with the summary tile's loading form, and no drawer. */
+export interface TicketRowLoadingProps {
+  loading: true;
+  id?: string;
+}
+
+/** A ticket row, or (`loading`) its loading form. List markers (`data-loading-item`) are forwarded in both forms. */
+export type TicketRowProps = (TicketRowLoadedProps | TicketRowLoadingProps) & {
+  [key: `data-${string}`]: unknown;
+};
+
+/**
+ * A ticket row. ONE switch (`useLoadingScope() || loading`): while the ticket is read the row draws the same frame
+ * with `ChatTicketItem loading` (its own loading form), else the summary tile and its drawer.
+ */
+export function TicketRow(props: TicketRowProps) {
+  if (useLoadingScope() || props.loading) {
+    return (
+      <div id={props.id} className={TICKET_ROW_OUTER_CLASS} {...loadingItemProps(props)}>
+        <div className={TICKET_ROW_FRAME_CLASS}>
+          <ChatTicketItem loading />
+        </div>
+      </div>
+    );
+  }
+  return <TicketRowLoaded {...props} />;
+}
+
+function TicketRowLoaded({
   ticket,
   expanded,
   onToggle,
@@ -57,7 +93,8 @@ export function TicketRow({
   onReopen,
   onActionCollapsed,
   id,
-}: TicketRowProps) {
+  ...markers
+}: TicketRowLoadedProps & { [key: `data-${string}`]: unknown }) {
   // Optimistic placeholders have no drawer — the real id hasn't
   // arrived yet, so action targets would be undefined.
   const optimistic = isOptimistic(ticket);
@@ -116,8 +153,8 @@ export function TicketRow({
   };
 
   return (
-    <div ref={rowRef} id={id} className="scroll-mt-24">
-      <Collapsible open={expanded && !optimistic} className="border-b border-ods-border last:border-b-0">
+    <div ref={rowRef} id={id} className={TICKET_ROW_OUTER_CLASS} {...loadingItemProps(markers)}>
+      <Collapsible open={expanded && !optimistic} className={TICKET_ROW_FRAME_CLASS}>
         <ChatTicketItem
           ticket={tileData}
           onClick={optimistic ? undefined : handleClick}

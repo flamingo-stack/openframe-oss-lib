@@ -9,6 +9,7 @@ public class OnboardingQueries {
             completedAt
             skipped
             skippedAt
+            tourDialogId
             """;
 
     public static final String USER_ONBOARDING_PROGRESS = """
@@ -38,6 +39,14 @@ public class OnboardingQueries {
     public static final String SKIP_USER_ONBOARDING = """
             mutation SkipUserOnboarding {
                 skipUserOnboarding {
+                    %s
+                }
+            }
+            """.formatted(USER_PROGRESS_FIELDS);
+
+    public static final String SET_USER_ONBOARDING_TOUR_DIALOG = """
+            mutation SetUserOnboardingTourDialog($dialogId: String!) {
+                setUserOnboardingTourDialog(dialogId: $dialogId) {
                     %s
                 }
             }
