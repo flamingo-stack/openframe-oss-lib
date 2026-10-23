@@ -7,6 +7,7 @@ import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
@@ -79,8 +80,18 @@ public class SoftwareInstallUpdateManagementService {
                         pkg.getPackageManager(), pkg.getPackageName(), action);
             }
             if (!orderTargets.isEmpty()) {
-                packageUpdateDispatchService.dispatchAdminUpdateNow(executionId, pkg.getPackageManager(),
-                        pkg.getPackageName(), pkg.getBrewPackageType(), orderTargets, initiatedBy);
+                packageUpdateDispatchService.dispatchAdminUpdateNow(RunningExecutionRows.builder()
+                        .executionId(executionId)
+                        .scriptId(script.getId())
+                        .machineIds(orderTargets)
+                        .privilegeLevel(script.getPrivilegeLevel())
+                        .timeoutSeconds(script.getDefaultTimeoutSeconds())
+                        .initiatedBy(initiatedBy)
+                        .source(source)
+                        .packageManager(pkg.getPackageManager())
+                        .packageName(pkg.getPackageName())
+                        .softwareAction(action)
+                        .build(), pkg.getBrewPackageType());
             }
 
             results.add(SoftwareDispatchResult.builder()

@@ -1,7 +1,7 @@
 package com.openframe.data.nats.packageupdate;
 
 import com.openframe.data.document.packagesearch.BrewPackageType;
-import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
@@ -10,6 +10,7 @@ import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
+import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.delivery.dispatch.DeliveryDispatcher;
 import lombok.RequiredArgsConstructor;
@@ -32,33 +33,37 @@ public class PackageUpdateDispatchService {
     private final DeliveryDispatcher deliveryDispatcher;
     private final PackageUpdateRequestRepository requestRepository;
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
+    private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
 
-    public void dispatchAdminUpdateNow(String executionId, PackageManagerType packageManager, String packageName,
-                                       BrewPackageType brewPackageType, List<String> machineIds, String initiatedBy) {
-        dispatch(executionId, packageManager, packageName, brewPackageType, machineIds, PackageUpdateSource.ADMIN,
-                initiatedBy, PackageUpdateMode.WAIT, DEFAULT_FORCE_COUNTDOWN_SECONDS, null);
+    public void dispatchAdminUpdateNow(RunningExecutionRows execution, BrewPackageType brewPackageType) {
+        dispatch(execution, brewPackageType, PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT,
+                DEFAULT_FORCE_COUNTDOWN_SECONDS, null);
     }
 
     // Every dispatch is its own request, so a shared execution id never collides on the request index.
-    public void dispatch(String executionId, PackageManagerType packageManager, String packageName,
-                         BrewPackageType brewPackageType, List<String> machineIds, PackageUpdateSource source,
-                         String initiatedBy, PackageUpdateMode mode, Integer forceCountdownSeconds,
-                         Long deadlineSeconds) {
+    public void dispatch(RunningExecutionRows execution, BrewPackageType brewPackageType, PackageUpdateSource source,
+                         PackageUpdateMode mode, Integer forceCountdownSeconds, Long deadlineSeconds) {
         String tenantId = tenantIdProvider.getTenantId();
         String requestId = UUID.randomUUID().toString();
         Instant now = Instant.now();
         // the device state is unique per request and machine, so a repeated id would fail the whole dispatch
-        List<String> targets = machineIds.stream().distinct().toList();
+        List<String> targets = execution.getMachineIds().stream().distinct().toList();
+
+        scriptExecutionRepository.saveQueued(execution.toBuilder()
+                .tenantId(tenantId)
+                .machineIds(targets)
+                .packageUpdateRequestId(requestId)
+                .build());
 
         requestRepository.save(PackageUpdateRequest.builder()
                 .tenantId(tenantId)
                 .requestId(requestId)
-                .executionId(executionId)
+                .executionId(execution.getExecutionId())
                 .action(SoftwareAction.UPDATE)
                 .source(source)
-                .packageManager(packageManager)
-                .packageName(packageName)
+                .packageManager(execution.getPackageManager())
+                .packageName(execution.getPackageName())
                 .brewPackageType(brewPackageType)
                 .mode(mode)
                 .forceCountdownSeconds(forceCountdownSeconds)
@@ -67,7 +72,7 @@ public class PackageUpdateDispatchService {
                 .machineIds(targets)
                 .totalMachineCount(targets.size())
                 .attempts(1)
-                .initiatedBy(initiatedBy)
+                .initiatedBy(execution.getInitiatedBy())
                 .createdAt(now)
                 .updatedAt(now)
                 .build());
@@ -85,10 +90,11 @@ public class PackageUpdateDispatchService {
                 .toList());
 
         targets.forEach(machineId -> deliveryDispatcher.dispatch(PackageUpdateWire.seed(
-                machineId, requestId, source, packageManager, packageName, brewPackageType, mode,
-                forceCountdownSeconds)));
+                machineId, requestId, source, execution.getPackageManager(), execution.getPackageName(),
+                brewPackageType, mode, forceCountdownSeconds)));
 
         log.info("Package-update dispatched requestId={} executionId={} source={} mode={} machines={} package={}/{}",
-                requestId, executionId, source, mode, targets.size(), packageManager, packageName);
+                requestId, execution.getExecutionId(), source, mode, targets.size(), execution.getPackageManager(),
+                execution.getPackageName());
     }
 }

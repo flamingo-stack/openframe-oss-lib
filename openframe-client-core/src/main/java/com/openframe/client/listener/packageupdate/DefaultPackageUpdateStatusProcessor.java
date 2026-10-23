@@ -29,6 +29,7 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
     private final MachineRepository machineRepository;
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
     private final PackageUpdateRequestRepository requestRepository;
+    private final PackageUpdateExecutionRecorder executionRecorder;
     private final ObjectProvider<PackageUpdateNotifier> notifier;
 
     @Override
@@ -54,6 +55,7 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
         apply(state, event);
         armDeadline(state, request, event);
+        executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
         log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
                         + "waitingReason={} waitingPhase={} closesAt={} doneResult={} rebootRequired={} relaunched={} "

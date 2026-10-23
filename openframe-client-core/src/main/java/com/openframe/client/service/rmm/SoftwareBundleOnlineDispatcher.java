@@ -82,14 +82,7 @@ public class SoftwareBundleOnlineDispatcher {
         }
 
         String executionId = SoftwareExecutionId.forBundle(bundle.getId(), pkg.getPackageManager(), pkg.getPackageName());
-        if (viaOrder) {
-            packageUpdateDispatchService.dispatchAdminUpdateNow(executionId, pkg.getPackageManager(),
-                    pkg.getPackageName(), pkg.getBrewPackageType(), List.of(machineId), bundle.getCreatedBy());
-            return;
-        }
-
-        List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
-        scriptExecutionRepository.saveQueued(RunningExecutionRows.builder()
+        RunningExecutionRows rows = RunningExecutionRows.builder()
                 .tenantId(bundle.getTenantId())
                 .executionId(executionId)
                 .scriptId(script.getId())
@@ -102,7 +95,14 @@ public class SoftwareBundleOnlineDispatcher {
                 .packageName(pkg.getPackageName())
                 .softwareAction(bundle.getAction())
                 .softwareBundleId(bundle.getId())
-                .build());
+                .build();
+        if (viaOrder) {
+            packageUpdateDispatchService.dispatchAdminUpdateNow(rows, pkg.getBrewPackageType());
+            return;
+        }
+
+        List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
+        scriptExecutionRepository.saveQueued(rows);
 
         ScriptMessage message = ScriptMessage.builder()
                 .executionId(executionId)

@@ -22,7 +22,10 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -34,6 +37,7 @@ class DefaultPackageUpdateStatusProcessorTest {
     @Mock private MachineRepository machineRepository;
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
     @Mock private PackageUpdateRequestRepository requestRepository;
+    @Mock private PackageUpdateExecutionRecorder executionRecorder;
     @Mock private ObjectProvider<PackageUpdateNotifier> notifierProvider;
     @Mock private PackageUpdateNotifier notifier;
 
@@ -129,6 +133,22 @@ class DefaultPackageUpdateStatusProcessorTest {
         assertThat(st.getDeadlineAt()).isNull();                 // admin Update now: no deadline
 
         verify(requestRepository).save(any());                   // rolled up to WAITING
+        verify(executionRecorder).record(any(), eq("m1"), any()); // mirrored onto the history row
+    }
+
+    @Test
+    void historyRowWriteFails_stateIsNotSaved_soTheRedeliveryIsNotTakenForADuplicate() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null)));
+        doThrow(new IllegalStateException("mongo down")).when(executionRecorder).record(any(), any(), any());
+
+        assertThatThrownBy(() -> processor.process("m1", base("e1", T, PackageUpdateStatusMessage.State.DONE)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(deviceStateRepository, never()).save(any());
     }
 
     @Test
@@ -142,6 +162,7 @@ class DefaultPackageUpdateStatusProcessorTest {
 
         verify(deviceStateRepository, never()).save(any());
         verify(requestRepository, never()).save(any());
+        verifyNoInteractions(executionRecorder);
     }
 
     @Test

@@ -158,8 +158,14 @@ class SoftwareScheduleFireDispatcherTest {
         dispatcher.dispatch(schedule, List.of("m-1", "m-2"), Instant.now());
 
         String executionId = SoftwareExecutionId.forSchedule("ss-1", PackageManagerType.BREW, "slack");
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(executionId, PackageManagerType.BREW, "slack",
-                BrewPackageType.CASK, List.of("m-1"), "user-1");
+        ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
+        assertThat(order.getValue().getExecutionId()).isEqualTo(executionId);
+        assertThat(order.getValue().getMachineIds()).containsExactly("m-1");
+        assertThat(order.getValue().getScriptId()).isEqualTo("brew-update-id");
+        assertThat(order.getValue().getSource()).isEqualTo(ExecutionSource.SCHEDULED);
+        assertThat(order.getValue().getSoftwareScheduleId()).isEqualTo("ss-1");
+        assertThat(order.getValue().getInitiatedBy()).isEqualTo("user-1");
 
         ArgumentCaptor<RunningExecutionRows> rows = ArgumentCaptor.forClass(RunningExecutionRows.class);
         verify(scriptExecutionRepository).saveQueued(rows.capture());
@@ -188,8 +194,9 @@ class SoftwareScheduleFireDispatcherTest {
 
         dispatcher.dispatch(schedule, List.of("m-1"), Instant.now());
 
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(any(), eq(PackageManagerType.BREW), eq("slack"),
-                eq(BrewPackageType.CASK), eq(List.of("m-1")), eq("user-1"));
+        ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
+        assertThat(order.getValue().getMachineIds()).containsExactly("m-1");
         verify(scriptExecutionRepository, never()).saveQueued(any());
         verify(softwareNatsPublisher, never()).publishSoftware(any(), any());
     }

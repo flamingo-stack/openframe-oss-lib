@@ -73,9 +73,14 @@ class SoftwareBundleOnlineDispatcherTest {
 
         dispatcher.dispatch(bundle(SoftwareAction.UPDATE), mac);
 
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(
-                SoftwareExecutionId.forBundle("b-1", PackageManagerType.BREW, "slack"),
-                PackageManagerType.BREW, "slack", BrewPackageType.CASK, List.of("m-1"), "user-1");
+        ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
+        RunningExecutionRows rows = order.getValue();
+        assertThat(rows.getExecutionId()).isEqualTo(SoftwareExecutionId.forBundle("b-1", PackageManagerType.BREW, "slack"));
+        assertThat(rows.getMachineIds()).containsExactly("m-1");
+        assertThat(rows.getScriptId()).isEqualTo("brew-update-id");
+        assertThat(rows.getSoftwareBundleId()).isEqualTo("b-1");
+        assertThat(rows.getInitiatedBy()).isEqualTo("user-1");
         verifyNoInteractions(scriptExecutionRepository, softwareNatsPublisher, retryStore);
     }
 
@@ -92,7 +97,7 @@ class SoftwareBundleOnlineDispatcherTest {
         verify(scriptExecutionRepository).saveQueued(rows.capture());
         assertThat(rows.getValue().getMachineIds()).containsExactly("m-1");
         verify(softwareNatsPublisher).publishSoftware(eq("m-1"), any());
-        verify(packageUpdateDispatchService, never()).dispatchAdminUpdateNow(any(), any(), any(), any(), any(), any());
+        verify(packageUpdateDispatchService, never()).dispatchAdminUpdateNow(any(), any());
     }
 
     @Test

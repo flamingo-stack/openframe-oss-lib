@@ -12,6 +12,7 @@ import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.RunningExecutionRows;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
 import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
@@ -196,14 +197,18 @@ class SoftwareInstallUpdateManagementServiceTest {
                 anyList(), eq(USER), eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"),
                 eq(SoftwareAction.UPDATE));
 
-        ArgumentCaptor<String> orderExec = ArgumentCaptor.forClass(String.class);
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<String>> orderTargets = ArgumentCaptor.forClass(List.class);
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(orderExec.capture(), eq(PackageManagerType.BREW),
-                eq("slack"), eq(BrewPackageType.CASK), orderTargets.capture(), eq(USER));
+        ArgumentCaptor<RunningExecutionRows> order = ArgumentCaptor.forClass(RunningExecutionRows.class);
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(order.capture(), eq(BrewPackageType.CASK));
 
-        assertThat(orderExec.getValue()).isEqualTo(scriptExec.getValue());   // one row on the screen
-        assertThat(orderTargets.getValue()).containsExactly("m1");
+        RunningExecutionRows rows = order.getValue();
+        assertThat(rows.getExecutionId()).isEqualTo(scriptExec.getValue());   // one row on the screen
+        assertThat(rows.getMachineIds()).containsExactly("m1");
+        assertThat(rows.getScriptId()).isEqualTo("brew-update-id");
+        assertThat(rows.getInitiatedBy()).isEqualTo(USER);
+        assertThat(rows.getSource()).isEqualTo(ExecutionSource.MANUAL);
+        assertThat(rows.getPackageManager()).isEqualTo(PackageManagerType.BREW);
+        assertThat(rows.getPackageName()).isEqualTo("slack");
+        assertThat(rows.getSoftwareAction()).isEqualTo(SoftwareAction.UPDATE);
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

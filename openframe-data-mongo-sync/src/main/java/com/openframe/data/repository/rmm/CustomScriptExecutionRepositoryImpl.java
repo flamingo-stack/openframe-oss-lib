@@ -98,6 +98,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                         .softwareAction(request.getSoftwareAction())
                         .softwareBundleId(request.getSoftwareBundleId())
                         .softwareScheduleId(request.getSoftwareScheduleId())
+                        .packageUpdateRequestId(request.getPackageUpdateRequestId())
                         .testRun(request.isTestRun())
                         .status(initialStatus)
                         .dispatchedAt(now)

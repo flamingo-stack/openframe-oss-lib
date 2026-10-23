@@ -84,21 +84,10 @@ public class SoftwareScheduleFireDispatcher {
         String executionId = SoftwareExecutionId.forSchedule(schedule.getId(), pkg.getPackageManager(), pkg.getPackageName());
         List<String> orderTargets = targets.stream().filter(orderMachines::contains).toList();
         List<String> scriptTargets = targets.stream().filter(id -> !orderMachines.contains(id)).toList();
-
-        if (!orderTargets.isEmpty()) {
-            packageUpdateDispatchService.dispatchAdminUpdateNow(executionId, pkg.getPackageManager(),
-                    pkg.getPackageName(), pkg.getBrewPackageType(), orderTargets, schedule.getCreatedBy());
-        }
-        if (scriptTargets.isEmpty()) {
-            return;
-        }
-
-        List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
-        scriptExecutionRepository.saveQueued(RunningExecutionRows.builder()
+        RunningExecutionRows rows = RunningExecutionRows.builder()
                 .tenantId(schedule.getTenantId())
                 .executionId(executionId)
                 .scriptId(script.getId())
-                .machineIds(scriptTargets)
                 .privilegeLevel(script.getPrivilegeLevel())
                 .timeoutSeconds(script.getDefaultTimeoutSeconds())
                 .initiatedBy(schedule.getCreatedBy())
@@ -107,7 +96,18 @@ public class SoftwareScheduleFireDispatcher {
                 .packageName(pkg.getPackageName())
                 .softwareAction(schedule.getAction())
                 .softwareScheduleId(schedule.getId())
-                .build());
+                .build();
+
+        if (!orderTargets.isEmpty()) {
+            packageUpdateDispatchService.dispatchAdminUpdateNow(rows.toBuilder().machineIds(orderTargets).build(),
+                    pkg.getBrewPackageType());
+        }
+        if (scriptTargets.isEmpty()) {
+            return;
+        }
+
+        List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
+        scriptExecutionRepository.saveQueued(rows.toBuilder().machineIds(scriptTargets).build());
 
         scriptTargets.forEach(machineId -> {
             ScriptMessage message = ScriptMessage.builder()
