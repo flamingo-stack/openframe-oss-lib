@@ -13,6 +13,7 @@ import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
@@ -27,6 +28,7 @@ import static com.openframe.stream.handler.software.FleetRowFields.longOrNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Component
+@ConditionalOnProperty(name = "openframe.fleet.software-cdc.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziumMessage, IntegratedToolEnrichedData> {
