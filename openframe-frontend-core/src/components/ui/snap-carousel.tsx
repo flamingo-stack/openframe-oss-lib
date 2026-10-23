@@ -5,11 +5,9 @@ import { useAutoplay } from '../../hooks/ui/use-autoplay';
 import { useInView } from '../../hooks/ui/use-in-view';
 import { useResumableTimeout } from '../../hooks/ui/use-resumable-timeout';
 import { cn } from '../../utils/cn';
-import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
-import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { Button } from './button';
 import { useLoadingScope } from './loading-scope';
+import { StepArrowButton } from './step-arrow-button';
 
 /** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
 const SNAP_CAROUSEL_CONTROLS_CLASS = 'mt-3 flex items-center gap-2';
@@ -117,28 +115,18 @@ export function SnapCarouselControls({
           {index + 1} / {count}
         </span>
       )}
-      <Button
-        variant="outline"
-        size="icon"
-        type="button"
+      <StepArrowButton
+        direction="previous"
         aria-label={prevLabel}
         disabled={loading || index === 0}
         onClick={onPrevious}
-        className="shrink-0"
-      >
-        <Chevron02LeftIcon size={20} />
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        type="button"
+      />
+      <StepArrowButton
+        direction="next"
         aria-label={nextLabel}
         disabled={loading || index === count - 1}
         onClick={onNext}
-        className="shrink-0"
-      >
-        <Chevron02RightIcon size={20} />
-      </Button>
+      />
     </div>
   );
 }
@@ -249,12 +237,26 @@ export function SnapCarousel<T>({
     if (focusIndex !== undefined && focusIndex >= 0) goToRef.current(focusIndex);
   }, [focusIndex]);
 
+  // The slide at the track's left edge. At the end of the track, where several slides are in view and the track can
+  // scroll no further, the slide is the LAST one: otherwise the index stopped short of it (9 of 11 with three slides
+  // in view) and the carousel never reached the end to wrap back to the first.
   const onScroll = useCallback(() => {
     const track = trackRef.current;
     const step = slideStep();
     if (!track || step === 0) return;
-    setIndex(Math.min(count - 1, Math.round(track.scrollLeft / step)));
+    const maxScroll = track.scrollWidth - track.clientWidth;
+    const atEnd = maxScroll > 0 && track.scrollLeft >= maxScroll - 1;
+    setIndex(atEnd ? count - 1 : Math.min(count - 1, Math.round(track.scrollLeft / step)));
   }, [count, slideStep]);
+
+  // Back one slide from where the track stands: at the end the index is the last slide, which sits further right
+  // than the track can scroll, so stepping back from the index alone would not move it.
+  const goBack = useCallback(() => {
+    const track = trackRef.current;
+    const step = slideStep();
+    if (!track || step === 0) return;
+    goTo(Math.min(index, Math.round(track.scrollLeft / step)) - 1);
+  }, [goTo, index, slideStep]);
 
   const canAutoAdvance = autoAdvanceMs > 0 && count > 1;
   const playing = auto.playing && canAutoAdvance;
@@ -308,7 +310,7 @@ export function SnapCarousel<T>({
         index={index}
         prevLabel={prevLabel}
         nextLabel={nextLabel}
-        onPrevious={() => goTo(index - 1)}
+        onPrevious={goBack}
         onNext={() => goTo(index + 1)}
         wait={showsWait ? { durationMs: autoAdvanceMs, ranMs, running: playing } : null}
         announce={!playing}

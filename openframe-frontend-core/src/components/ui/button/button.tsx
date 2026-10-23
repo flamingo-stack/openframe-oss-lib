@@ -52,6 +52,7 @@ const buttonVariants = cva(
         chip: '',
         card: '',
         cell: '',
+        stepper: '',
       },
       size: BUTTON_SIZE_CLASS,
       // Label typography axis (Figma 133-740). `bold` is the classic h3-bold

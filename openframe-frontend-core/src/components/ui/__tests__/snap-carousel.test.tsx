@@ -67,6 +67,60 @@ describe('SnapCarousel', () => {
     );
   });
 
+  it("draws its arrows as the shared round step arrows, never the strip's square outline icon button", () => {
+    renderCarousel();
+    for (const name of ['Previous', 'Next']) {
+      const arrow = screen.getByLabelText(name);
+      for (const cls of ['rounded-full', 'h-9', 'w-9']) expect(arrow.classList.contains(cls)).toBe(true);
+      for (const cls of ['rounded-md', 'h-11']) expect(arrow.classList.contains(cls)).toBe(false);
+    }
+  });
+
+  it('reaches its last slide when several are in view, wraps to the first, and steps back from the end', () => {
+    // Five slides, a track that shows about two: it can scroll no further than 2.7 steps, as a browser clamps it.
+    const items = ['a', 'b', 'c', 'd', 'e'];
+    const scrollWidth = items.length * SLIDE_WIDTH + (items.length - 1) * 12;
+    const clientWidth = 700;
+    const maxScroll = scrollWidth - clientWidth;
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', { configurable: true, get: () => scrollWidth });
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => clientWidth });
+    HTMLElement.prototype.scrollTo = function scrollTo(this: HTMLElement, options?: ScrollToOptions | number) {
+      const left = Math.min(maxScroll, typeof options === 'object' ? (options.left ?? 0) : 0);
+      scrolledTo.push(left);
+      Object.defineProperty(this, 'scrollLeft', { configurable: true, value: left });
+      fireEvent.scroll(this);
+    };
+    try {
+      render(<SnapCarousel items={items} label="Stories" renderItem={item => <p>{item}</p>} />);
+      setInView(true);
+      for (let advance = 0; advance < 3; advance++) {
+        act(() => {
+          vi.advanceTimersByTime(5000);
+        });
+      }
+      // Three advances: the third hits the end of the track, which is the last slide.
+      expect(screen.getByText('5 / 5')).toBeTruthy();
+      expect(screen.getByLabelText<HTMLButtonElement>('Next').disabled).toBe(true);
+
+      // Back from the end moves the track one slide back from where it stands.
+      fireEvent.click(screen.getByLabelText('Previous'));
+      expect(scrolledTo[scrolledTo.length - 1]).toBe(2 * STEP);
+      expect(screen.getByText('3 / 5')).toBeTruthy();
+
+      // And from the end it wraps to the first slide by itself.
+      fireEvent.click(screen.getByLabelText('Next'));
+      expect(screen.getByText('5 / 5')).toBeTruthy();
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(scrolledTo[scrolledTo.length - 1]).toBe(0);
+      expect(screen.getByText('1 / 5')).toBeTruthy();
+    } finally {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollWidth;
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
+    }
+  });
+
   it('advances every 5s only while it is in view, and wraps', () => {
     renderCarousel();
     act(() => {
