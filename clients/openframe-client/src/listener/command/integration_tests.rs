@@ -1,5 +1,6 @@
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use futures::StreamExt;
 use serde_json::json;
@@ -7,24 +8,38 @@ use tempfile::TempDir;
 use tokio::sync::Notify;
 use tokio::time::{timeout, Duration};
 
-use super::{CommandContext, CommandListener, FeatureFlagsHandler, RestartGate};
+use super::{
+    Begin, ClientUpdateHandler, CommandContext, CommandHandler, CommandListener,
+    FeatureFlagsHandler, Outcome, RestartGate,
+};
 use crate::clients::AuthClient;
 use crate::config::update_config::DEV_CLIENT_VERSION;
-use crate::models::{DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState};
-use crate::platform::DirectoryManager;
+use crate::models::{
+    DeliveryRef, DeliveryResult, DeliveryResultMessage, Feature, FeatureFlagsState,
+    OpenFrameClientUpdateMessage,
+};
+use crate::platform::{DirectoryManager, DmgExtractor};
 use crate::services::encryption_service::EncryptionService;
 use crate::services::execution_service::ExecutionService;
 use crate::services::feature_flags_service::FeatureFlagsService;
+use crate::services::installed_agent_message_publisher::InstalledAgentMessagePublisher;
+use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::local_tls_config_provider::LocalTlsConfigProvider;
 use crate::services::nats_connection_manager::NatsConnectionManager;
 use crate::services::nats_message_publisher::NatsMessagePublisher;
+use crate::services::openframe_client_info_service::OpenFrameClientInfoService;
+use crate::services::openframe_client_update_service::OpenFrameClientUpdateService;
 use crate::services::result_outbox_run_manager::ResultOutboxRunManager;
-use crate::services::result_store::ResultStore;
+use crate::services::result_store::{LedgerState, ResultStore};
 use crate::services::shared_token_service::SharedTokenService;
 use crate::services::tool_run_manager::ToolRunManager;
+use crate::services::update_cleanup_service::UpdateCleanupService;
+use crate::services::update_handler_service::UpdateHandlerService;
+use crate::services::update_state_service::UpdateStateService;
 use crate::services::{
-    AgentAuthService, AgentConfigurationService, DeactivationService, InitialConfigurationService,
-    InstalledToolsService, MachineIdService, ToolCommandParamsResolver, ToolKillService, ToolOps,
+    AgentAuthService, AgentConfigurationService, DeactivationService, GithubDownloadService,
+    InitialConfigurationService, InstalledToolsService, MachineIdService,
+    ToolCommandParamsResolver, ToolKillService, ToolOps,
 };
 use crate::test_support::NatsServer;
 
@@ -36,12 +51,14 @@ const VERSION: &str = "1.5.1";
 
 struct Agent {
     _server: NatsServer,
-    _dir: TempDir,
+    dir: TempDir,
+    directories: DirectoryManager,
     tester: async_nats::Client,
     results: async_nats::Subscriber,
     unclaimed: Vec<DeliveryResultMessage>,
     manager: NatsConnectionManager,
     config: AgentConfigurationService,
+    tool_ops: ToolOps,
     tool_run_manager: ToolRunManager,
     publisher: NatsMessagePublisher,
     store: Arc<ResultStore>,
@@ -69,11 +86,12 @@ impl Agent {
             .await
             .unwrap();
         let initial = InitialConfigurationService::new(directories.clone()).unwrap();
+        let tool_ops = ToolOps::default();
         let tool_run_manager = ToolRunManager::new(
             InstalledToolsService::new(directories.clone()).unwrap(),
             ToolCommandParamsResolver::new(directories.clone(), initial.clone(), config.clone()),
             ToolKillService::new(),
-            ToolOps::default(),
+            tool_ops.clone(),
         );
         let deactivation = DeactivationService::new(&directories);
         let auth = AgentAuthService::new(
@@ -123,12 +141,14 @@ impl Agent {
             _server: server,
             flags_path: directories.secured_dir().join("feature_flags.json"),
             version: version.to_string(),
-            _dir: dir,
+            dir,
+            directories,
             tester,
             results,
             unclaimed: Vec::new(),
             manager,
             config,
+            tool_ops,
             tool_run_manager,
             publisher,
             store,
@@ -138,7 +158,7 @@ impl Agent {
         Some((agent, gate))
     }
 
-    async fn launch(&mut self) -> (RestartGate, Arc<FeatureFlagsService>) {
+    fn context(&self) -> (RestartGate, CommandContext) {
         let gate = RestartGate::new(
             ToolOps::default().busy_tools(),
             ExecutionService::new().running_scripts(),
@@ -152,6 +172,11 @@ impl Agent {
             self.store.clone(),
             self.flush.clone(),
         );
+        (gate, context)
+    }
+
+    async fn launch(&mut self) -> (RestartGate, Arc<FeatureFlagsService>) {
+        let (gate, context) = self.context();
         let service = Arc::new(FeatureFlagsService::load(
             self.flags_path.clone(),
             self.version.clone(),
@@ -185,12 +210,47 @@ impl Agent {
         .expect("the flags listener never answered");
     }
 
+    async fn launch_fake(&mut self) -> FakeHandler {
+        self.launch_command(FakeHandler::default()).await
+    }
+
+    async fn launch_command<H: CommandHandler>(&mut self, handler: H) -> H {
+        let (_gate, context) = self.context();
+        CommandListener::new(handler.clone(), context)
+            .start()
+            .await
+            .unwrap();
+        // a probe id of its own, so a late answer to another listener's probe cannot pass for this one
+        let probe = format!("{PROBE}-{}", H::KIND);
+        timeout(BOUND, async {
+            loop {
+                self.send_to(H::subject(MACHINE), fake(&probe, Some(0), "done"))
+                    .await;
+                if timeout(Duration::from_millis(200), self.next_result(&probe))
+                    .await
+                    .is_ok()
+                {
+                    return;
+                }
+            }
+        })
+        .await
+        .expect("the fake listener never answered");
+        handler
+    }
+
     async fn send(&self, payload: serde_json::Value) {
+        self.send_to(format!("machine.{MACHINE}.feature-flags"), payload)
+            .await;
+    }
+
+    async fn send_fake(&self, payload: serde_json::Value) {
+        self.send_to(FakeHandler::subject(MACHINE), payload).await;
+    }
+
+    async fn send_to(&self, subject: String, payload: serde_json::Value) {
         self.tester
-            .publish(
-                format!("machine.{MACHINE}.feature-flags"),
-                serde_json::to_vec(&payload).unwrap().into(),
-            )
+            .publish(subject, serde_json::to_vec(&payload).unwrap().into())
             .await
             .unwrap();
         self.tester.flush().await.unwrap();
@@ -236,6 +296,40 @@ impl Agent {
             heard.is_err(),
             "unexpected result for {dispatch_id}: {heard:?}"
         );
+    }
+
+    async fn until_flushed(&self) {
+        timeout(BOUND, async {
+            while self.store.len().await.unwrap() > 0 {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("the outbox never drained");
+    }
+
+    fn client_update_service(&self) -> OpenFrameClientUpdateService {
+        let update_state = UpdateStateService::new(self.directories.clone()).unwrap();
+        let client_info = OpenFrameClientInfoService::new(self.directories.clone()).unwrap();
+        let last_known_good = LastKnownGoodService::new(self.directories.clone()).unwrap();
+        let update_handler = UpdateHandlerService::new(
+            update_state.clone(),
+            client_info.clone(),
+            UpdateCleanupService::for_binary(self.dir.path().join("openframe-client")),
+            last_known_good.clone(),
+            InstalledAgentMessagePublisher::new(self.publisher.clone()),
+            self.config.clone(),
+            self.store.clone(),
+        );
+        OpenFrameClientUpdateService::new(
+            client_info,
+            GithubDownloadService::new(reqwest::Client::new(), DmgExtractor::new()),
+            update_state,
+            last_known_good,
+            self.tool_run_manager.clone(),
+            self.tool_ops.clone(),
+            update_handler,
+        )
     }
 
     fn persisted(&self) -> FeatureFlagsState {
@@ -549,4 +643,382 @@ async fn invalid_flag_entries_are_done_without_a_restart() {
     agent.expect("d23", DeliveryResult::Done).await;
     expect_no_restart(&gate).await;
     assert!(agent.persisted().flags.is_empty());
+}
+
+#[derive(Clone, Default)]
+struct FakeHandler {
+    busy: Arc<AtomicBool>,
+    floor: Arc<AtomicI64>,
+    runs: Arc<Mutex<Vec<String>>>,
+    release: Arc<Notify>,
+}
+
+#[derive(serde::Deserialize)]
+struct FakeCommand {
+    action: String,
+}
+
+impl FakeHandler {
+    fn runs(&self) -> Vec<String> {
+        self.runs.lock().unwrap().clone()
+    }
+}
+
+impl CommandHandler for FakeHandler {
+    type Command = FakeCommand;
+    type Guard = ();
+
+    const KIND: &'static str = "fake";
+    const SEQUENCED: bool = true;
+
+    fn subject(machine_id: &str) -> String {
+        format!("machine.{machine_id}.fake.v2")
+    }
+
+    fn begin(&self, _command: &FakeCommand) -> Begin<()> {
+        if self.busy.load(Ordering::Acquire) {
+            return Begin::Busy("busy".to_string());
+        }
+        Begin::Accepted(())
+    }
+
+    fn applied_sequence(&self, _machine_id: &str) -> i64 {
+        self.floor.load(Ordering::Acquire)
+    }
+
+    async fn run(
+        &self,
+        _machine_id: &str,
+        delivery: &DeliveryRef,
+        command: FakeCommand,
+        _guard: (),
+    ) -> Outcome {
+        self.runs.lock().unwrap().push(delivery.dispatch_id.clone());
+        match command.action.as_str() {
+            "fail" => Outcome::Failed("boom".to_string()),
+            "hold" => {
+                self.release.notified().await;
+                Outcome::Done
+            }
+            _ => Outcome::Done,
+        }
+    }
+}
+
+fn fake(dispatch_id: &str, sequence: Option<i64>, action: &str) -> serde_json::Value {
+    let mut delivery = json!({
+        "type": "FAKE",
+        "targetId": "target",
+        "dispatchId": dispatch_id,
+    });
+    if let Some(sequence) = sequence {
+        delivery["sequence"] = json!(sequence);
+    }
+    json!({ "delivery": delivery, "action": action })
+}
+
+#[tokio::test]
+async fn a_busy_command_gets_no_ack_and_runs_on_the_backend_retry() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    handler.busy.store(true, Ordering::Release);
+
+    agent.send_fake(fake("f1", Some(1), "done")).await;
+    agent.expect_silence("f1").await;
+
+    handler.busy.store(false, Ordering::Release);
+    agent.send_fake(fake("f1", Some(1), "done")).await;
+    agent.expect("f1", DeliveryResult::Acked).await;
+    agent.expect("f1", DeliveryResult::Done).await;
+    assert_eq!(handler.runs(), vec!["f1"]);
+}
+
+#[tokio::test]
+async fn a_repeated_dispatch_re_sends_the_result_without_running_again() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f2", Some(2), "fail")).await;
+    agent.expect("f2", DeliveryResult::Acked).await;
+    agent.expect("f2", DeliveryResult::Failed).await;
+    agent.until_flushed().await;
+
+    agent.send_fake(fake("f2", Some(2), "fail")).await;
+
+    let repeated = agent.expect("f2", DeliveryResult::Failed).await;
+    assert_eq!(repeated.error.as_deref(), Some("boom"));
+    assert_eq!(handler.runs(), vec!["f2"]);
+}
+
+#[tokio::test]
+async fn a_repeat_queued_behind_its_own_run_gets_the_result_without_running_again() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f3", Some(3), "hold")).await;
+    agent.expect("f3", DeliveryResult::Acked).await;
+
+    agent.send_fake(fake("f3", Some(3), "hold")).await;
+    handler.release.notify_one();
+
+    agent.expect("f3", DeliveryResult::Done).await;
+    while let Ok(repeat) = timeout(QUIET, agent.next_result("f3")).await {
+        assert_eq!(repeat.result, DeliveryResult::Done);
+    }
+    assert_eq!(handler.runs(), vec!["f3"]);
+}
+
+#[tokio::test]
+async fn a_stale_sequence_is_acked_and_done_without_running() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f4", Some(4), "done")).await;
+    agent.expect("f4", DeliveryResult::Acked).await;
+    agent.expect("f4", DeliveryResult::Done).await;
+
+    for (dispatch_id, sequence) in [("f5", 4), ("f6", 3)] {
+        agent
+            .send_fake(fake(dispatch_id, Some(sequence), "fail"))
+            .await;
+
+        agent.expect(dispatch_id, DeliveryResult::Acked).await;
+        agent.expect(dispatch_id, DeliveryResult::Done).await;
+    }
+    assert_eq!(handler.runs(), vec!["f4"]);
+}
+
+#[tokio::test]
+async fn a_failed_run_does_not_move_the_applied_sequence() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    agent.send_fake(fake("f7", Some(7), "fail")).await;
+    agent.expect("f7", DeliveryResult::Acked).await;
+    agent.expect("f7", DeliveryResult::Failed).await;
+
+    agent.send_fake(fake("f8", Some(7), "done")).await;
+
+    agent.expect("f8", DeliveryResult::Acked).await;
+    agent.expect("f8", DeliveryResult::Done).await;
+    assert_eq!(handler.runs(), vec!["f7", "f8"]);
+}
+
+#[tokio::test]
+async fn a_sequence_at_or_below_the_handler_floor_is_done_without_running() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_fake().await;
+    handler.floor.store(10, Ordering::Release);
+
+    agent.send_fake(fake("f9", Some(10), "done")).await;
+    agent.expect("f9", DeliveryResult::Acked).await;
+    agent.expect("f9", DeliveryResult::Done).await;
+    agent.send_fake(fake("f10", Some(11), "done")).await;
+    agent.expect("f10", DeliveryResult::Acked).await;
+    agent.expect("f10", DeliveryResult::Done).await;
+
+    assert_eq!(handler.runs(), vec!["f10"]);
+}
+
+#[derive(Clone, Default)]
+struct LeavingHandler {
+    events: Arc<Mutex<Vec<String>>>,
+}
+
+impl LeavingHandler {
+    fn events_of(&self, dispatch_id: &str) -> Vec<String> {
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|event| event.ends_with(&format!(":{dispatch_id}")))
+            .cloned()
+            .collect()
+    }
+}
+
+impl CommandHandler for LeavingHandler {
+    type Command = FakeCommand;
+    type Guard = ();
+
+    const KIND: &'static str = "leaving";
+    const REMOVES_AGENT: bool = true;
+
+    fn subject(machine_id: &str) -> String {
+        format!("machine.{machine_id}.leaving.v2")
+    }
+
+    fn begin(&self, _command: &FakeCommand) -> Begin<()> {
+        Begin::Accepted(())
+    }
+
+    async fn run(
+        &self,
+        _machine_id: &str,
+        delivery: &DeliveryRef,
+        command: FakeCommand,
+        _guard: (),
+    ) -> Outcome {
+        self.events
+            .lock()
+            .unwrap()
+            .push(format!("run:{}", delivery.dispatch_id));
+        match command.action.as_str() {
+            "fail" => Outcome::Failed("unsupported".to_string()),
+            _ => Outcome::Done,
+        }
+    }
+
+    async fn remove_agent(&self) {
+        let mut events = self.events.lock().unwrap();
+        let last = events.last().cloned().unwrap_or_default();
+        events.push(last.replacen("run:", "removed:", 1));
+    }
+}
+
+#[tokio::test]
+async fn the_agent_is_removed_only_after_done_is_published() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = agent.launch_command(LeavingHandler::default()).await;
+    let subject = LeavingHandler::subject(MACHINE);
+
+    agent
+        .send_to(subject.clone(), fake("u1", None, "done"))
+        .await;
+    agent.expect("u1", DeliveryResult::Acked).await;
+    agent.expect("u1", DeliveryResult::Done).await;
+    timeout(BOUND, async {
+        while handler.events_of("u1") != ["run:u1", "removed:u1"] {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the agent was never removed");
+
+    agent.send_to(subject, fake("u2", None, "fail")).await;
+    agent.expect("u2", DeliveryResult::Acked).await;
+    agent.expect("u2", DeliveryResult::Failed).await;
+    agent.expect_silence("u2").await;
+    assert_eq!(handler.events_of("u2"), ["run:u2"]);
+}
+
+#[tokio::test]
+async fn a_command_cut_short_by_the_last_stop_is_failed_before_a_listener_subscribes() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let subject = format!("machine.{MACHINE}.delivery.result");
+    let cut = DeliveryRef {
+        delivery_type: "FAKE".to_string(),
+        target_id: "target".to_string(),
+        dispatch_id: "cut".to_string(),
+        sequence: None,
+    };
+    agent
+        .store
+        .delivery_accept(subject, cut, LedgerState::InFlight)
+        .await
+        .unwrap();
+
+    let handler = agent.launch_fake().await;
+
+    let failed = agent.expect("cut", DeliveryResult::Failed).await;
+    assert_eq!(
+        failed.error.as_deref(),
+        Some("interrupted by agent restart")
+    );
+    assert_eq!(
+        agent.store.delivery_state("cut".to_string()).await.unwrap(),
+        Some(LedgerState::Settled(failed))
+    );
+    assert!(handler.runs().is_empty());
+}
+
+fn client_update(dispatch_id: &str, version: &str) -> serde_json::Value {
+    json!({
+        "delivery": {
+            "type": "CLIENT_UPDATE",
+            "targetId": "openframe-client",
+            "dispatchId": dispatch_id,
+            "sequence": 1,
+        },
+        "version": version,
+        "downloadConfigurations": [],
+    })
+}
+
+#[tokio::test]
+async fn a_failed_client_update_is_reported_and_stops_holding_tool_operations() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let handler = ClientUpdateHandler::new(
+        agent.client_update_service(),
+        agent.tool_run_manager.clone(),
+    );
+    agent.launch_command(handler).await;
+
+    agent
+        .send_to(
+            ClientUpdateHandler::subject(MACHINE),
+            client_update("u1", "latest"),
+        )
+        .await;
+
+    agent.expect("u1", DeliveryResult::Acked).await;
+    let failed = agent.expect("u1", DeliveryResult::Failed).await;
+    assert!(
+        failed.error.as_deref().unwrap().contains("Invalid version"),
+        "{failed:?}"
+    );
+    assert!(!agent.tool_run_manager.is_client_update_pending());
+}
+
+#[tokio::test]
+async fn a_client_update_waits_for_a_busy_tool_or_a_running_update_without_an_ack() {
+    let Some((mut agent, _gate)) = Agent::start().await else {
+        return;
+    };
+    let service = agent.client_update_service();
+    agent
+        .launch_command(ClientUpdateHandler::new(
+            service.clone(),
+            agent.tool_run_manager.clone(),
+        ))
+        .await;
+
+    let busy = agent.tool_ops.lock("mesh").await.mark_busy();
+    agent
+        .send_to(
+            ClientUpdateHandler::subject(MACHINE),
+            client_update("u1", "9.9.9"),
+        )
+        .await;
+    agent.expect_silence("u1").await;
+    assert!(agent.tool_run_manager.is_client_update_pending());
+    drop(busy);
+
+    let running: OpenFrameClientUpdateMessage =
+        serde_json::from_value(client_update("running", "9.9.8")).unwrap();
+    let _running = service.reserve(&running).unwrap();
+    // as after an early updater exit, which clears pending while its watcher still holds the slot
+    agent.tool_run_manager.clear_client_update_pending();
+    agent
+        .send_to(
+            ClientUpdateHandler::subject(MACHINE),
+            client_update("u2", "9.9.9"),
+        )
+        .await;
+    agent.expect_silence("u2").await;
+    assert!(!agent.tool_run_manager.is_client_update_pending());
 }

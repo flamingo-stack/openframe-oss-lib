@@ -79,7 +79,7 @@ export interface ProductReleaseCardAnchorProps {
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
 }
 
-export interface ProductReleaseCardProps {
+export interface LoadedProductReleaseCardProps {
   /** Release title */
   title: string;
   /** Release summary/description */
@@ -108,8 +108,6 @@ export interface ProductReleaseCardProps {
   className?: string;
   /** Card density. Defaults to `'lg'` (the canonical large card). */
   size?: ProductReleaseCardSize;
-  /** The release is still being read: the card draws its own skeleton (also in a page's loading scope). */
-  loading?: boolean;
 
   // ─── Catalog-only props (ignored by `default` / `sm` branches) ─────────
   /** Cover image URL. Falls back to a neutral `Package`-icon placeholder. */
@@ -145,7 +143,20 @@ export interface ProductReleaseCardProps {
   };
 }
 
-export function ProductReleaseCard({
+/** The release, or `loading` while the host reads it: the card then draws its own loading form (also in a scope). */
+export type ProductReleaseCardProps =
+  | (LoadedProductReleaseCardProps & { loading?: boolean })
+  | (Partial<LoadedProductReleaseCardProps> & { loading: true });
+
+/** One switch: while the release is read (a prop, or a page's loading scope) the card is its own loading form. */
+export function ProductReleaseCard(props: ProductReleaseCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <ProductReleaseCardSkeleton size={props.size ?? 'lg'} className={props.className} />;
+  }
+  return <LoadedProductReleaseCard {...props} />;
+}
+
+function LoadedProductReleaseCard({
   title,
   summary,
   version,
@@ -162,10 +173,7 @@ export function ProductReleaseCard({
   viewCount,
   author,
   changelogCounts,
-  loading = false,
-}: ProductReleaseCardProps) {
-  // One switch: while the release is read (a prop, or a page's loading scope) the card is its skeleton.
-  if (useLoadingScope() || loading) return <ProductReleaseCardSkeleton size={size} className={className} />;
+}: LoadedProductReleaseCardProps) {
   // ----- LG branch (rich /releases catalog row + related-content rail) -----
   // The card has THREE zones:
   //   1. Hero — cover image LEFT, version pill + title + summary RIGHT.

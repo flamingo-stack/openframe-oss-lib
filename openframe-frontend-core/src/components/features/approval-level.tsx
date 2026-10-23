@@ -190,7 +190,7 @@ export function ApprovalLevelView({
   );
 }
 
-export interface ApprovalLevelSkeletonProps {
+interface ApprovalLevelSkeletonProps {
   /** The editable form (the four levels' group) or the read-only one (the level's icon). */
   editable?: boolean;
   /** Whether the level's name is written before the icons (default true, like the view). */
@@ -202,7 +202,7 @@ export interface ApprovalLevelSkeletonProps {
  * `ApprovalLevelView`'s own skeleton (a level chip, not a whole view): a level while it is read: the view's own row, the name a bar at its type step (the longest name's width), and the
  * read-only icon's box or the editable group's four small toggle boxes. Inert: nothing in it can be picked.
  */
-export function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelSkeletonProps) {
+function ApprovalLevelSkeleton({ editable = false, showLabel = true, className }: ApprovalLevelSkeletonProps) {
   const name = showLabel ? (
     <span className={LEVEL_NAME_CLASS}>
       <TextHold>{LONGEST_LEVEL_LABEL}</TextHold>

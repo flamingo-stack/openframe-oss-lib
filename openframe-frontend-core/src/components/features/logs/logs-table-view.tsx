@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useCallback, useEffect, useMemo } from 'react';
+import { type MouseEvent, type ReactNode, useCallback, useEffect, useMemo } from 'react';
 import { openInNewTab } from '../../../utils/open-in-new-tab';
 import { normalizeToolTypeWithFallback, toToolLabel } from '../../../utils/tool-utils';
 import {
@@ -13,8 +13,17 @@ import {
 } from '../../icons-v2-generated';
 import { ToolBadge } from '../../platform/ToolBadge';
 import { Button } from '../../ui/button';
-import { type ColumnDef, DataTable, multiSelectFilterFn, type Row, useDataTable } from '../../ui/data-table';
+import {
+  type ColumnDef,
+  DataTable,
+  dataTableLoadingRows,
+  multiSelectFilterFn,
+  type Row,
+  useDataTable,
+} from '../../ui/data-table';
+import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
 import { FilterModal } from '../../ui/filter-modal';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { NoData, type NoDataProps } from '../../ui/no-data';
 import { Tag } from '../../ui/tag';
 import { TruncateText } from '../../ui/truncate-text';
@@ -85,9 +94,67 @@ export interface LogsTableViewProps<T extends UiLogEntry = UiLogEntry> {
   guideButton?: LogsTableGuideButton;
   /** Columns left out (a narrow rendering). */
   hiddenColumns?: readonly LogsTableColumnId[];
+  /**
+   * How many logs one request loads (the host's page size). The loading body draws that many skeleton rows and the
+   * load-more footer one more page of them. Default: the table's own defaults (`DataTable.Body` / `InfiniteFooter`).
+   */
+  pageSize?: number;
 }
 
 const noop = () => {};
+
+/** A log still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
+const loadingLog = (id: string): UiLogEntry => ({
+  id,
+  logId: '',
+  timestamp: '',
+  status: { label: '' },
+  source: { name: '', toolType: '' },
+  device: { name: '' },
+  description: { title: '' },
+});
+
+/** The Source column: the device over its customer; both lines are bars while the row is read. */
+function LogSourceCell({ device }: { device: UiLogEntry['device'] }) {
+  const loading = useLoadingScope();
+  const { deviceName, organization } = logSourceLabels(device);
+  return (
+    <div className="flex min-h-[60px] flex-col justify-center gap-1 py-2">
+      {(deviceName || loading) && <TruncateText>{deviceName}</TruncateText>}
+      {(organization || loading) && (
+        <TruncateText variant="h6" tone="secondary">
+          {organization ?? ''}
+        </TruncateText>
+      )}
+    </div>
+  );
+}
+
+/** A row's icon button (quick view, open in a new tab): static chrome, drawn real and inert while the row is read. */
+function LogRowButton({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick?: (event: MouseEvent) => void;
+  icon: ReactNode;
+  label: string;
+}) {
+  const loading = useLoadingScope();
+  return (
+    <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
+      <Button
+        onClick={loading ? undefined : onClick}
+        disabled={loading}
+        variant="outline"
+        size="icon"
+        leftIcon={icon}
+        aria-label={label}
+        className="bg-ods-card"
+      />
+    </div>
+  );
+}
 
 /**
  * The logs table: its columns, rows, filters, empty and loading states. The host
@@ -95,7 +162,7 @@ const noop = () => {};
  */
 export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   logs,
-  loading = false,
+  loading: loadingProp = false,
   facets,
   filters,
   onFilterChange,
@@ -116,7 +183,10 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
   renderEmptyState,
   guideButton,
   hiddenColumns,
+  pageSize,
 }: LogsTableViewProps<T>) {
+  // ONE switch: in a page's loading state the table is loading (its body draws the row skeletons, never the empty state).
+  const loading = useLoadingScope() || loadingProp;
   const columns = useMemo<ColumnDef<T>[]>(() => {
     const multiSelect = multiSelectFor<T>();
     const all: ColumnDef<T>[] = [
@@ -183,19 +253,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
       {
         accessorKey: 'source',
         header: 'SOURCE',
-        cell: ({ row }: { row: Row<T> }) => {
-          const { deviceName, organization } = logSourceLabels(row.original.device);
-          return (
-            <div className="flex min-h-[60px] flex-col justify-center gap-1 py-2">
-              {deviceName && <TruncateText>{deviceName}</TruncateText>}
-              {organization && (
-                <TruncateText variant="h6" tone="secondary">
-                  {organization}
-                </TruncateText>
-              )}
-            </div>
-          );
-        },
+        cell: ({ row }: { row: Row<T> }) => <LogSourceCell device={row.original.device} />,
         enableSorting: false,
         filterFn: multiSelect,
         meta: {
@@ -228,16 +286,11 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
       {
         id: 'quickView',
         cell: ({ row }: { row: Row<T> }) => (
-          <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
-            <Button
-              onClick={() => onQuickView?.(row.original)}
-              variant="outline"
-              size="icon"
-              leftIcon={<EyeIcon className="h-5 w-5" />}
-              aria-label="Quick view"
-              className="bg-ods-card"
-            />
-          </div>
+          <LogRowButton
+            onClick={() => onQuickView?.(row.original)}
+            icon={<EyeIcon className="h-5 w-5" />}
+            label="Quick view"
+          />
         ),
         enableSorting: false,
         meta: { width: LOG_COLUMN_WIDTHS.action, align: 'right' },
@@ -245,16 +298,11 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
       {
         id: 'open',
         cell: ({ row }: { row: Row<T> }) => (
-          <div data-no-row-click className="pointer-events-auto flex items-center justify-end">
-            <Button
-              onClick={getLogHref ? openInNewTab(getLogHref(row.original)) : undefined}
-              variant="outline"
-              size="icon"
-              leftIcon={<ArrowRightUpIcon className="h-5 w-5" />}
-              aria-label="Open in new tab"
-              className="bg-ods-card"
-            />
-          </div>
+          <LogRowButton
+            onClick={getLogHref ? openInNewTab(getLogHref(row.original)) : undefined}
+            icon={<ArrowRightUpIcon className="h-5 w-5" />}
+            label="Open in new tab"
+          />
         ),
         enableSorting: false,
         meta: { width: LOG_COLUMN_WIDTHS.action, hideAt: 'md', align: 'right' },
@@ -299,8 +347,13 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
     [columnFilters, onFilterChange],
   );
 
+  // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loadingRows = useMemo(
+    () => (loading ? dataTableLoadingRows(pageSize ?? DATA_TABLE_SKELETON_ROWS, id => loadingLog(id) as T) : null),
+    [loading, pageSize],
+  );
   const table = useDataTable<T>({
-    data: logs,
+    data: loadingRows ?? logs,
     columns,
     getRowId: (row: T) => row.id,
     enableSorting: false,
@@ -357,11 +410,16 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
         {/* Keep the header while a query (search, filters, date range) is active,
             even with zero rows: its controls are the only way to change it. */}
         {!(scopedEmpty && !hasQuery) && (
-          <DataTable.Header stickyHeader stickyHeaderOffset="top-[96px]" rightSlot={<DataTable.RowCount />} />
+          <DataTable.Header
+            stickyHeader
+            stickyHeaderOffset="top-[96px]"
+            rightSlot={<DataTable.RowCount loading={loading} />}
+          />
         )}
         <DataTable.Body
           loading={loading}
-          skeletonRows={10}
+          loadingCells
+          skeletonRows={pageSize}
           // Scoped tabs get the unified empty state (as every other device and
           // customer tab); the standalone page keeps its inline message.
           {...(scoped
@@ -384,7 +442,7 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
           hasNextPage={hasNextPage}
           isFetchingNextPage={isFetchingNextPage}
           onLoadMore={onLoadMore}
-          skeletonRows={2}
+          skeletonRows={pageSize}
         />
       </DataTable>
 
@@ -413,99 +471,4 @@ export function LogsTableView<T extends UiLogEntry = UiLogEntry>({
 
 function columnId<T>(column: ColumnDef<T>): string {
   return String(column.id ?? (column as { accessorKey?: string }).accessorKey ?? '');
-}
-
-// ----------------------------------------------------------------
-// Loading skeleton
-// ----------------------------------------------------------------
-
-const EMPTY_LOG_ROWS: unknown[] = [];
-
-/**
- * A filterable column while the facets are still in flight: no options, plus the
- * flag saying they are coming. The flag keeps the funnel drawn (inert); an empty
- * filter without it means "there is nothing to filter by", and the table hides
- * the funnel for that column.
- */
-const PENDING_FILTER = { options: [] as never[], pending: true };
-
-export interface LogsTableSkeletonProps {
-  /** The Log ID header in its inert form, so the icon does not arrive with the data. */
-  logIdHeader?: ReactNode;
-  /** The loading state announces itself ("Loading results"). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-}
-
-/**
- * Loading fallback of the logs table: an empty `DataTable` with the table's own
- * columns, so the header row and the column widths match the loaded table.
- */
-export function LogsTableSkeleton({ logIdHeader, region = true }: LogsTableSkeletonProps) {
-  const columns = useMemo<ColumnDef<unknown>[]>(() => {
-    const multiSelect = multiSelectFor<unknown>();
-    return [
-      {
-        id: 'logId',
-        header: logIdHeader ? () => logIdHeader : 'Log ID',
-        enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.logId, alwaysShowHeader: true },
-      },
-      {
-        id: 'status',
-        header: 'Status',
-        enableSorting: false,
-        filterFn: multiSelect,
-        meta: { width: LOG_COLUMN_WIDTHS.status, filter: PENDING_FILTER },
-      },
-      {
-        id: 'tool',
-        header: 'Tool',
-        enableSorting: false,
-        filterFn: multiSelect,
-        meta: { width: LOG_COLUMN_WIDTHS.tool, hideAt: 'md', filter: PENDING_FILTER },
-      },
-      {
-        id: 'source',
-        header: 'SOURCE',
-        enableSorting: false,
-        filterFn: multiSelect,
-        meta: { width: LOG_COLUMN_WIDTHS.source, hideAt: 'md', filter: PENDING_FILTER },
-      },
-      {
-        id: 'description',
-        header: 'Log Details',
-        enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.description, hideAt: 'lg' },
-      },
-      {
-        id: 'copy',
-        enableSorting: false,
-        meta: { width: `${LOG_COLUMN_WIDTHS.action} ml-auto`, align: 'right' },
-      },
-      {
-        id: 'quickView',
-        enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.action, align: 'right' },
-      },
-      {
-        id: 'open',
-        enableSorting: false,
-        meta: { width: LOG_COLUMN_WIDTHS.action, hideAt: 'md', align: 'right' },
-      },
-    ];
-  }, [logIdHeader]);
-
-  const table = useDataTable<unknown>({
-    data: EMPTY_LOG_ROWS,
-    columns,
-    getRowId: () => '',
-    enableSorting: false,
-  });
-
-  return (
-    <DataTable table={table}>
-      <DataTable.Header stickyHeader stickyHeaderOffset="top-[96px]" />
-      <DataTable.Body loading={true} loadingRegion={region} skeletonRows={10} emptyMessage="" rowClassName="mb-1" />
-    </DataTable>
-  );
 }

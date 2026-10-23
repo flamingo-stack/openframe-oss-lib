@@ -3,6 +3,7 @@
 import { forwardRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { AlertCircleIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 import { useChatAppearance } from './chat-appearance-context';
 import { ExpandChevron } from './expand-chevron';
 import { useCollapsible } from './hooks/use-collapsible';
@@ -36,16 +37,13 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
         )}
         {...props}
       >
-        <button
+        <Button
+          variant="row"
           type="button"
           onClick={hasDetails ? () => setExpanded(prev => !prev) : undefined}
           aria-expanded={hasDetails ? expanded : undefined}
           aria-label={hasDetails ? (expanded ? 'Collapse details' : 'Expand details') : undefined}
           disabled={!hasDetails}
-          className={cn(
-            'flex w-full items-center gap-[var(--spacing-system-xsf)] text-left',
-            hasDetails ? 'cursor-pointer' : 'cursor-default',
-          )}
         >
           <AlertCircleIcon size={16} className={cn('shrink-0', iconTint[type])} />
           <span
@@ -58,7 +56,7 @@ const ErrorMessageDisplay = forwardRef<HTMLDivElement, ErrorMessageDisplayProps>
             {title}
           </span>
           {hasDetails && <ExpandChevron expanded={expanded} />}
-        </button>
+        </Button>
 
         {hasDetails && (
           <div style={containerStyle}>

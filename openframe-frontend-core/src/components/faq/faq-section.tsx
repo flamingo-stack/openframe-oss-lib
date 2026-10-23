@@ -12,11 +12,11 @@ import { serializeJsonLd } from '../../utils/common';
 import { faqSectionSlug, parseFaqHash, type FaqHashTarget } from '../../utils/faq-anchor';
 import { navigateSamePageHash, STICKY_HEADER_OFFSET_PX } from '../../utils/same-page-hash-nav';
 import { buildSuggestionUrl } from '../../utils/suggestion-url';
-import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, FaqAccordionSkeleton, type FaqItem } from '../faq-accordion';
+import { FAQ_ACCORDION_SKELETON_ROWS, FaqAccordion, type FaqItem } from '../faq-accordion';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { FaqAskCard, faqAskCardShown, type FaqAskOptions } from './faq-ask-card';
 import { buildFaqJsonLdFromFaqs, type FaqSchemaOptions } from './json-ld';
 
@@ -487,6 +487,7 @@ function GroupedFaqList({
         return (
           <Link
             key={group.slug}
+            data-loading-item
             href={`#${group.slug}`}
             aria-current={isActive ? 'true' : undefined}
             onClick={e => handleJump(e, group.slug as string)}
@@ -656,7 +657,7 @@ export function FaqSection({
   );
 }
 
-export interface FaqSectionSkeletonProps extends Pick<
+interface FaqSectionSkeletonProps extends Pick<
   FaqSectionProps,
   'heading' | 'topic' | 'showTopic' | 'aside' | 'className' | 'id'
 > {
@@ -673,7 +674,7 @@ export interface FaqSectionSkeletonProps extends Pick<
  */
 const DEFAULT_SKELETON_SHAPE: FaqSkeletonShape = [{}];
 
-export function FaqSectionSkeleton({
+function FaqSectionSkeleton({
   heading,
   topic,
   showTopic = false,
@@ -687,19 +688,22 @@ export function FaqSectionSkeleton({
   const CategoryHeading = heading === null ? 'h2' : 'h3';
   const groups = shape.length > 0 ? shape : DEFAULT_SKELETON_SHAPE;
   const named = groups.filter(group => group.heading).length;
-  const pill = (i: number) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton pills never reorder
-    <span key={i} className={cn(CATEGORY_PILL_CLASS, 'shrink-0 border-ods-border bg-ods-card')}>
-      <TextLineSkeleton type="inherit" as="span" className="w-24" />
-    </span>
+  const pills = (count: number) => (
+    <LoadingItems count={count}>
+      {() => (
+        <span className={cn(CATEGORY_PILL_CLASS, 'shrink-0 border-ods-border bg-ods-card')} data-loading-item>
+          <TextLineSkeleton type="inherit" as="span" className="w-24" />
+        </span>
+      )}
+    </LoadingItems>
   );
   const nav = navRow ? (
     <div className={CATEGORY_NAV_SKELETON_LINE_CLASS} aria-hidden>
-      {Array.from({ length: FAQ_NAV_SKELETON_PILLS }, (_, i) => pill(i))}
+      {pills(FAQ_NAV_SKELETON_PILLS)}
     </div>
   ) : named > 1 ? (
     <div className={CATEGORY_NAV_CLASS} aria-hidden>
-      {Array.from({ length: named }, (_, i) => pill(i))}
+      {pills(named)}
     </div>
   ) : undefined;
   const questions = (
@@ -713,7 +717,11 @@ export function FaqSectionSkeleton({
                 <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
               </CategoryHeading>
             )}
-            <FaqAccordionSkeleton count={Math.max(1, group.rows ?? FAQ_SECTION_SKELETON_QUESTIONS)} />
+            <FaqAccordion
+              loading
+              items={[]}
+              skeletonCount={Math.max(1, group.rows ?? FAQ_SECTION_SKELETON_QUESTIONS)}
+            />
           </section>
         );
       })}

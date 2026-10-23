@@ -2,7 +2,9 @@
 
 import { cn } from '../../utils/cn';
 import { AlertTriangleIcon } from '../icons-v2-generated';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { AnnouncementBarView } from './announcement-bar-view';
+import { useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 export interface SuperUserBannerViewProps {
@@ -13,6 +15,9 @@ export interface SuperUserBannerViewProps {
    * host has no environment to name; the strip then ends at the text.
    */
   environmentLabel?: string;
+  /** The tenant's name is still being read: the strip and its copy are drawn, the name is a bar. A loading scope
+   *  does the same. */
+  loading?: boolean;
   className?: string;
 }
 
@@ -28,7 +33,14 @@ export interface SuperUserBannerViewProps {
  * rule along the bottom, the triangle in error, the role in error and the
  * tenant in primary text at body scale - and the environment chip at the end.
  */
-export function SuperUserBannerView({ tenantName, environmentLabel, className }: SuperUserBannerViewProps) {
+export function SuperUserBannerView({
+  tenantName,
+  environmentLabel,
+  loading: loadingProp,
+  className,
+}: SuperUserBannerViewProps) {
+  // ONE switch: the strip is static copy; only the tenant's name is read data, drawn as a bar while it loads.
+  const loading = useLoadingScope() || !!loadingProp;
   return (
     <AnnouncementBarView
       className={cn('shrink-0 border-b border-ods-error bg-ods-error-secondary text-ods-text-primary', className)}
@@ -37,7 +49,11 @@ export function SuperUserBannerView({ tenantName, environmentLabel, className }:
       title={
         <p className="mb-0 min-w-0 max-w-full truncate text-h4">
           <span className="text-ods-error">Super user access: </span>
-          <span>{tenantName}</span>
+          {loading ? (
+            <TextLineSkeleton as="span" type="inherit" className="inline-flex w-32 align-bottom" />
+          ) : (
+            <span>{tenantName}</span>
+          )}
         </p>
       }
       endAdornment={

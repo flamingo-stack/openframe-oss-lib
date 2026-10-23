@@ -111,6 +111,9 @@ export const multiSelectFilterFn: FilterFn<unknown> = (row, columnId, filterValu
 /** Skeleton rows of a table that knows no page size: a typical count for an UNPAGED table. */
 export const DATA_TABLE_SKELETON_ROWS = 10;
 
+/** The rows a next page's skeleton draws when neither the host nor the table states a page size. */
+export const DATA_TABLE_NEXT_PAGE_SKELETON_ROWS = 3;
+
 /**
  * The page size a host gave its table (`state.pagination.pageSize`, else `initialState.pagination.pageSize`), or
  * undefined when it gave none. Read from the OPTIONS, never `getState()`: TanStack fills in a page size of 10 for a
@@ -124,4 +127,13 @@ export function dataTablePageSize(table: {
 }): number | undefined {
   const size = table.options.state?.pagination?.pageSize ?? table.options.initialState?.pagination?.pageSize;
   return size && size > 0 ? size : undefined;
+}
+
+/**
+ * One page of rows still being read: the placeholders a table holds while it loads, which `DataTable.Body`'s
+ * `loadingCells` draws with the REAL cells (every part of a cell drawing its own loading form). Each row is `fill(id)`
+ * keyed `loading-<index>`: the fields a row requires, empty, so a cell reads nothing it could show.
+ */
+export function dataTableLoadingRows<T>(count: number, fill: (id: string) => T): T[] {
+  return Array.from({ length: count }, (_, index) => fill(`loading-${index}`));
 }
