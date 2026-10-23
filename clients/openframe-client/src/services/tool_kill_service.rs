@@ -187,6 +187,12 @@ impl ToolKillService {
         ))
     }
 
+    /// Stops one process: graceful signal, then force kill with retries, each waited for.
+    pub async fn stop_process(&self, pid: u32, description: &str) -> Result<()> {
+        self.stop_process_with_retry(Pid::from_u32(pid), description)
+            .await
+    }
+
     /// Try graceful termination and wait for process to exit
     async fn try_graceful_stop(&self, pid: Pid, description: &str) -> Result<bool> {
         let mut sys = System::new_all();
