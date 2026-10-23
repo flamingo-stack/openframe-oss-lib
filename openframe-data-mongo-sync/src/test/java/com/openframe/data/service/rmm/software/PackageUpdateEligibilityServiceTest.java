@@ -1,4 +1,4 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.data.service.rmm.software;
 
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.clientconfiguration.OpenFrameClientConfiguration;
@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.openframe.data.document.rmm.software.SoftwareAction.INSTALL;
+import static com.openframe.data.document.rmm.software.SoftwareAction.UPDATE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -56,22 +58,30 @@ class PackageUpdateEligibilityServiceTest {
 
     @Test
     void eligibleMachines_emptyInput_isEmpty_noLookups() {
-        Set<String> result = service.eligibleMachines(List.of());
+        Set<String> result = service.eligibleMachines(UPDATE, List.of());
         assertThat(result).isEmpty();
+        verifyNoInteractions(clientConfigurationService, machineRepository);
+    }
+
+    @Test
+    void eligibleMachines_install_isEmpty_noLookups() {
+        // the order only upgrades what is installed — an install always runs the script
+        assertThat(service.eligibleMachines(INSTALL, List.of("m1"))).isEmpty();
+        assertThat(service.isEligible(INSTALL, machine("m1", "9.9.9"))).isFalse();
         verifyNoInteractions(clientConfigurationService, machineRepository);
     }
 
     @Test
     void eligibleMachines_flagDisabled_isEmpty() {
         flag(false, "1.0.0");
-        assertThat(service.eligibleMachines(List.of("m1"))).isEmpty();
+        assertThat(service.eligibleMachines(UPDATE, List.of("m1"))).isEmpty();
         verifyNoInteractions(machineRepository);
     }
 
     @Test
     void eligibleMachines_noClientConfiguration_isEmpty() {
         when(clientConfigurationService.get()).thenThrow(new IllegalStateException("No openframe client configuration found"));
-        assertThat(service.eligibleMachines(List.of("m1"))).isEmpty();
+        assertThat(service.eligibleMachines(UPDATE, List.of("m1"))).isEmpty();
         verifyNoInteractions(machineRepository);
     }
 
@@ -82,7 +92,7 @@ class PackageUpdateEligibilityServiceTest {
                 machine("m1", "1.3.0"),   // eligible
                 machine("m2", "1.1.0"),   // below floor
                 machine("m3", null)));    // no version
-        assertThat(service.eligibleMachines(List.of("m1", "m2", "m3"))).containsExactly("m1");
+        assertThat(service.eligibleMachines(UPDATE, List.of("m1", "m2", "m3"))).containsExactly("m1");
     }
 
     @Test
@@ -91,6 +101,20 @@ class PackageUpdateEligibilityServiceTest {
         lenient().when(machineRepository.findByMachineIdIn(List.of("m1", "m2"))).thenReturn(List.of(
                 machine("m1", "0.9.0"),
                 machine("m2", "9.9.9")));
-        assertThat(service.eligibleMachines(List.of("m1", "m2"))).containsExactlyInAnyOrder("m1", "m2");
+        assertThat(service.eligibleMachines(UPDATE, List.of("m1", "m2"))).containsExactlyInAnyOrder("m1", "m2");
+    }
+
+    @Test
+    void isEligible_checksTheGivenMachineWithoutLoadingIt() {
+        flag(true, "1.2.0");
+        assertThat(service.isEligible(UPDATE, machine("m1", "1.3.0"))).isTrue();
+        assertThat(service.isEligible(UPDATE, machine("m2", "1.1.0"))).isFalse();
+        verifyNoInteractions(machineRepository);
+    }
+
+    @Test
+    void isEligible_flagDisabled_isFalse() {
+        flag(false, null);
+        assertThat(service.isEligible(UPDATE, machine("m1", "9.9.9"))).isFalse();
     }
 }

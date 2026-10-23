@@ -14,12 +14,14 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
+import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.BrewPackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
+import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
 import com.openframe.data.service.rmm.software.WingetPackageManagerHandler;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -185,7 +186,8 @@ class SoftwareInstallUpdateManagementServiceTest {
         allMacTargets();
         ScriptResponse updateScript = systemScript("brew-update-id");
         when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(updateScript);
-        when(packageUpdateEligibility.eligibleMachines(any())).thenReturn(Set.of("m1"));   // m1 order, m2 legacy
+        when(packageUpdateEligibility.eligibleMachines(SoftwareAction.UPDATE, MACHINES))
+                .thenReturn(Set.of("m1"));   // m1 order, m2 legacy
 
         service.update(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL);
 
@@ -197,26 +199,11 @@ class SoftwareInstallUpdateManagementServiceTest {
         ArgumentCaptor<String> orderExec = ArgumentCaptor.forClass(String.class);
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> orderTargets = ArgumentCaptor.forClass(List.class);
-        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(orderExec.capture(), eq(SoftwareAction.UPDATE),
-                any(), orderTargets.capture(), eq(USER));
+        verify(packageUpdateDispatchService).dispatchAdminUpdateNow(orderExec.capture(), eq(PackageManagerType.BREW),
+                eq("slack"), eq(BrewPackageType.CASK), orderTargets.capture(), eq(USER));
 
         assertThat(orderExec.getValue()).isEqualTo(scriptExec.getValue());   // one row on the screen
         assertThat(orderTargets.getValue()).containsExactly("m1");
-    }
-
-    @Test
-    @DisplayName("install: a feature-enabled device still takes the script path — the order only upgrades what is installed")
-    void install_eligibleDevice_takesScriptPath() {
-        allMacTargets();
-        ScriptResponse installScript = systemScript("brew-install-id");
-        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(installScript);
-        lenient().when(packageUpdateEligibility.eligibleMachines(any())).thenReturn(Set.of("m1", "m2"));
-
-        service.install(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL);
-
-        verify(softwareDispatchService).dispatch(any(), eq(installScript), eq(MACHINES), anyList(), eq(USER),
-                eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
-        verifyNoInteractions(packageUpdateDispatchService);
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

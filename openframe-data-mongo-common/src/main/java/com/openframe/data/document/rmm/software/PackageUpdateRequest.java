@@ -30,6 +30,8 @@ public class PackageUpdateRequest implements TenantScoped {
 
     private String requestId;
 
+    private String executionId;
+
     private SoftwareAction action;
     private PackageUpdateSource source;
 

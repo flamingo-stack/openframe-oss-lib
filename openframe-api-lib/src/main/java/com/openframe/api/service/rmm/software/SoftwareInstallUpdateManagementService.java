@@ -9,9 +9,11 @@ import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareScriptCode;
+import com.openframe.data.nats.packageupdate.PackageUpdateDispatchService;
 import com.openframe.data.service.rmm.MachinePlatformResolver;
 import com.openframe.data.service.rmm.software.PackageManagerHandler;
 import com.openframe.data.service.rmm.software.PackageManagerRegistry;
+import com.openframe.data.service.rmm.software.PackageUpdateEligibilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -49,6 +51,7 @@ public class SoftwareInstallUpdateManagementService {
                                                   String initiatedBy, ExecutionSource source) {
         List<String> machineIds = input.getMachineIds();
         Map<String, OsType> osTypes = machinePlatformResolver.osTypesByMachineId(machineIds);
+        Set<String> orderMachines = packageUpdateEligibility.eligibleMachines(action, machineIds);
         Map<SoftwareScriptCode, ScriptResponse> scriptCache = new EnumMap<>(SoftwareScriptCode.class);
 
         List<SoftwareDispatchResult> results = new ArrayList<>(input.getPackages().size());
@@ -67,10 +70,8 @@ public class SoftwareInstallUpdateManagementService {
 
             List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
 
-            Set<String> orderTargets = action == SoftwareAction.UPDATE
-                    ? packageUpdateEligibility.eligibleMachines(targets)
-                    : Set.of();
-            List<String> scriptTargets = targets.stream().filter(id -> !orderTargets.contains(id)).toList();
+            List<String> orderTargets = targets.stream().filter(orderMachines::contains).toList();
+            List<String> scriptTargets = targets.stream().filter(id -> !orderMachines.contains(id)).toList();
             String executionId = UUID.randomUUID().toString();
 
             if (!scriptTargets.isEmpty()) {
@@ -78,8 +79,8 @@ public class SoftwareInstallUpdateManagementService {
                         pkg.getPackageManager(), pkg.getPackageName(), action);
             }
             if (!orderTargets.isEmpty()) {
-                packageUpdateDispatchService.dispatchAdminUpdateNow(executionId, action, pkg,
-                        List.copyOf(orderTargets), initiatedBy);
+                packageUpdateDispatchService.dispatchAdminUpdateNow(executionId, pkg.getPackageManager(),
+                        pkg.getPackageName(), pkg.getBrewPackageType(), orderTargets, initiatedBy);
             }
 
             results.add(SoftwareDispatchResult.builder()

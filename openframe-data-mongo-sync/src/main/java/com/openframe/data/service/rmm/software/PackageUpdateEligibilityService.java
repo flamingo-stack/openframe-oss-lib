@@ -1,7 +1,8 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.data.service.rmm.software;
 
 import com.openframe.data.document.clientconfiguration.ClientFeatureFlag;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.OpenFrameClientConfigurationService;
 import lombok.RequiredArgsConstructor;
@@ -27,19 +28,28 @@ public class PackageUpdateEligibilityService {
     private final OpenFrameClientConfigurationService clientConfigurationService;
     private final MachineRepository machineRepository;
 
-    public Set<String> eligibleMachines(Collection<String> machineIds) {
-        if (machineIds.isEmpty()) {
+    public Set<String> eligibleMachines(SoftwareAction action, Collection<String> machineIds) {
+        ClientFeatureFlag flag = machineIds.isEmpty() ? null : enabledFlag(action);
+        if (flag == null) {
             return Set.of();
         }
-        ClientFeatureFlag flag = flag();
-        if (flag == null || !flag.isEnabled()) {
-            return Set.of();
-        }
-        String minVersion = flag.getMinVersion();
         return machineRepository.findByMachineIdIn(machineIds).stream()
-                .filter(m -> versionAtLeast(m.getAgentVersion(), minVersion))
+                .filter(m -> versionAtLeast(m.getAgentVersion(), flag.getMinVersion()))
                 .map(Machine::getMachineId)
                 .collect(toSet());
+    }
+
+    public boolean isEligible(SoftwareAction action, Machine machine) {
+        ClientFeatureFlag flag = enabledFlag(action);
+        return flag != null && versionAtLeast(machine.getAgentVersion(), flag.getMinVersion());
+    }
+
+    private ClientFeatureFlag enabledFlag(SoftwareAction action) {
+        if (action != SoftwareAction.UPDATE) {
+            return null;
+        }
+        ClientFeatureFlag flag = flag();
+        return flag != null && flag.isEnabled() ? flag : null;
     }
 
     private ClientFeatureFlag flag() {

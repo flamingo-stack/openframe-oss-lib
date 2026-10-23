@@ -1,6 +1,5 @@
-package com.openframe.api.service.rmm.software;
+package com.openframe.data.nats.packageupdate;
 
-import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
@@ -10,8 +9,6 @@ import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
-import com.openframe.data.nats.packageupdate.UpdateMode;
-import com.openframe.data.nats.packageupdate.UpdateSource;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -26,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,26 +38,20 @@ class PackageUpdateDispatchServiceTest {
 
     @InjectMocks private PackageUpdateDispatchService service;
 
-    private SoftwarePackageInput pkg(PackageManagerType manager, String name, BrewPackageType brew) {
-        SoftwarePackageInput p = new SoftwarePackageInput();
-        p.setPackageManager(manager);
-        p.setPackageName(name);
-        p.setBrewPackageType(brew);
-        return p;
-    }
-
     @Test
     void adminUpdateNow_winget_persistsRequestDeviceStatesAndOrdersPerMachine() {
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
 
-        service.dispatchAdminUpdateNow("req-1", SoftwareAction.UPDATE,
-                pkg(PackageManagerType.WINGET, "Google.Chrome", null), List.of("m1", "m2"), "admin@x");
+        service.dispatchAdminUpdateNow("exec-1", PackageManagerType.WINGET, "Google.Chrome", null,
+                List.of("m1", "m2"), "admin@x");
 
         ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
         verify(requestRepository).save(req.capture());
         PackageUpdateRequest r = req.getValue();
+        String requestId = r.getRequestId();
         assertThat(r.getTenantId()).isEqualTo("t1");
-        assertThat(r.getRequestId()).isEqualTo("req-1");
+        assertThat(requestId).isNotBlank().isNotEqualTo("exec-1");    // own id per dispatch
+        assertThat(r.getExecutionId()).isEqualTo("exec-1");
         assertThat(r.getAction()).isEqualTo(SoftwareAction.UPDATE);
         assertThat(r.getSource()).isEqualTo(PackageUpdateSource.ADMIN);
         assertThat(r.getMode()).isEqualTo(PackageUpdateMode.WAIT);          // admin Update now never forces
@@ -73,7 +65,7 @@ class PackageUpdateDispatchServiceTest {
         verify(deviceStateRepository).saveAll(states.capture());
         assertThat(states.getValue()).hasSize(2)
                 .allSatisfy(s -> {
-                    assertThat(s.getRequestId()).isEqualTo("req-1");
+                    assertThat(s.getRequestId()).isEqualTo(requestId);
                     assertThat(s.getStatus()).isEqualTo(SoftwareActionStatus.SCHEDULED);
                     assertThat(s.getMode()).isEqualTo(PackageUpdateMode.WAIT);
                 });
@@ -81,7 +73,7 @@ class PackageUpdateDispatchServiceTest {
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
         verify(deliveryDispatcher, times(2)).dispatch(seed.capture());
         PackageUpdateDeliverySeed s1 = seed.getAllValues().get(0);
-        assertThat(s1.getRequestId()).isEqualTo("req-1");
+        assertThat(s1.getRequestId()).isEqualTo(requestId);
         assertThat(s1.getMode()).isEqualTo(UpdateMode.WAIT);
         assertThat(s1.getCountdownSeconds()).isNull();                       // WAIT carries no countdown
         assertThat(s1.getSource().getKind()).isEqualTo(UpdateSource.Kind.MANUAL);
@@ -94,11 +86,42 @@ class PackageUpdateDispatchServiceTest {
     }
 
     @Test
+    void adminUpdateNow_sameExecutionTwice_getsTwoRequests() {
+        // a bundle dispatches per machine and a schedule per fire, both under one execution id
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+
+        service.dispatchAdminUpdateNow("exec-1", PackageManagerType.WINGET, "Google.Chrome", null, List.of("m1"), "a");
+        service.dispatchAdminUpdateNow("exec-1", PackageManagerType.WINGET, "Google.Chrome", null, List.of("m2"), "a");
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository, times(2)).save(req.capture());
+        assertThat(req.getAllValues()).extracting(PackageUpdateRequest::getExecutionId).containsOnly("exec-1");
+        assertThat(req.getAllValues()).extracting(PackageUpdateRequest::getRequestId).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void adminUpdateNow_repeatedMachine_oneStateAndOneOrder() {
+        when(tenantIdProvider.getTenantId()).thenReturn("t1");
+
+        service.dispatchAdminUpdateNow("exec-1", PackageManagerType.WINGET, "Google.Chrome", null,
+                List.of("m1", "m1", "m2"), "a");
+
+        ArgumentCaptor<PackageUpdateRequest> req = ArgumentCaptor.forClass(PackageUpdateRequest.class);
+        verify(requestRepository).save(req.capture());
+        assertThat(req.getValue().getMachineIds()).containsExactly("m1", "m2");
+        assertThat(req.getValue().getTotalMachineCount()).isEqualTo(2);
+
+        ArgumentCaptor<List<PackageUpdateDeviceState>> states = ArgumentCaptor.forClass(List.class);
+        verify(deviceStateRepository).saveAll(states.capture());
+        assertThat(states.getValue()).extracting(PackageUpdateDeviceState::getMachineId).containsExactly("m1", "m2");
+        verify(deliveryDispatcher, times(2)).dispatch(any(PackageUpdateDeliverySeed.class));
+    }
+
+    @Test
     void dispatch_forceBrew_passesCountdownAndBrewReference() {
         when(tenantIdProvider.getTenantId()).thenReturn("t1");
 
-        service.dispatch("req-2", SoftwareAction.INSTALL,
-                pkg(PackageManagerType.BREW, "postman", BrewPackageType.CASK), List.of("m1"),
+        service.dispatch("exec-2", PackageManagerType.BREW, "postman", BrewPackageType.CASK, List.of("m1"),
                 PackageUpdateSource.AUTO, "system", PackageUpdateMode.FORCE, 120, null);
 
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
