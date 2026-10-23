@@ -1,6 +1,10 @@
 import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import {
+  type TextLinesByBreakpoint,
+  TextLineSkeleton,
+  TextLinesByBreakpointSkeleton,
+} from '../loading/unified-skeleton';
 
 /**
  * THE page-title style — the ODS `text-h1` token (`--font-size-h1-title` =
@@ -233,10 +237,14 @@ export interface SectionHeadingProps {
   /**
    * The title and intro are read data still being read: the heading draws its own loading form (the eyebrow and the
    * action for real, a bar at the heading's type step, `intro` lines at the intro's). `true` draws the title alone;
-   * an object also says how many intro lines the loaded heading has and the title bar's width. The heading renders on
-   * the server and cannot read a loading scope: a host passes its own switch (`useLoadingScope() || loading`).
+   * an object also says how many intro lines the loaded heading has and the title bar's width. A title or an intro
+   * that wraps differently with the width gives its typical lines per breakpoint (`titleLines`, `intro` as an
+   * object). The heading renders on the server and cannot read a loading scope: a host passes its own switch
+   * (`useLoadingScope() || loading`).
    */
-  loading?: boolean | { intro?: boolean | 1 | 2 | 3; titleWidth?: string };
+  loading?:
+    | boolean
+    | { intro?: boolean | 1 | 2 | 3 | TextLinesByBreakpoint; titleWidth?: string; titleLines?: TextLinesByBreakpoint };
 }
 
 /**
@@ -289,6 +297,7 @@ export function SectionHeading({
         level={level}
         eyebrow={eyebrow}
         titleWidth={shape.titleWidth}
+        titleLines={shape.titleLines}
         intro={shape.intro}
         action={action}
         platform={platform}
@@ -354,8 +363,10 @@ interface SectionHeadingSkeletonProps {
   eyebrow?: ReactNode;
   /** The title bar's width (a width class). Default `w-2/3`. */
   titleWidth?: string;
-  /** The intro's lines: `true` is two. Omitted: no intro. */
-  intro?: boolean | 1 | 2 | 3;
+  /** The title's lines per breakpoint, for a title that wraps. Omitted: one bar of `titleWidth`. */
+  titleLines?: TextLinesByBreakpoint;
+  /** The intro's lines: `true` is two, or the lines per breakpoint. Omitted: no intro. */
+  intro?: boolean | 1 | 2 | 3 | TextLinesByBreakpoint;
   /** Something at the far end of the row, drawn as given. */
   action?: ReactNode;
   platform?: string | null;
@@ -372,6 +383,7 @@ function SectionHeadingSkeleton({
   level = 'section',
   eyebrow,
   titleWidth = 'w-2/3',
+  titleLines,
   intro,
   action,
   platform,
@@ -379,7 +391,8 @@ function SectionHeadingSkeleton({
   className,
 }: SectionHeadingSkeletonProps) {
   const layout = SECTION_HEADING_LAYOUT[level];
-  const introLines = intro === true ? 2 : intro || 0;
+  const introByBreakpoint = typeof intro === 'object' ? intro : null;
+  const introLines = typeof intro === 'number' ? intro : intro === true ? 2 : 0;
   const stack = (
     <div className={layout.stack} aria-hidden>
       {eyebrow ? (
@@ -388,8 +401,17 @@ function SectionHeadingSkeleton({
         </SectionEyebrow>
       ) : null}
       <div className={layout.heading}>
-        <TextLineSkeleton type="inherit" className={titleWidth} />
+        {titleLines ? (
+          <TextLinesByBreakpointSkeleton lines={titleLines} />
+        ) : (
+          <TextLineSkeleton type="inherit" className={titleWidth} />
+        )}
       </div>
+      {introByBreakpoint ? (
+        <div className={layout.intro}>
+          <TextLinesByBreakpointSkeleton lines={introByBreakpoint} />
+        </div>
+      ) : null}
       {introLines > 0 ? (
         <div className={layout.intro}>
           {Array.from({ length: introLines }, (_, i) => (

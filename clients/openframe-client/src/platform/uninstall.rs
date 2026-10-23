@@ -458,6 +458,16 @@ pub async fn uninstall_windows(
         warn!("Failed to remove Apps & Features entry: {:#}", e);
     }
 
+    if let Some(bin_dir) = install_path.parent() {
+        if let Err(e) = crate::service::Service::remove_from_windows_path(bin_dir) {
+            warn!(
+                "Failed to remove {} from system PATH: {:#}",
+                bin_dir.display(),
+                e
+            );
+        }
+    }
+
     // Launch cleanup script to remove binary after process exit
     if install_path.exists() {
         info!("Launching binary cleanup script...");
