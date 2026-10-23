@@ -23,7 +23,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 @Slf4j
 @RequiredArgsConstructor
-public class ToolEventLogRepository {
+public class LokiLogEventRepository {
 
     private static final String JOB = "tool-events";
     private static final long NANOS_PER_MILLI = 1_000_000L;
@@ -33,7 +33,7 @@ public class ToolEventLogRepository {
 
     private final LokiClient lokiClient;
 
-    public void save(ToolEventLog event) {
+    public void save(LokiLogEvent event) {
         Map<String, String> labels = Map.of(
                 "job", JOB,
                 "tenant_id", event.getTenantId(),
@@ -45,7 +45,7 @@ public class ToolEventLogRepository {
         }
     }
 
-    public Optional<ToolEventLog> find(String tenantId, String toolType, Instant timestamp, String toolEventId) {
+    public Optional<LokiLogEvent> find(String tenantId, String toolType, Instant timestamp, String toolEventId) {
         String query = "{job=%s, tenant_id=%s, tool_type=%s} | tool_event_id=%s".formatted(
                 LogQl.quote(JOB), LogQl.quote(tenantId), LogQl.quote(toolType), LogQl.quote(toolEventId));
         List<LokiLogEntry> page = queryRange(query, timestamp.toEpochMilli() * NANOS_PER_MILLI - 1, tenantId);
@@ -77,7 +77,7 @@ public class ToolEventLogRepository {
         }
     }
 
-    String toLine(ToolEventLog event) {
+    String toLine(LokiLogEvent event) {
         try {
             return MAPPER.writeValueAsString(event);
         } catch (JacksonException e) {
@@ -103,7 +103,7 @@ public class ToolEventLogRepository {
         return parts;
     }
 
-    private static Map<String, String> metadata(ToolEventLog event, int part, int parts) {
+    private static Map<String, String> metadata(LokiLogEvent event, int part, int parts) {
         String toolEventId = event.getToolEventId();
         return parts == 1
                 ? Map.of("tool_event_id", toolEventId)
@@ -135,9 +135,9 @@ public class ToolEventLogRepository {
         return part == null ? 0 : Integer.parseInt(part);
     }
 
-    private static ToolEventLog fromLine(String line) {
+    private static LokiLogEvent fromLine(String line) {
         try {
-            return MAPPER.readValue(line, ToolEventLog.class);
+            return MAPPER.readValue(line, LokiLogEvent.class);
         } catch (JacksonException e) {
             throw new LokiQueryException("Tool event log line in Loki is not readable", e);
         }

@@ -13,9 +13,9 @@ import java.time.Instant;
  */
 @Table("unified_logs")
 @Data
-public class UnifiedLogEvent {
+public class CassandraLogEvent {
     @PrimaryKey
-    private UnifiedLogEventKey key;
+    private CassandraLogEventKey key;
 
     /**
      * User ID associated with the event, if available.
@@ -82,7 +82,7 @@ public class UnifiedLogEvent {
 
     @PrimaryKeyClass
     @Data
-    public static class UnifiedLogEventKey {
+    public static class CassandraLogEventKey {
         /**
          * Partition by ingest day (YYYY-MM-DD) for time-series scalability.
          */
