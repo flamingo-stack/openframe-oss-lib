@@ -631,7 +631,7 @@ const timeSelectTriggerStyles = cn(
   'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
   'focus:outline-none',
   'disabled:!cursor-not-allowed disabled:bg-ods-bg',
-  'disabled:text-ods-text-disabled disabled:[&>span]:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
+  'disabled:text-ods-text-disabled [&>span]:disabled:text-ods-text-disabled [&_svg]:disabled:text-ods-text-disabled',
   'cursor-pointer transition-colors duration-200',
   'text-ods-text-primary',
 );

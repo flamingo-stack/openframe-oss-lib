@@ -533,7 +533,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
             // label is a span, and they went invisible against their own fill in
             // the light theme. Anything nested inside the adornment that sets its
             // own colour keeps it; anything that doesn't inherits the grey.
-            'has-[:disabled]:[&>span]:text-ods-text-disabled has-[:disabled]:[&_svg]:text-ods-text-disabled',
+            '[&>span]:has-[:disabled]:text-ods-text-disabled [&_svg]:has-[:disabled]:text-ods-text-disabled',
             isOpen && !isInvalid && 'border-ods-accent hover:border-ods-accent',
             isInvalid && 'border-ods-error hover:border-ods-error',
           )}
