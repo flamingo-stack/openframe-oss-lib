@@ -127,7 +127,6 @@ class DeviceSoftwareHandlerTest {
         assertThat(saved.getName()).isEqualTo("Google Chrome");
         assertThat(saved.getSource()).isEqualTo("apps");
         assertThat(saved.getVersions()).containsExactly("1.0", "2.0");
-        assertThat(saved.getLastSeenAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
 
         ArgumentCaptor<DeviceSoftware> deleted = ArgumentCaptor.forClass(DeviceSoftware.class);

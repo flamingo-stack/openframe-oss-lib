@@ -41,7 +41,7 @@ public class SoftwareProjector {
         List<Software.Installation> installations = installed.stream()
                 .map(ds -> Software.Installation.builder()
                         .machineId(ds.getMachineId()).hostId(ds.getHostId())
-                        .versions(ds.getVersions()).lastSeenAt(ds.getLastSeenAt()).build())
+                        .versions(ds.getVersions()).build())
                 .toList();
         int devicesCount = (int) installations.stream()
                 .map(Software.Installation::getMachineId).filter(Objects::nonNull).distinct().count();

@@ -104,7 +104,6 @@ public class DeviceSoftwareHandler implements MessageHandler<DeserializedDebeziu
             deviceSoftware.setSource(title.getSource());
             deviceSoftware.setVersions(versionsOf(title));
             deviceSoftware.setVulnerabilities(vulnerabilities);
-            deviceSoftware.setLastSeenAt(now);
             deviceSoftware.setUpdatedAt(now);
             deviceSoftwareRepository.save(deviceSoftware);
             affectedTitles.add(titleId);
