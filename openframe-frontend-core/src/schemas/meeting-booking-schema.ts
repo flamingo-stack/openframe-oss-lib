@@ -775,6 +775,20 @@ export interface BookingContext {
   items: string[];
 }
 
+/**
+ * The space a form keeps for its context BEFORE any line is given: the page knows how many lines it can hold (the
+ * cards it lists), so the form reserves that many from its first paint, loading included, and the page never jumps
+ * when the visitor picks. Display only: never sent.
+ */
+export interface BookingContextSlot {
+  /** The block's heading, the context's own label ("Fix these first:"). */
+  label: string;
+  /** The most lines it can hold: the space reserved. */
+  slots: number;
+  /** Shown in that space while no line is given ("Nothing picked yet…"). */
+  emptyText: string;
+}
+
 /** The booking body's key for the context. */
 export const BOOKING_CONTEXT_FIELD = 'bookingContext';
 

@@ -49,6 +49,37 @@ describe('BookingForm context', () => {
   });
 });
 
+describe('BookingForm context slot', () => {
+  const contextSlot = { label: 'Fix these first:', slots: 4, emptyText: 'Nothing picked yet.' };
+  const cells = () =>
+    within(screen.getByRole('list', { name: 'Fix these first:', hidden: true })).getAllByRole('listitem', {
+      hidden: true,
+    });
+
+  it('keeps every slot and shows the empty state before any line', () => {
+    mountBookingForm(availability, { contextSlot });
+    expect(cells()).toHaveLength(4);
+    expect(screen.getByText('Nothing picked yet.')).toBeInTheDocument();
+  });
+
+  it('fills the slots in order and keeps the rest, with no empty state', () => {
+    mountBookingForm(availability, { contextSlot, context });
+    expect(cells()).toHaveLength(4);
+    expect(
+      cells()
+        .slice(0, 2)
+        .map(cell => cell.textContent),
+    ).toEqual(context.items);
+    expect(screen.queryByText('Nothing picked yet.')).not.toBeInTheDocument();
+  });
+
+  it('draws the same slots while the form loads', () => {
+    mountBookingForm(availability, { contextSlot, loading: true });
+    expect(screen.getByText('Fix these first:')).toBeInTheDocument();
+    expect(cells()).toHaveLength(4);
+  });
+});
+
 describe('booking context on the wire', () => {
   it('reads back what the form sent', () => {
     expect(readBookingContext(bookingContextFields(context))).toEqual(context);

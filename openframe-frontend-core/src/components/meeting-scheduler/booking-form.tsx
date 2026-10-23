@@ -28,6 +28,7 @@ import {
   type BookingFormValues,
   bookingContextFields,
   type BookingContext,
+  type BookingContextSlot,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
@@ -476,6 +477,12 @@ export interface BookingFormProps {
    * In `deferSlot` mode the form only shows it: the parent attaches the live context when it POSTs.
    */
   context?: BookingContext | null;
+  /**
+   * The space the form keeps for `context` from its first paint (loading included), so the page does not jump when
+   * a line is added: its label, the most lines, and what it shows while there are none. Omitted: the context takes
+   * room only once it has a line.
+   */
+  contextSlot?: BookingContextSlot;
   /** Defaults to "Confirm Booking"; details-first says "Continue". */
   submitLabel?: string;
   /** Small print beside the submit (details-first sets expectations). */
@@ -556,6 +563,7 @@ export function BookingForm(props: BookingFormProps) {
         consent={props.consent}
         footerNote={props.footerNote}
         submitLabel={props.submitLabel}
+        contextSlot={props.contextSlot}
       />
     );
   }
@@ -572,6 +580,7 @@ function BookingFormBody({
   initialValues,
   answers,
   context,
+  contextSlot,
   submitLabel,
   footerNote,
   fieldRows,
@@ -865,7 +874,7 @@ function BookingFormBody({
   return (
     <form id={formId} onSubmit={submit} className={FORM_STACK} noValidate {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
       <HoneypotField {...honeypotInputProps} />
-      <BookingContextSummary context={context} />
+      <BookingContextSummary context={context} slot={contextSlot} />
 
       {/* Email first, name pair below — the order the desktop and mobile mocks
           both draw. The pair stays TWO columns even on a phone (164px each at
@@ -1015,6 +1024,7 @@ function BookingFormPending({
   consent,
   footerNote,
   submitLabel = DEFAULT_SUBMIT_LABEL,
+  contextSlot,
 }: {
   fieldRows?: BookingFieldRow[];
   /** The optional questions the form asks (`BookingForm`'s `optionalFields`): a row slot naming another optional
@@ -1030,6 +1040,8 @@ function BookingFormPending({
   footerNote?: string;
   /** The submit button's label (`BookingForm`'s `submitLabel`): the button is drawn for real at its own size. */
   submitLabel?: string;
+  /** The context's reserved space (`BookingForm`'s `contextSlot`), drawn as its loading form at its full size. */
+  contextSlot?: BookingContextSlot;
 }) {
   const consentId = useId();
   // The real submit button (static copy), inert with the rest of the form.
@@ -1041,6 +1053,7 @@ function BookingFormPending({
   return (
     // Inert: the fields are the form's own controls, drawn so each is its loaded size; none takes focus.
     <div className={cn('flex-1', FORM_STACK)} aria-hidden inert>
+      <BookingContextSummary slot={contextSlot} loading />
       {/* The host's rows (or the built-in layout) through the SAME grid, column
           rule and normalisation as the loaded form — see `normalizeFieldRows`. */}
       {skeletonRows(fieldRows ?? DEFAULT_FIELD_ROWS, optionalFields).map(row => (
