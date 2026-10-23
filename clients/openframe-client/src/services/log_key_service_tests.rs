@@ -5,25 +5,27 @@ use crate::test_support::{directories, mock_server_with_body, registered_agent, 
 struct Fixture {
     _dir: tempfile::TempDir,
     initial: InitialConfigurationService,
-    service: Arc<InitialKeyService>,
+    service: Arc<LogKeyService>,
 }
 
-async fn fixture(base_url: String, initial_key: &str) -> Fixture {
+async fn fixture(base_url: String, log_key: &str) -> Fixture {
     let dir = tempfile::tempdir().unwrap();
     let dm = directories(&dir);
     let initial = InitialConfigurationService::new(dm.clone()).unwrap();
     initial
         .save(&InitialConfiguration {
             server_host: "acme.openframe.ai".into(),
-            initial_key: initial_key.into(),
+            initial_key: "enroll".into(),
+            log_key: log_key.into(),
             ..Default::default()
         })
         .unwrap();
-    let mut service = InitialKeyService::new(
+    let agent = registered_agent(&dm).await;
+    let mut service = LogKeyService::new(
         reqwest::Client::new(),
         base_url,
         initial.clone(),
-        registered_agent(&dm).await,
+        agent,
         DeactivationService::new(&dm),
     );
     service.timing = FAST;
@@ -47,13 +49,14 @@ async fn run_to_completion(fx: &Fixture) {
 }
 
 #[tokio::test]
-async fn present_key_makes_no_call() {
+async fn present_key_makes_no_call_and_drops_the_initial_key() {
     let server = mock_server_with_body(&[200], r#"{"key":"fresh"}"#).await;
     let fx = fixture(server.url.clone(), "existing").await;
 
     assert!(fx.service.clone().start().is_none());
     assert!(server.requests().is_empty());
-    assert_eq!(fx.initial.get_initial_key().unwrap(), "existing");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "existing");
+    assert_eq!(fx.initial.get_initial_key().unwrap(), "");
 }
 
 #[tokio::test]
@@ -67,13 +70,14 @@ async fn missing_key_is_fetched_with_the_machine_token_and_saved() {
     assert_eq!(requests.len(), 1);
     assert_eq!(
         requests[0].request_line,
-        "GET /clients/agent/registration-secret/active HTTP/1.1"
+        "GET /clients/agent/log-key HTTP/1.1"
     );
     assert!(requests[0]
         .head
         .to_ascii_lowercase()
         .contains("authorization: bearer machine-token"));
-    assert_eq!(fx.initial.get_initial_key().unwrap(), "fresh");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "fresh");
+    assert_eq!(fx.initial.get_initial_key().unwrap(), "");
 }
 
 #[tokio::test]
@@ -84,5 +88,20 @@ async fn failures_are_retried_until_the_key_arrives() {
     run_to_completion(&fx).await;
 
     assert_eq!(server.requests().len(), 3);
-    assert_eq!(fx.initial.get_initial_key().unwrap(), "fresh");
+    assert_eq!(fx.initial.get_log_key().unwrap(), "fresh");
+}
+
+#[tokio::test]
+async fn an_empty_key_is_not_saved() {
+    let server = mock_server_with_body(&[200], r#"{"key":""}"#).await;
+    let fx = fixture(server.url.clone(), "").await;
+
+    let handle = fx.service.clone().start().unwrap();
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    assert!(!handle.is_finished());
+    assert!(server.requests().len() >= 2);
+    assert_eq!(fx.initial.get_log_key().unwrap(), "");
+    assert_eq!(fx.initial.get_initial_key().unwrap(), "enroll");
+    handle.abort();
 }

@@ -38,8 +38,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // The real UserRepository and AuthUserRepository with UserAggregateSpec: AuthUser is a User, so its saves publish too.
 @SpringBootTest(classes = UserPublishingIT.TestApplication.class,
-        properties = {"openframe.events.topics.users.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true"})
+        properties = {"openframe.events.topics.users.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

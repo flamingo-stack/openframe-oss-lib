@@ -2,8 +2,6 @@ package com.openframe.processing.config;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
 import com.openframe.processing.config.properties.LargeUpdateProperties;
-import com.openframe.processing.config.properties.ProcessingModeProperties;
-import com.openframe.processing.mode.ProcessingModes;
 import com.openframe.processing.runner.EventProcessingMetrics;
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.processing.version.ProjectionVersionRepository;
@@ -18,9 +16,9 @@ import org.springframework.data.mongodb.core.MongoOperations;
 
 // Listed, not scanned (the projections come from the services' spec beans); off by default, so no listener runs before its topic exists.
 @AutoConfiguration(after = AggregateSpecAutoConfiguration.class)
-@ConditionalOnBooleanProperty(name = "openframe.events.processing.enabled")
-@EnableConfigurationProperties({ProcessingModeProperties.class, EventProcessingKafkaProperties.class, LargeUpdateProperties.class})
-@Import({ProcessingModes.class, ProcessingModeStartupCheck.class, ProjectionRunner.class, EventProcessingMetrics.class})
+@ConditionalOnBooleanProperty(name = "openframe.events.enabled")
+@EnableConfigurationProperties({EventProcessingKafkaProperties.class, LargeUpdateProperties.class})
+@Import({ProjectionRunner.class, EventProcessingMetrics.class})
 public class EventProcessingAutoConfiguration {
 
     // Missing-bean only for the tests that run without Mongo.

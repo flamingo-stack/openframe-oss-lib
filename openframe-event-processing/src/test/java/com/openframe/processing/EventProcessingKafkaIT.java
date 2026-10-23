@@ -62,12 +62,10 @@ import static org.mockito.Mockito.when;
 
 // A real broker: the module creates its topics, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
 @SpringBootTest(classes = EventProcessingKafkaIT.TestApplication.class,
-        properties = {"openframe.events.processing.enabled=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.topics.organizations.publish=true",
+        properties = {"openframe.events.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.topics.organizations.enabled=true",
                 "openframe.events.processing.kafka.topic-prefix=events.",
                 "openframe.events.processing.kafka.group-prefix=processing-it.",
-                "openframe.events.processing.projections." + EventProcessingKafkaIT.PROJECTION + ".mode=events",
-                "openframe.events.processing.kafka.topics.create=true",
                 "openframe.events.processing.kafka.topics.events.replication-factor=1",
                 "openframe.events.processing.kafka.topics.dead-letter.replication-factor=1",
                 "openframe.events.processing.kafka.back-off.initial-interval=100ms",

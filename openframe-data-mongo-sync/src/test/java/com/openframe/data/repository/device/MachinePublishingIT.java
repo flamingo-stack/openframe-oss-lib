@@ -40,8 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // The real MachineRepository and MachineWriter with MachineAggregateSpec: both write paths publish.
 @SpringBootTest(classes = MachinePublishingIT.TestApplication.class,
-        properties = {"openframe.events.topics.machines.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true"})
+        properties = {"openframe.events.topics.machines.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

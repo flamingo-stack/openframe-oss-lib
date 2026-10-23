@@ -2,6 +2,7 @@ package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.PublishedDocuments;
 import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +53,7 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
 
     private final ListableBeanFactory beanFactory;
     private final AggregateSpecRegistry specRegistry;
+    private final PublishedAggregateTopics publishedTopics;
 
     @Override
     public void afterSingletonsInstantiated() {
@@ -82,7 +84,7 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
     }
 
     // Subclass documents count (AuthUserRepository); none is valid, as the shared stream has no tenant-aware TicketRepository.
-    private static void logRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
+    private void logRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
         Class<?> documentClass = PublishedDocuments.classOf(spec);
         List<String> repositories = repositoriesByDocument.entrySet().stream()
                 .filter(entry -> documentClass.isAssignableFrom(entry.getKey()))
@@ -93,7 +95,12 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
             log.info("No repository of {} in this service, so it publishes no {} writes", documentClass.getName(), spec.getType());
             return;
         }
-        log.info("{} publish {}", repositories, spec.getType());
+        String type = spec.getType();
+        if (!publishedTopics.isPublishing(type)) {
+            log.info("{} publish no {} writes: openframe.events.topics.{}.enabled is off", repositories, type, type);
+            return;
+        }
+        log.info("{} publish {}", repositories, type);
     }
 
     private void check(RepositoryFactoryInformation<?, ?> factory, RepositoryInformation information) {

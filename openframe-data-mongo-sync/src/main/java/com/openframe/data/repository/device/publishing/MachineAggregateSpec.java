@@ -13,11 +13,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MachineAggregateSpec implements AggregateSpec<Machine, MachineEvent> {
 
+    public static final String TYPE = "machines";
+
     private final MachineOnTicketsProjection machineOnTickets;
 
     @Override
     public String getType() {
-        return "machines";
+        return TYPE;
     }
 
     @Override

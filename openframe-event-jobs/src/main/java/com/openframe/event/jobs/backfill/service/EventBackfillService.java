@@ -28,7 +28,7 @@ public class EventBackfillService {
 
     public void backfill(String type, String runId, String jobId) {
         if (!publishedAggregates.isPublishing(type)) {
-            log.warn("Backfill of {} skipped: the type has no spec or its publish is off in this service, run {}", type, runId);
+            log.debug("Backfill of {} skipped: the type is switched off in this service, run {}", type, runId);
             return;
         }
         EventJob job = jobService.jobOf(jobId);

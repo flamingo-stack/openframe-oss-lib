@@ -45,8 +45,8 @@ import static org.mockito.Mockito.doReturn;
 
 // Real repository proxies with the publishing interceptor, in real Mongo transactions: each write commits or rolls back with its rows.
 @SpringBootTest(classes = PublishingRepositoryIT.TestApplication.class,
-        properties = {"openframe.events.topics.organizations.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true"})
+        properties = {"openframe.events.topics.organizations.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

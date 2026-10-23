@@ -9,6 +9,7 @@ import com.openframe.event.jobs.core.lock.EventJobLock;
 import com.openframe.event.jobs.core.persistence.EventJob;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobTicker;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import com.openframe.publishing.registry.PublishedAggregates;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -18,9 +19,9 @@ import org.springframework.context.annotation.Import;
 
 import java.time.Clock;
 
-// Only with publishing on, the same condition as OutboxAutoConfiguration: the backfill writes the outbox.
+// Only with Mongo, like OutboxAutoConfiguration: the backfill writes the outbox through its publisher.
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBooleanProperty(name = {"spring.data.mongodb.enabled", "openframe.events.publishing.enabled"})
+@ConditionalOnBooleanProperty(name = "spring.data.mongodb.enabled")
 @Import(EventBackfillMetrics.class)
 public class BackfillConfiguration {
 
@@ -39,8 +40,9 @@ public class BackfillConfiguration {
     }
 
     @Bean
-    public BackfillRunsStartupCheck backfillRunsStartupCheck(EventBackfillProperties properties, AggregateSpecRegistry specRegistry) {
-        return new BackfillRunsStartupCheck(properties, specRegistry);
+    public BackfillRunsStartupCheck backfillRunsStartupCheck(EventBackfillProperties properties, AggregateSpecRegistry specRegistry,
+                                                             PublishedAggregateTopics publishedTopics) {
+        return new BackfillRunsStartupCheck(properties, specRegistry, publishedTopics);
     }
 
     @Bean

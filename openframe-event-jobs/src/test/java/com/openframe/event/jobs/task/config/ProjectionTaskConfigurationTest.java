@@ -30,21 +30,15 @@ class ProjectionTaskConfigurationTest {
             .withBean(EventJobLock.class, () -> mock(EventJobLock.class));
 
     @Test
-    void projectionTasks_areOffByDefault() {
-        runner.run(context -> assertThat(context).doesNotHaveBean(ProjectionTaskJob.class));
-    }
-
-    @Test
-    void theirSwitch_createsTheJob_withMetersPerProjection() {
-        runner.withPropertyValues("openframe.events.jobs.projection-tasks.enabled=true")
-                .run(context -> {
-                    assertThat(context).hasSingleBean(ProjectionTaskJob.class);
-                    MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
-                    assertThat(meterRegistry.find("openframe.events.projection.tasks.open")
-                            .tag("projection", "widget-copies").gauge()).isNotNull();
-                    assertThat(meterRegistry.find("openframe.events.projection.tasks.failed")
-                            .tag("projection", "widget-copies").counter()).isNotNull();
-                });
+    void theJob_isCreated_withMetersPerProjection() {
+        runner.run(context -> {
+            assertThat(context).hasSingleBean(ProjectionTaskJob.class);
+            MeterRegistry meterRegistry = context.getBean(MeterRegistry.class);
+            assertThat(meterRegistry.find("openframe.events.projection.tasks.open")
+                    .tag("projection", "widget-copies").gauge()).isNotNull();
+            assertThat(meterRegistry.find("openframe.events.projection.tasks.failed")
+                    .tag("projection", "widget-copies").counter()).isNotNull();
+        });
     }
 
     @SuppressWarnings("unchecked")

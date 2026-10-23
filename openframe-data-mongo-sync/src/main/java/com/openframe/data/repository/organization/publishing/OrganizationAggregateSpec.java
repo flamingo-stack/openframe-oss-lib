@@ -12,11 +12,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrganizationAggregateSpec implements AggregateSpec<Organization, OrganizationEvent> {
 
+    public static final String TYPE = "organizations";
+
     private final OrganizationOnTicketsProjection organizationOnTickets;
 
     @Override
     public String getType() {
-        return "organizations";
+        return TYPE;
     }
 
     @Override
