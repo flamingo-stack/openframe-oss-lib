@@ -67,7 +67,9 @@ public class SoftwareInstallUpdateManagementService {
 
             List<String> args = handler.buildArgs(pkg.getPackageName(), pkg.getBrewPackageType());
 
-            Set<String> orderTargets = packageUpdateEligibility.eligibleMachines(targets);
+            Set<String> orderTargets = action == SoftwareAction.UPDATE
+                    ? packageUpdateEligibility.eligibleMachines(targets)
+                    : Set.of();
             List<String> scriptTargets = targets.stream().filter(id -> !orderTargets.contains(id)).toList();
             String executionId = UUID.randomUUID().toString();
 

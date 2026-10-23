@@ -55,6 +55,13 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
         apply(state, event);
         armDeadline(state, request, event);
         deviceStateRepository.save(state);
+        log.info("[package-update] status applied requestId={} machineId={} eventId={} state={} status={} "
+                        + "waitingReason={} waitingPhase={} closesAt={} doneResult={} rebootRequired={} relaunched={} "
+                        + "failedReason={} exitCode={} failedMessage={} deadlineAt={}",
+                requestId, machineId, event.getEventId(), state.getState(), state.getStatus(),
+                state.getWaitingReason(), state.getWaitingPhase(), state.getClosesAt(), state.getDoneResult(),
+                state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(), state.getExitCode(),
+                state.getFailedMessage(), state.getDeadlineAt());
 
         notify(request, state, event);
         rollUp(tenantId, requestId, request);
@@ -188,6 +195,7 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
         List<PackageUpdateDeviceState> all = deviceStateRepository.findByTenantIdAndRequestId(tenantId, requestId);
         SoftwareActionStatus rolled = rollUpStatus(all);
         if (rolled != null && rolled != request.getStatus()) {
+            log.info("[package-update] request status requestId={} {} -> {}", requestId, request.getStatus(), rolled);
             request.setStatus(rolled);
             request.setUpdatedAt(Instant.now());
             requestRepository.save(request);

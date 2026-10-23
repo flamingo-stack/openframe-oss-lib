@@ -35,6 +35,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -201,6 +202,21 @@ class SoftwareInstallUpdateManagementServiceTest {
 
         assertThat(orderExec.getValue()).isEqualTo(scriptExec.getValue());   // one row on the screen
         assertThat(orderTargets.getValue()).containsExactly("m1");
+    }
+
+    @Test
+    @DisplayName("install: a feature-enabled device still takes the script path — the order only upgrades what is installed")
+    void install_eligibleDevice_takesScriptPath() {
+        allMacTargets();
+        ScriptResponse installScript = systemScript("brew-install-id");
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_INSTALL)).thenReturn(installScript);
+        lenient().when(packageUpdateEligibility.eligibleMachines(any())).thenReturn(Set.of("m1", "m2"));
+
+        service.install(input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL);
+
+        verify(softwareDispatchService).dispatch(any(), eq(installScript), eq(MACHINES), anyList(), eq(USER),
+                eq(ExecutionSource.MANUAL), eq(PackageManagerType.BREW), eq("slack"), eq(SoftwareAction.INSTALL));
+        verifyNoInteractions(packageUpdateDispatchService);
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {
