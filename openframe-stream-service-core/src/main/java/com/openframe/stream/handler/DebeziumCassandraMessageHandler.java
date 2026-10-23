@@ -73,8 +73,11 @@ public class DebeziumCassandraMessageHandler
                     : debeziumMessage.getMessage());
             logEvent.setDetails(debeziumMessage.getDetails());
         } catch (Exception e) {
-            log.error("Error processing Kafka message", e);
-            throw e;
+            throw new IllegalStateException(
+                    "Error processing Debezium message for toolEventId=" + debeziumMessage.getToolEventId()
+                            + ", tenantId=" + debeziumMessage.getTenantId()
+                            + ", toolType=" + debeziumMessage.getIntegratedToolType()
+                            + ", eventType=" + debeziumMessage.getUnifiedEventType(), e);
         }
         return logEvent;
     }
