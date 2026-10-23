@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
-class ToolEventLogRepositoryIT {
+class LokiLogEventRepositoryIT {
 
     private static final GenericContainer<?> LOKI = new GenericContainer<>(DockerImageName.parse("grafana/loki:3.7.3"))
             .withExposedPorts(3100)
@@ -34,11 +34,11 @@ class ToolEventLogRepositoryIT {
 
     private static final Instant MOMENT = Instant.now().minus(Duration.ofMinutes(5)).truncatedTo(ChronoUnit.MILLIS);
 
-    private static final ToolEventLog SAVED_FOR_EXACT_LOOKUPS =
+    private static final LokiLogEvent SAVED_FOR_EXACT_LOOKUPS =
             event("tenant-exact", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
 
     private static LokiClient lokiClient;
-    private static ToolEventLogRepository repository;
+    private static LokiLogEventRepository repository;
 
     @BeforeAll
     static void startLokiAndSaveTheEventForExactLookups() {
@@ -46,7 +46,7 @@ class ToolEventLogRepositoryIT {
         lokiClient = new LokiClient(RestClient.builder()
                 .baseUrl("http://" + LOKI.getHost() + ":" + LOKI.getMappedPort(3100))
                 .build());
-        repository = new ToolEventLogRepository(lokiClient);
+        repository = new LokiLogEventRepository(lokiClient);
         repository.save(SAVED_FOR_EXACT_LOOKUPS);
         awaitFound(SAVED_FOR_EXACT_LOOKUPS);
     }
@@ -58,7 +58,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void save_sameEventSentAgainAfterALaterEvent_isAcceptedAndTheEventIsStillFound() {
-        ToolEventLog event = event("tenant-twice", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
+        LokiLogEvent event = event("tenant-twice", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
 
         repository.save(event);
         repository.save(event("tenant-twice", "evt-2", MOMENT.plusMillis(1), "{\"ip\":\"10.0.0.2\"}"));
@@ -69,8 +69,8 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void find_twoEventsInTheSameMillisecond_returnsEachByItsOwnId() {
-        ToolEventLog first = event("tenant-same-milli", "evt-1", MOMENT, "{\"output\":\"first\"}");
-        ToolEventLog second = event("tenant-same-milli", "evt-2", MOMENT, "{\"output\":\"second\"}");
+        LokiLogEvent first = event("tenant-same-milli", "evt-1", MOMENT, "{\"output\":\"first\"}");
+        LokiLogEvent second = event("tenant-same-milli", "evt-2", MOMENT, "{\"output\":\"second\"}");
 
         repository.save(first);
         repository.save(second);
@@ -81,8 +81,8 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void find_eventSavedAgainLaterWithNewDetails_returnsTheVersionOfTheAskedMoment() {
-        ToolEventLog started = event("tenant-versions", "evt-1", MOMENT, "{\"status\":\"started\"}");
-        ToolEventLog finished = event("tenant-versions", "evt-1", MOMENT.plusSeconds(1), "{\"status\":\"finished\"}");
+        LokiLogEvent started = event("tenant-versions", "evt-1", MOMENT, "{\"status\":\"started\"}");
+        LokiLogEvent finished = event("tenant-versions", "evt-1", MOMENT.plusSeconds(1), "{\"status\":\"finished\"}");
 
         repository.save(started);
         repository.save(finished);
@@ -93,7 +93,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void find_eventIdWithQuotesBracesAndBackslash_returnsThatEvent() {
-        ToolEventLog event = event("tenant-odd-id", "evt-\"1\"{x}\\", MOMENT, "{\"ip\":\"10.0.0.1\"}");
+        LokiLogEvent event = event("tenant-odd-id", "evt-\"1\"{x}\\", MOMENT, "{\"ip\":\"10.0.0.1\"}");
 
         repository.save(event);
 
@@ -102,7 +102,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void find_eventCopiedFromTheOldStoreIntoItsOwnStream_returnsIt() {
-        ToolEventLog copied = event("tenant-history", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
+        LokiLogEvent copied = event("tenant-history", "evt-1", MOMENT, "{\"ip\":\"10.0.0.1\"}");
         String lineTheCopyScriptWrites = """
                 {"tenantId":"tenant-history","toolType":"RMM","eventType":"SCRIPT_EXECUTED","toolEventId":"evt-1",\
                 "ingestDay":"2026-10-01","eventTimestamp":%d,"severity":"INFO","message":"Script executed",\
@@ -123,7 +123,7 @@ class ToolEventLogRepositoryIT {
     @MethodSource("lookupsDifferingFromTheSavedEventInOnePart")
     void find_lookupDiffersFromTheSavedEventInOnePart_returnsEmpty(String tenantId, String toolType, Instant timestamp,
                                                                     String toolEventId) {
-        Optional<ToolEventLog> found = repository.find(tenantId, toolType, timestamp, toolEventId);
+        Optional<LokiLogEvent> found = repository.find(tenantId, toolType, timestamp, toolEventId);
 
         assertThat(found).isEmpty();
     }
@@ -131,14 +131,14 @@ class ToolEventLogRepositoryIT {
     @ParameterizedTest
     @MethodSource("lookupsWithAValueWrittenToWidenTheQuery")
     void find_lookupValueWrittenToWidenTheQuery_returnsEmpty(String tenantId, String toolType, String toolEventId) {
-        Optional<ToolEventLog> found = repository.find(tenantId, toolType, MOMENT, toolEventId);
+        Optional<LokiLogEvent> found = repository.find(tenantId, toolType, MOMENT, toolEventId);
 
         assertThat(found).isEmpty();
     }
 
     @Test
     void save_eventOlderThanLokiAccepts_throwsRejectedWithLokisReason() {
-        ToolEventLog tooOld = event("tenant-too-old", "evt-1", MOMENT.minus(Duration.ofDays(8)), "{\"ip\":\"10.0.0.1\"}");
+        LokiLogEvent tooOld = event("tenant-too-old", "evt-1", MOMENT.minus(Duration.ofDays(8)), "{\"ip\":\"10.0.0.1\"}");
 
         assertThatThrownBy(() -> repository.save(tooOld))
                 .isExactlyInstanceOf(LokiPushRejectedException.class)
@@ -149,7 +149,7 @@ class ToolEventLogRepositoryIT {
     @ParameterizedTest(name = "[{index}] {1}")
     @MethodSource("lineSizesAroundLokisLimitAndOneRead")
     void save_lineOfAnySize_isFoundWhole(int lineBytes, String size) {
-        ToolEventLog event = eventWithLineOf("tenant-" + lineBytes, lineBytes);
+        LokiLogEvent event = eventWithLineOf("tenant-" + lineBytes, lineBytes);
 
         repository.save(event);
 
@@ -158,7 +158,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void save_lineOverTheLimitOfTwoByteCharacters_isFoundWhole() {
-        ToolEventLog event = event("tenant-two-byte", "evt-1", MOMENT, "é".repeat(200_000));
+        LokiLogEvent event = event("tenant-two-byte", "evt-1", MOMENT, "é".repeat(200_000));
 
         repository.save(event);
 
@@ -167,7 +167,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void save_splitEventSentAgainAfterALaterEvent_isStillFoundWhole() {
-        ToolEventLog split = eventWithLineOf("tenant-split-twice", 300_000);
+        LokiLogEvent split = eventWithLineOf("tenant-split-twice", 300_000);
         repository.save(split);
         repository.save(event("tenant-split-twice", "evt-2", MOMENT.plusMillis(1), "{\"ip\":\"10.0.0.2\"}"));
 
@@ -181,19 +181,19 @@ class ToolEventLogRepositoryIT {
         Map<String, String> labels = Map.of("job", "tool-events", "tenant_id", "tenant-missing-part", "tool_type", "RMM");
         lokiClient.push(labels, MOMENT.toEpochMilli() * 1_000_000, "{\"tenantId\":", partMetadata(0, 3));
         lokiClient.push(labels, MOMENT.toEpochMilli() * 1_000_000 + 1, "\"tenant-missing-part\"", partMetadata(1, 3));
-        ToolEventLog later = event("tenant-missing-part", "evt-2", MOMENT.plusMillis(1), "{\"ip\":\"10.0.0.2\"}");
+        LokiLogEvent later = event("tenant-missing-part", "evt-2", MOMENT.plusMillis(1), "{\"ip\":\"10.0.0.2\"}");
         repository.save(later);
         awaitFound(later);
 
-        Optional<ToolEventLog> found = repository.find("tenant-missing-part", "RMM", MOMENT, "evt-1");
+        Optional<LokiLogEvent> found = repository.find("tenant-missing-part", "RMM", MOMENT, "evt-1");
 
         assertThat(found).isEmpty();
     }
 
     @Test
     void find_eventSavedTwiceInTheSameMillisecondWithDifferentDetails_returnsOneOfThem() {
-        ToolEventLog first = event("tenant-two-versions", "evt-1", MOMENT, "{\"hostname\":\"old-name\"}");
-        ToolEventLog second = event("tenant-two-versions", "evt-1", MOMENT, "{\"hostname\":\"new-name\"}");
+        LokiLogEvent first = event("tenant-two-versions", "evt-1", MOMENT, "{\"hostname\":\"old-name\"}");
+        LokiLogEvent second = event("tenant-two-versions", "evt-1", MOMENT, "{\"hostname\":\"new-name\"}");
         repository.save(first);
         repository.save(second);
 
@@ -203,7 +203,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void find_splitEventCopiedFromTheOldStoreAndSentAgainLive_returnsIt() {
-        ToolEventLog event = eventWithLineOf("tenant-split-copied", 1_000_000);
+        LokiLogEvent event = eventWithLineOf("tenant-split-copied", 1_000_000);
         String line = repository.toLine(event);
         Map<String, String> copyLabels = Map.of("job", "tool-events", "tenant_id", "tenant-split-copied", "tool_type", "RMM",
                 "origin", "cassandra");
@@ -219,7 +219,7 @@ class ToolEventLogRepositoryIT {
 
     @Test
     void save_heldEventSentAgainTooFarBehind_isRefusedAndTheEventIsStillFound() {
-        ToolEventLog held = event("tenant-held", "evt-1", MOMENT.minus(Duration.ofHours(2)), "{\"ip\":\"10.0.0.1\"}");
+        LokiLogEvent held = event("tenant-held", "evt-1", MOMENT.minus(Duration.ofHours(2)), "{\"ip\":\"10.0.0.1\"}");
         repository.save(held);
         repository.save(event("tenant-held", "evt-2", MOMENT, "{\"ip\":\"10.0.0.2\"}"));
 
@@ -255,7 +255,7 @@ class ToolEventLogRepositoryIT {
                 arguments("tenant-exact", "RMM\"} #", "evt-2"));
     }
 
-    private static void awaitFound(ToolEventLog event) {
+    private static void awaitFound(LokiLogEvent event) {
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertThat(repository.find(event.getTenantId(),
                 event.getToolType(), Instant.ofEpochMilli(event.getEventTimestamp()), event.getToolEventId()))
                 .contains(event));
@@ -265,14 +265,14 @@ class ToolEventLogRepositoryIT {
         return Map.of("tool_event_id", "evt-1", "part", String.valueOf(part), "parts", String.valueOf(parts));
     }
 
-    private static ToolEventLog eventWithLineOf(String tenantId, int lineBytes) {
+    private static LokiLogEvent eventWithLineOf(String tenantId, int lineBytes) {
         int bytesBesidesDetails = repository.toLine(event(tenantId, "evt-1", MOMENT, ""))
                 .getBytes(StandardCharsets.UTF_8).length;
         return event(tenantId, "evt-1", MOMENT, "x".repeat(lineBytes - bytesBesidesDetails));
     }
 
-    private static ToolEventLog event(String tenantId, String toolEventId, Instant moment, String details) {
-        return ToolEventLog.builder()
+    private static LokiLogEvent event(String tenantId, String toolEventId, Instant moment, String details) {
+        return LokiLogEvent.builder()
                 .tenantId(tenantId)
                 .toolType("RMM")
                 .eventType("SCRIPT_EXECUTED")
