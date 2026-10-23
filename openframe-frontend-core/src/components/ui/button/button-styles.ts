@@ -200,7 +200,7 @@ export const BUTTON_KIND_CLASS = {
     'data-[invalid]:border-ods-error enabled:data-[invalid]:hover:border-ods-error enabled:data-[invalid]:active:border-ods-error',
     'data-[invalid]:data-[state=open]:border-ods-error data-[invalid]:aria-expanded:border-ods-error',
     'enabled:data-[invalid]:data-[state=open]:hover:border-ods-error enabled:data-[invalid]:aria-expanded:hover:border-ods-error',
-    'disabled:cursor-not-allowed disabled:bg-ods-bg disabled:text-ods-text-disabled disabled:[&_svg]:text-ods-text-disabled',
+    'disabled:cursor-not-allowed disabled:bg-ods-bg disabled:text-ods-text-disabled [&_svg]:disabled:text-ods-text-disabled',
     'outline-none focus-visible:border-ods-accent',
     '[&_svg]:shrink-0',
   ].join(' '),
@@ -232,14 +232,15 @@ export const BUTTON_KIND_CLASS = {
   // own layer (`::after`), so it can fade while the current page switches in a single frame: the current page's entry
   // (`data-state="active"`) takes the accent's light fill, the accent text and glyphs and the accent bar on its leading
   // edge (`::before`). An entry whose route is still committing (`aria-busy="true"`) holds the hover wash and nothing
-  // else.
+  // else. The glyph's state sits AFTER its descendant variant (`[&_svg]:data-[state=active]:`): Tailwind 3 applies
+  // stacked variants right to left, so the state written first would be looked for on the svg itself.
   rail: [
     'relative isolate flex w-full items-center justify-start gap-[var(--spacing-system-s)] px-[var(--spacing-system-m)] py-[var(--spacing-system-s)] text-left',
     'bg-transparent text-ods-text-primary text-h4 [&_svg]:fill-ods-text-secondary',
     "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:bg-ods-bg-hover after:opacity-0 after:transition-opacity after:duration-150 after:content-['']",
     "before:absolute before:bottom-0 before:left-0 before:top-0 before:w-1 before:content-['']",
     'hover:after:opacity-100 aria-busy:after:opacity-100',
-    'data-[state=active]:bg-ods-open-yellow-light data-[state=active]:text-ods-accent data-[state=active]:[&_svg]:fill-ods-accent data-[state=active]:before:bg-ods-accent data-[state=active]:after:opacity-0',
+    'data-[state=active]:bg-ods-open-yellow-light data-[state=active]:text-ods-accent [&_svg]:data-[state=active]:fill-ods-accent data-[state=active]:before:bg-ods-accent data-[state=active]:after:opacity-0',
     'disabled:cursor-not-allowed disabled:text-ods-text-secondary disabled:opacity-50 disabled:after:opacity-0',
     KIND_FOCUS_INSET,
     '[&_svg]:shrink-0',
@@ -287,11 +288,14 @@ export const BUTTON_KIND_CLASS = {
   // A whole card or tile that is one click target (a card's hit area, a media tile, a summary that expands): the
   // content is the look; the button gives it the click, the keyboard and the focus ring.
   card: ['relative block w-full rounded-md text-left text-ods-text-primary', KIND_FOCUS].join(' '),
-  // A cell of a bar (a header's or a chat's top bar): the bar's full height, an icon or a short label, secondary
-  // until hovered. The current cell (`data-state="active"`: the header's open section) takes the pressed surface and
-  // the primary text.
+  // A cell of a bar (a header's or a chat's top bar) or of a card row: the row's full height, an icon or a short
+  // label, secondary until hovered. The current cell (`data-state="active"`: the header's open section) takes the
+  // pressed surface and the primary text. Full height is `self-stretch` + `min-h-full`, never `h-full`: a set
+  // `height: 100%` turns off `align-self: stretch`, so in a row with no fixed height (a chat entity card) the cell
+  // fell to the row's top with a divider only as tall as its icon. `min-h-full` keeps a bar's height in a parent
+  // that is not a flex row.
   cell: [
-    'flex h-full shrink-0 items-center justify-center gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
+    'flex min-h-full shrink-0 items-center justify-center self-stretch gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
     'bg-transparent text-ods-text-secondary text-h4 transition-colors duration-200',
     'hover:bg-ods-bg-hover hover:text-ods-text-primary aria-expanded:text-ods-text-primary',
     'data-[state=active]:bg-ods-bg-active data-[state=active]:text-ods-text-primary',

@@ -4,36 +4,37 @@ import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.loki.client.LokiPushException;
 import com.openframe.data.loki.client.LokiPushRejectedException;
 import com.openframe.data.loki.client.LokiQueryException;
-import com.openframe.data.loki.toolevent.ToolEventLog;
-import com.openframe.data.loki.toolevent.ToolEventLogRepository;
+import com.openframe.data.loki.toolevent.LokiLogEvent;
+import com.openframe.data.loki.toolevent.LokiLogEventRepository;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
+import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.retry.RetryCallback;
 import org.springframework.retry.RetryContext;
 import org.springframework.retry.RetryListener;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.Map;
 
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "loki")
-public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEventLog, DeserializedDebeziumMessage> {
+@ConditionalOnExpression("'${openframe.tool-events.store:}' matches '(?i)loki|both'")
+public class LokiLogEventHandler extends DebeziumMessageHandler<LokiLogEvent, DeserializedDebeziumMessage> {
 
     private static final int ATTEMPTS = 6;
     private static final long FIRST_RETRY_DELAY_MILLIS = 1_000;
     private static final long MAX_RETRY_DELAY_MILLIS = 30_000;
 
-    private final ToolEventLogRepository repository;
+    private final LokiLogEventRepository repository;
     private final DebeziumEventValidator eventValidator;
+    private final LogEventMapper logEventMapper;
     private final RetryTemplate retry = RetryTemplate.builder()
             .customPolicy(new SimpleRetryPolicy(ATTEMPTS, Map.of(
                     LokiPushException.class, true,
@@ -42,8 +43,7 @@ public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEvent
             .exponentialBackoff(FIRST_RETRY_DELAY_MILLIS, 2, MAX_RETRY_DELAY_MILLIS)
             .withListener(new RetryListener() {
                 @Override
-                public <T, E extends Throwable> void onError(RetryContext context, RetryCallback<T, E> callback,
-                                                             Throwable failure) {
+                public <T, E extends Throwable> void onError(RetryContext context, RetryCallback<T, E> callback, Throwable failure) {
                     if (!(failure instanceof LokiPushRejectedException)) {
                         log.warn("Loki call for a tool event failed, try {} of {}: {}",
                                 context.getRetryCount(), ATTEMPTS, failure.getMessage());
@@ -52,11 +52,12 @@ public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEvent
             })
             .build();
 
-    public DebeziumLokiMessageHandler(ToolEventLogRepository repository, ObjectMapper objectMapper,
-                                      DebeziumEventValidator eventValidator) {
+    public LokiLogEventHandler(LokiLogEventRepository repository, ObjectMapper objectMapper,
+                               DebeziumEventValidator eventValidator, LogEventMapper logEventMapper) {
         super(objectMapper);
         this.repository = repository;
         this.eventValidator = eventValidator;
+        this.logEventMapper = logEventMapper;
     }
 
     @Override
@@ -75,34 +76,13 @@ public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEvent
     }
 
     @Override
-    protected ToolEventLog transform(DeserializedDebeziumMessage debeziumMessage, IntegratedToolEnrichedData enrichedData) {
-        String message = StringUtils.hasText(debeziumMessage.getMessage())
-                ? debeziumMessage.getMessage()
-                : debeziumMessage.getUnifiedEventType().getSummary();
-        return ToolEventLog.builder()
-                .tenantId(debeziumMessage.getTenantId())
-                .toolType(debeziumMessage.getIntegratedToolType().name())
-                .eventType(debeziumMessage.getUnifiedEventType().name())
-                .toolEventId(debeziumMessage.getToolEventId())
-                .ingestDay(debeziumMessage.getIngestDay())
-                .eventTimestamp(debeziumMessage.getEventTimestamp())
-                .severity(debeziumMessage.getUnifiedEventType().getSeverity().name())
-                .message(message)
-                .details(debeziumMessage.getDetails())
-                .userId(enrichedData.getUserId())
-                .deviceId(enrichedData.getMachineId())
-                .hostname(enrichedData.getHostname())
-                .nickname(enrichedData.getNickname())
-                .executionSource(enrichedData.getExecutionSource())
-                .scriptCreationSource(enrichedData.getScriptCreationSource())
-                .organizationId(enrichedData.getOrganizationId())
-                .organizationName(enrichedData.getOrganizationName())
-                .build();
+    protected LokiLogEvent transform(DeserializedDebeziumMessage debeziumMessage, IntegratedToolEnrichedData enrichedData) {
+        return logEventMapper.toLokiLogEvent(debeziumMessage, enrichedData);
     }
 
-    protected void handleCreate(ToolEventLog event) {
+    protected void handleCreate(LokiLogEvent event) {
         try {
-            retry.execute(context -> {
+            retry.execute(_ -> {
                 repository.save(event);
                 return null;
             });
@@ -119,19 +99,19 @@ public class DebeziumLokiMessageHandler extends DebeziumMessageHandler<ToolEvent
         }
     }
 
-    private boolean isSaved(ToolEventLog event) {
-        return retry.execute(context -> repository.find(event.getTenantId(), event.getToolType(),
+    private boolean isSaved(LokiLogEvent event) {
+        return retry.execute(_ -> repository.find(event.getTenantId(), event.getToolType(),
                 Instant.ofEpochMilli(event.getEventTimestamp()), event.getToolEventId()).isPresent());
     }
 
-    protected void handleRead(ToolEventLog event) {
+    protected void handleRead(LokiLogEvent event) {
         handleCreate(event);
     }
 
-    protected void handleUpdate(ToolEventLog event) {
+    protected void handleUpdate(LokiLogEvent event) {
         handleCreate(event);
     }
 
-    protected void handleDelete(ToolEventLog event) {
+    protected void handleDelete(LokiLogEvent event) {
     }
 }

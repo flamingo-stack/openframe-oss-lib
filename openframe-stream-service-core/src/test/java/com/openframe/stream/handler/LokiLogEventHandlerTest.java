@@ -8,12 +8,13 @@ import com.openframe.data.cassandra.model.enums.UnifiedEventType;
 import com.openframe.data.loki.client.LokiPushException;
 import com.openframe.data.loki.client.LokiPushRejectedException;
 import com.openframe.data.loki.client.LokiQueryException;
-import com.openframe.data.loki.toolevent.ToolEventLog;
-import com.openframe.data.loki.toolevent.ToolEventLogRepository;
+import com.openframe.data.loki.toolevent.LokiLogEvent;
+import com.openframe.data.loki.toolevent.LokiLogEventRepository;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
+import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import org.junit.jupiter.api.AfterEach;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mapstruct.factory.Mappers;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
@@ -50,15 +52,15 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
-class DebeziumLokiMessageHandlerTest {
+class LokiLogEventHandlerTest {
 
     private static final long EVENT_MILLIS = 1_790_848_800_123L;
     private static final String DETAILS = "{\"stdout\":\"ok\"}";
-    private static final ToolEventLog EVENT = expectedEvent().build();
-    private static final Logger HANDLER_LOG = (Logger) LoggerFactory.getLogger(DebeziumLokiMessageHandler.class);
+    private static final LokiLogEvent EVENT = expectedEvent().build();
+    private static final Logger HANDLER_LOG = (Logger) LoggerFactory.getLogger(LokiLogEventHandler.class);
 
     @Mock
-    private ToolEventLogRepository repository;
+    private LokiLogEventRepository repository;
 
     @Mock
     private DebeziumEventValidator eventValidator;
@@ -283,12 +285,12 @@ class DebeziumLokiMessageHandlerTest {
         assertThat(handler().getType()).isEqualTo(EventHandlerType.COMMON_TYPE);
     }
 
-    private DebeziumLokiMessageHandler handler() {
-        return new DebeziumLokiMessageHandler(repository, new JsonMapper(), eventValidator);
+    private LokiLogEventHandler handler() {
+        return new LokiLogEventHandler(repository, new JsonMapper(), eventValidator, Mappers.getMapper(LogEventMapper.class));
     }
 
     private ThrowingCallable handlingValidCreate() {
-        DebeziumLokiMessageHandler handler = handler();
+        LokiLogEventHandler handler = handler();
         DeserializedDebeziumMessage message = valid(message("c"));
         return () -> handler.handle(message, enriched());
     }
@@ -302,7 +304,7 @@ class DebeziumLokiMessageHandlerTest {
         return message;
     }
 
-    private OngoingStubbing<Optional<ToolEventLog>> whenLookedUp() {
+    private OngoingStubbing<Optional<LokiLogEvent>> whenLookedUp() {
         return when(repository.find("tenant-a", "RMM", Instant.ofEpochMilli(EVENT_MILLIS), "evt-1"));
     }
 
@@ -318,8 +320,8 @@ class DebeziumLokiMessageHandlerTest {
         return new LokiPushRejectedException("Loki push failed with HTTP 400: timestamp too old", null);
     }
 
-    private static ToolEventLog.ToolEventLogBuilder eventFromMessage() {
-        return ToolEventLog.builder()
+    private static LokiLogEvent.LokiLogEventBuilder eventFromMessage() {
+        return LokiLogEvent.builder()
                 .tenantId("tenant-a")
                 .toolType("RMM")
                 .eventType("SCRIPT_FAILED")
@@ -331,7 +333,7 @@ class DebeziumLokiMessageHandlerTest {
                 .details(DETAILS);
     }
 
-    private static ToolEventLog.ToolEventLogBuilder expectedEvent() {
+    private static LokiLogEvent.LokiLogEventBuilder expectedEvent() {
         return eventFromMessage()
                 .userId("user-7")
                 .deviceId("device-7")
