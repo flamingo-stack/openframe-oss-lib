@@ -89,7 +89,7 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
         return taskRepository.save(failed);
     }
 
-    // FAILED stays in projection_tasks, for the alert and for the next event of the source, which starts it again.
+    // FAILED stays in event_projection_tasks, for the alert and for the next event of the source, which starts it again.
     @Override
     public ProjectionTask finishRun(ProjectionTask task, EventJobStatus status) {
         Instant now = clock.instant();

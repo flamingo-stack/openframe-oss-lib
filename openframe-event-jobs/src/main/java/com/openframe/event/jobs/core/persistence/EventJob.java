@@ -18,7 +18,7 @@ import java.util.List;
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "event_jobs")
+@Document(collection = "event_job_runs")
 public class EventJob implements EventJobProgress {
 
     private static final int MAX_REPLACED_RUN_IDS = 10;

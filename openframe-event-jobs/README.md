@@ -8,7 +8,7 @@ Three scheduled jobs around the published events:
   which of its projected items differ from their source, reports them, and publishes those sources again to repair them;
 - the **projection tasks** apply the large updates of a projection, for example a new organization name on 50,000
   tickets, in batches instead of inside one Kafka record. One task per projection, tenant and source document, in
-  `projection_tasks`; a newer event of that source starts its task again from the first item.
+  `event_projection_tasks`; a newer event of that source starts its task again from the first item.
 
 They run in `openframe-saas-stream` only. They do nothing until you switch them on.
 
@@ -24,14 +24,14 @@ EventBackfillService / ReconciliationService     start a run, continue it, or wa
 EventJobTicker                                   batches until DONE, half of lock-at-most-for, or shutdown
    │  one batch: EventBackfillRunner / ReconciliationRunner
    ▼
-EventJobService ──> event_jobs                  one document per job: run id, status, lastId, counts
+EventJobService ──> event_job_runs              one document per job: run id, status, lastId, counts
 ```
 
 - One pod runs a job at a time: the lock is ShedLock's, with the stream's `LockProvider` (Redis). A dead pod's lock
   expires after `lock-at-most-for`, and the next tick on any pod continues from the saved `lastId`.
 - [`EventJob`](src/main/java/com/openframe/event/jobs/core/persistence/EventJob.java#L21) holds the progress rules; each change returns a copy, and
   [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. The document has `@Version`, so a pod still busy
-  with an older copy fails its save and stops. `event_jobs` is read from the primary.
+  with an older copy fails its save and stops. `event_job_runs` is read from the primary.
 - [`EventJobTicker`](src/main/java/com/openframe/event/jobs/core/service/EventJobTicker.java#L17) runs both jobs' batches. It stops after the current batch when
   the service shuts down ([`EventJobShutdown`](src/main/java/com/openframe/event/jobs/core/service/EventJobShutdown.java#L7)): Spring does not interrupt a
   running `@Scheduled` task.
@@ -48,7 +48,7 @@ EventJobService ──> event_jobs                  one document per job: run id
   busy with the older event fails its next save and stops; the next tick starts the task again with the newer event.
   A finished task is deleted only if its version did not change.
 - The task keeps the event's envelope as the outbox payload and reads it back into the spec's event class.
-- `maxFailures` in a row set the task FAILED. It stays in `projection_tasks`; the next event of its source starts it
+- `maxFailures` in a row set the task FAILED. It stays in `event_projection_tasks`; the next event of its source starts it
   again.
 - Metrics, per `projection`: `openframe.events.projection.tasks.open` and `...oldest.age` (seconds since the oldest
   RUNNING task started), and the counter `openframe.events.projection.tasks.failed`.
@@ -113,10 +113,10 @@ Each batch is written from the documents' current state, then their versions are
 document written meanwhile is published once more, so its newest state is the last record on the compacted topic
 ([`republishChanged`](src/main/java/com/openframe/event/jobs/backfill/service/EventBackfillRunner.java#L55)).
 
-**Follow** it in `event_jobs`, `_id: "backfill:<type>"`:
+**Follow** it in `event_job_runs`, `_id: "backfill:<type>"`:
 
 ```javascript
-db.event_jobs.findOne({_id: "backfill:organizations"})
+db.event_job_runs.findOne({_id: "backfill:organizations"})
 // runId, status (RUNNING, DONE, FAILED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
 ```
 
@@ -135,7 +135,7 @@ and with the metric `openframe.events.backfill.documents{type}`.
 ## Reconciliation
 
 **Read** the result in the gauge `openframe.events.reconciliation.mismatches{projection}`: the projected items that
-differed in the last finished run. Every pod reports it from `event_jobs` on each tick, so the alert
+differed in the last finished run. Every pod reports it from `event_job_runs` on each tick, so the alert
 `event-reconciliation-drift` takes `max by (namespace, projection)`. A run in progress does not change it.
 
 The job reads the collection of the projection's `projectedClass()` in `_id` batches, only the fields of its

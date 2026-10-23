@@ -16,7 +16,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "outbox")
+@Document(collection = "event_outbox")
 public class OutboxEvent implements TenantScoped {
 
     @Id

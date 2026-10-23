@@ -253,7 +253,7 @@ class PublishingRepositoryIT {
 
         widgetRepository.delete(saved);
 
-        List<org.bson.Document> rawRows = mongoTemplate.getCollection("outbox").find().into(new ArrayList<>());
+        List<org.bson.Document> rawRows = mongoTemplate.getCollection("event_outbox").find().into(new ArrayList<>());
         List<org.bson.Document> rawTombstones = rawRows.stream().filter(row -> row.get("payload") == null).toList();
         assertThat(rawTombstones).singleElement().satisfies(row -> assertThat(row).containsKey("payload"));
     }

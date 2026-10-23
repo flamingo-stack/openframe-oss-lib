@@ -18,7 +18,7 @@ import java.util.Map;
 @Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
-@Document(collection = "projection_tasks")
+@Document(collection = "event_projection_tasks")
 public class ProjectionTask implements EventJobProgress {
 
     private static final String ID_SEPARATOR = ":";
