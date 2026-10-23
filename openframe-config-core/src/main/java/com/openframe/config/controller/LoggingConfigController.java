@@ -1,5 +1,6 @@
 package com.openframe.config.controller;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 import org.apache.commons.lang3.StringUtils;
@@ -21,7 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 public class LoggingConfigController {
 
     @GetMapping(value = "/{filename:.+}", produces = MediaType.APPLICATION_XML_VALUE)
-    public ResponseEntity<String> getLoggingConfig(@PathVariable String filename, HttpServletRequest request) throws Exception {
+    public ResponseEntity<String> getLoggingConfig(@PathVariable String filename, HttpServletRequest request) {
         log.debug("Received request for logging config file: {}", filename);
 
         ClassPathResource resource = new ClassPathResource("logging/" + filename);
@@ -32,7 +33,12 @@ public class LoggingConfigController {
             return ResponseEntity.notFound().build();
         }
 
-        String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        String content;
+        try {
+            content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read logging config file: " + filename, e);
+        }
         log.debug("Original content length: {}", content.length());
 
         String serverUrl = request.getScheme() + "://" + request.getServerName();
