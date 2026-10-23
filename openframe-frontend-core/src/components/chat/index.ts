@@ -32,6 +32,8 @@ export * from './ask-prompts';
 export * from './assistant-ask-prompts';
 export * from './quick-action-marquee';
 export * from './quick-action-wall';
+export * from './mingo-quick-action-wall';
+export * from './mingo-edge-light';
 export * from './chat-ticket-list';
 export * from './chat-typing-indicator';
 export * from './tool-execution-display';
@@ -43,8 +45,10 @@ export * from './msp-organization-card';
 export * from './guide-mode-banner';
 export * from './mingo-chat-history';
 export * from './mingo-archive-list';
+export * from './composer-sheet';
 export * from './mingo-chat-header';
 export * from './mingo-chat-rail';
+export { MingoChatSearchModal, type MingoChatSearchModalProps } from './mingo-chat-history-section';
 export * from './mingo-history-rail';
 export * from './mingo-chat-modals';
 export * from './chat-header-search-field';
@@ -54,6 +58,7 @@ export * from './chat-context-picker';
 export * from './chat-context-memory-bar';
 export * from './context-items-list';
 export * from './chat-archive-page';
+export { ChatListLoadError, type MingoDialogStatus, type MingoHistoryScope } from './mingo-chat-list-shared';
 export * from './model-display';
 export * from './chat-sidebar';
 export * from './chat-nav-sidebar';
@@ -139,4 +144,5 @@ export {
   ASK_AI_OPEN_WITH_REF_EVENT,
   ASK_AI_TRIGGER_ATTRIBUTE,
 } from './utils/ask-ai-events';
+export { chatDayLabel } from './utils/chat-day-label';
 export * from './proxy-credentials-panel';

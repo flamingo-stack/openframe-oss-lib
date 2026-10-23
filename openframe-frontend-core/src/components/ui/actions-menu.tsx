@@ -33,7 +33,12 @@ export interface ActionsMenuItem {
   icon?: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
-  type?: 'item' | 'checkbox' | 'submenu' | 'separator';
+  /**
+   * `checkbox`: one of many options, a box, the menu stays open. `radio`: one
+   * option of a set (a choice, not a toggle) — a check on the chosen one, the
+   * menu closes on a pick.
+   */
+  type?: 'item' | 'checkbox' | 'radio' | 'submenu' | 'separator';
   checked?: boolean;
   /**
    * Keep the dropdown open after this item is clicked instead of closing it
@@ -210,6 +215,10 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
         {item.label}
       </span>
 
+      {item.type === 'radio' && item.checked && (
+        <Check className="h-4 w-4 shrink-0 text-ods-accent md:h-6 md:w-6" strokeWidth={3} aria-hidden="true" />
+      )}
+
       {item.type === 'checkbox' && (
         <div
           className={cn(
@@ -276,7 +285,8 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, onItemClick }) => {
   return (
     <div className={WRAPPER_CLASSES}>
       <div
-        role="menuitem"
+        role={item.type === 'radio' ? 'menuitemradio' : 'menuitem'}
+        aria-checked={item.type === 'radio' ? !!item.checked : undefined}
         tabIndex={item.disabled ? -1 : 0}
         aria-disabled={item.disabled}
         className={itemClasses}

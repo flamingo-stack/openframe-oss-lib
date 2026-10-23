@@ -4,6 +4,7 @@ import React from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
 import { InteractiveSkeleton } from '../loading/unified-skeleton';
+import { useComposerDockHeight } from '../navigation/app-layout-context';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
@@ -501,8 +502,11 @@ function CompactPrimaryActions({ actions, loading: loadingProp }: { actions: Pag
 
 function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
   const loading = useLoadingScope() || loadingProp;
+  // Over the composer dock where the layout has one.
+  const dockHeight = useComposerDockHeight();
   return (
     <div
+      style={dockHeight > 0 ? { bottom: dockHeight } : undefined}
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50 md:hidden',
         'border-t border-ods-border bg-ods-card',

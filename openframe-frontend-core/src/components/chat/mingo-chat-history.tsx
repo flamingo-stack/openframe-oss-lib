@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
 import { LoadingRegion } from '../loading/loading-region';
@@ -13,6 +13,8 @@ import { SquareAvatar } from '../ui/square-avatar';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatListEmptyState } from './chat-list-empty-state';
 import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
+import { dialogTimestamp } from './mingo-chat-day-groups';
+import { useLoadMoreSentinel } from './mingo-chat-list-shared';
 import type { DialogItem } from './types/component.types';
 
 /**
@@ -85,12 +87,6 @@ interface DialogGroup {
 // Date grouping — Today / Yesterday / Older
 // =============================================================================
 
-function dialogTime(d: DialogItem): number | null {
-  if (!d.timestamp) return null;
-  const t = typeof d.timestamp === 'string' ? Date.parse(d.timestamp) : d.timestamp.getTime();
-  return Number.isNaN(t) ? null : t;
-}
-
 function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -100,7 +96,7 @@ function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
   const yesterday: DialogItem[] = [];
   const older: DialogItem[] = [];
   for (const d of dialogs) {
-    const t = dialogTime(d);
+    const t = dialogTimestamp(d);
     if (t !== null && t >= startOfToday) today.push(d);
     else if (t !== null && t >= startOfYesterday) yesterday.push(d);
     else older.push(d); // includes timestamp-less dialogs
@@ -378,41 +374,13 @@ export function MingoChatHistory({
 
   // Infinite scroll — load the next page when the sentinel enters the
   // scroll viewport.
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  // Refreshed in an unconditional effect, declared before the observer effect
-  // so it wins the same flush. Not in the render body: the only reader is the
-  // IntersectionObserver callback, which cannot fire before a commit, and a
-  // discarded render attempt must not install a loading flag that never was.
-  const onLoadMoreRef = useRef(onLoadMore);
-  const isLoadingMoreRef = useRef(isLoadingMore);
-  useEffect(() => {
-    onLoadMoreRef.current = onLoadMore;
-    isLoadingMoreRef.current = isLoadingMore;
+  const sentinelRef = useLoadMoreSentinel({
+    hasMore,
+    isLoadingMore,
+    onLoadMore,
+    itemCount: dialogs.length,
+    rootRef: scrollRef,
   });
-  const dialogCount = dialogs.length;
-  useEffect(() => {
-    const root = scrollRef.current;
-    const sentinel = sentinelRef.current;
-    if (!root || !sentinel || !hasMore || typeof IntersectionObserver === 'undefined') return undefined;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !isLoadingMoreRef.current) {
-          onLoadMoreRef.current?.();
-        }
-      },
-      { root, rootMargin: '120px', threshold: 0.1 },
-    );
-    io.observe(sentinel);
-    return () => io.disconnect();
-    // `dialogCount`/`isLoadingMore` deps re-arm the observer after every page
-    // lands: `observe()` re-reports the CURRENT intersection, so a sentinel
-    // that stays in view (short host-filtered list — e.g. the "My Chats"
-    // scope keeps a handful of rows out of a 20-row page) keeps chaining
-    // loads until the viewport fills or `hasMore` flips. A continuously
-    // visible sentinel never re-crosses the threshold, so the previous
-    // [hasMore]-only observer fired exactly once per mount and the list
-    // grew by a single page per drawer open.
-  }, [hasMore, isLoadingMore, dialogCount, scrollRef]);
 
   if (isLoading) return <MingoChatHistorySkeleton rows={pageSize} className={className} />;
 

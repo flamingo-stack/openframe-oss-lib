@@ -6,6 +6,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '../hover-card';
 import { AnthropicLogoGreyIcon, GeminiLogoGreyIcon, OpenaiLogoGreyIcon } from '../icons-v2-generated';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import { useChatAppearance } from './chat-appearance-context';
 import type { ModelDisplayProps, ModelUsageBreakdown } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -68,6 +69,8 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       hitRatePct,
       inputTokens,
       outputTokens,
+      onModelClick,
+      modelTooltip,
       loading = false,
       ...props
     },
@@ -97,6 +100,42 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
       );
     }
 
+    // The provider icon + model name. With `onModelClick` it is a button (the
+    // host's settings, where the model is chosen); the token tail stays text.
+    const labelContent = (
+      <>
+        {icon && <span className={PROVIDER_ICON_BOX_CLASS}>{icon}</span>}
+        <span className="font-body">{name}</span>
+      </>
+    );
+    const label = onModelClick ? (
+      <button
+        type="button"
+        onClick={onModelClick}
+        className="flex items-center gap-1 rounded-sm text-ods-text-secondary transition-colors hover:text-ods-text-primary focus:outline-none focus-visible:text-ods-text-primary focus-visible:ring-2 focus-visible:ring-ods-accent"
+      >
+        {labelContent}
+      </button>
+    ) : modelTooltip ? (
+      // A tooltip needs one element to anchor to.
+      <span className="flex items-center gap-1">{labelContent}</span>
+    ) : (
+      // Neither: the same two spans the row always had.
+      labelContent
+    );
+    const labelWithTooltip = modelTooltip ? (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>{label}</TooltipTrigger>
+          <TooltipContent side="top" align="start">
+            {modelTooltip}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ) : (
+      label
+    );
+
     // Inline pill: provider icon + model name + "X / Y tokens used".
     // The "tokens used" tail renders as soon as `contextWindow` is known
     // (typically from the leading metadata frame). `usedTokens` lags by a
@@ -105,8 +144,7 @@ const ModelDisplay = React.forwardRef<HTMLDivElement, ModelDisplayProps>(
     // model's capacity context without waiting for the first byte.
     const inline = (
       <div ref={ref} className={cn(MODEL_DISPLAY_ROW_CLASS, 'text-ods-text-secondary', className)} {...props}>
-        {icon && <span className={PROVIDER_ICON_BOX_CLASS}>{icon}</span>}
-        <span className="font-body">{name}</span>
+        {labelWithTooltip}
         {contextWindow != null && (
           <span className="ml-auto opacity-70 text-h6">
             {usedTokens != null ? formatCount(usedTokens) : '—'}

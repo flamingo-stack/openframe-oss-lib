@@ -43,6 +43,9 @@ export interface ChatContextMemoryBarProps {
   resolveIcon?: (item: ChatContextItem) => ReactNode;
   /** External disable (e.g. while a message is streaming). */
   disabled?: boolean;
+  /** A host control at the strip's start (e.g. "Continue <chat>" over a page).
+   *  With it the strip shows even with nothing remembered — the control alone. */
+  leading?: ReactNode;
   className?: string;
 }
 
@@ -51,6 +54,7 @@ export function ChatContextMemoryBar({
   onRemove,
   resolveIcon,
   disabled = false,
+  leading,
   className,
 }: ChatContextMemoryBarProps) {
   const [open, setOpen] = useState(false);
@@ -87,7 +91,8 @@ export function ChatContextMemoryBar({
     };
   }, [open]);
 
-  if (items.length === 0) return null;
+  const hasItems = items.length > 0;
+  if (!hasItems && !leading) return null;
 
   return (
     // `relative` anchors the popover to this strip; `bottom-full` floats it
@@ -105,22 +110,27 @@ export function ChatContextMemoryBar({
         }
       }}
     >
-      <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
-        {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
-      </p>
+      {leading}
+      {hasItems ? (
+        <p className="min-w-0 flex-1 truncate text-ods-text-secondary text-h6">
+          {items.length} recently viewed {items.length === 1 ? 'item' : 'items'} in context
+        </p>
+      ) : null}
 
-      <Button
-        variant="bare"
-        size="icon-sm"
-        type="button"
-        aria-label="Show remembered context"
-        aria-expanded={open}
-        title="Show remembered context"
-        onClick={() => setOpen(o => !o)}
-        className="shrink-0"
-      >
-        <Ellipsis01Icon size={16} />
-      </Button>
+      {hasItems && (
+        <Button
+          variant="bare"
+          size="icon-sm"
+          type="button"
+          aria-label="Show remembered context"
+          aria-expanded={open}
+          title="Show remembered context"
+          onClick={() => setOpen(o => !o)}
+          className="shrink-0"
+        >
+          <Ellipsis01Icon size={16} />
+        </Button>
+      )}
 
       {open && (
         <div

@@ -2,12 +2,14 @@
 
 import { type ComponentProps, type ReactNode, type Ref, useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
-import { BoxArchiveIcon } from '../icons-v2-generated';
+import { BoxArchiveIcon, Ellipsis01Icon } from '../icons-v2-generated';
+import { ActionsMenuDropdown, type ActionsMenuItem } from '../ui/actions-menu';
 import { ChatAttachmentAddButton } from './chat-attachment-bar';
 import { ChatFooter } from './chat-container';
 import { ChatContextMemoryBar } from './chat-context-memory-bar';
 import { ChatComposerPlusMenu, ChatContextChipStrip, ChatContextPicker } from './chat-context-picker';
 import { ChatInput } from './chat-input';
+import { MingoEdgeLight } from './mingo-edge-light';
 import { ModelDisplay } from './model-display';
 import type { ChatInputRef, ModelDisplayProps } from './types/component.types';
 import type { ChatContextItem, ChatContextPickerConfig } from './types/context-item.types';
@@ -38,8 +40,17 @@ export interface ChatComposerProps {
   attachmentsCount?: number;
   onAddFiles?: (files: FileList | File[]) => void;
   attachmentsDisabled?: boolean;
-  /** Model + usage row props, forwarded to `<ModelDisplay>`. */
-  model: ModelDisplayProps;
+  /** Model + usage row props, forwarded to `<ModelDisplay>`. Omitted → no
+   *  model row (e.g. a composer docked on a home page, before any chat). */
+  model?: ModelDisplayProps;
+  /** The composer's own ⋯ menu, at the end of the input row before Send
+   *  (e.g. "Compact Chat Memory"). Empty or omitted → no menu. Not shown on an
+   *  archived chat (there is no input), inert while `lock` is set. */
+  menuItems?: ActionsMenuItem[];
+  /** Controls at the end of the row under the input, after the model and its
+   *  usage (e.g. "Compact chat memory"). Draws that row on its own if there is
+   *  no model. */
+  footerActions?: ReactNode;
 
   // ─── Entity-context picker (Figma 31:28708 / 1:5699) ──────────────────────
   // When `contextPicker` is set the composer renders the `+` "Assign Item"
@@ -59,6 +70,9 @@ export interface ChatComposerProps {
    *  as a summary strip at the top of the composer card, above the assigned-item
    *  chips. Empty/omitted → no strip. */
   contextMemoryItems?: ChatContextItem[];
+  /** A host control at the start of the context memory strip (e.g. "Continue
+   *  <chat>"); the strip shows for it alone when nothing is remembered. */
+  contextLeading?: ReactNode;
   /** Drop one entity from the context memory (dropdown row ×). */
   onRemoveContextMemoryItem?: (item: ChatContextItem) => void;
   /** Controlled picker open state. */
@@ -77,6 +91,13 @@ export interface ChatComposerProps {
   /** Non-destructive ghost preview shown in the empty composer (e.g. a hovered
    *  quick-action's full prompt). Forwarded to `ChatInput.previewText`. */
   previewText?: string;
+  /** Clear the bottom safe-area inset (the iOS home bar) under the composer.
+   *  Default `true`. `false` for a composer docked inside a layout that already
+   *  owns that inset (a native shell's root), where it would be doubled. */
+  safeAreaBottom?: boolean;
+  /** Mingo's AI edge light (`MingoEdgeLight`, the header launcher's) travelling
+   *  around the input card. Not on an archived chat. Default `false`. */
+  edgeLight?: boolean;
 }
 
 /**
@@ -108,6 +129,7 @@ export function ChatComposer({
   onToggleContextItem,
   onRemoveContextItem,
   contextMemoryItems,
+  contextLeading,
   onRemoveContextMemoryItem,
   contextPickerOpen = false,
   onOpenContextPicker,
@@ -116,6 +138,10 @@ export function ChatComposer({
   onMentionQueryChange,
   onValueChange,
   previewText,
+  menuItems,
+  footerActions,
+  safeAreaBottom = true,
+  edgeLight = false,
 }: ChatComposerProps) {
   const contextEnabled = !!contextPicker && !archived;
   const locked = lock != null;
@@ -133,6 +159,35 @@ export function ChatComposer({
     return map;
   }, [entityTypes]);
   const resolveContextIcon = useCallback((item: ChatContextItem) => iconByType.get(item.type), [iconByType]);
+
+  const menu =
+    menuItems && menuItems.length > 0 ? (
+      <ActionsMenuDropdown
+        triggerAriaLabel="Composer actions"
+        side="top"
+        align="end"
+        onCloseAutoFocus={e => e.preventDefault()}
+        groups={[{ items: menuItems }]}
+        customTrigger={
+          <button
+            type="button"
+            aria-label="Composer actions"
+            disabled={locked}
+            className={cn(
+              'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
+              'cursor-pointer hover:text-ods-text-primary focus-visible:text-ods-accent focus-visible:outline-none',
+              'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
+            )}
+          >
+            <Ellipsis01Icon size={20} />
+          </button>
+        }
+      />
+    ) : undefined;
+  // The row under the input: the legacy attachment `+` and the model. Neither →
+  // no row at all, rather than an empty one under the input.
+  const showLegacyAttach = !contextEnabled && showAttachmentButton && !!onAddFiles;
+  const showFooterRow = showLegacyAttach || !!model || !!footerActions;
 
   // The input is identical in both layouts; only `hideBorder` (context mode
   // lets the outer card own the chrome) and the `+` adornment differ.
@@ -156,6 +211,7 @@ export function ChatComposer({
       onMentionQueryChange={contextEnabled ? onMentionQueryChange : undefined}
       onValueChange={contextEnabled ? onValueChange : undefined}
       hideBorder={contextEnabled}
+      endIcon={menu}
       // `+` lives INSIDE the input (start adornment, Figma 31:28275) and opens
       // the single context dropdown directly. The picker is passed as the
       // button's `dropdown` so it anchors to the `+`, not the input row.
@@ -183,14 +239,59 @@ export function ChatComposer({
     />
   );
 
+  const liveCard = contextEnabled ? (
+    // Unified card (Figma 1:6073 / 271:38656): the context-memory
+    // summary strip and the assigned-chip strip (both `bg-ods-bg`,
+    // `border-b`) stack flush above the input; the card owns the border
+    // / radius / focus ring. No `overflow-hidden` so the picker and the
+    // memory popover can float above the input (whichever strip comes
+    // first gets `rounded-t`).
+    // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
+    // border reacts ONLY to the composer editor — not the picker's search
+    // input or item buttons, which also live inside this card. The editor
+    // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
+    // target its data attribute rather than the element name.
+    <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
+      {/* Ambient navigation-history context — always the same items, so
+         it sits furthest from the textarea. Self-hides when empty. */}
+      <ChatContextMemoryBar
+        items={memory}
+        onRemove={onRemoveContextMemoryItem}
+        resolveIcon={resolveContextIcon}
+        disabled={sending || locked}
+        leading={contextLeading}
+        className="rounded-t-md"
+      />
+      {selected.length > 0 && (
+        <ChatContextChipStrip
+          items={selected}
+          onRemove={onRemoveContextItem}
+          resolveIcon={resolveContextIcon}
+          disabled={sending || locked}
+          className={cn(
+            'border-b border-ods-border bg-ods-bg p-2',
+            // Only the TOP strip rounds into the card corner.
+            memory.length === 0 && !contextLeading && 'rounded-t-md',
+          )}
+        />
+      )}
+      {/* Picker is rendered inside the `+` button (its `dropdown` prop)
+         so it anchors to the button, not this card. */}
+      {inputNode}
+    </div>
+  ) : (
+    inputNode
+  );
+
   return (
     <div
       className="flex flex-shrink-0 flex-col gap-[var(--spacing-system-xxs)] px-[var(--spacing-system-m)] pb-[var(--spacing-system-xxs)]"
       // Tight `xxs` bottom padding (the model/usage row already sits just below
-      // the input); `max(…, safe-area-inset)` still clears the iOS home bar.
-      style={{
-        paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))',
-      }}
+      // the input); `max(…, safe-area-inset)` still clears the iOS home bar —
+      // unless the host's layout already does (`safeAreaBottom={false}`).
+      style={
+        safeAreaBottom ? { paddingBottom: 'max(var(--spacing-system-xxs), env(safe-area-inset-bottom))' } : undefined
+      }
     >
       <div>
         <ChatFooter className="!p-0" fullWidth>
@@ -199,66 +300,35 @@ export function ChatComposer({
               <BoxArchiveIcon size={24} className="shrink-0 text-ods-text-secondary" />
               <p className="truncate text-ods-text-secondary text-h4">Unarchive the chat to continue</p>
             </div>
-          ) : contextEnabled ? (
-            // Unified card (Figma 1:6073 / 271:38656): the context-memory
-            // summary strip and the assigned-chip strip (both `bg-ods-bg`,
-            // `border-b`) stack flush above the input; the card owns the border
-            // / radius / focus ring. No `overflow-hidden` so the picker and the
-            // memory popover can float above the input (whichever strip comes
-            // first gets `rounded-t`).
-            // `has-[[data-editor]:focus]` (not `focus-within`) so the accent
-            // border reacts ONLY to the composer editor — not the picker's search
-            // input or item buttons, which also live inside this card. The editor
-            // is a `contentEditable` div (`data-editor`), not a `<textarea>`, so we
-            // target its data attribute rather than the element name.
-            <div className="rounded-md border border-ods-border bg-ods-card transition-colors has-[[data-editor]:focus]:border-ods-accent">
-              {/* Ambient navigation-history context — always the same items, so
-                  it sits furthest from the textarea. Self-hides when empty. */}
-              <ChatContextMemoryBar
-                items={memory}
-                onRemove={onRemoveContextMemoryItem}
-                resolveIcon={resolveContextIcon}
-                disabled={sending || locked}
-                className="rounded-t-md"
-              />
-              {selected.length > 0 && (
-                <ChatContextChipStrip
-                  items={selected}
-                  onRemove={onRemoveContextItem}
-                  resolveIcon={resolveContextIcon}
-                  disabled={sending || locked}
-                  className={cn(
-                    'border-b border-ods-border bg-ods-bg p-2',
-                    // Only the TOP strip rounds into the card corner.
-                    memory.length === 0 && 'rounded-t-md',
-                  )}
-                />
-              )}
-              {/* Picker is rendered inside the `+` button (its `dropdown` prop)
-                  so it anchors to the button, not this card. */}
-              {inputNode}
+          ) : edgeLight ? (
+            // On the card's border box: a wrapper the card fills, so the ring
+            // lies over the card's border.
+            <div className="relative">
+              {liveCard}
+              <MingoEdgeLight className="rounded-md" />
             </div>
           ) : (
-            inputNode
+            liveCard
           )}
         </ChatFooter>
       </div>
 
-      <div className="flex w-full items-center gap-2">
-        {/* Legacy (Guide-mode, no context picker) inline attachment `+`. With the
-            context picker on, uploads live in the in-input `+` menu instead. */}
-        {!contextEnabled && showAttachmentButton && onAddFiles && (
-          <ChatAttachmentAddButton
-            attachmentsEnabled
-            attachmentsCount={attachmentsCount}
-            onAddFiles={onAddFiles}
-            disabled={attachmentsDisabled || locked}
-          />
-        )}
-        <div className="min-w-0 flex-1">
-          <ModelDisplay {...model} />
+      {showFooterRow && (
+        <div className="flex w-full items-center gap-2">
+          {/* Legacy (Guide-mode, no context picker) inline attachment `+`. With the
+              context picker on, uploads live in the in-input `+` menu instead. */}
+          {showLegacyAttach && onAddFiles && (
+            <ChatAttachmentAddButton
+              attachmentsEnabled
+              attachmentsCount={attachmentsCount}
+              onAddFiles={onAddFiles}
+              disabled={attachmentsDisabled || locked}
+            />
+          )}
+          <div className="min-w-0 flex-1">{model && <ModelDisplay {...model} />}</div>
+          {footerActions && <div className="flex shrink-0 items-center">{footerActions}</div>}
         </div>
-      </div>
+      )}
     </div>
   );
 }

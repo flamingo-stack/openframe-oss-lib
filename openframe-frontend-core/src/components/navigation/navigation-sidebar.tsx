@@ -1,19 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { useLocalStorage } from '../../hooks/ui/use-local-storage';
 import { useLgUp, useMdUp } from '../../hooks/ui/use-media-query';
 import type { NavigationSidebarConfig, NavigationSidebarItem } from '../../types/navigation';
 import { cn } from '../../utils';
+import { NAVIGATION_SIDEBAR_ATTRIBUTE } from './app-layout-context';
+import {
+  NavigationSidebarGroupedEntries,
+  NavigationSidebarGroupedSkeleton,
+  useOpenNavigationGroup,
+} from './navigation-sidebar-grouped';
 import { NavigationSidebarHeader } from './navigation-sidebar-header';
 import { NavigationSidebarItemButton } from './navigation-sidebar-item';
+import { resolveNavigationActive } from './navigation-sidebar-match';
+import { hasNavigationSidebarSlot, renderNavigationSidebarSlot } from './navigation-sidebar-slot';
 import { NavigationSidebarToggle } from './navigation-sidebar-toggle';
 
 const MINIMIZED_WIDTH = 56; // 3.5rem = 56px
-const EXPANDED_WIDTH = 224; // 14rem = 224px
+const EXPANDED_WIDTH = 224; // 14rem = 224px — the default; a grouped config may set its own
+/** The narrowest custom `expandedWidth`: the rows read 140px and up as expanded. */
+const MIN_CUSTOM_EXPANDED_WIDTH = 141;
 const STORAGE_KEY = 'of.navigationSidebar.minimized';
 
 /**
@@ -36,6 +46,16 @@ const STORAGE_KEY = 'of.navigationSidebar.minimized';
 export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width';
 
 /**
+ * A grouped config's own `expandedWidth`, as an inline custom property on the
+ * sidebar and its tablet push slot. Unlike the width above it is a prop, the
+ * same on the server and the client, so it can sit in the markup: the tablet
+ * overlay, the push slot and the desktop fallback read it on the first paint.
+ * Set only when the config gives a width, so a config without one renders the
+ * literal classes it always did.
+ */
+const EXPANDED_WIDTH_VAR = '--of-navigation-sidebar-expanded-width';
+
+/**
  * The rail as a query container, so the parts of the sidebar that follow its
  * collapsed state can read that state off the rail's own width — currently the
  * collapse chevron's direction, in `navigation-sidebar-toggle.tsx`.
@@ -51,7 +71,8 @@ export const NAVIGATION_SIDEBAR_WIDTH_VAR = '--of-navigation-sidebar-width';
  * backwards under it.
  *
  * Queried as `@[140px]/of-nav-sidebar:` — 140px is the midpoint between the 56px
- * rail and the 224px expanded sidebar, so the width only crosses it mid-toggle.
+ * rail and the 224px expanded sidebar, so the width only crosses it mid-toggle
+ * (a custom `expandedWidth` is kept above it).
  * Container queries are min-width, so a follower styles its COLLAPSED look as the
  * default and lets the query take it back. Written out literally at each use
  * rather than interpolated from a constant: Tailwind scans source text, and a
@@ -84,17 +105,26 @@ const SIDEBAR_CONTAINER = '@container/of-nav-sidebar';
  * `EXPANDED_WIDTH`, as is the `14rem` fallback below. Keep them in step; a class
  * string cannot interpolate a constant.
  */
-const SIDEBAR_GEOMETRY_CLASSES = [
+const SIDEBAR_POSITION_CLASSES = [
   // Tablet: float over the content, anchored to the layout row (`absolute`
   // within AppLayout's `relative` row) — NOT the viewport — so an optional
   // `topBar` above the row is not overlapped. With no topBar the row spans the
   // full viewport, so this is visually identical to a viewport-fixed sidebar.
   'md:absolute md:inset-y-0 md:left-0 md:z-[45]',
-  // Desktop: back in the flex flow, width from the persisted preference. The
-  // fallback IS the default, so the property needs no global declaration and an
-  // unseeded consumer gets the full sidebar rather than a rail with no labels.
-  'lg:relative lg:inset-auto lg:z-auto lg:h-full lg:w-[var(--of-navigation-sidebar-width,14rem)]',
-].join(' ');
+  // Desktop: back in the flex flow, width from the persisted preference.
+  'lg:relative lg:inset-auto lg:z-auto lg:h-full',
+];
+const SIDEBAR_GEOMETRY_CLASSES = {
+  // The fallback IS the default, so the property needs no global declaration
+  // and an unseeded consumer gets the full sidebar rather than a rail with no
+  // labels.
+  default: [...SIDEBAR_POSITION_CLASSES, 'lg:w-[var(--of-navigation-sidebar-width,14rem)]'].join(' '),
+  // With a config width the fallback is that width (`EXPANDED_WIDTH_VAR`).
+  custom: [
+    ...SIDEBAR_POSITION_CLASSES,
+    'lg:w-[var(--of-navigation-sidebar-width,var(--of-navigation-sidebar-expanded-width))]',
+  ].join(' '),
+} as const;
 
 /**
  * The tablet width, as ONE `md:` class rather than a rail plus an override.
@@ -110,10 +140,14 @@ const SIDEBAR_GEOMETRY_CLASSES = [
  * `lg:` still governs desktop either way: it is emitted after `md:`, so an
  * overlay left open while the window widens does not leak into the desktop width.
  */
-const SIDEBAR_TABLET_WIDTH = { rail: 'md:w-14', overlay: 'md:w-56' } as const;
+const SIDEBAR_TABLET_WIDTH = {
+  rail: 'md:w-14',
+  overlay: 'md:w-56',
+  customOverlay: 'md:w-[var(--of-navigation-sidebar-expanded-width)]',
+} as const;
 
 /** A click the browser will resolve itself — new tab, new window, middle button. */
-const isModifiedClick = (event?: MouseEvent): boolean =>
+export const isModifiedClick = (event?: MouseEvent): boolean =>
   !!event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
 
 export interface NavigationSidebarProps {
@@ -130,9 +164,23 @@ export interface NavigationSidebarProps {
    * false (overlay).
    */
   pushOnTablet?: boolean;
+  /**
+   * Animate the width where it moves the content (the desktop rail, the tablet
+   * slot with `pushOnTablet`). Default true. `AppLayout` turns it off while the
+   * page column is a size container (a side panel or a composer dock): each frame
+   * of the transition then re-evaluated the page's `content-*` container queries,
+   * ~25 ms of layout per frame on a large page in WebKit, so there the width snaps.
+   * The tablet overlay still slides: it floats over the content.
+   */
+  animateWidth?: boolean;
 }
 
-export function NavigationSidebar({ config, disabled = false, pushOnTablet = false }: NavigationSidebarProps) {
+export function NavigationSidebar({
+  config,
+  disabled = false,
+  pushOnTablet = false,
+  animateWidth = true,
+}: NavigationSidebarProps) {
   const isMdUp = useMdUp() ?? false;
   const isLgUp = useLgUp() ?? false;
 
@@ -143,8 +191,35 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
   // Desktop preference persists across sessions. Tablet state is in-memory
   // only so entering tablet always starts minimized without clobbering the
   // user's desktop choice.
-  const [desktopMinimized, setDesktopMinimized] = useLocalStorage<boolean>(STORAGE_KEY, config.minimized ?? false);
+  const [storedMinimized, setStoredMinimized] = useLocalStorage<boolean>(STORAGE_KEY, config.minimized ?? false);
   const [tabletMinimized, setTabletMinimized] = useState(true);
+
+  // Controlled collapse (`config.collapsed`) replaces the persisted desktop
+  // preference — the store is still read (hooks run unconditionally) but never
+  // consulted or written. The tablet overlay stays this component's own.
+  const isControlled = config.collapsed !== undefined;
+  const desktopMinimized = isControlled ? (config.collapsed ?? false) : storedMinimized;
+
+  // A CHANGE of the controlled value is also a command for the tablet overlay:
+  // `false` opens it, `true` closes it — so a host can reveal the sidebar from
+  // anywhere (⌘K) at every width without the overlay ever writing back into the
+  // host's desktop preference. Adjusted while rendering, like the reset below.
+  const [collapsedSeen, setCollapsedSeen] = useState(config.collapsed);
+  if (collapsedSeen !== config.collapsed) {
+    setCollapsedSeen(config.collapsed);
+    if (isTablet && config.collapsed !== undefined) setTabletMinimized(config.collapsed);
+  }
+
+  // `revealSignal`: each change shows the expanded sidebar. The tablet overlay
+  // is this component's own state, so it opens while rendering, like the
+  // `collapsed` command above — and unlike it, also when `collapsed` is already
+  // `false`. Desktop is the host's preference (or the stored one): that is
+  // written from the effect below, never during render.
+  const [revealSeen, setRevealSeen] = useState(config.revealSignal);
+  if (revealSeen !== config.revealSignal) {
+    setRevealSeen(config.revealSignal);
+    if (isTablet && config.revealSignal !== undefined) setTabletMinimized(false);
+  }
 
   // Entering tablet always starts minimized. Adjusted while rendering — React's
   // documented pattern for a reset driven by a value the render already has —
@@ -170,10 +245,33 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
   // were never visible.
   const hydrated = useIsHydrated();
 
-  const minimized = hydrated ? (isTablet ? tabletMinimized : desktopMinimized) : (config.minimized ?? false);
+  // A controlled value is the host's, identical on both sides of hydration, so it
+  // needs no gate; the persisted one does.
+  const serverMinimized = isControlled ? desktopMinimized : (config.minimized ?? false);
+  const minimized = hydrated ? (isTablet ? tabletMinimized : desktopMinimized) : serverMinimized;
 
   // Enable transitions only after the correct width is painted
   const [transitionsEnabled, setTransitionsEnabled] = useState(false);
+
+  // A grouped config's own expanded width (`expandedWidth`); `null` = the
+  // default 224px through the literal classes, exactly as before.
+  const customExpandedWidth =
+    config.variant === 'grouped' && config.expandedWidth !== undefined
+      ? Math.max(config.expandedWidth, MIN_CUSTOM_EXPANDED_WIDTH)
+      : null;
+  const expandedWidth = customExpandedWidth ?? EXPANDED_WIDTH;
+  const expandedWidthStyle =
+    customExpandedWidth === null ? undefined : ({ [EXPANDED_WIDTH_VAR]: `${customExpandedWidth}px` } as CSSProperties);
+
+  // A new expanded width (the host swapped configs — e.g. a placeholder for
+  // the grouped tree) is a different sidebar, not a toggle: it snaps instead of
+  // animating. The transition is dropped in the same commit that moves the
+  // width and comes back a frame later (the effect below).
+  const [widthFor, setWidthFor] = useState(expandedWidth);
+  if (widthFor !== expandedWidth) {
+    setWidthFor(expandedWidth);
+    setTransitionsEnabled(false);
+  }
 
   const isOverlayOpen = isTablet && !minimized;
 
@@ -183,14 +281,28 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     if (isTablet) {
       setTabletMinimized(prev => !prev);
     } else {
-      setDesktopMinimized(prev => !prev);
+      if (!isControlled) setStoredMinimized(prev => !prev);
+      config.onCollapsedChange?.(!desktopMinimized);
     }
     config.onToggleMinimized?.();
-  }, [isTablet, setDesktopMinimized, config]);
+  }, [isTablet, isControlled, setStoredMinimized, desktopMinimized, config]);
 
   const closeOverlay = useCallback(() => {
     setTabletMinimized(true);
   }, []);
+
+  // The desktop half of `revealSignal`: expand a collapsed sidebar — through
+  // the host when it owns the value, through the stored preference otherwise.
+  // Only a CHANGE counts; the value the sidebar mounted with is no command.
+  const revealHandledRef = useRef(config.revealSignal);
+  const { revealSignal, onCollapsedChange } = config;
+  useEffect(() => {
+    if (revealHandledRef.current === revealSignal) return;
+    revealHandledRef.current = revealSignal;
+    if (revealSignal === undefined || !isLgUp || !desktopMinimized) return;
+    if (!isControlled) setStoredMinimized(false);
+    onCollapsedChange?.(false);
+  }, [revealSignal, isLgUp, desktopMinimized, isControlled, setStoredMinimized, onCollapsedChange]);
 
   // Dismiss the tablet overlay with Escape so it behaves like a transient panel
   useEffect(() => {
@@ -213,7 +325,16 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
   // a section still loading and announce it as the current page to a screen
   // reader — a statement that is simply false until the router says otherwise.
   const [pendingItemId, setPendingItemId] = useState<string | null>(null);
-  const committedActiveId = useMemo(() => config.items.find(item => item.isActive)?.id ?? null, [config.items]);
+  const grouped = config.variant === 'grouped';
+  // ONE active entry for the whole tree. Flat: `items.find(isActive)`, exactly
+  // as before, unless the host also hands over `currentPath` for entries that
+  // leave `isActive` out. Grouped: resolved through the children too, so the
+  // committed id — and the pending hint cleared by it — can be a child's.
+  const { activeId: committedActiveId, groupId: activeGroupId } = useMemo(
+    () => resolveNavigationActive(config.items, { currentPath: config.currentPath, includeChildren: grouped }),
+    [config.items, config.currentPath, grouped],
+  );
+  const [openGroupId, setOpenGroupId] = useOpenNavigationGroup(activeGroupId);
 
   // Any committed change clears it — including one that landed somewhere else
   // entirely (a redirect, a link elsewhere on the page). A navigation that never
@@ -270,6 +391,13 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     [config, isTablet, committedActiveId],
   );
 
+  // A group parent (grouped variant) only opens and folds; it goes nowhere. The
+  // one-open rule closes whichever group was open.
+  const handleGroupClick = useCallback(
+    (item: NavigationSidebarItem) => setOpenGroupId(current => (current === item.id ? null : item.id)),
+    [setOpenGroupId],
+  );
+
   const { primaryItems, secondaryItems } = useMemo(
     () => ({
       primaryItems: config.items.filter(item => item.section !== 'secondary'),
@@ -293,15 +421,35 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     };
   }, [config.loading, config.loadingRows?.primary, config.loadingRows?.secondary]);
 
-  const sidebarWidth = useMemo(() => (minimized ? `${MINIMIZED_WIDTH}px` : `${EXPANDED_WIDTH}px`), [minimized]);
+  // The grouped rows glide and fade with the width, on the same curve.
+  const widthTransition = cn(
+    'transition-[width] duration-300',
+    grouped && '[transition-timing-function:cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+  );
+
+  const sidebarWidth = useMemo(
+    () => (minimized ? `${MINIMIZED_WIDTH}px` : `${expandedWidth}px`),
+    [minimized, expandedWidth],
+  );
+
+  // Shown from 140px, fading in as it arrives (the rows' labels fade the same
+  // way, and a node section has no width to fade in below that).
+  const sectionRailHidden =
+    typeof config.sectionSlot !== 'function' &&
+    'hidden @[140px]/of-nav-sidebar:flex animate-in fade-in duration-300 motion-reduce:animate-none';
 
   // Published to CSS from an EFFECT, never from render. Before hydration the
   // width belongs to whatever seeded `NAVIGATION_SIDEBAR_WIDTH_VAR` in `<head>`
   // — put it in the markup instead and it becomes part of what React hydrates,
   // which is precisely what cannot agree across the server boundary. Afterwards
   // this is what a toggle moves.
+  //
+  // On the rail, not on `<html>` where the seed sits: the rail is its only reader,
+  // and an inherited custom property on the root made WebKit restyle the whole
+  // document on every toggle. Its own value overrides the inherited seed.
+  const asideRef = useRef<HTMLElement>(null);
   useIsomorphicLayoutEffect(() => {
-    document.documentElement.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
+    asideRef.current?.style.setProperty(NAVIGATION_SIDEBAR_WIDTH_VAR, sidebarWidth);
   }, [sidebarWidth]);
 
   // There used to be an `isHydrated` gate here — `isMdUp !== undefined && ...`
@@ -318,6 +466,45 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
     });
     return () => cancelAnimationFrame(id);
   }, [transitionsEnabled]);
+
+  // One `<nav>` block's rows: placeholders while loading, else the entries in
+  // the variant's geometry.
+  const renderEntries = (placeholders: string[] | null, items: NavigationSidebarItem[]): ReactNode => {
+    if (placeholders) {
+      return placeholders.map(key =>
+        grouped ? (
+          <NavigationSidebarGroupedSkeleton key={key} />
+        ) : (
+          <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
+        ),
+      );
+    }
+    if (grouped) {
+      return (
+        <NavigationSidebarGroupedEntries
+          items={items}
+          activeId={committedActiveId}
+          pendingId={pendingItemId}
+          openGroupId={openGroupId}
+          showLabel={showLabel}
+          disabled={disabled}
+          onItemClick={handleItemClick}
+          onGroupClick={handleGroupClick}
+        />
+      );
+    }
+    return items.map(item => (
+      <NavigationSidebarItemButton
+        key={item.id}
+        item={item}
+        isActive={item.id === committedActiveId}
+        isPending={item.id === pendingItemId}
+        showLabel={showLabel}
+        disabled={disabled}
+        onClick={handleItemClick}
+      />
+    ));
+  };
 
   return (
     <>
@@ -342,9 +529,14 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
       <div
         className={cn(
           'hidden h-full flex-shrink-0 md:block lg:hidden',
-          isOverlayOpen && pushOnTablet ? 'w-56' : 'w-14',
-          transitionsEnabled && 'transition-[width] duration-300',
+          isOverlayOpen && pushOnTablet
+            ? customExpandedWidth === null
+              ? 'w-56'
+              : 'w-[var(--of-navigation-sidebar-expanded-width)]'
+            : 'w-14',
+          transitionsEnabled && animateWidth && widthTransition,
         )}
+        style={expandedWidthStyle}
         aria-hidden="true"
       />
 
@@ -353,68 +545,91 @@ export function NavigationSidebar({ config, disabled = false, pushOnTablet = fal
           SIDEBAR_CONTAINER,
           'hidden flex-shrink-0 flex-col md:flex',
           'border-r border-ods-border bg-ods-card',
-          SIDEBAR_GEOMETRY_CLASSES,
+          customExpandedWidth === null ? SIDEBAR_GEOMETRY_CLASSES.default : SIDEBAR_GEOMETRY_CLASSES.custom,
           // The one width a viewport cannot imply: an overlay the user opened on
           // tablet. Only ever true after a click, so the first paint always gets
           // the rail.
-          isOverlayOpen ? SIDEBAR_TABLET_WIDTH.overlay : SIDEBAR_TABLET_WIDTH.rail,
-          transitionsEnabled && 'transition-[width] duration-300',
+          !isOverlayOpen
+            ? SIDEBAR_TABLET_WIDTH.rail
+            : customExpandedWidth === null
+              ? SIDEBAR_TABLET_WIDTH.overlay
+              : SIDEBAR_TABLET_WIDTH.customOverlay,
+          transitionsEnabled && widthTransition,
+          // Snaps where its width moves the content: the desktop rail, and the
+          // tablet overlay too when it pushes (its slot above snaps with it).
+          !animateWidth && (pushOnTablet ? 'transition-none' : 'lg:transition-none'),
           config.className,
         )}
+        ref={asideRef}
+        style={expandedWidthStyle}
         aria-label="Main navigation sidebar"
+        {...{ [NAVIGATION_SIDEBAR_ATTRIBUTE]: '' }}
       >
         <NavigationSidebarHeader minimized={minimized} />
 
-        <div className="flex flex-1 flex-col justify-between overflow-y-auto py-4">
-          {/* The top slot and the primary nav are ONE `justify-between` child.
-              As siblings they would be three, and the spare space would open
-              between the slot and the nav instead of between the two navs. */}
+        <div
+          className={cn(
+            'flex flex-1 flex-col justify-between overflow-y-auto',
+            grouped ? 'px-[var(--spacing-system-xsf)] py-[var(--spacing-system-mf)]' : 'py-4',
+          )}
+        >
+          {/* The top slot, the primary nav and the section are ONE
+              `justify-between` child. As siblings the spare space would open
+              between them instead of above the secondary nav. */}
           <div className="flex flex-col">
             {config.topSlot?.({ minimized })}
 
             {/* `aria-busy` on the nav, not the rows: the region is what is loading,
                 and each placeholder row is already `aria-hidden`. */}
-            <nav className="flex flex-col" aria-label="Primary navigation" aria-busy={!!loadingRows}>
-              {loadingRows
-                ? loadingRows.primary.map(key => (
-                    <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
-                  ))
-                : primaryItems.map(item => (
-                    <NavigationSidebarItemButton
-                      key={item.id}
-                      item={item}
-                      isActive={item.id === committedActiveId}
-                      isPending={item.id === pendingItemId}
-                      showLabel={showLabel}
-                      disabled={disabled}
-                      onClick={handleItemClick}
-                    />
-                  ))}
+            <nav
+              className={cn('flex flex-col', grouped && 'gap-[var(--spacing-system-xxs)]')}
+              aria-label="Primary navigation"
+              aria-busy={!!loadingRows}
+            >
+              {renderEntries(loadingRows?.primary ?? null, primaryItems)}
             </nav>
+
+            {/* The host's section (the chat history), in the flow at its full
+                height: the body scrolls the tree and the section as one, so
+                there is one scroll to follow and none to get caught in. A node
+                has no use for a 56px rail and is hidden there by the rail's
+                width (mounted, so its search survives a toggle); a function
+                decides for itself. */}
+            {hasNavigationSidebarSlot(config.sectionSlot) && (
+              // A divider between the tree and the section, as under the top slot's rows.
+              <div
+                className={cn(
+                  'mt-[var(--spacing-system-xsf)] flex flex-col border-t border-ods-border pt-[var(--spacing-system-sf)]',
+                  sectionRailHidden,
+                )}
+              >
+                {renderNavigationSidebarSlot(config.sectionSlot, { minimized, inDrawer: false })}
+              </div>
+            )}
           </div>
 
           {(loadingRows ? loadingRows.secondary.length > 0 : secondaryItems.length > 0) && (
             <nav className="flex flex-col" aria-label="Secondary navigation" aria-busy={!!loadingRows}>
-              {loadingRows
-                ? loadingRows.secondary.map(key => (
-                    <NavigationSidebarItemButton key={key} loading showLabel={showLabel} />
-                  ))
-                : secondaryItems.map(item => (
-                    <NavigationSidebarItemButton
-                      key={item.id}
-                      item={item}
-                      isActive={item.id === committedActiveId}
-                      isPending={item.id === pendingItemId}
-                      showLabel={showLabel}
-                      disabled={disabled}
-                      onClick={handleItemClick}
-                    />
-                  ))}
+              {renderEntries(loadingRows?.secondary ?? null, secondaryItems)}
             </nav>
           )}
         </div>
 
-        <NavigationSidebarToggle minimized={minimized} showLabel={showLabel} onToggle={handleToggle} />
+        {/* The host's footer (the account row), pinned above the toggle and inset
+            like the rows. Rendered in both widths: a function adapts to
+            `minimized`, a node is clipped to the rail. */}
+        {hasNavigationSidebarSlot(config.footerSlot) && (
+          <div className="shrink-0 overflow-hidden border-t border-ods-border px-[var(--spacing-system-xsf)] py-[var(--spacing-system-xxs)]">
+            {renderNavigationSidebarSlot(config.footerSlot, { minimized, inDrawer: false })}
+          </div>
+        )}
+
+        <NavigationSidebarToggle
+          minimized={minimized}
+          showLabel={showLabel}
+          onToggle={handleToggle}
+          compact={grouped}
+        />
       </aside>
     </>
   );

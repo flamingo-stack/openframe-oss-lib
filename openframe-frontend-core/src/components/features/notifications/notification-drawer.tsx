@@ -21,6 +21,11 @@ export interface NotificationDrawerProps {
   liveDurationMs?: number;
   loadMoreRootMargin?: string;
   renderTile?: RenderNotificationTile;
+  /**
+   * Draw the title's × close button. Off by default: the header bell turns into × while the drawer
+   * is open. A host without a desktop header (`AppLayout desktopHeader={false}`) has no such bell.
+   */
+  showClose?: boolean;
 }
 
 export function NotificationDrawer({
@@ -28,6 +33,7 @@ export function NotificationDrawer({
   liveDurationMs,
   loadMoreRootMargin = '200px',
   renderTile: renderTileProp,
+  showClose = false,
 }: NotificationDrawerProps) {
   const ctx = useOptionalNotifications();
   // Inside AppLayout the drawer renders in-layout (dims and covers only the
@@ -67,7 +73,7 @@ export function NotificationDrawer({
     <>
       <div className="px-[var(--spacing-system-m)] pt-[var(--spacing-system-m)]">
         <DrawerTitle
-          hideClose
+          hideClose={!showClose}
           className="truncate"
           actions={
             <Button

@@ -3,10 +3,8 @@
 import React from 'react';
 import { useMdUp } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
-import { useOptionalNotifications } from '../features/notifications/notifications-context';
 import { TimeTrackerHeaderButton } from '../features/time-tracker';
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated';
-import { BellIcon } from '../icons-v2-generated/interface/bell-icon';
 import { LogOutIcon } from '../icons-v2-generated/interface/log-out-icon';
 import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
 import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-icon';
@@ -18,6 +16,7 @@ import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
 import { HeaderMingoButton } from './header-mingo-button';
 import { HeaderOrganizationFilter } from './header-organization-filter';
+import { NotificationsBellButton } from './notifications-bell-button';
 import { TicketAlertsButton } from './ticket-alerts-button';
 import { TopNavigation } from './top-navigation';
 
@@ -74,6 +73,14 @@ export interface AppHeaderProps {
    */
   disabled?: boolean;
   /**
+   * The host's own action cells beside the built-in ones (a phone "Chat
+   * history" cell, say). Drawn as the built-in cells are — an icon-only
+   * `HeaderButton` with the leading divider, dimmed and disabled with the
+   * header — in the order given, at their `placement`. Optional; without it the
+   * header is unchanged.
+   */
+  customCells?: ReadonlyArray<AppHeaderCell>;
+  /**
    * Draw placeholder cells instead of the live controls.
    *
    * Solves a problem this header cannot solve on its own: its mobile/desktop split
@@ -119,10 +126,37 @@ export interface AppHeaderProps {
  * - `'icon-md'` — the same cell, from md only (the avatar: `isMdUp && showUser`).
  * - `'icon-lg'` — the same cell, from lg only (the organization filter, which the
  *   live header renders `hidden lg:flex`).
+ * - `'icon-max-md'` — the same cell, below md only (a `customCells` entry with
+ *   `mobileOnly`).
  * - `'wide'` — the Mingo launcher: a 48px square below md, where the live button is
  *   `iconOnly`, and the fixed 140px labelled cell from md.
  */
-export type HeaderLoadingCell = 'icon' | 'icon-md' | 'icon-lg' | 'wide';
+export type HeaderLoadingCell = 'icon' | 'icon-md' | 'icon-lg' | 'icon-max-md' | 'wide';
+
+/**
+ * A host-defined trailing cell — see `AppHeaderProps.customCells`.
+ */
+export interface AppHeaderCell {
+  /** Stable React key. */
+  id: string;
+  /** The cell's icon, sized like the built-in ones (`h-6 w-6`). */
+  icon: React.ReactNode;
+  /** Accessible name; the cell is icon-only. */
+  label: string;
+  onClick?: () => void;
+  /** Pressed look, e.g. while the panel the cell opens is showing. */
+  isActive?: boolean;
+  /** The shared unread dot on the icon. */
+  showUnreadDot?: boolean;
+  /**
+   * - `start` (default): before the built-in cells — after the phone search
+   *   trigger and the organization filter, before the time tracker and the bell.
+   * - `end`: after them, immediately before the Mingo cell.
+   */
+  placement?: 'start' | 'end';
+  /** Only below md: a phone top-bar cell. In CSS, like every split here. Default false. */
+  mobileOnly?: boolean;
+}
 
 export const AppHeader = React.memo(function AppHeaderImpl({
   showSearch,
@@ -153,6 +187,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   disabled = false,
   loading: loadingProp = false,
   loadingActionCells,
+  customCells,
 }: AppHeaderProps) {
   const isMdUp = useMdUp() ?? false;
   const loading = useLoadingScope() || loadingProp;
@@ -171,10 +206,12 @@ export const AppHeader = React.memo(function AppHeaderImpl({
           // gated on `isMdUp`, and Mingo is `iconOnly` below md.
           ([
             showOrganizations && 'icon-lg',
+            ...customCellFootprints(customCells, 'start'),
             showTimeTracker && 'icon',
             showNotifications && 'icon',
             showTicketAlerts && 'icon',
             showUser && 'icon-md',
+            ...customCellFootprints(customCells, 'end'),
             showMingoAI && 'wide',
           ].filter(Boolean) as HeaderLoadingCell[])
         }
@@ -187,6 +224,22 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   // Cells carry their own dividers in the unified TopNavigation model
   // (the shell no longer applies divide-x).
   const cellDivider = 'border-l border-ods-border';
+  const renderCustomCells = (placement: NonNullable<AppHeaderCell['placement']>) =>
+    customCells
+      ?.filter(cell => (cell.placement ?? 'start') === placement)
+      .map(cell => (
+        <HeaderButton
+          key={cell.id}
+          type="button"
+          icon={cell.icon}
+          aria-label={cell.label}
+          onClick={cell.onClick}
+          isActive={cell.isActive}
+          showUnreadDot={cell.showUnreadDot}
+          disabled={disabled || !cell.onClick}
+          className={cn(cell.mobileOnly && 'md:hidden', cellDivider, dimmedClass)}
+        />
+      ));
 
   return (
     <TopNavigation
@@ -241,15 +294,17 @@ export const AppHeader = React.memo(function AppHeaderImpl({
             />
           )}
 
+          {renderCustomCells('start')}
+
           {/* Time tracker button */}
           {showTimeTracker && <TimeTrackerHeaderButton disabled={disabled} className={cn(cellDivider, dimmedClass)} />}
 
           {/* Notifications button */}
           {showNotifications && (
-            <NotificationsHeaderButton
+            <NotificationsBellButton
               fallbackUnreadCount={unreadCount}
               disabled={disabled}
-              dimmedClass={cn(cellDivider, dimmedClass)}
+              className={cn(cellDivider, dimmedClass)}
             />
           )}
 
@@ -332,6 +387,8 @@ export const AppHeader = React.memo(function AppHeaderImpl({
             </DropdownMenu>
           )}
 
+          {renderCustomCells('end')}
+
           {/* Mingo AI launcher — anchored at the very end of the header. On mobile
           it collapses to an icon-only affordance (no "Mingo AI" wordmark). */}
           {showMingoAI && (
@@ -350,33 +407,6 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   );
 });
 
-interface NotificationsHeaderButtonProps {
-  fallbackUnreadCount: number;
-  disabled: boolean;
-  dimmedClass: string;
-}
-
-function NotificationsHeaderButton({ fallbackUnreadCount, disabled, dimmedClass }: NotificationsHeaderButtonProps) {
-  const ctx = useOptionalNotifications();
-  const hasUnread = (ctx?.unreadCount ?? fallbackUnreadCount) > 0;
-  const isActive = ctx?.isOpen ?? false;
-  const onClick = ctx?.toggle;
-
-  return (
-    <HeaderButton
-      icon={isActive ? <XmarkIcon className="h-6 w-6" /> : <BellIcon className="h-6 w-6" />}
-      // Shared dot primitive on the cell — same markup every indicator
-      // cell renders (see HeaderButton.showUnreadDot / <UnreadDot>).
-      showUnreadDot={!isActive && hasUnread}
-      aria-label={isActive ? 'Close notifications' : 'Notifications'}
-      onClick={onClick}
-      isActive={isActive}
-      disabled={disabled || !onClick}
-      className={dimmedClass}
-    />
-  );
-}
-
 export default AppHeader;
 
 // Literal class strings — Tailwind's scanner needs to see them spelled out.
@@ -384,7 +414,18 @@ const CELL_VISIBILITY: Record<Exclude<HeaderLoadingCell, 'wide'>, string | undef
   icon: undefined,
   'icon-md': 'hidden md:flex',
   'icon-lg': 'hidden lg:flex',
+  'icon-max-md': 'md:hidden',
 };
+
+/** The loading footprints of the custom cells at one placement, in order. */
+function customCellFootprints(
+  cells: ReadonlyArray<AppHeaderCell> | undefined,
+  placement: NonNullable<AppHeaderCell['placement']>,
+): HeaderLoadingCell[] {
+  return (cells ?? [])
+    .filter(cell => (cell.placement ?? 'start') === placement)
+    .map(cell => (cell.mobileOnly ? 'icon-max-md' : 'icon'));
+}
 
 /** One trailing action cell placeholder — mirrors the live cells' 48/56px box. */
 function HeaderCellSkeleton({ className }: { className?: string }) {
