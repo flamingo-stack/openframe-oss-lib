@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * Wire payload sent to the OpenFrame agent over core NATS for a schedule fire —
@@ -25,7 +26,7 @@ import java.util.List;
  * correlates via that shared id.
  */
 @Data
-@Builder
+@Builder(toBuilder = true)
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -40,4 +41,10 @@ public class ScriptScheduleExecutionMessage {
     private String initiatedBy;
 
     private List<ScriptScheduleExecutionItem> scripts;
+
+    public ScriptScheduleExecutionMessage revealed(UnaryOperator<String> decrypt) {
+        List<ScriptScheduleExecutionItem> revealedScripts = scripts == null ? null
+                : scripts.stream().map(item -> item.revealed(decrypt)).toList();
+        return toBuilder().scripts(revealedScripts).build();
+    }
 }

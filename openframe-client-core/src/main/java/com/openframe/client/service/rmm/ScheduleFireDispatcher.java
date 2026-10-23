@@ -1,5 +1,6 @@
 package com.openframe.client.service.rmm;
 
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
@@ -55,6 +56,7 @@ public class ScheduleFireDispatcher {
     private final MachineRepository machineRepository;
     private final DeviceOnlineDispatchRepository dispatchRepository;
     private final ScriptDeliveryRetryStore retryStore;
+    private final EncryptionService encryptionService;
 
     public void dispatch(ScheduleScript schedule, Instant now) {
         List<String> targets = targetResolver.resolveTargetMachineIds(schedule);
@@ -238,7 +240,8 @@ public class ScheduleFireDispatcher {
                     .initiatedBy(fire.initiatedBy())
                     .scripts(items)
                     .build();
-            scriptScheduleNatsPublisher.publish(machineId, message);
+            ScriptScheduleExecutionMessage revealed = message.revealed(encryptionService::decrypt);
+            scriptScheduleNatsPublisher.publish(machineId, revealed);
             retryStore.store(fire.executionId(), machineId, DeliveryChannel.SCHEDULE, message);
         });
     }

@@ -14,6 +14,7 @@ import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptScheduleMapper;
 import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.NotFoundException;
@@ -77,7 +78,8 @@ class ScheduleScriptServiceTest {
         tenantIdProvider = mock(TenantIdProvider.class);
         deviceLocalDispatchRepository = mock(ScheduleDeviceLocalDispatchRepository.class);
         onlineDeviceDispatchRepository = mock(DeviceOnlineDispatchRepository.class);
-        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(), scriptService,
+        scheduleService = new ScheduleScriptService(scheduleRepository, new ScriptScheduleMapper(
+                new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0")), scriptService,
                 tenantIdProvider, deviceLocalDispatchRepository, onlineDeviceDispatchRepository);
 
         createInput = new CreateScriptScheduleInput();

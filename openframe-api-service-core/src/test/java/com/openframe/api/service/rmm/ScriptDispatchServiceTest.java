@@ -421,7 +421,7 @@ class ScriptDispatchServiceTest {
                                 ScheduledScriptCustomParams.builder()
                                         .scriptId(SCRIPT_ID)
                                         .args(List.of("--custom", "42"))
-                                        .envVars(List.of(new ScriptEnvVar("OVERRIDE", "v", false)))
+                                        .envVars(List.of(ScriptEnvVar.builder().name("OVERRIDE").value("v").secret(false).build()))
                                         .build()))
                         .build();
         when(scheduleScriptService.get(scheduleId)).thenReturn(schedule);
