@@ -14,9 +14,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Collection;
 import java.util.List;
 
-// The projections' ticket writes. Not TicketRepository: that one is tenant-aware and not created in the shared stream,
-// where the projections run, so every write here names its tenant. Ticket.class makes Spring add $inc on @Version, so a
-// user holding an old copy of a ticket gets a conflict instead of overwriting the new name.
+// The projections' ticket writes; TicketRepository is tenant-aware and absent in the shared stream, so each names the tenant.
 @Repository
 @RequiredArgsConstructor
 public class TicketProjectionRepository {

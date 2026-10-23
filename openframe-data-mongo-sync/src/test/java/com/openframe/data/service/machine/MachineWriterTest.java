@@ -2,6 +2,9 @@ package com.openframe.data.service.machine;
 
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.repository.device.publishing.MachineAggregateSpec;
+import com.openframe.data.repository.device.publishing.MachineEvent;
+import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,9 +17,14 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.openframe.data.service.machine.MachineFields.LAST_SEEN;
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
@@ -168,5 +176,57 @@ class MachineWriterTest {
         assertThat(writer.update("m1", machineUpdate())).isEmpty();
 
         verifyNoInteractions(template);
+    }
+
+    // Heartbeat and status writes change no copied name, so they stay out of the outbox transaction.
+    @Test
+    void aStatusWrite_isNotPublished_evenWithPublishingOn() {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider);
+        Machine stored = new Machine();
+        storedDocumentIs(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(STATUS, DeviceStatus.OFFLINE));
+
+        verifyNoInteractions(publisher);
+        capturedUpdate();
+    }
+
+    @Test
+    void aNicknameWrite_isPublishedForTheMachinesDocument() {
+        OutboxPublisher publisher = mock(OutboxPublisher.class);
+        MachineAggregateSpec spec = mock(MachineAggregateSpec.class);
+        ObjectProvider<OutboxPublisher> publisherProvider = present(publisher);
+        ObjectProvider<MachineAggregateSpec> specProvider = present(spec);
+        MachineWriter publishingWriter = new MachineWriter(template, publisherProvider, specProvider);
+        Machine stored = new Machine();
+        stored.setId("doc-1");
+        when(template.findOne(any(Query.class), eq(Machine.class))).thenReturn(stored);
+
+        publishingWriter.update("m1", machineUpdate().set(NICKNAME, "Reception iMac"));
+
+        verify(publisher).publishChangedByIds(eq(spec), eq(List.of("doc-1")), any());
+    }
+
+    // A field added to MachineEvent must be added to EVENT_PATHS too, or its writes would not be published.
+    @Test
+    void theEventPaths_areTheFieldsOfMachineEvent_butTheId() {
+        Set<String> eventFields = Arrays.stream(MachineEvent.class.getDeclaredFields())
+                .filter(field -> !Modifier.isStatic(field.getModifiers()))
+                .map(Field::getName)
+                .filter(name -> !name.equals("machineId"))
+                .collect(Collectors.toSet());
+
+        assertThat(MachineWriter.EVENT_PATHS).isEqualTo(eventFields);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> ObjectProvider<T> present(T bean) {
+        ObjectProvider<T> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(bean);
+        return provider;
     }
 }

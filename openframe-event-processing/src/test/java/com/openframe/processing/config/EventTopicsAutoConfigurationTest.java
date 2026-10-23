@@ -3,7 +3,7 @@ package com.openframe.processing.config;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
 import com.openframe.processing.topic.EventTopicCreator;
-import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -17,7 +17,8 @@ class EventTopicsAutoConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(EventTopicsAutoConfiguration.class))
-            .withUserConfiguration(AggregateSpecRegistry.class)
+            .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
             .withBean(WidgetSpec.class, () -> new WidgetSpec(List.of(new RecordingProjection("widget-on-organizations"))));
 
     @Test

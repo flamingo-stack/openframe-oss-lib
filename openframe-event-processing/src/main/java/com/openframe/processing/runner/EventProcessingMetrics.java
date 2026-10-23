@@ -19,6 +19,7 @@ public class EventProcessingMetrics {
     private static final String TAG_PROJECTION = "projection";
     private static final String TAG_OUTCOME = "outcome";
     static final String OUTCOME_APPLIED = "applied";
+    static final String OUTCOME_UNCHANGED = "unchanged";
     static final String OUTCOME_HANDED_OVER = "handed_over";
     static final String OUTCOME_SKIPPED = "skipped";
     static final String OUTCOME_DELETED = "deleted";
@@ -42,6 +43,11 @@ public class EventProcessingMetrics {
     void recordApplied(Timer.Sample sample, String projectionName) {
         ProjectionMeters meters = metersByProjection.get(projectionName);
         sample.stop(meters.applied);
+    }
+
+    void recordUnchanged(Timer.Sample sample, String projectionName) {
+        ProjectionMeters meters = metersByProjection.get(projectionName);
+        sample.stop(meters.unchanged);
     }
 
     void recordHandedOver(Timer.Sample sample, String projectionName) {
@@ -71,12 +77,13 @@ public class EventProcessingMetrics {
 
     private ProjectionMeters metersOf(String projectionName) {
         Timer applied = timerOf(projectionName, OUTCOME_APPLIED);
+        Timer unchanged = timerOf(projectionName, OUTCOME_UNCHANGED);
         Timer handedOver = timerOf(projectionName, OUTCOME_HANDED_OVER);
         Timer skipped = timerOf(projectionName, OUTCOME_SKIPPED);
         Timer deleted = timerOf(projectionName, OUTCOME_DELETED);
         Timer failed = timerOf(projectionName, OUTCOME_FAILED);
         Timer mongoUnavailable = timerOf(projectionName, OUTCOME_MONGO_UNAVAILABLE);
-        return new ProjectionMeters(applied, handedOver, skipped, deleted, failed, mongoUnavailable);
+        return new ProjectionMeters(applied, unchanged, handedOver, skipped, deleted, failed, mongoUnavailable);
     }
 
     private Timer timerOf(String projectionName, String outcome) {
@@ -87,6 +94,7 @@ public class EventProcessingMetrics {
     private static class ProjectionMeters {
 
         private final Timer applied;
+        private final Timer unchanged;
         private final Timer handedOver;
         private final Timer skipped;
         private final Timer deleted;

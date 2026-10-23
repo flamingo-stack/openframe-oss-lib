@@ -19,14 +19,9 @@ public class TimeEntryCascadeAspect {
 
     private final TimeEntryCascadeService timeEntryCascadeService;
     private final TicketRepository ticketRepository;
-    // Off once the stream's ticket-on-time-entries projection applies the ticket events instead.
-    private final boolean ticketCascadeEnabled;
 
     @Around("execution(* com.openframe.data.repository.ticket.TicketRepository.save(..)) && args(ticket)")
     public Object aroundTicketSave(ProceedingJoinPoint joinPoint, Ticket ticket) throws Throwable {
-        if (!ticketCascadeEnabled) {
-            return joinPoint.proceed();
-        }
         String oldTitle = captureTicketTitle(ticket);
 
         Ticket savedTicket = (Ticket) joinPoint.proceed();
@@ -41,9 +36,6 @@ public class TimeEntryCascadeAspect {
 
     @Around("execution(* com.openframe.data.repository.ticket.TicketRepository.saveAll(..)) && args(tickets)")
     public Object aroundTicketSaveAll(ProceedingJoinPoint joinPoint, Iterable<Ticket> tickets) throws Throwable {
-        if (!ticketCascadeEnabled) {
-            return joinPoint.proceed();
-        }
         Map<String, String> oldTitles = captureTicketTitles(tickets);
 
         @SuppressWarnings("unchecked")

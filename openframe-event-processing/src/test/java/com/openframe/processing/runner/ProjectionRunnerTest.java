@@ -245,6 +245,19 @@ class ProjectionRunnerTest {
                 });
     }
 
+    // A save that kept the copied value changes nothing, so no write is sent; its version is stored all the same.
+    @Test
+    void anEventThatChangesNothing_isNotApplied_butItsVersionIsStored() {
+        onTickets.changes = 0;
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(false));
+
+            assertThat(onTickets.records).isEmpty();
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_UNCHANGED)).isEqualTo(1);
+        });
+    }
+
     @Test
     void anEventBelowTheInlineLimit_isAppliedInline() {
         onTickets.changes = 4999;

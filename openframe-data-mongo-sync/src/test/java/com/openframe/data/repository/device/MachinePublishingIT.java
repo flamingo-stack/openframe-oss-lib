@@ -32,6 +32,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.openframe.data.service.machine.MachineFields.NICKNAME;
 import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
@@ -103,6 +104,21 @@ class MachinePublishingIT {
     private static long readVersion(OutboxEvent row) {
         Number version = (Number) row.getPayload().get("version");
         return version.longValue();
+    }
+
+    // The reconcile reads only the names, not whole machines.
+    @Test
+    void theReconcileRead_returnsTheNamesOnly() {
+        machineRepository.save(buildMachine());
+        Set<String> tenantIds = Set.of("tenant-1");
+        Set<String> machineIds = Set.of("machine-1");
+
+        List<Machine> found = machineRepository.findByTenantIdInAndMachineIdIn(tenantIds, machineIds);
+
+        assertThat(found).singleElement().satisfies(machine -> {
+            assertThat(machine.getHostname()).isNotNull();
+            assertThat(machine.getIp()).isNull();
+        });
     }
 
     private static Machine buildMachine() {

@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class UserOnTicketsProjectionTest {
@@ -83,6 +84,37 @@ class UserOnTicketsProjectionTest {
 
         // verifications
         assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2");
+    }
+
+    // An assignment may have stored the email for a user with no name; the projection must not blank it.
+    @Test
+    void aUserWithoutAName_leavesTheTicketCopiesAlone() {
+        // setup
+        PublishedRecord<UserEvent> record = buildRecord("tenant-a", "user-1", " ", null);
+
+        // execution
+        projection.apply(record);
+        long changes = projection.countChanges(record, 5000);
+        String lastId = projection.applyBatch(record, null, 1000);
+
+        // verifications
+        assertThat(changes).isZero();
+        assertThat(lastId).isNull();
+        verifyNoInteractions(ticketProjectionRepository);
+    }
+
+    @Test
+    void theEmailCopyOfAUserWithoutAName_isNoMismatch() {
+        // setup
+        when(userRepository.findByTenantIdInAndIdIn(Set.of("tenant-a"), Set.of("user-1")))
+                .thenReturn(List.of(buildUser("tenant-a", "user-1", null, " ")));
+
+        // execution
+        ReconciliationResult result = projection.reconcile(List.of(
+                buildTicket("t1", "tenant-a", "user-1", "ada@example.com", null, null)));
+
+        // verifications
+        assertThat(result.getMismatches()).isEmpty();
     }
 
     @Test

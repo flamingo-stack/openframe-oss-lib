@@ -7,10 +7,8 @@ import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
+import com.openframe.publishing.api.model.TenantScopedId;
 import com.openframe.publishing.api.spec.Projection;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,8 +21,7 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
-// The hostname every ticket keeps for its device (deviceHostname, by deviceId); TicketCascadeAspect writes it until the
-// mode is events.
+// The hostname every ticket keeps (deviceHostname, by deviceId); TicketCascadeAspect writes it until the mode is events.
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -90,7 +87,7 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
 
         Set<String> tenantIds = withDevice.stream().map(TicketDeviceView::getTenantId).collect(toSet());
         Set<String> machineIds = withDevice.stream().map(TicketDeviceView::getDeviceId).collect(toSet());
-        Map<TenantMachine, String> hostnames = findHostnames(tenantIds, machineIds);
+        Map<TenantScopedId, String> hostnames = findHostnames(tenantIds, machineIds);
 
         List<Mismatch> mismatches = withDevice.stream()
             .map(ticket -> toMismatch(ticket, hostnames))
@@ -100,12 +97,12 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
     }
 
     // The current hostname of every machine of the batch, in one query.
-    private Map<TenantMachine, String> findHostnames(Set<String> tenantIds, Set<String> machineIds) {
-        Map<TenantMachine, String> hostnames = new HashMap<>();
+    private Map<TenantScopedId, String> findHostnames(Set<String> tenantIds, Set<String> machineIds) {
+        Map<TenantScopedId, String> hostnames = new HashMap<>();
         for (Machine machine : machineRepository.findByTenantIdInAndMachineIdIn(tenantIds, machineIds)) {
             String tenantId = machine.getTenantId();
             String machineId = machine.getMachineId();
-            TenantMachine key = new TenantMachine(tenantId, machineId);
+            TenantScopedId key = new TenantScopedId(tenantId, machineId);
             String hostname = machine.getHostname();
             hostnames.put(key, hostname);
         }
@@ -113,11 +110,11 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
     }
 
     // Null when the copy matches its machine.
-    private static Mismatch toMismatch(TicketDeviceView ticket, Map<TenantMachine, String> hostnames) {
+    private static Mismatch toMismatch(TicketDeviceView ticket, Map<TenantScopedId, String> hostnames) {
         String tenantId = ticket.getTenantId();
         String ticketId = ticket.getId();
         String machineId = ticket.getDeviceId();
-        TenantMachine key = new TenantMachine(tenantId, machineId);
+        TenantScopedId key = new TenantScopedId(tenantId, machineId);
         if (!hostnames.containsKey(key)) {
             return new Mismatch(tenantId, ticketId, "machine " + machineId + " is gone");
         }
@@ -128,15 +125,5 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         }
         return new Mismatch(tenantId, ticketId,
             "hostname \"" + copiedHostname + "\" differs from machine's \"" + sourceHostname + "\"");
-    }
-
-    // A tenant's machine: a machineId is looked up inside its tenant.
-    @Getter
-    @EqualsAndHashCode
-    @AllArgsConstructor
-    private static final class TenantMachine {
-
-        private final String tenantId;
-        private final String machineId;
     }
 }

@@ -5,6 +5,7 @@ import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.processing.topic.EventTopicNames;
 import com.openframe.publishing.api.PublishedDocuments;
 import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import org.springframework.kafka.annotation.KafkaListenerConfigurer;
 import org.springframework.kafka.config.KafkaListenerContainerFactory;
@@ -21,11 +22,13 @@ public class PublishedEventListeners implements KafkaListenerConfigurer {
     private final EventProcessingKafkaProperties properties;
     private final JsonMapper envelopeMapper;
     private final KafkaListenerContainerFactory<?> containerFactory;
+    private final PublishedAggregateTopics publishedTopics;
 
     public PublishedEventListeners(AggregateSpecRegistry specRegistry, ProjectionRunner runner,
                                    EventProcessingKafkaProperties properties, JsonMapper envelopeMapper,
-                                   KafkaListenerContainerFactory<?> containerFactory) {
+                                   KafkaListenerContainerFactory<?> containerFactory, PublishedAggregateTopics publishedTopics) {
         this.specRegistry = specRegistry;
+        this.publishedTopics = publishedTopics;
         this.runner = runner;
         this.properties = properties;
         this.envelopeMapper = envelopeMapper;
@@ -39,6 +42,10 @@ public class PublishedEventListeners implements KafkaListenerConfigurer {
         String groupPrefix = EventTopicNames.requireGroupPrefix(kafka);
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String type = spec.getType();
+            // A type nobody publishes has no topic, so no listener either.
+            if (!publishedTopics.isPublishing(type)) {
+                continue;
+            }
             Class<?> eventClass = PublishedDocuments.eventClassOf(spec);
             PublishedTypeListener listener = new PublishedTypeListener(type, eventClass, envelopeMapper, runner);
             String topic = EventTopicNames.topicOf(topicPrefix, type);

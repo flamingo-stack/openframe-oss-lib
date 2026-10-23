@@ -81,15 +81,19 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
         }
     }
 
-    // None is valid: the shared stream has no tenant-aware repository, such as TicketRepository, so it never writes tickets.
+    // Subclass documents count (AuthUserRepository); none is valid, as the shared stream has no tenant-aware TicketRepository.
     private static void logRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
         Class<?> documentClass = PublishedDocuments.classOf(spec);
-        List<String> repositories = repositoriesByDocument.getOrDefault(documentClass, List.of());
+        List<String> repositories = repositoriesByDocument.entrySet().stream()
+                .filter(entry -> documentClass.isAssignableFrom(entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
+                .sorted()
+                .toList();
         if (repositories.isEmpty()) {
             log.info("No repository of {} in this service, so it publishes no {} writes", documentClass.getName(), spec.getType());
             return;
         }
-        log.info("{} publishes {}", repositories.getFirst(), spec.getType());
+        log.info("{} publish {}", repositories, spec.getType());
     }
 
     private void check(RepositoryFactoryInformation<?, ?> factory, RepositoryInformation information) {

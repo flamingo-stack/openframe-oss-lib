@@ -15,7 +15,7 @@ packages are internal.
 events.organizations ──> PublishedTypeListener             one per spec type (PublishedEventListeners), group <group-prefix>organizations
                            │  (a tombstone, the second record of a delete, is skipped here)
                            ▼
-                         ProjectionRunner                  a delete envelope is skipped: no projection handles deletes yet
+                         ProjectionRunner                  a delete envelope calls applyDelete (a no-op by default)
                            │  for each projection of the type's spec, unless its mode is aspect
                            ▼
                          projection.apply(record)          writes its projected items through its own repository
@@ -27,7 +27,8 @@ events.organizations ──> PublishedTypeListener             one per spec type
 - A record's Kafka key is the aggregate's Mongo `_id` (the outbox `aggregateId`), not a business id such as
   `organizationId`. The listener passes it to the runner for the logs.
 - [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L16)
-  registers one listener per spec type at startup, so a new published type needs no listener class.
+  registers one listener per spec type whose `openframe.events.topics.<type>.publish` is on in this service's config, so a
+  new published type needs no listener class.
 - The value is the `PublishedRecord` envelope: `tenantId`, `version`, `deleted`, `schemaVersion` and `event`. It is
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
@@ -94,8 +95,10 @@ openframe:
 
 With `enabled: true` and `kafka.topics.create: true`,
 [`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L31) creates
-`<topic-prefix><type>` and `<topic-prefix><type>-dlt` for every spec at startup, before the listeners start, so a new
-published type needs no topic config. With processing off, nothing is created: off means no infrastructure. So the
+`<topic-prefix><type>` and `<topic-prefix><type>-dlt` at startup, before the listeners start, for every spec whose
+`openframe.events.topics.<type>.publish` is on in this service's own config: the stream keeps the same switches as the
+publishing services, so a type nobody publishes gets no topic and no listener. With processing off, nothing is
+created: off means no infrastructure. So the
 rollout enables processing (every processor on `aspect`) before the outbox connector is registered, and the topics
 exist before the connector writes.
 
@@ -145,7 +148,8 @@ aspect's newer one, until it reads the newer event. The aspects read the mode fr
 2. Add its mode under `openframe.events.processing.projections`, with `mode: aspect`, and switch it per environment
    (see [Modes](#modes)).
 
-A new published type needs only its spec: the listener of its topic is registered from the spec at startup.
+A new published type needs only its spec and its `publish` switch in the stream's config: the listener of its topic is
+registered from the spec at startup.
 
 ## Errors and the DLT
 
@@ -198,7 +202,7 @@ must still start. That projection, if it exists, stays on `aspect`.
 
 | Metric | Tags | Meaning |
 |---|---|---|
-| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `skipped`, `deleted`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it, `skipped` that a newer version was already stored, `deleted` that the projection removed its copy (or kept it, the default). The count is the number of events, the total the time spent. |
+| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `unchanged`, `handed_over`, `skipped`, `deleted`, `failed`, `mongo_unavailable` | One per event and projection; `unchanged` means `countChanges` found nothing to change, so `apply` did not run; `handed_over` means a projection task took it, `skipped` that a newer version was already stored, `deleted` that the projection removed its copy (or kept it, the default). The count is the number of events, the total the time spent. |
 
 ## Debugging
 
@@ -216,7 +220,7 @@ logging:
 | `Projection X failed for <id> version V of tenant T` (WARN, with the stack trace) | That projection failed; the record goes to the DLT after the others ran. |
 | `Record <id> of <topic>-<partition> at offset O goes to <topic>-dlt` (ERROR) | Sent to the DLT. |
 | `openframe.events.processing.projections names [...], but no projection has that name` (ERROR, at startup) | A typo, or a config newer than this image. |
-| `Delete of ... skipped` / `Tombstone of ... skipped` | A delete; no projection handles deletes yet. |
+| `Tombstone of ... skipped` | The second record of a delete; the first one already reached `applyDelete`. |
 | `Created the event topic <name>` (INFO, at startup) | The topic did not exist; it now has the configured settings. |
 | `Event topic <name> exists with cleanup.policy=delete, not compact` (WARN, at startup) | Fix the topic by hand. |
 
