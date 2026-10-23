@@ -1,5 +1,4 @@
 import type { RealCategory } from './categories';
-import type { UserProfile } from './user';
 import type { Vendor, VendorPricing } from './vendor';
 
 // Selection source enum – indicates whether the vendor selection was AI-generated or manually selected
@@ -160,9 +159,6 @@ export interface StackTemplate {
   created_at: string;
   updated_at: string;
 }
-
-// Export types for external use
-export type { UserProfile, Vendor, VendorPricing, RealCategory };
 
 // Cost calculation interfaces (use slugs for identification)
 export interface StackCostCalculation {

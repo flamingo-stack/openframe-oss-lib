@@ -14,7 +14,9 @@ import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useIsHydrated } from '../../../hooks/ui/use-is-hydrated';
 import { AlertCircleIcon } from '../../icons-v2-generated';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../button';
+import { useLoadingScope } from '../loading-scope';
 
 /**
  * SECURITY SSOT for the mermaid renderer — the ONLY place these knobs are
@@ -193,10 +195,12 @@ const FRAME_CLASS: Record<MermaidFrame, string> = {
 };
 
 export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame?: MermaidFrame }> = ({
-  chart,
+  chart: givenChart,
   zoomable = true,
   frame = 'content',
 }) => {
+  // In a loading scope the diagram is not drawn: its frame shows the skeleton an empty chart shows.
+  const chart = useLoadingScope() ? '' : givenChart;
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -455,9 +459,8 @@ export const MermaidDiagram: React.FC<{ chart: string; zoomable?: boolean; frame
         </div>
       </div>
     ) : empty || isLoading || !svg ? (
-      <div className="skeleton-code m-auto animate-pulse font-sans text-ods-text-tertiary">
-        {isLoading ? 'Loading diagram renderer...' : 'Rendering diagram...'}
-      </div>
+      // The frame's own size, as a skeleton: the frame sets the height the diagram lands in.
+      <UnifiedSkeleton aria-label="Rendering diagram" className="h-auto w-full self-stretch" />
     ) : (
       <div
         className="mermaid-svg-container flex shrink-0 justify-center"

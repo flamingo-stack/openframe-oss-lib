@@ -4,6 +4,7 @@ import { type CSSProperties, type ReactNode, useLayoutEffect, useRef, useState }
 import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { cn } from '../../utils/cn';
 import { PagePicture } from '../layout/page-picture';
+import { LoadingScope } from './loading-scope';
 import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 /** The widest content step: a product screen is drawn at this width and scaled to its frame. */
@@ -69,7 +70,8 @@ export function ProductScreenFrame({
   const [frame, setFrame] = useState<HTMLDivElement | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
   // Which layout the screen takes. `pending` until measured: the frame keeps its
-  // box and shows nothing, so the first paint is never the unscaled screen.
+  // box and the screen draws as its own loading state, so the first paint is
+  // never the unscaled real screen.
   // React holds only this (it changes at two widths); the scale itself changes
   // with every pixel of a resize, so it is written to a CSS variable on the
   // frame and never re-renders the screen.
@@ -91,8 +93,16 @@ export function ProductScreenFrame({
     return () => observer.disconnect();
   }, [designWidth, scaleFrom]);
 
-  const screenStyle: CSSProperties =
-    mode === 'scaled'
+  // Before the frame is measured (the server's HTML, until hydration) the stylesheet lays the screen out the way the
+  // measure will (`styles/product-screen-frame.css`): at the design width, scaled to the frame. So the loading form a
+  // first paint shows is the loaded screen's own layout, never the narrow one.
+  const pending = mode === 'pending';
+  const screenStyle: CSSProperties = pending
+    ? ({
+        '--product-screen-design-width': `${designWidth}px`,
+        '--product-screen-scale-from': `${scaleFrom}px`,
+      } as CSSProperties)
+    : mode === 'scaled'
       ? {
           width: designWidth,
           // The crop is in frame pixels, so the unscaled box is taller by the same factor.
@@ -110,7 +120,7 @@ export function ProductScreenFrame({
       role="img"
       aria-label={label}
       data-app-type={appType}
-      className={cn('relative overflow-hidden', className)}
+      className={cn('product-screen-frame relative overflow-hidden', className)}
       style={{ height }}
     >
       <PortalContainerContext.Provider value={portalHost}>
@@ -118,11 +128,17 @@ export function ProductScreenFrame({
           <div
             inert
             aria-hidden
-            className={cn('ods-content-area', mode === 'pending' && 'invisible')}
+            className={cn('ods-content-area', pending && 'product-screen-pending')}
             style={screenStyle}
           >
             <div className="ods-content-scope">
-              <PagePicture>{children}</PagePicture>
+              {/* Until measured (the server's HTML, a page without scripts) the screen is its own loading state: every
+                  component in it draws its skeleton, so the window shows the screen's shape instead of nothing, and
+                  the unscaled real screen is never painted. */}
+              {/* One tree whether measured or not: only the scope turns off, so nothing inside is mounted twice. */}
+              <LoadingScope bare active={pending}>
+                <PagePicture>{children}</PagePicture>
+              </LoadingScope>
             </div>
             <div ref={setPortalHost} style={{ display: 'contents' }} />
           </div>

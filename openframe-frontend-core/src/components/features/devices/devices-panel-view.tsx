@@ -13,6 +13,7 @@ import {
   PageLayout,
   TabSelector,
 } from '../../ui';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { DevicesFilterToolbar, type DevicesFilterToolbarProps } from './devices-filter-toolbar';
 import { DevicesGrid } from './devices-grid';
 import { DevicesGridFilters } from './devices-grid-filters';
@@ -71,7 +72,7 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
    */
   loading?: boolean;
   /**
-   * The loading state announces itself, once ("Loading devices…"; the table or grid inside it stays quiet).
+   * The loading state announces itself, once ("Loading devices"; the table or grid inside it stays quiet).
    * `false` inside another loading region. Default `true`.
    */
   loadingRegion?: boolean;
@@ -111,6 +112,12 @@ export interface DevicesPanelViewProps<T extends DeviceRow = DeviceRow> {
   onLoadMore?: () => void;
   /** The grid's infinite-scroll sentinel. */
   gridSentinelRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * The host query's page size: a loading table or grid draws one full page, and the next page's skeleton the same.
+   * Omitted, the table falls back to its own page size (`DataTable.Body`, `InfiniteFooter`) and the grid to its
+   * declared default.
+   */
+  pageSize?: number;
 }
 
 /**
@@ -131,7 +138,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   onViewModeChange,
   actions,
   devices,
-  loading = false,
+  loading: loadingGiven = false,
   loadingRegion = true,
   isNarrowing = false,
   totalCount,
@@ -152,7 +159,11 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
   isFetchingNextPage = false,
   onLoadMore = noop,
   gridSentinelRef,
+  pageSize,
 }: DevicesPanelViewProps<T>) {
+  // One switch: a page's loading scope, or the host's request.
+  const scoped = useLoadingScope();
+  const loading = scoped || loadingGiven;
   const gridColumns =
     filterColumns ?? getDeviceFilterColumns(deviceFilters).filter(column => !hideFilters?.includes(column.key));
 
@@ -165,7 +176,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
           isLoading={loading}
           loadingRegion={false}
           emptyMessage={loading ? '' : emptyMessage}
-          skeletonRows={10}
+          skeletonRows={pageSize}
           stickyHeaderOffset="top-[96px]"
           deviceFilters={deviceFilters}
           // Loading: the facets have not answered, which is not "this list has
@@ -185,7 +196,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
                 onLoadMore={onLoadMore}
-                skeletonRows={2}
+                skeletonRows={pageSize}
               />
             )
           }
@@ -210,6 +221,7 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
             isFetchingNextPage={isFetchingNextPage}
             sentinelRef={gridSentinelRef}
             emptyMessage={loading ? '' : emptyMessage}
+            pageSize={pageSize}
           />
         </>
       )}
@@ -235,9 +247,10 @@ export function DevicesPanelView<T extends DeviceRow = DeviceRow>({
       contentClassName="flex flex-col"
     >
       {headerSlot}
-      {loading && loadingRegion && (
+      {/* Inside a page's loading scope the page has announced it already. */}
+      {loading && loadingRegion && !scoped && (
         <span role="status" className="sr-only">
-          Loading devices…
+          Loading devices
         </span>
       )}
       {noOrganizations && !loading && (

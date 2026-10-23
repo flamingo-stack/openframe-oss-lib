@@ -87,3 +87,12 @@ export function orderContentRefTypes(present: Iterable<string>): string[] {
   const unregistered = [...presentSet].filter(type => !CONTENT_REF_GROUPS[type]);
   return [...registeredInOrder, ...unregistered];
 }
+
+/** Items per page within one type group of the related-content rail. Groups larger than this paginate
+ *  with the standard Pagination control (NO nested scrolling — a bounded
+ *  scrollbox inside the page traps wheel events and hides the sections
+ *  below it). MUST stay at or above the largest suggestion fill
+ *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
+ *  current rails never paginate — only genuinely big groups (author pages)
+ *  do. Server-safe here (no client boundary), so a server page can read a group's first page (`initialRows`). */
+export const GROUP_PAGE_SIZE = 12;

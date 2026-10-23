@@ -41,6 +41,14 @@ export default defineConfig([
   ]),
 
   {
+    // A module exports what it declares; only an index barrel re-exports (see ./eslint-config/re-exports.js).
+    name: 'openframe-frontend-core/no-re-export',
+    files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/no-re-export': 'error' },
+  },
+
+  {
     // Every extension the Next preset matches, not just ts/tsx: the rule prints
     // its "Pages directory cannot be found" warning from inside `create()`, so a
     // single unconfigured `.js` file in the repo is enough to emit it. Off since
@@ -198,6 +206,25 @@ export default defineConfig([
       // every `[id]` in the container and asserts the set size, which is the only
       // formulation of that claim.
       'src/components/ui/__tests__/store-badges.test.tsx',
+      // A loading state is aria-hidden skeleton shapes: what is under test is that
+      // the shapes are there (the skeleton surface) and that one surface never
+      // pulses inside another, which `screen` cannot reach.
+      'src/components/ui/__tests__/loading-scope.test.tsx',
+      'src/__tests__/one-pulse.test.tsx',
+      'src/__tests__/skeleton-nesting.test.tsx',
+      // Every table row and skeleton row carries `data-loading-item`, the height gate's marker: an attribute on
+      // aria-hidden or role-less row cards, which `screen` cannot count.
+      'src/__tests__/data-table-loading-items.test.tsx',
+      // The same marker on the chat's conversation rows (loaded and loading), counted per list.
+      'src/components/chat/__tests__/chat-history-loading.test.tsx',
+      // Static controls drawn real and inert while loading: the `inert` ancestor and the skeleton surfaces are
+      // role-less and aria-hidden, so `screen` cannot see what is under test.
+      'src/components/ui/__tests__/static-controls-loading.test.tsx',
+      // A header action's icon in the mobile "..." row: what is under test is the
+      // re-tint wrapper around it, a role-less <span> whose class IS the contract
+      // (an accent-tinted icon must not stay dark on the menu's dark row). No
+      // `screen` query reaches it, so the test walks up from the icon.
+      'src/components/ui/__tests__/page-actions-menu-icon.test.tsx',
     ],
     rules: {
       'testing-library/no-node-access': 'off',

@@ -14,15 +14,17 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { MEDIA_ASPECT, TEXT_LINES_MIN, TILE_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
-import { getProxiedImageUrl } from '../../../utils/image-proxy';
 import { ImageClassicIcon } from '../../icons-v2-generated/audio-and-visual/image-classic-icon';
 import { FigmaClassicIcon } from '../../icons-v2-generated/brand-logos/figma-classic-icon';
-import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge, generationTierFromLabel } from '../../ui/status-badge';
+import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import type { RoadmapItem } from '../types/entities/roadmap-item';
 import { getStatusColorScheme } from '../utils/agent-status-message';
 import { getTaskTypeLabel } from '../utils/clickup-task-type-utils';
@@ -31,13 +33,13 @@ import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_OUTER_STATIC,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
   safeHref,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { RoadmapVoteButton } from './roadmap-vote-button';
 import { TaskTypeIcon } from './task-type-icon';
@@ -45,63 +47,86 @@ import { TaskTypeIcon } from './task-type-icon';
 type CardSize = 'default' | 'sm';
 export type VoteType = 'up' | 'down' | null;
 
-export function RoadmapCardSkeleton({ size = 'default' }: { size?: CardSize }) {
+/** The compact card's bordered 48px logo box, read by the card and its skeleton. */
+const ROADMAP_COMPACT_SLOT = `${MEDIA_ASPECT.square} ${TILE_SIZE.xl} shrink-0 self-start overflow-hidden rounded-md border border-ods-border p-1.5`;
+
+// The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
+const ROADMAP_CARD_BODY =
+  'flex h-full scroll-mt-24 flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]';
+const ROADMAP_CARD_HEADER = 'flex w-full items-center gap-[16px]';
+const ROADMAP_CARD_ICON_BOX = `flex ${TILE_SIZE.feature} flex-shrink-0 items-center justify-center rounded-lg`;
+const ROADMAP_CARD_HEADING = 'flex min-w-0 flex-1 flex-col';
+/** Two `text-h3` lines. */
+const ROADMAP_CARD_TITLE_ROW = `flex items-center text-h3 ${TEXT_LINES_MIN[2]}`;
+const ROADMAP_CARD_META_ROW = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`;
+/** Three `text-h4` lines. */
+const ROADMAP_CARD_SUMMARY_ROW = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
+const ROADMAP_CARD_FOOTER = 'flex w-full items-center justify-between';
+const ROADMAP_CARD_VOTES = 'flex h-[48px] overflow-hidden rounded-[6px]';
+const ROADMAP_CARD_FOOTER_END = 'flex min-w-0 items-center gap-2';
+
+/**
+ * A roadmap card while it is read. `default`, in the card's own boxes: the 64px icon box, the title as two `text-h3`
+ * lines, the quarter and id as a `text-h5` line, the status badge's box (beside the heading from md, its own row
+ * below), the description as three `text-h4` lines and the vote buttons' 48px box (with `votes`); the assignees and
+ * target version are drawn only when an item has them, so the skeleton leaves them out. `sm`: the compact card's rows.
+ */
+function RoadmapCardSkeleton({
+  size = 'default',
+  votes = true,
+  className,
+}: {
+  size?: CardSize;
+  /** `default`: the card shows its vote buttons (the caller passes `onVote`). */
+  votes?: boolean;
+  className?: string;
+}) {
   if (size === 'sm') {
     return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <UnifiedSkeleton
-          as="span"
-          className="block aspect-square h-12 w-12 shrink-0 self-start rounded-md border border-ods-border p-1.5"
-        />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={`${COMPACT_CARD_TITLE_ROW} flex-nowrap gap-2`}>
-            <UnifiedSkeleton as="span" className="h-3.5 w-1/2 rounded" />
-            <UnifiedSkeleton as="span" className="h-4 w-12 shrink-0 rounded" />
-          </span>
-          <span className={`${COMPACT_CARD_META_ROW_BOX} flex-nowrap gap-2`}>
-            <UnifiedSkeleton as="span" className="h-3 w-2/5 flex-1 rounded" />
-            <UnifiedSkeleton as="span" className="h-3 w-10 shrink-0 rounded" />
-            {/* assignee-stack placeholder — mirrors the xs AvatarStack
-                slot so row width doesn't shift when assignees load */}
-            <UnifiedSkeleton as="span" className="h-6 w-14 shrink-0 rounded-full" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <UnifiedSkeleton as="span" className="h-3 w-5/6 rounded" />
-          </span>
-        </span>
-      </span>
+      <CompactCardSkeleton
+        slotClassName={ROADMAP_COMPACT_SLOT}
+        titleWidth="w-1/2"
+        titleBadges={['w-12']}
+        rows={[
+          // The votes, Figma and screenshot marks after the meta line are the record's (optional): not drawn.
+          { width: 'w-2/5 flex-1' },
+          { width: 'w-5/6' },
+        ]}
+        className={className}
+      />
     );
   }
   return (
-    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, 'flex h-full flex-col gap-4 p-[var(--spacing-system-lf)]')}>
-      <div className="flex items-center gap-4">
-        <UnifiedSkeleton className="h-16 w-16 flex-shrink-0 rounded-lg" />
-        <div className="flex-1 space-y-2">
-          <UnifiedSkeleton className="h-5 w-3/4 rounded" />
-          <UnifiedSkeleton className="h-3 w-1/2 rounded" />
+    <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, ROADMAP_CARD_BODY, className)} aria-hidden>
+      <div className={ROADMAP_CARD_HEADER}>
+        <UnifiedSkeleton className={ROADMAP_CARD_ICON_BOX} />
+        <div className={ROADMAP_CARD_HEADING}>
+          <div className={ROADMAP_CARD_TITLE_ROW}>
+            <TextLineSkeleton type="h3" lines={2} className="w-3/4" />
+          </div>
+          <div className={ROADMAP_CARD_META_ROW}>
+            <TextLineSkeleton type="h5" className="w-1/3" />
+          </div>
         </div>
-        <UnifiedSkeleton className="h-6 w-16 rounded" />
+        <div className="hidden md:block">
+          <StatusBadge loading text="" />
+        </div>
       </div>
-      <div className="space-y-2">
-        <UnifiedSkeleton className="h-3 w-full rounded" />
-        <UnifiedSkeleton className="h-3 w-5/6 rounded" />
-        <UnifiedSkeleton className="h-3 w-4/5 rounded" />
+      <div className="md:hidden">
+        <StatusBadge loading text="" />
+      </div>
+      <div className={ROADMAP_CARD_SUMMARY_ROW}>
+        <TextLineSkeleton type="h4" lines={3} className="w-full" />
       </div>
       <div className="flex-1" />
-      <div className="flex items-center justify-between">
-        <UnifiedSkeleton className="h-12 w-32 rounded" />
-        <div className="flex items-center gap-2">
-          {/* assignee-stack placeholder — matches the xs AvatarStack in
-              the loaded card's action row */}
-          <UnifiedSkeleton className="h-6 w-14 rounded-full" />
-          <UnifiedSkeleton className="h-8 w-20 rounded" />
-        </div>
+      <div className={ROADMAP_CARD_FOOTER}>
+        {votes && <UnifiedSkeleton className={cn(ROADMAP_CARD_VOTES, 'w-32')} />}
       </div>
     </div>
   );
 }
 
-export interface RoadmapCardProps {
+interface LoadedRoadmapCardProps {
   item: RoadmapItem;
   /** Detail URL for the compact branch (`sm`). Used by the parent
    *  wrapper to drive nav. Default-branch cards don't need href —
@@ -128,6 +153,13 @@ export interface RoadmapCardProps {
   isVoting?: boolean;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope.
+ */
+export type RoadmapCardProps =
+  (LoadedRoadmapCardProps & { loading?: boolean }) | (Partial<LoadedRoadmapCardProps> & { loading: true });
+
 /** Wire assignees → AvatarStack people (name+avatar only on the wire). */
 function assigneePeople(
   assignees: Array<{ id: number; name: string | null; avatarUrl: string | null }> | undefined,
@@ -139,7 +171,15 @@ function assigneePeople(
   }));
 }
 
-export function RoadmapCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function RoadmapCard(props: RoadmapCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <RoadmapCardSkeleton size={props.size} votes={!!props.onVote} className={props.className} />;
+  }
+  return <LoadedRoadmapCard {...props} />;
+}
+
+function LoadedRoadmapCard({
   item,
   href,
 
@@ -153,11 +193,11 @@ export function RoadmapCard({
   userVote,
   onVote,
   isVoting = false,
-}: RoadmapCardProps) {
+}: LoadedRoadmapCardProps) {
   const [showScreenshots, setShowScreenshots] = useState(false);
 
   const logoUrl = item.icon && item.icon.startsWith('http') ? item.icon : null;
-  const iconSrc = logoUrl ? getProxiedImageUrl(logoUrl, { directHttps: true }) || logoUrl : null;
+  const iconSrc = useProxiedImageUrl(logoUrl) || null;
 
   if (size === 'sm') {
     const compactHref = safeHref(href ?? null);
@@ -169,7 +209,7 @@ export function RoadmapCard({
     const body = (
       <>
         <span
-          className="flex aspect-square h-12 w-12 shrink-0 items-center justify-center self-start overflow-hidden rounded-md border border-ods-border bg-ods-bg p-1.5 text-ods-accent"
+          className={cn(ROADMAP_COMPACT_SLOT, 'flex items-center justify-center bg-ods-bg text-ods-accent')}
           title={typeLabel ?? undefined}
         >
           {useTypeIcon ? (
@@ -267,16 +307,9 @@ export function RoadmapCard({
   }
 
   return (
-    <div
-      id={id}
-      className={cn(
-        CONTENT_CARD_FRAME_CLASS,
-        'flex h-full scroll-mt-24 flex-col gap-[var(--spacing-system-mf)] p-[var(--spacing-system-lf)]',
-        className,
-      )}
-    >
-      <div className="flex w-full items-center gap-[16px]">
-        <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg border border-ods-border bg-ods-bg">
+    <div id={id} className={cn(CONTENT_CARD_FRAME_CLASS, ROADMAP_CARD_BODY, className)}>
+      <div className={ROADMAP_CARD_HEADER}>
+        <div className={cn(ROADMAP_CARD_ICON_BOX, 'border border-ods-border bg-ods-bg')}>
           {iconSrc ? (
             <Image
               src={iconSrc}
@@ -293,11 +326,11 @@ export function RoadmapCard({
           )}
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex min-h-[48px] items-center">
+        <div className={ROADMAP_CARD_HEADING}>
+          <div className={ROADMAP_CARD_TITLE_ROW}>
             <h3 className="line-clamp-2 flex-1 text-ods-text-primary text-h3">{item.title}</h3>
           </div>
-          <div className="flex min-h-[20px] items-center">
+          <div className={ROADMAP_CARD_META_ROW}>
             <p className="truncate text-ods-text-secondary text-h5">
               {item.quarter}, {item.id}
             </p>
@@ -321,15 +354,15 @@ export function RoadmapCard({
         />
       </div>
 
-      <div className="flex min-h-[72px] items-center">
+      <div className={ROADMAP_CARD_SUMMARY_ROW}>
         <p className="line-clamp-3 text-ods-text-secondary text-h4">{item.description || ''}</p>
       </div>
 
       <div className="flex-1" />
 
-      <div className="flex w-full items-center justify-between">
+      <div className={ROADMAP_CARD_FOOTER}>
         {onVote && (
-          <div className="flex h-[48px] overflow-hidden rounded-[6px] border border-ods-border bg-ods-card">
+          <div className={cn(ROADMAP_CARD_VOTES, 'border border-ods-border bg-ods-card')}>
             <RoadmapVoteButton
               voteType="up"
               count={item.upvotes}
@@ -351,7 +384,7 @@ export function RoadmapCard({
           </div>
         )}
 
-        <div className="flex min-w-0 items-center gap-2">
+        <div className={ROADMAP_CARD_FOOTER_END}>
           {item.assignees && item.assignees.length > 0 ? (
             <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
           ) : null}
@@ -376,7 +409,11 @@ export function RoadmapCard({
             ) : null;
           })()}
           {item.targetVersion && (
-            <StatusBadge gen={generationTierFromLabel(item.targetVersion)} text={item.targetVersion} />
+            <StatusBadge
+              data-loading-optional
+              gen={generationTierFromLabel(item.targetVersion)}
+              text={item.targetVersion}
+            />
           )}
         </div>
       </div>

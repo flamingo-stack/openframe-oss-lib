@@ -22,7 +22,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from '../../embed-shims/next-navigation';
 import { createSearchParams, parseSchemaParams, type ParamSchema, type JSType } from '../../utils/search-params';
-import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
+import { shouldIncludeInUrl } from '../../utils/search-params';
+import type { FlattenedParam } from './flatten-schema';
 
 /**
  * Returns the previous reference if the JSON-serialized content of `value`
@@ -116,11 +117,6 @@ type OutputTypeForJSType<T extends JSType> = OutputTypeMap[T];
  * Get the TypeScript type for INPUT (setting params)
  */
 type InputTypeForJSType<T extends JSType> = InputTypeMap[T];
-
-// Schema types + the schema helper live in the search-params leaf, so the hook's
-// `params` ARE the same parsed contract a server route produces for that URL.
-export type { ParamConfig, ParamSchema } from '../../utils/search-params';
-export { defineParamSchema } from '../../utils/search-params';
 
 /**
  * Options for useApiParams hook
@@ -517,7 +513,3 @@ export function useApiParams<TSchema extends ParamSchema>(
     resetParams,
   };
 }
-
-// THE serializer lives in the search-params leaf (one array/object/omission
-// rule for the hook and for server code); re-exported for existing importers.
-export { createSearchParams } from '../../utils/search-params';

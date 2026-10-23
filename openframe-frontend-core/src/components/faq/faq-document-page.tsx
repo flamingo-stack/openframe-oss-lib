@@ -59,6 +59,10 @@ export interface FaqDocumentPageProps {
   /** The "ask the assistant" card beside the questions (forwarded to `FaqSection`): `false` switches it off, an
    *  object states its topic, wording and the chat it opens. */
   ask?: FaqSectionProps['ask'];
+  /** The FAQ's loading state, group by group (forwarded to `FaqSection`). */
+  skeletonShape?: FaqSectionProps['skeletonShape'];
+  /** The FAQ's loading state draws the category nav's row (forwarded to `FaqSection`): the host's list is categorised. */
+  skeletonNav?: boolean;
 }
 
 export function FaqDocumentPage({
@@ -74,6 +78,8 @@ export function FaqDocumentPage({
   minResults,
   topic,
   ask,
+  skeletonShape,
+  skeletonNav,
   shell = true,
 }: FaqDocumentPageProps) {
   const router = useRouter();
@@ -102,6 +108,8 @@ export function FaqDocumentPage({
         minResults={minResults}
         topic={topic}
         ask={ask}
+        skeletonShape={skeletonShape}
+        skeletonNav={skeletonNav}
       />
     </PageLayout>
   );

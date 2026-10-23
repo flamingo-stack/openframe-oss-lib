@@ -16,6 +16,9 @@ import {
 } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../embed-shims/next-navigation';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from './button';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 export interface TabItem {
@@ -55,7 +58,7 @@ export interface TabItem {
   badge?: string;
   /** A second, quieter line of text: beside the label from `md`, under it below. */
   sublabel?: string;
-  /** A leading visual used instead of `icon` (an avatar, a logo). Rendered as given. */
+  /** A leading visual used instead of `icon` (an avatar, a logo), drawn `TAB_AVATAR_PX` square. Rendered as given. */
   avatar?: React.ReactNode;
   /**
    * 0..1. Set on the ACTIVE tab, the underline stops being a selection marker
@@ -132,6 +135,22 @@ interface TabNavigationProps {
   // URL sync mode
   urlSync?: boolean | TabNavigationUrlSyncOptions;
   defaultTab?: string; // Fallback when no valid tab in URL or initial value
+  /**
+   * The tab labels are static copy (config, never read data): in a loading scope the real strip is drawn (inert)
+   * instead of its skeleton bars. Default `false`: labels built from read data stay skeletons.
+   */
+  staticLabels?: boolean;
+  /** The tabs are still being read: the strip draws its skeleton (or, with `staticLabels`, the real strip inert). A
+   *  loading scope does the same. */
+  loading?: boolean;
+  /** Tabs the skeleton draws: the tabs the host reads. Default `tabs.length`. */
+  skeletonCount?: number;
+  /** The skeleton's tabs lead with an avatar (the host's read tabs carry one). Default: whether any tab in `tabs` has
+   *  one, which a host that has not read its tabs yet (empty `tabs`) cannot answer: it states it here. */
+  skeletonAvatar?: boolean;
+  /** The skeleton's tabs carry a second line (the host's read tabs carry a `sublabel`). Default: whether any tab in
+   *  `tabs` has one; a host with no tabs yet states it here. */
+  skeletonSublabel?: boolean;
 
   /**
    * Render prop for the tab BODY. Receives the tab to render and, additively,
@@ -150,6 +169,24 @@ interface IndicatorRect {
 }
 
 const HIDDEN_INDICATOR: IndicatorRect = { left: 0, width: 0 };
+
+/** The strip's layout, read by the strip and by its skeleton, so the skeleton is the strip's size. */
+const STRIP_FRAME_CLASS = 'relative w-full';
+const STRIP_ROW_CLASS =
+  'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden';
+const ADMIN_TAB_GAP_CLASS = 'gap-[var(--spacing-system-xxs)]';
+/** A tab's box, loaded and loading: the lib's tab (`Button variant="tab"`), which the loading tab draws too. */
+const TAB_CLASS = BUTTON_KIND_CLASS.tab;
+const TAB_AVATAR_GAP_CLASS = 'gap-[var(--spacing-system-xsf)]';
+/** A tab's avatar, in px: the size a host draws `TabItem.avatar` at, and the circle the skeleton draws for it. */
+export const TAB_AVATAR_PX = 24;
+const TAB_STRETCH_CLASS = 'flex-1';
+const tabAlignClass = (tabAlign: 'center' | 'start') =>
+  tabAlign === 'start' ? 'justify-start text-left' : 'justify-center';
+/** A tab with a second line: the label and its sublabel, beside each other from md, stacked below. */
+const TAB_SUBLABEL_WRAP_CLASS =
+  'flex min-w-0 flex-col items-start text-left content-md:flex-row content-md:items-baseline content-md:gap-[var(--spacing-system-xsf)]';
+const STRIP_BORDER_CLASS = 'pointer-events-none absolute bottom-0 left-0 right-0 h-px';
 
 const StatusDot = ({ indicator, className }: { indicator: NonNullable<TabItem['indicator']>; className?: string }) => (
   <div
@@ -175,6 +212,8 @@ interface TabBarProps {
   tabAlign: 'center' | 'start';
   progressTransitionMs: number;
   variant: TabNavigationVariant;
+  /** The tabs are read data (not `staticLabels`): each tab carries `data-loading-item`, as its skeleton's tabs do. */
+  itemMarks: boolean;
 }
 
 /**
@@ -201,6 +240,7 @@ const TabBar = memo(function TabBarImpl({
   tabAlign,
   progressTransitionMs,
   variant,
+  itemMarks,
 }: TabBarProps) {
   const isAdmin = variant === 'admin';
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -423,48 +463,29 @@ const TabBar = memo(function TabBarImpl({
   }
 
   return (
-    <div className={cn('relative w-full', className)}>
+    <div className={cn(STRIP_FRAME_CLASS, className)}>
       {/* scrollbar-hide: tabs stay swipe/wheel-scrollable, bar never shows.
           `relative` makes this the offsetParent the underline is measured against. */}
-      <div
-        ref={scrollRef}
-        className={cn(
-          'scrollbar-hide relative flex h-full items-center justify-start overflow-x-auto overflow-y-hidden',
-          isAdmin && 'gap-[var(--spacing-system-xxs)]',
-        )}
-      >
+      <div ref={scrollRef} className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}>
         {tabs.map(tab => {
           const isActive = activeTab === tab.id;
 
           return (
-            <button
+            <Button
+              variant="tab"
               key={tab.id}
               ref={isActive ? activeTabRef : undefined}
+              data-loading-item={itemMarks || undefined}
+              data-state={isActive ? 'active' : undefined}
+              // The admin strip marks its open and hovered tab with the accent fade; the default one by the underline alone.
+              data-emphasis={isAdmin ? 'fade' : undefined}
               type="button"
               onClick={() => onTabChange(tab.id)}
               aria-label={tab.badge ? `${tab.label} (${tab.badge})` : undefined}
               className={cn(
-                'group relative flex shrink-0 cursor-pointer items-center gap-[var(--spacing-system-xxs)] p-[var(--spacing-system-m)]',
-                tabAlign === 'start' ? 'justify-start text-left' : 'justify-center',
-                // Named rather than `transition-all`: the only thing that moves
-                // here is colour.
-                'border-none bg-transparent outline-none transition-colors duration-200',
-                // `outline-none` above drops the browser's own focus ring, so
-                // put one back or the strip is un-navigable by keyboard — you
-                // can tab through it with nothing to show where you are. Inset,
-                // so it stays within the button and never overlaps a neighbour.
-                'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus',
-                stretchTabs && 'flex-1',
-                tab.avatar && 'gap-[var(--spacing-system-xsf)]',
-                // `default`: the open tab is marked by the underline alone, no surface
-                // of its own. `admin`: the open and the hovered tab carry an accent
-                // fade. ODS colour vars hold hex values, so Tailwind alpha modifiers
-                // (to-ods-accent/10) silently produce no CSS; color-mix() accepts
-                // hex, so the 10%-alpha stop is derived from the token.
-                isAdmin &&
-                  (isActive
-                    ? 'bg-gradient-to-b from-transparent to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'
-                    : 'hover:bg-gradient-to-b hover:from-transparent hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]'),
+                tabAlignClass(tabAlign),
+                stretchTabs && TAB_STRETCH_CLASS,
+                tab.avatar && TAB_AVATAR_GAP_CLASS,
               )}
             >
               {tab.avatar ? (
@@ -492,7 +513,7 @@ const TabBar = memo(function TabBarImpl({
               ) : null}
 
               {tab.sublabel ? (
-                <span className="flex min-w-0 flex-col items-start text-left content-md:flex-row content-md:items-baseline content-md:gap-[var(--spacing-system-xsf)]">
+                <span className={TAB_SUBLABEL_WRAP_CLASS}>
                   <span
                     className={cn(
                       'whitespace-nowrap transition-colors text-h4',
@@ -529,7 +550,7 @@ const TabBar = memo(function TabBarImpl({
                   className="pointer-events-none my-[calc((var(--font-line-space-h4-body)_-_2rem)/2)] ml-[var(--spacing-system-xxs)] shrink-0"
                 />
               )}
-            </button>
+            </Button>
           );
         })}
 
@@ -571,12 +592,89 @@ const TabBar = memo(function TabBarImpl({
       )}
 
       {/* Bottom border — a gradient-capable 1px line that fades to transparent on any edge that has an active fade shadow. */}
-      <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px" style={borderStyle} />
+      <div className={STRIP_BORDER_CLASS} style={borderStyle} />
     </div>
   );
 });
 
-export function TabNavigation({
+interface TabNavigationSkeletonProps {
+  /** How many tabs the strip draws. */
+  count: number;
+  /** Each tab leads with an avatar: a `TAB_AVATAR_PX` circle before its label. */
+  avatar?: boolean;
+  /** Each tab carries a quieter second line (`TabItem.sublabel`): beside the label from md, under it below. */
+  sublabel?: boolean;
+  stretchTabs?: boolean;
+  tabAlign?: 'center' | 'start';
+  variant?: TabNavigationVariant;
+  className?: string;
+}
+
+/**
+ * The strip while its tabs are read: the same strip, tab padding and gaps, each label a bar at the label's type
+ * step, and the strip's bottom border drawn for real. `TabNavigation` draws it in a loading scope.
+ */
+function TabNavigationSkeleton({
+  count,
+  avatar = false,
+  sublabel = false,
+  stretchTabs = false,
+  tabAlign = 'center',
+  variant,
+  className,
+}: TabNavigationSkeletonProps) {
+  const providedVariant = useContext(TabNavigationVariantContext);
+  const isAdmin = (variant ?? providedVariant) === 'admin';
+  return (
+    <div className={cn(STRIP_FRAME_CLASS, className)} aria-hidden>
+      <div className={cn(STRIP_ROW_CLASS, isAdmin && ADMIN_TAB_GAP_CLASS)}>
+        <LoadingItems count={count}>
+          {() => (
+            <div
+              data-loading-item
+              className={cn(
+                TAB_CLASS,
+                tabAlignClass(tabAlign),
+                stretchTabs && TAB_STRETCH_CLASS,
+                avatar && TAB_AVATAR_GAP_CLASS,
+              )}
+            >
+              {avatar && (
+                <UnifiedSkeleton variant="circular" width={TAB_AVATAR_PX} height={TAB_AVATAR_PX} className="shrink-0" />
+              )}
+              {sublabel ? (
+                <span className={TAB_SUBLABEL_WRAP_CLASS}>
+                  <TextLineSkeleton as="span" type="h4" className="w-20" />
+                  <TextLineSkeleton as="span" type="h6" className="w-28" />
+                </span>
+              ) : (
+                <TextLineSkeleton type="h4" className="w-20" />
+              )}
+            </div>
+          )}
+        </LoadingItems>
+      </div>
+      <div className={cn(STRIP_BORDER_CLASS, 'bg-ods-border')} />
+    </div>
+  );
+}
+
+/**
+ * Only a URL-synced bar reads the URL. `useSearchParams()` in a component makes Next render the whole page in the
+ * browser when it is prerendered (or fail the build without a Suspense boundary), so a page whose tabs are plain
+ * controlled state (`urlSync` off, the default) must not call it: that is what kept every page with a tab strip
+ * (the flamingo homepage) from being served from a CDN (CU-17tkuw5xp4q). `urlSync` is fixed per bar; switching it
+ * remounts the bar.
+ */
+export function TabNavigation(props: TabNavigationProps) {
+  return props.urlSync ? <UrlSyncedTabNavigation {...props} /> : <TabNavigationBody {...props} searchParams={null} />;
+}
+
+function UrlSyncedTabNavigation(props: TabNavigationProps) {
+  return <TabNavigationBody {...props} searchParams={useSearchParams()} />;
+}
+
+function TabNavigationBody({
   activeTab: controlledActiveTab,
   onTabChange: controlledOnTabChange,
   tabs,
@@ -590,13 +688,18 @@ export function TabNavigation({
   variant: variantProp,
   urlSync = false,
   defaultTab,
+  staticLabels = false,
+  loading: loadingProp,
+  skeletonCount,
+  skeletonAvatar,
+  skeletonSublabel,
   children,
-}: TabNavigationProps) {
+  searchParams,
+}: TabNavigationProps & { searchParams: ReturnType<typeof useSearchParams> | null }) {
   const providedVariant = useContext(TabNavigationVariantContext);
   const variant = variantProp ?? providedVariant;
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   // Determine URL sync settings
   const isUrlSyncEnabled = !!urlSync;
@@ -751,22 +854,55 @@ export function TabNavigation({
   //    body can mark itself while it waits.
   const deferredActiveTab = useDeferredValue(activeTab);
   const isStale = activeTab !== deferredActiveTab;
+  // In a loading scope the body below draws its own loading state. The strip draws its skeleton, unless the caller
+  // says its labels are static copy (`staticLabels`): then the real strip is drawn, inert.
+  const loading = useLoadingScope() || !!loadingProp;
 
   return (
     <>
-      <TabBar
-        tabs={tabs}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        className={className}
-        shadowClassName={shadowClassName}
-        showLeftGradient={showLeftGradient}
-        showRightGradient={showRightGradient}
-        stretchTabs={stretchTabs}
-        tabAlign={tabAlign}
-        progressTransitionMs={progressTransitionMs}
-        variant={variant}
-      />
+      {loading && staticLabels ? (
+        <div className="contents" aria-hidden="true" inert>
+          <TabBar
+            tabs={tabs}
+            activeTab={activeTab}
+            onTabChange={LOADING_NOOP}
+            className={className}
+            shadowClassName={shadowClassName}
+            showLeftGradient={showLeftGradient}
+            showRightGradient={showRightGradient}
+            stretchTabs={stretchTabs}
+            tabAlign={tabAlign}
+            progressTransitionMs={progressTransitionMs}
+            variant={variant}
+            itemMarks={false}
+          />
+        </div>
+      ) : loading ? (
+        <TabNavigationSkeleton
+          count={skeletonCount ?? tabs.length}
+          avatar={skeletonAvatar ?? tabs.some(tab => Boolean(tab.avatar))}
+          sublabel={skeletonSublabel ?? tabs.some(tab => Boolean(tab.sublabel))}
+          stretchTabs={stretchTabs}
+          tabAlign={tabAlign}
+          variant={variant}
+          className={className}
+        />
+      ) : (
+        <TabBar
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          className={className}
+          shadowClassName={shadowClassName}
+          showLeftGradient={showLeftGradient}
+          showRightGradient={showRightGradient}
+          stretchTabs={stretchTabs}
+          tabAlign={tabAlign}
+          progressTransitionMs={progressTransitionMs}
+          variant={variant}
+          itemMarks={!staticLabels}
+        />
+      )}
 
       {/* Render children with active tab if provided */}
       {children && children(deferredActiveTab, { isStale })}

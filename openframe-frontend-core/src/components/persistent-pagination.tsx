@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../utils/cn';
+import { useLoadingScope } from './ui/loading-scope';
 import { UnifiedPagination } from './unified-pagination';
 
 interface PersistentPaginationProps {
@@ -161,6 +162,10 @@ export function PersistentPaginationWrapper({
   onPageChange,
   className,
 }: PersistentPaginationWrapperProps) {
+  // In a page's loading state the pager inside draws its skeleton (UnifiedPagination), at full strength: a dimmed
+  // pulse would be a second rhythm.
+  const inScope = useLoadingScope();
+
   // ALWAYS show pagination for predictable layout
   // For no results (totalPages = 0), show grayed out pagination
   const hasResults = totalPages > 0;
@@ -178,7 +183,7 @@ export function PersistentPaginationWrapper({
         className,
       )}
       style={{
-        opacity: isPaginationDisabled ? 0.3 : hasNoResults ? 0.5 : 1,
+        opacity: inScope ? 1 : isPaginationDisabled ? 0.3 : hasNoResults ? 0.5 : 1,
         transitionDuration: '300ms',
       }}
       role="navigation"

@@ -66,7 +66,9 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { resizedImageUrl } from '../../embed-shims/next-image';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { MEDIA_ASPECT } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import {
   WALKTHROUGH_VIDEO_DISMISS_KEY,
@@ -82,15 +84,20 @@ import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { CardHitLayer } from './card-hit-layer';
-import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
+import { Video } from './video';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
+import type { VideoPlayerHandle, VideoMutedFallbackState } from './video-shared';
+
+/** The poster width the collapsed card asks for: its widest box (320px) at 2x for retina screens. */
+const CARD_POSTER_WIDTH_PX = 640;
 
 /** The inline card's box: 16:9 across the host's width, rounded and bordered. ONE string, read by the card and
  *  its skeleton, so the page keeps the same height before and after the player mounts. */
-const INLINE_CARD_BOX_CLASS = 'aspect-video w-full rounded-md border border-ods-border';
+const INLINE_CARD_BOX_CLASS = `${MEDIA_ASPECT.video} w-full rounded-md border border-ods-border`;
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -234,6 +241,7 @@ function WalkthroughVideo({
   className,
 }: WalkthroughVideoProps): React.ReactElement | null {
   const inline = placement === 'inline';
+  const inScope = useLoadingScope();
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
   // id-match dismissal key: a new video (new id) re-shows the card. No id
@@ -936,6 +944,9 @@ function WalkthroughVideo({
     cardModeRef.current = cardMode;
   });
 
+  // While the page is read the video is not known: inline, the block is its skeleton (the same box); floating, the
+  // card is an overlay that takes no space, so nothing is drawn.
+  if (inScope) return inline ? <InlineWalkthroughVideoSkeleton className={className} /> : null;
   if (!video || (!video.mainVideoUrl && !video.youtubeUrl)) return null;
 
   // The collapsed card is suppressed by the appear-delay mount gate and by
@@ -1056,7 +1067,10 @@ function WalkthroughVideo({
           // File player only. The theater resolves YouTube-wins; the card must
           // not mount MuxPlayer on a youtube.com URL (it renders the poster).
           url={video.mainVideoUrl || ''}
-          posterUrl={video.posterUrl}
+          // The card is at most 320px wide: ask the host for a poster twice that (retina), not the full-size
+          // original the theater shows (a 1920x1080 file drawn at 333x187, CU-17tkuw5xp4q). The original is kept
+          // where the host registered no resizer.
+          posterUrl={video.posterUrl ? resizedImageUrl(video.posterUrl, CARD_POSTER_WIDTH_PX) : video.posterUrl}
           active={cardActive}
           isClone={false}
           badge="play"
@@ -1328,6 +1342,6 @@ export function InlineWalkthroughVideo(props: InlineWalkthroughVideoProps): Reac
  * The inline video's loading state: the shared skeleton in the card's own box. The inline card draws it itself
  * until its player mounts; a host whose video data is still loading draws it in the same slot.
  */
-export function InlineWalkthroughVideoSkeleton({ className }: { className?: string }): React.ReactElement {
+function InlineWalkthroughVideoSkeleton({ className }: { className?: string }): React.ReactElement {
   return <UnifiedSkeleton className={cn(INLINE_CARD_BOX_CLASS, className)} />;
 }

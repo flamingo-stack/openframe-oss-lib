@@ -1,4 +1,3 @@
-use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::config::update_config::ALLOW_DOWNGRADE;
 use crate::models::tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 use crate::models::{Installation, InstalledAsset, ToolRecordState};
@@ -7,7 +6,7 @@ use crate::platform::{
     run_update, system_service, DirectoryManager, ToolUpdaterDeps,
 };
 use crate::services::agent_configuration_service::AgentConfigurationService;
-use crate::services::tool_ops::ToolOps;
+use crate::services::tool_ops::{ToolOpGuard, ToolOps};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -22,7 +21,6 @@ use tracing::{error, info, warn};
 #[derive(Clone)]
 pub struct ToolAgentUpdateService {
     github_download_service: GithubDownloadService,
-    tool_agent_file_client: ToolAgentFileClient,
     installed_tools_service: InstalledToolsService,
     tool_kill_service: ToolKillService,
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -38,7 +36,6 @@ impl ToolAgentUpdateService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         github_download_service: GithubDownloadService,
-        tool_agent_file_client: ToolAgentFileClient,
         installed_tools_service: InstalledToolsService,
         tool_kill_service: ToolKillService,
         tool_run_manager: ToolRunManager,
@@ -56,7 +53,6 @@ impl ToolAgentUpdateService {
 
         Self {
             github_download_service,
-            tool_agent_file_client,
             installed_tools_service,
             tool_kill_service,
             tool_run_manager,
@@ -90,6 +86,17 @@ impl ToolAgentUpdateService {
                 );
             }
         };
+        self.process_update_locked(message, tool_lock).await
+    }
+
+    // a ToolLock is marked busy only once there is something to update; a ToolOpGuard already is
+    pub async fn process_update_locked(
+        &self,
+        message: ToolAgentUpdateMessage,
+        tool: impl Into<ToolOpGuard>,
+    ) -> Result<()> {
+        let tool_agent_id = &message.tool_agent_id;
+        let new_version = &message.version;
 
         // Check if tool is installed
         let mut installed_tool = match self
@@ -209,7 +216,7 @@ impl ToolAgentUpdateService {
             return Ok(());
         }
 
-        let _op = tool_lock.mark_busy();
+        let _op: ToolOpGuard = tool.into();
 
         // A Standard->GuiApp migration self-relaunches, so only relaunch here if it was already a GUI app.
         let was_gui_before_update =
@@ -332,13 +339,10 @@ impl ToolAgentUpdateService {
     ) -> Result<()> {
         let tool_agent_id = &installed_tool.tool_agent_id;
 
-        let download_config = if !message.download_configurations.is_empty() {
-            self.github_download_service
-                .find_config_for_current_os(&message.download_configurations)
-                .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
-        } else {
-            return self.do_legacy_update(new_version, installed_tool).await;
-        };
+        let download_config = self
+            .github_download_service
+            .find_config_for_current_os(&message.download_configurations)
+            .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?;
 
         let deps = ToolUpdaterDeps {
             github_download_service: self.github_download_service.clone(),
@@ -410,78 +414,6 @@ impl ToolAgentUpdateService {
         self.register_windows_gui_app_autorun(installed_tool);
 
         info!(tool_id = %tool_agent_id, version = %new_version, "Update completed successfully");
-        self.publish_installed_agent_message(tool_agent_id, new_version)
-            .await;
-
-        Ok(())
-    }
-
-    async fn do_legacy_update(
-        &self,
-        new_version: &str,
-        installed_tool: &mut crate::models::installed_tool::InstalledTool,
-    ) -> Result<()> {
-        #[cfg(target_family = "unix")]
-        use std::os::unix::fs::PermissionsExt;
-        use tokio::fs::{self, File};
-        use tokio::io::AsyncWriteExt;
-
-        let tool_agent_id = &installed_tool.tool_agent_id;
-
-        if !matches!(installed_tool.installation, Installation::Standard { .. }) {
-            anyhow::bail!(
-                "Legacy update (without download_configurations) only supports Standard installation type. \
-                Tool {} has {:?}",
-                tool_agent_id,
-                installed_tool.installation
-            );
-        }
-
-        let agent_file_path = self.directory_manager.get_agent_path(tool_agent_id);
-        let backup_file_path = agent_file_path.with_extension("backup");
-
-        info!(tool_id = %tool_agent_id, "Using legacy update method (Artifactory)");
-
-        self.tool_kill_service
-            .stop_tool(tool_agent_id)
-            .await
-            .with_context(|| format!("Failed to stop tool: {}", tool_agent_id))?;
-
-        if agent_file_path.exists() {
-            fs::copy(&agent_file_path, &backup_file_path)
-                .await
-                .with_context(|| "Failed to backup")?;
-        }
-
-        let new_agent_bytes = self
-            .tool_agent_file_client
-            .get_tool_agent_file(tool_agent_id.to_string())
-            .await
-            .with_context(|| "Failed to download from Artifactory")?;
-
-        File::create(&agent_file_path)
-            .await?
-            .write_all(&new_agent_bytes)
-            .await?;
-
-        #[cfg(target_family = "unix")]
-        {
-            let mut perms = fs::metadata(&agent_file_path).await?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(&agent_file_path, perms).await?;
-        }
-
-        installed_tool.version = new_version.to_string();
-        self.installed_tools_service
-            .save(installed_tool.clone())
-            .await?;
-
-        if backup_file_path.exists() {
-            let _ = fs::remove_file(&backup_file_path).await;
-        }
-
-        info!(tool_id = %tool_agent_id, version = %new_version, "Legacy update completed");
-
         self.publish_installed_agent_message(tool_agent_id, new_version)
             .await;
 

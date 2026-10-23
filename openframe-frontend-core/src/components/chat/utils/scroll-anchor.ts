@@ -20,8 +20,6 @@
 
 import { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types';
 
-export { SCROLL_ANCHOR, type ScrollAnchor };
-
 /** Wire-frame key for the `scrollAnchor` field on the metadata leading
  *  frame. Used as a computed property name on both the emit side
  *  (server) and the parse side (client) so a rename is one-file. */

@@ -3,9 +3,13 @@
 import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { SquareAvatar, AvatarStack, Button } from '../ui';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { TimezoneSelect } from '../ui/timezone-select';
+import { HostIdentity } from './host-identity';
+
+/** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
 
 /**
  * The head of the scheduler's MODAL layout: the host strip (who, and how long
@@ -28,42 +32,15 @@ export interface SchedulerModalHeaderProps {
   disabled?: boolean;
   /** Whether the timezone row renders (not on the confirmation). */
   showTimezone?: boolean;
+  /** The meeting is read on the client and has not arrived: the header draws its skeleton, as in a loading scope. */
+  loading?: boolean;
 }
 
 const ROW_CLASS = 'border-b border-ods-border p-[var(--spacing-system-m)]';
 const STRIP_CLASS = cn(ROW_CLASS, 'flex items-center justify-between gap-[var(--spacing-system-m)]');
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
-
-function HostIdentity({ hosts }: { hosts: MeetingHost[] }) {
-  if (hosts.length === 0) return null;
-  if (hosts.length > 3) {
-    return (
-      <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-        <AvatarStack people={hosts} max={4} size="lg" label="Hosts" />
-        <p className="text-ods-text-secondary text-h6">{hosts.length} hosts on this calendar</p>
-      </div>
-    );
-  }
-  return (
-    <div className="flex min-w-0 flex-col gap-[var(--spacing-system-s)]">
-      {hosts.map(host => (
-        <div key={host.name} className="flex items-center gap-[var(--spacing-system-xs)]">
-          <SquareAvatar
-            variant="round"
-            size="sm"
-            src={host.avatarUrl ?? undefined}
-            alt={host.name}
-            fallback={host.name}
-          />
-          <div className="flex min-w-0 flex-col">
-            <p className="truncate text-ods-text-primary text-h4">{host.name}</p>
-            {host.title && <p className="truncate text-ods-text-secondary text-h6">{host.title}</p>}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
+const TIMEZONE_ROW_CLASS = cn(ROW_CLASS, 'flex flex-col gap-[var(--spacing-system-xxs)]');
+const DURATION_LINE_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
 
 export function SchedulerModalHeader({
   hosts,
@@ -75,8 +52,11 @@ export function SchedulerModalHeader({
   locked = false,
   disabled = false,
   showTimezone = true,
+  loading = false,
 }: SchedulerModalHeaderProps) {
   const chips = !locked && durationsMs.length > 1;
+  // While the meeting is read the header is its skeleton (the hosts and durations are read data).
+  if (useLoadingScope() || loading) return <SchedulerModalHeaderSkeleton showTimezone={showTimezone} />;
   return (
     <>
       <div className={STRIP_CLASS}>
@@ -97,50 +77,42 @@ export function SchedulerModalHeader({
           </div>
         ) : (
           selectedDurationMs != null && (
-            <p className="shrink-0 text-ods-text-secondary text-h6">
-              {formatDurationCompact(selectedDurationMs / 1000)} call
-            </p>
+            <p className={DURATION_LINE_CLASS}>{formatDurationCompact(selectedDurationMs / 1000)} call</p>
           )
         )}
       </div>
       {showTimezone && (
-        <div className={cn(ROW_CLASS, 'flex flex-col gap-[var(--spacing-system-xxs)]')}>
+        <div className={TIMEZONE_ROW_CLASS}>
           <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          {timezone ? (
-            <TimezoneSelect
-              value={timezone}
-              disabled={disabled}
-              onChange={tz => {
-                if (tz) onTimezoneChange?.(tz);
-              }}
-            />
-          ) : (
-            <UnifiedSkeleton className="h-12 w-full" />
-          )}
+          {/* The zone resolves after mount: until then the picker draws its own skeleton. */}
+          <TimezoneSelect
+            value={timezone}
+            loading={!timezone}
+            disabled={disabled}
+            onChange={tz => {
+              if (tz) onTimezoneChange?.(tz);
+            }}
+          />
         </div>
       )}
     </>
   );
 }
 
-/** Same footprint as the loaded header, for the cold load. */
-export function SchedulerModalHeaderSkeleton() {
+/** Same footprint as the loaded header, for the cold load: "Timezone" real, one host and the length as bars. */
+function SchedulerModalHeaderSkeleton({ showTimezone = true }: { showTimezone?: boolean } = {}) {
   return (
     <>
       <div className={STRIP_CLASS}>
-        <div className="flex items-center gap-[var(--spacing-system-xs)]">
-          <UnifiedSkeleton className="h-8 w-8 shrink-0 rounded-full" />
-          <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
-            <UnifiedSkeleton className="h-5 w-32" />
-            <UnifiedSkeleton className="h-4 w-24" />
-          </div>
+        <HostIdentity hosts={[]} loading />
+        <TextLineSkeleton type="h6" className={cn(DURATION_LINE_CLASS, 'w-20')} />
+      </div>
+      {showTimezone && (
+        <div className={TIMEZONE_ROW_CLASS}>
+          <p className={FIELD_LABEL_CLASS}>Timezone</p>
+          <TimezoneSelect value={null} loading onChange={LOADING_NOOP} />
         </div>
-        <UnifiedSkeleton className="h-4 w-20 shrink-0" />
-      </div>
-      <div className={cn(ROW_CLASS, 'flex flex-col gap-[var(--spacing-system-xxs)]')}>
-        <p className={FIELD_LABEL_CLASS}>Timezone</p>
-        <UnifiedSkeleton className="h-12 w-full" />
-      </div>
+      )}
     </>
   );
 }

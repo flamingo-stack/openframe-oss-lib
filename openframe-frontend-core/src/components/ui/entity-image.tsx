@@ -3,11 +3,16 @@
 import React from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 /** The design size, when a caller does not state one. */
-const ENTITY_IMAGE_SIZE = 'size-[52px] content-md:size-[60px]';
+export const ENTITY_IMAGE_SIZE = TILE_SIZE.entity;
+/** The image's corner, read by the image, its initials fallback and its skeleton. */
+const ENTITY_IMAGE_RADIUS_CLASS = 'rounded-md';
 
 export interface EntityImageProps {
   src?: string | null;
@@ -29,7 +34,10 @@ export interface EntityImageProps {
 }
 
 export function EntityImage({ src, alt, fallbackText, sizeClassName, className }: EntityImageProps) {
-  const resolvedSrc = useAuthedImageSrc(src);
+  // In a loading scope the image is its skeleton, and it is not fetched.
+  const held = useLoadingScope();
+  const authedSrc = useAuthedImageSrc(held ? undefined : src);
+  const resolvedSrc = authedSrc;
   // Which src failed, rather than a bare "failed" flag reset from an effect on
   // every src change. The reset is then implicit — a new src simply is not the
   // one that failed — so the fallback initials never survive into the render
@@ -37,6 +45,7 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
   const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
   const imageFailed = resolvedSrc !== undefined && failedSrc === resolvedSrc;
 
+  if (held) return <EntityImageSkeleton sizeClassName={sizeClassName} className={className} />;
   const showFallback = imageFailed || !resolvedSrc;
   const initials = personInitials(fallbackText ?? alt);
 
@@ -45,7 +54,8 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
       <div
         aria-label={alt}
         className={cn(
-          'flex shrink-0 select-none items-center justify-center rounded-md border border-ods-border bg-ods-bg text-ods-text-secondary text-h4',
+          'flex shrink-0 select-none items-center justify-center border border-ods-border bg-ods-bg text-ods-text-secondary text-h4',
+          ENTITY_IMAGE_RADIUS_CLASS,
           sizeClassName ?? ENTITY_IMAGE_SIZE,
           className,
         )}
@@ -61,7 +71,8 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
       alt={alt ?? ''}
       onError={() => setFailedSrc(resolvedSrc)}
       className={cn(
-        'shrink-0 rounded-md border border-ods-border object-contain',
+        'shrink-0 border border-ods-border object-contain',
+        ENTITY_IMAGE_RADIUS_CLASS,
         sizeClassName ?? ENTITY_IMAGE_SIZE,
         className,
       )}
@@ -71,6 +82,15 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
       width={60}
       height={60}
       unoptimized
+    />
+  );
+}
+
+/** An EntityImage while its record is read: a box of the image's own size and corner. */
+function EntityImageSkeleton({ sizeClassName, className }: Pick<EntityImageProps, 'sizeClassName' | 'className'>) {
+  return (
+    <UnifiedSkeleton
+      className={cn('shrink-0', ENTITY_IMAGE_RADIUS_CLASS, sizeClassName ?? ENTITY_IMAGE_SIZE, className)}
     />
   );
 }
