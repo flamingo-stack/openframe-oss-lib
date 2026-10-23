@@ -1,7 +1,7 @@
 # OpenFrame Event Publishing
 
 Writes an outbox row for every change of a published Mongo document, in the same transaction as the change.
-Debezium will later read the `outbox` collection and send each row to Kafka. Nothing reads the outbox yet.
+Debezium will later read the `event_outbox` collection and send each row to Kafka. Nothing reads the outbox yet.
 
 `openframe-data-mongo-sync` depends on this module, so every service with Mongo has it on the classpath.
 It does nothing until you enable it.
@@ -208,7 +208,7 @@ its type.
 
 ## The outbox row
 
-Collection `outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publishing/persistence/OutboxEvent.java):
+Collection `event_outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publishing/persistence/OutboxEvent.java):
 
 | Field | Value |
 |---|---|
@@ -221,7 +221,7 @@ Collection `outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publis
 | `occurredAt` | When the row was written. |
 | `payload` | The `PublishedRecord` envelope as JSON (Jackson names, ISO dates); `null` for the second delete row; the key is always written, because Debezium's router needs it. |
 
-`OutboxIndexInitializer` creates the TTL index `outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
+`OutboxIndexInitializer` creates the TTL index `event_outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
 change the TTL later, write a migration that drops the index first; `createIndex` with other options fails at
 startup with `IndexOptionsConflict`.
 

@@ -7,8 +7,9 @@ Three scheduled jobs around the published events:
 - the **reconciliation** asks every projection of a type switched on, such as the organization name on tickets,
   which of its projected items differ from their source, reports them, and publishes those sources again to repair them;
 - the **projection tasks** apply the large updates of a projection, for example a new organization name on 50,000
-  tickets, in batches instead of inside one Kafka record. One task per projection, tenant and source document, in
-  `projection_tasks`; a newer event of that source starts its task again from the first item.
+  tickets, in batches instead of inside one Kafka record. One document per run in `event_projection_tasks`, with at most
+  one current run per projection, tenant and source document; a newer event of that source closes the current run and opens a
+  new one from the first item.
 
 They run in `openframe-saas-stream` only. They do nothing until you switch them on.
 
@@ -24,14 +25,17 @@ EventBackfillService / ReconciliationService     start a run, continue it, or wa
 EventJobTicker                                   batches until DONE, half of lock-at-most-for, or shutdown
    │  one batch: EventBackfillRunner / ReconciliationRunner
    ▼
-EventJobService ──> event_jobs                  one document per job: run id, status, lastId, counts
+EventJobService ──> event_job_runs              one document per run: run id, status, lastId, counts
 ```
 
 - One pod runs a job at a time: the lock is ShedLock's, with the stream's `LockProvider` (Redis). A dead pod's lock
   expires after `lock-at-most-for`, and the next tick on any pod continues from the saved `lastId`.
 - [`EventJob`](src/main/java/com/openframe/event/jobs/core/persistence/EventJob.java#L21) holds the progress rules; each change returns a copy, and
-  [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. The document has `@Version`, so a pod still busy
-  with an older copy fails its save and stops. `event_jobs` is read from the primary.
+  [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. Each run is its own document, `_id: "<job>:<run id>"`;
+  the job's current run is its newest by `startedAt`. A new run ends a RUNNING one as REPLACED, and the documents have
+  `@Version`, so a pod still busy with an older copy fails its save and stops. `event_job_runs` is read from the primary.
+- Finished runs stay for good, as the jobs' history; they are small, and reconciliation adds one per projection a night.
+  [`EventJobRunIndexInitializer`](src/main/java/com/openframe/event/jobs/core/persistence/EventJobRunIndexInitializer.java) creates the `{jobId, startedAt}` index that finds the current run.
 - [`EventJobTicker`](src/main/java/com/openframe/event/jobs/core/service/EventJobTicker.java#L17) runs both jobs' batches. It stops after the current batch when
   the service shuts down ([`EventJobShutdown`](src/main/java/com/openframe/event/jobs/core/service/EventJobShutdown.java#L7)): Spring does not interrupt a
   running `@Scheduled` task.
@@ -41,15 +45,18 @@ EventJobService ──> event_jobs                  one document per job: run id
 
 ### Projection tasks
 
-- Every tick lists the RUNNING tasks and works each under its own lock `projection-task:<task id>`, so several pods
+- Every tick lists the RUNNING runs and works each under its own lock `projection-task:<run id>`, so several pods
   share them. Under the lock the task is read again, then `EventJobTicker` runs its batches: the projection's
   `applyBatch` after the saved `lastId`, until it returns `null`.
-- [`ProjectionTask`](src/main/java/com/openframe/event/jobs/task/persistence/ProjectionTask.java#L22) has `@Version`. A newer event bumps it, so a worker
-  busy with the older event fails its next save and stops; the next tick starts the task again with the newer event.
-  A finished task is deleted only if its version did not change.
+- [`ProjectionTask`](src/main/java/com/openframe/event/jobs/task/persistence/ProjectionTask.java#L22) is one run, `_id: "<key>:<event version>:<started ms>"`, with
+  `key` = `<projection>:<tenantId>:<sourceId>` and `current` while RUNNING or FAILED. A newer event closes the current run (a
+  RUNNING one ends REPLACED, a FAILED one stays FAILED) and inserts a new one; a unique index on `key` among current runs
+  ([`ProjectionTaskIndexInitializer`](src/main/java/com/openframe/event/jobs/task/persistence/ProjectionTaskIndexInitializer.java)) allows only one. The runs have `@Version`, so a worker busy
+  with the closed run fails its next save and stops; the next tick works the new run.
+- A finished run is kept DONE, as the tasks' history; runs are never deleted.
 - The task keeps the event's envelope as the outbox payload and reads it back into the spec's event class.
-- `maxFailures` in a row set the task FAILED. It stays in `projection_tasks`; the next event of its source starts it
-  again.
+- `maxFailures` in a row set the run FAILED. It stays current, so the events of its source still go to the tasks; the next
+  one opens a new run.
 - Metrics, per `projection`: `openframe.events.projection.tasks.open` and `...oldest.age` (seconds since the oldest
   RUNNING task started), and the counter `openframe.events.projection.tasks.failed`.
 
@@ -106,18 +113,18 @@ libraries it scans.
 a date is easy to read. The log shows `Backfill of <type> started, run <id>`, then `done` at the end.
 
 **Repeat** it: set a new run id and restart. The new run starts again from the first document. Leaving the same run id
-changes nothing: a DONE run stays done. A run id once replaced is never started again, so pods that still have the old
-config during a rolling restart leave the new run alone; always use a new value.
+changes nothing: a DONE run stays done. A run id the job already had is never started again, so pods that still have
+the old config during a rolling restart leave the new run alone; always use a new value.
 
 Each batch is written from the documents' current state, then their versions are read again from the primary. A
 document written meanwhile is published once more, so its newest state is the last record on the compacted topic
 ([`republishChanged`](src/main/java/com/openframe/event/jobs/backfill/service/EventBackfillRunner.java#L55)).
 
-**Follow** it in `event_jobs`, `_id: "backfill:<type>"`:
+**Follow** it in `event_job_runs`, newest run first:
 
 ```javascript
-db.event_jobs.findOne({_id: "backfill:organizations"})
-// runId, status (RUNNING, DONE, FAILED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
+db.event_job_runs.find({jobId: "backfill:organizations"}).sort({startedAt: -1})
+// runId, status (RUNNING, DONE, FAILED, REPLACED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
 ```
 
 and with the metric `openframe.events.backfill.documents{type}`.
@@ -135,7 +142,7 @@ and with the metric `openframe.events.backfill.documents{type}`.
 ## Reconciliation
 
 **Read** the result in the gauge `openframe.events.reconciliation.mismatches{projection}`: the projected items that
-differed in the last finished run. Every pod reports it from `event_jobs` on each tick, so the alert
+differed in the last finished run. Every pod reports it from `event_job_runs` on each tick, so the alert
 `event-reconciliation-drift` takes `max by (namespace, projection)`. A run in progress does not change it.
 
 The job reads the collection of the projection's `projectedClass()` in `_id` batches, only the fields of its

@@ -12,7 +12,6 @@ import org.mockito.ArgumentCaptor;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +39,7 @@ class EventBackfillServiceTest {
     void setUp() {
         when(publishedAggregates.isPublishing(TYPE)).thenReturn(true);
         when(jobRepository.save(any(EventJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jobRepository.insert(any(EventJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
         Clock clock = Clock.fixed(POD_STARTED, ZoneOffset.UTC);
         EventJobService jobService = new EventJobService(jobRepository, clock);
         service = new EventBackfillService(publishedAggregates, jobService, runner, clock);
@@ -48,7 +48,7 @@ class EventBackfillServiceTest {
     @Test
     void aNewRunId_startsTheRun_fromTheFirstDocument() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.empty());
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.empty());
 
         // execution
         service.backfill(TYPE, "run-1", JOB);
@@ -61,26 +61,45 @@ class EventBackfillServiceTest {
     }
 
     @Test
-    void anotherRunId_startsAgain_andRemembersTheReplacedOne() {
+    void anotherRunId_startsANewRunDocument() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.DONE, "z", null)));
+        EventJob done = stored("run-1", EventJobStatus.DONE, "z", null);
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(done));
 
         // execution
         service.backfill(TYPE, "run-2", JOB);
 
         // verifications
         EventJob started = writtenJob();
+        assertThat(started.getId()).isEqualTo(JOB + ":run-2");
         assertThat(started.getRunId()).isEqualTo("run-2");
         assertThat(started.getLastId()).isNull();
-        assertThat(started.getReplacedRunIds()).containsExactly("run-1");
+        verify(jobRepository, never()).save(any());
+    }
+
+    @Test
+    void anotherRunId_whileTheOldRunIsRunning_endsTheOldRunReplaced() {
+        // setup
+        EventJob running = stored("run-1", EventJobStatus.RUNNING, "m", null);
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(running));
+
+        // execution
+        service.backfill(TYPE, "run-2", JOB);
+
+        // verifications
+        ArgumentCaptor<EventJob> replaced = ArgumentCaptor.forClass(EventJob.class);
+        verify(jobRepository).save(replaced.capture());
+        assertThat(replaced.getValue().getId()).isEqualTo(JOB + ":run-1");
+        assertThat(replaced.getValue().getStatus()).isEqualTo(EventJobStatus.REPLACED);
+        assertThat(writtenJob().getRunId()).isEqualTo("run-2");
     }
 
     @Test
     void aPodWithAReplacedRunId_doesNotStartItAgain() {
         // setup
-        EventJob job = stored("run-2", EventJobStatus.RUNNING, "m", null);
-        job.setReplacedRunIds(List.of("run-1"));
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(job));
+        EventJob newer = stored("run-2", EventJobStatus.RUNNING, "m", null);
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(newer));
+        when(jobRepository.existsByJobIdAndRunId(JOB, "run-1")).thenReturn(true);
 
         // execution
         service.backfill(TYPE, "run-1", JOB);
@@ -88,12 +107,13 @@ class EventBackfillServiceTest {
         // verifications
         verifyNoInteractions(runner);
         verify(jobRepository, never()).save(any());
+        verify(jobRepository, never()).insert(any(EventJob.class));
     }
 
     @Test
     void aRunningRun_continuesAfterItsLastId() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.RUNNING, "b", null)));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.RUNNING, "b", null)));
 
         // execution
         service.backfill(TYPE, "run-1", JOB);
@@ -106,7 +126,7 @@ class EventBackfillServiceTest {
     @Test
     void aDoneRun_writesNothing() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.DONE, "z", null)));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.DONE, "z", null)));
 
         // execution
         service.backfill(TYPE, "run-1", JOB);
@@ -119,7 +139,7 @@ class EventBackfillServiceTest {
     void aRunThatFailedBeforeThisPodStarted_isResumedFromItsLastId() {
         // setup
         Instant failedAt = POD_STARTED.minusSeconds(600);
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.FAILED, "b", failedAt)));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.FAILED, "b", failedAt)));
 
         // execution
         service.backfill(TYPE, "run-1", JOB);
@@ -134,7 +154,7 @@ class EventBackfillServiceTest {
     void aRunThatFailedWhileThisPodRan_staysFailed() {
         // setup
         Instant failedAt = POD_STARTED.plusSeconds(600);
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.FAILED, "b", failedAt)));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored("run-1", EventJobStatus.FAILED, "b", failedAt)));
 
         // execution
         service.backfill(TYPE, "run-1", JOB);
@@ -164,6 +184,7 @@ class EventBackfillServiceTest {
     }
 
     private static EventJob stored(String runId, EventJobStatus status, String lastId, Instant finishedAt) {
-        return EventJob.builder().id(JOB).version(1L).runId(runId).status(status).lastId(lastId).finishedAt(finishedAt).build();
+        return EventJob.builder().id(JOB + ":" + runId).jobId(JOB).version(1L).runId(runId).status(status).lastId(lastId)
+                .finishedAt(finishedAt).build();
     }
 }

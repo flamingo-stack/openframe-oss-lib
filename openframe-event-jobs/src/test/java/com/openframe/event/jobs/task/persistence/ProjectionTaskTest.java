@@ -14,40 +14,59 @@ class ProjectionTaskTest {
     private static final Instant LATER = Instant.parse("2026-10-22T10:05:00Z");
 
     @Test
-    void anOpenedTask_isRunningFromTheFirstItem_underTheIdOfItsProjectionTenantAndSource() {
+    void anOpenedTask_isTheCurrentRunFromTheFirstItem_underTheKeyOfItsProjectionTenantAndSource() {
         // execution
         ProjectionTask task = open();
 
         // verifications
-        assertThat(task.getId()).isEqualTo("organization-on-tickets:tenant-a:org-doc-1");
+        assertThat(task.getKey()).isEqualTo("organization-on-tickets:tenant-a:org-doc-1");
+        assertThat(task.getId()).isEqualTo("organization-on-tickets:tenant-a:org-doc-1:4:" + OPENED_AT.toEpochMilli());
         assertThat(task.getStatus()).isEqualTo(EventJobStatus.RUNNING);
+        assertThat(task.isCurrent()).isTrue();
         assertThat(task.getLastId()).isNull();
         assertThat(task.getEventVersion()).isEqualTo(4L);
-        assertThat(task.getCreatedAt()).isEqualTo(OPENED_AT);
         assertThat(task.getStartedAt()).isEqualTo(OPENED_AT);
         assertThat(task.getRunId()).isEqualTo("event version 4");
     }
 
     @Test
-    void aNewerEvent_startsTheTaskAgainFromTheFirstItem_andKeepsWhenItWasCreated() {
+    void closingARunningRun_endsItReplaced() {
         // setup
-        ProjectionTask failedHalfway = open().recordBatch("t500", OPENED_AT).recordFailure("boom", OPENED_AT)
-                .finish(EventJobStatus.FAILED, OPENED_AT);
-        Map<String, Object> newerEnvelope = Map.of("version", 5);
+        ProjectionTask halfway = open().recordBatch("t500", OPENED_AT);
 
         // execution
-        ProjectionTask restarted = failedHalfway.restartWith(newerEnvelope, 5, LATER);
+        ProjectionTask closed = halfway.close(LATER);
 
         // verifications
-        assertThat(restarted.getStatus()).isEqualTo(EventJobStatus.RUNNING);
-        assertThat(restarted.getEnvelope()).isEqualTo(newerEnvelope);
-        assertThat(restarted.getEventVersion()).isEqualTo(5L);
-        assertThat(restarted.getLastId()).isNull();
-        assertThat(restarted.getBatches()).isZero();
-        assertThat(restarted.getFailures()).isZero();
-        assertThat(restarted.getLastError()).isNull();
-        assertThat(restarted.getStartedAt()).isEqualTo(LATER);
-        assertThat(restarted.getCreatedAt()).isEqualTo(OPENED_AT);
+        assertThat(closed.getStatus()).isEqualTo(EventJobStatus.REPLACED);
+        assertThat(closed.isCurrent()).isFalse();
+        assertThat(closed.getLastId()).isEqualTo("t500");
+        assertThat(closed.getUpdatedAt()).isEqualTo(LATER);
+    }
+
+    @Test
+    void closingAFailedRun_keepsItFailed() {
+        // setup
+        ProjectionTask failed = open().recordFailure("boom", OPENED_AT).finish(EventJobStatus.FAILED, OPENED_AT);
+
+        // execution
+        ProjectionTask closed = failed.close(LATER);
+
+        // verifications
+        assertThat(failed.isCurrent()).isTrue();
+        assertThat(closed.getStatus()).isEqualTo(EventJobStatus.FAILED);
+        assertThat(closed.getLastError()).isEqualTo("boom");
+        assertThat(closed.isCurrent()).isFalse();
+    }
+
+    @Test
+    void aDoneRun_isNotCurrent() {
+        // execution
+        ProjectionTask done = open().finish(EventJobStatus.DONE, LATER);
+
+        // verifications
+        assertThat(done.getStatus()).isEqualTo(EventJobStatus.DONE);
+        assertThat(done.isCurrent()).isFalse();
     }
 
     @Test

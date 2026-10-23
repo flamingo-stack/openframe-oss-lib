@@ -48,7 +48,7 @@ public class ProjectedItemRepository {
         return mongoOperations.collectionExists(projectedClass);
     }
 
-    public String idOf(Object projectedItem) {
+    public String resolveId(Object projectedItem) {
         return documents.idOf(projectedItem);
     }
 

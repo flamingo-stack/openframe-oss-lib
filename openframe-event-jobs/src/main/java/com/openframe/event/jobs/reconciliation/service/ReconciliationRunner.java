@@ -67,7 +67,7 @@ public class ReconciliationRunner {
         republishSources(projection, job, mismatches);
 
         T lastItem = projectedItems.getLast();
-        String batchLastId = itemRepository.idOf(lastItem);
+        String batchLastId = itemRepository.resolveId(lastItem);
         int items = projectedItems.size();
         int mismatchCount = mismatches.size();
         EventJob saved = jobService.saveBatch(job, batchLastId, items, mismatchCount);
@@ -110,7 +110,7 @@ public class ReconciliationRunner {
         String projectionName = projection.name();
         String runId = job.getRunId();
         RunSources run = republishedSources.asMap().compute(projectionName,
-                (name, current) -> current != null && current.isOf(runId) ? current : new RunSources(runId));
+                (name, current) -> current != null && current.isForRun(runId) ? current : new RunSources(runId));
         return run.addNew(sourceIds);
     }
 
@@ -159,7 +159,7 @@ public class ReconciliationRunner {
         private final String runId;
         private final Set<String> published = new HashSet<>();
 
-        boolean isOf(String otherRunId) {
+        boolean isForRun(String otherRunId) {
             return runId.equals(otherRunId);
         }
 

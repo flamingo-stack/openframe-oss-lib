@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-// Per projection: a gauge of its last finished run's mismatches, set only from event_jobs on every tick, and a FAILED-runs counter.
+// Per projection: a gauge of its last finished run's mismatches, set only from event_job_runs on every tick, and a FAILED-runs counter.
 public class ReconciliationMetrics {
 
     private static final String MISMATCHES_GAUGE = "openframe.events.reconciliation.mismatches";
