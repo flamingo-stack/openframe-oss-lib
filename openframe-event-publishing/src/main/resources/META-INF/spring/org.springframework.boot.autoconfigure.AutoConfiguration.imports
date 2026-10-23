@@ -1,0 +1,4 @@
+com.openframe.publishing.config.AggregateSpecAutoConfiguration
+com.openframe.publishing.config.OutboxAutoConfiguration
+com.openframe.publishing.config.OutboxIndexAutoConfiguration
+com.openframe.publishing.config.PublishingSwitchedOffAutoConfiguration
