@@ -3,6 +3,7 @@ package com.openframe.processing.topic;
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties.TopicSettings;
 import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-// Creates every published type's topic and DLT that does not exist yet, before the listeners start; never changes an existing one.
+// Creates the missing topic and DLT of each type whose publish switch is on, before the listeners; never changes one.
 // A plain AdminClient, not NewTopic beans: every KafkaAdmin in the context (Spring Boot's, the stream's saasKafkaAdmin) would create those too.
 @Slf4j
 @RequiredArgsConstructor
@@ -35,6 +36,7 @@ public class EventTopicCreator implements SmartInitializingSingleton {
     private static final String COMPACT = "compact";
 
     private final AggregateSpecRegistry specRegistry;
+    private final PublishedAggregateTopics publishedTopics;
     private final EventProcessingKafkaProperties properties;
 
     @Override
@@ -63,6 +65,10 @@ public class EventTopicCreator implements SmartInitializingSingleton {
         List<String> existingEventTopics = new ArrayList<>();
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String typeName = spec.getType();
+            if (!publishedTopics.isPublishing(typeName)) {
+                log.info("No event topic for {}: openframe.events.topics.{}.publish is off", typeName, typeName);
+                continue;
+            }
             String topic = EventTopicNames.topicOf(topicPrefix, typeName);
             String deadLetterTopic = EventTopicNames.deadLetterTopicOf(topic);
             if (existing.contains(topic)) {

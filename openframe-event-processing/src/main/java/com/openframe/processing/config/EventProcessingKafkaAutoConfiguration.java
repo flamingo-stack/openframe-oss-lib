@@ -6,6 +6,7 @@ import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.listener.PublishedEventListeners;
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.processing.topic.EventTopicNames;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -98,10 +99,11 @@ public class EventProcessingKafkaAutoConfiguration {
     public PublishedEventListeners publishedEventListeners(AggregateSpecRegistry specRegistry,
                                                            ProjectionRunner projectionRunner,
                                                            EventProcessingKafkaProperties processingKafkaProperties,
-                                                           @Qualifier(PROCESSING_CONTAINER_FACTORY) ConcurrentKafkaListenerContainerFactory<String, byte[]> containerFactory) {
+                                                           @Qualifier(PROCESSING_CONTAINER_FACTORY) ConcurrentKafkaListenerContainerFactory<String, byte[]> containerFactory,
+                                                           PublishedAggregateTopics publishedTopics) {
         JsonMapper envelopeMapper = buildEnvelopeMapper();
         return new PublishedEventListeners(specRegistry, projectionRunner, processingKafkaProperties, envelopeMapper,
-            containerFactory);
+            containerFactory, publishedTopics);
     }
 
     // Spring Kafka's mapper (unknown fields ignored); an enum value from a newer producer becomes null, not a DLT record.

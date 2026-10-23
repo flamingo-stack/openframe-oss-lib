@@ -2,10 +2,13 @@ package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
+import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -24,7 +27,12 @@ class CustomTicketRepositoryStampTest {
     private static final Document KEEP_VERSION = new Document("version", 0);
 
     private final TenantAwareMongoTemplate mongoTemplate = mock(TenantAwareMongoTemplate.class);
-    private final CustomTicketRepositoryImpl repository = new CustomTicketRepositoryImpl(mongoTemplate);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<OutboxPublisher> outboxPublisher = mock(ObjectProvider.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<TicketAggregateSpec> ticketSpec = mock(ObjectProvider.class);
+    private final CustomTicketRepositoryImpl repository = new CustomTicketRepositoryImpl(mongoTemplate, outboxPublisher,
+            ticketSpec);
 
     @Test
     @DisplayName("Given a chat message, when the last activity is stamped, then the update increments the version by 0, so Spring adds no +1 and a user edit of the ticket does not conflict")

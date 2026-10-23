@@ -4,6 +4,7 @@ import com.openframe.data.document.user.User;
 import com.openframe.data.document.user.UserRole;
 import com.openframe.data.document.user.UserStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -22,6 +23,10 @@ public interface UserRepository extends MongoRepository<User, String>, BaseUserR
     Boolean existsByEmailAndStatus(String email, UserStatus status);
 
     List<User> findByRolesInAndStatus(Collection<UserRole> roles, UserStatus status);
+
+    // Only the names of a reconcile batch's users, across tenants; only the shared stream calls it.
+    @Query(fields = "{ 'tenantId': 1, 'firstName': 1, 'lastName': 1 }")
+    List<User> findByTenantIdInAndIdIn(Collection<String> tenantIds, Collection<String> ids);
 
     /**
      * Whether a user with the given id is a member of the given tenant. Tenant-first form so the

@@ -159,6 +159,7 @@ lambda and runs it with its rows in one transaction:
 |---|---|
 | `publishChanged(spec, write)` | A write that returns the new state: `findAndModify` with `returnNew`, `save`. |
 | `publishChangedByIds(spec, ids, write)` | A write that returns only a count, such as `updateMulti`: the documents are read again after it. |
+| `republishByIds(spec, ids, write)` | A write beside the documents that changes what their projections read, such as a directory link. Raises their version in the same transaction, then publishes their current state. |
 | `publishDeleted(spec, write)` | A write that returns what it removed: `findAndRemove`, `findAllAndRemove`. |
 | `publishDeleted(spec, stored, write)` | A delete that returns nothing, when the documents are known before it. Their tenant and version are read again by id. |
 | `publishDeletedByIds(spec, ids, write)` | A delete by ids that returns nothing. |
@@ -191,7 +192,7 @@ These writes produce no outbox row, and nothing warns about them:
 
 | Problem | Fix |
 |---|---|
-| The spec's document has no repository, or more than one | Keep exactly one repository per published document. |
+| A published document class has more than one repository | Keep at most one repository per document class. A document with no repository in a service, such as tickets in the shared stream, is fine: that service logs INFO and publishes no writes of it. |
 | Its document has no `@Version` field | Add `@Version Long version`. |
 | It has no `PublishingRepositoryInterceptor` | The repository was created outside Spring Data's normal setup; let the auto-configuration create it. |
 | It has an `@Update` method | It returns no documents to publish; write a custom method with `publishChanged` or `publishChangedByIds`. |

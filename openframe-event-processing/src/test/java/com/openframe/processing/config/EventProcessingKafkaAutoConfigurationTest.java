@@ -4,7 +4,7 @@ import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
-import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
@@ -39,7 +39,8 @@ class EventProcessingKafkaAutoConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                     EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-            .withUserConfiguration(AggregateSpecRegistry.class)
+            .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
             .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
             .withPropertyValues("openframe.events.processing.enabled=true",
                     "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
@@ -81,6 +82,15 @@ class EventProcessingKafkaAutoConfigurationTest {
         });
     }
 
+    // The stream reads the same publish switch as the publishing services: a type nobody publishes has no topic to read.
+    @Test
+    void aTypeWhosePublishIsOff_getsNoListener() {
+        runner.withPropertyValues("openframe.events.topics.organizations.publish=false").run(context -> {
+            KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
+            assertThat(registry.getListenerContainers()).isEmpty();
+        });
+    }
+
     @Test
     void theListenerOfASpecsType_takesTheConfiguredPrefixes_asTheDevSharedsDo() {
         runner.withPropertyValues("openframe.events.processing.kafka.topic-prefix=dev3.events.",
@@ -97,7 +107,8 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.processing.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
@@ -134,7 +145,8 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.processing.enabled=true",
                         "openframe.events.processing.kafka.topic-prefix=events.",
@@ -155,7 +167,8 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withUserConfiguration(AggregateSpecRegistry.class)
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.processing.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
