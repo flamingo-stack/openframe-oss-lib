@@ -61,6 +61,7 @@ use crate::models::{
     BootstrapScriptMessage, CommandMessage, ScriptMessage, ScriptScheduleExecutionMessage,
     SoftwareScriptMessage,
 };
+use crate::platform::binary_hash::running_binary_sha256_or_warn;
 use crate::platform::DirectoryManager;
 use crate::platform::DmgExtractor;
 use crate::services::agent_configuration_service::AgentConfigurationService;
@@ -251,8 +252,11 @@ impl Client {
 
         let local_mode = initial_configuration_service.is_local_mode()?;
 
+        let binary_hash = running_binary_sha256_or_warn();
+
         let http_client = build_agent_http_client(
             &machine_id,
+            binary_hash.as_deref(),
             Duration::from_secs(HTTP_CLIENT_TIMEOUT_SECS),
             local_mode,
         )
@@ -260,6 +264,7 @@ impl Client {
 
         let download_client = build_agent_http_client(
             &machine_id,
+            binary_hash.as_deref(),
             Duration::from_secs(DOWNLOAD_CLIENT_TIMEOUT_SECS),
             local_mode,
         )

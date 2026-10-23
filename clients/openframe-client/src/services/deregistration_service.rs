@@ -3,10 +3,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tracing::{info, warn};
 
-use crate::clients::{DeregistrationOutcome, RegistrationClient};
+use crate::clients::{build_agent_http_client, DeregistrationOutcome, RegistrationClient};
+use crate::platform::binary_hash::running_binary_sha256_or_warn;
 use crate::platform::machine_info_persistence::{self, PersistedMachineInfo};
 use crate::platform::DirectoryManager;
-use crate::services::{AgentConfigurationService, InitialConfigurationService};
+use crate::services::{AgentConfigurationService, InitialConfigurationService, MachineIdService};
 
 /// Deregistration is best-effort and must never block the local wipe for long.
 const DEREGISTER_ATTEMPTS: u32 = 3;
@@ -27,13 +28,17 @@ impl DeregistrationService {
         let config_service = AgentConfigurationService::new(directory_manager.clone())
             .context("Failed to initialize agent configuration service")?;
 
-        let http_client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(DEREGISTER_HTTP_TIMEOUT_SECS))
-            .danger_accept_invalid_certs(initial_config_service.is_local_mode()?)
-            .no_proxy()
-            .pool_max_idle_per_host(0)
-            .build()
-            .context("Failed to create HTTP client")?;
+        // Same identity headers as the running agent.
+        let machine_id = MachineIdService::new(directory_manager)
+            .get_or_create()
+            .context("Failed to get or create machine ID")?;
+        let http_client = build_agent_http_client(
+            &machine_id,
+            running_binary_sha256_or_warn().as_deref(),
+            Duration::from_secs(DEREGISTER_HTTP_TIMEOUT_SECS),
+            initial_config_service.is_local_mode()?,
+        )
+        .context("Failed to create HTTP client")?;
 
         let base_url = format!("https://{}", initial_config_service.get_server_url()?);
         let registration_client = RegistrationClient::new(base_url, http_client)

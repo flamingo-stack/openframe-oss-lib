@@ -1559,6 +1559,7 @@ dependencies = [
  "serde",
  "serde_json",
  "service-manager",
+ "sha2",
  "sys-info",
  "sysinfo",
  "tar",
