@@ -131,5 +131,19 @@ describe('EmbeddableChat - aboveComposer', () => {
 
     expect(screen.getByText('hello')).toBeInTheDocument();
     expect(editor()).toBeInTheDocument();
+    expect(screen.queryByTestId('chat-above-composer')).not.toBeInTheDocument();
+    expect(screen.getByTestId('chat-content-panel')).not.toHaveClass('min-h-32');
+  });
+
+  // jsdom has no layout: the classes are the contract. In a short panel the
+  // block gives way and the thread keeps room for a line and the working
+  // status, which otherwise spilled onto the block.
+  it('keeps room for the thread in a short panel: the block shrinks instead', () => {
+    renderPanel(createState({ activeDialogId: 'd-1', messages: [MESSAGE] }), <p>Getting started</p>);
+
+    expect(screen.getByTestId('chat-content-panel')).toHaveClass('flex-1', 'min-h-32');
+    const slot = screen.getByTestId('chat-above-composer');
+    expect(slot).toHaveClass('min-h-0', 'shrink', 'flex', 'flex-col');
+    expect(slot).not.toHaveClass('shrink-0');
   });
 });

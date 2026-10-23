@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, FileText, Folder, FolderOpen } from 'lucide-rea
 import { cn } from '../../utils/cn';
 import { DEFAULT_FOLDER_INDEX_FILE as CANONICAL_FOLDER_INDEX_FILE } from '../../utils/doc-tree-nav';
 import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
 import { useLoadingScope } from '../ui/loading-scope';
 
 export interface NavigationNode {
@@ -48,25 +49,22 @@ const DEFAULT_FOLDER_INDEX_FILE = CANONICAL_FOLDER_INDEX_FILE;
 const NAV_LIST_CLASS = 'space-y-2';
 const NAV_ITEM_CLASS = 'space-y-1';
 const NAV_ROW_FRAME_CLASS = 'relative w-full rounded-lg border transition-all duration-150';
-const NAV_ROW_CONTENT_CLASS = 'flex w-full items-center rounded-lg px-2 text-h6';
+/** A row's button in its line (the folder toggle, when there is one, sits beside it). */
+const NAV_ROW_LAYOUT_CLASS = 'min-w-0 flex-1';
 /** Each entry's side padding, around its row frame. */
 const NAV_ROW_PAD_CLASS = 'px-2';
-/**
- * A row's height (the desktop tree's, the dropdown's), with the folder toggle's square box at the row's end and the
- * room the name leaves for it: read by the loaded rows and by their skeleton.
- */
+/** A row's height (the desktop tree's, the dropdown's): read by the loaded rows and by their skeleton. */
 const NAV_ROW_HEIGHT = {
-  desktop: { row: 'h-12', toggle: 'h-12 w-12', toggleRoom: 'pr-12' },
-  mobile: { row: 'h-11', toggle: 'h-11 w-11', toggleRoom: 'pr-11' },
+  desktop: 'h-12',
+  mobile: 'h-11',
 } as const;
 /**
- * How many rows each skeleton draws (the desktop tree, the mobile dropdown): a layout fold, the rows one screen holds.
- * A row is 48px (44px in the dropdown) with its border and the list's gap, about 54px (50px): a first screen of 900px
- * (844px on a phone) holds 17. The tree opens on the reader's repository, so the skeleton draws that shape: one root
- * entry open, the rest of the fold its entries (indented as the tree indents them). It is drawn open FIRST: the root
- * order is the source's path sort, and which repositories sort before the reader's needs the read, so a page in a
- * later repository differs by one collapsed root row above the open one. A repository holding fewer entries ends
- * past the first screen anyway, and the tree's other root entries are list growth below it.
+ * How many rows each skeleton draws (the desktop tree, the mobile dropdown) when its host states no count. The tree
+ * lists every entry its source holds (no page, no limit), so this is a typical count, drawn at every width. The tree
+ * opens on the reader's repository, so the skeleton draws that shape: one root entry open, the rest its entries
+ * (indented as the tree indents them). It is drawn open FIRST: the root order is the source's path sort, and which
+ * repositories sort before the reader's needs the read, so a page in a later repository differs by one collapsed
+ * root row above the open one. A host that knows its entry count passes it as `rows`.
  */
 export const MULTI_LEVEL_NAVIGATION_SKELETON_ROWS = 17;
 export const MOBILE_NAVIGATION_SKELETON_ROWS = 17;
@@ -88,7 +86,7 @@ function NavigationRowSkeleton({
   return (
     <div className={cn(NAV_ROW_PAD_CLASS, indentClass)}>
       <div className={cn(NAV_ROW_FRAME_CLASS, 'border-ods-border bg-ods-card')}>
-        <div className={cn(NAV_ROW_CONTENT_CLASS, rowHeightClass)}>
+        <div className={cn(BUTTON_KIND_CLASS.row, rowHeightClass)}>
           <MediaSkeleton.Icon size="sm" className="mr-2 flex-shrink-0" />
           <TextLineSkeleton type="h6" className={NAV_SKELETON_LABEL_WIDTHS[index % NAV_SKELETON_LABEL_WIDTHS.length]} />
         </div>
@@ -128,7 +126,7 @@ function NavigationTreeSkeleton({
 }
 
 /** The documentation tree while it is read: its rows' frames, each with an icon box and a bar of its name. */
-export function MultiLevelNavigationSkeleton({
+function MultiLevelNavigationSkeleton({
   rows = MULTI_LEVEL_NAVIGATION_SKELETON_ROWS,
   className,
 }: {
@@ -138,7 +136,7 @@ export function MultiLevelNavigationSkeleton({
   return (
     <NavigationTreeSkeleton
       rows={rows}
-      rowHeightClass={NAV_ROW_HEIGHT.desktop.row}
+      rowHeightClass={NAV_ROW_HEIGHT.desktop}
       indentClass={NAV_INDENT_CLASS.desktop}
       className={className}
     />
@@ -146,7 +144,7 @@ export function MultiLevelNavigationSkeleton({
 }
 
 /** The mobile documentation dropdown while it is read: the same rows at the dropdown's height. */
-export function MobileNavigationDropdownSkeleton({
+function MobileNavigationDropdownSkeleton({
   rows = MOBILE_NAVIGATION_SKELETON_ROWS,
   className,
 }: {
@@ -156,7 +154,7 @@ export function MobileNavigationDropdownSkeleton({
   return (
     <NavigationTreeSkeleton
       rows={rows}
-      rowHeightClass={NAV_ROW_HEIGHT.mobile.row}
+      rowHeightClass={NAV_ROW_HEIGHT.mobile}
       indentClass={NAV_INDENT_CLASS.mobile}
       className={className}
     />
@@ -269,14 +267,12 @@ function NavigationItem({
           )}
         >
           <div className="relative flex items-center">
-            <button
-              className={cn(
-                NAV_ROW_CONTENT_CLASS,
-                NAV_ROW_HEIGHT.desktop.row,
-                'text-ods-text-primary transition-all duration-150',
-                !isSelected && 'hover:bg-ods-bg-hover',
-                hasChildren && NAV_ROW_HEIGHT.desktop.toggleRoom,
-              )}
+            <Button
+              variant="row"
+              data-state={isSelected ? 'active' : undefined}
+              // The open page holds its line's border-grey fill: no hover over it.
+              data-tone="muted"
+              className={cn(NAV_ROW_LAYOUT_CLASS, NAV_ROW_HEIGHT.desktop)}
               onClick={() => onNodeClick(node)}
               aria-label={`${isSelected ? 'Selected' : 'Select'} ${node.name}`}
             >
@@ -299,14 +295,13 @@ function NavigationItem({
                   README
                 </span>
               )}
-            </button>
+            </Button>
 
             {hasChildren && (
-              <button
-                className={cn(
-                  'absolute right-0 top-0 flex items-center justify-center text-ods-text-secondary transition-colors duration-150 hover:text-ods-text-primary',
-                  NAV_ROW_HEIGHT.desktop.toggle,
-                )}
+              <Button
+                variant="bare"
+                size="icon-sm"
+                className="mr-[var(--spacing-system-xxs)] shrink-0"
                 onClick={e => {
                   e.stopPropagation();
                   if (onToggleExpand) {
@@ -317,8 +312,8 @@ function NavigationItem({
                 }}
                 aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`}
               >
-                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
+                {isExpanded ? <ChevronUp /> : <ChevronDown />}
+              </Button>
             )}
           </div>
 
@@ -403,14 +398,12 @@ function MobileNavigationItem({
           )}
         >
           <div className="relative flex items-center">
-            <button
-              className={cn(
-                NAV_ROW_CONTENT_CLASS,
-                NAV_ROW_HEIGHT.mobile.row,
-                'text-ods-text-primary transition-all duration-150',
-                !isSelected && 'hover:bg-ods-bg-hover',
-                hasChildren && NAV_ROW_HEIGHT.mobile.toggleRoom,
-              )}
+            <Button
+              variant="row"
+              data-state={isSelected ? 'active' : undefined}
+              // The open page holds its line's border-grey fill: no hover over it.
+              data-tone="muted"
+              className={cn(NAV_ROW_LAYOUT_CLASS, NAV_ROW_HEIGHT.mobile)}
               onClick={() => onNodeClick(node)}
             >
               <span className="mr-2 flex-shrink-0">
@@ -432,14 +425,13 @@ function MobileNavigationItem({
                   README
                 </span>
               )}
-            </button>
+            </Button>
 
             {hasChildren && (
-              <button
-                className={cn(
-                  'absolute right-0 top-0 flex items-center justify-center text-ods-text-secondary transition-colors duration-150 hover:text-ods-text-primary',
-                  NAV_ROW_HEIGHT.mobile.toggle,
-                )}
+              <Button
+                variant="bare"
+                size="icon-sm"
+                className="mr-[var(--spacing-system-xxs)] shrink-0"
                 onClick={e => {
                   e.stopPropagation();
                   if (onToggleExpand) {
@@ -450,8 +442,8 @@ function MobileNavigationItem({
                 }}
                 aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${node.name}`}
               >
-                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
+                {isExpanded ? <ChevronUp /> : <ChevronDown />}
+              </Button>
             )}
           </div>
 

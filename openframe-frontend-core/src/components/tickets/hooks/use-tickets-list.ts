@@ -27,7 +27,8 @@ import { PAGE_PARAM_LIMITS, pageCount, positiveInt } from '../../../utils/search
 import type { TicketData } from '../types';
 
 const FIND_TICKET_ENDPOINT = '/api/chat/agent/find-ticket';
-const DEFAULT_PAGE_SIZE = 20;
+/** The tickets a page of the list loads unless the host asks for another size; also its skeleton's row count. */
+export const TICKETS_PAGE_SIZE = 20;
 
 interface FindTicketResponse {
   tickets?: TicketData[];
@@ -101,7 +102,7 @@ export function useTicketsList(filters: UseTicketsListFilters): UseTicketsListRe
   const status = (filters.status ?? '').trim().toLowerCase();
   const statusFilter = status && status !== 'all' ? status : '';
   const page = positiveInt(filters.page, 1);
-  const pageSize = positiveInt(filters.pageSize, DEFAULT_PAGE_SIZE, { max: PAGE_PARAM_LIMITS.maxPageSize });
+  const pageSize = positiveInt(filters.pageSize, TICKETS_PAGE_SIZE, { max: PAGE_PARAM_LIMITS.maxPageSize });
 
   // `customerEmail` is the source of truth — parent (HelpCenterList)
   // already gates on `identity.user?.email` being truthy before

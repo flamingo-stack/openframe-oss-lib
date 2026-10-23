@@ -8,7 +8,7 @@ import { cn } from '../../utils/cn';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Badge, Input } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 /** Option ids are whatever the consumer keys its rows by — string (UUID / enum value) or numeric row id. */
@@ -86,6 +86,9 @@ interface PushButtonSelectorProps<Id extends SelectableOptionId = string> {
 }
 
 /** The selector's layout, read by the selector and by its skeleton, so the skeleton is the selector's size. */
+/** The option rows a loading selector draws when the host states none (a typical short list of options). */
+const PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS = 3;
+
 const SELECTOR_STACK_CLASS = 'space-y-4';
 const SELECTOR_TITLE_CLASS = 'text-ods-text-primary text-h5';
 const SELECTOR_HELP_CLASS = 'text-ods-text-secondary text-h6';
@@ -109,9 +112,15 @@ const OPTION_IDLE_SURFACE_CLASS = 'border-ods-border bg-ods-bg';
 
 /** One option row while it is read: the row's own frame, an icon box, its name (and description) lines and the
  *  selection box. */
-function OptionRowSkeleton({ description = true }: { description?: boolean }) {
+function OptionRowSkeleton({
+  description = true,
+  ...props
+}: {
+  description?: boolean;
+  [key: `data-${string}`]: unknown;
+}) {
   return (
-    <div className={cn(OPTION_FRAME_CLASS, OPTION_IDLE_SURFACE_CLASS)}>
+    <div className={cn(OPTION_FRAME_CLASS, OPTION_IDLE_SURFACE_CLASS)} {...loadingItemProps(props)}>
       <div className={OPTION_ROW_CLASS}>
         <div className={OPTION_LEAD_CLASS}>
           <UnifiedSkeleton className={OPTION_ICON_BOX_CLASS} />
@@ -149,9 +158,9 @@ function OptionListSkeleton({
   sections?: SectionDefinition[];
   description?: boolean;
 }) {
-  const rows = (n: number) =>
-    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-    Array.from({ length: n }, (_, i) => <OptionRowSkeleton key={i} description={description} />);
+  const rows = (n: number) => (
+    <LoadingItems count={n}>{() => <OptionRowSkeleton description={description} data-loading-item />}</LoadingItems>
+  );
   if (!sections || sections.length === 0) return <div className={OPTION_LIST_CLASS}>{rows(count)}</div>;
   const perSection = Math.max(1, Math.round(count / sections.length));
   return (
@@ -166,7 +175,7 @@ function OptionListSkeleton({
   );
 }
 
-export interface PushButtonSelectorSkeletonProps {
+interface PushButtonSelectorSkeletonProps {
   /** How many option rows to draw (the selector's `skeletonCount`). */
   count?: number;
   /** The selector's title and help text: static copy, drawn as they are. */
@@ -185,8 +194,8 @@ export interface PushButtonSelectorSkeletonProps {
  * The selector while its options are read: its title, section headers and help text drawn for real, every option
  * row a skeleton of the row. `PushButtonSelector` draws it while `isLoading` and in a loading scope.
  */
-export function PushButtonSelectorSkeleton({
-  count = 3,
+function PushButtonSelectorSkeleton({
+  count = PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS,
   title,
   helpText,
   sections,
@@ -227,7 +236,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
   optional = false,
   isLoading = false,
   error = null,
-  skeletonCount = 3,
+  skeletonCount = PUSH_BUTTON_SELECTOR_SKELETON_OPTIONS,
   optionDescriptions = true,
   sections,
   search,
@@ -272,6 +281,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
 
   const searchInput = search ? (
     <Input
+      userValue
       value={search.value}
       onChange={e => search.onChange(e.target.value)}
       placeholder={search.placeholder}
@@ -342,6 +352,7 @@ export function PushButtonSelector<Id extends SelectableOptionId = string>({
     const optionEl = (
       <div
         key={option.id}
+        data-loading-item
         className={cn(
           'group transition-all duration-200',
           OPTION_FRAME_CLASS,

@@ -6,13 +6,13 @@ import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from '
 import { autoScrollColumn } from '../../../utils/auto-scroll-ancestors';
 import { cn } from '../../../utils/cn';
 import { TagIcon } from '../../icons-v2-generated/shopping/tag-icon';
+import { LoadingItems } from '../../ui/loading-scope';
 import { BoardColumnHeader } from './board-column-header';
 import { tintOnDark } from './color-utils';
 import { useDropAim } from './drop-aim';
 import { DROP_LINE_ATTRIBUTE, nearestCardIn } from './lane-geometry';
 import { TicketCard } from './ticket-card';
-import { TicketCardSkeleton } from './ticket-card-skeleton';
-import type { BoardColumnDef, BoardTicket } from './types';
+import { BOARD_COLUMN_PAGE_SIZE, type BoardColumnDef, type BoardTicket } from './types';
 import { useLaneScrollAnchor } from './use-lane-scroll-anchor';
 
 export interface BoardColumnProps {
@@ -234,7 +234,10 @@ function ColumnBody({
       className="flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-xs)] overflow-y-auto py-[5px] [overflow-anchor:none]"
     >
       {column.isLoading ? (
-        <SkeletonStack />
+        // A lane loads one page of its tickets: its loading form draws that page, each card its own skeleton.
+        <LoadingItems count={column.pageSize ?? BOARD_COLUMN_PAGE_SIZE}>
+          {() => <TicketCard ticket={null} columnId={column.id} data-loading-item />}
+        </LoadingItems>
       ) : column.tickets.length === 0 ? (
         <EmptyState columnId={column.id} touchMode={touchMode} />
       ) : (
@@ -251,25 +254,14 @@ function ColumnBody({
             dragDisabled={touchMode || column.dragDisabled}
             dropDisabled={touchMode || column.dropDisabled}
             allowedFromColumns={column.allowedFromColumns}
+            data-loading-item
           />
         ))
       )}
-      {column.isLoadingMore && !column.isLoading && <TicketCardSkeleton />}
+      {/* The next page on its way: one card drawing itself while it is read. */}
+      {column.isLoadingMore && !column.isLoading && <TicketCard ticket={null} columnId={column.id} />}
       {column.hasMore && <div ref={sentinelRef} aria-hidden className="h-1 shrink-0" />}
     </div>
-  );
-}
-
-function SkeletonStack({ count = 4 }: { count?: number }) {
-  // Position IS the identity here: the rows are interchangeable placeholders in
-  // a fixed-length list, so the index is the correct key. Random keys remounted
-  // every row whenever this re-rendered with a different `count`.
-  return (
-    <>
-      {Array.from({ length: count }, (_, i) => (
-        <TicketCardSkeleton key={`skeleton-${i}`} />
-      ))}
-    </>
   );
 }
 

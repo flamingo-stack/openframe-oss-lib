@@ -16,8 +16,8 @@ export type { SoftwareSourceBadgeProps, SoftwareSource } from './SoftwareSourceB
 export { CveLink } from './CveLink';
 export type { CveLinkProps } from './CveLink';
 
-export { TOOL_CHIP_HEIGHT, ToolBadge, ToolBadgeSkeleton } from './ToolBadge';
-export type { ToolBadgeProps, ToolBadgeSkeletonProps } from './ToolBadge';
+export { TOOL_CHIP_HEIGHT, ToolBadge } from './ToolBadge';
+export type { ToolBadgeProps } from './ToolBadge';
 export type { ToolType } from '../../types/tool.types';
 
 export { ShellTypeBadge } from './ShellTypeBadge';

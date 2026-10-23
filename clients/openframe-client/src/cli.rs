@@ -33,6 +33,10 @@ struct InstallArgs {
     #[arg(long = "initialKey")]
     initial_key: Option<String>,
 
+    /// Key for the logs stream; fetched after registration when absent
+    #[arg(long = "logKey")]
+    log_key: Option<String>,
+
     #[arg(long = "localMode", default_value_t = false)]
     local_mode: bool,
 
@@ -55,6 +59,7 @@ impl InstallArgs {
         InstallConfigParams {
             server_url: self.server_url.clone(),
             initial_key: self.initial_key.clone(),
+            log_key: self.log_key.clone(),
             org_id: self.org_id.clone(),
             user_id: self.user_id.clone(),
             local_mode: self.local_mode,

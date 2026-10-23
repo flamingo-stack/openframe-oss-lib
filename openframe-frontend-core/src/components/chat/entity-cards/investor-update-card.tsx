@@ -25,15 +25,15 @@ import {
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
 import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
-import { AdminContentCard, AdminContentCardSkeleton } from './admin-content-card';
-import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+import { AdminContentCard } from './admin-content-card';
+import { EntityPortraitCard } from './entity-portrait-card';
 
 /** The content-type chip a portrait investor update shows (a static label). */
 const INVESTOR_UPDATE_TYPE_LABEL = 'Investor Update';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface InvestorUpdateCardProps {
+interface LoadedInvestorUpdateCardProps {
   update: InvestorUpdate;
   href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
@@ -50,10 +50,18 @@ export interface InvestorUpdateCardProps {
 }
 
 /**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope.
+ */
+export type InvestorUpdateCardProps =
+  | (LoadedInvestorUpdateCardProps & { loading?: boolean })
+  | (Partial<LoadedInvestorUpdateCardProps> & { loading: true });
+
+/**
  * An investor update card while it is read, one per density: `default` is the admin card's own skeleton (the card is
  * an `AdminContentCard`), `portrait` the shared portrait skeleton with the static chip, `sm` the compact card's rows.
  */
-export function InvestorUpdateCardSkeleton({
+function InvestorUpdateCardSkeleton({
   size = 'default',
   showTypeBadge = true,
   className,
@@ -65,7 +73,11 @@ export function InvestorUpdateCardSkeleton({
 }) {
   if (size === 'portrait') {
     return (
-      <EntityPortraitCardSkeleton
+      <EntityPortraitCard
+        loading
+        href=""
+        imageAlt=""
+        title=""
         typeLabel={showTypeBadge ? INVESTOR_UPDATE_TYPE_LABEL : undefined}
         className={className}
       />
@@ -74,7 +86,7 @@ export function InvestorUpdateCardSkeleton({
   if (size === 'default') {
     return (
       <div className={`block h-full ${className ?? ''}`}>
-        <AdminContentCardSkeleton actions={false} subtitleRow={false} />
+        <AdminContentCard loading title="" subtitleRow={false} />
       </div>
     );
   }
@@ -91,7 +103,17 @@ export function InvestorUpdateCardSkeleton({
   return null;
 }
 
-export function InvestorUpdateCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function InvestorUpdateCard(props: InvestorUpdateCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return (
+      <InvestorUpdateCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />
+    );
+  }
+  return <LoadedInvestorUpdateCard {...props} />;
+}
+
+function LoadedInvestorUpdateCard({
   update,
   href,
   target: targetProp,
@@ -101,7 +123,7 @@ export function InvestorUpdateCard({
   size = 'default',
   showTypeBadge = true,
   className,
-}: InvestorUpdateCardProps) {
+}: LoadedInvestorUpdateCardProps) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -114,9 +136,6 @@ export function InvestorUpdateCard({
     aspect: size === 'sm' ? 'square' : 'wide',
   });
   const coverImage = update.featured_image || placeholderUrl || null;
-  if (useLoadingScope()) {
-    return <InvestorUpdateCardSkeleton size={size} showTypeBadge={showTypeBadge} className={className} />;
-  }
 
   if (size === 'sm') {
     const periodText = formatInvestorUpdatePeriod(update.period_start, update.period_end);

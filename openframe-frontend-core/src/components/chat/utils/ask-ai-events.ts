@@ -35,6 +35,11 @@ export function holdAskAiOpens(): void {
   for (const name of ASK_AI_OPEN_EVENTS) window.addEventListener(name, holdOpen);
 }
 
+/** An open came before any chat was listening, and waits to be delivered: the chat must load now. */
+export function askAiOpenIsHeld(): boolean {
+  return heldOpen !== null;
+}
+
 /**
  * A chat is listening now: stop holding, and send it the open that came before
  * it was. Returns what to call when that chat stops listening.
@@ -47,5 +52,26 @@ export function chatListensForAskAiOpens(): () => void {
   if (held) window.dispatchEvent(new CustomEvent(held.type, { detail: held.detail }));
   return () => {
     listening -= 1;
+  };
+}
+
+/**
+ * The attribute every element that opens the chat carries (the Mingo button, an ask prompt). A pointer or focus
+ * reaching one is the visitor's intent to open it: the chat starts loading then, a moment before the click, instead
+ * of on every page view (`onAskAiIntent`).
+ */
+export const ASK_AI_TRIGGER_ATTRIBUTE = 'data-ask-ai-trigger';
+
+/** Runs `run` once a pointer, a touch or the focus reaches an element carrying `ASK_AI_TRIGGER_ATTRIBUTE`. */
+export function onAskAiIntent(run: () => void): () => void {
+  if (typeof document === 'undefined') return () => {};
+  const selector = `[${ASK_AI_TRIGGER_ATTRIBUTE}]`;
+  const onIntent = (event: Event) => {
+    if (event.target instanceof Element && event.target.closest(selector)) run();
+  };
+  const kinds = ['pointerover', 'focusin', 'touchstart'] as const;
+  for (const kind of kinds) document.addEventListener(kind, onIntent, { capture: true, passive: true });
+  return () => {
+    for (const kind of kinds) document.removeEventListener(kind, onIntent, { capture: true });
   };
 }

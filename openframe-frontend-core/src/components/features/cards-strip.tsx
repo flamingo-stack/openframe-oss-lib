@@ -120,8 +120,8 @@ interface CardsStripEngineProps {
   className?: string;
   /**
    * The strip in a page's loading state, when its items are read (none handed in yet): `count` copies of `card`, the
-   * strip's cards' own skeleton (in children mode each in the managed cell's width). `count` is the strip's fold:
-   * the cards one screen of the strip shows. Absent: an empty strip draws nothing, in a scope too.
+   * strip's cards' own skeleton (in children mode each in the managed cell's width). `count` is the number of cards
+   * the host reads (its limit), drawn at every width. Absent: an empty strip draws nothing, in a scope too.
    */
   skeleton?: { card: React.ReactNode; count: number };
 }
@@ -807,7 +807,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     // Outside a loading state an empty strip is nothing; inside one, a strip whose host states a skeleton draws it
     // (a host that states none expects no strip, e.g. a record with no bites).
     if (!inScope || !skeleton) return null;
-    // The items are read: the heading (the page's own words), the slot, and a fold of the cards' own skeleton.
+    // The items are read: the heading (the page's own words), the slot, and `count` of the cards' own skeleton.
     return (
       <div className={cn(STRIP_ROOT_CLASS, className)}>
         {heading}

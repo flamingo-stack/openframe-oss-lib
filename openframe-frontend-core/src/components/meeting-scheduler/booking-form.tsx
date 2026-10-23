@@ -51,7 +51,7 @@ import {
   ToggleGroupItem,
 } from '../ui';
 import { HoneypotField } from '../ui/honeypot-field';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
 
 /**
@@ -440,7 +440,7 @@ const builtInId = (name: string) => `ms-${name.replace(/[A-Z]/g, m => `-${m.toLo
 export interface BookingFormProps {
   /** The link's availability; null while it is read (the form is then its skeleton). */
   availability: MeetingAvailability | null;
-  /** The link is still being read: the form draws its own skeleton (`BookingFormSkeleton`), as in a loading scope. */
+  /** The link is still being read: the form draws its own loading state, as in a loading scope. */
   loading?: boolean;
   meetingId: string;
   /** Absent in `deferSlot` mode — the slot is chosen AFTER these answers. */
@@ -539,7 +539,7 @@ export function BookingForm(props: BookingFormProps) {
   const { availability } = props;
   if (inScope || props.loading || !availability) {
     return (
-      <BookingFormSkeleton
+      <BookingFormPending
         fieldRows={props.fieldRows}
         optionalFields={props.optionalFields}
         fieldCopy={props.fieldCopy}
@@ -993,7 +993,7 @@ function BookingFormBody({
  * cannot know: a textarea row is taller than its placeholder (the rows carry no
  * type), and a HubSpot `legalConsent` block only exists once availability lands.
  */
-export function BookingFormSkeleton({
+function BookingFormPending({
   fieldRows,
   optionalFields,
   fieldCopy,
@@ -1052,7 +1052,7 @@ export function BookingFormSkeleton({
         <CheckboxBlock
           id={consentId}
           checked={false}
-          onCheckedChange={() => {}}
+          onCheckedChange={LOADING_NOOP}
           required
           label={
             consent === true ? <TextLineSkeleton type="inherit" as="span" className="w-64 max-w-full" /> : consent.label

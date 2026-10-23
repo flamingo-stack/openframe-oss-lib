@@ -6,7 +6,7 @@ import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { MEDIA_ASPECT } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
-import { PlatformBadge, PlatformBadgeSkeleton } from '../../features/platform-badge';
+import { PlatformBadge } from '../../features/platform-badge';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
@@ -64,6 +64,12 @@ interface AdminContentCardProps {
   subtitleRow?: boolean;
   /** Additional class names */
   className?: string;
+  /**
+   * The record is still being read: the card draws its skeleton in its own boxes. `actions` then says what the
+   * actions row shows: `true` draws button bars, a node draws those controls for real (inert), absent draws none. A
+   * loading scope does the same.
+   */
+  loading?: boolean;
 }
 
 export function AdminContentCard({
@@ -79,6 +85,7 @@ export function AdminContentCard({
   reserveRows = false,
   subtitleRow = true,
   className,
+  loading,
 }: AdminContentCardProps) {
   const [imageError, setImageError] = useState(false);
   // WHICH url finished loading, rather than a bare flag reset from an effect on
@@ -91,10 +98,9 @@ export function AdminContentCard({
   const imageLoaded = Boolean(displayUrl) && loadedUrl === displayUrl;
   const imageBgColor = useImageEdgeColor(displayUrl || null, 'transparent');
 
-  if (useLoadingScope()) {
-    return (
-      <AdminContentCardSkeleton className={className} subtitleRow={subtitleRow} actions={actions ? actions : false} />
-    );
+  const inScope = useLoadingScope();
+  if (inScope || loading) {
+    return <AdminContentCardSkeleton className={className} subtitleRow={subtitleRow} actions={actions || false} />;
   }
 
   return (
@@ -171,7 +177,7 @@ export function AdminContentCard({
  * title, the subtitle line, a two-line `text-h6` summary, the 28px badges row, the meta line and the bordered actions
  * row. The actions are the caller's own controls (static) when it passes them, bars otherwise.
  */
-export function AdminContentCardSkeleton({
+function AdminContentCardSkeleton({
   className,
   actions = true,
   subtitleRow = true,
@@ -193,8 +199,8 @@ export function AdminContentCardSkeleton({
         {subtitleRow && <TextLineSkeleton type="h6" className="w-1/2" />}
         <TextLineSkeleton type="h6" lines={2} className="w-full" />
         <div className={cn(ADMIN_CARD_BADGES, ADMIN_CARD_BADGES_RESERVED)}>
-          <PlatformBadgeSkeleton size="xs" />
-          <PlatformBadgeSkeleton size="xs" />
+          <PlatformBadge loading size="xs" />
+          <PlatformBadge loading size="xs" />
         </div>
         <div className={ADMIN_CARD_META}>
           <TextLineSkeleton type="h6" className="w-32" />

@@ -26,6 +26,9 @@ export interface CompleteAccountFormProps {
   /** SSO alternatives offered above the fields ("Continue with …"). */
   ssoProviders?: AuthSsoProvider[];
   onSsoClick?: (provider: AuthSsoProvider) => void;
+  /** The SSO providers are still being read: the provider buttons draw their boxes (the typical offer) over the real
+   *  divider. */
+  ssoProvidersLoading?: boolean;
   title?: string;
   subtitle?: string;
   dividerLabel?: string;
@@ -64,6 +67,7 @@ export function CompleteAccountForm({
   onBack,
   ssoProviders,
   onSsoClick,
+  ssoProvidersLoading = false,
   title = 'Complete your Account',
   subtitle = 'Fill in the details below to get started',
   dividerLabel = 'or create account',
@@ -98,14 +102,15 @@ export function CompleteAccountForm({
         <p className="text-ods-text-secondary text-h4">{subtitle}</p>
       </div>
 
-      {/* SSO shortcuts + divider */}
-      {ssoProviders && ssoProviders.length > 0 && (
+      {/* SSO shortcuts + divider; while the providers are read, the buttons draw their boxes over the real divider */}
+      {(ssoProvidersLoading || (ssoProviders && ssoProviders.length > 0)) && (
         <>
           <SsoProviderButtons
-            providers={ssoProviders}
+            providers={ssoProviders ?? []}
             onSsoClick={onSsoClick}
             actionLabel={ssoActionLabel}
             disabled={fieldsDisabled}
+            loading={ssoProvidersLoading}
           />
           <LabeledDivider label={dividerLabel} />
         </>

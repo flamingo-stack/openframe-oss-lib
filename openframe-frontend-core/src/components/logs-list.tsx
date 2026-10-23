@@ -4,8 +4,9 @@ import { cn } from '../utils/cn';
 import { formatDateTimeYmd } from '../utils/format';
 import { LoadingRegion } from './loading/loading-region';
 import { TextLineSkeleton } from './loading/unified-skeleton';
-import { LogSeverityDot, LogSeverityDotSkeleton } from './log-severity-dot';
+import { LogSeverityDot } from './log-severity-dot';
 import { ToolIcon } from './tool-icon';
+import { LoadingItems } from './ui/loading-scope';
 
 // UTC-pinned so the server and every client agree (React #418), through the one
 // renderer rather than hand-built `getUTC*` strings.
@@ -18,16 +19,16 @@ const LOG_META_ROW_CLASS = 'flex items-center gap-2';
 const LOG_SCROLL_CLASS = 'flex-1 overflow-y-auto px-4 py-3';
 const LOG_FRAME_CLASS = 'relative flex flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card';
 /**
- * Rows the list's skeleton draws: one screen of the list's default 400px box (a row is a `text-h6` title over a
- * `text-h5` time, about 60px with its padding).
+ * Rows the list's skeleton draws when its host states no `skeletonRows`: a typical count. A host that reads its logs
+ * with a page size or a limit passes it, and the skeleton draws exactly that many rows.
  */
-const LOGS_LIST_FOLD = 6;
+const LOGS_LIST_SKELETON_ROWS = 6;
 
 /** A log row while it is read: the severity dot's box, the title and the time as bars. */
 function LogCardSkeleton() {
   return (
-    <div className={LOG_ROW_CLASS} aria-hidden>
-      <LogSeverityDotSkeleton size="md" />
+    <div className={LOG_ROW_CLASS} aria-hidden data-loading-item>
+      <LogSeverityDot loading size="md" />
       <div className={LOG_ROW_TEXT_CLASS}>
         <TextLineSkeleton type="h6" className="w-3/4" />
         <div className={LOG_META_ROW_CLASS}>
@@ -45,7 +46,7 @@ const LogCard: FC<{
   onClick?: () => void;
 }> = ({ log, isLast, showConnector, onClick }) => {
   return (
-    <div className="relative">
+    <div className="relative" data-loading-item>
       <div
         className={cn(LOG_ROW_CLASS, 'cursor-pointer transition-colors hover:bg-ods-bg-hover/50')}
         onClick={onClick}
@@ -91,6 +92,7 @@ export const LogsList = forwardRef<HTMLDivElement, LogsListProps>(
       showConnector = true,
       onLogClick,
       loading = false,
+      skeletonRows = LOGS_LIST_SKELETON_ROWS,
       emptyMessage = 'No logs to display',
       className,
     },
@@ -111,14 +113,11 @@ export const LogsList = forwardRef<HTMLDivElement, LogsListProps>(
     };
 
     if (loading) {
-      // The list's own frame and scroller with a screen of row skeletons.
+      // The list's own frame and scroller with a full page of row skeletons.
       return (
         <div ref={ref} className={cn(LOG_FRAME_CLASS, getContainerClasses(), className)} style={getContainerStyles()}>
           <LoadingRegion label="Loading logs" className={LOG_SCROLL_CLASS}>
-            {Array.from({ length: LOGS_LIST_FOLD }, (_, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows never reorder
-              <LogCardSkeleton key={i} />
-            ))}
+            <LoadingItems count={skeletonRows}>{() => <LogCardSkeleton />}</LoadingItems>
           </LoadingRegion>
         </div>
       );

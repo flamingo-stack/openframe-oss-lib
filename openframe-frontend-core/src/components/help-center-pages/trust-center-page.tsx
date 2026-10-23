@@ -54,13 +54,13 @@ import { useScrollSpy } from '../docs/use-scroll-spy';
 import { FaqSection, type FaqSectionProps, type FaqSkeletonShape } from '../faq/faq-section';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { LoadingRegion } from '../loading/loading-region';
+import { LoadingFallback } from '../loading/loading-fallback';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
 import { DataAttribution } from '../ui/data-attribution';
 import { DownloadButton } from '../ui/download-button';
 import { EntityImage } from '../ui/entity-image';
 import { LoadError } from '../ui/error-state';
-import { LoadingScope, useLoadingScope } from '../ui/loading-scope';
+import { useLoadingScope } from '../ui/loading-scope';
 import { StatusIndicator } from '../ui/status-indicator';
 import {
   AiSection,
@@ -112,7 +112,7 @@ export interface TrustCenterPageProps {
   faqSkeletonShape?: FaqSkeletonShape;
   /**
    * Rows each panel's loading state draws, for a host whose lists are curated (it knows their lengths: the frameworks
-   * it is audited against). Absent: the layout's fold, the rows one screen holds.
+   * it is audited against). Absent: a typical count, at every width.
    */
   panelSkeletonRows?: Partial<Record<TrustCenterPanelId, TrustPanelRows>>;
 }
@@ -305,9 +305,9 @@ export function TrustCenterPage({
   // layout: `contents`), announced once unless a host's scope already did.
   const inLoadingScope = (node: ReactNode, label: string): ReactNode =>
     loading ? (
-      <LoadingRegion label={label} announce={!scoped} className="contents">
-        <LoadingScope className="contents">{node}</LoadingScope>
-      </LoadingRegion>
+      <LoadingFallback label={label} className="contents">
+        {node}
+      </LoadingFallback>
     ) : (
       node
     );
@@ -401,26 +401,6 @@ export function TrustCenterPage({
           )
         : null}
     </>
-  );
-}
-
-/**
- * @deprecated Render `<TrustCenterPage>` inside a `LoadingScope`: the page draws its own loading state (this is what
- * it does). Kept so hosts on an older release keep compiling; nothing in the lib uses it. `region` is ignored: the
- * page announces its own loading state.
- */
-// loading-standard-ok: deprecated re-export kept for external consumers
-export function TrustCenterPageSkeleton({
-  region: _region,
-  ...chrome
-}: Pick<TrustCenterPageProps, 'shell' | 'backButton' | 'title' | 'subtitle'> & {
-  /** Ignored: the page announces its own loading state. */
-  region?: boolean;
-}) {
-  return (
-    <LoadingScope>
-      <TrustCenterPage {...chrome} />
-    </LoadingScope>
   );
 }
 

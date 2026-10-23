@@ -15,9 +15,11 @@
  * in a `<div>` (static, like delivery) or `<button>` (clickable, like
  * tickets) and renders the row content via this component.
  *
- * Pair with `DevCardRowSkeletonList` for the loading state — the
- * skeleton mirrors the same min-heights so the in-flight UI doesn't
- * shift the layout when real data lands.
+ * The row draws its own loading state (a loading scope, or `loading`): its
+ * skeleton mirrors the same min-heights so the in-flight UI doesn't shift
+ * the layout when real data lands. A list draws its loading rows through
+ * its own row component (`HelpCenterCard ticket={null}`), never a list
+ * skeleton picked by the parent.
  *
  * NOTE: the ticket conversation row is NOT here — it renders the shared
  * `<ChatMessageRow>` (`components/chat/chat-message-row.tsx`), the SAME
@@ -27,10 +29,9 @@
 
 import type { ReactNode } from 'react';
 import { TEXT_LINES_MIN } from '../../../styles/component-sizes';
-import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
-import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadgeSkeleton } from '../../ui/status-badge';
+import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
+import { StatusBadge } from '../../ui/status-badge';
 
 export interface DevCardRowContentProps {
   title: string;
@@ -43,6 +44,10 @@ export interface DevCardRowContentProps {
   emptyDescription?: string;
   /** Right column — caller renders its own stacked badges. */
   rightBadges: ReactNode;
+  /** The record is still being read: the row draws its own skeleton. A loading scope does the same. */
+  loading?: boolean;
+  /** The list's markers (`data-loading-item`), forwarded to the row's root in both forms. */
+  [marker: `data-${string}`]: unknown;
 }
 
 /** The row's layout, read by the row and by its skeleton, so the skeleton is the row's size. */
@@ -54,17 +59,12 @@ const ROW_SUBTITLE_LINE_CLASS = `flex items-center text-h5 ${TEXT_LINES_MIN[1]}`
 const ROW_DESCRIPTION_LINE_CLASS = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}`;
 const ROW_BADGES_CLASS = 'flex flex-shrink-0 flex-col gap-2 self-start';
 
-export function DevCardRowContent({
-  title,
-  subtitle,
-  description,
-  emptyDescription = 'No description provided',
-  rightBadges,
-}: DevCardRowContentProps) {
+export function DevCardRowContent(props: DevCardRowContentProps) {
+  const { title, subtitle, description, emptyDescription = 'No description provided', rightBadges } = props;
   // While the page is read the record is not known: the row's content is its skeleton.
-  if (useLoadingScope()) return <DevCardRowContentSkeleton />;
+  if (useLoadingScope() || props.loading) return <DevCardRowContentSkeleton {...loadingItemProps(props)} />;
   return (
-    <div className={ROW_INNER_CLASS}>
+    <div className={ROW_INNER_CLASS} {...loadingItemProps(props)}>
       <div className={ROW_TEXT_COLUMN_CLASS}>
         <div className={ROW_TITLE_LINE_CLASS}>
           <h3 className="line-clamp-2 flex-1 break-words tracking-[-0.36px] text-ods-text-primary text-h3 content-md:truncate">
@@ -83,10 +83,11 @@ export function DevCardRowContent({
   );
 }
 
-/** A row's content while its record is read: the title, subtitle and description as bars, two badge skeletons. */
-export function DevCardRowContentSkeleton() {
+/** A row's content while its record is read: the title, subtitle and description as bars, the status badge every row carries.
+ *  Its `data-*` props (the list's markers) are forwarded, like the loaded row's. */
+function DevCardRowContentSkeleton(props: { [marker: `data-${string}`]: unknown }) {
   return (
-    <div className={ROW_INNER_CLASS} aria-hidden>
+    <div className={ROW_INNER_CLASS} aria-hidden {...loadingItemProps(props)}>
       <div className={ROW_TEXT_COLUMN_CLASS}>
         <div className={ROW_TITLE_LINE_CLASS}>
           <TextLineSkeleton type="h3" className="w-full" />
@@ -99,48 +100,10 @@ export function DevCardRowContentSkeleton() {
         </div>
       </div>
       <div className={ROW_BADGES_CLASS}>
-        <StatusBadgeSkeleton variant="card" />
-        <StatusBadgeSkeleton variant="card" />
+        {/* The one badge every row carries (a ticket's status); the others (NEW, priority) are optional, so not
+            drawn. The badges are a row's fixed parts, not a list. */}
+        <StatusBadge loading text="" variant="card" />
       </div>
     </div>
-  );
-}
-
-/**
- * Skeleton rendering for a single row — the bars mirror the same
- * min-heights as `DevCardRowContent` so the loading→loaded swap
- * doesn't reflow.
- */
-export function DevCardRowSkeleton() {
-  return (
-    <div className="border-b border-ods-border p-[12px] last:border-b-0 content-md:p-[16px]">
-      <DevCardRowContentSkeleton />
-    </div>
-  );
-}
-
-/**
- * The standard "5 skeleton rows inside a bordered card" loading state
- * used by every list shell. Both delivery (`delivery-table.tsx`) and
- * tickets (`tickets-list.tsx`) mount this directly.
- */
-export function DevCardRowSkeletonList({
-  region = true,
-  rows = 5,
-}: {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-  rows?: number;
-}) {
-  return (
-    <LoadingRegion
-      label="Loading"
-      announce={region}
-      className="w-full overflow-hidden rounded-[6px] border border-ods-border bg-ods-card"
-    >
-      {Array.from({ length: rows }, (_, i) => (
-        <DevCardRowSkeleton key={i} />
-      ))}
-    </LoadingRegion>
   );
 }

@@ -26,6 +26,13 @@ import { MarqueeWall } from './marquee-wall';
 export interface PhotoWallImage {
   url: string;
   alt?: string;
+  /**
+   * The picture's pixel size, when the host knows it (a server that read the file). A picture with a size is laid
+   * out at once; one without is measured in the browser first, and the wall waits for that, so it is the page's
+   * largest paint only after every picture has loaded (CU-17tkuw5xp4q).
+   */
+  width?: number;
+  height?: number;
 }
 
 export type PhotoOrientation = 'tall' | 'wide' | 'square';
@@ -174,6 +181,14 @@ export interface PhotoWallProps {
   className?: string;
   /** The pictures are still being fetched: show the wall's own placeholder frames. */
   loading?: boolean;
+  /**
+   * The width a column is drawn at, as an image `sizes` value (e.g. `(min-width: 1024px) 25vw, 50vw`). With it, and a
+   * size on every picture, the wall is laid out at once, on the server too, and each picture is drawn with the host's
+   * `srcset`: the first frames are in the HTML and fetched before any script runs, instead of after the wall has been
+   * measured in the browser (CU-17tkuw5xp4q: the careers hero's largest paint waited for that). Two walls given the
+   * same pictures and `sizes` (one per breakpoint) ask for the same files.
+   */
+  sizes?: string;
 }
 
 export function PhotoWall({
@@ -183,6 +198,7 @@ export function PhotoWall({
   fadeColor,
   className,
   loading: loadingProp = false,
+  sizes,
 }: PhotoWallProps) {
   // In a page's loading state the pictures are read: the wall draws its placeholder frames and measures nothing.
   const inScope = useLoadingScope();
@@ -218,18 +234,36 @@ export function PhotoWall({
       : undefined;
   // One frame per picture: a url listed twice is its first entry. Nothing is
   // asked for before the wall knows its width.
+  // Laid out without measuring: every picture's size is stated and the caller states the column's width.
+  const sizedUpFront = !!sizes && images.length > 0 && images.every(image => image.width && image.height);
   const unique = useMemo(() => {
-    if (requestWidth === undefined || inScope) return [];
+    if (inScope || (!sizedUpFront && requestWidth === undefined)) return [];
     const byUrl = new Map<string, PhotoWallImage>();
     for (const image of images) if (!byUrl.has(image.url)) byUrl.set(image.url, image);
     return Array.from(byUrl.values());
-  }, [images, requestWidth, inScope]);
+  }, [images, requestWidth, inScope, sizedUpFront]);
   // Each picture is measured at the url it is drawn from (the boxed `Image`'s
   // `optimizedWidth`: the host's resizer at the column's width), so it is downloaded once.
-  const drawnWidth = requestWidth ?? undefined;
+  // Laid out up front, a picture is drawn from its own url with the host's `srcset` (`sizes`), on the server too.
+  const drawnWidth = sizedUpFront ? undefined : (requestWidth ?? undefined);
   const drawnUrl = useCallback((url: string) => (drawnWidth ? resizedImageUrl(url, drawnWidth) : url), [drawnWidth]);
-  const urls = useMemo(() => unique.map(image => drawnUrl(image.url)), [unique, drawnUrl]);
-  const orientations = usePhotoOrientations(urls);
+  // A picture whose size the host stated has its orientation now; only the others are measured.
+  const known = useMemo(() => {
+    const byUrl = new Map<string, PhotoOrientation>();
+    for (const image of unique) {
+      if (image.width && image.height) byUrl.set(drawnUrl(image.url), photoOrientation(image.width, image.height));
+    }
+    return byUrl;
+  }, [unique, drawnUrl]);
+  const urls = useMemo(
+    () => unique.map(image => drawnUrl(image.url)).filter(url => !known.has(url)),
+    [unique, drawnUrl, known],
+  );
+  const probed = usePhotoOrientations(urls);
+  const orientations = useMemo(() => {
+    if (urls.length === 0) return known;
+    return probed ? new Map([...known, ...probed]) : null;
+  }, [urls, known, probed]);
 
   const layout = useMemo(() => {
     if (!orientations) return null;
@@ -254,7 +288,7 @@ export function PhotoWall({
 
   if (images.length === 0 && !loading) return null;
   // Until the pictures arrive AND their sizes are known, the same placeholder frames.
-  const columnsToDraw = loading || requestWidth === undefined ? null : layout;
+  const columnsToDraw = loading || (!sizedUpFront && requestWidth === undefined) ? null : layout;
 
   const gridStyle = {
     gridTemplateColumns: `repeat(${columnsToDraw?.length || columns}, minmax(0, 1fr))`,
@@ -290,10 +324,9 @@ export function PhotoWall({
                     alt={photo.alt ?? ''}
                     fill
                     className="object-cover"
-                    // Asked for at the column's width. With no step that covers the column the
-                    // caller's url is drawn as it is (already sized by its own image service).
-                    optimizedWidth={drawnWidth}
-                    unoptimized
+                    // Asked for at the column's width: through the host's `srcset` when the wall was laid
+                    // out up front, else at the measured width (the caller's url when no step covers it).
+                    {...(sizedUpFront ? { sizes } : { optimizedWidth: drawnWidth, unoptimized: true })}
                     // A column's first frames are on screen when the wall appears (one of them is
                     // usually the page's largest paint), so they are not left to lazy loading.
                     loading={i < EAGER_PHOTOS_PER_COLUMN ? 'eager' : 'lazy'}

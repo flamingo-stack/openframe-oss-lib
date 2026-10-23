@@ -4,14 +4,17 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.model.enums.DataEnrichmentServiceType;
+import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -53,6 +56,8 @@ class RmmEnrichmentServiceTest {
     @Mock
     private ScriptExecutionRepository scriptExecutionRepository;
     @Mock
+    private CommandExecutionRepository commandExecutionRepository;
+    @Mock
     private ScriptRepository scriptRepository;
 
     private RmmEnrichmentService service;
@@ -62,7 +67,56 @@ class RmmEnrichmentServiceTest {
         lenient().when(tenantIdProvider.getTenantId()).thenReturn(TENANT_ID);
         // Tenant cluster mode — no ClusterTenantIdResolver bean.
         service = new RmmEnrichmentService(machineIdCacheService, null, tenantIdProvider,
-                scriptExecutionRepository, scriptRepository);
+                scriptExecutionRepository, commandExecutionRepository, scriptRepository);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a script test run keeps its row update but is routed away from the log and analytics sinks")
+    void getExtraParams_scriptTestRun_excludesLogSinks() {
+        stubMachine();
+        ScriptExecution execution = ScriptExecution.builder()
+                .tenantId(TENANT_ID).executionId(EXECUTION_ID).scriptId(SCRIPT_ID).testRun(true)
+                .build();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(execution));
+        DeserializedDebeziumMessage message = scriptResult(SCRIPT_ID);
+
+        service.getExtraParams(message);
+
+        assertThat(message.getExcludedDestinations()).containsExactlyInAnyOrder(
+                Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a command test run — no script row under the id — is found among command rows and excluded too")
+    void getExtraParams_commandTestRun_excludesLogSinks() {
+        stubMachine();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.empty());
+        when(commandExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(CommandExecution.builder().executionId(EXECUTION_ID).testRun(true).build()));
+        DeserializedDebeziumMessage message = scriptResult(null);
+
+        service.getExtraParams(message);
+
+        assertThat(message.getExcludedDestinations()).containsExactlyInAnyOrder(
+                Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+    }
+
+    @Test
+    @DisplayName("getExtraParams: a regular run reaches every sink")
+    void getExtraParams_regularRun_excludesNothing() {
+        stubMachine();
+        ScriptExecution execution = ScriptExecution.builder()
+                .tenantId(TENANT_ID).executionId(EXECUTION_ID).scriptId(SCRIPT_ID)
+                .build();
+        when(scriptExecutionRepository.findFirstByTenantIdAndExecutionId(TENANT_ID, EXECUTION_ID))
+                .thenReturn(Optional.of(execution));
+        DeserializedDebeziumMessage message = scriptResult(SCRIPT_ID);
+
+        service.getExtraParams(message);
+
+        assertThat(message.getExcludedDestinations()).isNull();
     }
 
     @Test

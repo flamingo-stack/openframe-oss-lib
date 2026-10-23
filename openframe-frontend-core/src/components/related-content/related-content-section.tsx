@@ -54,6 +54,7 @@ import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import {
   CONTENT_REF_GROUPS,
+  GROUP_PAGE_SIZE,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,
   type ContentRefGroupConfig,
@@ -199,8 +200,11 @@ function CardForType({
   linkProps,
   extras,
   adminCampaignCard,
+  priority,
 }: {
   type: string;
+  /** The rail's first card: its image is fetched at once (see `RelatedCardContext.priority`). */
+  priority?: boolean;
   /** One fetched row, still unvalidated. Its shape is decided at RUNTIME by
    *  `type` (each group fetches from its own per-type list API), so it stays
    *  `unknown` right up to the registry entry for that type — which owns the
@@ -246,6 +250,7 @@ function CardForType({
     // a numeric title reached `buildOgPlaceholderUrl` as a number. `rowString`
     // makes the claim true.
     placeholderUrl: extras?.buildOgPlaceholderUrl?.(rowString(item, 'title') ?? '') ?? undefined,
+    priority,
     extras,
   });
 }
@@ -259,10 +264,18 @@ function CardForType({
 // refetch, no cross-mount cache.
 // =============================================================================
 
-function useGroupItems(type: string, refs: ContentRef[], buildUrl: (type: string, ids: string[]) => string | null) {
+function useGroupItems(
+  type: string,
+  refs: ContentRef[],
+  buildUrl: (type: string, ids: string[]) => string | null,
+  seedRows?: ReadonlyArray<unknown>,
+) {
   const ids = refs.map(r => r.id);
   const url = ids.length > 0 ? buildUrl(type, ids) : null;
-  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() => new Map());
+  // The page the server already read (`initialRows`) is in hand from the first render, the server's included.
+  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() =>
+    seedRows && url !== null ? new Map([[url, [...seedRows]]]) : new Map(),
+  );
   const cached = url !== null ? pages.get(url) : undefined;
   const { data, dataUrl, error } = useSelfFetch<unknown>(cached ? null : url);
   if (data != null && dataUrl !== null && !pages.has(dataUrl)) {
@@ -302,15 +315,8 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
   );
 }
 
-/** Items per page within one type group. Groups larger than this paginate
- *  with the standard Pagination control (NO nested scrolling — a bounded
- *  scrollbox inside the page traps wheel events and hides the sections
- *  below it). MUST stay at or above the largest suggestion fill
- *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
- *  current rails never paginate — only genuinely big groups (author pages)
- *  do. Exported through the subpath barrel for the hub's module-load
- *  assertion of that relation (entity-suggestion-sections.tsx). */
-export const GROUP_PAGE_SIZE = 12;
+// The page size (`GROUP_PAGE_SIZE`) lives with the groups' other settings (`utils/content-ref-groups`, server-safe), so
+// a server page can read a group's first page for `initialRows`.
 
 /** A group's layout, read by the group and by the rail's skeleton, so the skeleton is the rail's size. */
 const GROUP_CLASS = 'space-y-4';
@@ -318,33 +324,13 @@ const GROUP_LIST_CLASS = 'space-y-4';
 const GROUP_HEADING_CLASS = 'font-semibold text-ods-text-secondary text-h5';
 // A column with a gap, not space-y: the region's screen-reader status (absolutely positioned) must not take a margin.
 // The rail is a page section (a `<section>`, loaded and loading). Its groups and each group's cards are read lists
-// (`data-loading-item`): how many there are is the data's, and the skeleton draws one fold of each group.
+// (`data-loading-item`): how many there are is the data's, and the skeleton draws ONE FULL PAGE of each group.
 const RAIL_CLASS = 'flex flex-col gap-8';
-/** Cards per group a skeleton draws when the host states no count. */
-const RAIL_SKELETON_CARDS = 3;
-/**
- * One screen of a group, the most its skeleton draws (the host's count is the upper bound): list groups stack
- * full-width cards, two of which fill a screen; grid groups show two rows at their widest column count, and the
- * cards past two rows at a narrower step are hidden by the same breakpoints the grid uses (`gridClassFor`).
- */
-const RAIL_LIST_FOLD = 2;
-const RAIL_GRID_FOLD_ROWS = 2;
 /**
  * The card an unknown-type group draws while its type is read: the rail's grid content card (a cover over a title
  * and an excerpt), the shape the read types' grid cards share, so the group holds a grid card's height.
  */
 const UNKNOWN_TYPE_CARD = 'blog_post_existing';
-/** The grid's column count per step, as `gridClassFor` sets it: [phone, sm, lg]. */
-const GRID_COLUMNS_BY_STEP: Record<2 | 3, readonly [number, number, number]> = { 2: [1, 2, 2], 3: [1, 2, 3] };
-
-/** A grid skeleton card's visibility: shown only at the steps where it is within the fold's rows. */
-function gridFoldClass(index: number, columns: 2 | 3): string | undefined {
-  const [phone, sm, lg] = GRID_COLUMNS_BY_STEP[columns].map(c => c * RAIL_GRID_FOLD_ROWS);
-  if (index < phone) return undefined;
-  if (index < sm) return 'hidden sm:block';
-  if (index < lg) return 'hidden lg:block';
-  return 'hidden';
-}
 
 /** A group's heading: the type's label (static copy), loaded and loading. */
 function GroupHeading({ type }: { type: string }) {
@@ -378,9 +364,15 @@ function ContentGroup({
   adminCampaignCard,
   heading,
   onLoadingChange,
+  seedRows,
+  leadsRail = false,
 }: {
   type: string;
   refs: ContentRef[];
+  /** The rows of this group's FIRST page, read by the server (`initialRows`). */
+  seedRows?: ReadonlyArray<unknown>;
+  /** The rail's first group: its first card's image is fetched at once. */
+  leadsRail?: boolean;
   columns: 2 | 3;
   buildUrl: (type: string, ids: string[]) => string | null;
   resolveHref: (ref: ContentRef) => { href: string | null; targetPlatform: string | null };
@@ -412,7 +404,7 @@ function ContentGroup({
   }
   const totalGroupPages = pageCount(refs.length, GROUP_PAGE_SIZE);
   const pageRefs = refs.slice((page - 1) * GROUP_PAGE_SIZE, page * GROUP_PAGE_SIZE);
-  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl);
+  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl, seedRows);
   const groupPagination =
     totalGroupPages > 1 ? <Pagination currentPage={page} totalPages={totalGroupPages} onPageChange={setPage} /> : null;
   useEffect(() => {
@@ -463,7 +455,7 @@ function ContentGroup({
   const itemById = new Map(items.map(it => [rowKey(it), it]));
 
   const cards = pageRefs
-    .map(contentRef => {
+    .map((contentRef, index) => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
       if (!item) return null;
@@ -486,6 +478,8 @@ function ContentGroup({
                 linkProps={linkProps}
                 extras={extras}
                 adminCampaignCard={adminCampaignCard}
+                // The rail's first card, on its first page: the top of the rail, often the page's largest paint.
+                priority={leadsRail && page === 1 && index === 0}
               />
             )}
           </LinkProvider>
@@ -560,6 +554,13 @@ export interface RelatedContentSectionProps {
    *  drills the refs here; the first client fetch is skipped (useSelfFetch
    *  initialData contract). */
   initialItems?: ContentRefWithReason[];
+  /**
+   * The rows of each group's FIRST page, read by the server, keyed by the refs' `type`: exactly what the group's list
+   * URL answers for those ids (`buildListUrl(type, firstPageIds)`). The cards are then in the server HTML instead of
+   * appearing after a request per group in the browser, which on an author page made a card the page's largest paint
+   * seconds after load (CU-17tkuw5xp4q). A group with no entry fetches as before; later pages always fetch.
+   */
+  initialRows?: Readonly<Record<string, ReadonlyArray<unknown>>>;
   /** Section title (default: "Related Content") */
   title?: string;
   /**
@@ -632,6 +633,7 @@ export function RelatedContentSection({
   sameTypeMinResults,
   includeTypes,
   initialItems,
+  initialRows,
   title = 'Related Content',
   columns = 2,
   excludeTypes,
@@ -794,7 +796,7 @@ export function RelatedContentSection({
   return (
     <LoadingRegion as="section" label="Loading related content" announce={loadingTypes.size > 0} className={RAIL_CLASS}>
       <h2 className={RAIL_TITLE_CLASS}>{accentSentenceMarks(title)}</h2>
-      {orderedTypes.map(type => (
+      {orderedTypes.map((type, groupIndex) => (
         <ContentGroup
           key={type}
           type={type}
@@ -807,13 +809,15 @@ export function RelatedContentSection({
           adminCampaignCard={adminCampaignCard}
           heading={<GroupHeading type={type} />}
           onLoadingChange={onGroupLoadingChange}
+          seedRows={initialRows?.[type]}
+          leadsRail={groupIndex === 0}
         />
       ))}
     </LoadingRegion>
   );
 }
 
-export interface RelatedContentSectionSkeletonProps extends Pick<
+interface RelatedContentSectionSkeletonProps extends Pick<
   RelatedContentSectionProps,
   'title' | 'entityType' | 'minResults' | 'sameTypeMinResults' | 'columns' | 'adminCampaignCard' | 'extras'
 > {
@@ -830,7 +834,7 @@ export interface RelatedContentSectionSkeletonProps extends Pick<
  * group per type in the loaded rail's order, each with its real label heading and its cards' own skeletons in the
  * group's layout: `sameTypeMinResults` for the host's type, `minResults` for the others (a page never needs a pager).
  */
-export function RelatedContentSectionSkeleton({
+function RelatedContentSectionSkeleton({
   title = 'Related Content',
   types,
   entityType,
@@ -848,9 +852,9 @@ export function RelatedContentSectionSkeleton({
           <TextLineSkeleton type="inherit" as="span" className="w-24" />
         </h3>
         <div className={gridClassFor(columns)}>
-          {Array.from({ length: Math.max(...GRID_COLUMNS_BY_STEP[columns]) * RAIL_GRID_FOLD_ROWS }, (_, i) => (
+          {Array.from({ length: GROUP_PAGE_SIZE }, (_, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-            <div key={i} className={gridFoldClass(i, columns)} data-loading-item>
+            <div key={i} data-loading-item>
               {renderSkeletonForType(UNKNOWN_TYPE_CARD, 'default', adminCampaignCard, extras)}
             </div>
           ))}
@@ -868,15 +872,14 @@ export function RelatedContentSectionSkeleton({
         const config = resolveGroupConfig(type);
         const sameType = canonicalEntityType !== null && canonicalContentRefType(type) === canonicalEntityType;
         const isList = config.layout === 'list';
-        const fold = isList ? RAIL_LIST_FOLD : Math.max(...GRID_COLUMNS_BY_STEP[columns]) * RAIL_GRID_FOLD_ROWS;
+        // One full page of the group: the count the host fetches, never more than a group's page.
         const count = Math.min(
           GROUP_PAGE_SIZE,
-          fold,
-          (sameType ? (sameTypeMinResults ?? minResults) : minResults) ?? RAIL_SKELETON_CARDS,
+          (sameType ? (sameTypeMinResults ?? minResults) : minResults) ?? GROUP_PAGE_SIZE,
         );
         const cards = Array.from({ length: count }, (_, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
-          <div key={i} className={isList ? undefined : gridFoldClass(i, columns)} data-loading-item>
+          <div key={i} data-loading-item>
             {renderSkeletonForType(type, config.gridSize, adminCampaignCard, extras)}
           </div>
         ));

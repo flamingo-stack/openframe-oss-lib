@@ -86,7 +86,7 @@ export function StripCard({
  * own box), the title a `text-h3` bar and the caption, when the card carries one, a `text-h6` bar. The body is
  * the caller's: its components draw their own skeletons.
  */
-export function StripCardSkeleton({
+function StripCardSkeleton({
   lead,
   caption = false,
   density = 'default',
