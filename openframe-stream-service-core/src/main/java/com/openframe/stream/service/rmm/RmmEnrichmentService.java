@@ -1,14 +1,17 @@
 package com.openframe.stream.service.rmm;
 
 import tools.jackson.databind.JsonNode;
+import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.model.enums.DataEnrichmentServiceType;
+import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.redis.CachedMachineInfo;
 import com.openframe.data.model.redis.CachedOrganizationInfo;
 import com.openframe.data.repository.redis.MachineIdCacheService;
+import com.openframe.data.repository.rmm.CommandExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import com.openframe.data.repository.rmm.ScriptRepository;
 import com.openframe.data.service.TenantIdProvider;
@@ -20,6 +23,8 @@ import com.openframe.stream.service.IntegratedToolDataEnrichmentService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Set;
 
 /**
  * Enrichment for native OpenFrame RMM execution-result events
@@ -42,21 +47,26 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
     private static final String FIELD_EXECUTION_ID = "executionId";
     private static final String FIELD_SCRIPT_ID = "scriptId";
 
+    private static final Set<Destination> TEST_RUN_HIDDEN_DESTINATIONS = Set.of(Destination.CASSANDRA_EVENT_LOG, Destination.LOKI_EVENT_LOG, Destination.KAFKA_PINOT);
+
     private final MachineIdCacheService machineIdCacheService;
     private final ClusterTenantIdResolver clusterTenantIdResolver;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptExecutionRepository scriptExecutionRepository;
+    private final CommandExecutionRepository commandExecutionRepository;
     private final ScriptRepository scriptRepository;
 
     public RmmEnrichmentService(MachineIdCacheService machineIdCacheService,
                                 @Autowired(required = false) ClusterTenantIdResolver clusterTenantIdResolver,
                                 TenantIdProvider tenantIdProvider,
                                 ScriptExecutionRepository scriptExecutionRepository,
+                                CommandExecutionRepository commandExecutionRepository,
                                 ScriptRepository scriptRepository) {
         this.machineIdCacheService = machineIdCacheService;
         this.clusterTenantIdResolver = clusterTenantIdResolver;
         this.tenantIdProvider = tenantIdProvider;
         this.scriptExecutionRepository = scriptExecutionRepository;
+        this.commandExecutionRepository = commandExecutionRepository;
         this.scriptRepository = scriptRepository;
     }
 
@@ -110,6 +120,9 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
             if (execution != null) {
                 stampExecution(execution, enriched);
             }
+            if (isTestRun(tenantId, executionId, execution)) {
+                message.setExcludedDestinations(TEST_RUN_HIDDEN_DESTINATIONS);
+            }
             String scriptId = text(after, FIELD_SCRIPT_ID);
             if (scriptId == null && execution != null) {
                 scriptId = execution.getScriptId();
@@ -123,6 +136,15 @@ public class RmmEnrichmentService implements DataEnrichmentService<DeserializedD
         } catch (Exception e) {
             log.warn("Failed to resolve the run origin for tenantId={} executionId={}", tenantId, executionId, e);
         }
+    }
+
+    private boolean isTestRun(String tenantId, String executionId, ScriptExecution scriptExecution) {
+        if (scriptExecution != null) {
+            return scriptExecution.isTestRun();
+        }
+        return commandExecutionRepository.findFirstByTenantIdAndExecutionId(tenantId, executionId)
+                .map(CommandExecution::isTestRun)
+                .orElse(false);
     }
 
     private static void stampExecution(ScriptExecution execution, IntegratedToolEnrichedData enriched) {
