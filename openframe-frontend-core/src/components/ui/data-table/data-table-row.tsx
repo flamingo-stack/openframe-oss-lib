@@ -223,6 +223,19 @@ function DataTableRowImpl<T>({
     [onClick, row.original, isLinkMode],
   );
 
+  // Link mode, CAPTURE phase: a click on a `data-no-row-click` control inside the row link must not follow the
+  // link. The bubble handler above cannot promise that alone: a control that calls `stopPropagation` (or sits in a
+  // wrapper that does) keeps the click from ever reaching it, and the browser then follows the anchor, so the
+  // control's own action ran and the page navigated away (an Edit button opened its modal, then the row's page).
+  // Capture runs before any descendant handler. Only `preventDefault`, never `stopPropagation`: the control still
+  // gets its click. A portalled descendant's click is left alone: its target is outside the anchor, so the anchor
+  // has no default action to take, and a link in a portalled menu must keep its own.
+  const preventControlNavigation = useCallback((e: React.MouseEvent) => {
+    const container = containerRef.current;
+    if (!(e.target instanceof Element) || !container?.contains(e.target)) return;
+    if (!isOwnClick(e.target, container)) e.preventDefault();
+  }, []);
+
   const containerClassName = cn(
     DATA_TABLE_ROW_FRAME_CLASS,
     'text-inherit no-underline',
@@ -282,6 +295,7 @@ function DataTableRowImpl<T>({
         prefetch={false}
         ref={containerRef as React.RefObject<HTMLAnchorElement>}
         className={containerClassName}
+        onClickCapture={preventControlNavigation}
         onClick={handleClick}
         {...markers}
       >
@@ -306,6 +320,7 @@ function DataTableRowImpl<T>({
             'cursor-pointer text-inherit no-underline transition-colors hover:bg-ods-bg-active',
             rowHeightClassName ? 'flex min-h-0 flex-1 flex-col' : 'block',
           )}
+          onClickCapture={preventControlNavigation}
           onClick={handleClick}
         >
           {cells}
