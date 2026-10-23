@@ -6,8 +6,11 @@ import com.openframe.client.service.rmm.watchdog.DeliveryRepublisher;
 import com.openframe.client.service.rmm.watchdog.DeliveryRepublisherRegistry;
 import com.openframe.client.service.rmm.watchdog.ScheduleDeliveryRepublisher;
 import com.openframe.client.service.rmm.watchdog.SoftwareDeliveryRepublisher;
+import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.rmm.script.DeliveryChannel;
+import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.nats.rmm.model.ScriptMessage;
+import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionItem;
 import com.openframe.data.nats.rmm.model.ScriptScheduleExecutionMessage;
 import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.nats.rmm.publisher.SoftwareNatsPublisher;
@@ -26,10 +29,12 @@ import static org.mockito.Mockito.verify;
 class DeliveryRepublisherTest {
 
     private final ObjectMapper objectMapper = new JsonMapper();
+    private final EncryptionService encryptionService =
+            new EncryptionService("test-encryption-password-of-32-chars!", "74f62c51327175b0");
     private final ScriptScheduleNatsPublisher scheduleNats = mock(ScriptScheduleNatsPublisher.class);
     private final SoftwareNatsPublisher softwareNats = mock(SoftwareNatsPublisher.class);
 
-    private final ScheduleDeliveryRepublisher schedule = new ScheduleDeliveryRepublisher(objectMapper, scheduleNats);
+    private final ScheduleDeliveryRepublisher schedule = new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService);
     private final SoftwareDeliveryRepublisher software = new SoftwareDeliveryRepublisher(objectMapper, softwareNats);
 
     @Test
@@ -56,6 +61,25 @@ class DeliveryRepublisherTest {
     }
 
     @Test
+    @DisplayName("schedule republisher: the stored copy keeps secrets encrypted, the agent gets them in plain")
+    void schedule_republishRevealsStoredSecrets() throws Exception {
+        ScriptEnvVar secret = ScriptEnvVar.builder().name("TOKEN").value("s3cr3t").secret(true).build()
+                .sealed(encryptionService::encrypt);
+        String json = objectMapper.writeValueAsString(ScriptScheduleExecutionMessage.builder()
+                .executionId("exec-1").machineId("m-1")
+                .scripts(List.of(ScriptScheduleExecutionItem.builder().scriptId("s-1").envVars(List.of(secret)).build()))
+                .build());
+        assertThat(json).doesNotContain("s3cr3t");
+
+        schedule.republish("m-1", json);
+
+        verify(scheduleNats).publish(eq("m-1"), argThat(m -> {
+            ScriptEnvVar sent = m.getScripts().get(0).getEnvVars().get(0);
+            return "s3cr3t".equals(sent.getValue()) && !sent.isEncrypted();
+        }));
+    }
+
+    @Test
     @DisplayName("registry routes each channel to its republisher; an unmapped channel is a hard error")
     void registry_routesByChannel() {
         DeliveryRepublisherRegistry registry = new DeliveryRepublisherRegistry(List.of(schedule, software));
@@ -73,7 +97,7 @@ class DeliveryRepublisherTest {
     @DisplayName("registry rejects duplicate republishers for the same channel")
     void registry_rejectsDuplicates() {
         assertThatThrownBy(() -> new DeliveryRepublisherRegistry(
-                List.of(schedule, new ScheduleDeliveryRepublisher(objectMapper, scheduleNats))))
+                List.of(schedule, new ScheduleDeliveryRepublisher(objectMapper, scheduleNats, encryptionService))))
                 .isInstanceOf(IllegalStateException.class);
     }
 }

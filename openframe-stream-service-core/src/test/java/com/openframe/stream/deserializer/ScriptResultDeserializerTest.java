@@ -338,7 +338,7 @@ class ScriptResultDeserializerTest {
                 .id(SCRIPT_ID).tenantId(TENANT_ID).name("Disk cleanup").shell(ScriptShell.BASH)
                 .privilegeLevel(PrivilegeLevel.ADMIN).scriptBody("echo hi").supportedPlatforms(List.of(OsType.MAC_OS))
                 .defaultTimeoutSeconds(300).defaultArgs(List.of("-a", "--verbose"))
-                .envVars(List.of(new ScriptEnvVar("REGION", "eu", false), new ScriptEnvVar("API_KEY", "s3cr3t", true)))
+                .envVars(List.of(ScriptEnvVar.builder().name("REGION").value("eu").secret(false).build(), ScriptEnvVar.builder().name("API_KEY").value("s3cr3t").secret(true).build()))
                 .createdBy("user-1").creationSource(ScriptCreationSource.AI_ASSISTANT)
                 .createdAt(Instant.parse("2026-09-28T17:58:16.101Z")).contentHash("abc123")
                 .build();
