@@ -51,6 +51,9 @@ public class HubspotApiEmailService implements EmailService {
     @Value("${openframe.mail.hubspot.delete-account-email-id:}")
     private String deleteAccountEmailId;
 
+    @Value("${openframe.mail.hubspot.download-link-email-id:}")
+    private String downloadLinkEmailId;
+
     @Value("${openframe.mail.hubspot.base-url}")
     private String baseUrl;
 
@@ -85,6 +88,11 @@ public class HubspotApiEmailService implements EmailService {
     @Override
     public void sendAccountDeletedEmail(String toEmail) {
         send(deleteAccountEmailId, toEmail, "Your account has been deleted", Map.of(), "Account deletion");
+    }
+
+    @Override
+    public void sendDownloadLinkEmail(String toEmail, String downloadId) {
+        send(downloadLinkEmailId, toEmail, "Your OpenFrame download link", Map.of("download_id", downloadId), "Download link");
     }
 
     private void sendWithTemplate(String emailTemplateId, String toEmail, String subject, String link, String debugContext) {
