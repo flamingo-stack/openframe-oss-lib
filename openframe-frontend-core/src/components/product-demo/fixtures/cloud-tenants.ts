@@ -6,13 +6,15 @@ function tenant(
   organization: DemoOrganization,
   provider: TenantRow['provider'],
   rest: Pick<TenantRow, 'accessState' | 'userCount' | 'lastReadAt'>,
+  /** Other customers the same directory serves. */
+  sharedWith: readonly DemoOrganization[] = [],
 ): TenantRow {
   return {
     id: `tenant-${organization.id}-${provider}`,
     name: organization.name,
     provider,
     domain: organization.domain,
-    customer: { name: organization.name, imageUrl: organization.logoUrl },
+    customers: [organization, ...sharedWith].map(customer => ({ name: customer.name, imageUrl: customer.logoUrl })),
     ...rest,
   };
 }
@@ -23,15 +25,23 @@ export interface CloudTenantsFixture {
   now: Date;
 }
 
-/** The three customers' directories, a Microsoft 365 and a Google Workspace tenant each: all connected with write access but one that lost its connection. */
+/**
+ * The three customers' directories, a Microsoft 365 and a Google Workspace tenant each: all connected with write
+ * access but one that lost its connection. Acme's Microsoft 365 directory also serves Harbor.
+ */
 export function buildCloudTenantsFixture(cast: DemoCast): CloudTenantsFixture {
   return {
     rows: [
-      tenant(cast.organization('acme'), 'MICROSOFT_365', {
-        accessState: 'WRITE_ENABLED',
-        userCount: 212,
-        lastReadAt: demoMinutesAgo(9),
-      }),
+      tenant(
+        cast.organization('acme'),
+        'MICROSOFT_365',
+        {
+          accessState: 'WRITE_ENABLED',
+          userCount: 212,
+          lastReadAt: demoMinutesAgo(9),
+        },
+        [cast.organization('harbor')],
+      ),
       tenant(cast.organization('northbridge'), 'GOOGLE_WORKSPACE', {
         accessState: 'WRITE_ENABLED',
         userCount: 48,
