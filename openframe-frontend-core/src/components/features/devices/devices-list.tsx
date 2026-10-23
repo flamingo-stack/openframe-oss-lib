@@ -3,6 +3,7 @@
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { useStickyToolbar } from '../../../hooks/ui/use-sticky-toolbar';
 import { type ColumnFiltersState, DataTable, type NoDataProps, type OnChangeFn } from '../../ui';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { DevicesFilterToolbar } from './devices-filter-toolbar';
 import { DevicesTableBody, getDeviceActionsColumn, getDeviceFilterColumns } from './devices-table-columns';
 import type { DeviceFilters, DeviceRow } from './types';
@@ -139,6 +140,9 @@ export interface DevicesListProps<T extends DeviceRow = DeviceRow> {
 
 const NOOP = () => {};
 
+/** The rows a loading list draws when the host states none (a typical page of devices). */
+const DEVICES_LIST_SKELETON_ROWS = 8;
+
 /**
  * The devices list, search + tag chips + column funnels over the shared devices
  * table, identical on every surface that shows devices.
@@ -164,7 +168,7 @@ const NOOP = () => {};
  */
 export function DevicesList<T extends DeviceRow = DeviceRow>({
   devices,
-  isLoading,
+  isLoading: isLoadingProp,
   deviceFilters = null,
   filtersPending,
   isPending,
@@ -176,12 +180,15 @@ export function DevicesList<T extends DeviceRow = DeviceRow>({
   rowActions,
   emptyState,
   narrowedEmptyState,
-  skeletonRows = 8,
+  skeletonRows = DEVICES_LIST_SKELETON_ROWS,
   infiniteScroll,
   stickyToolbar = true,
   stickyHeaderOffset,
   className,
 }: DevicesListProps<T>) {
+  // ONE switch: in a page's loading state (or while the host reads the rows) the list is loading: its toolbar and
+  // column header stay, its body draws the row skeletons, never the empty state.
+  const isLoading = useLoadingScope() || !!isLoadingProp;
   const patch = useCallback(
     (next: Partial<DevicesListNarrowing>) => onNarrowingChange({ ...narrowing, ...next }),
     [narrowing, onNarrowingChange],

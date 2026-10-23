@@ -5,11 +5,24 @@ import type React from 'react';
 import { memo, useCallback, useRef, type ReactNode } from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
-import { ROW_HEIGHT_DESKTOP, ROW_SHELL_CLASSES } from './data-table-skeleton';
+import { isOwnClick } from '../../../utils/own-click';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { loadingItemProps, useLoadingScope } from '../loading-scope';
+import { useDataTableContext } from './data-table';
+import {
+  DATA_TABLE_ROW_FRAME_CLASS,
+  ROW_DESKTOP_SHELL_CLASS,
+  ROW_HEIGHT_DESKTOP,
+  ROW_HEIGHT_MOBILE,
+  ROW_MOBILE_SHELL_CLASS,
+  ROW_SHELL_CLASSES,
+} from './data-table-row-classes';
 import { alignJustify, getHideClasses } from './utils';
 
 export interface DataTableRowProps<T> {
-  row: Row<T>;
+  /** The row. `null` is a row still being read (a body's loading rows): it draws its own skeleton, as it does in a
+   *  loading scope. */
+  row: Row<T> | null;
   onClick?: (item: T) => void;
   href?: string | null;
   /** Dense row height. */
@@ -29,6 +42,116 @@ export interface DataTableRowProps<T> {
   className?: string;
   /** Expandable content rendered below the cells, inside the same card. */
   subRow?: ReactNode;
+  /** A loading row's position in its list: every other row draws a second, secondary line under its first cell. */
+  loadingIndex?: number;
+  /** Classes on the loading row's cell shell (the skeleton's `rowClassName`). */
+  cellsClassName?: string;
+  /**
+   * A placeholder row the host put in the table while it loads (`DataTable.Body`'s `loadingCells`): in the loading
+   * scope it draws its REAL cells, each part drawing its own loading form, instead of the row's generic bars.
+   */
+  drawsCells?: boolean;
+  /** `data-*` markers (`data-loading-item`: the body marks every row it draws), on the row's root in both forms. */
+  [key: `data-${string}`]: unknown;
+}
+
+/**
+ * One row of the table, loaded and loading. ONE switch: in a loading scope, or with `row={null}` (a body's loading
+ * rows), it is its own {@link DataTableRowSkeleton}; the body never picks it.
+ */
+function DataTableRowSwitch<T>(props: DataTableRowProps<T>) {
+  const inScope = useLoadingScope();
+  if ((inScope || props.row === null) && !(props.drawsCells && props.row)) {
+    return (
+      <DataTableRowSkeleton
+        index={props.loadingIndex ?? 0}
+        compact={props.compact}
+        rowHeightClassName={props.rowHeightClassName}
+        className={typeof props.className === 'string' ? props.className : undefined}
+        cellsClassName={props.cellsClassName}
+        {...loadingItemProps(props)}
+      />
+    );
+  }
+  return <DataTableRowImpl {...props} row={props.row} />;
+}
+
+/**
+ * A row while it is read: the row's own card and shells (`data-table-row-classes`), each visible column's cell a
+ * `text-h4` bar (every other row a secondary `text-h6` line under the first cell), one stacked pair below `md`. One
+ * row of the read list (`data-loading-item`), like the loaded row.
+ */
+function DataTableRowSkeleton({
+  index,
+  compact,
+  rowHeightClassName,
+  className,
+  cellsClassName,
+  ...props
+}: {
+  index: number;
+  compact?: boolean;
+  rowHeightClassName?: string;
+  className?: string;
+  cellsClassName?: string;
+  [key: `data-${string}`]: unknown;
+}) {
+  const table = useDataTableContext();
+  const columns = table.getVisibleFlatColumns();
+  const firstColumnId = columns[0]?.id;
+  // The loaded row's height rule: a stated slot height, else a dense row's padding, else the design height.
+  const heightClass = (designHeight: string) =>
+    rowHeightClassName ? 'h-full' : compact ? 'py-[var(--spacing-system-xsf)]' : designHeight;
+  return (
+    <div
+      // Decoration: the table's own status line says it is loading.
+      aria-hidden="true"
+      {...loadingItemProps(props)}
+      className={cn(DATA_TABLE_ROW_FRAME_CLASS, rowHeightClassName, className)}
+    >
+      <div
+        className={cn(
+          ROW_DESKTOP_SHELL_CLASS,
+          !compact && 'py-0',
+          ROW_SHELL_CLASSES,
+          heightClass(ROW_HEIGHT_DESKTOP),
+          cellsClassName,
+        )}
+      >
+        {columns.map(column => {
+          const meta = column.columnDef.meta;
+          return (
+            <div
+              key={column.id}
+              className={cn(
+                'flex shrink-0 flex-col justify-center',
+                meta?.width || 'flex-1',
+                // Same responsive hiding the real header and row apply, so the columns are sized against one total.
+                getHideClasses(meta?.hideAt),
+              )}
+            >
+              <TextLineSkeleton type="h4" className="w-3/4" />
+              {index % 2 === 0 && column.id === firstColumnId && <TextLineSkeleton type="h6" className="w-1/2" />}
+            </div>
+          );
+        })}
+      </div>
+      <div
+        className={cn(
+          ROW_MOBILE_SHELL_CLASS,
+          !compact && 'py-0',
+          ROW_SHELL_CLASSES,
+          heightClass(ROW_HEIGHT_MOBILE),
+          cellsClassName,
+        )}
+      >
+        <div className="flex min-w-0 flex-1 flex-col justify-center py-[var(--spacing-system-sf)]">
+          <TextLineSkeleton type="h4" className="w-3/4" />
+          <TextLineSkeleton type="h6" className="w-1/2" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -76,7 +199,10 @@ function DataTableRowImpl<T>({
   rowHeightClassName,
   className,
   subRow,
-}: DataTableRowProps<T>) {
+  drawsCells: _drawsCells,
+  ...props
+}: DataTableRowProps<T> & { row: Row<T> }) {
+  const markers = loadingItemProps(props);
   const hasSubRow = subRow != null && subRow !== false;
   // A sub-row carries its own interactive controls, so it must not live inside the
   // row-level <Link>; when present, the link wraps only the cells.
@@ -86,15 +212,9 @@ function DataTableRowImpl<T>({
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      // React-bubbled events from portaled descendants (tooltips, dropdowns, etc.)
-      // reach this handler even though their DOM target lives outside the row.
-      // Suppress them — and in link mode, preventDefault so `<Link>` does not navigate.
-      if (!containerRef.current?.contains(target)) {
-        if (isLinkMode) e.preventDefault();
-        return;
-      }
-      if (target.closest('[data-no-row-click]')) {
+      // Not the row's own click (a portalled descendant, a `data-no-row-click` element): suppressed,
+      // and in link mode `preventDefault` so `<Link>` does not navigate.
+      if (!isOwnClick(e.target, containerRef.current)) {
         if (isLinkMode) e.preventDefault();
         return;
       }
@@ -104,12 +224,10 @@ function DataTableRowImpl<T>({
   );
 
   const containerClassName = cn(
-    'overflow-hidden rounded-md border border-ods-border bg-ods-card text-inherit no-underline',
-    // A row fades in when it MOUNTS — so a loaded page eases in over the
-    // skeleton it replaces instead of snapping, and rows that were already on
-    // screen (keyed by id) do not replay it. Opacity only: nothing that moves
-    // or resizes the slot, which is the whole point of the fixed row height.
-    'duration-200 animate-in fade-in-0 motion-reduce:animate-none',
+    DATA_TABLE_ROW_FRAME_CLASS,
+    'text-inherit no-underline',
+    // No entrance fade: a loaded row replaces its loading row in place. A fade from transparent left the slot
+    // empty for a moment between the two (the loading row is gone at once), which read as loading twice.
     // A stated slot height goes HERE, on the card, with the cells flexing to
     // fill whatever the sub-row leaves. `border-box` sizing means the number a
     // caller writes is the number the row occupies, borders included.
@@ -165,6 +283,7 @@ function DataTableRowImpl<T>({
         ref={containerRef as React.RefObject<HTMLAnchorElement>}
         className={containerClassName}
         onClick={handleClick}
+        {...markers}
       >
         {cells}
       </Link>
@@ -176,6 +295,8 @@ function DataTableRowImpl<T>({
       ref={containerRef as React.RefObject<HTMLDivElement>}
       className={containerClassName}
       onClick={onClick ? handleClick : undefined}
+      // A row of a read list (the body marks it `data-loading-item`): how many there are is the record's.
+      {...markers}
     >
       {isLinkMode && href ? (
         <Link
@@ -197,7 +318,7 @@ function DataTableRowImpl<T>({
   );
 }
 
-export const DataTableRow = memo(DataTableRowImpl) as typeof DataTableRowImpl;
+export const DataTableRow = memo(DataTableRowSwitch) as typeof DataTableRowSwitch;
 
 /** Wraps primitive string/number cell values in the default text style. */
 function CellContent({ children }: { children: ReactNode }) {

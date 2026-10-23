@@ -21,8 +21,14 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+#[derive(Debug, PartialEq)]
+pub enum UpdateLaunch {
+    Launched,
+    Skipped,
+}
+
 /// Marks an update as in progress until dropped
-struct UpdateGuard(Arc<AtomicBool>);
+pub struct UpdateGuard(Arc<AtomicBool>);
 
 impl UpdateGuard {
     fn acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
@@ -74,18 +80,18 @@ impl OpenFrameClientUpdateService {
         }
     }
 
-    pub async fn process_update(&self, message: OpenFrameClientUpdateMessage) -> Result<()> {
+    pub async fn process_update(
+        &self,
+        message: OpenFrameClientUpdateMessage,
+    ) -> Result<UpdateLaunch> {
+        let guard = self.reserve(&message)?;
+        self.apply(message, guard).await
+    }
+
+    /// Takes the update slot and parks new tool operations, unless another update or a tool holds them
+    pub fn reserve(&self, message: &OpenFrameClientUpdateMessage) -> Result<UpdateGuard> {
         let requested_version = message.version.trim();
         info!("Received update request for version: {}", requested_version);
-
-        self.tool_run_manager.mark_client_update_pending();
-
-        if self.tool_ops.any_busy() {
-            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
-            return Err(anyhow!(
-                "Tool operation in progress, deferring client update"
-            ));
-        }
 
         // 1. Held until the updater is done with this process, so a redelivery cannot overlap a live script
         let Some(guard) = UpdateGuard::acquire(&self.update_in_progress) else {
@@ -97,15 +103,23 @@ impl OpenFrameClientUpdateService {
         };
         info!("Acquired update lock for version: {}", requested_version);
 
-        self.process_update_internal(message, guard).await
+        self.tool_run_manager.mark_client_update_pending();
+
+        if self.tool_ops.any_busy() {
+            warn!("Tool operation in progress, deferring client update to version {} (will redeliver)", requested_version);
+            return Err(anyhow!(
+                "Tool operation in progress, deferring client update"
+            ));
+        }
+        Ok(guard)
     }
 
-    /// Internal update processing with version validation and safety checks
-    async fn process_update_internal(
+    /// Update processing with version validation and safety checks, under a reserved update slot
+    pub async fn apply(
         &self,
         message: OpenFrameClientUpdateMessage,
         guard: UpdateGuard,
-    ) -> Result<()> {
+    ) -> Result<UpdateLaunch> {
         let requested_version = message.version.trim();
 
         // 2. Validate version format
@@ -124,7 +138,7 @@ impl OpenFrameClientUpdateService {
                 canonical_version
             );
             self.tool_run_manager.clear_client_update_pending();
-            return Ok(());
+            return Ok(UpdateLaunch::Skipped);
         }
 
         if !ALLOW_DOWNGRADE {
@@ -149,7 +163,7 @@ impl OpenFrameClientUpdateService {
                             requested_version, anchor
                         );
                         self.tool_run_manager.clear_client_update_pending();
-                        return Ok(());
+                        return Ok(UpdateLaunch::Skipped);
                     }
                     Ok(_) => {}
                     Err(e) => warn!(
@@ -218,7 +232,7 @@ impl OpenFrameClientUpdateService {
             info!("Update failed, NATS will retry");
         }
 
-        update_result
+        update_result.map(|()| UpdateLaunch::Launched)
     }
 
     /// Execute the actual update process

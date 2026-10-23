@@ -1,31 +1,38 @@
 'use client';
 
-import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
+import { useChatRuntime } from '../../../contexts/chat-runtime-context';
 import { getProxiedImageUrl } from '../../../utils/image-proxy';
 
+export interface UseProxiedImageUrlOptions {
+  /** A host-injected mapper. When given it wins over the ambient runtime (a host that resolves its own images). */
+  proxyImageUrl?: (url: string) => string;
+  /**
+   * Load an `https://` image directly instead of through the proxy. Default `true` (the proxy is for `http://` and
+   * hosts that refuse a cross-origin request); pass `false` for an image that must go through the proxy.
+   */
+  directHttps?: boolean;
+}
+
 /**
- * Hook-version of `getProxiedImageUrl` that reads `proxyPrefix` and
- * `skipDomains` from the ambient `ChatRuntime`. Use anywhere inside
- * a `<ChatRuntimeContext.Provider>`.
+ * THE way a component resolves an image URL through the image proxy: every avatar, logo and cover in the lib and its
+ * hosts reads it here, never by calling `getProxiedImageUrl` with the runtime's endpoints by hand.
  *
- * Returns the input URL (or `''` for null/undefined) when no
- * `imageProxyUrlPrefix` is configured. Always passes `directHttps: true`
- * — callers that need proxied https (e.g. raster-only) must use the pure
- * `getProxiedImageUrl` from `@flamingo-stack/openframe-frontend-core/utils`
- * directly.
+ * Order: the host's `proxyImageUrl` → the ambient `ChatRuntime`'s `imageProxyUrlPrefix` / `imageProxySkipDomains` →
+ * the URL as it is (a bare embed with no runtime loads images directly). Returns `''` for no URL, so a caller writes
+ * `const src = useProxiedImageUrl(url); src ? <Image src={src}/> : <Initials/>`.
  *
- * Rules of hooks: call at the TOP of a component, NOT inside loops/maps.
- * For `.map(item => proxy(item.url))` patterns, use the pure
- * `getProxiedImageUrl` and hardcode the proxy config — the rare
- * non-React-tree caller pattern.
+ * Rules of hooks: call at the top of a component, never inside a loop. A list of images is a list of components, each
+ * calling it for its own row; a server or non-React caller uses the pure `getProxiedImageUrl`.
  */
-export function useProxiedImageUrl(url: string | null | undefined): string {
-  const r = useRequiredChatRuntime();
+export function useProxiedImageUrl(url: string | null | undefined, options?: UseProxiedImageUrlOptions): string {
+  const runtime = useChatRuntime();
+  if (!url) return '';
+  if (options?.proxyImageUrl) return options.proxyImageUrl(url);
   return (
-    getProxiedImageUrl(url ?? '', {
-      proxyPrefix: r.endpoints.imageProxyUrlPrefix,
-      skipDomains: r.endpoints.imageProxySkipDomains,
-      directHttps: true,
-    }) ?? ''
+    getProxiedImageUrl(url, {
+      proxyPrefix: runtime?.endpoints.imageProxyUrlPrefix,
+      skipDomains: runtime?.endpoints.imageProxySkipDomains,
+      directHttps: options?.directHttps ?? true,
+    }) ?? url
   );
 }

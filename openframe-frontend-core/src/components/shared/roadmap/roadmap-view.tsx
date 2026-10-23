@@ -23,10 +23,11 @@ import { usePageDataSync } from '../../layout/page-data-sync';
 import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
 import { RoadmapGrid } from './roadmap-grid';
-import { RoadmapGridSkeleton } from './roadmap-grid-skeleton';
 import type { UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 const DEFAULT_ENDPOINT = '/api/roadmap';
+/** The grid's items before the read answers (it draws its loading form). */
+const NO_ITEMS: RoadmapItem[] = [];
 /** The list under its sync line (the line the endpoint's `sync` states). */
 const SYNCED_LIST_CLASS = 'flex w-full flex-col gap-[var(--spacing-system-lf)]';
 // Defaults sourced from the ONE param-key registry the chrome (OPENFRAME_DEV_SECTIONS) also
@@ -103,7 +104,8 @@ export function RoadmapView({
     return (
       <div className={SYNCED_LIST_CLASS}>
         {!syncInPage && <DataSyncLine loading />}
-        <RoadmapGridSkeleton showLeftMargin={showLeftMargin} />
+        {/* The view groups by quarter: the quarter-grouped grid draws its own loading form. */}
+        <RoadmapGrid items={NO_ITEMS} isLoading groupByQuarter showLeftMargin={showLeftMargin} />
       </div>
     );
   }

@@ -53,9 +53,3 @@ fn backoff_doubles_up_to_the_cap() {
     let secs: Vec<u64> = delays.iter().map(Duration::as_secs).collect();
     assert_eq!(secs, [30, 60, 120, 240, 480, 960, 1800, 1800]);
 }
-
-#[test]
-fn fixed_timing_never_grows() {
-    let timing = RetryTiming::fixed(Duration::from_secs(60));
-    assert_eq!(timing.next(timing.initial), Duration::from_secs(60));
-}

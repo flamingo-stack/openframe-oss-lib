@@ -2,15 +2,23 @@ package com.openframe.data.repository.delivery;
 
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface CustomMachineDeliveryRepository {
 
     List<MachineDelivery> findDue(DeliveryStatus status, Instant before, int limit);
+
+    List<MachineDelivery> findDue(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit);
+
+    List<MachineDelivery> findDueExcept(DeliveryStatus status, Set<DeliveryType> types, Instant before, int limit);
+
+    Optional<MachineDelivery> findByIdOnPrimary(String id);
 
     boolean upsertPending(MachineDelivery delivery);
 

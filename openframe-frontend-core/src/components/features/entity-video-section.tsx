@@ -3,7 +3,9 @@
 import type React from 'react';
 import type { ComponentType } from 'react';
 import type { VideoTeaser } from '../../types/video-processing';
+import { cn } from '../../utils/cn';
 import { SECTION_HEADING_CLASS } from '../layout/page-heading';
+import { useLoadingScope } from '../ui/loading-scope';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { useCaptions } from './use-captions';
 import { Video } from './video';
@@ -23,6 +25,14 @@ import { VideoBitesStrip, type VideoBiteStripItem } from './video-bites-strip';
  * resolved here (in the section wrapper) rather than inside `<Video>`,
  * so the underlying primitive stays single-source-per-render.
  */
+
+/** The tab row's layout, read by the section and by its skeleton, so the skeleton is the section's size. */
+const VIDEO_TAB_LIST_CLASS = 'inline-flex h-auto justify-start gap-0 rounded-none bg-transparent p-0';
+const VIDEO_TAB_TRIGGER_CLASS =
+  'rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6';
+const VIDEO_TAB_CONTENT_CLASS = 'mt-4';
+const FULL_VIDEO_TAB_LABEL = 'Full Video';
+const HIGHLIGHTS_TAB_LABEL = 'Highlights';
 
 interface MarkdownRendererProps {
   content: string;
@@ -79,6 +89,11 @@ export interface EntityVideoSectionProps {
   captionsEntity?: { type: string; id: string | number } | null;
   /** LCP hint — when true, the full-video tab's poster eager-loads. */
   priority?: boolean;
+  /**
+   * The host's records carry both a full video and a highlight reel (an interview is recorded with its reel): in a
+   * loading scope the section draws its player under the real "Full Video" / "Highlights" tabs. Default false.
+   */
+  skeletonTabs?: boolean;
 }
 
 export function EntityVideoSection({
@@ -102,8 +117,10 @@ export function EntityVideoSection({
   highlightCaptionsUrl: highlightCaptionsUrlProp,
   captionsEntity,
   priority = false,
+  skeletonTabs = false,
 }: EntityVideoSectionProps) {
   const captions = useCaptions();
+  const loading = useLoadingScope();
   const hasFullVideo = !!(youtubeUrl || mainVideoUrl);
   const hasHighlight = !!highlightVideoUrl;
   const hasVideo = hasFullVideo || hasHighlight;
@@ -114,6 +131,9 @@ export function EntityVideoSection({
   const derivedCaptions = captionsEntity ? captions.forEntityId(captionsEntity.type, captionsEntity.id) : null;
   const captionsUrl = captionsUrlProp ?? derivedCaptions?.captionsUrl;
   const highlightCaptionsUrl = highlightCaptionsUrlProp ?? derivedCaptions?.highlightCaptionsUrl;
+
+  // In a loading scope the props are empty: the section is its player while the record is read.
+  if (loading) return <EntityVideoSectionSkeleton tabs={skeletonTabs} />;
 
   if (!hasVideo && !videoSummary && (!videoBites || videoBites.length === 0)) {
     return null;
@@ -134,22 +154,16 @@ export function EntityVideoSection({
       {hasVideo &&
         (fullVideoUrl && hasHighlight ? (
           <Tabs defaultValue="full-video" className="w-full">
-            <TabsList className="inline-flex h-auto justify-start gap-0 rounded-none bg-transparent p-0">
-              <TabsTrigger
-                value="full-video"
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6"
-              >
-                Full Video
+            <TabsList className={VIDEO_TAB_LIST_CLASS}>
+              <TabsTrigger value="full-video" className={VIDEO_TAB_TRIGGER_CLASS}>
+                {FULL_VIDEO_TAB_LABEL}
               </TabsTrigger>
-              <TabsTrigger
-                value="highlights"
-                className="rounded-none border-b-2 border-transparent px-4 py-3 text-ods-text-secondary data-[state=active]:border-ods-accent data-[state=active]:bg-transparent data-[state=active]:text-ods-text-primary data-[state=active]:shadow-none content-md:px-6"
-              >
-                Highlights
+              <TabsTrigger value="highlights" className={VIDEO_TAB_TRIGGER_CLASS}>
+                {HIGHLIGHTS_TAB_LABEL}
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="full-video" className="mt-4">
+            <TabsContent value="full-video" className={VIDEO_TAB_CONTENT_CLASS}>
               <Video
                 kind={fullVideoKind}
                 url={fullVideoUrl}
@@ -161,7 +175,7 @@ export function EntityVideoSection({
               />
             </TabsContent>
 
-            <TabsContent value="highlights" className="mt-4">
+            <TabsContent value="highlights" className={VIDEO_TAB_CONTENT_CLASS}>
               <Video
                 url={highlightVideoUrl}
                 poster={highlightVideoThumbnail}
@@ -212,5 +226,29 @@ export function EntityVideoSection({
         />
       )}
     </>
+  );
+}
+
+/**
+ * The video section while its record is read: the centered player box (`Video loading`), under the real static
+ * "Full Video" / "Highlights" tab row when `tabs` (a record that has both). Its classes are the section's own.
+ */
+function EntityVideoSectionSkeleton({ tabs = false, className }: { tabs?: boolean; className?: string }) {
+  if (!tabs) return <Video loading url="" layout="centered" className={className} />;
+  // The real tabs (static labels): TabsTrigger draws its own box in a scope. `inert`: nothing in it can be focused or clicked.
+  return (
+    <Tabs defaultValue="full-video" className={cn('w-full', className)} aria-hidden inert>
+      <TabsList className={VIDEO_TAB_LIST_CLASS}>
+        <TabsTrigger value="full-video" className={VIDEO_TAB_TRIGGER_CLASS}>
+          {FULL_VIDEO_TAB_LABEL}
+        </TabsTrigger>
+        <TabsTrigger value="highlights" className={VIDEO_TAB_TRIGGER_CLASS}>
+          {HIGHLIGHTS_TAB_LABEL}
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="full-video" className={VIDEO_TAB_CONTENT_CLASS}>
+        <Video loading url="" layout="centered" />
+      </TabsContent>
+    </Tabs>
   );
 }

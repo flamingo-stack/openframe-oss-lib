@@ -49,11 +49,12 @@
  */
 
 import type React from 'react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelfFetch } from '../../hooks/use-self-fetch';
 import type { ContentRef, ContentRefWithReason } from '../../types/content-ref';
 import {
   CONTENT_REF_GROUPS,
+  GROUP_PAGE_SIZE,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,
   type ContentRefGroupConfig,
@@ -67,7 +68,9 @@ import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
 import { decideNewTab } from '../chat/utils/decide-new-tab';
 import { accentSentenceMarks } from '../layout/page-heading';
 import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Pagination } from '../pagination';
+import { useLoadingScope } from '../ui/loading-scope';
 // The per-type card dispatch — one registry entry per content type, each
 // carrying its OWN row type — plus the DEEP card imports that keep this
 // chunk's source graph free of @tanstack/react-query (the `../chat` barrel
@@ -81,8 +84,6 @@ import {
   type CardSize,
   type RelatedCardRegistryEntry,
 } from './card-registry';
-
-export type { CardLinkAnchorProps };
 
 /** Render-prop component injection for the navigation decision — keeps hook
  *  calls legal (hooks live INSIDE the injected component; `CardForType`
@@ -157,18 +158,22 @@ export interface AdminCampaignCardSlot {
  *
  * `marketing_campaign` is the one type with no registry entry: BOTH its card
  * and its skeleton are host-injected (`AdminCampaignCardSlot`), so there is no
- * lib component to register.
+ * lib component to register. A type with no skeleton of its own (unregistered,
+ * or the campaign slot not injected) draws the generic card's skeleton: a group
+ * is never an empty grid while it loads.
  */
 function renderSkeletonForType(
   type: string,
   size: CardSize,
   adminCampaignCard?: AdminCampaignCardSlot,
+  extras?: ChatCardDispatchExtras,
 ): React.ReactNode {
+  // A type with no card (no host slot, no registry entry) draws nothing loaded (`CardForType`), so nothing loading.
   if (type === 'marketing_campaign') {
     return adminCampaignCard ? <adminCampaignCard.Skeleton size={size === 'sm' ? 'sm' : 'default'} /> : null;
   }
   const entry: RelatedCardRegistryEntry | undefined = RELATED_CARD_REGISTRY[type];
-  return entry ? entry.skeleton(size) : null;
+  return entry ? entry.skeleton(size, extras) : null;
 }
 
 /**
@@ -195,8 +200,11 @@ function CardForType({
   linkProps,
   extras,
   adminCampaignCard,
+  priority,
 }: {
   type: string;
+  /** The rail's first card: its image is fetched at once (see `RelatedCardContext.priority`). */
+  priority?: boolean;
   /** One fetched row, still unvalidated. Its shape is decided at RUNTIME by
    *  `type` (each group fetches from its own per-type list API), so it stays
    *  `unknown` right up to the registry entry for that type — which owns the
@@ -242,6 +250,7 @@ function CardForType({
     // a numeric title reached `buildOgPlaceholderUrl` as a number. `rowString`
     // makes the claim true.
     placeholderUrl: extras?.buildOgPlaceholderUrl?.(rowString(item, 'title') ?? '') ?? undefined,
+    priority,
     extras,
   });
 }
@@ -255,10 +264,18 @@ function CardForType({
 // refetch, no cross-mount cache.
 // =============================================================================
 
-function useGroupItems(type: string, refs: ContentRef[], buildUrl: (type: string, ids: string[]) => string | null) {
+function useGroupItems(
+  type: string,
+  refs: ContentRef[],
+  buildUrl: (type: string, ids: string[]) => string | null,
+  seedRows?: ReadonlyArray<unknown>,
+) {
   const ids = refs.map(r => r.id);
   const url = ids.length > 0 ? buildUrl(type, ids) : null;
-  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() => new Map());
+  // The page the server already read (`initialRows`) is in hand from the first render, the server's included.
+  const [pages, setPages] = useState<ReadonlyMap<string, unknown[]>>(() =>
+    seedRows && url !== null ? new Map([[url, [...seedRows]]]) : new Map(),
+  );
   const cached = url !== null ? pages.get(url) : undefined;
   const { data, dataUrl, error } = useSelfFetch<unknown>(cached ? null : url);
   if (data != null && dataUrl !== null && !pages.has(dataUrl)) {
@@ -298,15 +315,43 @@ function resolveGroupConfig(type: string): ContentRefGroupConfig {
   );
 }
 
-/** Items per page within one type group. Groups larger than this paginate
- *  with the standard Pagination control (NO nested scrolling — a bounded
- *  scrollbox inside the page traps wheel events and hides the sections
- *  below it). MUST stay at or above the largest suggestion fill
- *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
- *  current rails never paginate — only genuinely big groups (author pages)
- *  do. Exported through the subpath barrel for the hub's module-load
- *  assertion of that relation (entity-suggestion-sections.tsx). */
-export const GROUP_PAGE_SIZE = 12;
+// The page size (`GROUP_PAGE_SIZE`) lives with the groups' other settings (`utils/content-ref-groups`, server-safe), so
+// a server page can read a group's first page for `initialRows`.
+
+/** A group's layout, read by the group and by the rail's skeleton, so the skeleton is the rail's size. */
+const GROUP_CLASS = 'space-y-4';
+const GROUP_LIST_CLASS = 'space-y-4';
+const GROUP_HEADING_CLASS = 'font-semibold text-ods-text-secondary text-h5';
+// A column with a gap, not space-y: the region's screen-reader status (absolutely positioned) must not take a margin.
+// The rail is a page section (a `<section>`, loaded and loading). Its groups and each group's cards are read lists
+// (`data-loading-item`): how many there are is the data's, and the skeleton draws ONE FULL PAGE of each group.
+const RAIL_CLASS = 'flex flex-col gap-8';
+/**
+ * The card an unknown-type group draws while its type is read: the rail's grid content card (a cover over a title
+ * and an excerpt), the shape the read types' grid cards share, so the group holds a grid card's height.
+ */
+const UNKNOWN_TYPE_CARD = 'blog_post_existing';
+
+/** A group's heading: the type's label (static copy), loaded and loading. */
+function GroupHeading({ type }: { type: string }) {
+  return <h3 className={GROUP_HEADING_CLASS}>{getContentRefLabelOrTitleCase(type)}</h3>;
+}
+
+/**
+ * The rail's group order, for the loaded rail and its skeleton alike: registered types in CONTENT_REF_GROUPS order,
+ * unregistered ones after, and the host's own type hoisted first (compared through the alias canonicalizer).
+ */
+function orderRailTypes(types: Iterable<string>, entityType?: string): string[] {
+  let ordered = orderContentRefTypes(types);
+  if (entityType) {
+    const canonicalEntityType = canonicalContentRefType(entityType);
+    const sameType = ordered.filter(t => canonicalContentRefType(t) === canonicalEntityType);
+    if (sameType.length > 0) {
+      ordered = [...sameType, ...ordered.filter(t => canonicalContentRefType(t) !== canonicalEntityType)];
+    }
+  }
+  return ordered;
+}
 
 function ContentGroup({
   type,
@@ -318,9 +363,16 @@ function ContentGroup({
   extras,
   adminCampaignCard,
   heading,
+  onLoadingChange,
+  seedRows,
+  leadsRail = false,
 }: {
   type: string;
   refs: ContentRef[];
+  /** The rows of this group's FIRST page, read by the server (`initialRows`). */
+  seedRows?: ReadonlyArray<unknown>;
+  /** The rail's first group: its first card's image is fetched at once. */
+  leadsRail?: boolean;
   columns: 2 | 3;
   buildUrl: (type: string, ids: string[]) => string | null;
   resolveHref: (ref: ContentRef) => { href: string | null; targetPlatform: string | null };
@@ -331,6 +383,8 @@ function ContentGroup({
    *  nothing (fetch miss / unsupported type / missing program config) drops
    *  its heading too — no orphaned titles. */
   heading: React.ReactNode;
+  /** Tells the rail when this group starts and stops loading: the rail announces once for all its groups. */
+  onLoadingChange: (type: string, loading: boolean) => void;
 }) {
   const config = resolveGroupConfig(type);
   const isListLayout = config.layout === 'list';
@@ -350,22 +404,29 @@ function ContentGroup({
   }
   const totalGroupPages = pageCount(refs.length, GROUP_PAGE_SIZE);
   const pageRefs = refs.slice((page - 1) * GROUP_PAGE_SIZE, page * GROUP_PAGE_SIZE);
-  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl);
+  const { items, isLoading } = useGroupItems(type, pageRefs, buildUrl, seedRows);
   const groupPagination =
     totalGroupPages > 1 ? <Pagination currentPage={page} totalPages={totalGroupPages} onPageChange={setPage} /> : null;
+  useEffect(() => {
+    onLoadingChange(type, isLoading);
+    return () => onLoadingChange(type, false);
+  }, [onLoadingChange, type, isLoading]);
 
   // Skeletons until this page's rows land — SSR HTML and the client's first
   // paint render identical skeletons (useSelfFetch starts loading on both
   // sides). The pager stays in place while an unfetched page loads.
   if (isLoading) {
     const skeletons = pageRefs.map(r => (
-      <div key={r.id}>{renderSkeletonForType(type, cardSize, adminCampaignCard)}</div>
+      <div key={r.id} data-loading-item>
+        {renderSkeletonForType(type, cardSize, adminCampaignCard, extras)}
+      </div>
     ));
     return (
-      <LoadingRegion label="Loading related content" className="space-y-4">
+      // The rail announces for every group (`announce={false}`): one rail, one "loading".
+      <LoadingRegion announce={false} className={GROUP_CLASS} data-loading-item>
         {heading}
         {isListLayout ? (
-          <div className="space-y-4">{skeletons}</div>
+          <div className={GROUP_LIST_CLASS}>{skeletons}</div>
         ) : (
           <div className={gridClassFor(columns)}>{skeletons}</div>
         )}
@@ -394,7 +455,7 @@ function ContentGroup({
   const itemById = new Map(items.map(it => [rowKey(it), it]));
 
   const cards = pageRefs
-    .map(contentRef => {
+    .map((contentRef, index) => {
       const itemId = String(contentRef.id);
       const item = itemById.get(itemId);
       if (!item) return null;
@@ -405,7 +466,7 @@ function ContentGroup({
       const href = resolved.href ?? '';
       const targetPlatform = resolved.targetPlatform ?? contentRef.targetPlatform ?? null;
       return (
-        <div key={itemId}>
+        <div key={itemId} data-loading-item>
           <LinkProvider href={href || null} targetPlatform={targetPlatform}>
             {linkProps => (
               <CardForType
@@ -417,6 +478,8 @@ function ContentGroup({
                 linkProps={linkProps}
                 extras={extras}
                 adminCampaignCard={adminCampaignCard}
+                // The rail's first card, on its first page: the top of the rail, often the page's largest paint.
+                priority={leadsRail && page === 1 && index === 0}
               />
             )}
           </LinkProvider>
@@ -433,7 +496,7 @@ function ContentGroup({
     // (no pager) still vanishes with its heading.
     if (groupPagination) {
       return (
-        <div className="space-y-4">
+        <div className={GROUP_CLASS} data-loading-item>
           {heading}
           {groupPagination}
         </div>
@@ -443,9 +506,13 @@ function ContentGroup({
   }
 
   return (
-    <div className="space-y-4">
+    <div className={GROUP_CLASS} data-loading-item>
       {heading}
-      {isListLayout ? <div className="space-y-4">{cards}</div> : <div className={gridClassFor(columns)}>{cards}</div>}
+      {isListLayout ? (
+        <div className={GROUP_LIST_CLASS}>{cards}</div>
+      ) : (
+        <div className={gridClassFor(columns)}>{cards}</div>
+      )}
       {groupPagination}
     </div>
   );
@@ -487,6 +554,13 @@ export interface RelatedContentSectionProps {
    *  drills the refs here; the first client fetch is skipped (useSelfFetch
    *  initialData contract). */
   initialItems?: ContentRefWithReason[];
+  /**
+   * The rows of each group's FIRST page, read by the server, keyed by the refs' `type`: exactly what the group's list
+   * URL answers for those ids (`buildListUrl(type, firstPageIds)`). The cards are then in the server HTML instead of
+   * appearing after a request per group in the browser, which on an author page made a card the page's largest paint
+   * seconds after load (CU-17tkuw5xp4q). A group with no entry fetches as before; later pages always fetch.
+   */
+  initialRows?: Readonly<Record<string, ReadonlyArray<unknown>>>;
   /** Section title (default: "Related Content") */
   title?: string;
   /**
@@ -547,6 +621,9 @@ export interface RelatedContentSectionProps {
   emptyState?: React.ReactNode;
 }
 
+/** The rail's title, loaded and loading. */
+const RAIL_TITLE_CLASS = 'text-ods-text-primary text-h2';
+
 export function RelatedContentSection({
   contentRefs,
   entityType,
@@ -556,6 +633,7 @@ export function RelatedContentSection({
   sameTypeMinResults,
   includeTypes,
   initialItems,
+  initialRows,
   title = 'Related Content',
   columns = 2,
   excludeTypes,
@@ -623,6 +701,18 @@ export function RelatedContentSection({
     [initialItems, suggestionsDisabled],
   );
   const { data, isLoading } = useSelfFetch<RelatedContentResponse>(suggestUrl, { initialData });
+  const inScope = useLoadingScope();
+  // The groups still reading their cards: while any is, the rail is the ONE region that says "loading".
+  const [loadingTypes, setLoadingTypes] = useState<ReadonlySet<string>>(() => new Set());
+  const onGroupLoadingChange = useCallback((type: string, loading: boolean) => {
+    setLoadingTypes(prev => {
+      if (prev.has(type) === loading) return prev;
+      const next = new Set(prev);
+      if (loading) next.add(type);
+      else next.delete(type);
+      return next;
+    });
+  }, []);
 
   // Default group fetcher: the lib's byte-parity-tested builder, prefixed for
   // embeds. Memoized so group-fetch URLs stay value-stable across renders.
@@ -643,26 +733,31 @@ export function RelatedContentSection({
   // no empty shell. Opt-in (`showWhenEmpty`): render the title + an empty-state
   // line so the section is always present (e.g. people-hub "What I Shipped").
   if (!visibleRefs.length) {
-    if (!showWhenEmpty) return null; // non-showWhenEmpty consumers stay blank (unchanged)
+    // Loading first (a page's loading state, or the rail's own unanswered fetch): the rail holds its place. Only a
+    // settled empty answer is the empty state (nothing, unless `showWhenEmpty`).
     // Client-fetch loading (author/suggestion mode, no SSR initialItems): render a
     // SKELETON grid — reserves height + matches the rest of the app's loading, so
     // there's no blank-then-pop jump (the prior `return null` collapsed the tab to
     // zero height during the fetch). SSR controlled mode has isLoading=false → it
     // skips straight to the empty state below. Skeleton type = the requested rail
     // type (author mode passes a single `includeTypes`).
-    if (isLoading) {
-      const skeletonType = includeTypes?.[0] ?? entityType ?? 'blog_post_existing';
+    if (isLoading || inScope) {
       return (
-        <LoadingRegion label="Loading related content" className="space-y-8">
-          <h2 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h2>
-          <div className={gridClassFor(columns)}>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i}>{renderSkeletonForType(skeletonType, 'default', adminCampaignCard)}</div>
-            ))}
-          </div>
-        </LoadingRegion>
+        <RelatedContentSectionSkeleton
+          title={title}
+          // The groups a rail may hold, when the host states them; otherwise (an author's rail) which groups there are
+          // is read data: the skeleton draws one group whose type is not known.
+          types={(includeTypes ?? []).filter(t => !exclude.has(t))}
+          entityType={entityType}
+          minResults={minResults}
+          sameTypeMinResults={sameTypeMinResults}
+          columns={columns}
+          adminCampaignCard={adminCampaignCard}
+          extras={extras}
+        />
       );
     }
+    if (!showWhenEmpty) return null; // non-showWhenEmpty consumers stay blank (unchanged)
     return (
       <div className="space-y-8">
         <h2 className="text-2xl font-bold text-ods-text-primary">{accentSentenceMarks(title)}</h2>
@@ -677,29 +772,31 @@ export function RelatedContentSection({
     grouped[ref.type].push(ref);
   }
 
-  // Registered types in CONTENT_REF_GROUPS order, then any unregistered
-  // types appended (same shape the investor-email builder uses — both
-  // consume `orderContentRefTypes` so cross-surface ordering matches).
-  // SAME-TYPE FIRST: when a host entityType is known (suggestion / SSR
-  // modes), its own content-type group is hoisted to the top — a blog
-  // post's rail leads with blog posts. Rail group keys are compared via
-  // the shared alias canonicalizer (blog_post_existing ↔ blog_post).
-  let orderedTypes = orderContentRefTypes(Object.keys(grouped));
-  if (entityType) {
-    // Canonicalize BOTH sides — hosts pass registry vocab ('blog_post') but
-    // rail-vocab aliases ('blog_post_existing') are also legal inputs; a raw
-    // comparison would silently lose the same-type-first hoist for aliases.
-    const canonicalEntityType = canonicalContentRefType(entityType);
-    const sameType = orderedTypes.filter(t => canonicalContentRefType(t) === canonicalEntityType);
-    if (sameType.length > 0) {
-      orderedTypes = [...sameType, ...orderedTypes.filter(t => canonicalContentRefType(t) !== canonicalEntityType)];
-    }
+  // Registered types in CONTENT_REF_GROUPS order, then any unregistered types appended (same shape the
+  // investor-email builder uses: both consume `orderContentRefTypes`). SAME-TYPE FIRST: the host's own type group
+  // is hoisted to the top (a blog post's rail leads with blog posts). See `orderRailTypes`.
+  const orderedTypes = orderRailTypes(Object.keys(grouped), entityType);
+
+  // In a page's loading state the groups are read: the rail draws its skeleton of the groups it was handed.
+  if (inScope) {
+    return (
+      <RelatedContentSectionSkeleton
+        title={title}
+        types={orderedTypes}
+        entityType={entityType}
+        minResults={minResults}
+        sameTypeMinResults={sameTypeMinResults}
+        columns={columns}
+        adminCampaignCard={adminCampaignCard}
+        extras={extras}
+      />
+    );
   }
 
   return (
-    <div className="space-y-8">
-      <h2 className="text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h2>
-      {orderedTypes.map(type => (
+    <LoadingRegion as="section" label="Loading related content" announce={loadingTypes.size > 0} className={RAIL_CLASS}>
+      <h2 className={RAIL_TITLE_CLASS}>{accentSentenceMarks(title)}</h2>
+      {orderedTypes.map((type, groupIndex) => (
         <ContentGroup
           key={type}
           type={type}
@@ -710,11 +807,93 @@ export function RelatedContentSection({
           LinkProvider={LinkProvider}
           extras={extras}
           adminCampaignCard={adminCampaignCard}
-          heading={
-            <h3 className="font-semibold text-ods-text-secondary text-h5">{getContentRefLabelOrTitleCase(type)}</h3>
-          }
+          heading={<GroupHeading type={type} />}
+          onLoadingChange={onGroupLoadingChange}
+          seedRows={initialRows?.[type]}
+          leadsRail={groupIndex === 0}
         />
       ))}
-    </div>
+    </LoadingRegion>
+  );
+}
+
+interface RelatedContentSectionSkeletonProps extends Pick<
+  RelatedContentSectionProps,
+  'title' | 'entityType' | 'minResults' | 'sameTypeMinResults' | 'columns' | 'adminCampaignCard' | 'extras'
+> {
+  /**
+   * The rail's content types (its `includeTypes`, or the types of the refs it holds). Ordered like the loaded rail.
+   * Empty: the types are read data (an author's rail): one group of an unknown type, its heading a bar and its cards
+   * the rail's grid content card's skeleton.
+   */
+  types: string[];
+}
+
+/**
+ * The rail while its groups are read: the title (a bar when it is read with the record and passed empty), then one
+ * group per type in the loaded rail's order, each with its real label heading and its cards' own skeletons in the
+ * group's layout: `sameTypeMinResults` for the host's type, `minResults` for the others (a page never needs a pager).
+ */
+function RelatedContentSectionSkeleton({
+  title = 'Related Content',
+  types,
+  entityType,
+  minResults,
+  sameTypeMinResults,
+  columns = 2,
+  adminCampaignCard,
+  extras,
+}: RelatedContentSectionSkeletonProps) {
+  const canonicalEntityType = entityType ? canonicalContentRefType(entityType) : null;
+  const unknownGroup =
+    types.length === 0 ? (
+      <div className={GROUP_CLASS} aria-hidden data-loading-item>
+        <h3 className={GROUP_HEADING_CLASS}>
+          <TextLineSkeleton type="inherit" as="span" className="w-24" />
+        </h3>
+        <div className={gridClassFor(columns)}>
+          {Array.from({ length: GROUP_PAGE_SIZE }, (_, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+            <div key={i} data-loading-item>
+              {renderSkeletonForType(UNKNOWN_TYPE_CARD, 'default', adminCampaignCard, extras)}
+            </div>
+          ))}
+        </div>
+      </div>
+    ) : null;
+  return (
+    <LoadingRegion as="section" label="Loading related content" className={RAIL_CLASS}>
+      <h2 className={RAIL_TITLE_CLASS}>
+        {/* A title read with the record (passed empty while it is read) is a bar of its line. */}
+        {title ? accentSentenceMarks(title) : <TextLineSkeleton type="inherit" as="span" className="w-1/2" />}
+      </h2>
+      {unknownGroup}
+      {orderRailTypes(new Set(types), entityType).map(type => {
+        const config = resolveGroupConfig(type);
+        const sameType = canonicalEntityType !== null && canonicalContentRefType(type) === canonicalEntityType;
+        const isList = config.layout === 'list';
+        // One full page of the group: the count the host fetches, never more than a group's page.
+        const count = Math.min(
+          GROUP_PAGE_SIZE,
+          (sameType ? (sameTypeMinResults ?? minResults) : minResults) ?? GROUP_PAGE_SIZE,
+        );
+        const cards = Array.from({ length: count }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+          <div key={i} data-loading-item>
+            {renderSkeletonForType(type, config.gridSize, adminCampaignCard, extras)}
+          </div>
+        ));
+        return (
+          <div key={type} className={GROUP_CLASS} aria-hidden data-loading-item>
+            <GroupHeading type={type} />
+            {isList ? (
+              <div className={GROUP_LIST_CLASS}>{cards}</div>
+            ) : (
+              <div className={gridClassFor(columns)}>{cards}</div>
+            )}
+          </div>
+        );
+      })}
+    </LoadingRegion>
   );
 }

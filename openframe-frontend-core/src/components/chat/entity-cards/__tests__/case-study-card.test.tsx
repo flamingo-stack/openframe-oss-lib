@@ -6,7 +6,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { CaseStudyCardData } from '../../../../types/case-study';
-import { CaseStudyCard, CaseStudyCardSkeleton } from '../case-study-card';
+import { CaseStudyCard } from '../case-study-card';
 
 const base: CaseStudyCardData = { id: 1, title: 'How Acme cut ticket time', summary: null, featured_image: null };
 const withMetrics: CaseStudyCardData = {
@@ -67,8 +67,8 @@ describe('CaseStudyCard result size', () => {
     expect(screen.getByText('50%').className).toContain('text-ods-flamingo-cyan-base');
   });
 
-  it('has a skeleton in the same boxes', () => {
-    render(<CaseStudyCardSkeleton size="result" />);
+  it('has a loading form in the same boxes', () => {
+    render(<CaseStudyCard loading size="result" />);
     render(<CaseStudyCard study={withMetrics} href="/case-studies/acme" size="result" placeholderUrl={null} />);
     expect(screen.getByTestId('case-study-result-skeleton-metric').className).toContain('h-[112px]');
     expect(zone()?.className).toContain('h-[112px]');

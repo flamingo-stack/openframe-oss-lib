@@ -3,6 +3,7 @@
 import React, { forwardRef } from 'react';
 import { useInteractiveState, type InteractiveState } from '../hooks/use-interactive-state';
 import { cn } from '../utils/cn';
+import { LIVE_PULSE_CLASS } from './ui/skeleton-surface';
 
 interface InteractiveOptions {
   enableHover?: boolean;
@@ -175,7 +176,10 @@ export const InteractiveWrapper = forwardRef<HTMLElement, InteractiveWrapperProp
       ) : null,
       /* Loading Overlay */
       loading ? (
-        <div key="loading" className="pointer-events-none absolute inset-0 animate-pulse bg-current opacity-10" />
+        <div
+          key="loading"
+          className={cn('pointer-events-none absolute inset-0 bg-current opacity-10', LIVE_PULSE_CLASS)}
+        />
       ) : null,
     );
   },
@@ -228,26 +232,6 @@ export const InteractivePresets = {
       }}
       className={cn('rounded-lg border border-ods-border bg-ods-card p-4', props.className)}
       focusable={true}
-      role="button"
-      {...props}
-    />
-  )),
-
-  /**
-   * Button-like interactive element
-   */
-  Button: forwardRef<HTMLButtonElement, Omit<InteractiveWrapperProps, 'interactive' | 'as'>>((props, ref) => (
-    <InteractiveWrapper
-      ref={ref}
-      as="button"
-      interactive={{
-        enableAnimations: true,
-        enableColorShifts: true,
-        enableAccessibilityEnhancements: true,
-        enableHapticFeedback: true,
-        animations: true,
-      }}
-      className={cn('rounded-md bg-ods-accent px-4 py-2 font-medium text-ods-text-on-accent', props.className)}
       role="button"
       {...props}
     />
@@ -334,7 +318,6 @@ export const InteractivePresets = {
 
 // Export individual preset components with display names
 InteractivePresets.Card.displayName = 'InteractiveCard';
-InteractivePresets.Button.displayName = 'InteractiveButton';
 InteractivePresets.NavItem.displayName = 'InteractiveNavItem';
 InteractivePresets.Input.displayName = 'InteractiveInput';
 InteractivePresets.Toggle.displayName = 'InteractiveToggle';

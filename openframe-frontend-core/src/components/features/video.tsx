@@ -32,6 +32,7 @@
 import type React from 'react';
 import {
   createElement,
+  forwardRef,
   useCallback,
   useEffect,
   useMemo,
@@ -40,8 +41,13 @@ import {
   useSyncExternalStore,
   type ComponentType,
 } from 'react';
+import Image from '../../embed-shims/next-image';
 import { useNearViewport } from '../../hooks/use-near-viewport';
+import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { VideoPlayBadge } from './video-center-badge';
 import type { FilePlayerProps } from './video-file-player';
 import {
@@ -52,17 +58,6 @@ import {
   type VideoLayout,
   type VideoProps,
   type VideoYouTubeFacadeProps,
-} from './video-shared';
-
-export {
-  VIDEO_PLAYBACK_FAILED_EVENT,
-  type VideoFailureKind,
-  type VideoFailureReason,
-  type VideoLayout,
-  type VideoMutedFallbackState,
-  type VideoPlaybackFailureDetail,
-  type VideoPlayerHandle,
-  type VideoProps,
 } from './video-shared';
 
 /**
@@ -105,26 +100,47 @@ function subscribeToFilePlayer(listener: () => void): () => void {
 const loadedFilePlayer = () => filePlayer;
 const noFilePlayer = () => null;
 
-/** The player's box while its module loads: the poster at the player's own size, so nothing moves. */
-function FilePlayerFallback({ poster, className }: { poster?: string | null; className?: string }) {
+/**
+ * The video's box with its poster in it, until the player is drawn. The poster is a real image, not a CSS background:
+ * a background is found only after layout and is never ranked, so on a page whose video is the largest thing painted
+ * the poster arrived last (CU-17tkuw5xp4q). A `priority` video's poster is fetched at once and ranked high.
+ */
+const PosterBox = forwardRef<
+  HTMLDivElement,
+  { poster?: string | null; className?: string; priority?: boolean; fill?: boolean }
+>(function PosterBoxView({ poster, className, priority, fill }, ref) {
   return (
     <div
+      ref={ref}
       aria-hidden="true"
-      className={className}
-      style={{
-        width: '100%',
-        height: '100%',
-        ...(poster ? { backgroundImage: `url(${poster})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
-      }}
-    />
+      className={cn('relative overflow-hidden', className)}
+      style={fill ? { width: '100%', height: '100%' } : undefined}
+    >
+      {poster ? (
+        <Image src={poster} alt="" fill sizes="100vw" priority={priority} unoptimized className="object-cover" />
+      ) : null}
+    </div>
   );
+});
+
+/** The player's box while its module loads: the poster at the player's own size, so nothing moves. */
+function FilePlayerFallback({
+  poster,
+  className,
+  priority,
+}: {
+  poster?: string | null;
+  className?: string;
+  priority?: boolean;
+}) {
+  return <PosterBox poster={poster} className={className} priority={priority} fill />;
 }
 
-function FilePlayer(props: FilePlayerProps): React.ReactElement {
+function FilePlayer({ priority, ...props }: FilePlayerProps & { priority?: boolean }): React.ReactElement {
   // The player's component when its module has arrived (a loaded module, drawn through `createElement`).
   const arrived = useSyncExternalStore(subscribeToFilePlayer, loadedFilePlayer, noFilePlayer);
   if (arrived) return createElement(arrived, props);
-  return <FilePlayerFallback poster={props.poster} className={props.className} />;
+  return <FilePlayerFallback poster={props.poster} className={props.className} priority={priority} />;
 }
 
 // =============================================================================
@@ -205,24 +221,27 @@ export function extractYouTubeId(url: string): string | null {
 export function Video(props: VideoProps): React.ReactElement | null {
   // Hooks run unconditionally; the gate only applies when `lazy` is set.
   const { ref: nearRef, isNear } = useNearViewport<HTMLDivElement>();
+  const loading = useLoadingScope();
   const url = props.url;
+  const layout = props.layout ?? 'native';
+  // ONE switch: in a loading scope with no url yet (it is read) the video is its skeleton and no player is mounted;
+  // a url it is given there is the page's own and plays as it is.
+  if ((loading && !url) || props.loading) return <VideoSkeleton layout={layout} className={props.className} />;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);
-  const layout = props.layout ?? 'native';
 
-  if (props.lazy && !isNear) {
+  // Drawn when it comes near the screen, like it plays when it is on it: the player and hls.js are the largest
+  // script a page can load, so a video below the fold costs its poster until it is approached. `lazy={false}`
+  // mounts the player at once (a caller that drives playback itself before it is seen).
+  if ((props.lazy ?? true) && !isNear) {
     // Same box, poster only: the observer target IS the reserved space.
     return wrapWithLayout(
-      <div
+      <PosterBox
         ref={nearRef}
+        poster={props.poster}
         className={props.className}
-        style={
-          props.poster
-            ? { backgroundImage: `url(${props.poster})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-            : undefined
-        }
-        aria-hidden="true"
+        priority={'priority' in props ? props.priority : undefined}
       />,
       layout,
     );
@@ -250,6 +269,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
       <FilePlayer
         url={url}
         poster={props.poster}
+        priority={props.priority}
         muted={props.muted}
         {...pickFilePlayback(props)}
         className={props.className}
@@ -280,6 +300,14 @@ function resolveKind(props: VideoProps, url: string): 'youtube' | 'file' {
   // length-11 strings were mis-routed to YouTube).
   if (BARE_YT_ID_RE.test(url)) return 'youtube';
   return isYouTubeUrl(url) ? 'youtube' : 'file';
+}
+
+/**
+ * A video while it is read: the player's box in the player's own layout wrapper (so its size and frame are the
+ * player's), drawn as the skeleton's surface. `Video` draws it in a loading scope.
+ */
+function VideoSkeleton({ layout = 'native', className }: { layout?: VideoLayout; className?: string }) {
+  return wrapWithLayout(<UnifiedSkeleton variant="rectangular" className={cn('h-full w-full', className)} />, layout);
 }
 
 function wrapWithLayout(inner: React.ReactElement, layout: VideoLayout): React.ReactElement {
@@ -703,11 +731,12 @@ function YouTubeFacadeInner({
 
   return (
     <div className={wrapperClass} style={wrapperStyle}>
-      <button
+      <Button
+        variant="card"
         type="button"
         aria-label={`Play: ${title}`}
         onClick={() => setActivated(true)}
-        className="group absolute inset-0 m-0 cursor-pointer overflow-hidden rounded-lg border border-ods-border bg-ods-card p-0"
+        className="group absolute inset-0 h-full overflow-hidden"
       >
         <picture>
           <source type="image/webp" srcSet={posterWebp} />
@@ -737,7 +766,7 @@ function YouTubeFacadeInner({
             className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
           />
         </div>
-      </button>
+      </Button>
     </div>
   );
 }

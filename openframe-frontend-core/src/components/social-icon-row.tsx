@@ -5,9 +5,6 @@ import { normalizeSocialPlatform, type SocialIconLink } from '../utils/social-pl
 import { iconOf, type IconComponent, type IconRef } from './chat/utils/icon-loading';
 import { Button } from './ui/button';
 
-/** Re-exported for call sites that already import the link type from this module. */
-export type { SocialIconLink };
-
 interface SocialIconRowProps {
   className?: string;
   links?: SocialIconLink[];
@@ -23,6 +20,11 @@ interface SocialIconRowProps {
    *  presentation-only here — the caller must still gate which links it passes
    *  server-side. Default false keeps a single flat row. */
   groupByVisibility?: boolean;
+  /**
+   * The links are a read list (a person's profiles, whose number is the data's): every button carries
+   * `data-loading-item`, as the caller's loading state's buttons do. Default false (a fixed set, e.g. the defaults).
+   */
+  listItems?: boolean;
 }
 
 const defaultLinks: SocialIconLink[] = [
@@ -79,12 +81,24 @@ function renderSocialIcon(platform: string) {
   return icon ? createElement(icon, { className: 'h-5 w-5' }) : null;
 }
 
+/** The row's box: what a caller's loading state draws its skeleton buttons in, so they sit where the row's buttons do. */
+export function socialIconRowClass(compact = false): string {
+  return `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'}`;
+}
+
+/** One button's size and stretch in the row (compact: the quiet 32px icon; else the full-width 44/48px one): read by
+ *  the row and by a caller's skeleton buttons. */
+export function socialIconButtonProps(compact = false): { size: 'icon-sm' | 'icon'; className?: string } {
+  return compact ? { size: 'icon-sm' } : { size: 'icon', className: 'flex-1' };
+}
+
 export function SocialIconRow({
   className = '',
   links = defaultLinks,
   variant,
   compact = false,
   groupByVisibility = false,
+  listItems = false,
 }: SocialIconRowProps) {
   // ── Compact design rationale ──────────────────────────────────────────
   // Page-level identity/share rows read as METADATA, not CTAs. The major
@@ -102,6 +116,7 @@ export function SocialIconRow({
   // stretch untouched.
   const resolvedVariant = variant !== undefined ? variant : compact ? 'transparent' : 'outline';
 
+  const marker = { 'data-loading-item': listItems || undefined };
   const renderButton = (link: SocialIconLink, index: number) => {
     const ariaLabel = link.label || link.platform;
     return link.onClick ? (
@@ -109,10 +124,10 @@ export function SocialIconRow({
         key={index}
         type="button"
         variant={resolvedVariant}
-        size={compact ? 'icon-sm' : 'icon'}
-        className={compact ? undefined : 'flex-1'}
+        {...socialIconButtonProps(compact)}
         aria-label={ariaLabel}
         onClick={link.onClick}
+        {...marker}
       >
         {renderSocialIcon(link.platform)}
       </Button>
@@ -123,18 +138,18 @@ export function SocialIconRow({
       <Button
         key={index}
         variant={resolvedVariant}
-        size={compact ? 'icon-sm' : 'icon'}
-        className={compact ? undefined : 'flex-1'}
+        {...socialIconButtonProps(compact)}
         href={link.href}
         openInNewTab
         aria-label={ariaLabel}
+        {...marker}
       >
         {renderSocialIcon(link.platform)}
       </Button>
     );
   };
 
-  const rowClass = `flex flex-row items-center ${compact ? 'gap-2 w-fit' : 'gap-3 w-full'} ${className}`;
+  const rowClass = `${socialIconRowClass(compact)} ${className}`;
 
   // Two-group mode: external links, a thin divider, then internal links — but only
   // when both groups are present (otherwise it's just a flat row, no stray divider).

@@ -20,19 +20,24 @@ import { cn } from '../../utils/cn';
  *    in `items-center` rows. Opt into `spacing` ONLY when the label truly has
  *    no spacing container.
  *
- * Raw `<label>` elements remain correct for CLICK-SURFACES (a field's adorned
- * chrome, checkbox/radio rows, upload dropzones) — those are interaction
- * wrappers, not text labels, and must not inherit this typography.
+ * A CLICK-SURFACE (a field's adorned chrome, a checkbox/radio row, a slider's
+ * caption row) is a `Label` too, with `variant="surface"`: the label element and
+ * its control association, with NO typography of its own; the call site's
+ * `className` draws the surface. Never a raw `<label>`.
  */
-const labelVariants = cva('block text-ods-text-primary text-h6', {
+const LABEL_TEXT_CLASS = 'block text-ods-text-primary text-h6';
+
+const labelVariants = cva('', {
   variants: {
     variant: {
-      default: '',
+      default: LABEL_TEXT_CLASS,
       /** @deprecated alias of `default` — the three small scales converged on text-h6. */
-      small: '',
+      small: LABEL_TEXT_CLASS,
       /** @deprecated alias of `default`. */
-      medium: '',
-      large: 'text-h4',
+      medium: LABEL_TEXT_CLASS,
+      large: cn(LABEL_TEXT_CLASS, 'text-h4'),
+      /** A click surface that labels its control: no typography, the site's `className` is its look. */
+      surface: '',
     },
     spacing: {
       none: '',

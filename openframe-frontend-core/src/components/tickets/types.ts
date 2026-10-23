@@ -303,15 +303,6 @@ export type TicketUnreadSummary = {
 export const TICKET_MARK_READ_DEBOUNCE_MS = 2000;
 
 /**
- * Ticket deep-link SSOT — DEFINED in the server-safe param-keys module
- * (`utils/dev-sections/dev-section-param-keys.ts`, beside its sibling
- * `devSectionAnchorId`) because producers span both worlds: the hub's
- * SERVER-side chat-ref builder and the client header cell. Re-exported
- * here so ticket-surface consumers keep one import home.
- */
-export { TICKET_OPEN_PARAM, buildTicketOpenHref } from '../../utils/dev-sections/dev-section-param-keys';
-
-/**
  * Centralized toast copy. Keep all wording here so QA / localization
  * can find every user-visible string in one file.
  */

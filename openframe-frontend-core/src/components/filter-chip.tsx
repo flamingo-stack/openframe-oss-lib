@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { Button } from './ui/button';
 
 // Unified FilterChip component for consistent styling across the application
 interface FilterChipProps {
@@ -83,7 +84,9 @@ export function FilterChip({
         {label}
       </span>
       {removable && onRemove && (
-        <button
+        <Button
+          variant="transparent"
+          size="icon-inline"
           type="button"
           onClick={e => {
             e.preventDefault();
@@ -91,24 +94,11 @@ export function FilterChip({
             if (!disabled) onRemove();
           }}
           disabled={disabled}
-          className={cn(
-            'flex h-4 w-4 items-center justify-center rounded-full md:h-4 md:w-4',
-            'shrink-0 transition-all duration-200',
-            'focus:outline-none focus:ring-2 focus:ring-offset-1 group-hover:scale-110',
-            variant === 'category'
-              ? 'text-ods-text-primary hover:bg-ods-bg-hover focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface'
-              : variant === 'subcategory'
-                ? 'text-ods-text-primary hover:bg-ods-bg-hover focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface'
-                : variant === 'tag'
-                  ? 'text-ods-text-primary hover:bg-ods-bg-hover focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface'
-                  : 'text-ods-text-primary hover:bg-ods-bg-hover focus:ring-ods-border-focus focus:ring-offset-ods-bg-surface',
-            disabled && 'cursor-not-allowed opacity-50 hover:scale-100',
-          )}
           aria-label={`Remove ${label} filter`}
           tabIndex={disabled ? -1 : 0}
         >
-          <X className="h-2 w-2 md:h-2 md:w-2" />
-        </button>
+          <X />
+        </Button>
       )}
     </div>
   );

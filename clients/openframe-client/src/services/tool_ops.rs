@@ -126,6 +126,12 @@ impl ToolLock {
     }
 }
 
+impl From<ToolLock> for ToolOpGuard {
+    fn from(lock: ToolLock) -> Self {
+        lock.mark_busy()
+    }
+}
+
 impl Drop for ToolOpGuard {
     fn drop(&mut self) {
         let mut state = self

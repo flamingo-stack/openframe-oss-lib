@@ -1,22 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
+import type { DateRange } from 'react-day-picker';
 import { cn } from '../../utils/cn';
 import { Filter02Icon } from '../icons-v2-generated/sort-and-filter/filter-02-icon';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
-import { DateFilterPanel, type DateFilterResult, type DateRange } from './date-picker';
+import type { DataTableFilters } from './data-table/types';
+import { DateFilterPanel, type DateFilterResult } from './date-picker';
 import { FilterCheckboxItem } from './filter-checkbox-item';
+import { LOADING_NOOP, LoadingItems, LoadingScope } from './loading-scope';
 import { ModalV2, ModalV2Content, ModalV2Footer, ModalV2Header, ModalV2Title } from './modal-v2';
 import { ScrollFadeOverlay, useScrollFade } from './scroll-fade';
 import { SortColumnItem, type SortConfig, type SortDirection } from './sort-column-item';
-import type { TableFilters } from './table/types';
 import { TagKeyValueFilter, type TagKeyConfig } from './tag-key-value-filter';
-
-// Re-export sub-component types for consumers
-export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
-export type { TagKeyConfig, TagValueOption } from './tag-key-value-filter';
 
 export interface FilterModalOption {
   id: string;
@@ -35,8 +32,8 @@ export interface FilterModalProps {
   onClose: () => void;
   title?: string;
   filterGroups: FilterGroup[];
-  onFilterChange: (filters: TableFilters) => void;
-  currentFilters?: TableFilters;
+  onFilterChange: (filters: DataTableFilters) => void;
+  currentFilters?: DataTableFilters;
   resetButtonText?: string;
   applyButtonText?: string;
   className?: string;
@@ -77,6 +74,12 @@ export interface FilterModalProps {
   emptyStateDescription?: string;
 }
 
+/** Filter groups a loading modal draws (its groups are read with the facets): a typical two. */
+const FILTER_MODAL_SKELETON_GROUPS = 2;
+
+/** Options each loading group draws: a typical three (a facet's option count is the data's). */
+const FILTER_MODAL_SKELETON_OPTIONS = 3;
+
 export function FilterModal({
   isOpen,
   onClose,
@@ -99,7 +102,7 @@ export function FilterModal({
   emptyStateTitle = 'No filters available',
   emptyStateDescription = 'There are no filter options to display at the moment',
 }: FilterModalProps) {
-  const [selectedFilters, setSelectedFilters] = useState<TableFilters>(() => {
+  const [selectedFilters, setSelectedFilters] = useState<DataTableFilters>(() => {
     return { ...currentFilters };
   });
   const [pendingTags, setPendingTags] = useState<string[]>(selectedTags ?? []);
@@ -134,7 +137,7 @@ export function FilterModal({
   }, [isOpen, seedKey]);
 
   const handleFilterToggle = (groupId: string, optionId: string, checked: boolean) => {
-    setSelectedFilters((prev: TableFilters) => {
+    setSelectedFilters((prev: DataTableFilters) => {
       const current = prev[groupId] || [];
       const updated = checked
         ? current.includes(optionId)
@@ -199,27 +202,7 @@ export function FilterModal({
             onScroll={updateFade}
             className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto md:py-3"
           >
-            {isLoading ? (
-              <>
-                {[0, 1].map(group => (
-                  <div key={group} className="flex flex-col gap-1">
-                    <UnifiedSkeleton className="h-5 w-24" />
-                    <div className="overflow-hidden rounded-md border border-ods-border">
-                      {[0, 1, 2].map(row => (
-                        <div
-                          key={row}
-                          className="flex items-center gap-3 border-b border-ods-border bg-ods-card px-4 py-3 last:border-b-0"
-                        >
-                          <UnifiedSkeleton className="h-6 w-6 shrink-0 rounded-[6px]" />
-                          <UnifiedSkeleton className="h-4 max-w-[60%] flex-1" />
-                          <UnifiedSkeleton className="h-4 w-10 shrink-0" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </>
-            ) : isEmpty ? (
+            {isEmpty ? (
               <div className="flex h-[240px] flex-col items-center justify-center gap-6 p-6">
                 <Filter02Icon className="text-ods-text-secondary" size={24} />
                 <div className="flex flex-col items-center text-center text-ods-text-secondary">
@@ -228,7 +211,10 @@ export function FilterModal({
                 </div>
               </div>
             ) : (
-              <>
+              // ONE tree for both forms: while the facets are read (`isLoading`) the modal is its own loading state in a
+              // scope (inert): the sort columns and the date filter the page configures are drawn real, the read filter
+              // groups as their loading rows.
+              <LoadingScope active={isLoading} className="contents">
                 {/* Sort columns */}
                 {sortConfig && sortConfig.columns.length > 0 && (
                   <div className="flex flex-col gap-1">
@@ -247,30 +233,55 @@ export function FilterModal({
                   </div>
                 )}
 
-                {/* Filter groups. A group with no options is skipped, not drawn as an
+                {isLoading ? (
+                  <LoadingItems count={FILTER_MODAL_SKELETON_GROUPS}>
+                    {() => (
+                      <div data-loading-item className="flex flex-col gap-1">
+                        <TextLineSkeleton type="h5" className="w-24" />
+                        <div className="overflow-hidden rounded-md border border-ods-border">
+                          <LoadingItems count={FILTER_MODAL_SKELETON_OPTIONS}>
+                            {() => (
+                              <FilterCheckboxItem
+                                data-loading-item
+                                label=""
+                                count={0}
+                                checked={false}
+                                onChange={LOADING_NOOP}
+                              />
+                            )}
+                          </LoadingItems>
+                        </div>
+                      </div>
+                    )}
+                  </LoadingItems>
+                ) : (
+                  <>
+                    {/* Filter groups. A group with no options is skipped, not drawn as an
             empty box: same rule the column funnels follow — a control that
             cannot be used is worse than no control. */}
-                {filterGroups.map(group => {
-                  if (group.options.length === 0) return null;
-                  const groupSelection = selectedFilters[group.id] || [];
-                  return (
-                    <div key={group.id} className="flex flex-col gap-1">
-                      <span className="text-ods-text-secondary text-h5">{group.title}</span>
-                      <div className="overflow-hidden rounded-md border border-ods-border">
-                        {group.options.map(option => (
-                          <FilterCheckboxItem
-                            key={option.id}
-                            label={option.label}
-                            count={option.count}
-                            checked={groupSelection.includes(option.id)}
-                            onChange={checked => handleFilterToggle(group.id, option.id, checked)}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-
+                    {filterGroups.map(group => {
+                      if (group.options.length === 0) return null;
+                      const groupSelection = selectedFilters[group.id] || [];
+                      return (
+                        <div key={group.id} data-loading-item className="flex flex-col gap-1">
+                          <span className="text-ods-text-secondary text-h5">{group.title}</span>
+                          <div className="overflow-hidden rounded-md border border-ods-border">
+                            {group.options.map(option => (
+                              <FilterCheckboxItem
+                                key={option.id}
+                                data-loading-item
+                                label={option.label}
+                                count={option.count}
+                                checked={groupSelection.includes(option.id)}
+                                onChange={checked => handleFilterToggle(group.id, option.id, checked)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
                 {/* Tag key:value filter */}
                 {tagFilterKeys && tagFilterKeys.length > 0 && onTagsChange && (
                   <TagKeyValueFilter
@@ -296,7 +307,7 @@ export function FilterModal({
                     />
                   </div>
                 )}
-              </>
+              </LoadingScope>
             )}
           </div>
 

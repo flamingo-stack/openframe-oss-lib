@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ChatContainer, ChatContent, ChatFooter, ChatHeader } from '../components/chat/chat-container';
 import { ChatInput } from '../components/chat/chat-input';
 import { ChatMessageList } from '../components/chat/chat-message-list';
-import { ModelDisplay, ModelDisplaySkeleton } from '../components/chat/model-display';
+import { ModelDisplay } from '../components/chat/model-display';
 import type { QuickActionChip } from '../components/chat/quick-action-chip';
 import { QuickActionWall } from '../components/chat/quick-action-wall';
 import type { Message } from '../components/chat/types/message.types';
@@ -147,19 +147,19 @@ function FaeChatShell({
         <ChatInput onSend={handleSend} placeholder="Message Fae..." fullWidth={fullWidth} />
         {/* Model row below the composer — its width tracks the composer's, so
             in `fullWidth` it spans the footer instead of the centered column.
-            Loaded state shows the real `ModelDisplay`; `modelLoading` swaps in
-            the skeleton placeholder. */}
+            `ModelDisplay` draws its own skeleton while `loading`. */}
         <div
           className={cn(
             'mt-[var(--spacing-system-s)]',
             fullWidth ? 'w-full' : 'mx-auto w-full max-w-ods-content-narrow',
           )}
         >
-          {modelLoading ? (
-            <ModelDisplaySkeleton />
-          ) : (
-            <ModelDisplay provider="google" modelName="gemini-2.5" displayName="Google Gemini 3.5" />
-          )}
+          <ModelDisplay
+            loading={modelLoading}
+            provider="google"
+            modelName="gemini-2.5"
+            displayName="Google Gemini 3.5"
+          />
         </div>
       </ChatFooter>
     </ChatContainer>
@@ -220,8 +220,8 @@ export const ClientChatWithMspOrganization: Story = {
 };
 
 /**
- * Client chat MSP organization slot in its loading state —
- * `MspOrganizationCardSkeleton` holds the space while tenant info resolves,
+ * Client chat MSP organization slot in its loading state — the card draws its
+ * own skeleton (`loading`) while tenant info resolves,
  * so the header doesn't shift when the branding bar swaps in.
  */
 export const ClientChatMspOrganizationLoading: Story = {
@@ -248,10 +248,10 @@ export const FaeBareHeader: Story = {
 };
 
 /**
- * Model row in its loading state — `ModelDisplaySkeleton` stands in for the
- * `ModelDisplay` pill below the composer until the model metadata resolves.
- * Shows only the left part (provider icon + model name); the "tokens used"
- * tail is opt-in via `showTokens`.
+ * Model row in its loading state — `ModelDisplay` with `loading` draws its own
+ * skeleton below the composer until the model metadata resolves: the left part
+ * (provider icon + model name), and the "tokens used" tail once the context
+ * window is known.
  */
 export const FaeModelLoading: Story = {
   render: () => <FaeChatShell modelLoading />,

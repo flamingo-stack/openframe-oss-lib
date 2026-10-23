@@ -15,7 +15,9 @@ import { Component, type ReactNode, type UIEvent, useCallback } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckFillIcon } from '../icons-v2-generated/signs-and-symbols/check-fill-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../ui/button';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import type { ChatContextItem } from './types/context-item.types';
 
 const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
@@ -24,11 +26,18 @@ const itemKey = (i: { type: string; id: string }) => `${i.type}:${i.id}`;
 // every level is visually identical and there's one source of truth.
 export const CONTEXT_ROW_CLASS =
   'flex w-full items-center gap-2 border-b border-ods-border bg-ods-bg py-3 pl-4 pr-2 text-left outline-none transition-colors last:border-b-0 hover:bg-ods-bg-hover focus-visible:bg-ods-bg-hover [&_svg]:size-4 md:[&_svg]:size-6';
-export const CONTEXT_ICON_CLASS = 'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary md:size-6';
+export const CONTEXT_ICON_CLASS =
+  'flex size-4 shrink-0 items-center justify-center text-ods-text-secondary md:size-6 [&_svg]:size-4 md:[&_svg]:size-6';
 export const CONTEXT_LABEL_CLASS = 'flex-1 truncate text-h4 font-medium leading-6 text-ods-text-primary';
-export const CONTEXT_BACK_CLASS =
-  'flex shrink-0 items-center gap-2 border-b border-ods-border bg-ods-bg px-2 py-3 text-left text-h4 font-medium leading-6 text-ods-text-secondary outline-none transition-colors hover:text-ods-text-primary [&_svg]:size-4 md:[&_svg]:size-6';
+/** The bar that pins a level's Back row while the list under it scrolls: its surface keeps rows from showing through. */
+export const CONTEXT_BACK_BAR_CLASS = 'sticky top-0 z-10 shrink-0 bg-ods-bg';
 export const CONTEXT_STATE_CLASS = 'bg-ods-bg px-4 py-3 text-h4 text-ods-text-secondary';
+/** The items list's scroll box, loaded and loading. Capped at 340px but never past ~half the viewport, so on short
+ *  screens the list (inside the bottom-anchored picker popover) still fits and scrolls. */
+const CONTEXT_LIST_CLASS = 'max-h-[min(340px,45vh)] divide-y divide-ods-border overflow-y-auto overscroll-contain';
+
+/** The rows a page of items holds when the host states no page size: the loading list and each next page draw it. */
+const CONTEXT_ITEMS_PAGE_SIZE = 10;
 
 // ===========================================================================
 // ROW — one menu row (icon + label + optional trailing). Shared primitive.
@@ -46,6 +55,9 @@ export interface ContextMenuRowProps {
   selected?: boolean;
   role?: 'menuitem' | 'option';
   title?: string;
+  /** The row's item is still being read: the SAME row (an inert `div`) draws its label as a bar. In a loading scope a
+   *  row with no label yet does the same. */
+  loading?: boolean;
 }
 
 export function ContextMenuRow({
@@ -57,21 +69,42 @@ export function ContextMenuRow({
   selected,
   role = 'menuitem',
   title,
+  loading: loadingProp = false,
+  ...props
 }: ContextMenuRowProps) {
+  // ONE switch. A row with a label of its own (a static menu entry such as "Assign Item") stays real in a loading
+  // scope; only a row whose item is not here yet draws its label as a bar.
+  const inScope = useLoadingScope();
+  const loading = loadingProp || (inScope && (label == null || label === ''));
+  const content = (
+    <>
+      {icon != null && <span className={CONTEXT_ICON_CLASS}>{icon}</span>}
+      <span className={CONTEXT_LABEL_CLASS}>
+        {loading ? <TextLineSkeleton type="inherit" as="span" className="w-1/2" /> : label}
+      </span>
+      {!loading && trailing}
+    </>
+  );
+  if (loading) {
+    return (
+      <div aria-hidden className={BUTTON_KIND_CLASS.row} {...loadingItemProps(props)}>
+        {content}
+      </div>
+    );
+  }
   return (
-    <button
+    <Button
+      variant="row"
       type="button"
       role={role}
       aria-selected={role === 'option' ? selected : undefined}
       disabled={disabled}
       onClick={onClick}
       title={title}
-      className={cn(CONTEXT_ROW_CLASS, disabled && 'cursor-not-allowed opacity-40 hover:bg-ods-bg')}
+      {...loadingItemProps(props)}
     >
-      {icon != null && <span className={CONTEXT_ICON_CLASS}>{icon}</span>}
-      <span className={CONTEXT_LABEL_CLASS}>{label}</span>
-      {trailing}
-    </button>
+      {content}
+    </Button>
   );
 }
 
@@ -79,19 +112,9 @@ export function ContextMenuRow({
 // SKELETON — Suspense fallback (initial load) + inline load-more rows.
 // ===========================================================================
 
-export function ContextItemsSkeleton({ count }: { count: number }) {
-  return (
-    <>
-      {Array.from({ length: count }, (_, i) => (
-        <div
-          key={`ctx-skeleton-${i}`}
-          className="flex items-center border-b border-ods-border bg-ods-bg py-3 pl-4 pr-2 last:border-b-0"
-        >
-          <UnifiedSkeleton className="h-5 w-1/2" />
-        </div>
-      ))}
-    </>
-  );
+/** Item rows while they are read: `count` loading item rows (`ContextMenuRow loading`), each one item of the list. */
+function ContextItemsSkeleton({ count }: { count: number }) {
+  return <LoadingItems count={count}>{() => <ContextMenuRow loading label="" data-loading-item />}</LoadingItems>;
 }
 
 // ===========================================================================
@@ -112,6 +135,9 @@ export interface ContextItemsListProps {
   onLoadMore?: () => void;
   /** A page is currently loading (shows inline skeleton rows). */
   loadingMore?: boolean;
+  /** The host's page size: the rows the loading list and each next page draw. Default
+   *  {@link CONTEXT_ITEMS_PAGE_SIZE}. */
+  pageSize?: number;
   emptyLabel?: string;
   className?: string;
 }
@@ -124,9 +150,12 @@ export function ContextItemsList({
   hasMore = false,
   onLoadMore,
   loadingMore = false,
+  pageSize = CONTEXT_ITEMS_PAGE_SIZE,
   emptyLabel = 'No results',
   className,
 }: ContextItemsListProps) {
+  // ONE switch: in a loading scope (the picker's Suspense fallback) the list is one page of its own skeleton rows.
+  const loading = useLoadingScope();
   const onScroll = useCallback(
     (e: UIEvent<HTMLDivElement>) => {
       if (!hasMore || loadingMore || !onLoadMore) return;
@@ -136,20 +165,20 @@ export function ContextItemsList({
     [hasMore, loadingMore, onLoadMore],
   );
 
+  if (loading) {
+    return (
+      <div className={cn(CONTEXT_LIST_CLASS, className)}>
+        <ContextItemsSkeleton count={pageSize} />
+      </div>
+    );
+  }
+
   if (items.length === 0 && !loadingMore) {
     return <div className={CONTEXT_STATE_CLASS}>{emptyLabel}</div>;
   }
 
   return (
-    <div
-      role="listbox"
-      aria-label="Items"
-      onScroll={onScroll}
-      // Cap to 340px but never exceed ~half the viewport, so on short screens the
-      // results list (inside the bottom-anchored picker popover) still fits and
-      // scrolls instead of overflowing past the top edge.
-      className={cn('max-h-[min(340px,45vh)] overflow-y-auto overscroll-contain', className)}
-    >
+    <div role="listbox" aria-label="Items" onScroll={onScroll} className={cn(CONTEXT_LIST_CLASS, className)}>
       {items.map(item => {
         const selected = selectedKeys.has(itemKey(item));
         return (
@@ -162,13 +191,15 @@ export function ContextItemsList({
             label={item.label}
             title={!selected && atLimit ? 'Selection limit reached' : undefined}
             trailing={selected ? <CheckFillIcon className="size-4 shrink-0 text-ods-accent md:size-6" /> : undefined}
+            // One item of a read list, like its loading row.
+            data-loading-item
           />
         );
       })}
       {loadingMore && (
         // `contents`: the rows stay the list's own rows; the region only adds the one announcement.
         <LoadingRegion label="Loading more items" className="contents">
-          <ContextItemsSkeleton count={3} />
+          <ContextItemsSkeleton count={pageSize} />
         </LoadingRegion>
       )}
     </div>
