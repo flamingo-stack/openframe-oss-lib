@@ -89,4 +89,6 @@ public class CommandExecution implements TenantScoped {
     private String stderr;
     private Boolean stderrTruncated;
     private String error;
+
+    private boolean testRun;
 }

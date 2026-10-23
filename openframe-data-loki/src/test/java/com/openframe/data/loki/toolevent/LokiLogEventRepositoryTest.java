@@ -43,7 +43,7 @@ import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
-class ToolEventLogRepositoryTest {
+class LokiLogEventRepositoryTest {
 
     private static final long EVENT_MILLIS = 1_790_848_800_123L;
     private static final long EVENT_NANOS = 1_790_848_800_123_000_000L;
@@ -66,7 +66,7 @@ class ToolEventLogRepositoryTest {
     private LokiClient lokiClient;
 
     @InjectMocks
-    private ToolEventLogRepository repository;
+    private LokiLogEventRepository repository;
 
     @Test
     void save_event_pushesItUnderItsTenantAndToolAtTheEventTime() {
@@ -77,7 +77,7 @@ class ToolEventLogRepositoryTest {
 
     @Test
     void save_lineExactlyAtLokisLimit_pushesItWholeAsTheOnlyPartWithoutPartNumbers() {
-        ToolEventLog event = eventWithLineOf(LOKI_LINE_LIMIT_BYTES);
+        LokiLogEvent event = eventWithLineOf(LOKI_LINE_LIMIT_BYTES);
 
         repository.save(event);
 
@@ -87,7 +87,7 @@ class ToolEventLogRepositoryTest {
 
     @Test
     void save_lineOneByteOverLokisLimit_pushesTwoNumberedPartsAtConsecutiveNanoseconds() {
-        ToolEventLog event = eventWithLineOf(LOKI_LINE_LIMIT_BYTES + 1);
+        LokiLogEvent event = eventWithLineOf(LOKI_LINE_LIMIT_BYTES + 1);
 
         repository.save(event);
 
@@ -102,7 +102,7 @@ class ToolEventLogRepositoryTest {
     @MethodSource("multiByteCharactersOnTheLimit")
     void save_multiByteCharacterOnTheLimit_endsThePartAtTheLastWholeCharacter(String details, int firstPartBytes,
                                                                              String onTheLimit) {
-        ToolEventLog event = fullEvent(details);
+        LokiLogEvent event = fullEvent(details);
 
         repository.save(event);
 
@@ -120,7 +120,7 @@ class ToolEventLogRepositoryTest {
 
     @Test
     void save_secondPartRefused_throwsTheRefusalAndPushesNoThirdPart() {
-        ToolEventLog event = eventWithLineOf(2 * LOKI_LINE_LIMIT_BYTES + 1);
+        LokiLogEvent event = eventWithLineOf(2 * LOKI_LINE_LIMIT_BYTES + 1);
         String line = repository.toLine(event);
         LokiPushRejectedException refusal = new LokiPushRejectedException(
                 "Loki push failed with HTTP 400: entry too far behind", null);
@@ -136,7 +136,7 @@ class ToolEventLogRepositoryTest {
 
     @Test
     void toLine_optionalFieldsNull_leavesThemOut() {
-        ToolEventLog event = ToolEventLog.builder()
+        LokiLogEvent event = LokiLogEvent.builder()
                 .tenantId("tenant-a")
                 .toolType("FLEET")
                 .eventType("LOGIN")
@@ -152,7 +152,7 @@ class ToolEventLogRepositoryTest {
     void find_storedEvent_returnsIt() {
         whenLookedUp().thenReturn(List.of(new LokiLogEntry(EVENT_NANOS, FULL_LINE, Map.of())));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
     }
@@ -172,7 +172,7 @@ class ToolEventLogRepositoryTest {
     void find_nothingStored_returnsEmpty() {
         whenLookedUp().thenReturn(List.of());
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).isEmpty();
     }
@@ -184,7 +184,7 @@ class ToolEventLogRepositoryTest {
                 part(1, 3, FULL_LINE.substring(100, 250)),
                 part(2, 3, FULL_LINE.substring(250))));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
     }
@@ -197,7 +197,7 @@ class ToolEventLogRepositoryTest {
                 part(2, 4, FULL_LINE.substring(100, 200)),
                 part(3, 4, FULL_LINE.substring(200))));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
         verify(lokiClient).queryRange(QUERY, EVENT_NANOS - 1, EVENT_NANOS + PARTS_PER_READ, PARTS_PER_READ,
@@ -216,7 +216,7 @@ class ToolEventLogRepositoryTest {
                 part(3, 5, FULL_LINE.substring(200, 300)),
                 part(4, 5, FULL_LINE.substring(300))));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
     }
@@ -225,7 +225,7 @@ class ToolEventLogRepositoryTest {
     void find_firstReadShortOfThePartCount_answersNotFoundAndLogsTheParts(CapturedOutput output) {
         whenLookedUp().thenReturn(List.of(part(0, 3, "{"), part(1, 3, "}")));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).isEmpty();
         assertThat(output.getOut()).contains("Tool event log in Loki is incomplete, 2 of 3 parts: "
@@ -237,7 +237,7 @@ class ToolEventLogRepositoryTest {
         whenLookedUp().thenReturn(List.of(part(0, 5, "{"), part(1, 5, "\"a\""), part(2, 5, ":"), part(3, 5, "1")));
         whenLookedUpFrom(EVENT_NANOS + 3).thenReturn(List.of(part(3, 5, "1")));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).isEmpty();
         assertThat(output.getOut()).contains("Tool event log in Loki is incomplete, 4 of 5 parts: "
@@ -250,7 +250,7 @@ class ToolEventLogRepositoryTest {
                 new LokiLogEntry(EVENT_NANOS, FULL_LINE, Map.of()),
                 new LokiLogEntry(EVENT_NANOS, FULL_LINE.replace("host-7", "renamed-host"), Map.of())));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
     }
@@ -262,7 +262,7 @@ class ToolEventLogRepositoryTest {
                 part(0, 2, "{\"other\":"),
                 part(1, 2, FULL_LINE.substring(100))));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
     }
@@ -285,7 +285,7 @@ class ToolEventLogRepositoryTest {
                 part(3, 4, FULL_LINE.substring(200)),
                 copiedPart(3, 4, FULL_LINE.substring(200))));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
         assertThat(found).contains(fullEvent());
     }
@@ -295,9 +295,9 @@ class ToolEventLogRepositoryTest {
         whenLookedUp().thenReturn(List.of(new LokiLogEntry(EVENT_NANOS,
                 "{\"toolEventId\":\"evt-1\",\"eventTimestamp\":1790848800123,\"origin\":\"cassandra\"}", Map.of())));
 
-        Optional<ToolEventLog> found = find();
+        Optional<LokiLogEvent> found = find();
 
-        assertThat(found).contains(ToolEventLog.builder().toolEventId("evt-1").eventTimestamp(EVENT_MILLIS).build());
+        assertThat(found).contains(LokiLogEvent.builder().toolEventId("evt-1").eventTimestamp(EVENT_MILLIS).build());
     }
 
     @Test
@@ -339,7 +339,7 @@ class ToolEventLogRepositoryTest {
                 LokiDirection.FORWARD, "tenant-a"));
     }
 
-    private Optional<ToolEventLog> find() {
+    private Optional<LokiLogEvent> find() {
         return repository.find("tenant-a", "FLEET", LAST_NANO_OF_THE_EVENT_MILLI, "evt-1");
     }
 
@@ -365,17 +365,17 @@ class ToolEventLogRepositoryTest {
         return Map.of("tool_event_id", "evt-1", "part", String.valueOf(part), "parts", String.valueOf(parts));
     }
 
-    private ToolEventLog eventWithLineOf(int lineBytes) {
+    private LokiLogEvent eventWithLineOf(int lineBytes) {
         int bytesBesidesDetails = repository.toLine(fullEvent("")).getBytes(UTF_8).length;
         return fullEvent("x".repeat(lineBytes - bytesBesidesDetails));
     }
 
-    private static ToolEventLog fullEvent() {
+    private static LokiLogEvent fullEvent() {
         return fullEvent("{\"ip\":\"10.0.0.1\"}");
     }
 
-    private static ToolEventLog fullEvent(String details) {
-        return ToolEventLog.builder()
+    private static LokiLogEvent fullEvent(String details) {
+        return LokiLogEvent.builder()
                 .tenantId("tenant-a")
                 .toolType("FLEET")
                 .eventType("LOGIN")

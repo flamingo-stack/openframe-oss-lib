@@ -162,7 +162,7 @@ export function TagSearchInput<T = string>({
           // this container has no adornment spans of its own, so a `[&_span]`
           // rule would ONLY have reached the selected `Tag` chips, whose label is
           // a span, and greyed them into their own fill in the light theme.
-          'has-[:disabled]:[&_svg]:text-ods-text-disabled',
+          '[&_svg]:has-[:disabled]:text-ods-text-disabled',
           className,
         )}
         onClick={() => {

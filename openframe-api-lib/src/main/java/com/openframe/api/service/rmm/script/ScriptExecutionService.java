@@ -9,6 +9,7 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptExecutionMapper;
+import com.openframe.api.service.rmm.TestRunPolicy;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.RunningExecutionRows;
@@ -37,6 +38,7 @@ public class ScriptExecutionService {
     private final ScriptExecutionRepository scriptExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
     private final ScriptExecutionMapper scriptExecutionMapper;
+    private final TestRunPolicy testRunPolicy;
 
     /**
      * Non-throwing lookup by the row's Mongo {@code _id} (tenant-scoped) — backs
@@ -80,9 +82,10 @@ public class ScriptExecutionService {
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
                 .source(source)
+                .testRun(testRunPolicy.isTestRun())
                 .build());
-        log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} source={} status=RUNNING",
-                executionId, scriptId, machineId, initiatedBy, source);
+        log.info("Persisted execution row: executionId={} scriptId={} machineId={} initiatedBy={} source={} testRun={} status=RUNNING",
+                executionId, scriptId, machineId, initiatedBy, source, saved.get(0).isTestRun());
         return scriptExecutionMapper.toResponse(saved.get(0));
     }
 
@@ -112,6 +115,8 @@ public class ScriptExecutionService {
                 .timeoutSeconds(timeoutSeconds)
                 .initiatedBy(initiatedBy)
                 .source(source)
+                // A schedule run keeps its parent ScheduleScriptExecution row, so it stays visible whole.
+                .testRun(scheduleId == null && testRunPolicy.isTestRun())
                 .build());
         log.info("Persisted batch execution rows: executionId={} scriptId={} scheduleId={} machineCount={} initiatedBy={} source={} status=RUNNING",
                 executionId, scriptId, scheduleId, machineIds.size(), initiatedBy, source);
@@ -180,7 +185,7 @@ public class ScriptExecutionService {
 
         String sortField = resolveSortField(sort);
         Sort.Direction sortDirection = resolveSortDirection(sort);
-        ScriptExecutionQueryFilter queryFilter = toQueryFilter(filter);
+        ScriptExecutionQueryFilter queryFilter = ScriptExecutionHistoryFilter.of(filter);
 
         long filteredCount = scriptExecutionRepository.count(tenantId, owner, queryFilter, search);
         List<ScriptExecution> page = scriptExecutionRepository.findPage(tenantId, owner, queryFilter,
@@ -222,24 +227,6 @@ public class ScriptExecutionService {
             return Sort.Direction.ASC;
         }
         return Sort.Direction.DESC;
-    }
-
-    // History is a user-facing view — platform bootstrap runs are never part of it
-    private static final List<ExecutionSource> HIDDEN_SOURCES = List.of(ExecutionSource.SYSTEM_BOOTSTRAP);
-
-    private static ScriptExecutionQueryFilter toQueryFilter(ScriptExecutionFilterInput input) {
-        ScriptExecutionQueryFilter.ScriptExecutionQueryFilterBuilder builder =
-                ScriptExecutionQueryFilter.builder().excludedSources(HIDDEN_SOURCES);
-        if (input == null) {
-            return builder.build();
-        }
-        return builder
-                .statuses(input.getStatuses())
-                .initiatedByIds(input.getInitiatorIds())
-                .machineIds(input.getMachineIds())
-                .dispatchedAtFrom(input.getDispatchedAtFrom())
-                .dispatchedAtTo(input.getDispatchedAtTo())
-                .build();
     }
 
     private static PageInfo buildPageInfo(String startCursor, String endCursor,

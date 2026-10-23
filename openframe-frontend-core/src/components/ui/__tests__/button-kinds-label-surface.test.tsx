@@ -53,7 +53,7 @@ describe('Button kinds', () => {
     for (const cls of [
       'data-[state=active]:bg-ods-open-yellow-light',
       'data-[state=active]:text-ods-accent',
-      'data-[state=active]:[&_svg]:fill-ods-accent',
+      '[&_svg]:data-[state=active]:fill-ods-accent',
       'data-[state=active]:before:bg-ods-accent',
       'aria-busy:after:opacity-100',
     ]) {
