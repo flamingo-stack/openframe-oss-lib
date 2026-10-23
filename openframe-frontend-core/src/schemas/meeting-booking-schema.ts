@@ -753,3 +753,51 @@ export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>
  * the two survives only on TS's bivariant method-parameter check.
  */
 export type BookingFormValues = z.infer<ReturnType<typeof makeDeferredBookingSchema>>;
+
+// ---------------------------------------------------------------------------
+// Booking context
+// ---------------------------------------------------------------------------
+
+/**
+ * What the visitor told the host page BEFORE its form, beside the link's own
+ * questions: a labelled list ("Fix these first:" and the cards they picked).
+ * The form shows it as a summary of tags and sends it with the booking under
+ * `BOOKING_CONTEXT_FIELD`; it never depends on a question the link declares, so
+ * a page can carry it on any link. The host reads it on its server with
+ * `readBookingContext` and records it where the person running the call sees
+ * it (the hub: a note on the HubSpot contact). Never sent to the booking
+ * itself: the server schema strips it like any undeclared key.
+ */
+export interface BookingContext {
+  /** The summary's heading and the note's lead ("Fix these first:"). */
+  label: string;
+  /** One line each, in the order the visitor gave them. */
+  items: string[];
+}
+
+/** The booking body's key for the context. */
+export const BOOKING_CONTEXT_FIELD = 'bookingContext';
+
+/** Bounds of a context the server accepts; a longer list or line is refused whole. */
+export const BOOKING_CONTEXT_LIMITS = { label: 120, items: 20, item: 400 } as const;
+
+const bookingContextSchema = z.object({
+  label: z.string().trim().min(1).max(BOOKING_CONTEXT_LIMITS.label),
+  items: z.array(z.string().trim().min(1).max(BOOKING_CONTEXT_LIMITS.item)).min(1).max(BOOKING_CONTEXT_LIMITS.items),
+});
+
+/** A context worth showing and sending: a label and at least one line. */
+export function hasBookingContext(context: BookingContext | null | undefined): context is BookingContext {
+  return Boolean(context && context.label.trim() && context.items.some(item => item.trim()));
+}
+
+/** The body fields that carry a context: none when there is nothing to send. */
+export function bookingContextFields(context: BookingContext | null | undefined): Record<string, BookingContext> {
+  return hasBookingContext(context) ? { [BOOKING_CONTEXT_FIELD]: context } : {};
+}
+
+/** The context a booking body carries (`BOOKING_CONTEXT_FIELD`), validated; null when absent or malformed. */
+export function readBookingContext(body: Record<string, unknown>): BookingContext | null {
+  const parsed = bookingContextSchema.safeParse(body[BOOKING_CONTEXT_FIELD]);
+  return parsed.success ? parsed.data : null;
+}

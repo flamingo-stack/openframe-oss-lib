@@ -26,6 +26,8 @@ import {
   type MeetingFormField,
   type SupportedMeetingFormField,
   type BookingFormValues,
+  bookingContextFields,
+  type BookingContext,
 } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import type { FormRescueDefinition } from '../../utils/form-rescue';
@@ -53,6 +55,7 @@ import {
 import { HoneypotField } from '../ui/honeypot-field';
 import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { TOGGLE_SIZE_CLASS } from '../ui/toggle';
+import { BookingContextSummary } from './booking-context-summary';
 
 /**
  * One field in a host-supplied row. `name` is a built-in (`email`, `firstName`,
@@ -466,6 +469,13 @@ export interface BookingFormProps {
    * does not ask is ignored.
    */
   answers?: Readonly<Record<string, string>>;
+  /**
+   * What the visitor told the page before the form, beside the link's questions (the cards they picked): drawn at
+   * the top of the form as a summary of tags and sent with the booking (`BOOKING_CONTEXT_FIELD`), whatever questions
+   * the link declares. Read live, so a change made above the form shows at once; omitted or empty draws nothing.
+   * In `deferSlot` mode the form only shows it: the parent attaches the live context when it POSTs.
+   */
+  context?: BookingContext | null;
   /** Defaults to "Confirm Booking"; details-first says "Continue". */
   submitLabel?: string;
   /** Small print beside the submit (details-first sets expectations). */
@@ -561,6 +571,7 @@ function BookingFormBody({
   deferSlot = false,
   initialValues,
   answers,
+  context,
   submitLabel,
   footerNote,
   fieldRows,
@@ -738,6 +749,7 @@ function BookingFormBody({
       // must do so synchronously in this call — this form and its honeypot are
       // still mounted here, and `getSignals()` reads a detached ref once they
       // unmount, which would silently disable the decoy.
+      // No context here: it can change while the visitor picks a time, so the parent attaches it live at the POST.
       await onSubmit({ ...data, meetingId, [HOST_CONSENT_KEY]: consented, ...formRescue.submitFields() });
       return;
     }
@@ -748,6 +760,8 @@ function BookingFormBody({
       startTimeMs,
       durationMs,
       timezone,
+      // The page's context rides beside the answers, never inside them: the server strips it from the booking.
+      ...bookingContextFields(context),
       ...getSignals(),
       ...formRescue.submitFields(),
     });
@@ -851,6 +865,7 @@ function BookingFormBody({
   return (
     <form id={formId} onSubmit={submit} className={FORM_STACK} noValidate {...HUBSPOT_DO_NOT_COLLECT_FORM_PROPS}>
       <HoneypotField {...honeypotInputProps} />
+      <BookingContextSummary context={context} />
 
       {/* Email first, name pair below — the order the desktop and mobile mocks
           both draw. The pair stays TWO columns even on a phone (164px each at
