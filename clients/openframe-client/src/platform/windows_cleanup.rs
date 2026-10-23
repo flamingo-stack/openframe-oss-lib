@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use std::path::{Path, PathBuf};
-use tracing::info;
+use tracing::{info, warn};
 
 #[cfg(windows)]
 use super::get_powershell_path;
@@ -11,6 +11,7 @@ use super::get_powershell_path;
 /// 1. Wait for the current process to exit
 /// 2. Force delete the binary file
 /// 3. Remove empty parent directories (bin, then OpenFrame)
+/// 4. Delete itself
 pub fn generate_binary_cleanup_script(
     install_path: &Path,
     current_pid: u32,
@@ -62,6 +63,7 @@ if ($waited -ge $maxWaitSeconds) {{
 try {{
     $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
     if ($null -ne $process) {{
+        Remove-Item -LiteralPath $PSCommandPath -Force
         exit 1
     }}
 }} catch {{
@@ -144,6 +146,7 @@ if (($BinDir -ne "") -and (Test-Path $BinDir)) {{
     }}
 }}
 
+Remove-Item -LiteralPath $PSCommandPath -Force
 exit 0
 "#,
         current_pid = current_pid,
@@ -192,26 +195,38 @@ pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathB
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
+        const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x01000000;
+        const ERROR_ACCESS_DENIED: i32 = 5;
 
         let ps_path = get_powershell_path().map_err(|e| anyhow!(e))?;
         info!("Using PowerShell: {}", ps_path);
 
-        Command::new(&ps_path)
-            .args([
-                "-NoProfile",
-                "-WindowStyle",
-                "Hidden",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                &script_path.to_string_lossy(),
-            ])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .context("Failed to spawn binary cleanup script")?;
+        let spawn = |flags: u32| {
+            Command::new(&ps_path)
+                .args([
+                    "-NoProfile",
+                    "-WindowStyle",
+                    "Hidden",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    &script_path.to_string_lossy(),
+                ])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .creation_flags(flags)
+                .spawn()
+        };
+
+        match spawn(CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB) {
+            Err(e) if e.raw_os_error() == Some(ERROR_ACCESS_DENIED) => {
+                warn!("Job object does not allow breakaway, starting cleanup script inside it");
+                spawn(CREATE_NO_WINDOW)
+            }
+            result => result,
+        }
+        .context("Failed to spawn binary cleanup script")?;
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -236,3 +251,7 @@ pub fn execute_binary_cleanup_script(install_path: &Path, bin_dir: Option<&PathB
     info!("Binary cleanup script started successfully");
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "windows_cleanup_tests.rs"]
+mod tests;
