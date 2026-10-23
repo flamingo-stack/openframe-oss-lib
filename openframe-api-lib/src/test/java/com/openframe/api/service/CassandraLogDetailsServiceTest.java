@@ -1,8 +1,9 @@
 package com.openframe.api.service;
 
 import com.openframe.api.dto.audit.LogDetails;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.api.mapper.LogDetailsMapper;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
+import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
 import com.openframe.data.service.TenantIdProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,54 +26,28 @@ class CassandraLogDetailsServiceTest {
     private static final Instant TIMESTAMP = Instant.parse("2026-10-01T10:00:00.123Z");
 
     @Mock
-    private UnifiedLogEventRepository unifiedLogEventRepository;
+    private CassandraLogEventRepository cassandraLogEventRepository;
 
     @Mock
     private TenantIdProvider tenantIdProvider;
+
+    @Mock
+    private LogDetailsMapper logDetailsMapper;
 
     @InjectMocks
     private CassandraLogDetailsService service;
 
     @Test
-    void findLogDetails_rowStoredUnderTheFullKeyOfTheCallersTenant_mapsEveryFieldOfTheStoredRow() {
-        UnifiedLogEvent stored = new UnifiedLogEvent();
+    void findLogDetails_rowStoredUnderTheFullKeyOfTheCallersTenant_returnsItMapped() {
+        CassandraLogEvent stored = new CassandraLogEvent();
         stored.setKey(key());
-        stored.setSeverity("WARNING");
-        stored.setMessage("User logged in");
-        stored.setDetails("{\"ip\":\"10.0.0.1\"}");
-        stored.setDebeziumMessage("{\"op\":\"c\"}");
-        stored.setUserId("user-7");
-        stored.setDeviceId("device-7");
-        stored.setHostname("host-7");
-        stored.setNickname("Reception iMac");
-        stored.setExecutionSource("MANUAL");
-        stored.setScriptCreationSource("AI_ASSISTANT");
-        stored.setOrganizationId("org-7");
-        stored.setOrganizationName("Acme");
+        LogDetails mapped = LogDetails.builder().id("1790848800123_evt-1").build();
         whenLookedUpForTheCallersTenant().thenReturn(Optional.of(stored));
+        when(logDetailsMapper.toLogDetails(stored)).thenReturn(mapped);
 
         Optional<LogDetails> details = findLogDetails();
 
-        assertThat(details).contains(LogDetails.builder()
-                .id("1790848800123_evt-1")
-                .toolEventId("evt-1")
-                .eventType("LOGIN")
-                .ingestDay("2026-10-01")
-                .toolType("FLEET")
-                .severity("WARNING")
-                .userId("user-7")
-                .deviceId("device-7")
-                .hostname("host-7")
-                .nickname("Reception iMac")
-                .executionSource("MANUAL")
-                .scriptCreationSource("AI_ASSISTANT")
-                .organizationId("org-7")
-                .organizationName("Acme")
-                .summary("User logged in")
-                .timestamp(TIMESTAMP)
-                .message("User logged in")
-                .details("{\"ip\":\"10.0.0.1\"}")
-                .build());
+        assertThat(details).containsSame(mapped);
     }
 
     @Test
@@ -96,13 +71,13 @@ class CassandraLogDetailsServiceTest {
         return service.findLogDetails("2026-10-01", "FLEET", "LOGIN", TIMESTAMP, "evt-1");
     }
 
-    private OngoingStubbing<Optional<UnifiedLogEvent>> whenLookedUpForTheCallersTenant() {
+    private OngoingStubbing<Optional<CassandraLogEvent>> whenLookedUpForTheCallersTenant() {
         when(tenantIdProvider.getTenantId()).thenReturn("tenant-a");
-        return when(unifiedLogEventRepository.findById(key()));
+        return when(cassandraLogEventRepository.findById(key()));
     }
 
-    private static UnifiedLogEvent.UnifiedLogEventKey key() {
-        UnifiedLogEvent.UnifiedLogEventKey key = new UnifiedLogEvent.UnifiedLogEventKey();
+    private static CassandraLogEvent.CassandraLogEventKey key() {
+        CassandraLogEvent.CassandraLogEventKey key = new CassandraLogEvent.CassandraLogEventKey();
         key.setIngestDay("2026-10-01");
         key.setToolType("FLEET");
         key.setTenantId("tenant-a");
