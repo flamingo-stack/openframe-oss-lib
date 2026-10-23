@@ -1,7 +1,7 @@
 package com.openframe.data.cassandra.config;
 
 import com.datastax.oss.driver.api.core.CqlSession;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class CassandraTableColumnSyncIntegrationTest extends BaseCassandraIntegrationTe
         session.execute(CREATE_UNIFIED_LOGS_BEFORE_RUN_ORIGIN.formatted(KEYSPACE));
 
         CassandraMappingContext mappingContext = new CassandraMappingContext();
-        mappingContext.setInitialEntitySet(Set.of(UnifiedLogEvent.class));
+        mappingContext.setInitialEntitySet(Set.of(CassandraLogEvent.class));
         mappingContext.afterPropertiesSet();
         MappingCassandraConverter converter = new MappingCassandraConverter(mappingContext);
         converter.afterPropertiesSet();
