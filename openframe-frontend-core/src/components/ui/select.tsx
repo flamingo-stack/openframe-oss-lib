@@ -59,7 +59,7 @@ const SelectTrigger = forwardRef<
         'disabled:!cursor-not-allowed disabled:bg-ods-bg',
         'disabled:text-ods-text-disabled disabled:data-[placeholder]:text-ods-border',
         // The chevron sets its own colour — grey it with the value.
-        'disabled:[&_svg]:text-ods-text-disabled',
+        '[&_svg]:disabled:text-ods-text-disabled',
         'cursor-pointer transition-colors duration-200',
         '[&>span]:line-clamp-1',
         isInvalid &&
