@@ -1,9 +1,12 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import com.openframe.api.datafetcher.rmm.ScriptExecutionDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.filter.ExecutionOwnerScope;
+import com.openframe.data.document.rmm.software.SoftwareAction;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.execution.ScriptExecutionFilterInput;
@@ -26,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.concurrent.CompletableFuture;
@@ -54,6 +58,8 @@ class ScriptExecutionDataFetcherTest {
     private ScriptExecutionFilterService scriptExecutionFilterService;
     @Mock
     private GraphQLScriptExecutionMapper executionMapper;
+    @Spy
+    private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks
     private ScriptExecutionDataFetcher dataFetcher;
@@ -179,12 +185,33 @@ class ScriptExecutionDataFetcherTest {
     }
 
     @Test
-    @DisplayName("ScriptExecution.id resolver returns the Relay global id (Base64 \"ScriptExecution:<rawId>\") — the opaque node handle, not the raw Mongo id")
-    void scriptExecutionNodeId_returnsGlobalId() {
-        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
-        doReturn(ScriptExecutionResponse.builder().id("doc-1").build()).when(dfe).getSource();
+    @DisplayName("softwareExecutions: scopes the list by the package identity (manager + name + action), not by scriptId")
+    void softwareExecutions_scopesByPackage() {
+        SortInput sort = SortInput.builder().build();
+        CursorPaginationCriteria pagination = CursorPaginationCriteria.builder().build();
+        CountedGenericQueryResult<ScriptExecutionResponse> result = CountedGenericQueryResult.<ScriptExecutionResponse>builder().build();
+        CountedGenericConnection<GenericEdge<ScriptExecutionResponse>> connection =
+                CountedGenericConnection.<GenericEdge<ScriptExecutionResponse>>builder().build();
+        ExecutionOwnerScope owner = ExecutionOwnerScope.forSoftware(PackageManagerType.BREW, "google-chrome", SoftwareAction.UPDATE);
+        when(executionMapper.toCursorPaginationCriteria(any(ConnectionArgs.class))).thenReturn(pagination);
+        when(scriptExecutionService.list(owner, null, null, sort, pagination)).thenReturn(result);
+        when(executionMapper.toConnection(result)).thenReturn(connection);
 
-        assertThat(dataFetcher.scriptExecutionNodeId(dfe)).isEqualTo(new Relay().toGlobalId("ScriptExecution", "doc-1"));
+        assertThat(dataFetcher.softwareExecutions(PackageManagerType.BREW, "google-chrome", SoftwareAction.UPDATE,
+                null, null, sort, 10, null, null, null)).isSameAs(connection);
+        verify(scriptExecutionService).list(owner, null, null, sort, pagination);
+    }
+
+    @Test
+    @DisplayName("softwareExecutionFilters: facets scoped by the same package identity")
+    void softwareExecutionFilters_scopesByPackage() {
+        ScriptExecutionFilters filters = ScriptExecutionFilters.builder().filteredCount(0).build();
+        ExecutionOwnerScope owner = ExecutionOwnerScope.forSoftware(PackageManagerType.WINGET, "Google.Chrome", SoftwareAction.INSTALL);
+        when(scriptExecutionFilterService.getExecutionFilters(owner, null, null)).thenReturn(filters);
+
+        assertThat(dataFetcher.softwareExecutionFilters(PackageManagerType.WINGET, "Google.Chrome", SoftwareAction.INSTALL, null, null))
+                .isSameAs(filters);
+        verify(scriptExecutionFilterService).getExecutionFilters(owner, null, null);
     }
 
     @Test

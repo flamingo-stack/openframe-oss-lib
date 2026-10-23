@@ -27,6 +27,7 @@ public class PackageCatalogSyncScheduler {
     private final PackageCatalogWriter packageCatalogWriter;
     private final PackageCatalogSyncProperties syncProperties;
     private final LockingTaskExecutor packageCatalogSyncLockExecutor;
+    private final PackageCatalogSyncMetrics syncMetrics;
 
     @Scheduled(initialDelayString = "#{@packageCatalogSyncProperties.initialDelay.toMillis()}",
             fixedDelayString = "#{@packageCatalogSyncProperties.brewInterval.toMillis()}")
@@ -56,8 +57,10 @@ public class PackageCatalogSyncScheduler {
         try {
             List<PackageCatalogEntry> entries = brewCatalogFetcher.fetchAll();
             packageCatalogWriter.replaceManagerEntries(PackageManagerType.BREW, entries);
+            syncMetrics.recordSuccess(PackageManagerType.BREW);
         } catch (Exception e) {
             log.error("Homebrew catalog sync failed, keeping the previous snapshot", e);
+            syncMetrics.recordFailure(PackageManagerType.BREW);
         }
     }
 
@@ -65,8 +68,10 @@ public class PackageCatalogSyncScheduler {
         try {
             List<PackageCatalogEntry> entries = wingetCatalogFetcher.fetchAll();
             packageCatalogWriter.replaceManagerEntries(PackageManagerType.WINGET, entries);
+            syncMetrics.recordSuccess(PackageManagerType.WINGET);
         } catch (Exception e) {
             log.error("winget catalog sync failed, keeping the previous snapshot", e);
+            syncMetrics.recordFailure(PackageManagerType.WINGET);
         }
     }
 }

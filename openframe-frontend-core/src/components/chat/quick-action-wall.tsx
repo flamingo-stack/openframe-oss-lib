@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import {
   MarqueeWall,
   MarqueeWallFades,
@@ -10,7 +11,7 @@ import {
   type MarqueeWallProps,
 } from '../ui/marquee-wall';
 import {
-  QuickActionChipSkeleton,
+  QuickActionChipButton,
   QuickActionChipFromData,
   type QuickActionThemeSpec,
   type QuickActionChip,
@@ -25,6 +26,10 @@ import {
  *  wall overflows typical caps at any viewport width (same fill + fade as
  *  the loaded state — zero height jump when data lands). */
 export const WALL_SKELETON_LABEL_CH = [17, 24, 14, 20, 15, 25, 12, 21, 16, 19, 13, 23];
+
+/** Skeleton chips a loading wall draws when its host names none: a wall has no page size, and 24 overflow the
+ *  typical caps at any width (the loaded wall's fill and fade). */
+const QUICK_ACTION_WALL_SKELETON_CHIPS = 24;
 
 /** Deterministic index-alternating merge — the mixed "one stream" pile
  *  (deck slide 3's IT+SEC blend and its Storybook mirror). Input order
@@ -104,8 +109,10 @@ export interface QuickActionWallProps {
   fadeSize?: MarqueeWallProps['fadeSize'];
   /** THE wall pitch — one value drives the chip gap, the clone-seam gap, and
    *  (in brick mode) the row-stack gap, so the courses read as a uniform wall
-   *  and the seam is invisible by construction. Default
-   *  `var(--spacing-system-xsf)`. */
+   *  and the seam is invisible by construction. Default `var(--chip-wall-gap)`,
+   *  the ODS component token every wall of these chips reads (in-app and in the
+   *  marketing decks), so they cannot drift apart — override it only for a
+   *  surface that genuinely is not one of those walls. */
   copyGap?: number | string;
   /** Pad the track by REPEATING the chips up to this count (suffixed keys) so
    *  one copy always overflows the container and the loop engages — without
@@ -133,8 +140,8 @@ export interface QuickActionWallProps {
    * the cap at `rows`. Optional — decorative/marketing walls omit it.
    */
   agentSlug?: string;
-  /** Draw skeleton chips instead of `chips` (the shared
-   *  {@link QuickActionChipSkeleton} — 1:1 geometry with loaded chips).
+  /** Draw the chips' own loading form instead of `chips` (`QuickActionChipButton loading`, 1:1 geometry with loaded
+   *  chips), `skeletonCount` of them.
    *  Callers own the policy (`loading` flag vs skeleton-when-empty). */
   loading?: boolean;
   skeletonCount?: number;
@@ -184,12 +191,14 @@ export function QuickActionWall({
   minChips,
   rows,
   agentSlug,
-  loading = false,
-  skeletonCount = 24,
+  loading: loadingProp = false,
+  skeletonCount = QUICK_ACTION_WALL_SKELETON_CHIPS,
   className,
   contentClassName,
   sync,
 }: QuickActionWallProps) {
+  // ONE switch: in a page's loading state (or while the host reads the chips) the wall draws skeleton chips.
+  const loading = useLoadingScope() || loadingProp;
   // Adapt the per-row pad target to the actual geometry (brick mode only): a
   // narrow chat composer needs only a handful of repeats to overflow, a wide
   // wall needs many, and a tiny chip needs more repeats than a wide one. We
@@ -238,14 +247,22 @@ export function QuickActionWall({
     ).flat();
   }, [chips, padTarget]);
 
-  const renderSkeletons = (count: number, offset = 0) =>
-    Array.from({ length: count }, (_, i) => (
-      <QuickActionChipSkeleton
-        key={i}
-        lozenge={lozenges}
-        labelCh={WALL_SKELETON_LABEL_CH[(offset + i) % WALL_SKELETON_LABEL_CH.length]}
-      />
-    ));
+  // The chips while the wall is read: each chip's own loading form (it switches itself), `icon` reserving its slot
+  // because most wall chips carry one, labels cycled through the declared width spread.
+  const renderSkeletons = (count: number, offset = 0) => (
+    <LoadingItems count={count}>
+      {i => (
+        <QuickActionChipButton
+          loading
+          label=""
+          icon
+          lozenge={lozenges}
+          labelCh={WALL_SKELETON_LABEL_CH[(offset + i) % WALL_SKELETON_LABEL_CH.length]}
+          data-loading-item
+        />
+      )}
+    </LoadingItems>
+  );
 
   const renderChipNodes = (list: ReadonlyArray<QuickActionChip>) =>
     list.map(chip => (
@@ -256,6 +273,7 @@ export function QuickActionWall({
         defaultLozenge={lozenges}
         interactive={!!chip.onSelect}
         className="max-w-full"
+        data-loading-item
       />
     ));
 
@@ -264,7 +282,7 @@ export function QuickActionWall({
   // ONE pitch for chips, clone seams, and (brick mode) the row stack — a
   // custom `copyGap` moves all three together, so no seam can ever disagree
   // with the chip gap.
-  const gap = copyGap ?? 'var(--spacing-system-xsf)';
+  const gap = copyGap ?? 'var(--chip-wall-gap)';
 
   // ---- BRICK-WALL mode: stacked independent row marquees ---------------------
   if (rows && rows > 0) {

@@ -23,6 +23,7 @@ public final class HttpHeaders {
     // Client context headers
     public static final String X_CLIENT_ID = "X-Client-Id";
     public static final String X_CLIENT_SCOPES = "X-Client-Scopes";
+    public static final String X_OPENFRAME_CLIENT = "X-OpenFrame-Client";
 
     // Standard HTTP headers
     public static final String AUTHORIZATION = "Authorization";

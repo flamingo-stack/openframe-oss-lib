@@ -22,7 +22,12 @@ import java.time.Instant;
 @Document(collection = "knowledge_base_items")
 @CompoundIndexes({
     @CompoundIndex(name = "tenant_parent_type_sort", def = "{'tenantId': 1, 'parentId': 1, 'type': 1, 'sortOrder': 1}"),
-    @CompoundIndex(name = "tenant_type_status", def = "{'tenantId': 1, 'type': 1, 'status': 1}")
+    @CompoundIndex(name = "tenant_type_status", def = "{'tenantId': 1, 'type': 1, 'status': 1}"),
+    // The article stream of a listing, keyset-ordered by (updatedAt desc, _id desc): the first
+    // serves a level or a subtree (parentId fixed or $in), the second the whole knowledge base.
+    // The folder stream's (name, _id) indexes carry a collation and live in MongoIndexConfig.
+    @CompoundIndex(name = "tenant_parent_type_updated", def = "{'tenantId': 1, 'parentId': 1, 'type': 1, 'updatedAt': -1, '_id': -1}"),
+    @CompoundIndex(name = "tenant_type_updated", def = "{'tenantId': 1, 'type': 1, 'updatedAt': -1, '_id': -1}")
 })
 public class KnowledgeBaseItem implements TenantScoped {
     @Id

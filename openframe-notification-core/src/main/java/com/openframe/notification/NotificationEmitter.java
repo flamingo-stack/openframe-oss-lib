@@ -1,7 +1,6 @@
 package com.openframe.notification;
 
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSeverity;
 import com.openframe.notification.service.NotificationBroadcaster;
@@ -58,7 +57,6 @@ public class NotificationEmitter {
         Audience audience = spec.audience(typed);
         String title = spec.composeTitle(typed);
         String description = spec.composeDescription(typed);
-        NotificationContext legacyContext = spec.buildLegacyContext(typed);
         NotificationSeverity severity = spec.getSeverity();
         NotificationType specType = spec.getType();
         String applePushCategory = spec.getApplePushCategory().orElse(null);
@@ -75,7 +73,6 @@ public class NotificationEmitter {
                 .title(title)
                 .description(description)
                 .severity(severity)
-                .context(legacyContext)
                 .correlationId(correlationId)
                 .audience(audience)
                 .build();

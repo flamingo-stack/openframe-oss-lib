@@ -13,4 +13,10 @@ import lombok.NoArgsConstructor;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MessageOwner {
     private MessageOwnerType type;
+
+    // AssistantOwner only: the model id the agent resolved for this reply (e.g. "gpt-5.5"), and its
+    // display name and provider. Filled from the assistant's settings when the message is saved.
+    private String model;
+    private String modelName;
+    private String providerName;
 }

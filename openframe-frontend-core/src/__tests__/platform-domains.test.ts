@@ -3,6 +3,11 @@ import {
   PLATFORM_DOMAINS,
   byKey,
   getPlatformProductionUrl,
+  getPlatformUrl,
+  getDeploymentUrl,
+  getRequestOrigin,
+  isLocalUrl,
+  resolveRedirectTarget,
   getPlatformByHostname,
   getAllPlatformBaseDomains,
   hostOf,
@@ -54,7 +59,7 @@ describe('🔒 cross-subdomain cookie sharing (the SSO invariant — must never 
     }
   });
   it('shares one base domain across all *.flamingo.so hubs (cross-hub SSO)', () => {
-    for (const hub of ['marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub']) {
+    for (const hub of ['marketing-hub', 'company-hub', 'product-hub', 'revenue-hub', 'people-hub', 'coding-hub']) {
       const host = hostOf(getPlatformProductionUrl(hub));
       // `hostOf` returns null for an unparseable URL — that is a registry bug
       // worth naming, not a TypeError inside `toRegistrableBaseDomain`.
@@ -65,7 +70,7 @@ describe('🔒 cross-subdomain cookie sharing (the SSO invariant — must never 
   it('keeps flamingo.cx OUT of the cookie set (alias excluded) but IN the reverse map', () => {
     const bases = withProdWindow('www.flamingo.run', getAllPlatformBaseDomains);
     expect(bases).not.toContain('.flamingo.cx');
-    expect(getPlatformByHostname('flamingo.cx')).toBe('flamingo-teaser');
+    expect(getPlatformByHostname('flamingo.cx')).toBe('flamingo');
   });
   it('returns [] for localhost and .vercel.app (host-only cookies)', () => {
     expect(withProdWindow('localhost', getAllPlatformBaseDomains)).toEqual([]);
@@ -77,8 +82,8 @@ describe('reverse resolver (first-wins ordering + aliases)', () => {
   it.each([
     ['www.flamingo.run', 'flamingo'],
     ['flamingo.run', 'flamingo'],
-    ['flamingo.cx', 'flamingo-teaser'],
-    ['www.flamingo.cx', 'flamingo-teaser'],
+    ['flamingo.cx', 'flamingo'],
+    ['www.flamingo.cx', 'flamingo'],
     ['openframe.ai', 'openframe'],
     ['www.openframe.ai', 'openframe'],
     ['hub.openframe.ai', 'openframe'], // additive fix — was null in the old PLATFORM_DOMAIN_MAP
@@ -105,7 +110,7 @@ describe('host primitives', () => {
   it('toRegistrableBaseDomain + aliasHostsOf', () => {
     expect(toRegistrableBaseDomain('marketing-hub.flamingo.so')).toBe('flamingo.so');
     expect(toRegistrableBaseDomain('localhost')).toBeUndefined();
-    expect(aliasHostsOf('flamingo-teaser')).toEqual(['flamingo.cx', 'www.flamingo.cx']);
+    expect(aliasHostsOf('flamingo')).toEqual(['flamingo.cx', 'www.flamingo.cx']);
     expect(aliasHostsOf('openmsp')).toEqual([]);
   });
 });
@@ -126,11 +131,11 @@ describe('env override path', () => {
     // a non-sharing key is unaffected
     expect(mod.getPlatformProductionUrl('openmsp')).toBe('https://www.openmsp.ai');
   });
-  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives all three of its keys', async () => {
+  it('the shared NEXT_PUBLIC_FLAMINGO_URL drives both of its keys', async () => {
     vi.stubEnv('NEXT_PUBLIC_FLAMINGO_URL', 'https://sentinel-flamingo.example');
     vi.resetModules();
     const mod = await import('@/platform-domains');
-    for (const k of ['flamingo', 'flamingo-teaser', 'universal']) {
+    for (const k of ['flamingo', 'universal']) {
       expect(mod.getPlatformProductionUrl(k)).toBe('https://sentinel-flamingo.example');
     }
   });
@@ -154,6 +159,125 @@ describe('env override path', () => {
     expect(host).toBe('www.openmsp.ai');
     expect(mod.toRegistrableBaseDomain(host)).toBe('openmsp.ai');
   });
+});
+
+describe('getPlatformUrl — the one platform-URL resolver', () => {
+  it('is the registry URL in a production build, with no trailing slash', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    expect(getPlatformUrl('flamingo')).toBe('https://www.flamingo.run');
+    expect(getPlatformUrl('openframe')).toBe(getPlatformProductionUrl('openframe').replace(/\/+$/, ''));
+  });
+
+  it("never reads Vercel's first-listed domain", () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', 'flamingo.cx');
+    expect(getPlatformUrl('flamingo')).toBe('https://www.flamingo.run');
+  });
+
+  it('is the local dev URL outside a production build, unless production is asked for', () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', '');
+    expect(getPlatformUrl('openmsp')).toBe('http://localhost:3000');
+    expect(getPlatformUrl('openmsp', { environment: 'production' })).toBe('https://www.openmsp.ai');
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', 'https://my-tunnel.example/');
+    expect(getPlatformUrl('openmsp')).toBe('https://my-tunnel.example');
+  });
+});
+
+describe('getDeploymentUrl — the one app-origin resolver', () => {
+  // Server-side cases: jsdom defines `window`, which is the browser branch.
+  const onServer = () => vi.stubGlobal('window', undefined);
+
+  it("is a Vercel preview's own immutable URL", () => {
+    onServer();
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    vi.stubEnv('VERCEL_URL', 'flamingo-abc123-flamingocx.vercel.app');
+    expect(getDeploymentUrl({ platform: 'flamingo' })).toBe('https://flamingo-abc123-flamingocx.vercel.app');
+  });
+
+  it("is the platform's registry URL in production, whatever Vercel's first domain is", () => {
+    onServer();
+    vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('VERCEL_PROJECT_PRODUCTION_URL', 'flamingo.cx');
+    expect(getDeploymentUrl({ platform: 'flamingo' })).toBe('https://www.flamingo.run');
+  });
+
+  it('uses a runtime-configured app URL (a self-hosted install) over every default', () => {
+    onServer();
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect(getDeploymentUrl({ platform: 'openframe-dashboard', configuredUrl: 'frame.acme-msp.example/' })).toBe(
+      'https://frame.acme-msp.example',
+    );
+    expect(getDeploymentUrl({ platform: 'openframe-dashboard', configuredUrl: '  ' })).toBe(
+      getPlatformUrl('openframe-dashboard', { environment: 'production' }),
+    );
+  });
+
+  it('is localhost on the running port in development', () => {
+    onServer();
+    vi.stubEnv('VERCEL_ENV', '');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', '');
+    vi.stubEnv('PORT', '4000');
+    expect(getDeploymentUrl({ platform: 'openframe-dashboard' })).toBe('http://localhost:4000');
+  });
+
+  it("is the page's origin in the browser", () => {
+    vi.stubGlobal('window', { location: { origin: 'https://tenant.openframe.ai' } });
+    expect(getDeploymentUrl({ platform: 'openframe-dashboard', configuredUrl: 'https://ignored.example' })).toBe(
+      'https://tenant.openframe.ai',
+    );
+  });
+});
+
+describe('getRequestOrigin / isLocalUrl / resolveRedirectTarget', () => {
+  const headers = (values: Record<string, string>) => ({ get: (name: string) => values[name] ?? null });
+
+  it('reads the host the request arrived on, https unless local, ignoring x-forwarded-host, else the app origin', () => {
+    expect(getRequestOrigin(headers({ host: 'www.flamingo.run' }), { platform: 'flamingo' })).toBe(
+      'https://www.flamingo.run',
+    );
+    expect(getRequestOrigin(headers({ host: 'localhost:3000' }), { platform: 'flamingo' })).toBe(
+      'http://localhost:3000',
+    );
+    expect(getRequestOrigin(headers({ host: '[::1]:3000' }), { platform: 'flamingo' })).toBe('http://[::1]:3000');
+    expect(
+      getRequestOrigin(headers({ host: 'x.vercel.app', 'x-forwarded-proto': 'https' }), { platform: 'flamingo' }),
+    ).toBe('https://x.vercel.app');
+    expect(
+      getRequestOrigin(headers({ host: 'www.flamingo.run', 'x-forwarded-host': 'evil.example' }), {
+        platform: 'flamingo',
+      }),
+    ).toBe('https://www.flamingo.run');
+    vi.stubGlobal('window', undefined);
+    vi.stubEnv('NEXT_PUBLIC_DEV_URL', 'http://localhost:4000');
+    expect(getRequestOrigin(headers({}), { platform: 'flamingo' })).toBe('http://localhost:4000');
+  });
+
+  it.each([
+    ['http://localhost:3000', true],
+    ['http://127.0.0.1:3000/x', true],
+    ['http://0.0.0.0', true],
+    ['http://[::1]:3000', true],
+    ['https://www.flamingo.run', false],
+    ['https://localhost.example.com', false],
+    ['http://127.evil.example', false],
+    ['not a url', false],
+  ])('isLocalUrl(%s) → %s', (url, local) => expect(isLocalUrl(url)).toBe(local));
+
+  it('resolves same-origin paths and passes explicit absolute URLs through', () => {
+    const origin = 'https://flamingo-abc123-flamingocx.vercel.app';
+    expect(resolveRedirectTarget(origin, '/admin/x?y=1').href).toBe(`${origin}/admin/x?y=1`);
+    expect(resolveRedirectTarget(origin, 'auth/callback-client').href).toBe(`${origin}/auth/callback-client`);
+    expect(resolveRedirectTarget(origin, 'https://www.flamingo.run/blog').href).toBe('https://www.flamingo.run/blog');
+  });
+
+  it.each(['//evil.example/path', '/\\evil.example/path', '\\\\evil.example', '\\/evil.example'])(
+    'refuses %s, which would leave the origin',
+    target => {
+      expect(() => resolveRedirectTarget('https://www.flamingo.run', target)).toThrow('is not a same-origin path');
+    },
+  );
 });
 
 describe('registry integrity', () => {

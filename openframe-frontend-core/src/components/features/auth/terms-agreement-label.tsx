@@ -5,10 +5,16 @@ import { PolicyLink } from '../../ui/policy-link';
 export interface TermsAgreementLabelProps {
   termsUrl?: string;
   privacyPolicyUrl?: string;
+  /** The words after the links, leading space included. */
+  suffix?: string;
 }
 
 /** "Agree to Terms & Privacy Policy by signing up." — shared checkbox label. */
-export function TermsAgreementLabel({ termsUrl = '#', privacyPolicyUrl = '#' }: TermsAgreementLabelProps) {
+export function TermsAgreementLabel({
+  termsUrl = '#',
+  privacyPolicyUrl = '#',
+  suffix = ' by signing up.',
+}: TermsAgreementLabelProps) {
   return (
     <span className="text-ods-text-primary text-h4">
       {'Agree to '}
@@ -19,7 +25,7 @@ export function TermsAgreementLabel({ termsUrl = '#', privacyPolicyUrl = '#' }: 
       <PolicyLink href={privacyPolicyUrl} tone="secondary">
         Privacy Policy
       </PolicyLink>
-      {' by signing up.'}
+      {suffix}
     </span>
   );
 }

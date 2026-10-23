@@ -77,3 +77,28 @@ fn main() -> anyhow::Result<()> {
     openframe::run()
 }
 ```
+
+## OpenFrame Client (device agent): install, enrol, remove
+
+`openframe-client/` is the source of the OpenFrame device agent, published by Flamingo as a prebuilt, signed binary (macOS: Developer ID signed and notarized universal binary; Windows: Authenticode-signed x64 executable). Official downloads, always the current production release: `https://openframe.ai/v0/api/assets/download?agent=client&platform=macos` and `...&platform=windows`.
+
+Installation is two steps. Step 1 registers the agent as a system service; step 2 connects it to your OpenFrame tenant. Between the two steps the service waits idle and sends nothing anywhere.
+
+Step 1: extract the archive and run `sudo ./openframe-client install` (macOS) or `.\openframe-client.exe install` (Windows, elevated). The downloaded file is named `openframe-client`.
+
+Step 2, on every platform, with the values shown in your dashboard under **Devices → Add device** (a new terminal on Windows, because the install adds the program folder to PATH):
+
+    sudo openframe-client auth --serverUrl <tenant host> --initialKey <key> --logKey <log key> --orgId <organization id> --userId <user id>
+
+What the commands do:
+
+- `install` (administrator/sudo, no arguments): copies the binary to `/usr/local/bin/openframe-client` or `C:\Program Files\OpenFrame\bin\`, registers the system service `com.openframe.client` (a LaunchDaemon running as root on macOS, a Windows service on Windows) and starts it.
+- `auth` (administrator/sudo): validates the parameters and the network path to the tenant, writes the configuration, restarts the service; the device registers within a minute.
+- `doctor`: read-only health check of the installed agent.
+- `uninstall` (administrator/sudo): stops and removes the service, deregisters the device from the tenant, uninstalls the integrated tools, deletes the binaries and the data directory.
+
+Files: data and configuration in `/Library/Application Support/OpenFrame/` or `C:\ProgramData\OpenFrame\`; logs in `/Library/Logs/OpenFrame/` or `C:\ProgramData\OpenFrame\logs\`; the macOS service definition at `/Library/LaunchDaemons/com.openframe.client.plist`.
+
+On Windows the agent is listed in Settings → Apps as "OpenFrame Client"; its Uninstall button asks for administrator approval and runs `openframe-client uninstall`.
+
+Updates are delivered by the OpenFrame platform. Running `install` again on an installed device reinstalls it: the service, the integrated tools and the local data are removed and installed again, and the device keeps its identity. With tenant parameters it re-registers right away; without them it waits for `auth`.

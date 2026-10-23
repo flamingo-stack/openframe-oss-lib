@@ -2,9 +2,12 @@
 
 import { ChevronRight } from 'lucide-react';
 import { type ButtonHTMLAttributes, forwardRef } from 'react';
+import { TILE_SIZE } from '../../../styles/component-sizes';
 import { cn } from '../../../utils/cn';
 import { WrenchIcon } from '../../icons-v2-generated/household/wrench-icon';
-import { Skeleton } from '../../ui/skeleton';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from '../../ui/button';
+import { loadingItemProps, useLoadingScope } from '../../ui/loading-scope';
 import { Tag } from '../../ui/tag';
 import { TicketStatusTag, resolveStatusTagProps, resolveTicketStatus } from '../../ui/ticket-status-tag';
 
@@ -27,6 +30,18 @@ export interface ChatTicketItemData {
   statusColor?: string;
   category?: string;
   timeAgo?: string;
+  /** Explicit secondary line under the title. When set, it replaces the
+   *  default `ticketNumber • category • timeAgo` composition verbatim, so
+   *  the host decides how the reference reads - the Fae client passes
+   *  `Ticket Number: 165 • 6m ago` (reference labelled but visually
+   *  secondary). An empty string hides the line. */
+  subtitle?: string;
+  /** The ticket has activity the customer has not opened yet
+   *  (Figma fae-chat 1-5592): the secondary line and the chevron switch to
+   *  the brand yellow, and the line reads the unread notice unless
+   *  `subtitle` overrides it. The host clears it once the ticket is
+   *  opened, and the reference line comes back. */
+  unread?: boolean;
   /** When set, renders a "Linked work" chip with a wrench icon next to
    *  the status tag — tells the customer at a glance that an internal
    *  delivery task is in flight for this ticket, even before they
@@ -37,82 +52,73 @@ export interface ChatTicketItemData {
 }
 
 export interface ChatTicketItemProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick'> {
-  /** Optional while `isLoading` — the skeleton placeholder needs no data. */
+  /** Optional while `loading`: the loading row needs no data. */
   ticket?: ChatTicketItemData;
   onClick?: (ticketId: string) => void;
-  /** Render a non-interactive skeleton placeholder sized to a real row. */
-  isLoading?: boolean;
+  /** The ticket is still being read: the row draws its loading form (same box, its own text slots as bars). */
+  loading?: boolean;
 }
 
+const UNREAD_NOTICE = 'You have a new unread message';
+
+/** The ticket row's box: the lib's list row (`Button variant="row"`) at the row's height. The loading form draws the
+ *  same box as an inert `div`, so the two land on the same pixels. */
+const TICKET_ROW_HEIGHT = 'h-20';
+const TICKET_ROW = cn(BUTTON_KIND_CLASS.row, TICKET_ROW_HEIGHT);
+const TICKET_ROW_TEXT = 'flex min-w-0 flex-1 flex-col justify-center';
+const TICKET_ROW_CHEVRON = `flex ${TILE_SIZE.xl} shrink-0 items-center justify-center rounded-md border`;
+
+/**
+ * A ticket row. ONE switch (`useLoadingScope() || loading`): while the ticket is read the SAME row (an inert `div`, not
+ * a button) draws its title and reference line as `text-h3` / `text-h6` bars, its status tag in the tag's own loading
+ * form, and the chevron (static) for real.
+ */
 const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
-  ({ className, ticket, onClick, isLoading = false, ...props }, ref) => {
-    if (isLoading) {
-      return (
-        <div
-          aria-hidden
-          className={cn(
-            'flex h-20 w-full items-center gap-4 px-4',
-            'border-b border-ods-border bg-ods-card',
-            className,
-          )}
-        >
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-            {/* title line */}
-            <Skeleton className="h-5 w-1/2" />
-            {/* subtitle line */}
-            <Skeleton className="h-4 w-1/3" />
-          </div>
-          {/* status tag */}
-          <Skeleton className="h-8 w-20 shrink-0 rounded-r-md" />
-          {/* chevron box */}
-          <Skeleton className="size-12 shrink-0 rounded-md" />
-        </div>
-      );
-    }
+  ({ className, ticket, onClick, loading: loadingProp = false, ...props }, ref) => {
+    const loading = useLoadingScope() || loadingProp;
+    if (!loading && !ticket) return null;
 
-    if (!ticket) return null;
+    const statusTagProps = ticket
+      ? resolveStatusTagProps({
+          status: ticket.status,
+          statusKind: ticket.statusKind,
+          statusName: ticket.statusLabel,
+          statusColor: ticket.statusColor,
+        })
+      : null;
+    const isResolved =
+      !!ticket && (ticket.statusKind === 'RESOLVED' || resolveTicketStatus(ticket.status) === 'RESOLVED');
+    const composedSubtitle = ticket
+      ? [ticket.ticketNumber, ticket.category, ticket.timeAgo].filter(Boolean).join(' \u2022 ')
+      : '';
+    const subtitle = ticket?.subtitle ?? (ticket?.unread ? UNREAD_NOTICE : composedSubtitle);
+    const unread = !!ticket?.unread;
 
-    const statusTagProps = resolveStatusTagProps({
-      status: ticket.status,
-      statusKind: ticket.statusKind,
-      statusName: ticket.statusLabel,
-      statusColor: ticket.statusColor,
-    });
-    const isResolved = ticket.statusKind === 'RESOLVED' || resolveTicketStatus(ticket.status) === 'RESOLVED';
-
-    const subtitle = [ticket.ticketNumber, ticket.category, ticket.timeAgo].filter(Boolean).join(' \u2022 ');
-
-    return (
-      <button
-        ref={ref}
-        type="button"
-        onClick={() => onClick?.(ticket.id)}
-        className={cn(
-          'flex h-20 w-full items-center gap-4 px-4',
-          'border-b border-ods-border bg-ods-card',
-          'cursor-pointer transition-colors duration-150',
-          'hover:bg-ods-bg-hover',
-          // `focus-visible:` covers keyboard nav AND the post-click state
-          // jsdom/Chromium leave behind. Without it, the global focus
-          // ring (1.5px white) renders as a stray "white border" after
-          // clicking a row.
-          'focus:bg-ods-bg-hover focus:outline-none',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
-          className,
-        )}
-        {...props}
-      >
-        <div className="flex min-w-0 flex-1 flex-col justify-center text-left">
-          <p
-            className={cn('truncate text-h3', isResolved ? 'text-ods-text-secondary' : 'text-ods-text-primary')}
-            title={ticket.title}
-          >
-            {ticket.title}
-          </p>
-          {subtitle && (
-            <p className="truncate text-ods-text-secondary text-h6" title={subtitle}>
-              {subtitle}
-            </p>
+    const content = (
+      <>
+        <div className={cn(TICKET_ROW_TEXT, 'text-left')}>
+          {loading || !ticket ? (
+            <>
+              <TextLineSkeleton type="h3" className="w-1/2" />
+              <TextLineSkeleton type="h6" className="w-1/3" />
+            </>
+          ) : (
+            <>
+              <p
+                className={cn('truncate text-h3', isResolved ? 'text-ods-text-secondary' : 'text-ods-text-primary')}
+                title={ticket.title}
+              >
+                {ticket.title}
+              </p>
+              {subtitle && (
+                <p
+                  className={cn('truncate text-h6', unread ? 'text-ods-open-yellow' : 'text-ods-text-secondary')}
+                  title={subtitle}
+                >
+                  {subtitle}
+                </p>
+              )}
+            </>
           )}
         </div>
 
@@ -122,20 +128,52 @@ const ChatTicketItem = forwardRef<HTMLButtonElement, ChatTicketItemProps>(
             tag so the canonical ticket status still wins the
             right-aligned slot. Hidden on small screens (sm:flex) to
             avoid crowding the row when both badges are present. */}
-        {ticket.linkedTaskLabel && (
+        {ticket?.linkedTaskLabel && (
           <Tag
+            data-loading-optional
             label={ticket.linkedTaskLabel}
             variant="outline"
             icon={<WrenchIcon size={14} color="var(--color-text-secondary)" />}
             className="hidden shrink-0 sm:inline-flex"
           />
         )}
-        {(statusTagProps.status || statusTagProps.label) && <TicketStatusTag {...statusTagProps} />}
+        {loading ? (
+          <TicketStatusTag status="" loading className="w-20" />
+        ) : (
+          statusTagProps && (statusTagProps.status || statusTagProps.label) && <TicketStatusTag {...statusTagProps} />
+        )}
 
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-card">
-          <ChevronRight className="size-6 text-ods-text-secondary" />
+        <div
+          data-testid="chat-ticket-item-chevron"
+          className={cn(
+            TICKET_ROW_CHEVRON,
+            unread ? 'border-ods-open-yellow bg-ods-open-yellow' : 'border-ods-border bg-ods-card',
+          )}
+        >
+          <ChevronRight className={cn('size-6', unread ? 'text-ods-text-on-accent' : 'text-ods-text-secondary')} />
         </div>
-      </button>
+      </>
+    );
+
+    if (loading || !ticket) {
+      return (
+        <div aria-hidden className={cn(TICKET_ROW, className)} {...loadingItemProps(props)}>
+          {content}
+        </div>
+      );
+    }
+
+    return (
+      <Button
+        variant="row"
+        ref={ref}
+        type="button"
+        onClick={() => onClick?.(ticket.id)}
+        className={cn(TICKET_ROW_HEIGHT, className)}
+        {...props}
+      >
+        {content}
+      </Button>
     );
   },
 );

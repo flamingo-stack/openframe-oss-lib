@@ -1,31 +1,75 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Instant;
 
 use crate::models::{ExecutionRequest, RmmResult};
 
+#[cfg(windows)]
+use crate::models::PrivilegePolicy;
+#[cfg(any(unix, windows))]
+use crate::{executor::Privilege, models::PrivilegeLevel};
+
 #[derive(Clone, Default)]
-pub struct ExecutionService;
+pub struct ExecutionService {
+    running: Arc<AtomicUsize>,
+}
+
+struct Running(Arc<AtomicUsize>);
+
+#[derive(Clone)]
+pub struct RunningScripts(Arc<AtomicUsize>);
+
+impl RunningScripts {
+    pub fn any(&self) -> bool {
+        self.0.load(Ordering::Acquire) > 0
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
 
 impl ExecutionService {
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    pub fn running_scripts(&self) -> RunningScripts {
+        RunningScripts(self.running.clone())
+    }
+
+    fn track(&self) -> Running {
+        self.running.fetch_add(1, Ordering::AcqRel);
+        Running(self.running.clone())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn running_for_tests(&self) -> impl Drop {
+        self.track()
     }
 
     pub async fn execute(&self, req: &ExecutionRequest<'_>, machine_id: &str) -> RmmResult {
+        let _running = self.track();
         let start = Instant::now();
 
         #[cfg(any(unix, windows))]
         {
-            use crate::executor::{execute_script, Privilege, ScriptParams};
-            use crate::models::PrivilegeLevel;
+            use crate::executor::{execute_script, ScriptParams};
+            use tracing::{info, warn};
 
             let timeout_secs = match req.timeout_secs {
                 0 => 900,
                 t => t.min(u32::MAX as u64) as u32,
             };
-            let privilege = match req.privilege {
-                PrivilegeLevel::Admin => Privilege::Agent,
-                PrivilegeLevel::User => Privilege::User,
-            };
+            let privilege = resolve_privilege(req);
+
+            info!(
+                execution_id = req.execution_id,
+                privilege = ?privilege,
+                "Executing script"
+            );
 
             let result = execute_script(ScriptParams {
                 code: req.code,
@@ -38,6 +82,12 @@ impl ExecutionService {
             .await;
 
             let error = if result.retcode == 85 {
+                warn!(
+                    execution_id = req.execution_id,
+                    privilege = ?privilege,
+                    detail = %result.stderr,
+                    "Script did not start"
+                );
                 Some(result.stderr.clone())
             } else {
                 None
@@ -73,6 +123,27 @@ impl ExecutionService {
             }
         }
     }
+}
+
+#[cfg(any(unix, windows))]
+fn base_privilege(level: PrivilegeLevel) -> Privilege {
+    match level {
+        PrivilegeLevel::Admin => Privilege::Agent,
+        PrivilegeLevel::User => Privilege::User,
+    }
+}
+
+#[cfg(windows)]
+fn resolve_privilege(req: &ExecutionRequest<'_>) -> Privilege {
+    match req.privilege_policy {
+        PrivilegePolicy::InteractiveElevated => Privilege::ElevatedUser,
+        PrivilegePolicy::AsRequested => base_privilege(req.privilege),
+    }
+}
+
+#[cfg(unix)]
+fn resolve_privilege(req: &ExecutionRequest<'_>) -> Privilege {
+    base_privilege(req.privilege)
 }
 
 #[cfg(all(test, unix))]

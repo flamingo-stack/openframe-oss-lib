@@ -2,8 +2,8 @@
 
 A standalone **Vite + React** app that embeds the chat (`EmbeddableChat`) and every
 page-level content surface from `@flamingo-stack/openframe-frontend-core` (onboarding
-guides, roadmap, delivery, product releases, authors, FAQ, legal, contact, tickets,
-announcements), talking to the multi-platform hub through a **`/content` reverse proxy**.
+guides, roadmap, delivery, product releases, authors, FAQ, trust center, legal, contact,
+tickets, announcements), talking to the multi-platform hub through a **`/content` reverse proxy**.
 
 Credentials are pasted once on the app's `/debug` page (localStorage), so
 the chat greets that user with no client-side auth — exactly how a real embedder works.
@@ -101,8 +101,10 @@ All client calls use `/content/api/...`. Per-surface retargeting:
 | Onboarding catalog/detail | `/content/api/onboarding-guides[/:slug\|/sections]` | props-driven fetch (`content-api.ts`) |
 | Roadmap | `/content/api/roadmap`, `/roadmap/vote`, `/roadmap/:id` | `items` + `buildRefreshUrl` + `votingOptions` |
 | Delivery | `/content/api/delivery/{completed,in-progress}` | `completedApiEndpoint` / `inProgressApiEndpoint` |
-| Release detail | `/content/api/product-releases/:slug`, `/roadmap` | host `useRelease` + injected section |
+| Release detail | `/content/api/product-releases/:slug`, `/roadmap` | host-resolved `release` / `isLoading` / `error` + injected section |
 | Authors (`ArticleAuthorByline` + `RelatedContentSection authorId`) | `/content/api/related-content?authorId=…` + per-type list endpoints, `/content/api/image-proxy` (avatar) | `apiBaseUrl` prop + ambient `ChatRuntime` |
+| Trust center (`TrustCenterPage`) | `/content/api/trust-center` (+ `/content/api/contact` for document requests) | `endpoint` prop (`EP.trustCenter`) + `EndpointsRuntime.contactUrl` |
+| Download (`DownloadAppsPage`) | `/content/api/downloads` | `endpoint` prop (`EP.downloads`); the store links and the install QR code are lib constants |
 | Legal | `/content/api/legal/:docType` | `apiEndpoint` |
 | Contact | `/content/api/contact` | `EndpointsRuntime.contactUrl` |
 | Announcements | `/content/api/announcements/active` | `EndpointsRuntime.announcementsUrl` |
@@ -221,7 +223,7 @@ docPlatformTargets: {
   markdown:      { platform: 'flamingo',    basePath: 'knowledge-base' },
   data_room_doc: { platform: 'company-hub', basePath: 'data-room' },
 },
-// markdown chip → getBaseUrl('flamingo')/knowledge-base/<path>, opened in a new tab.
+// markdown chip → getPlatformUrl('flamingo')/knowledge-base/<path>, opened in a new tab.
 ```
 
 ### 4. Shared-page chrome — `DevSectionPage` props

@@ -73,7 +73,7 @@ export function computeIsNewTab(
  */
 export function newTabAnchorAttrs(isNewTab: boolean): {
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
 } {
   return isNewTab ? { target: '_blank' as const, rel: 'noopener noreferrer' as const } : {};
 }
@@ -91,6 +91,6 @@ export function newTabAnchorAttrs(isNewTab: boolean): {
 export function buildAnchorProps(
   href: string | null | undefined,
   isNewTab: boolean,
-): { href: string; target?: '_blank'; rel?: 'noopener noreferrer' } | undefined {
+): { href: string; target?: '_blank'; rel?: 'noopener' | 'noopener noreferrer' } | undefined {
   return href ? { href, ...newTabAnchorAttrs(isNewTab) } : undefined;
 }

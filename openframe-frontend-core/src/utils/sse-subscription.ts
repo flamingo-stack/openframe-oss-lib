@@ -16,11 +16,26 @@
  *     (INCLUDING `: keepalive` comment lines — they reset the timer
  *     before frame parsing drops them) count as life. Silence beyond
  *     `silenceTimeoutMs` (default 45s = 3× keepalive) aborts + reconnects.
- *   - Terminal responses (NO retry): any 4xx except 408/429 — the
- *     `x-block-layer` header, when readable, is logged for attribution
- *     only, never used as a retry gate (proxies may strip it); and
- *     204 → a distinct `no-stream` status (the caller decides when to
- *     try again). Backoff-retry is for transport errors, 408/429, and 5xx.
+ *   - Terminal responses: any 4xx except 408/429 — the `x-block-layer`
+ *     header, when readable, is logged for attribution only, never used
+ *     as a retry gate (proxies may strip it); and 204 → a distinct
+ *     `no-stream` status (the caller decides when to try again).
+ *     Backoff-retry is for transport errors, 408/429, and 5xx.
+ *   - Long-lived streams (`pauseWhenHidden`) never stay terminal, because
+ *     a page a desktop shell keeps open for days would otherwise stay
+ *     dead until reloaded:
+ *       · 401 is retried on a slow timer (30s doubling to 5min, plus
+ *         jitter). The default fetch already refreshed + retried once, so
+ *         this is a session the host could not renew yet — and every
+ *         attempt makes it try again, which rotates a refresh token. So
+ *         visible / focus do NOT shortcut this timer. What does: a new
+ *         credential reported by the host (`EmbedAuthAdapter.subscribe`,
+ *         default fetch only), plus the unconditional reconnect paths
+ *         (`online`, resuming after a suspend, `reconnectNow()`).
+ *       · Any other terminal 4xx is retried on visible / window focus, no
+ *         sooner than 30s after the last connect attempt.
+ *     Finite streams keep the terminal behavior: their monitors have no
+ *     auth adapter to recover with and must reach a final state.
  *
  * THE common SSE client for lib + hosts — exported from the `utils`
  * barrel. Consumers: `TicketLiveProvider` (lib) and the hub's
@@ -31,10 +46,11 @@
  * never-terminating reconnect loop re-opens the finished stream.
  */
 
-import { embedAuthedFetch } from './embed-authed-fetch';
+import { embedAuthedFetch, subscribeEmbedCredentialChange } from './embed-authed-fetch';
 
 /** Transport-level status. `suspended` = paused by `pauseWhenHidden`
- *  after the hidden grace elapsed (resumes automatically on visible). */
+ *  after the hidden grace elapsed (resumes automatically on visible).
+ *  `terminal` is final only without `pauseWhenHidden`. */
 export type SseTransportStatus =
   'connecting' | 'open' | 'reconnecting' | 'no-stream' | 'terminal' | 'suspended' | 'closed';
 
@@ -64,10 +80,11 @@ export interface SseSubscriptionOptions {
   /**
    * Pause the subscription while the tab is hidden (45s grace so
    * Cmd-Tab thrash doesn't churn connections), resume + reconnect on
-   * visible, and reconnect on `online`. OPT-IN — short-lived streams
-   * (workflow/invocation monitors) must keep running in background
-   * tabs. Long-lived per-user streams should enable it (scale relief:
-   * a hidden tab holds no server invocation).
+   * visible, and reconnect on `online`. Also makes the stream
+   * self-healing after a 401 or terminal 4xx (see the module header).
+   * OPT-IN — short-lived streams (workflow/invocation monitors) must
+   * keep running in background tabs. Long-lived per-user streams should
+   * enable it (scale relief: a hidden tab holds no server invocation).
    */
   pauseWhenHidden?: boolean;
   /** Silence threshold before the connection is presumed dead. MUST be
@@ -82,7 +99,8 @@ export interface SseSubscription {
   /** Permanently stop — no further reconnects, no callbacks. */
   close: () => void;
   /** Drop the current connection (if any) and reconnect immediately,
-   *  resetting backoff. No-op after `close()`. */
+   *  resetting the transport backoff (a 401 backoff carries over until a
+   *  successful open). No-op after `close()`. */
   reconnectNow: () => void;
 }
 
@@ -102,6 +120,13 @@ const SERVER_RETRY_GRACE_MS = 90_000;
 const FAILED_RECONNECT_DELAY_MS = 30_000;
 /** Grace before a hidden tab's subscription is suspended. */
 const HIDDEN_GRACE_MS = 45_000;
+/** 401 retry backoff for long-lived streams — slow on purpose, see the
+ *  module header. */
+const AUTH_RETRY_INITIAL_MS = 30_000;
+const AUTH_RETRY_MAX_MS = 300_000;
+/** Minimum time since the last connect attempt before a presence signal
+ *  retries a terminal stream — focus can fire many times a minute. */
+const PRESENCE_RETRY_MIN_INTERVAL_MS = 30_000;
 
 export function createSseSubscription(options: SseSubscriptionOptions): SseSubscription {
   const {
@@ -119,6 +144,18 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
   let closed = false;
   let suspended = false;
   let attempt = 0;
+  let authAttempt = 0;
+  /** Stopped on a terminal response — what a presence signal retries.
+   *  Cleared by every connect(). */
+  let stalled = false;
+  /** A 401 retry timer is pending — the only state a host credential change
+   *  acts on, so routine rotations never tear down a live stream. Cleared by
+   *  every connect(): a change reported while a request is in flight is
+   *  indistinguishable from the default fetch's own refresh, so it is not
+   *  acted on (a 401 that follows waits for the next backoff step) — acting
+   *  on it would let a 401 → refresh → notify cycle loop. */
+  let awaitingAuth = false;
+  let lastConnectAt = 0;
   /** Connection generation — bumped by each connect() and by
    *  reconnectNow(). A stale loop (aborted, still unwinding) compares
    *  its captured generation before scheduling a reconnect, so an
@@ -223,7 +260,8 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     confirmTimerId = clearLifecycleTimer(confirmTimerId);
     serverGraceTimerId = clearLifecycleTimer(serverGraceTimerId);
     failedDelayTimerId = clearLifecycleTimer(failedDelayTimerId);
-    hiddenGraceTimerId = clearLifecycleTimer(hiddenGraceTimerId);
+    // NOT the hidden-grace timer: it tracks the page's visibility, not this
+    // connection, and a reconnect while hidden must still suspend on time.
   };
 
   const armSilenceTimer = () => {
@@ -235,16 +273,29 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     }, silenceTimeoutMs);
   };
 
-  const scheduleReconnect = () => {
+  /** `delayMs` overrides the transport backoff (auth-failure pacing). */
+  const scheduleReconnect = (delayMs?: number) => {
     if (closed || suspended || retryTimerId) return;
-    setStatus('reconnecting');
-    const backoff = Math.min(maxBackoffMs, initialBackoffMs * 2 ** attempt);
+    if (failedDelayTimerId) {
+      // A server `reconnect_failed` already scheduled the next attempt at the
+      // no-stampede delay. A transport retry here would jump that queue, and
+      // the pending timer would then abort the connection it opened.
+      setStatus('reconnecting');
+      return;
+    }
+    let backoff = delayMs;
+    if (backoff === undefined) {
+      backoff = Math.min(maxBackoffMs, initialBackoffMs * 2 ** attempt);
+      attempt += 1;
+    }
     const jitter = backoff * 0.25 * Math.random();
-    attempt += 1;
     retryTimerId = setTimeout(() => {
       retryTimerId = null;
       void connect();
     }, backoff + jitter);
+    // After arming: a status callback that calls reconnectNow() must find
+    // the timer to clear, or it would later fire behind a live stream.
+    setStatus('reconnecting');
   };
 
   const parseFrame = (rawFrame: string) => {
@@ -285,6 +336,9 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
   async function connect(): Promise<void> {
     if (closed || suspended) return;
     const gen = ++generation;
+    stalled = false;
+    awaitingAuth = false;
+    lastConnectAt = Date.now();
     setStatus('connecting');
     abortController = new AbortController();
 
@@ -316,12 +370,23 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
         scheduleReconnect();
         return;
       }
-      // Terminal 4xx. x-block-layer (proxy surface block) is logged for
-      // attribution when readable — never gates the decision.
+      // x-block-layer (proxy surface block) is logged for attribution
+      // when readable — never gates the decision.
       const blockLayer = response.headers.get('x-block-layer');
+      const blockNote = blockLayer ? ` (x-block-layer: ${blockLayer})` : '';
+      if (response.status === 401 && pauseWhenHidden) {
+        const delayMs = Math.min(AUTH_RETRY_MAX_MS, AUTH_RETRY_INITIAL_MS * 2 ** authAttempt);
+        authAttempt += 1;
+        console.warn(`[sse-subscription] 401 for ${url}${blockNote} — retrying in ~${Math.round(delayMs / 1000)}s`);
+        awaitingAuth = true;
+        scheduleReconnect(delayMs);
+        return;
+      }
       console.warn(
-        `[sse-subscription] terminal ${response.status} for ${url}${blockLayer ? ` (x-block-layer: ${blockLayer})` : ''} — not retrying`,
+        `[sse-subscription] terminal ${response.status} for ${url}${blockNote} — ${pauseWhenHidden ? 'retrying on presence' : 'not retrying'}`,
       );
+      // Before the status callback, which may re-enter via reconnectNow().
+      stalled = pauseWhenHidden;
       setStatus('terminal');
       return;
     }
@@ -332,6 +397,7 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
 
     // Successful open — reset backoff, start liveness accounting.
     attempt = 0;
+    authAttempt = 0;
     setStatus('open');
     armSilenceTimer();
     // Transport open ≠ connected: require the server's `subscribed`
@@ -418,6 +484,12 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     abortController?.abort();
     setStatus('suspended');
   };
+  /** A person is back at the page: the moment a fixed backend or a
+   *  restored permission can be noticed without a reload. */
+  const retryIfStalled = () => {
+    if (!stalled || Date.now() - lastConnectAt < PRESENCE_RETRY_MIN_INTERVAL_MS) return;
+    doReconnect();
+  };
   const onVisibilityChange = () => {
     if (document.visibilityState === 'hidden') {
       if (!hiddenGraceTimerId) {
@@ -435,15 +507,27 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
     if (suspended) {
       suspended = false;
       void connect();
+      return;
     }
+    retryIfStalled();
   };
   const onOnline = () => {
     if (!suspended) doReconnect();
   };
+  // Only requests that carry the adapter's credentials can be rescued by a
+  // new one, and only long-lived streams ever wait out a 401. Subscribed
+  // before the DOM listeners, so a throwing host adapter leaks none of them.
+  const unsubscribeCredentials =
+    pauseWhenHidden && fetchImpl === embedAuthedFetch
+      ? subscribeEmbedCredentialChange(() => {
+          if (awaitingAuth) doReconnect();
+        })
+      : null;
   const listenersActive = pauseWhenHidden && typeof document !== 'undefined' && typeof window !== 'undefined';
   if (listenersActive) {
     document.addEventListener('visibilitychange', onVisibilityChange);
     window.addEventListener('online', onOnline);
+    window.addEventListener('focus', retryIfStalled);
   }
 
   void connect();
@@ -454,11 +538,14 @@ export function createSseSubscription(options: SseSubscriptionOptions): SseSubsc
       closed = true;
       generation += 1;
       clearTimers();
+      hiddenGraceTimerId = clearLifecycleTimer(hiddenGraceTimerId);
       abortController?.abort();
       if (listenersActive) {
         document.removeEventListener('visibilitychange', onVisibilityChange);
         window.removeEventListener('online', onOnline);
+        window.removeEventListener('focus', retryIfStalled);
       }
+      unsubscribeCredentials?.();
       setConnected(false);
       onStatusChange?.('closed');
     },

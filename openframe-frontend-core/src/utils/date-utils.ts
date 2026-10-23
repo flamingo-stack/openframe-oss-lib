@@ -1,11 +1,26 @@
 /**
  * Unified Date Utilities for OpenMSP Platform
- * Provides consistent date formatting across all components
+ *
+ * Relative-time logic lives here; every ABSOLUTE date or time these helpers
+ * print is rendered by `formatDateWithTimezone` in `./format`, with the zone
+ * stated explicitly — never by a local `toLocale*` call or hand-built string.
  */
+
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from './format';
+
+/** `mediumDateTime`'s fields, spread so a caller's own options still override. */
+const ZONED_DATE_FIELDS_MEDIUM_DATETIME: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+};
 
 /**
  * Relative display label for a ticket timestamp (ISO string).
- * < 1 min → "Just now" | 1-59 min → "X min ago" | 1-23 h → "X hour(s) ago" | 24+ h → "MM/DD/YYYY"
+ * < 1 min → "Just now" | 1-59 min → "X min ago" | 1-23 h → "X hour(s) ago" | 24+ h → the
+ * calendar day as the viewer writes it (`03/20/2026` in en-US, `20/03/2026` in en-AU).
  */
 export function formatTicketRelativeTime(iso: string): string {
   const now = new Date();
@@ -17,30 +32,25 @@ export function formatTicketRelativeTime(iso: string): string {
   if (diffMin < 60) return `${diffMin} min ago`;
   const diffHours = Math.floor(diffMin / 60);
   if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
-  // UTC getters so the MM/DD/YYYY tail is identical on server (UTC) and client
-  // (local) — otherwise React #418 hydration mismatch.
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  const yyyy = date.getUTCFullYear();
-  return `${mm}/${dd}/${yyyy}`;
+  // The label already depends on the viewer's clock (`now`), so it is client-only
+  // by nature: the day is theirs too, in their zone and locale.
+  return formatDateWithTimezone(date, VIEWER_TIMEZONE, 'numeric', { viewerLocale: true });
 }
 
 /**
- * Full tooltip timestamp in "MM/DD/YYYY, H:MM AM/PM" format.
+ * Full tooltip timestamp for a ticket — the numeric date and the clock in the
+ * viewer's own zone and locale (`03/20/2026, 1:05 PM` in en-US,
+ * `20/03/2026, 13:05` in en-AU). A ticket's "created at" is read by the person
+ * looking at it, not by a server, so it is not UTC-pinned like content dates.
+ * The locale's own 12/24-hour convention applies — no `hour12` is forced.
  */
 export function formatTicketFullTimestamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  // UTC getters so the tooltip timestamp is identical on server (UTC) and
-  // client (local) — otherwise React #418 hydration mismatch.
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  const yyyy = date.getUTCFullYear();
-  let hours = date.getUTCHours();
-  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12 || 12;
-  return `${mm}/${dd}/${yyyy}, ${hours}:${minutes} ${ampm}`;
+  return formatDateWithTimezone(
+    iso,
+    VIEWER_TIMEZONE,
+    { year: 'numeric', month: '2-digit', day: '2-digit', hour: 'numeric', minute: '2-digit' },
+    { viewerLocale: true },
+  );
 }
 
 /**
@@ -55,7 +65,14 @@ export function formatTicketFullTimestamp(iso: string): string {
  * formatRelativeTime(new Date()) // 'Just now'
  */
 export function formatRelativeTime(timestamp: string | Date): string {
-  const now = new Date();
+  return formatRelativeTimeFrom(timestamp, new Date());
+}
+
+/**
+ * {@link formatRelativeTime} against a given "now": for a view that renders
+ * with a fixed clock (a product screen fed by a fixture, a test).
+ */
+export function formatRelativeTimeFrom(timestamp: string | Date, now: Date): string {
   const targetTime = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
 
   // Validate the date
@@ -95,11 +112,10 @@ export function formatRelativeTime(timestamp: string | Date): string {
   // Older than 30 days - show formatted date, pinned to UTC so SSR (UTC) and
   // the client agree (React #418). Year comparison also uses UTC for the same
   // reason (avoids a server/client split right at a year boundary).
-  return targetTime.toLocaleDateString('en-US', {
+  return formatDateWithTimezone(targetTime, null, {
     month: 'short',
     day: 'numeric',
     year: targetTime.getUTCFullYear() !== now.getUTCFullYear() ? 'numeric' : undefined,
-    timeZone: 'UTC',
   });
 }
 
@@ -118,17 +134,13 @@ export function formatAbsoluteDate(timestamp: string | Date, options: Intl.DateT
     return 'Invalid date';
   }
 
-  const defaultOptions: Intl.DateTimeFormatOptions = {
+  // UTC unless the caller names a zone; `options.timeZone` is passed as THE zone.
+  return formatDateWithTimezone(targetTime, options.timeZone ?? null, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
-    // Pin to UTC so SSR (Vercel = UTC) and the client agree (React #418).
-    // Caller can override via `options`.
-    timeZone: 'UTC',
     ...options,
-  };
-
-  return targetTime.toLocaleDateString('en-US', defaultOptions);
+  });
 }
 
 /**
@@ -146,19 +158,10 @@ export function formatDateTime(timestamp: string | Date, options: Intl.DateTimeF
     return 'Invalid date';
   }
 
-  const defaultOptions: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    // Pin to UTC so SSR (Vercel = UTC) and the client agree (React #418).
-    // Caller can override via `options`.
-    timeZone: 'UTC',
+  return formatDateWithTimezone(targetTime, options.timeZone ?? null, {
+    ...ZONED_DATE_FIELDS_MEDIUM_DATETIME,
     ...options,
-  };
-
-  return targetTime.toLocaleDateString('en-US', defaultOptions);
+  });
 }
 
 /**

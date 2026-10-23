@@ -3,12 +3,14 @@
  */
 
 import type { ComponentType, HTMLAttributes, ReactNode, TextareaHTMLAttributes } from 'react';
+import type { AvatarStackPerson } from '../../ui/avatar-stack';
 import type { ChatRef } from '../chat-ref.types';
 import type { MspOrganizationCardProps } from '../msp-organization-card';
 import type {
   ApprovalBlockVariant,
   AssistantType,
   AuthorType,
+  ChatAppearance,
   ChatApprovalStatus,
   ConnectionStatus,
 } from './chat.types';
@@ -136,11 +138,21 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
   name?: string;
   assistantType?: AssistantType;
   authorType?: AuthorType;
+  /** Whose words are the viewer's own, for a thread where two kinds of people
+   *  write (`ChatMessageList.selfAuthorType`). Omit and every `user` turn is
+   *  the viewer's own. */
+  selfAuthorType?: AuthorType;
+  /** Write the speaker's name on the agent's turn and the viewer's own bubble
+   *  too (`ChatMessageList.nameEveryTurn`). Default false. */
+  nameEveryTurn?: boolean;
   /** Viewer variant for approval blocks in this message's segments.
    *  `'admin'` (default) = full command block; `'client'` = end-client
    *  (Fae desktop app) title-only card. Forwarded to
    *  ApprovalRequestMessage / ApprovalBatchMessage. */
   approvalVariant?: ApprovalBlockVariant;
+  /** Visual generation of the row. Omit to inherit the thread's
+   *  (`ChatMessageList.appearance`); `classic` outside a list. */
+  appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
   avatar?: string | null;
   timestamp?: Date;
@@ -196,6 +208,20 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
    */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
   /**
+   * References this answer's metadata described, used to expand the
+   * `[card://type:id]` markers in its body.
+   *
+   * A marker on the wire carries only a type and an id, so without these a card
+   * has to be hydrated by id through a per-entity API — which the host may not
+   * have for entities that live on another platform. Supplying the reference
+   * here is what lets such a card render with a real title and link instead of
+   * falling back to its raw id.
+   *
+   * Presence is NOT a render list: only markers actually written into the body
+   * render, and the metadata routinely describes more than the model cited.
+   */
+  refs?: ChatRef[];
+  /**
    * Host-provided anchor component for markdown links. When supplied, the
    * `<a>` override in the markdown renderer delegates to this component
    * so the host's unified click rule (e.g. `useNavLink`) owns routing
@@ -234,8 +260,18 @@ export interface ChatMessageEnhancedProps extends Omit<HTMLAttributes<HTMLDivEle
 export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   messages: Message[];
   dialogId?: string;
+  /** The thread is still loading: the list draws its own loading state. Inside a `LoadingScope` it does so whatever
+   *  this says. */
   isLoading?: boolean;
+  /** The reader's limit: how many messages the host reads for the thread, so the loading state draws exactly that
+   *  many rows. Default `CHAT_MESSAGE_LIST_SKELETON_MESSAGES` (a typical thread, for a host that reads with no limit). */
+  pageSize?: number;
+  /** The loading state top-anchors its rows and clips them, so a fixed-height host box reads as "the whole panel is
+   *  loading" and never grows a scrollbar. Default `false` (rows bottom-anchored like the loaded thread). */
+  fill?: boolean;
   isTyping?: boolean;
+  /** The line shown beside the pending-turn loader: what the turn is doing right
+   *  now ("Searching 28 sources"). Omitted, the loader cycles its generic phrases. */
   typingMessage?: string;
   smoothScroll?: boolean;
   autoScroll?: boolean;
@@ -274,6 +310,21 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
    *  `'client'` ONLY on true end-client surfaces — admin views of a Fae
    *  dialog (tickets dialog client tab) keep the default. */
   approvalVariant?: ApprovalBlockVariant;
+  /** The `authorType` whose turns are the viewer's own: a bubble on the right.
+   *  Every other person's turn (a `user` row of another author type) reads as
+   *  an incoming reply, with their face and name. Omit where every `user` row
+   *  is the viewer's (Mingo: the admin's own turns arrive as `admin`); the Fae
+   *  client passes `'user'`, so a technician (`admin`) answers from the left. */
+  selfAuthorType?: AuthorType;
+  /** Write the speaker's name on every turn: the agent's and the viewer's own
+   *  bubbles too, not only another person's. For a thread of several parties
+   *  — a ticket, where the end user, the agent and any number of technicians
+   *  (all `admin`) write — so who said what is information. Default false: a
+   *  two-party thread (Mingo, the Fae client) is told apart by its faces. */
+  nameEveryTurn?: boolean;
+  /** Visual generation of the whole thread, blocks included. Default
+   *  `classic`; the Fae client passes `v2`. See `ChatAppearance`. */
+  appearance?: ChatAppearance;
   assistantIcon?: ReactNode;
   pendingApprovals?: MessageSegment[];
   onApprove?: ApprovalResolutionHandler;
@@ -296,6 +347,19 @@ export interface ChatMessageListProps extends HTMLAttributes<HTMLDivElement> {
   /** Host-provided renderer for inline entity cards. Forwarded verbatim
    *  to every message's ChatMessageEnhanced. v6.1 §B.2.7. */
   renderEntityCard?: (reference: ChatRef) => ReactNode;
+  /**
+   * Content owned by ONE message, rendered directly beneath it.
+   *
+   * For anything whose subject is that specific answer rather than the thread —
+   * the source chips a Guide answer cites, today. Rendering such content once at
+   * the bottom of the thread instead is a quiet lie in a multi-answer
+   * conversation: it attributes the newest answer's sources to whichever answer
+   * the reader is actually looking at.
+   *
+   * Return `null` for messages that own nothing. Hidden and pending-placeholder
+   * messages never reach it — they do not render at all.
+   */
+  renderAfterMessage?: (message: Message, index: number) => ReactNode;
   /** Host-provided anchor for markdown links. Forwarded verbatim to every
    *  message's ChatMessageEnhanced. Owns the unified click rule
    *  (same-origin soft nav, cross-origin new tab). */
@@ -415,7 +479,19 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
   onSend?: (message: string) => void | boolean | Promise<boolean | void>;
   onStop?: () => void | Promise<void>;
   sending?: boolean;
+  /** Replaces the editor with the hand-off bar: the conversation is with the
+   *  technicians now, and the client waits for one of them to reply. */
   awaitingResponse?: boolean;
+  /** Faces shown in the v2 hand-off bar (the tenant's technicians). Omit or
+   *  pass an empty list for a text-only bar. */
+  awaitingTeam?: AvatarStackPerson[];
+  /** Size of the whole team when `awaitingTeam` is only a sample of it: the
+   *  bar shows those faces and "+N" for the rest. */
+  awaitingTeamCount?: number;
+  /** `v2`: the fae chat v2 hand-off bar ("Handed off to your technical
+   *  support team" + faces). `classic` (default): "Waiting for Technician
+   *  Response". Only the awaiting state differs. */
+  appearance?: ChatAppearance;
   /** Same `fullWidth` semantics as `ChatHeaderProps.fullWidth` — drops
    *  the default `max-w-ods-content-narrow` so the input fills the
    *  parent. */
@@ -426,6 +502,13 @@ export interface ChatInputProps extends Omit<TextareaHTMLAttributes<HTMLTextArea
    */
   reserveAvatarOffset?: boolean;
   disabled?: boolean;
+  /**
+   * Placeholder shown while `disabled`, in the prompt's place — what the user
+   * cannot do right now. Defaults to the connection-lost copy, which is what
+   * `disabled` has meant so far (the ticket reply composer); a host that
+   * disables the input for another reason says so here.
+   */
+  disabledPlaceholder?: string;
   maxRows?: number;
   showSendButton?: boolean;
   sendButtonLabel?: string;
@@ -595,6 +678,9 @@ export interface AskDisplayProps extends Omit<HTMLAttributes<HTMLDivElement>, 'o
 // ========== Model Display Props ==========
 
 export interface ModelDisplayProps extends HTMLAttributes<HTMLDivElement> {
+  /** The model metadata is still loading: the row draws its own skeleton (with the "tokens used" tail when
+   *  `contextWindow` is known). Inside a `LoadingScope` it does so whatever this says. */
+  loading?: boolean;
   provider?: string;
   modelName?: string;
   displayName?: string;
@@ -658,6 +744,10 @@ export interface DialogItem {
     /** Absolute avatar URL; falls back to initials when absent or failing. */
     avatarUrl?: string | null;
   };
+  /** The conversation is archived - read-only until restored. Read off
+   *  `UnifiedChatState.activeDialog`, the host's own record of the open
+   *  conversation; rows of the active list never carry it. */
+  archived?: boolean;
 }
 
 // ========== Chat Sidebar Props ==========
@@ -674,6 +764,9 @@ export interface ChatSidebarProps extends HTMLAttributes<HTMLDivElement> {
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   onLoadMore?: () => void;
+  /** The host's page size: how many skeleton rows the first load (and the next page) draws. Default
+   *  `CHAT_HISTORY_PAGE_SIZE`. */
+  pageSize?: number;
 }
 
 // ========== Dialog List Item Props ==========
@@ -682,4 +775,7 @@ export interface DialogListItemProps extends HTMLAttributes<HTMLDivElement> {
   dialog: DialogItem;
   isActive?: boolean;
   onDialogSelect?: (dialogId: string) => void;
+  /** The dialog is still being read: the row draws its skeleton (as it does in a loading scope), carrying the row's
+   *  `data-*` markers. */
+  loading?: boolean;
 }

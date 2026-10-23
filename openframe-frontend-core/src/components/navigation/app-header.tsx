@@ -5,10 +5,15 @@ import { useMdUp } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
 import { useOptionalNotifications } from '../features/notifications/notifications-context';
 import { TimeTrackerHeaderButton } from '../features/time-tracker';
-import { LogOutIcon, OpenFrameLogo, OpenFrameText, UserIcon } from '../icons';
 import { Menu01Icon, SearchIcon, XmarkIcon } from '../icons-v2-generated';
 import { BellIcon } from '../icons-v2-generated/interface/bell-icon';
+import { LogOutIcon } from '../icons-v2-generated/interface/log-out-icon';
+import { OpenframeLogoIcon } from '../icons-v2-generated/logos/openframe-logo-icon';
+import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-icon';
+import { UserClassicIcon } from '../icons-v2-generated/users/user-classic-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
+import { useLoadingScope } from '../ui/loading-scope';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
 import { HeaderMingoButton } from './header-mingo-button';
@@ -47,6 +52,10 @@ export interface AppHeaderProps {
   onMingoAI?: () => void;
   /** Whether the Mingo drawer is currently open (visually pressed state). */
   isMingoAIActive?: boolean;
+  /** Swap the Mingo logo for a close "X" while active, beside the wordmark
+   *  too (icon-only mode always does). For a panel the button both opens and
+   *  closes. */
+  mingoAICloseWhenActive?: boolean;
   // User block
   showUser?: boolean;
   userName?: string;
@@ -131,6 +140,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   showMingoAI = false,
   onMingoAI,
   isMingoAIActive = false,
+  mingoAICloseWhenActive = false,
   showUser,
   userName,
   userEmail,
@@ -141,12 +151,13 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   isMobileMenuOpen,
   onToggleMobileMenu,
   disabled = false,
-  loading = false,
+  loading: loadingProp = false,
   loadingActionCells,
 }: AppHeaderProps) {
   const isMdUp = useMdUp() ?? false;
+  const loading = useLoadingScope() || loadingProp;
 
-  // After the only hook above, so the hook order is identical in both branches.
+  // After the only hooks above, so the hook order is identical in both branches.
   if (loading) {
     return (
       <AppHeaderSkeleton
@@ -197,12 +208,12 @@ export const AppHeader = React.memo(function AppHeaderImpl({
       logo={
         !isMdUp && (
           <>
-            <OpenFrameLogo
+            <OpenframeLogoIcon
+              secondaryColor="var(--color-accent-primary)"
               className="h-6 w-6 shrink-0"
-              upperPathColor="var(--color-text-primary)"
-              lowerPathColor="var(--color-accent-primary)"
+              color="var(--color-text-primary)"
             />
-            <OpenFrameText textColor="var(--color-text-primary)" className="h-4" />
+            <OpenframeTextIcon color="var(--color-text-primary)" className="h-4 w-[87px]" />
           </>
         )
       }
@@ -303,7 +314,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
                   className="cursor-pointer rounded-none border-b border-ods-border bg-ods-card px-3 py-3 hover:bg-ods-card/80 focus:bg-ods-card/80"
                 >
                   <div className="flex items-center gap-2">
-                    <UserIcon className="h-6 w-6 shrink-0 text-ods-text-primary" />
+                    <UserClassicIcon className="h-6 w-6 shrink-0 text-ods-text-primary" />
                     <span className="text-ods-text-primary text-h4">Profile Settings</span>
                   </div>
                 </DropdownMenuItem>
@@ -327,6 +338,7 @@ export const AppHeader = React.memo(function AppHeaderImpl({
             <HeaderMingoButton
               onClick={onMingoAI}
               isActive={isMingoAIActive}
+              closeWhenActive={mingoAICloseWhenActive}
               iconOnly={!isMdUp}
               disabled={disabled || !onMingoAI}
               className={cn(cellDivider, dimmedClass)}
@@ -378,7 +390,7 @@ const CELL_VISIBILITY: Record<Exclude<HeaderLoadingCell, 'wide'>, string | undef
 function HeaderCellSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn('flex h-full w-14 shrink-0 items-center justify-center border-l border-ods-border', className)}>
-      <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+      <UnifiedSkeleton className="h-6 w-6 rounded" />
     </div>
   );
 }
@@ -394,8 +406,8 @@ function HeaderCellSkeleton({ className }: { className?: string }) {
 function HeaderWideCellSkeleton() {
   return (
     <div className="flex h-full w-14 shrink-0 items-center justify-center gap-2 border-l border-ods-border md:w-[140px] md:px-4">
-      <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
-      <div className="hidden h-5 animate-pulse rounded bg-ods-border md:block md:w-[72px]" />
+      <UnifiedSkeleton className="h-6 w-6 shrink-0 rounded" />
+      <UnifiedSkeleton className="hidden h-5 rounded md:block md:w-[72px]" />
     </div>
   );
 }
@@ -429,13 +441,13 @@ function AppHeaderSkeleton({
       leading={
         // Burger cell: mobile only, in CSS.
         <div className="flex h-full w-14 shrink-0 items-center justify-center border-r border-ods-border md:hidden">
-          <div className="h-6 w-6 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-6 w-6 rounded" />
         </div>
       }
       logo={
         <>
-          <div className="h-6 w-6 shrink-0 animate-pulse rounded bg-ods-border" />
-          <div className="h-4 w-24 animate-pulse rounded bg-ods-border" />
+          <UnifiedSkeleton className="h-6 w-6 shrink-0 rounded" />
+          <UnifiedSkeleton className="h-4 w-24 rounded" />
         </>
       }
       // `md:hidden` belongs on the WRAPPER, not the placeholder inside it:
@@ -446,7 +458,7 @@ function AppHeaderSkeleton({
       // it back on handoff, which is the exact jump this branch removes.
       logoClassName="gap-2 md:hidden"
       // `TopNavigation` already hides the center zone below `centerBreakpoint`.
-      center={showSearch ? <div className="h-10 w-full animate-pulse rounded-md bg-ods-border" /> : undefined}
+      center={showSearch ? <UnifiedSkeleton className="h-10 w-full rounded-md" /> : undefined}
       sideActions={
         <>
           {/* Mobile-only search trigger; from md the search lives in the center zone. */}

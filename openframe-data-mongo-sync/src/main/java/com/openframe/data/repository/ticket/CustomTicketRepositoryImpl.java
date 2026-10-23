@@ -1,7 +1,6 @@
 package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.ticket.filter.TicketActivityCriteria;
 import com.openframe.data.document.ticket.filter.TicketActivityFilter;
@@ -32,6 +31,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
+import static org.springframework.util.StringUtils.hasText;
+
 @Slf4j
 @ConditionalOnProperty(name = "openframe.tenant-isolation.enabled", havingValue = "true")
 public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport implements CustomTicketRepository {
@@ -41,7 +42,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String DEFAULT_SORT_FIELD = "_id";
     private static final String AND_OPERATOR = "$and";
 
-    private static final String FIELD_STATUS = "status";
     private static final String FIELD_STATUS_ID = "statusId";
     private static final String FIELD_STATUS_KIND = "statusKind";
     private static final String FIELD_TICKET_NUMBER = "ticketNumber";
@@ -61,6 +61,8 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final String FIELD_LAST_ACTIVITY_AT = "lastActivityAt";
     private static final String FIELD_AWAITING_CLIENT_SINCE = "awaitingClientSince";
 
+    private static final String CASE_INSENSITIVE = "i";
+
     private static final String AGG_COUNT = "count";
     private static final String AGG_RESOLUTION_TIME = "resolutionTime";
     private static final String AGG_AVG_RESOLUTION_TIME = "avgResolutionTime";
@@ -68,7 +70,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private static final List<String> SORTABLE_FIELDS = List.of(
             ID_FIELD,
             FIELD_TICKET_NUMBER,
-            FIELD_STATUS,
             FIELD_STATUS_KIND,
             FIELD_ORGANIZATION_NAME,
             FIELD_ASSIGNED_NAME,
@@ -90,7 +91,7 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         Query query = new Query();
 
         if (filter != null) {
-            addCriteriaIfNotEmpty(query, FIELD_STATUS, filter.getStatuses());
+            addCriteriaIfNotEmpty(query, FIELD_TICKET_NUMBER, filter.getTicketNumbers());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_ID, filter.getStatusIds());
             addCriteriaIfNotEmpty(query, FIELD_STATUS_KIND, filter.getStatusKinds());
             addCriteriaIfNotEmpty(query, FIELD_ORGANIZATION_ID, filter.getOrganizationIds());
@@ -118,17 +119,46 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     }
 
     private void applySearchCriteria(Query query, String search) {
-        if (search == null || search.trim().isEmpty()) {
+        if (!hasText(search)) {
             return;
         }
-        String searchTrimmed = Pattern.quote(search.trim());
-        Criteria searchCriteria = new Criteria().orOperator(
-                Criteria.where(FIELD_TITLE).regex(searchTrimmed, "i"),
-                Criteria.where(FIELD_DEVICE_HOSTNAME).regex(searchTrimmed, "i"),
-                Criteria.where(FIELD_ORGANIZATION_NAME).regex(searchTrimmed, "i"),
-                Criteria.where(FIELD_ASSIGNED_NAME).regex(searchTrimmed, "i")
-        );
+        String searchTrimmed = search.trim();
+        List<Criteria> alternatives = buildTextAlternatives(searchTrimmed);
+        Optional<Integer> ticketNumber = parseTicketNumber(searchTrimmed);
+        ticketNumber.map(number -> Criteria.where(FIELD_TICKET_NUMBER).is(number))
+                .ifPresent(alternatives::add);
+
+        Criteria searchCriteria = new Criteria().orOperator(alternatives);
         query.addCriteria(searchCriteria);
+    }
+
+    private List<Criteria> buildTextAlternatives(String searchTrimmed) {
+        String quoted = Pattern.quote(searchTrimmed);
+        List<Criteria> alternatives = new ArrayList<>();
+        alternatives.add(Criteria.where(FIELD_TITLE).regex(quoted, CASE_INSENSITIVE));
+        alternatives.add(Criteria.where(FIELD_DEVICE_HOSTNAME).regex(quoted, CASE_INSENSITIVE));
+        alternatives.add(Criteria.where(FIELD_ORGANIZATION_NAME).regex(quoted, CASE_INSENSITIVE));
+        alternatives.add(Criteria.where(FIELD_ASSIGNED_NAME).regex(quoted, CASE_INSENSITIVE));
+        return alternatives;
+    }
+
+    private Optional<Integer> parseTicketNumber(String searchTrimmed) {
+        if (!hasOnlyDigits(searchTrimmed)) {
+            return Optional.empty();
+        }
+        try {
+            Integer ticketNumber = Integer.valueOf(searchTrimmed);
+            return Optional.of(ticketNumber);
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    private boolean hasOnlyDigits(String value) {
+        if (value.isEmpty()) {
+            return false;
+        }
+        return value.chars().allMatch(Character::isDigit);
     }
 
     private void addCriteriaIfNotEmpty(Query query, String field, List<?> values) {
@@ -287,7 +317,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     private Object getSortFieldValue(Ticket ticket, String sortField) {
         return switch (sortField) {
             case FIELD_TICKET_NUMBER -> ticket.getTicketNumber();
-            case FIELD_STATUS -> ticket.getStatus() != null ? ticket.getStatus().name() : null;
             case FIELD_STATUS_KIND -> ticket.getStatusKind() != null ? ticket.getStatusKind().name() : null;
             case FIELD_ORGANIZATION_NAME -> ticket.getOrganizationName();
             case FIELD_ASSIGNED_NAME -> ticket.getAssignedName();
@@ -304,33 +333,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
     @Override
     public long countTickets(Query query) {
         return mongoTemplate.count(query, Ticket.class);
-    }
-
-    @Override
-    public Map<TicketStatus, Long> countTicketsByStatus() {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(tenantCriteria()),
-                Aggregation.group(FIELD_STATUS).count().as(AGG_COUNT),
-                Aggregation.project(AGG_COUNT).and(ID_FIELD).as(FIELD_STATUS)
-        );
-
-        AggregationResults<Document> results = mongoTemplate.aggregate(
-                aggregation, Ticket.class, Document.class);
-
-        Map<TicketStatus, Long> statusCounts = new EnumMap<>(TicketStatus.class);
-        for (Document doc : results.getMappedResults()) {
-            String statusStr = doc.getString(FIELD_STATUS);
-            if (statusStr != null) {
-                try {
-                    TicketStatus status = TicketStatus.valueOf(statusStr);
-                    statusCounts.put(status, doc.getInteger(AGG_COUNT).longValue());
-                } catch (IllegalArgumentException e) {
-                    log.warn("Unknown ticket status: {}", statusStr);
-                }
-            }
-        }
-
-        return statusCounts;
     }
 
     @Override
@@ -408,19 +410,6 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
         }
 
         return Optional.empty();
-    }
-
-    @Override
-    public int updateStatusBulk(TicketStatus fromStatus, TicketStatus toStatus) {
-        Query query = new Query(Criteria.where(FIELD_STATUS).is(fromStatus));
-        Update update = new Update()
-                .set(FIELD_STATUS, toStatus)
-                .set(FIELD_UPDATED_AT, Instant.now());
-
-        long modifiedCount = mongoTemplate.updateMulti(query, update, Ticket.class).getModifiedCount();
-        log.debug("Bulk status update: {} -> {}, modified: {}", fromStatus, toStatus, modifiedCount);
-
-        return (int) modifiedCount;
     }
 
     @Override

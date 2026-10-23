@@ -11,9 +11,18 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.tool.ConnectionStatus;
+import com.openframe.data.document.tool.ToolConnection;
+import com.openframe.data.document.tool.ToolType;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -33,6 +42,48 @@ public class GraphQLDeviceMapper {
                 .tagKeys(input.getTagKeys())
                 .tagValues(input.getTagValues())
                 .build();
+    }
+
+    public DeviceFilterCriteria toDeviceFilterCriteria(DeviceFilterInput input,
+                                                       Collection<PackageManagerType> manageableByPackageManagers) {
+        DeviceFilterCriteria criteria = toDeviceFilterCriteria(input);
+        criteria.setManageableByPackageManagers(manageableByPackageManagers);
+        return criteria;
+    }
+
+    public MachinePackageManagersResponse toPackageManagers(Map<PackageManagerType, PackageManagerState> states) {
+        if (states == null) {
+            return null;
+        }
+        return MachinePackageManagersResponse.builder()
+                .brew(states.get(PackageManagerType.BREW))
+                .winget(states.get(PackageManagerType.WINGET))
+                .choco(states.get(PackageManagerType.CHOCO))
+                .build();
+    }
+
+    public DeviceEnrollmentResponse toEnrollment(Machine machine, List<ToolConnection> toolConnections) {
+        Instant connectedAt = machine.getFirstConnectedAt();
+        Instant inventoryConnectedAt = fleetInventoryConnectedAt(toolConnections);
+        return DeviceEnrollmentResponse.builder()
+                .registeredAt(machine.getRegisteredAt())
+                .connectedAt(connectedAt)
+                .inventoryConnectedAt(inventoryConnectedAt)
+                .ready(connectedAt != null && inventoryConnectedAt != null)
+                .build();
+    }
+
+    private static Instant fleetInventoryConnectedAt(List<ToolConnection> toolConnections) {
+        if (toolConnections == null) {
+            return null;
+        }
+        return toolConnections.stream()
+                .filter(connection -> connection.getToolType() == ToolType.FLEET_MDM)
+                .filter(connection -> connection.getStatus() == ConnectionStatus.CONNECTED)
+                .filter(connection -> StringUtils.isNumeric(connection.getAgentToolId()))
+                .map(ToolConnection::getConnectedAt)
+                .findFirst()
+                .orElse(null);
     }
 
     public CursorPaginationCriteria toCursorPaginationCriteria(ConnectionArgs args) {

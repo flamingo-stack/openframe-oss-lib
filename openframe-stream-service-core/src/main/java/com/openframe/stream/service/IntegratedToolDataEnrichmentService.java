@@ -40,29 +40,40 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
 
         enrichFromTenant(message, enriched);
         enrichFromMachine(message, enriched);
+        enriched.setUserId(message.getUserId());
         return enriched;
     }
 
     private void enrichFromMachine(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
-        String agentId = message.getAgentId();
-        if (agentId == null) {
-            return;
-        }
-        CachedMachineInfo machine = findMachine(message, enriched, agentId);
+        CachedMachineInfo machine = resolveMachine(message, enriched);
         if (machine == null) {
-            log.warn("Machine ID not found for agent: {}", agentId);
             return;
         }
         enriched.setMachineId(machine.getMachineId());
         enriched.setHostname(machine.getHostname());
+        enriched.setNickname(machine.getNickname());
 
         CachedOrganizationInfo organization = machineIdCacheService.getOrganization(machine.getOrganizationId());
         log.debug("Found machine ID {} for agent {} (organization {})",
-                machine.getMachineId(), agentId, machine.getOrganizationId());
+                machine.getMachineId(), message.getAgentId(), machine.getOrganizationId());
         if (organization != null) {
             enriched.setOrganizationId(organization.getOrganizationId());
             enriched.setOrganizationName(organization.getName());
         }
+    }
+
+    private CachedMachineInfo resolveMachine(DeserializedDebeziumMessage message, IntegratedToolEnrichedData enriched) {
+        String agentId = message.getAgentId();
+        CachedMachineInfo byAgent = agentId == null ? null : findMachine(message, enriched, agentId);
+        if (byAgent != null) {
+            return byAgent;
+        }
+        String machineId = message.getMachineId();
+        CachedMachineInfo byMachineId = machineId == null ? null : machineIdCacheService.getMachineByMachineId(machineId);
+        if (byMachineId == null && agentId != null) {
+            log.warn("Machine ID not found for agent: {}", agentId);
+        }
+        return byMachineId;
     }
 
     // Numeric agent ids (Fleet host ids, Tactical agent ids) are only unique per tenant per tool,
@@ -90,6 +101,8 @@ public class IntegratedToolDataEnrichmentService implements DataEnrichmentServic
             case FLEET -> ToolType.FLEET_MDM;
             case MESHCENTRAL -> ToolType.MESHCENTRAL;
             case RMM -> ToolType.OPENFRAME_RMM;
+            // Directory events (pre-enriched, no agent machine) — no machine-cache tool scope.
+            case MICROSOFT_365, GOOGLE_WORKSPACE -> null;
         };
     }
 

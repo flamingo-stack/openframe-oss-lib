@@ -9,11 +9,13 @@ import {
   ChatRuntimeContext,
   EndpointsRuntimeContext,
 } from '@flamingo-stack/openframe-frontend-core/contexts'
+import { AgentIdentityProvider } from '@flamingo-stack/openframe-frontend-core/components'
 import { ChatIdentityProvider } from '@flamingo-stack/openframe-frontend-core/components/chat'
 import { RichMarkdownRuntimeProvider } from '@flamingo-stack/openframe-frontend-core/components/embeds'
 import { TicketLiveProvider } from '@flamingo-stack/openframe-frontend-core/components/tickets'
 import { buildChatRuntime, buildEndpointsRuntime } from './content-runtime'
 import { EP } from '../config/endpoints'
+import { AssistantRuntimeProvider } from './assistant-identity'
 
 const queryClient = new QueryClient()
 
@@ -45,7 +47,15 @@ export function AppProviders({ children }: { children: ReactNode }) {
                   TicketAlertsButton AND the /tickets page. Mounted inside
                   ChatIdentityProvider (streams only for authed identities)
                   and the runtime contexts (reads endpoints). */}
-              <TicketLiveProvider>{children}</TicketLiveProvider>
+              {/* The assistant's identity (server-read) and this embed's chat
+                  opener, for the lib's "ask" surfaces (the FAQ's card). */}
+              {/* The AI agents' pictures, read from the server (EP.aiAgents): every
+                  mark of Fae or Mingo the lib draws is the icon its identity holds. */}
+              <AgentIdentityProvider endpoint={EP.aiAgents}>
+                <AssistantRuntimeProvider>
+                  <TicketLiveProvider>{children}</TicketLiveProvider>
+                </AssistantRuntimeProvider>
+              </AgentIdentityProvider>
             </RichMarkdownRuntimeProvider>
           </EndpointsRuntimeContext.Provider>
         </ChatIdentityProvider>

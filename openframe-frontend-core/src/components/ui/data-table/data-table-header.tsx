@@ -4,6 +4,8 @@ import { flexRender, type Header } from '@tanstack/react-table';
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
 import { Arrow01DownIcon, Arrow01UpIcon, SwitchVrIcon } from '../../icons-v2-generated';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { InfoHint } from '../info-hint';
 import { useDataTableContext } from './data-table';
 import { DataTableColumnFilter } from './data-table-column-filter';
 import type { TailwindBreakpoint } from './types';
@@ -71,7 +73,7 @@ export function DataTableHeader({
   return (
     <div
       className={cn(
-        'hidden md:flex md:flex-col',
+        'hidden content-md:flex content-md:flex-col',
         stickyHeader && `sticky z-10 bg-ods-bg ${stickyHeaderOffset ?? 'top-0'}`,
         className,
       )}
@@ -92,7 +94,7 @@ export function DataTableHeader({
                   // the absolute placement. Safe as a `max-lg:` override: nothing
                   // else in this string sets margin or height, so it competes only
                   // with unprefixed defaults, never with a `md:`/`lg:` class.
-                  'max-lg:ml-auto max-lg:h-12 lg:absolute lg:inset-y-0 lg:right-[var(--spacing-system-mf)]',
+                  'content-max-lg:ml-auto content-max-lg:h-12 content-lg:absolute content-lg:inset-y-0 content-lg:right-[var(--spacing-system-mf)]',
             )}
           >
             {rightSlot}
@@ -127,7 +129,7 @@ type ColumnMeta = AnyHeader['column']['columnDef']['meta'];
  * every screen narrower than a desktop. A consumer wanting it back had no legal
  * move: `meta.width` is neutralized here by a doubled-class rule, so the escape
  * was a specificity fight, and the one consumer who tried it ended up
- * re-implementing this whole decision in `max-lg:[&&&]:` classes.
+ * re-implementing this whole decision in `content-max-lg:[&&&]:` classes.
  *
  * A sortable column whose CELLS are hidden below `lg` (`meta.hideAt`) still
  * keeps its toggle, exactly as a filterable one does: reordering by a column
@@ -141,16 +143,16 @@ function keepsCellOnTablet(meta: ColumnMeta): boolean {
 // Literal class maps — Tailwind's scanner needs the full class strings, which a
 // `${bp}:flex` template would not give it.
 const SHOW_FROM: Record<TailwindBreakpoint, string> = {
-  md: 'md:flex',
-  lg: 'lg:flex',
-  xl: 'xl:flex',
-  '2xl': '2xl:flex',
+  md: 'content-md:flex',
+  lg: 'content-lg:flex',
+  xl: 'content-xl:flex',
+  '2xl': 'content-2xl:flex',
 };
 const HIDE_FROM: Record<TailwindBreakpoint, string> = {
-  md: 'md:hidden',
-  lg: 'lg:hidden',
-  xl: 'xl:hidden',
-  '2xl': '2xl:hidden',
+  md: 'content-md:hidden',
+  lg: 'content-lg:hidden',
+  xl: 'content-xl:hidden',
+  '2xl': 'content-2xl:hidden',
 };
 /** Index of `lg` in the `[base, md, lg, xl, 2xl]` visibility array. */
 const LG_STEP = BREAKPOINT_ORDER.indexOf('lg') + 1;
@@ -160,7 +162,7 @@ const LG_STEP = BREAKPOINT_ORDER.indexOf('lg') + 1;
  *
  * Two rules stack here: the column's own `hideAt`, and "below `lg` only the
  * cells a user can act on". Layering them as classes does not work — a
- * `max-lg:` override cannot cancel a `md:hidden` from `hideAt`, because Tailwind
+ * `max-lg:` override cannot cancel a `content-md:hidden` from `hideAt`, because Tailwind
  * emits the `max-lg` block BEFORE the `md` one and equal-specificity rules are
  * decided by source order. So both rules are resolved on booleans first, and only
  * the result is turned into classes: at most one utility per breakpoint, each a
@@ -197,7 +199,7 @@ function getCellVisibilityClasses(
  * non-filterable cell returned `null`, and the survivors rendered with no width and
  * no alignment. One frame later the real values arrived, so the header visibly
  * filled in and the columns snapped into place — while `DataTableRow` and
- * `DataTableSkeleton`, which have always used plain `hideAt` classes, were correct
+ * its loading rows, which have always used plain `hideAt` classes, were correct
  * from the start. Header and body therefore disagreed about which columns exist and
  * how wide they are for exactly one frame, which is the flicker-and-jump on every
  * table's load.
@@ -217,6 +219,17 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
   // the `sort` prop; we do not consult TanStack's sort APIs here.
   const canSort = meta?.sortable === true;
   const sortDir: false | 'asc' | 'desc' = sort?.id === column.id ? (sort.desc ? 'desc' : 'asc') : false;
+  // Built once: rendered bare, or beside the column's hint.
+  const filterTrigger = filter ? (
+    <DataTableColumnFilter
+      column={column}
+      options={filter.options}
+      placement={filter.placement}
+      pending={filter.pending}
+      label={resolveHeaderLabel(header)}
+      align={align}
+    />
+  ) : null;
 
   return (
     <div
@@ -232,7 +245,7 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         //
         // `[&&]` doubles the class in the selector (`.cls.cls`, specificity 0-2-0),
         // and it is load-bearing: consumers routinely write a RESPONSIVE width
-        // (`w-[80px] md:w-1/5` is the common shape), and between md and lg that
+        // (`w-[80px] content-md:w-1/5` is the common shape), and between md and lg that
         // `md:` rule and this `max-lg:` one both match. At equal specificity source
         // order decides, and Tailwind emits the `max-lg` block BEFORE the `md` one
         // — the same ordering documented for visibility above — so the tablet would
@@ -243,19 +256,22 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
         // consumer that genuinely needs a tablet width can still take it back with a
         // more specific rule — `!important` could only be answered with another one.
         meta?.width || 'min-w-0 flex-1',
-        keepOnTablet && 'max-lg:[&&]:w-auto max-lg:[&&]:flex-none max-lg:[&&]:basis-auto',
+        keepOnTablet && 'content-max-lg:[&&]:w-auto content-max-lg:[&&]:flex-none content-max-lg:[&&]:basis-auto',
         meta?.headerClassName,
       )}
     >
-      {filter ? (
-        <DataTableColumnFilter
-          column={column}
-          options={filter.options}
-          placement={filter.placement}
-          pending={filter.pending}
-          label={resolveHeaderLabel(header)}
-          align={align}
-        />
+      {filterTrigger ? (
+        // Only a column that HAS a hint gets the extra row, so every existing
+        // filter header keeps its exact structure — the trigger stays a direct
+        // child of the cell.
+        meta?.hint ? (
+          <div className="flex items-start gap-[var(--spacing-system-xxs)]">
+            {filterTrigger}
+            <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
+          </div>
+        ) : (
+          filterTrigger
+        )
       ) : (
         <div
           className={cn(
@@ -264,12 +280,25 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
             'flex h-12 w-full select-none items-center gap-[var(--spacing-system-xsf)] rounded-sm transition-colors duration-200',
             // Same "always, neutralized below lg" shape as the width above.
             alignJustify(align),
-            keepOnTablet && 'max-lg:justify-start',
+            keepOnTablet && 'content-max-lg:justify-start',
             canSort && 'group cursor-pointer',
           )}
           onClick={canSort ? () => onSortChange?.(column.id) : undefined}
         >
-          <HeaderLabel header={header} />
+          {meta?.hint ? (
+            // The hint shares a LABEL GROUP with the text, pinned to the FIRST
+            // line (`items-start`): on a label that breaks onto a second line it
+            // reads beside the opening word instead of floating in the gap
+            // between the two. Only a column WITH a hint gets the group, so a
+            // hint-less header keeps its DOM. The sort icon stays outside it,
+            // centred on the row.
+            <span className="flex min-w-0 items-start gap-[var(--spacing-system-xxs)]">
+              <HeaderLabel header={header} />
+              <InfoHint label={resolveHeaderLabel(header)}>{meta.hint}</InfoHint>
+            </span>
+          ) : (
+            <HeaderLabel header={header} />
+          )}
           {canSort && <SortIcon sorted={sortDir} />}
         </div>
       )}
@@ -281,12 +310,31 @@ function HeaderCell({ header, sort, onSortChange }: HeaderCellProps) {
  * THE header label styling. Exported because a column may supply a NODE header
  * (an icon beside the text), and without this those headers rendered unstyled
  * beside the string ones — same row, two different type treatments.
+ *
+ * The label WRAPS inside its own cell (`min-w-0`, no `whitespace-nowrap`). A
+ * nowrapped label longer than its column does not truncate — it paints straight
+ * across the next column's header, which is how "Implementation owners" landed
+ * on top of "Updated". `text-balance` makes the break a GOOD one: the lines come
+ * out even ("IMPLEMENTATION / OWNERS") instead of one word stranded on its own.
+ * Two lines of the 20px label still fit the fixed 48px header, and a label that
+ * fits on one line looks exactly as it did.
  */
 export const DATA_TABLE_HEADER_LABEL_CLASS =
-  'whitespace-nowrap uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
+  'min-w-0 text-balance uppercase text-ods-text-secondary transition-colors duration-200 text-h5 group-hover:text-ods-text-primary';
+
+/** A header label's bar while its text is read (`meta.headerLoading`). */
+const DATA_TABLE_HEADER_LABEL_BAR_CLASS = 'w-40 max-w-full';
 
 function HeaderLabel({ header }: { header: AnyHeader }) {
   const headerDef = header.column.columnDef.header;
+  // The label is read data (whose list the table is): its bar in the label's own box and type step.
+  if (header.column.columnDef.meta?.headerLoading) {
+    return (
+      <span className={DATA_TABLE_HEADER_LABEL_CLASS}>
+        <TextLineSkeleton type="inherit" as="span" className={DATA_TABLE_HEADER_LABEL_BAR_CLASS} />
+      </span>
+    );
+  }
   if (headerDef === undefined) return null;
   if (typeof headerDef === 'string') {
     return <span className={DATA_TABLE_HEADER_LABEL_CLASS}>{headerDef}</span>;

@@ -1,5 +1,7 @@
 package com.openframe.management.initializer;
 
+import com.openframe.data.nats.delivery.DeliveryResultMessage;
+import com.openframe.data.nats.rmm.model.MachinePackageManagersMessage;
 import com.openframe.management.service.NatsStreamManagementService;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
@@ -70,16 +72,6 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
                     .build(),
-            // server -> agent: "report your timezone" requests for DEVICE_LOCAL schedules
-            // Re-sent every 30-minute sweep per pending device, so cap age to keep the stream small
-            StreamConfiguration.builder()
-                    .name("MACHINE_TIMEZONE_REQUEST")
-                    .subjects(List.of("machine.*.timezone.request"))
-                    .storageType(StorageType.File)
-                    .retentionPolicy(RetentionPolicy.Limits)
-                    .maxAge(Duration.ofHours(1))
-                    .build(),
-            // agent -> server: reported IANA timezone (reply to the request above)
             StreamConfiguration.builder()
                     .name("MACHINE_TIMEZONE")
                     .subjects(List.of("machine.*.timezone"))
@@ -92,6 +84,20 @@ public class NatsStreamConfigurationInitializer implements ApplicationRunner {
                     .subjects(List.of("machine.*.execution.acknowledge"))
                     .storageType(StorageType.File)
                     .retentionPolicy(RetentionPolicy.Limits)
+                    .build(),
+            StreamConfiguration.builder()
+                    .name(DeliveryResultMessage.STREAM)
+                    .subjects(List.of(DeliveryResultMessage.SUBJECT_FILTER))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofDays(1))
+                    .build(),
+            StreamConfiguration.builder()
+                    .name(MachinePackageManagersMessage.STREAM)
+                    .subjects(List.of(MachinePackageManagersMessage.SUBJECT_FILTER))
+                    .storageType(StorageType.File)
+                    .retentionPolicy(RetentionPolicy.Limits)
+                    .maxAge(Duration.ofHours(1))
                     .build()
     );
 

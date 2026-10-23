@@ -1,0 +1,6 @@
+# Run outputs are not committed: this folder sits inside the `openframe-test-service-core/**`
+# path filter that triggers the oss-lib Java release on every push to main, so a daily results
+# commit would publish a library version. Keep results local (or copy a report elsewhere).
+results/*
+!results/.gitkeep
+__pycache__/

@@ -1,50 +1,80 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
+import { useIsomorphicLayoutEffect } from '../../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../../utils/cn';
+import { LoadingFallback } from '../../loading/loading-fallback';
+import { LoadingRegion } from '../../loading/loading-region';
+import { LoadingItems, useLoadingScope } from '../loading-scope';
 import type { NoDataProps } from '../no-data';
 import { useDataTableContext } from './data-table';
 import { DataTableEmpty } from './data-table-empty';
+import { useDataTableLoadMoreStore } from './data-table-load-more';
+import { PlaceholderRows, ReservedEmptyState } from './data-table-reserved-rows';
 import { DataTableRow } from './data-table-row';
-import { DataTableSkeleton, PlaceholderRows, ReservedEmptyState } from './data-table-skeleton';
+import { ROW_STACK_CLASSES } from './data-table-row-classes';
+import { DATA_TABLE_SKELETON_ROWS, dataTablePageSize } from './utils';
 
 export interface DataTableBodyProps<T = unknown> {
   /** Show skeleton rows while `loading` is true and data is empty. */
   loading?: boolean;
+  /**
+   * While loading, the table holds placeholder rows (the host gives `useDataTable` one full page of them) and the body
+   * draws them with their REAL cells in a loading scope: every part of a cell draws its own loading form, so the
+   * loading row is the loaded row's own layout. Without it a loading row is one bar per column.
+   */
+  loadingCells?: boolean;
   /** @deprecated Use `emptyState` instead. Legacy single-line message; mapped to the empty state's title. */
   emptyMessage?: string;
   /** Props for the empty state (NoData) shown when there are no rows. Overrides `emptyMessage`. */
   emptyState?: NoDataProps;
-  /** Skeleton row count when loading. Default `10`. */
+  /**
+   * Skeleton rows while loading: ONE FULL PAGE. Default the table's page size (`state.pagination.pageSize`), else
+   * `minRows`, else `DATA_TABLE_SKELETON_ROWS` (a typical count for an unpaged table).
+   */
   skeletonRows?: number;
+  /**
+   * The loading state announces itself (`LoadingRegion`: aria-busy plus one "Loading results" status).
+   * `false` when the table sits inside a loading region of its own (a page skeleton). Default `true`.
+   */
+  loadingRegion?: boolean;
   className?: string;
   /**
    * Per-row class name. Prefer `useCallback` for function form to avoid
    * breaking `React.memo` on rows.
+   *
+   * The STRING form also lands on every skeleton row this body draws — the
+   * loading state and the infinite footer's load-more rows. It is where tables
+   * put their row spacing (`mb-1` is the common one), and a skeleton without it
+   * stacks at a tighter pitch than the rows it stands in for: 4px per row,
+   * accumulating, so row 20 of a loading table sat 80px above where it loaded.
+   * The function form has no item to be called with and is skipped there.
    */
   rowClassName?: string | ((item: T, index: number) => string);
   /** Dense row height. */
   compact?: boolean;
   /**
-   * Treat the design row height as a minimum so multi-line cell content grows
-   * the row instead of clipping. Default keeps the fixed height.
-   */
-  autoHeight?: boolean;
-  /**
    * REPLACES the design row height for THIS table's rows, its pad rows and its
    * skeleton alike — one number, so they cannot disagree.
    *
+   * It is also the ONLY way to a taller row. There used to be an `autoHeight`
+   * flag that let a row grow with its content; it was removed because a row
+   * whose height depends on its data cannot be stood in for — every skeleton
+   * and pad row is a guess, and the list jumps by the error on every load. Fit
+   * the content to the row instead (`TruncateText lines={n}` keeps the rest in
+   * a tooltip), or state a taller row here.
+   *
    * Why a prop and not a className: `minRows` promises a stable table height,
    * but its pad rows and the skeleton were hard-coded to the design height
-   * while a row passing `autoHeight` renders as tall as its content. A table
+   * while the table's real rows were taller. A table
    * with 112px rows padded a short page with 78px placeholders and came up
    * 34px per missing row too short — on a 15-row page with 5 results, 340px of
    * jump against every other page. Appending a height through `rowClassName`
    * cannot fix it either: tailwind-merge drops the plain `h-[66px]` but keeps
-   * the `md:h-[78px]` beside it, so the override holds on a phone and loses on
+   * the `content-md:h-[78px]` beside it, so the override holds on a phone and loses on
    * a desktop. Pass it here and every row slot in the table agrees.
    *
-   * Responsive values belong in the string itself, e.g. `'h-[200px] md:h-[112px]'`.
+   * Responsive values belong in the string itself, e.g. `'h-[200px] content-md:h-[112px]'`.
    */
   rowHeightClassName?: string;
   /**
@@ -70,6 +100,9 @@ export interface DataTableBodyProps<T = unknown> {
   renderSubRow?: (item: T) => ReactNode;
 }
 
+/** Server snapshot: no page is loading during a server render. */
+const getNoRows = () => 0;
+
 /**
  * Renders skeleton / empty state / rows based on table context state. Place
  * inside `<DataTable>`. Rows use `React.memo` for performance — memoize
@@ -77,14 +110,15 @@ export interface DataTableBodyProps<T = unknown> {
  * in the consumer to get the full benefit.
  */
 export function DataTableBody<T = unknown>({
-  loading,
+  loading: loadingProp,
+  loadingCells = false,
   emptyMessage,
   emptyState,
-  skeletonRows = 10,
+  skeletonRows: skeletonRowsProp,
+  loadingRegion = true,
   className,
   rowClassName,
   compact,
-  autoHeight,
   rowHeightClassName,
   onRowClick,
   rowHref,
@@ -92,17 +126,73 @@ export function DataTableBody<T = unknown>({
   renderSubRow,
 }: DataTableBodyProps<T>) {
   const table = useDataTableContext<T>();
+  const skeletonRows =
+    skeletonRowsProp ?? dataTablePageSize(table) ?? (minRows && minRows > 0 ? minRows : DATA_TABLE_SKELETON_ROWS);
+  // In a page's loading state the body is loading: its rows are the row skeletons.
+  const inScope = useLoadingScope();
+  const loading = inScope || loadingProp;
   const rows = table.getRowModel().rows;
+  const hasRows = rows.length > 0;
 
-  if (loading && rows.length === 0) {
+  // Load-more skeleton rows requested by `<DataTable.InfiniteFooter>`. Drawn
+  // HERE, inside the rows' own container, so they take this body's gap and row
+  // classes by construction — see `data-table-load-more.ts`. Only a body that
+  // has rows to continue takes them over; an empty or loading one leaves the
+  // footer drawing its own, as before.
+  const loadMore = useDataTableLoadMoreStore();
+  // The next page the footer is reading: its page size, drawn as that many loading rows.
+  const loadMorePageSize = useSyncExternalStore(loadMore.subscribe, loadMore.getSkeletonRows, getNoRows);
+  useIsomorphicLayoutEffect(() => (hasRows ? loadMore.registerRowsBody() : undefined), [loadMore, hasRows]);
+
+  const skeletonRowClassName = typeof rowClassName === 'string' ? rowClassName : undefined;
+
+  if (loading && loadingCells && hasRows) {
     return (
-      <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
-        <DataTableSkeleton rows={skeletonRows} rowHeightClassName={rowHeightClassName} />
-      </div>
+      <LoadingFallback
+        label="Loading results"
+        status={loadingRegion && !inScope}
+        className={cn(ROW_STACK_CLASSES, className)}
+      >
+        {rows.map((row, index) => (
+          <DataTableRow<T>
+            key={row.id}
+            row={row}
+            drawsCells
+            compact={compact}
+            rowHeightClassName={rowHeightClassName}
+            className={typeof rowClassName === 'function' ? rowClassName(row.original, index) : rowClassName}
+            data-loading-item
+          />
+        ))}
+      </LoadingFallback>
     );
   }
 
-  if (rows.length === 0) {
+  if (loading && !hasRows) {
+    return (
+      <LoadingRegion
+        label="Loading results"
+        // The page's loading region announces a loading state once.
+        announce={loadingRegion && !inScope}
+        className={cn(ROW_STACK_CLASSES, className)}
+      >
+        <LoadingItems count={skeletonRows}>
+          {index => (
+            <DataTableRow
+              row={null}
+              loadingIndex={index}
+              compact={compact}
+              className={skeletonRowClassName}
+              rowHeightClassName={rowHeightClassName}
+              data-loading-item
+            />
+          )}
+        </LoadingItems>
+      </LoadingRegion>
+    );
+  }
+
+  if (!hasRows) {
     const empty = emptyState ? (
       <DataTableEmpty {...emptyState} />
     ) : emptyMessage != null ? (
@@ -127,13 +217,14 @@ export function DataTableBody<T = unknown>({
       );
     }
 
-    return <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>{empty}</div>;
+    return <div className={cn(ROW_STACK_CLASSES, className)}>{empty}</div>;
   }
 
-  const padCount = minRows ? Math.max(0, minRows - rows.length) : 0;
+  // Load-more rows are row slots too, so they count against `minRows`.
+  const padCount = minRows ? Math.max(0, minRows - rows.length - loadMorePageSize) : 0;
 
   return (
-    <div className={cn('flex w-full flex-col gap-[var(--spacing-system-xsf)]', className)}>
+    <div className={cn(ROW_STACK_CLASSES, className)}>
       {rows.map((row, index) => {
         const item = row.original;
         const href = rowHref?.(item) ?? undefined;
@@ -145,13 +236,27 @@ export function DataTableBody<T = unknown>({
             onClick={onRowClick}
             href={href}
             compact={compact}
-            autoHeight={autoHeight}
             rowHeightClassName={rowHeightClassName}
             className={cls}
             subRow={renderSubRow?.(item)}
+            data-loading-item
           />
         );
       })}
+      {loadMorePageSize > 0 && (
+        <LoadingItems count={loadMorePageSize}>
+          {index => (
+            <DataTableRow
+              row={null}
+              loadingIndex={index}
+              compact={compact}
+              className={skeletonRowClassName}
+              rowHeightClassName={rowHeightClassName}
+              data-loading-item
+            />
+          )}
+        </LoadingItems>
+      )}
       {padCount > 0 && <PlaceholderRows count={padCount} rowHeightClassName={rowHeightClassName} />}
     </div>
   );

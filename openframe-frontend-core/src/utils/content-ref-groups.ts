@@ -55,6 +55,7 @@ export const CONTENT_REF_GROUPS: Record<string, ContentRefGroupConfig> = {
   onboarding_guide: { label: 'Onboarding Guides', order: 9, layout: 'list', gridSize: 'default' },
   what_i_shipped: { label: 'What I Shipped', order: 10, layout: 'grid', gridSize: 'default' },
   how_i_work: { label: 'How I Work', order: 11, layout: 'grid', gridSize: 'default' },
+  ai_prompt: { label: 'Squawkbox', order: 12, layout: 'grid', gridSize: 'default' },
 };
 
 /** Human-readable label for a content_ref `type`. Returns null when the type
@@ -86,3 +87,12 @@ export function orderContentRefTypes(present: Iterable<string>): string[] {
   const unregistered = [...presentSet].filter(type => !CONTENT_REF_GROUPS[type]);
   return [...registeredInOrder, ...unregistered];
 }
+
+/** Items per page within one type group of the related-content rail. Groups larger than this paginate
+ *  with the standard Pagination control (NO nested scrolling — a bounded
+ *  scrollbox inside the page traps wheel events and hides the sections
+ *  below it). MUST stay at or above the largest suggestion fill
+ *  (RELATED_SAME_TYPE_COUNT in the hub's lib/constants/suggestions.ts) so
+ *  current rails never paginate — only genuinely big groups (author pages)
+ *  do. Server-safe here (no client boundary), so a server page can read a group's first page (`initialRows`). */
+export const GROUP_PAGE_SIZE = 12;

@@ -7,6 +7,7 @@ use crate::service_adapter::{CrossPlatformServiceManager, ServiceConfig};
 use crate::services::{
     AgentConfigurationService, DeregistrationService, InitialConfigurationService,
     InstalledToolsService, ToolCommandParamsResolver, ToolKillService, ToolUninstallService,
+    UpdateCleanupService,
 };
 
 const SERVICE_NAME: &str = "client";
@@ -16,69 +17,84 @@ const DESCRIPTION: &str = "OpenFrame client service for remote management and mo
 /// CLI subcommand the detached process runs to remove the client.
 const UNINSTALL_SUBCOMMAND: &str = "uninstall";
 
+/// Removes the copies the update flow leaves next to the binary: `<exe>.lkg`,
+/// `<exe>.prev`, `<exe>.old`, `<exe>.bad`, `<exe>.bak`, `<exe>.backup.<ts>`.
+/// Matched by prefix on purpose: every sibling written next to the binary is
+/// an update artefact, and an enumerated list would leave the next suffix
+/// behind on uninstall again.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_binary_siblings(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+    let Some(exe_name) = install_path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+    else {
+        return;
+    };
+    let prefix = format!("{exe_name}.");
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_name().to_string_lossy().starts_with(&prefix) {
+            continue;
+        }
+        let path = entry.path();
+        match std::fs::remove_file(&path) {
+            Ok(()) => info!("Removed update leftover: {}", path.display()),
+            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
+        }
+    }
+}
+
+/// Removes the `openframe` alias earlier versions created next to the binary, and
+/// only that: `openframe` is also the openframe-cli binary name, so a file that is
+/// not our symlink (unix) or shim (Windows) belongs to another tool and stays.
+pub fn remove_legacy_alias(install_path: &Path) {
+    let Some(dir) = install_path.parent() else {
+        return;
+    };
+
+    #[cfg(target_os = "windows")]
+    let (alias, ours) = {
+        let alias = dir.join("openframe.cmd");
+        let target = install_path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let shim = format!("@\"%~dp0{}\" %*\r\n", target);
+        let ours = std::fs::read_to_string(&alias).is_ok_and(|content| content == shim);
+        (alias, ours)
+    };
+    #[cfg(not(target_os = "windows"))]
+    let (alias, ours) = {
+        let alias = dir.join("openframe");
+        let ours = std::fs::read_link(&alias).is_ok_and(|target| target == install_path);
+        (alias, ours)
+    };
+
+    if !ours {
+        return;
+    }
+    match std::fs::remove_file(&alias) {
+        Ok(()) => info!("Removed legacy alias: {}", alias.display()),
+        Err(e) => warn!("Failed to remove legacy alias {}: {}", alias.display(), e),
+    }
+}
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_update_temp_files(install_path: &Path) {
+    UpdateCleanupService::for_binary(install_path.to_path_buf()).sweep_temp_leftovers(None);
+}
+
 /// Spawn a detached `openframe-client uninstall` that survives this service being stopped.
 /// Self-uninstall stops the `com.openframe.client` service (our own process), so it must run
 /// out-of-process. macOS + Windows only — Linux client self-uninstall is unsupported.
 pub fn spawn_detached_uninstall(install_path: &Path) -> Result<()> {
-    #[cfg(target_os = "macos")]
-    {
-        spawn_detached_uninstall_macos(install_path)
-    }
-    #[cfg(target_os = "windows")]
-    {
-        spawn_detached_uninstall_windows(install_path)
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        let _ = install_path;
-        anyhow::bail!("client self-uninstall is not supported on this platform")
-    }
-}
-
-/// Detached child in its own session (setsid) so it outlives launchd stopping our own
-/// `com.openframe.client` service — no launchd job/plist needed.
-#[cfg(target_os = "macos")]
-fn spawn_detached_uninstall_macos(install_path: &Path) -> Result<()> {
-    use std::os::unix::process::CommandExt;
-    use std::process::{Command, Stdio};
-
-    let child = unsafe {
-        Command::new(install_path)
-            .arg(UNINSTALL_SUBCOMMAND)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            // SAFETY: setsid() is async-signal-safe; it moves the child into a new session so
-            // launchd stopping our service can't signal it away mid-uninstall.
-            .pre_exec(|| {
-                if libc::setsid() == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            })
-            .spawn()
-    }
-    .context("Failed to spawn detached self-uninstall process")?;
-
-    info!("Self-uninstall process launched (PID: {})", child.id());
-    Ok(())
-}
-
-/// Detached child (inherits LocalSystem) so it survives the SCM stopping our service.
-#[cfg(target_os = "windows")]
-fn spawn_detached_uninstall_windows(install_path: &Path) -> Result<()> {
-    use std::os::windows::process::CommandExt;
-    use std::process::Command;
-
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    const DETACHED_PROCESS: u32 = 0x0000_0008;
-
-    let child = Command::new(install_path)
-        .arg(UNINSTALL_SUBCOMMAND)
-        .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
-        .spawn()
-        .context("Failed to spawn detached self-uninstall process")?;
-
+    let child =
+        crate::platform::detached_process::spawn_detached(install_path, UNINSTALL_SUBCOMMAND)?;
     info!("Self-uninstall process launched (PID: {})", child.id());
     Ok(())
 }
@@ -94,6 +110,18 @@ pub fn orbit_dir() -> std::path::PathBuf {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
         std::path::PathBuf::from("/opt/orbit")
+    }
+}
+
+/// Orbit's node key and osquery.db live here; left behind, a reinstall re-joins the old Fleet team.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+async fn remove_orbit_dir(dir: &Path) {
+    if !dir.exists() {
+        return;
+    }
+    info!("Cleaning up Orbit directory: {}", dir.display());
+    if let Err(e) = remove_directory_with_retry(dir, 5).await {
+        warn!("Failed to remove Orbit directory: {}", e);
     }
 }
 
@@ -126,6 +154,19 @@ pub async fn remove_directory_with_retry(path: &Path, max_retries: u32) -> Resul
                 return Ok(());
             }
             Err(e) => {
+                // Sharing violation (os error 32): a process holds a file open without
+                // FILE_SHARE_DELETE. Identify the holders, evict the safe ones, and retry.
+                #[cfg(target_os = "windows")]
+                if crate::platform::file_lock::is_file_in_use_error(&e) {
+                    warn!(
+                        "Removal of {} blocked by a sharing violation on attempt {}/{}; attempting lock-aware recovery",
+                        path.display(),
+                        attempt,
+                        max_retries
+                    );
+                    crate::platform::lock_recovery::evict_holders_for_removal(path).await;
+                }
+
                 if attempt < max_retries {
                     let wait_secs = std::cmp::min(2_u64.pow(attempt - 1), 8); // Exponential backoff, max 8 seconds
                     warn!(
@@ -403,17 +444,18 @@ pub async fn uninstall_windows(
         }
     }
 
-    let orbit_dir = orbit_dir();
-    if orbit_dir.exists() {
-        info!("Cleaning up Orbit directory: {}", orbit_dir.display());
-        if let Err(e) = remove_directory_with_retry(&orbit_dir, 5).await {
-            warn!("Failed to remove Orbit directory: {}", e);
-        }
-    }
+    remove_orbit_dir(&orbit_dir()).await;
 
     // Final chance to report the uninstall, before the cleanup script starts waiting on our exit.
     if let Some(deregistration_service) = &deregistration_service {
         deregistration_service.retry_if_unreported().await;
+    }
+
+    remove_binary_siblings(install_path);
+    remove_update_temp_files(install_path);
+
+    if let Err(e) = crate::platform::apps_entry::unregister() {
+        warn!("Failed to remove Apps & Features entry: {:#}", e);
     }
 
     // Launch cleanup script to remove binary after process exit
@@ -501,6 +543,8 @@ pub async fn uninstall_macos(
         }
     }
 
+    remove_orbit_dir(&orbit_dir()).await;
+
     if install_path.exists() {
         info!("Removing installed binary: {}", install_path.display());
 
@@ -531,6 +575,9 @@ pub async fn uninstall_macos(
         }
     }
 
+    remove_binary_siblings(install_path);
+    remove_update_temp_files(install_path);
+
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {
         deregistration_service.retry_if_unreported().await;
@@ -543,3 +590,7 @@ pub async fn uninstall_macos(
 
     Ok(())
 }
+
+#[cfg(all(test, any(target_os = "windows", target_os = "macos")))]
+#[path = "uninstall_tests.rs"]
+mod tests;

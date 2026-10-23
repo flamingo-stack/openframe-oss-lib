@@ -31,12 +31,16 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter, usePathname } from '../../../embed-shims';
 import { useScrollToHash } from '../../../hooks/use-scroll-to-hash';
+import type { DataSync } from '../../../types/data-sync';
 import type { DeliveryItem, DeliveryResponse } from '../../../types/delivery';
 import { DEV_SECTION_PARAM_KEYS } from '../../../utils/dev-sections/dev-section-param-keys';
 import { contentFetch } from '../../../utils/embed-content-fetch';
 import { STICKY_HEADER_OFFSET_PX } from '../../../utils/same-page-hash-nav';
-import { EmptyState } from '../../empty-state';
+import { usePageDataSync } from '../../layout/page-data-sync';
+import { ListEmptyState } from '../../list-empty-state';
+import { DataSyncLine } from '../../ui/data-attribution';
 import { LoadError } from '../../ui/error-state';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { DeliveryTable } from './delivery-table';
 
 const DEFAULT_COMPLETED_ENDPOINT = '/api/delivery/completed';
@@ -47,13 +51,15 @@ const DEFAULT_SEARCH_PARAM_KEY = DEV_SECTION_PARAM_KEYS.search;
 const DEFAULT_TASK_TYPE_PARAM_KEY = DEV_SECTION_PARAM_KEYS.deliveryTaskType;
 
 /**
- * Wire shape of ONE bucket endpoint — `{ items, count, pagination }`. Only
- * `items` is read here; `items` stays optional because an embedder's proxy is
+ * Wire shape of ONE bucket endpoint — `{ items, count, pagination, sync }`. Only
+ * `items` and `sync` are read here; `items` stays optional because an embedder's proxy is
  * free to answer with an empty envelope, and the render treats "no items" and
  * "empty items" identically.
  */
 interface DeliveryBucketResponse {
   items?: DeliveryItem[];
+  /** Where the tasks are mirrored from and when it last read them (both buckets read the same mirror). */
+  sync?: DataSync;
 }
 
 export interface DeliveryListsProps {
@@ -82,8 +88,12 @@ export function DeliveryLists({
   const pathname = usePathname();
 
   const [data, setData] = useState<DeliveryResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsLoading] = useState(true);
+  // ONE switch: in a page's loading state nothing is fetched and the lists are their skeletons.
+  const inScope = useLoadingScope();
+  const isLoading = inScope || isFetching;
   const [error, setError] = useState<string | null>(null);
+  const [sync, setSync] = useState<DataSync | null>(null);
 
   // Get filter state from URL
   const searchQuery = searchParams.get(searchParamKey) || '';
@@ -94,6 +104,7 @@ export function DeliveryLists({
     // rewrites the query string re-runs this effect while the previous pair of
     // requests is still open. Without this guard a slower EARLIER response can
     // resolve last and paint results for a query the user already moved past.
+    if (inScope) return undefined;
     let cancelled = false;
 
     async function fetchDeliveryData() {
@@ -134,6 +145,7 @@ export function DeliveryLists({
           completed: completedResult.items ?? [],
           inProgress: inProgressResult.items ?? [],
         });
+        setSync(completedResult.sync ?? inProgressResult.sync ?? null);
       } catch (err) {
         if (cancelled) return;
         console.error('Error fetching delivery items:', err);
@@ -149,7 +161,15 @@ export function DeliveryLists({
     return () => {
       cancelled = true;
     };
-  }, [searchQuery, taskTypeFilter, completedApiEndpoint, inProgressApiEndpoint, searchParamKey, taskTypeParamKey]);
+  }, [
+    inScope,
+    searchQuery,
+    taskTypeFilter,
+    completedApiEndpoint,
+    inProgressApiEndpoint,
+    searchParamKey,
+    taskTypeParamKey,
+  ]);
 
   const filteredCompleted = data?.completed || [];
   const filteredInProgress = data?.inProgress || [];
@@ -160,6 +180,8 @@ export function DeliveryLists({
   // by RoadmapView). 96 matches the sticky-header offset every
   // hash-scroll surface in the app uses.
   useScrollToHash(data, { headerOffset: STICKY_HEADER_OFFSET_PX });
+  // The page states the sync under its title; the lists shown without that page draw it above themselves.
+  const syncInPage = usePageDataSync(sync, isLoading && !data);
 
   const showCompleted = true;
   const showInProgress = true;
@@ -180,36 +202,30 @@ export function DeliveryLists({
 
   return (
     <div className="flex w-full flex-col gap-[40px]">
+      {!syncInPage && <DataSyncLine sync={sync} loading={isLoading && !data} />}
       {/* Empty state if no results after filtering */}
-      {!isLoading &&
-        !hasResults &&
-        (hasActiveFilters ? (
-          <EmptyState
-            type="search"
-            title="No tasks found"
-            description="No tasks match your current filters. Try adjusting your search or status filter."
-            showCTA={true}
-            ctaText="Reset Filters"
-            onCtaClick={() => {
-              const params = new URLSearchParams(searchParams.toString());
-              params.delete(searchParamKey);
-              params.delete(taskTypeParamKey);
-              router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-            }}
-          />
-        ) : (
-          <EmptyState
-            type="generic"
-            title="No tasks available"
-            description="Check back soon for upcoming tasks!"
-            showCTA={false}
-          />
-        ))}
+      {!isLoading && !hasResults && (
+        <ListEmptyState
+          isFiltered={hasActiveFilters}
+          filtered={{
+            title: 'No tasks found',
+            description: 'No tasks match your current filters. Try adjusting your search or status filter.',
+            clearText: 'Reset Filters',
+          }}
+          onClearFilters={() => {
+            const params = new URLSearchParams(searchParams.toString());
+            params.delete(searchParamKey);
+            params.delete(taskTypeParamKey);
+            router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+          }}
+          empty={{ title: 'No tasks available', description: 'Check back soon for upcoming tasks!' }}
+        />
+      )}
 
       {/* Completed Tasks Table */}
       {showCompleted && (hasResults || isLoading) && (
         <div className="w-full">
-          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 md:tracking-[-0.56px] lg:tracking-[-0.64px]">
+          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 content-md:tracking-[-0.56px] content-lg:tracking-[-0.64px]">
             Recently Completed<span className="text-ods-accent">:</span>
           </h3>
           <DeliveryTable items={filteredCompleted} isLoading={isLoading} />
@@ -219,7 +235,7 @@ export function DeliveryLists({
       {/* In Progress Tasks Table */}
       {showInProgress && (hasResults || isLoading) && (
         <div className="w-full">
-          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 md:tracking-[-0.56px] lg:tracking-[-0.64px]">
+          <h3 className="mb-4 tracking-[-0.48px] text-ods-text-primary text-h2 content-md:tracking-[-0.56px] content-lg:tracking-[-0.64px]">
             Active Tasks<span className="text-ods-accent">:</span>
           </h3>
           <DeliveryTable items={filteredInProgress} isLoading={isLoading} />

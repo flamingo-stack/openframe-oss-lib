@@ -5,12 +5,12 @@ export type PlatformName =
   | 'openmsp'
   | 'tmcg'
   | 'flamingo'
-  | 'flamingo-teaser'
   | 'universal'
   | 'marketing-hub'
   | 'product-hub'
   | 'revenue-hub'
   | 'people-hub'
+  | 'coding-hub'
   | 'openframe'
   | 'company-hub'
   | 'mlg';
@@ -58,7 +58,6 @@ export interface PlatformConfig {
   name: string; // same as name
   display_name: string;
   default_color: string;
-  default_icon: string;
   description: string;
 }
 

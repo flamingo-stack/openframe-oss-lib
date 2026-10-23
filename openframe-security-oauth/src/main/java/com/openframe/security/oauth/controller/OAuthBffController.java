@@ -1,5 +1,7 @@
 package com.openframe.security.oauth.controller;
 
+import com.openframe.core.exception.AuthErrorCode;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.security.cookie.CookieService;
 import com.openframe.security.oauth.dto.TokenResponse;
 import com.openframe.security.oauth.exception.AppleNativeRegistrationRequiredException;
@@ -21,6 +23,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
+import static com.openframe.core.exception.AuthErrorCode.SSO_LOGIN_FAILED;
 import static com.openframe.security.oauth.SecurityConstants.*;
 import static org.springframework.http.HttpHeaders.LOCATION;
 import static org.springframework.http.HttpStatus.FOUND;
@@ -49,6 +52,9 @@ public class OAuthBffController {
     /** Web continuation page a non-allow-listed signup handoff falls back to. */
     @Value("${openframe.gateway.oauth.signup-continue-page:/auth/sso-continue}")
     private String signupContinuePage;
+    /** Web page a mobile consent-page cancel falls back to when redirectTo is not allow-listed. */
+    @Value("${openframe.gateway.oauth.join-cancel-page:/auth/login}")
+    private String joinCancelPage;
 
     @GetMapping("/login")
     public Mono<ResponseEntity<Void>> login(@RequestParam String tenantId,
@@ -58,6 +64,7 @@ public class OAuthBffController {
                                             ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearSasCookies(headers);
+        cookieService.addClearStaleOAuthStateCookies(headers, request);
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, authMobile && mobileAuthEnabled, request)
                 .map(data -> {
                     String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
@@ -67,7 +74,7 @@ public class OAuthBffController {
     }
 
     /**
-     * Initializes OAuth authorize redirect (PKCE/state) without clearing any cookies or session.
+     * Initializes OAuth authorize redirect (PKCE/state) without clearing the session or auth cookies (stale state cookies are still dropped).
      * Useful for "continue" flows after SSO finalization where we already have an authenticated principal.
      */
     @GetMapping("/continue")
@@ -76,6 +83,7 @@ public class OAuthBffController {
                                                    @RequestParam(value = "authMobile", required = false, defaultValue = "false") boolean authMobile,
                                                    ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
+        cookieService.addClearStaleOAuthStateCookies(headers, request);
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, null, authMobile && mobileAuthEnabled, request)
                 .map(data -> {
                     String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
@@ -100,11 +108,14 @@ public class OAuthBffController {
                 )))
                 .onErrorResume(e -> {
                     log.error("OAuth callback failed: {}", e.getMessage(), e);
-                    String msg = URLEncoder.encode(
-                            e.getMessage() != null ? e.getMessage() : "Authentication failed. Please try again.",
-                            StandardCharsets.UTF_8);
-                    return Mono.just(buildFound(authErrorUrl + "?error=" + msg, state));
+                    AuthErrorCode errorCode = errorCodeOf(e);
+                    String target = authErrorUrl + "?ref=" + errorCode.name();
+                    return Mono.just(buildFound(target, state));
                 });
+    }
+
+    private AuthErrorCode errorCodeOf(Throwable failure) {
+        return failure instanceof AuthFlowException flowException ? flowException.getCode() : SSO_LOGIN_FAILED;
     }
 
     @PostMapping("/refresh")
@@ -252,6 +263,37 @@ public class OAuthBffController {
                 ? redirectTo + (redirectTo.contains("?") ? "&" : "?") + "signupTicket="
                         + URLEncoder.encode(signupTicket, StandardCharsets.UTF_8)
                 : signupContinuePage;
+        return Mono.just(ResponseEntity.status(FOUND).header(LOCATION, target).build());
+    }
+
+    /**
+     * Allow-list hop for the mobile "one last step" consent page. When that page cannot finish —
+     * the user declines (Back to Login) or its pending call expired (409) — the sheet returns the
+     * user to the app, but only to an exact-allow-listed native URI (same
+     * {@code openframe.gateway.redirect.allowed-uris} the login devTicket and signup handoff use);
+     * anything else falls back to the web login page. The auth server never decides the target — it
+     * only carries redirectTo to the frontend (see SsoFlowHandler.redirectToJoinConfirm), and this
+     * hop is where redirect policy is enforced.
+     *
+     * <p>The native callback carries neither a {@code devTicket} (login) nor an {@code error}, so
+     * without a signal the app cannot tell a deliberate cancel from a broken handoff. The optional
+     * {@code reason} (e.g. {@code USER_CANCELED} / {@code SESSION_EXPIRED}) is forwarded as
+     * {@code error} on the app redirect — same convention as the callback error path — so the app
+     * can stay silent on a user cancel and surface a message on an expired session. Purely
+     * additive: absent reason, or a non-allow-listed target, behaves as before.
+     */
+    @GetMapping("/join-return")
+    public Mono<ResponseEntity<Void>> joinReturn(@RequestParam("redirectTo") String redirectTo,
+                                                 @RequestParam(value = "reason", required = false) String reason) {
+        String target;
+        if (redirectTargetResolver.isAllowedRedirectUri(redirectTo)) {
+            target = hasText(reason)
+                    ? redirectTo + (redirectTo.contains("?") ? "&" : "?") + "error="
+                            + URLEncoder.encode(reason, StandardCharsets.UTF_8)
+                    : redirectTo;
+        } else {
+            target = joinCancelPage;
+        }
         return Mono.just(ResponseEntity.status(FOUND).header(LOCATION, target).build());
     }
 

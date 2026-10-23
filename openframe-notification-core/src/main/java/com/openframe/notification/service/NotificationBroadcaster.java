@@ -2,8 +2,6 @@ package com.openframe.notification.service;
 
 import com.openframe.data.document.notification.Notification;
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
-import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.data.document.notification.NotificationReadState;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationSettings;
@@ -36,7 +34,6 @@ public class NotificationBroadcaster {
 
     private final NotificationRepository notificationRepository;
     private final NotificationReadStateService readStateService;
-    private final NotificationContextDescriptorRegistry descriptorRegistry;
     private final Optional<NotificationNatsPublisher> natsPublisher;
     private final NotificationChannelDispatcher channelDispatcher;
     private final AudienceResolver audienceResolver;
@@ -51,10 +48,9 @@ public class NotificationBroadcaster {
             return null;
         }
 
-        NotificationCategory category = categoryOf(command);
+        NotificationCategory category = command.getCategory();
         Recipients recipients = audienceResolver.resolve(command.getAudience());
         Set<String> adminAudience = recipients.getUsers();
-        NotificationContext context = command.getContext();
         Set<String> admins = withoutOptedOut(adminAudience, command);
         Set<String> machines = recipients.getMachines();
         if (admins.isEmpty() && machines.isEmpty()) {
@@ -63,7 +59,7 @@ public class NotificationBroadcaster {
         }
 
         NotificationType commandType = command.getType();
-        String typeName = commandType == null ? null : commandType.name();
+        String typeName = commandType.name();
         Notification notification = Notification.builder()
                 .severity(command.getSeverity())
                 .category(category)
@@ -72,7 +68,6 @@ public class NotificationBroadcaster {
                 .type(typeName)
                 .attributes(command.getAttributes())
                 .applePushCategory(command.getApplePushCategory())
-                .context(command.getContext())
                 .correlationId(command.getCorrelationId())
                 .build();
         Notification saved = notificationRepository.save(notification);
@@ -119,23 +114,13 @@ public class NotificationBroadcaster {
         return saved;
     }
 
-    private NotificationCategory categoryOf(NotificationCommand command) {
-        NotificationCategory category = command.getCategory();
-        return category != null ? category : descriptorRegistry.categoryOf(command.getContext());
-    }
-
-    private NotificationSettingGroup settingsGroupOf(NotificationCommand command) {
-        NotificationSettingGroup group = command.getSettingsGroup();
-        return group != null ? group : descriptorRegistry.settingsGroupOf(command.getContext()).orElse(null);
-    }
-
     /** Settings bite at the audience: an opted-out admin gets no row/card/NATS/push and nothing arrives retroactively. Absent settings deliver; a failed lookup drops every admin — like every other Mongo failure in broadcast, it must not deliver against unknown preferences. */
     private Set<String> withoutOptedOut(Set<String> admins, NotificationCommand command) {
         if (admins.isEmpty()) {
             return admins;
         }
         try {
-            NotificationSettingGroup group = settingsGroupOf(command);
+            NotificationSettingGroup group = command.getSettingsGroup();
             List<NotificationSettings> rows = settingsRepository.findByUserIdIn(admins);
             if (rows.isEmpty()) {
                 return admins;

@@ -66,7 +66,9 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import type React from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { resizedImageUrl } from '../../embed-shims/next-image';
 import { useIsHydrated } from '../../hooks/ui/use-is-hydrated';
+import { MEDIA_ASPECT } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import {
   WALKTHROUGH_VIDEO_DISMISS_KEY,
@@ -79,13 +81,23 @@ import { VolumeXmarkIcon } from '../icons-v2-generated/audio-and-visual/volume-x
 import { PauseIcon } from '../icons-v2-generated/media-playback/pause-icon';
 import { PlayIcon } from '../icons-v2-generated/media-playback/play-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
 import { DialogPortal, DialogOverlay } from '../ui/dialog';
+import { useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { CardHitLayer } from './card-hit-layer';
-import { Video, type VideoPlayerHandle, type VideoMutedFallbackState } from './video';
+import { Video } from './video';
 import { VideoPlayBadge, VideoUnmuteGlyph } from './video-center-badge';
 import { VideoHoverPreviewSurface } from './video-hover-preview';
+import type { VideoPlayerHandle, VideoMutedFallbackState } from './video-shared';
+
+/** The poster width the collapsed card asks for: its widest box (320px) at 2x for retina screens. */
+const CARD_POSTER_WIDTH_PX = 640;
+
+/** The inline card's box: 16:9 across the host's width, rounded and bordered. ONE string, read by the card and
+ *  its skeleton, so the page keeps the same height before and after the player mounts. */
+const INLINE_CARD_BOX_CLASS = `${MEDIA_ASPECT.video} w-full rounded-md border border-ods-border`;
 
 /** Wire-shape data for the widget. Kept as the shared contract the hub DAL
  *  re-exports as `PublicWalkthroughVideo & { id }`. `mainVideoUrl`/`youtubeUrl`
@@ -105,6 +117,13 @@ export interface WalkthroughVideoData {
    *  video; anything other than 'right' (including absent) means left. */
   position?: 'left' | 'right' | null;
 }
+
+/**
+ * What ends Largest Contentful Paint: the browser reports no new candidate after
+ * the visitor's first scroll, tap or key press. The floating card renders only
+ * after one of these.
+ */
+const FIRST_INTERACTION_EVENTS = ['scroll', 'pointerdown', 'keydown'] as const;
 
 /** Everything the two placements share — the widget's actual contract. */
 interface WalkthroughVideoBaseProps {
@@ -129,6 +148,12 @@ interface WalkthroughVideoBaseProps {
    *  SSR-safe: the server renders closed, and the theater lives in a portal,
    *  so the hydrated (non-portal) markup is identical either way. */
   deepLinkParam?: string;
+  /** Start the card playing on mount, muted, with the unmute glyph up — the
+   *  muted-autoplay pattern, for a page whose point IS the clip (an onboarding
+   *  hero). The card behaves as after a muted theater close: the clip runs in
+   *  the card, a click opens the theater from the current time. File videos
+   *  only; a YouTube card never plays inline. */
+  autoPlayCard?: boolean;
   label?: string;
   className?: string;
 }
@@ -142,6 +167,9 @@ interface WalkthroughVideoBaseProps {
  * not in the base.
  */
 export interface FloatingWalkthroughVideoProps extends WalkthroughVideoBaseProps {
+  /** The card appears no sooner than this after load, and only once the visitor
+   *  has scrolled, tapped or pressed a key (so it can never be the page's
+   *  Largest Contentful Paint). Default 3000. */
   appearDelayMs?: number;
   /** Cookie-based dismissal (id-match, mirrors the announcement bar). `false`
    *  disables the X entirely. `storageKey` is the per-platform cookie name. */
@@ -199,11 +227,13 @@ function WalkthroughVideo({
   defaultOpen,
   defaultOpenPaused,
   deepLinkParam = WALKTHROUGH_OPEN_QUERY_PARAM,
+  autoPlayCard = false,
   label = 'Play Demo Video',
   placement,
-  // Keeps the FLOATING card off the critical path. The inline preset passes 0:
-  // an in-page block is part of a page the visitor is already looking at, so
-  // staggering it in would only jump the layout.
+  // The FLOATING card never appears sooner than this (and never before the
+  // visitor's first interaction: see the mount gate). The inline preset passes
+  // 0: an in-page block is part of a page the visitor is already looking at,
+  // so staggering it in would only jump the layout.
   appearDelayMs = 3000,
   dismissal = {},
   hideNearSelector = 'footer',
@@ -211,13 +241,23 @@ function WalkthroughVideo({
   className,
 }: WalkthroughVideoProps): React.ReactElement | null {
   const inline = placement === 'inline';
+  const inScope = useLoadingScope();
   const dismissEnabled = dismissal !== false;
   const storageKey = (dismissEnabled && dismissal.storageKey) || WALKTHROUGH_VIDEO_DISMISS_KEY;
   // id-match dismissal key: a new video (new id) re-shows the card. No id
   // (embedder) → a stable presence marker so dismissal still works.
   const dismissalId = video?.id != null ? String(video.id) : 'dismissed';
 
-  // --- mount gate (never LCP; cookie read happens post-delay, no hydration mismatch) ---
+  // --- mount gate (cookie read happens post-delay, no hydration mismatch) ---
+  // The FLOATING card waits for two things: the appear delay AND the visitor's
+  // first scroll, tap or key press. The delay alone never kept it out of Largest
+  // Contentful Paint: the metric takes candidates until the first interaction,
+  // so a late card that was the largest thing in a short window became the
+  // page's LCP (blog post, 1440x215: the heading at 3.2 s, then the card's
+  // poster at 7.1 s). No attribute opts an element out, and a timer does not
+  // either; rendering only after the first interaction is the documented way,
+  // because the metric is final by then. The inline block is part of the page's
+  // own content and waits for neither.
   const [mounted, setMounted] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const hasVideo = video != null;
@@ -228,31 +268,52 @@ function WalkthroughVideo({
     // dismissal id was 'dismissed' on the first pass and a dismissed card
     // flashed for the length of a second appear-delay before hiding.
     if (!hasVideo) return undefined; // wait for data — see the id-based dep below
-    const timer = setTimeout(() => {
-      const reveal = () => {
-        if (dismissEnabled && isWalkthroughDismissed(storageKey, dismissalId)) {
-          setDismissed(true);
-          return;
-        }
-        // Cleared on the way through: a client-only embedder can swap to a NEW
-        // video id in-session (the cookie is id-matched, so the new one isn't
-        // dismissed), and a sticky `dismissed` kept the card hidden until a
-        // full reload — contradicting the id-match behaviour documented above.
-        setDismissed(false);
-        setMounted(true);
-      };
+    let delayElapsed = false;
+    let interacted = inline;
+    const reveal = () => {
+      if (dismissEnabled && isWalkthroughDismissed(storageKey, dismissalId)) {
+        setDismissed(true);
+        return;
+      }
+      // Cleared on the way through: a client-only embedder can swap to a NEW
+      // video id in-session (the cookie is id-matched, so the new one isn't
+      // dismissed), and a sticky `dismissed` kept the card hidden until a
+      // full reload — contradicting the id-match behaviour documented above.
+      setDismissed(false);
+      setMounted(true);
+    };
+    const revealWhenReady = () => {
+      if (!delayElapsed || !interacted) return;
       const ric = (window as unknown as { requestIdleCallback?: (cb: () => void) => number }).requestIdleCallback;
       if (typeof ric === 'function') idleHandle = ric(reveal);
       else reveal();
+    };
+    const stopListening = () => {
+      for (const type of FIRST_INTERACTION_EVENTS) window.removeEventListener(type, onInteraction, true);
+    };
+    function onInteraction() {
+      interacted = true;
+      stopListening();
+      revealWhenReady();
+    }
+    if (!interacted) {
+      for (const type of FIRST_INTERACTION_EVENTS) {
+        window.addEventListener(type, onInteraction, { capture: true, passive: true });
+      }
+    }
+    const timer = setTimeout(() => {
+      delayElapsed = true;
+      revealWhenReady();
     }, appearDelayMs);
     return () => {
       clearTimeout(timer);
+      stopListening();
       const cic = (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback;
       if (idleHandle !== null && typeof cic === 'function') cic(idleHandle);
     };
     // `videoId`, not the object: a new identity (embedder refetch, re-seeded
     // RSC payload) would otherwise restart the appear delay.
-  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, hasVideo, videoId]);
+  }, [appearDelayMs, dismissEnabled, storageKey, dismissalId, hasVideo, videoId, inline]);
 
   // --- environment preferences (read after hydration; no SSR access) ---
   // Derived, not stored: both inputs are plain reads of the environment, and
@@ -313,7 +374,11 @@ function WalkthroughVideo({
   const endedLatchRef = useRef(false);
 
   const [hovered, setHovered] = useState(false);
-  const [handoff, setHandoff] = useState<Handoff | null>(null);
+  // `autoPlayCard` seeds the same state a muted theater close leaves behind, so
+  // the card starts in resume mode with nothing else to special-case.
+  const [handoff, setHandoff] = useState<Handoff | null>(() =>
+    autoPlayCard && !video?.youtubeUrl ? { time: 0, muted: true, playing: true } : null,
+  );
   const [suspended, setSuspended] = useState(false);
   const [theaterStart, setTheaterStart] = useState<{ time: number; muted: boolean }>({ time: 0, muted: false });
   const [footerObservation, setFooterObservation] = useState<{ key: string; hidden: boolean } | null>(null);
@@ -879,6 +944,9 @@ function WalkthroughVideo({
     cardModeRef.current = cardMode;
   });
 
+  // While the page is read the video is not known: inline, the block is its skeleton (the same box); floating, the
+  // card is an overlay that takes no space, so nothing is drawn.
+  if (inScope) return inline ? <InlineWalkthroughVideoSkeleton className={className} /> : null;
   if (!video || (!video.mainVideoUrl && !video.youtubeUrl)) return null;
 
   // The collapsed card is suppressed by the appear-delay mount gate and by
@@ -915,6 +983,7 @@ function WalkthroughVideo({
         // receives pointer events — the media layer is pointer-events-none, so
         // a group inside it can never match :hover.
         'group/card pointer-events-auto relative overflow-hidden rounded-md border border-ods-border bg-ods-card',
+        inline && INLINE_CARD_BOX_CLASS,
         // The lift is what separates a FLOATING card from the page beneath it;
         // an in-flow block sitting inside a host card needs no shadow at all.
         !inline && 'shadow-2xl',
@@ -998,7 +1067,10 @@ function WalkthroughVideo({
           // File player only. The theater resolves YouTube-wins; the card must
           // not mount MuxPlayer on a youtube.com URL (it renders the poster).
           url={video.mainVideoUrl || ''}
-          posterUrl={video.posterUrl}
+          // The card is at most 320px wide: ask the host for a poster twice that (retina), not the full-size
+          // original the theater shows (a 1920x1080 file drawn at 333x187, CU-17tkuw5xp4q). The original is kept
+          // where the host registered no resizer.
+          posterUrl={video.posterUrl ? resizedImageUrl(video.posterUrl, CARD_POSTER_WIDTH_PX) : video.posterUrl}
           active={cardActive}
           isClone={false}
           badge="play"
@@ -1006,6 +1078,9 @@ function WalkthroughVideo({
           // Mirrors the card's own responsive width above — a flat 320px hint
           // made every phone fetch a poster ~1.7x wider than the box.
           posterSizes="(max-width: 639px) 192px, 320px"
+          // Pinned to the screen (or laid out in the host's first view), so it
+          // is often the largest thing painted: never lazy.
+          posterInView
           preload="none"
           hideMutedBadge
           onMutedFallbackChange={onCardFallbackChange}
@@ -1140,6 +1215,9 @@ function WalkthroughVideo({
 
   return (
     <>
+      {/* Inline, the card mounts after hydration: until then its skeleton holds the same box, so the page below
+          does not jump when the player appears. A floating card is an overlay and takes no space. */}
+      {inline && !showCard && !dismissed && <InlineWalkthroughVideoSkeleton className={className} />}
       {showCard &&
         (inline ? (
           // No wrapper: a positioning / z-index / safe-area shell around an
@@ -1258,4 +1336,12 @@ export function FloatingWalkthroughVideo(props: FloatingWalkthroughVideoProps): 
  */
 export function InlineWalkthroughVideo(props: InlineWalkthroughVideoProps): React.ReactElement {
   return <WalkthroughVideo {...props} placement="inline" appearDelayMs={0} dismissal={false} />;
+}
+
+/**
+ * The inline video's loading state: the shared skeleton in the card's own box. The inline card draws it itself
+ * until its player mounts; a host whose video data is still loading draws it in the same slot.
+ */
+function InlineWalkthroughVideoSkeleton({ className }: { className?: string }): React.ReactElement {
+  return <UnifiedSkeleton className={cn(INLINE_CARD_BOX_CLASS, className)} />;
 }

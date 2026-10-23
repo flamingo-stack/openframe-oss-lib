@@ -3,6 +3,7 @@ package com.openframe.data.repository.device;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -198,6 +199,28 @@ class CustomMachineRepositoryImplTest {
         Document q = repo.buildDeviceQuery(filter, null, "status").getQueryObject();
 
         assertThat(mentionsField(q, "machineId")).isTrue();
+    }
+
+    @Test
+    @DisplayName("buildDeviceQuery: manageableByPackageManagers → unreported machines pass, otherwise one of the given managers must be in a manageable state")
+    void manageableByPackageManagers_orOverGivenManagers() {
+        MachineQueryFilter filter = new MachineQueryFilter();
+        filter.setManageableByPackageManagers(List.of(PackageManagerType.BREW, PackageManagerType.WINGET));
+
+        Document q = repo.buildDeviceQuery(filter, null).getQueryObject();
+
+        assertThat(mentionsField(q, "packageManagers")).isTrue();
+        assertThat(mentionsField(q, "packageManagers.BREW")).isTrue();
+        assertThat(mentionsField(q, "packageManagers.WINGET")).isTrue();
+        assertThat(mentionsField(q, "packageManagers.CHOCO")).isFalse();
+    }
+
+    @Test
+    @DisplayName("buildDeviceQuery: without manageableByPackageManagers the query never touches packageManagers (scripts, devices page)")
+    void noManageableFilter_noPackageManagersClause() {
+        Document q = repo.buildDeviceQuery(allDimensionsFilter(), "x").getQueryObject();
+
+        assertThat(mentionsField(q, "packageManagers")).isFalse();
     }
 
     private static Pattern fieldPattern(Object node, String field) {

@@ -1,5 +1,8 @@
 import type { ComponentType } from 'react';
-import { BashIcon, CmdIcon, DenoIcon, NushellIcon, ShellIcon } from '../components/icons';
+import { BashIcon } from '../components/icons-v2-generated/brand-logos/bash-icon';
+import { CmdIcon } from '../components/icons-v2-generated/brand-logos/cmd-icon';
+import { DenoIcon } from '../components/icons-v2-generated/brand-logos/deno-icon';
+import { NushellIcon } from '../components/icons-v2-generated/brand-logos/nushell-icon';
 /**
  * Centralized Shell Types
  *
@@ -8,6 +11,7 @@ import { BashIcon, CmdIcon, DenoIcon, NushellIcon, ShellIcon } from '../componen
  */
 import { PowershellLogoIcon } from '../components/icons-v2-generated/brand-logos/powershell-logo-icon';
 import { PythonLogoIcon } from '../components/icons-v2-generated/brand-logos/python-logo-icon';
+import { ShellIcon } from '../components/icons-v2-generated/brand-logos/shell-icon';
 import type { IconProps } from './icons';
 
 export const ShellTypeValues = {

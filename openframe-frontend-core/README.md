@@ -5,7 +5,7 @@ Shared design system and component library for Flamingo platforms (OpenMSP, Open
 ## Installation
 
 ```bash
-npm install @flamingo-stack/openframe-frontend-core
+npm install https://pkg.pr.new/flamingo-stack/openframe-oss-lib/@flamingo-stack/openframe-frontend-core@<x.y.z>
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ npm install @flamingo-stack/openframe-frontend-core
 ```tsx
 import { Button, Card, Input, Modal, Tag } from '@flamingo-stack/openframe-frontend-core/components/ui'
 import { YouTubeEmbed, FigmaPrototypeViewer } from '@flamingo-stack/openframe-frontend-core/components/features'
-import { GitHubIcon, OpenFrameLogo } from '@flamingo-stack/openframe-frontend-core/components/icons'
+import { GithubIcon, OpenframeLogoIcon } from '@flamingo-stack/openframe-frontend-core/components/icons-v2'
 ```
 
 ### Hooks
@@ -27,7 +27,7 @@ import { useDebounce, useMediaQuery, useToast } from '@flamingo-stack/openframe-
 ### Utilities
 
 ```tsx
-import { cn, formatDate, formatPrice, getBaseUrl } from '@flamingo-stack/openframe-frontend-core/utils'
+import { cn, formatDate, formatPrice, getPlatformUrl } from '@flamingo-stack/openframe-frontend-core/utils'
 ```
 
 ### Styles
@@ -60,12 +60,11 @@ export default {
 | `.` | Main entry (all components, hooks, utils) |
 | `./components/ui` | Base UI components (Button, Card, Input, Modal, Tag, etc.) |
 | `./components/features` | Complex components (YouTubeEmbed, FigmaPrototypeViewer, AuthProvidersList) |
-| `./components/icons` | Icon components (GitHubIcon, OpenFrameLogo, XLogo) |
 | `./components/icons-v2` | Generated icon set |
 | `./components/navigation` | Navigation components (Header, StickySectionNav) |
 | `./components/toast` | Toast notification system |
 | `./hooks` | React hooks (useDebounce, useMediaQuery, useToast, etc.) |
-| `./utils` | Utilities (cn, formatDate, formatPrice, getBaseUrl, platform-config) |
+| `./utils` | Utilities (cn, formatDate, formatPrice, getPlatformUrl, platform-config) |
 | `./types` | TypeScript type definitions |
 | `./styles` | CSS styles and ODS design tokens |
 | `./nats` | NATS WebSocket utilities |
@@ -177,3 +176,4 @@ End-to-end guides under [`docs/`](./docs):
 ## License
 
 Private package for Flamingo CX projects.
+

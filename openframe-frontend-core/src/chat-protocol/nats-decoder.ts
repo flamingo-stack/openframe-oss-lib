@@ -20,6 +20,7 @@ import { MESSAGE_TYPE } from '../components/chat/types/message.types';
 import type { AskOptionData } from '../components/chat/types/message.types';
 import { ESCALATION_STATE, escalationResolvedStatus } from './events';
 import type { ApprovalToolCall, ChatStreamEvent } from './events';
+import { attachmentsEvent, sourceMetadataEvent } from './source-metadata';
 import { isRecord } from './wire-narrow';
 
 /** Minimal structural view of a NATS chunk (see `ChunkData` in
@@ -120,6 +121,19 @@ export function decodeNatsChunk(chunk: unknown): ChatStreamEvent | null {
         return { type: 'thinking-delta', text: data.text, ...seq };
       }
       return null;
+
+    // The chunk arrives BEFORE or between the answer's text deltas, so the
+    // reducer — not this decoder — owns attaching it to the right turn.
+    case MESSAGE_TYPE.ATTACHMENTS: {
+      const event = attachmentsEvent(data);
+      return event ? { ...event, ...seq } : null;
+    }
+
+    // The envelope `ATTACHMENTS` replaced (see `MESSAGE_TYPE.GUIDE`).
+    case MESSAGE_TYPE.GUIDE: {
+      const event = sourceMetadataEvent(data.payload);
+      return event ? { ...event, ...seq } : null;
+    }
 
     // An ask card is only an ask card with something to pick: a question and at
     // least one option. Anything less is dropped rather than rendered as an

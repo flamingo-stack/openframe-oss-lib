@@ -8,6 +8,7 @@ import { cn } from '../../utils';
 import { Logout02Icon, PenEditIcon, UserSearchIcon } from '../icons-v2-generated';
 import { Button, SquareAvatar } from '../ui';
 import { OVERLAY_BACKDROP_CLASS } from '../ui/drawer';
+import { NavigationItemBadge } from './navigation-item-badge';
 
 // Header height constant — the unified top-navigation `small` bar (56px on all screens)
 const HEADER_HEIGHT = 56;
@@ -76,23 +77,19 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
     const isActive = item.isActive ?? false;
 
     return (
-      <button
+      <Button
+        variant="row"
         key={item.id}
         onClick={() => handleItemClick(item)}
         disabled={disabled}
-        className={cn(
-          'relative flex items-center gap-1 p-3',
-          'focus:outline-none focus-visible:outline-none',
-          'transition-colors duration-200',
-          'rounded-md border border-ods-border bg-ods-card',
-          !disabled && 'hover:bg-ods-bg-hover',
-          isGridItem ? 'w-full min-w-0' : 'w-full',
-          // Active state
-          isActive && !disabled && 'border-ods-accent',
-          // Disabled state
-          disabled && 'cursor-not-allowed opacity-50',
-        )}
+        data-state={isActive && !disabled ? 'active' : undefined}
+        // Every entry is a bordered card; the current page's takes the accent border.
+        data-tone="framed"
+        className={isGridItem ? 'min-w-0' : undefined}
         aria-current={isActive ? 'page' : undefined}
+        // The same name the sidebar row announces — "Scripts (Beta)" — rather than
+        // the content read raw, which Chrome hands over as "Scripts BETA".
+        aria-label={item.badge ? `${item.label} (${item.badge})` : undefined}
       >
         {/* Icon */}
         {item.icon && (
@@ -104,16 +101,20 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
           </div>
         )}
 
-        {/* Label */}
-        <span
-          className={cn(
-            'flex-1 truncate text-left text-h6',
-            isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-primary',
-          )}
-        >
-          {item.label}
+        {/* Label, with its stamp when the entry carries one. The button's
+            accessible name is its content, so the stamp reads as part of it. */}
+        <span className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xxs)]">
+          <span
+            className={cn(
+              'min-w-0 truncate text-left text-h6',
+              isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-primary',
+            )}
+          >
+            {item.label}
+          </span>
+          {item.badge && <NavigationItemBadge compact label={item.badge} />}
         </span>
-      </button>
+      </Button>
     );
   };
 
@@ -240,18 +241,10 @@ export const MobileBurgerMenu = React.memo(function MobileBurgerMenuImpl({
 
           {/* Logout Button */}
           {onLogout && (
-            <button
-              onClick={onLogout}
-              disabled={disabled}
-              className={cn(
-                'flex w-full items-center gap-1 rounded-md border border-ods-border bg-ods-card p-3 transition-colors',
-                !disabled && 'hover:bg-ods-bg-hover',
-                disabled && 'cursor-not-allowed opacity-50',
-              )}
-            >
+            <Button variant="row" data-tone="framed" onClick={onLogout} disabled={disabled}>
               <Logout02Icon className="size-4 text-ods-error" />
               <span className="flex-1 text-left text-ods-text-primary text-h6">Log Out</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>

@@ -4,10 +4,13 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.InputArgument;
 import com.openframe.data.document.packagesearch.BrewPackageType;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.packagesearch.PackageDetails;
+import com.openframe.api.dto.packagesearch.PackageSearchItem;
 import com.openframe.data.document.packagesearch.PackageManagerType;
-import com.openframe.api.dto.packagesearch.PackageSearchInput;
-import com.openframe.api.dto.packagesearch.PackageSearchResult;
+import com.openframe.api.dto.shared.ConnectionArgs;
+import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.service.packagesearch.PackageSearchService;
 import lombok.RequiredArgsConstructor;
 
@@ -18,8 +21,16 @@ public class PackageSearchDataFetcher {
     private final PackageSearchService packageSearchService;
 
     @DgsQuery
-    public PackageSearchResult searchPackages(@InputArgument PackageSearchInput input) {
-        return packageSearchService.search(input);
+    public CountedGenericConnection<GenericEdge<PackageSearchItem>> searchPackages(
+            @InputArgument PackageManagerType packageManager,
+            @InputArgument String search,
+            @InputArgument Integer first,
+            @InputArgument String after,
+            @InputArgument Integer last,
+            @InputArgument String before) {
+        ConnectionArgs args = ConnectionArgs.builder()
+                .first(first).after(after).last(last).before(before).build();
+        return packageSearchService.search(packageManager, search, CursorPaginationCriteria.fromConnectionArgs(args));
     }
 
     @DgsQuery

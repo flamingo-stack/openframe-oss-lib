@@ -1,6 +1,9 @@
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
-import { getProxiedImageUrl } from '../../../utils/image-proxy-stub';
+import Link from '../../../embed-shims/next-link';
+import { useLoadingScope } from '../../ui/loading-scope';
+import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
+import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import { AdminContentCard } from './admin-content-card';
 
 /** The fields every people-hub employee entry shares. Entity-specific bindings
@@ -15,7 +18,7 @@ export interface EmployeeEntryCardData {
   author?: { full_name?: string | null; avatar_url?: string | null } | null;
 }
 
-export interface EmployeeEntryCardProps {
+interface LoadedEmployeeEntryCardProps {
   entry: EmployeeEntryCardData;
   /** Already-formatted date shown in the meta row. Bindings own the format so
    *  the UTC-pin convention stays in `utils/format`, not in the card. */
@@ -35,26 +38,47 @@ export interface EmployeeEntryCardProps {
   className?: string;
 }
 
-const STATUS_BADGE_CLASS: Record<string, string> = {
-  published: 'bg-ods-success-secondary text-ods-success',
-  draft: 'bg-ods-warning-secondary text-ods-warning',
-  archived: 'bg-ods-border text-ods-text-secondary',
+/**
+ * The entry, or `loading` while the host reads it: the card then draws its own loading form (the admin card's), as it
+ * does in a loading scope. `actions` then says what the actions row shows (a node drawn for real and inert, `true`
+ * button bars, absent none).
+ */
+export type EmployeeEntryCardProps =
+  (LoadedEmployeeEntryCardProps & { loading?: boolean }) | (Partial<LoadedEmployeeEntryCardProps> & { loading: true });
+
+/** Entry lifecycle → the standard badge colour scheme (the same ODS pairs every status badge uses). */
+const STATUS_BADGE_SCHEME: Record<string, NonNullable<StatusBadgeProps['colorScheme']>> = {
+  published: 'success',
+  draft: 'warning',
+  archived: 'default',
   // Design-doc lifecycle (product-hub) — same ODS pairs, no new palette.
-  in_review: 'bg-ods-warning-secondary text-ods-warning',
-  approved: 'bg-ods-success-secondary text-ods-success',
-  building: 'bg-ods-success-secondary text-ods-success',
-  shipped: 'bg-ods-success-secondary text-ods-success',
-  abandoned: 'bg-ods-border text-ods-text-secondary',
+  in_review: 'warning',
+  approved: 'success',
+  building: 'success',
+  shipped: 'success',
+  abandoned: 'default',
 };
 
-/** Shared badge treatment so an entity's own badges (discipline, level) sit
- *  flush with the status badge instead of re-deriving the classes per card. */
-export function EmployeeEntryBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="rounded border border-ods-border bg-ods-card px-2 py-1 text-xs font-medium text-ods-text-secondary">
-      {children}
-    </span>
-  );
+/** An entity's own badge (discipline, level, step count): the standard `StatusBadge`
+ *  stamp, so it sits at exactly the size and height of the status badge beside it. */
+export function EmployeeEntryBadge({ children }: { children: string }) {
+  return <StatusBadge text={children} colorScheme="default" variant="button" singleLine />;
+}
+
+/** ONE switch: in a loading scope (or `loading`) the card is the admin card's loading form, box for box. */
+export function EmployeeEntryCard(props: EmployeeEntryCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return (
+      <AdminContentCard
+        loading
+        title=""
+        className={props.className}
+        actions={props.actions || false}
+        subtitleRow={false}
+      />
+    );
+  }
+  return <LoadedEmployeeEntryCard {...props} />;
 }
 
 /**
@@ -66,7 +90,7 @@ export function EmployeeEntryBadge({ children }: { children: React.ReactNode }) 
  * format and which extra badges they add, so the card itself cannot drift
  * between the dashboard and the related-content rail.
  */
-export function EmployeeEntryCard({
+function LoadedEmployeeEntryCard({
   entry,
   dateLabel,
   extraBadges,
@@ -75,7 +99,8 @@ export function EmployeeEntryCard({
   actions,
   anchorProps,
   className,
-}: EmployeeEntryCardProps) {
+}: LoadedEmployeeEntryCardProps) {
+  const authorAvatar = useProxiedImageUrl(entry.author?.avatar_url, { directHttps: false });
   const card = (
     <AdminContentCard
       imageUrl={entry.featured_image || entry.main_video_thumbnail}
@@ -86,13 +111,12 @@ export function EmployeeEntryCard({
         entry.status || extraBadges ? (
           <>
             {entry.status ? (
-              <span
-                className={`rounded px-2 py-1 text-xs font-medium ${
-                  STATUS_BADGE_CLASS[entry.status] ?? 'border border-ods-border bg-ods-card text-ods-text-secondary'
-                }`}
-              >
-                {entry.status}
-              </span>
+              <StatusBadge
+                text={entry.status}
+                colorScheme={STATUS_BADGE_SCHEME[entry.status] ?? 'default'}
+                variant="button"
+                singleLine
+              />
             ) : null}
             {extraBadges}
           </>
@@ -101,11 +125,13 @@ export function EmployeeEntryCard({
       meta={
         <>
           <span className="flex min-w-0 items-center gap-2">
-            {entry.author?.avatar_url ? (
+            {authorAvatar ? (
               <Image
-                src={getProxiedImageUrl(entry.author.avatar_url) ?? entry.author.avatar_url}
+                src={authorAvatar}
                 alt=""
-                className="h-5 w-5 shrink-0 rounded-full object-cover"
+                // One line of the meta row tall (16px on a phone, 20px from md), so the
+                // row is exactly the line the skeleton reserves.
+                className="h-[1lh] w-[1lh] shrink-0 rounded-full object-cover"
                 width={20}
                 height={20}
                 unoptimized
@@ -117,39 +143,20 @@ export function EmployeeEntryCard({
         </>
       }
       actions={actions}
+      // Every row keeps its space, so every card in a rail or a grid is one
+      // height with its rows aligned, and `EmployeeEntryCardSkeleton` (the
+      // shared `AdminContentCard loading`) matches it box for box.
+      reserveRows
+      // An entry has no subtitle line: nothing to reserve between title and summary.
+      subtitleRow={false}
       className={className}
     />
   );
   return anchorProps ? (
-    <a {...anchorProps} className="block h-full">
+    <Link {...anchorProps} className="block h-full">
       {card}
-    </a>
+    </Link>
   ) : (
     card
-  );
-}
-
-/** Loading skeleton matching EmployeeEntryCard's AdminContentCard shape (3:2 cover
- *  + title / summary / meta lines). Used by the related-content rail while a
- *  group hydrates so there's no shape jump when the real card lands. */
-export function EmployeeEntryCardSkeleton({ className }: { className?: string }) {
-  // Same convention as BlogCardSkeleton et al.: animate-pulse on the container,
-  // `bg-ods-bg` placeholder blocks, flex-grow body with an `mt-auto` avatar+name
-  // row. Shape mirrors EmployeeEntryCard's AdminContentCard (rounded-2xl, 3:2 cover).
-  return (
-    <div
-      className={`group flex h-full animate-pulse flex-col overflow-hidden rounded-2xl border border-ods-border bg-ods-card ${className ?? ''}`}
-    >
-      <div className="aspect-[3/2] bg-ods-bg" />
-      <div className="flex flex-grow flex-col space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-bg" />
-        <div className="h-3 w-full rounded bg-ods-bg/60" />
-        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
-        <div className="mt-auto flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-ods-bg" />
-          <div className="h-3 w-24 rounded bg-ods-bg/60" />
-        </div>
-      </div>
-    </div>
   );
 }

@@ -8,10 +8,11 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
+import com.openframe.api.event.DeviceNicknameUpdatedEvent;
 import com.openframe.api.exception.DeviceNotFoundException;
 import com.openframe.api.mapper.DeviceFilterOptionMapper;
 import com.openframe.api.service.processor.DeviceStatusProcessor;
-import com.openframe.api.service.rmm.schedule.ScheduleScriptDeviceService;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
@@ -20,17 +21,19 @@ import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
-import com.openframe.data.repository.rmm.DeviceOnlineDispatchRepository;
 import com.openframe.data.repository.device.MachineRepository;
+import com.openframe.data.repository.device.MachineNameMatches;
 import com.openframe.data.repository.tag.TagAssignmentRepository;
 import com.openframe.data.repository.tag.TagRepository;
 import com.openframe.data.service.machine.MachineWriteResult;
 import com.openframe.data.service.machine.MachineWriter;
+import com.openframe.data.service.rmm.DeletedMachineCleanup;
 import com.openframe.data.service.TenantIdProvider;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -38,7 +41,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -55,20 +57,43 @@ import static com.openframe.data.service.machine.MachineUpdate.machineUpdate;
 public class DeviceService {
 
     private final MachineRepository machineRepository;
-    private final DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
+    private final DeletedMachineCleanup deletedMachineCleanup;
     private final MachineWriter machineWriter;
     private final TagRepository tagRepository;
     private final TagAssignmentRepository tagAssignmentRepository;
     private final DeviceStatusProcessor deviceStatusProcessor;
-    private final ScheduleScriptDeviceService scheduleScriptDeviceService;
     private final DeviceFilterOptionMapper deviceFilterOptionMapper;
     private final TenantIdProvider tenantIdProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     public Optional<Machine> findByMachineId(@NotBlank String machineId) {
         log.debug("Finding machine by ID: {}", machineId);
         Optional<Machine> result = machineRepository.findByMachineId(machineId);
         log.debug("Found machine: {}", result.isPresent());
         return result;
+    }
+
+    /**
+     * One query for the whole set; machines that do not exist are simply absent from the result.
+     */
+    public List<Machine> findByMachineIds(Collection<String> machineIds) {
+        log.debug("Finding machines by IDs: {}", machineIds);
+        List<Machine> result = machineRepository.findByMachineIdIn(machineIds);
+        log.debug("Found {} of {} machines", result.size(), machineIds.size());
+        return result;
+    }
+
+    public void verifyDispatchable(List<String> machineIds) {
+        machineIds.forEach(this::verifyDispatchable);
+    }
+
+    public void verifyDispatchable(String machineId) {
+        Machine machine = findByMachineId(machineId)
+                .orElseThrow(() -> new DeviceNotFoundException("Machine not found: " + machineId));
+        if (!DeviceStatus.CONNECTED.contains(machine.getStatus())) {
+            throw new BadRequestException(
+                    "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + machineId);
+        }
     }
 
     public CountedGenericQueryResult<Machine> queryDevices(DeviceFilterCriteria filterOptions,
@@ -80,11 +105,18 @@ public class DeviceService {
         return paginate(machineFilter(filterOptions, null, null), search, paginationCriteria, sort);
     }
 
-    /**
-     * Same as {@link #queryDevices} but restricted to a fixed set of machineIds (e.g. the
-     * devices assigned to a script schedule). A {@code null}/empty set yields an empty page;
-     * the restriction is intersected with any tag filter.
-     */
+    public List<Machine> findDevicesAfter(DeviceFilterCriteria filterOptions, String afterMachineId, int limit) {
+        String tenantId = tenantIdProvider.getTenantId();
+        MachineQueryFilter filter = machineFilter(filterOptions, null, null);
+        return machineRepository.findMachinesAfter(tenantId, filter, afterMachineId, limit);
+    }
+
+    public MachineNameMatches findMatchingNames(DeviceFilterCriteria filterOptions) {
+        String tenantId = tenantIdProvider.getTenantId();
+        MachineQueryFilter filter = machineFilter(filterOptions, null, null);
+        return machineRepository.findMatchingNames(tenantId, filter);
+    }
+
     public CountedGenericQueryResult<Machine> queryAssignedDevices(Collection<String> machineIds,
                                                   DeviceFilterCriteria filterOptions,
                                                   CursorPaginationCriteria paginationCriteria,
@@ -153,20 +185,12 @@ public class DeviceService {
                 .build();
     }
 
-    /**
-     * All machineIds of devices matching {@code filter}/{@code search} within the given platforms —
-     * backs "Add all devices" for a schedule (resolve the whole filtered set at once, unpaginated).
-     */
     public List<String> findDeviceIdsForPlatforms(Collection<OsType> platformNames,
                                                   DeviceFilterCriteria filterOptions, String search) {
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
                 scheduleDeviceFilter(filterOptions, platformNames, null), search);
     }
 
-    /**
-     * Of the given machineIds, those matching {@code filter}/{@code search} — backs "Remove all
-     * devices" (the assigned set narrowed by the Selected-tab filter). Empty/null in → empty out.
-     */
     public List<String> findAssignedDeviceIds(Collection<String> machineIds,
                                               DeviceFilterCriteria filterOptions, String search) {
         if (machineIds == null || machineIds.isEmpty()) {
@@ -177,6 +201,11 @@ public class DeviceService {
         }
         return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
                 scheduleDeviceFilter(filterOptions, null, machineIds), search);
+    }
+
+    public List<String> findAllDeviceIds(DeviceFilterCriteria filterOptions, String search) {
+        return machineRepository.findMachineIds(tenantIdProvider.getTenantId(),
+                scheduleDeviceFilter(filterOptions, null, null), search);
     }
 
     private CountedGenericQueryResult<Machine> paginate(MachineQueryFilter filter, String search,
@@ -190,13 +219,11 @@ public class DeviceService {
 
         long totalFilteredCount = machineRepository.countMachines(tenantId, filter, search);
 
-        List<Machine> allWithOne = machineRepository.findMachinesWithCursor(tenantId, filter, search,
-                normalizedPagination.getCursor(), normalizedPagination.getLimit() + 1,
-                sortField, sortDirection.name());
-        List<Machine> pageItems = allWithOne.size() > normalizedPagination.getLimit()
-                ? allWithOne.subList(0, normalizedPagination.getLimit())
-                : allWithOne;
-        boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
+        int limit = normalizedPagination.getLimit();
+        List<Machine> raw = machineRepository.findMachinesWithCursor(tenantId, filter, search,
+                normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
+        boolean hasNextPage = raw.size() > limit;
+        List<Machine> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor());
 
@@ -218,12 +245,9 @@ public class DeviceService {
                 .build();
     }
 
-    /** Statuses a device may have to be offered to / kept on a script schedule: only live agents. */
-    private static final Set<DeviceStatus> SCHEDULE_ALLOWED_STATUSES = EnumSet.of(DeviceStatus.ONLINE, DeviceStatus.OFFLINE);
 
-    /** Every status other than {@link #SCHEDULE_ALLOWED_STATUSES}, applied as a {@code $nin} on top of any user filter. */
     private static final List<String> SCHEDULE_EXCLUDED_STATUSES = Arrays.stream(DeviceStatus.values())
-            .filter(status -> !SCHEDULE_ALLOWED_STATUSES.contains(status))
+            .filter(status -> !DeviceStatus.CONNECTED.contains(status))
             .map(Enum::name)
             .toList();
 
@@ -238,19 +262,23 @@ public class DeviceService {
     private MachineQueryFilter machineFilter(DeviceFilterCriteria filter,
                                              Collection<OsType> osTypeScope,
                                              Collection<String> restrictToMachineIds) {
-        MachineQueryFilter out = new MachineQueryFilter();
+        MachineQueryFilter.MachineQueryFilterBuilder builder = MachineQueryFilter.builder();
         List<OsType> filterOsTypes = null;
         if (filter != null) {
-            out.setStatuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setDeviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null);
-            out.setOrganizationIds(filter.getOrganizationIds());
+            builder.statuses(filter.getStatuses() != null ? filter.getStatuses().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .deviceTypes(filter.getDeviceTypes() != null ? filter.getDeviceTypes().stream().map(Enum::name).collect(Collectors.toList()) : null)
+                    .organizationIds(filter.getOrganizationIds())
+                    .manageableByPackageManagers(filter.getManageableByPackageManagers())
+                    .pattern(filter.getPattern())
+                    .hostnames(filter.getHostnames())
+                    .nicknames(filter.getNicknames())
+                    .tagKeys(filter.getTagKeys())
+                    .tagValues(filter.getTagValues());
             filterOsTypes = filter.getOsTypes();
         }
-        out.setOsTypes(resolveOsTypes(filterOsTypes, osTypeScope));
-        List<String> tagMachineIds = filter != null ? resolveTagFilterToMachineIds(filter) : null;
-        out.setRestrictToMachineIds(intersectMachineIds(tagMachineIds, restrictToMachineIds));
-
-        return out;
+        return builder.osTypes(resolveOsTypes(filterOsTypes, osTypeScope))
+                .restrictToMachineIds(restrictToMachineIds)
+                .build();
     }
 
     private static List<OsType> resolveOsTypes(Collection<OsType> filterOsTypes, Collection<OsType> osTypeScope) {
@@ -260,11 +288,7 @@ public class DeviceService {
         return osTypeScope != null && !osTypeScope.isEmpty() ? new ArrayList<>(osTypeScope) : null;
     }
 
-    /**
-     * Combine the tag-filter machineId restriction with an explicit caller restriction into a
-     * single {@code $in} set. {@code null} on a side means "no restriction from that side";
-     * when both are present the result is their intersection (possibly empty).
-     */
+    // null on a side = no restriction from that side; both present = intersection (possibly empty).
     private static Collection<String> intersectMachineIds(List<String> tagMachineIds, Collection<String> restrict) {
         if (tagMachineIds == null && restrict == null) {
             return null;
@@ -279,11 +303,7 @@ public class DeviceService {
         return tagMachineIds.stream().filter(restrictSet::contains).collect(Collectors.toList());
     }
 
-    /**
-     * Resolves tag-based filters (tagKeys, tagValues) to a set of machineIds.
-     * Returns null if no tag filters are applied, meaning no restriction needed.
-     * Returns an empty list if tag filters are applied but no machines match.
-     */
+    // null = no tag filter applied (no restriction); empty list = filter applied but nothing matched.
     private List<String> resolveTagFilterToMachineIds(DeviceFilterCriteria filter) {
         boolean hasTagKeys = filter.getTagKeys() != null && !filter.getTagKeys().isEmpty();
         boolean hasTagValues = filter.getTagValues() != null && !filter.getTagValues().isEmpty();
@@ -330,11 +350,7 @@ public class DeviceService {
             return;
         }
         if (status == DeviceStatus.DELETED) {
-            scheduleScriptDeviceService.removeDeviceFromAllSchedules(machine.getTenantId(), machineId);
-            long removedDispatch = deviceOnlineDispatchRepository.deleteByTenantIdAndMachineId(machine.getTenantId(), machineId);
-            if (removedDispatch > 0) {
-                log.info("Removed first-online dispatch record(s) for deleted machineId={}, count={}", machineId, removedDispatch);
-            }
+            deletedMachineCleanup.removeFromSchedules(machine.getTenantId(), machineId);
         }
 
         machine.setStatus(status);
@@ -354,6 +370,7 @@ public class DeviceService {
         MachineWriteResult result = machineWriter
                 .update(machineId, machineUpdate().set(NICKNAME, normalizeNickname(nickname)))
                 .orElseThrow(() -> new DeviceNotFoundException("Device not found: " + machineId));
+        eventPublisher.publishEvent(new DeviceNicknameUpdatedEvent(this, machineId));
         log.info("Device {} nickname updated", machineId);
         return result.after();
     }

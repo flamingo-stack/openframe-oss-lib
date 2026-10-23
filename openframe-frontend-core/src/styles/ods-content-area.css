@@ -1,0 +1,31 @@
+/* Open Design System – Content Area Tokens */
+/*
+ * The responsive tokens in ods-responsive-tokens.css follow the VIEWPORT. A
+ * layout with a docked side panel narrows the content area without the
+ * viewport changing, so content inside `.ods-content-area` follows its OWN
+ * width instead:
+ *
+ *   - `.ods-content-area` is a named inline-size container (`ods-content`).
+ *   - `.ods-content-scope` sits inside it and re-declares the mobile tokens
+ *     while the area is narrower than the content `md` step
+ *     (ods-content-area-tokens.css, generated). The variables cascade, so
+ *     every `text-h*` and `var(--spacing-system-*)` below the scope picks
+ *     them up with no change to the components.
+ *   - From that step up the scope declares nothing and inherits the viewport
+ *     tokens from :root, so a wide content area renders exactly as before.
+ *
+ * A container query cannot style the container itself, hence two elements.
+ * The scope is `display: contents`: it carries the variables without adding a
+ * box, so pages keep `<main>` as their layout parent.
+ *
+ * Layout switches inside the area use the `content-md:` / `content-lg:`
+ * Tailwind variants. The steps themselves live in layout-steps.ts.
+ */
+
+.ods-content-area {
+  container: ods-content / inline-size;
+}
+
+.ods-content-scope {
+  display: contents;
+}

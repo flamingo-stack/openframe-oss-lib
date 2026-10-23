@@ -2,22 +2,30 @@
 
 import type React from 'react';
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 
-/** Loading skeleton for iframe embeds — clean iframe-sized rectangle.
- *  Uses `bg-ods-card` (visible token) rather than `bg-ods-skeleton`
- *  which resolves to transparent in this build (the same gotcha
- *  documented in `chat-message-row.tsx`'s skeleton). No fake inner
- *  placeholder cruft — a real loading iframe shows a blank rectangle.
+/** Loading skeleton for iframe embeds: a clean iframe-sized `UnifiedSkeleton`
+ *  rectangle. No fake inner placeholder cruft: a real loading iframe shows a
+ *  blank rectangle.
  *
  *  Exported so a viewer that is still RESOLVING where its frame points
  *  (ClaudeEmbed probing for a self-hosted mirror, before it has a `src`)
  *  can render the IDENTICAL skeleton through `EmbedViewerFrame`, keeping
  *  every embed's loading state 1:1 with the Figma/Sheets/PDF viewers. */
-export function EmbedLoadingSkeleton({ height }: { height?: string }) {
+export function EmbedLoadingSkeleton({
+  height,
+  region = true,
+}: {
+  height?: string;
+  /** The box announces itself (one named status). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+}) {
   return (
-    <div
-      className="w-full animate-pulse overflow-hidden rounded-lg border border-ods-border bg-ods-card"
-      style={{ height: height || 'calc(100vh - 250px)' }}
+    <UnifiedSkeleton
+      className="w-full overflow-hidden rounded-lg border border-ods-border"
+      height={height || 'calc(100vh - 250px)'}
+      aria-label={region ? 'Loading the embed' : undefined}
     />
   );
 }
@@ -79,6 +87,7 @@ export function EmbedIframe({
   const isLoaded = loadedSrc === src;
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const handleLoad = useCallback(() => setLoadedSrc(src), [src]);
+  const held = useLoadingScope();
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -94,6 +103,9 @@ export function EmbedIframe({
   }, [src]);
 
   const resolvedHeight = height || 'calc(100vh - 250px)';
+
+  // In a loading scope the embed is its loading box, and nothing is framed.
+  if (held) return <EmbedLoadingSkeleton height={resolvedHeight} />;
 
   return (
     <>

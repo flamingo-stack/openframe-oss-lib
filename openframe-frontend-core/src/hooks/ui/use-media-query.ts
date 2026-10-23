@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { LAYOUT_STEPS } from '../../styles/layout-steps';
 import { useIsomorphicLayoutEffect } from './use-isomorphic-layout-effect';
 
 /**
@@ -35,8 +36,8 @@ export function useMediaQuery(query: string): boolean | undefined {
  * Predefined breakpoints for common screen sizes
  */
 export const breakpoints = {
-  md: '(min-width: 800px)', // Tablet: 50rem
-  lg: '(min-width: 1280px)', // Desktop: 80rem
+  md: `(min-width: ${LAYOUT_STEPS.md.viewport}px)`, // Tablet
+  lg: `(min-width: ${LAYOUT_STEPS.lg.viewport}px)`, // Desktop
 };
 
 /** @deprecated Use useMdUp instead */

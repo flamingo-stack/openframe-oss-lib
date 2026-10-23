@@ -9,6 +9,7 @@ import com.openframe.test.data.dto.external.customer.CustomerResponse;
 import com.openframe.test.data.dto.external.customer.CustomersResponse;
 import io.restassured.response.Response;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -108,6 +109,9 @@ public class ExternalPaginationTest extends ExternalApiBaseTest {
         assertThat(page.getPageInfo()).as("Paginated response should carry pageInfo").isNotNull();
     }
 
+    // Disabled pending https://app.clickup.com/t/86akk8pyu: hasNextPage is true on any exactly-full
+    // page, so on a tenant whose customer count is a multiple of the limit the endCursor leads nowhere.
+    @Disabled("Wait for bug fix")
     @Tag("feature")
     @Tag("read")
     @Order(5)

@@ -3,8 +3,11 @@
 import { ChevronRight } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { cn } from '../../utils/cn';
+import { formatDateWithTimezone, formatTimeWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { MAX_MONTH_OFFSET } from '../../utils/hubspot-meetings-convention';
-import { Button, DatePickerCalendar, Skeleton } from '../ui';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button, DatePickerCalendar } from '../ui';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * SlotPicker — day layer + time-chip grid for the meeting scheduler.
@@ -43,11 +46,22 @@ import { Button, DatePickerCalendar, Skeleton } from '../ui';
  * itself, keeping SSR output deterministic).
  */
 
+/**
+ * How the two columns sit. `card` is the scheduler card's own (the module
+ * docblock). `modal` is the onboarding "Book an Onboarding Call" window: a
+ * 600px box where the calendar keeps its width and the times run down ONE
+ * column beside it, scrolling inside the calendar's height - on a phone the
+ * times are four across, as that design draws them.
+ */
+export type SlotPickerLayout = 'card' | 'modal';
+
 export interface SlotPickerProps {
   /** Bookable slot start times (epoch ms) for the selected duration. */
   slots: number[];
-  /** IANA zone every label renders in (parent resolves post-mount). */
-  timezone: string;
+  /** Column layout; `card` unless the host says otherwise. */
+  layout?: SlotPickerLayout;
+  /** IANA zone every label renders in (parent resolves post-mount; null until then, which draws the skeleton). */
+  timezone: string | null;
   monthOffset: number;
   onMonthOffsetChange: (offset: number) => void;
   selectedSlot: number | null;
@@ -63,6 +77,11 @@ export interface SlotPickerProps {
    * the visitor can see WHICH time is being booked.
    */
   isSubmitting?: boolean;
+  /**
+   * The availability (or the duration and zone it is read for) has not arrived: the whole picker draws its
+   * skeleton, as in a loading scope. DISTINCT from `isLoading`, a month refetch under a mounted picker.
+   */
+  loading?: boolean;
 }
 
 /** Stable per-zone day key for an instant, e.g. "2026-08-14" (exported — the
@@ -89,7 +108,7 @@ function dateFromDayKey(key: string): Date {
 }
 
 function timeLabelInZone(ms: number, timeZone: string): string {
-  return new Intl.DateTimeFormat(undefined, { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(ms));
+  return formatTimeWithTimezone(ms, timeZone, { viewerLocale: true });
 }
 
 /**
@@ -109,7 +128,7 @@ function timeLabelInZone(ms: number, timeZone: string): string {
  * 48px targets and the COLUMN widens to house it, rather than the buttons
  * shrinking to fit a narrower column.
  */
-const CALENDAR_W = 'md:w-[19rem] md:shrink-0 lg:w-[16rem]';
+const CALENDAR_W = 'content-md:w-[19rem] content-md:shrink-0 content-lg:w-[16rem]';
 
 /** Column heading ("Select Date & Time" / the chosen day) — body-weight
  *  primary, 4px above its content, mirrored by both skeletons. */
@@ -149,7 +168,7 @@ const CHIP_GRID_CLASS = cn(
   // 700px card into a 1500px one and buries whatever the page puts below
   // it. This is the one nested scroller worth having: a small, obviously
   // bounded list with a visible edge, exactly as drawn.
-  'max-h-[9.75rem] md:max-h-none',
+  'max-h-[9.75rem] content-md:max-h-none',
   // No height of its own, and none borrowed from the calendar either: the card
   // states one height, the panel and this row pass it down, and what is left
   // after the column heading IS the scroll box. A long day scrolls inside it.
@@ -187,36 +206,55 @@ const CHIP_CLASS = 'w-full px-[var(--spacing-system-xxs)]';
  * is worse than the thing it saves.
  */
 const SLOT_ROW_CLASS = cn(
-  'flex min-w-0 flex-col md:flex-row',
+  'flex min-w-0 flex-col content-md:flex-row',
   // Default `stretch` at every width, deliberately. Stacked, that is what
   // makes each section span the card — an `items-start` here (it was here, to
   // stop a column growing taller than its month) collapses both sections to
   // their intrinsic WIDTH instead, which on a phone left the calendar and the
   // chips huddled against the left edge with half the card empty. The
   // calendar no longer needs protecting: its height is fixed, not derived.
-  'md:min-h-0 md:flex-1 lg:gap-[var(--spacing-system-lf)]',
+  'content-md:min-h-0 content-md:flex-1 content-lg:gap-[var(--spacing-system-lf)]',
 );
 
 /** Shared by both columns: self-padded until the panel takes over at `lg`.
  *  Widths are per-column — the calendar states one (`CALENDAR_W`) and the
  *  times take what is left, rather than a 50/50 split that would size the
  *  month by the card's width. */
-const COLUMN_BOX = 'p-[var(--spacing-system-l)] lg:p-0';
+const COLUMN_BOX = 'p-[var(--spacing-system-l)] content-lg:p-0';
 
 /** The rule between the two, wherever the layout puts it. */
-const COLUMN_DIVIDER = 'border-b border-ods-border md:border-b-0 md:border-r lg:border-0';
+const COLUMN_DIVIDER = 'border-b border-ods-border content-md:border-b-0 content-md:border-r content-lg:border-0';
+
+/**
+ * The modal layout's classes: the same two columns, side by side from `md`
+ * only (the modal never reaches the desktop card's `lg` arrangement), the
+ * calendar at the card's tablet width and the rule between them at every
+ * width from `md`. The times column states the calendar's height
+ * (`MODAL_TIMES_H`) and scrolls inside it, so the window is as tall as the
+ * month whatever the day offers. On a phone the chips are four across and
+ * the column keeps the card's own three-row window.
+ */
+const MODAL_ROW_CLASS = 'flex min-w-0 flex-col content-md:flex-row content-md:items-start';
+const MODAL_CALENDAR_W = 'content-md:w-[19rem] content-md:shrink-0';
+const MODAL_COLUMN_BOX = 'p-[var(--spacing-system-m)]';
+const MODAL_COLUMN_DIVIDER = 'border-b border-ods-border content-md:border-b-0 content-md:border-r';
+/** The calendar column's height: its heading, the month header and six week rows. */
+const MODAL_TIMES_H = 'content-md:h-[21.5rem]';
+const MODAL_CHIP_GRID_CLASS = cn(
+  'grid grid-cols-4 content-start gap-[var(--spacing-system-xs)] overflow-y-auto content-md:grid-cols-1',
+  'max-h-[9.75rem] min-h-0 flex-1 content-md:max-h-none',
+);
 
 /** Deterministic month caption for a given offset (fixed en-US locale so
  *  the SSR and client first-paint markup agree byte-for-byte). */
 export function monthLabelFor(offset: number): string {
   const now = new Date();
   const month = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(month);
+  return formatDateWithTimezone(month, VIEWER_TIMEZONE, 'monthYear');
 }
 
 /** Nothing is bookable yet — used while a month is still loading. */
 const DISABLE_EVERY_DAY = () => true;
-const NOOP = () => undefined;
 
 interface DayCalendarProps {
   monthOffset: number;
@@ -284,44 +322,60 @@ function DayCalendar({ monthOffset, onMonthOffsetChange, selectedDay, onSelectDa
  * the times column is a skeleton, and it is the same one the loaded picker
  * shows while a month loads, so there is no swap between the two.
  */
-export function SlotPickerSkeleton({ monthOffset = 0 }: { monthOffset?: number }) {
+function SlotPickerSkeleton({ monthOffset = 0, layout = 'card' }: { monthOffset?: number; layout?: SlotPickerLayout }) {
+  const modal = layout === 'modal';
   return (
-    <div className={SLOT_ROW_CLASS}>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'md:overflow-y-auto')}>
+    <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>
+      <div
+        className={
+          modal
+            ? cn(COLUMN_STACK, MODAL_COLUMN_BOX, MODAL_COLUMN_DIVIDER, MODAL_CALENDAR_W)
+            : cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'content-md:overflow-y-auto')
+        }
+      >
         {/* Needs no data — the heading renders REAL in every loading state. */}
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         <DayCalendar
           monthOffset={monthOffset}
-          onMonthOffsetChange={NOOP}
+          onMonthOffsetChange={LOADING_NOOP}
           selectedDay={null}
-          onSelectDay={NOOP}
+          onSelectDay={LOADING_NOOP}
           slotsByDay={null}
         />
       </div>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 md:flex-1')}>
-        <TimeChipsSkeleton />
+      <div
+        className={
+          modal
+            ? cn(COLUMN_STACK, MODAL_COLUMN_BOX, MODAL_TIMES_H, 'min-w-0 content-md:flex-1')
+            : cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 content-md:flex-1')
+        }
+      >
+        <TimeChipsSkeleton layout={layout} />
       </div>
     </div>
   );
 }
 
+/** Time chips the loading day draws: enough to fill the visible scroll box at any column count. */
+const SLOT_PICKER_SKELETON_CHIPS = 16;
+
 /** Same-footprint skeleton for the time-chip column. */
-export function TimeChipsSkeleton() {
+function TimeChipsSkeleton({ layout = 'card' }: { layout?: SlotPickerLayout } = {}) {
   return (
     <>
       {/* The day label is data — but it is held inside the REAL heading line
           box, so the skeleton's first row sits exactly where the label lands. */}
       <div className={COLUMN_HEADING_CLASS}>
-        <Skeleton className="inline-block h-4 w-40 align-middle" />
+        <TextLineSkeleton type="h4" className="w-40" />
       </div>
-      <div className={CHIP_GRID_CLASS}>
+      <div className={layout === 'modal' ? MODAL_CHIP_GRID_CLASS : CHIP_GRID_CLASS}>
         {/* Enough to fill the visible scroll box at any column count — the
             grid's track count follows the card width, so no fixed number
             lands flush and a partial last row is the honest shape anyway. */}
-        {Array.from({ length: 16 }, (_, i) => (
-          // h-11 md:h-12 — the loaded chip's own default-size height.
-          <Skeleton key={i} className={cn(CHIP_CLASS, 'h-11 md:h-12')} />
-        ))}
+        <LoadingItems count={SLOT_PICKER_SKELETON_CHIPS}>
+          {/* h-11 content-md:h-12 — the loaded chip's own default-size height. */}
+          {() => <UnifiedSkeleton data-loading-item className={cn(CHIP_CLASS, 'h-11 content-md:h-12')} />}
+        </LoadingItems>
       </div>
     </>
   );
@@ -329,6 +383,7 @@ export function TimeChipsSkeleton() {
 
 export function SlotPicker({
   slots,
+  layout = 'card',
   timezone,
   monthOffset,
   onMonthOffsetChange,
@@ -338,9 +393,12 @@ export function SlotPicker({
   onSelectDay,
   isLoading = false,
   isSubmitting = false,
+  loading = false,
 }: SlotPickerProps) {
+  const inScope = useLoadingScope() || loading;
   const slotsByDay = useMemo(() => {
     const map = new Map<string, number[]>();
+    if (timezone == null) return map;
     for (const ms of slots) {
       const key = dayKeyInZone(ms, timezone);
       const list = map.get(key) ?? [];
@@ -364,9 +422,19 @@ export function SlotPicker({
   const monthPrefix = `${visibleMonth.getFullYear()}-${String(visibleMonth.getMonth() + 1).padStart(2, '0')}`;
   const monthHasSlots = [...slotsByDay.keys()].some(key => key.startsWith(monthPrefix));
 
+  const modal = layout === 'modal';
+  // While the availability (or the zone it is shown in) is read the picker is its skeleton: the calendar real, the
+  // times as chip boxes.
+  if (inScope || timezone == null) return <SlotPickerSkeleton monthOffset={monthOffset} layout={layout} />;
   return (
-    <div className={SLOT_ROW_CLASS}>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'md:overflow-y-auto')}>
+    <div className={modal ? MODAL_ROW_CLASS : SLOT_ROW_CLASS}>
+      <div
+        className={
+          modal
+            ? cn(COLUMN_STACK, MODAL_COLUMN_BOX, MODAL_COLUMN_DIVIDER, MODAL_CALENDAR_W)
+            : cn(COLUMN_STACK, COLUMN_BOX, COLUMN_DIVIDER, CALENDAR_W, 'content-md:overflow-y-auto')
+        }
+      >
         <p className={COLUMN_HEADING_CLASS}>{SLOT_PICKER_HEADING}</p>
         {/* Stays mounted through a month load — `slotsByDay: null` is what
             "nothing selectable yet" looks like, not an unmount. */}
@@ -378,21 +446,23 @@ export function SlotPicker({
           slotsByDay={isLoading ? null : slotsByDay}
         />
       </div>
-      <div className={cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 md:flex-1')}>
+      <div
+        className={
+          modal
+            ? cn(COLUMN_STACK, MODAL_COLUMN_BOX, MODAL_TIMES_H, 'min-w-0 content-md:flex-1')
+            : cn(COLUMN_STACK, COLUMN_BOX, 'min-w-0 content-md:flex-1')
+        }
+      >
         {isLoading ? (
-          <TimeChipsSkeleton />
+          <TimeChipsSkeleton layout={layout} />
         ) : selectedDay ? (
           <>
             <p className={COLUMN_HEADING_CLASS}>
               {/* Format the DAY-KEY itself (plain calendar date) — re-zoning a
                   local instant could label an adjacent day. */}
-              {new Intl.DateTimeFormat(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              }).format(dateFromDayKey(selectedDay))}
+              {formatDateWithTimezone(dateFromDayKey(selectedDay), VIEWER_TIMEZONE, 'weekday', { viewerLocale: true })}
             </p>
-            <div className={CHIP_GRID_CLASS}>
+            <div className={modal ? MODAL_CHIP_GRID_CLASS : CHIP_GRID_CLASS}>
               {daySlots.map(ms => {
                 const isSelected = selectedSlot === ms;
                 return (
@@ -408,6 +478,7 @@ export function SlotPicker({
                       if (isSubmitting) return;
                       onSelectSlot(ms);
                     }}
+                    data-loading-item
                     className={CHIP_CLASS}
                   >
                     {timeLabelInZone(ms, timezone)}

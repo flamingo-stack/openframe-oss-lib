@@ -4,6 +4,7 @@ import com.openframe.data.pinot.model.LogProjection;
 import com.openframe.data.pinot.model.OrganizationOption;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ResultSet;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -14,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Repository
@@ -32,6 +35,14 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
     private static final String DEFAULT_SORT_COLUMN = "eventTimestamp";
     private static final String PRIMARY_KEY_FIELD = "toolEventId";
 
+    /**
+     * Explicit upper bound for the filter-option queries. Pinot applies its own default of 10 to any query that
+     * does not set a LIMIT, so without this a facet silently returns only the first 10 values in ORDER BY order -
+     * an organization whose name sorts eleventh simply never appears in the Source filter. 10000 is the builder's
+     * maximum and is comfortably above the number of distinct values any of these facets can hold.
+     */
+    private static final int MAX_FILTER_OPTIONS = 10000;
+
     @Value("${pinot.tables.logs.name:logs}")
     private String logsTable;
 
@@ -45,7 +56,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                         List<String> severities, List<String> organizationIds, String deviceId, String cursor, int limit,
                                         String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -66,7 +77,7 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                                           List<String> severities, List<String> organizationIds, String deviceId, String searchTerm, String cursor, int limit,
                                           String sortField, String sortDirection) {
         PinotQueryBuilder queryBuilder = new PinotQueryBuilder(logsTable, tenantId)
-                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "organizationId", "organizationName", "summary", "eventTimestamp")
+                .select("toolEventId", "ingestDay", "toolType", "eventType", "severity", "userId", "deviceId", "hostname", "nickname", "executionSource", "scriptCreationSource", "organizationId", "organizationName", "summary", "eventTimestamp")
                 .whereDateRange("eventTimestamp", startDate, endDate)
                 .whereTimestampRange("eventTimestamp", timestampFrom, timestampTo)
                 .whereIn("toolType", toolTypes)
@@ -91,7 +102,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("eventType");
+                .orderBy("eventType")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -105,7 +117,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("severity");
+                .orderBy("severity")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -119,7 +132,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("toolType");
+                .orderBy("toolType")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -133,7 +147,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
                 .whereIn("organizationId", organizationIds)
-                .orderBy("ingestDay");
+                .orderBy("ingestDay")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeSingleColumnQuery(queryBuilder.build());
     }
@@ -148,7 +163,8 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
                 .whereIn("toolType", toolTypes)
                 .whereIn("eventType", eventTypes)
                 .whereIn("severity", severities)
-                .orderBy("organizationName");
+                .orderBy("organizationName")
+                .limit(MAX_FILTER_OPTIONS);
 
         return executeQuery(queryBuilder.build(), resultSet -> rowIndex -> {
             String organizationId = resultSet.getString(rowIndex, 0);
@@ -178,22 +194,36 @@ public class PinotClientLogRepository extends AbstractPinotRepository implements
         return DEFAULT_SORT_COLUMN;
     }
 
+    // Optional columns store the schema default (empty string) when absent, and the API contract is an
+    // absent field, not an empty one.
+    private String readOptionalString(ResultSet resultSet, int rowIndex, Map<String, Integer> columnIndexMap,
+                                      String column) {
+        String value = readString(resultSet, rowIndex, columnIndexMap, column);
+        if (!hasText(value)) {
+            return null;
+        }
+        return value;
+    }
+
     private List<LogProjection> executeLogQuery(String query) {
         return executeQuery(query, resultSet -> {
             Map<String, Integer> columnIndexMap = buildColumnIndexMap(resultSet);
             return rowIndex -> {
                 LogProjection projection = new LogProjection();
-                projection.toolEventId = resultSet.getString(rowIndex, columnIndexMap.get("toolEventId"));
-                projection.ingestDay = resultSet.getString(rowIndex, columnIndexMap.get("ingestDay"));
-                projection.toolType = resultSet.getString(rowIndex, columnIndexMap.get("toolType"));
-                projection.eventType = resultSet.getString(rowIndex, columnIndexMap.get("eventType"));
-                projection.severity = resultSet.getString(rowIndex, columnIndexMap.get("severity"));
-                projection.userId = resultSet.getString(rowIndex, columnIndexMap.get("userId"));
-                projection.deviceId = resultSet.getString(rowIndex, columnIndexMap.get("deviceId"));
-                projection.hostname = resultSet.getString(rowIndex, columnIndexMap.get("hostname"));
-                projection.organizationId = resultSet.getString(rowIndex, columnIndexMap.get("organizationId"));
-                projection.organizationName = resultSet.getString(rowIndex, columnIndexMap.get("organizationName"));
-                projection.summary = resultSet.getString(rowIndex, columnIndexMap.get("summary"));
+                projection.toolEventId = readString(resultSet, rowIndex, columnIndexMap, "toolEventId");
+                projection.ingestDay = readString(resultSet, rowIndex, columnIndexMap, "ingestDay");
+                projection.toolType = readString(resultSet, rowIndex, columnIndexMap, "toolType");
+                projection.eventType = readString(resultSet, rowIndex, columnIndexMap, "eventType");
+                projection.severity = readString(resultSet, rowIndex, columnIndexMap, "severity");
+                projection.userId = readString(resultSet, rowIndex, columnIndexMap, "userId");
+                projection.deviceId = readString(resultSet, rowIndex, columnIndexMap, "deviceId");
+                projection.hostname = readString(resultSet, rowIndex, columnIndexMap, "hostname");
+                projection.nickname = readOptionalString(resultSet, rowIndex, columnIndexMap, "nickname");
+                projection.executionSource = readOptionalString(resultSet, rowIndex, columnIndexMap, "executionSource");
+                projection.scriptCreationSource = readOptionalString(resultSet, rowIndex, columnIndexMap, "scriptCreationSource");
+                projection.organizationId = readString(resultSet, rowIndex, columnIndexMap, "organizationId");
+                projection.organizationName = readString(resultSet, rowIndex, columnIndexMap, "organizationName");
+                projection.summary = readString(resultSet, rowIndex, columnIndexMap, "summary");
                 projection.eventTimestamp = Instant.ofEpochMilli(resultSet.getLong(rowIndex, columnIndexMap.get("eventTimestamp")));
                 return projection;
             };

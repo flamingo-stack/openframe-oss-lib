@@ -1,7 +1,9 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.DeviceFirstOnlineDispatch;
 import com.openframe.data.document.rmm.schedule.DeviceOnlineDispatchStatus;
 import com.openframe.data.document.rmm.script.ScriptExecution;
@@ -56,7 +58,7 @@ class ScriptExecutionHandlerTest {
     private DeviceOnlineDispatchRepository deviceOnlineDispatchRepository;
 
     private ScriptExecutionHandler handler;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new JsonMapper();
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     @BeforeEach
@@ -92,7 +94,7 @@ class ScriptExecutionHandlerTest {
         assertThat(saved.getStdoutTruncated()).isFalse();
         assertThat(saved.getFinishedAt()).isNotNull();
         assertThat(saved.getStatusChangedAt()).isNotNull();
-        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SUCCESS").counter().count()).isEqualTo(1.0);
+        assertThat(meterRegistry.get(COMPLETED_COUNTER).tags("kind", "script", "status", "SUCCESS", "source", "MANUAL", "manager", "NONE").counter().count()).isEqualTo(1.0);
     }
 
     @Test
@@ -194,6 +196,22 @@ class ScriptExecutionHandlerTest {
     }
 
     @Test
+    @DisplayName("handle: package-install row → completed counter carries source and manager, so the software-management board can filter it")
+    void handle_packageInstallRow_countsCompletedBySourceAndManager() {
+        ScriptExecution row = runningRow(EXECUTION_ID);
+        row.setSource(ExecutionSource.PACKAGE_INSTALLATION);
+        row.setPackageManager(PackageManagerType.BREW);
+        when(scriptExecutionRepository.findByMachineIdAndExecutionIdAndScriptId(MACHINE_ID, EXECUTION_ID, SCRIPT_ID))
+                .thenReturn(Optional.of(row));
+
+        handler.handle(messageWith(EXECUTION_ID, 1, false, null, 42L, "", "Error: No available formula"), new IntegratedToolEnrichedData());
+
+        assertThat(meterRegistry.get(COMPLETED_COUNTER)
+                .tags("kind", "script", "status", "FAILED", "source", "PACKAGE_INSTALLATION", "manager", "BREW")
+                .counter().count()).isEqualTo(1.0);
+    }
+
+    @Test
     @DisplayName("handle: non-zero exitCode → FAILED")
     void handle_nonZeroExit_transitionsRowToFailing() {
         ScriptExecution row = runningRow(EXECUTION_ID);
@@ -289,7 +307,7 @@ class ScriptExecutionHandlerTest {
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
         message.setTenantId(TENANT_ID);
         ObjectNode after = mapper.createObjectNode().put("exitCode", 0);
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
 
@@ -311,7 +329,7 @@ class ScriptExecutionHandlerTest {
                 .put("machineId", MACHINE_ID)
                 .put("scriptId", SCRIPT_ID)
                 .put("exitCode", 0);
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
         // tenantId intentionally NOT set — mirrors the stream consumer context.
@@ -329,7 +347,7 @@ class ScriptExecutionHandlerTest {
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();
         message.setTenantId(TENANT_ID);
         ObjectNode after = mapper.createObjectNode().put("executionId", EXECUTION_ID);
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
 
@@ -427,7 +445,7 @@ class ScriptExecutionHandlerTest {
                 .put("executionId", EXECUTION_ID)
                 .put("machineId", MACHINE_ID)
                 .put("exitCode", 0);
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
         message.setPayload(payload);
 
@@ -455,7 +473,7 @@ class ScriptExecutionHandlerTest {
         if (stdout != null) after.put("stdout", stdout);
         if (stderr != null) after.put("stderr", stderr);
 
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setAfter(after);
 
         DeserializedDebeziumMessage message = new DeserializedDebeziumMessage();

@@ -21,13 +21,27 @@ export interface FieldWrapperProps {
    *
    * It is positioned OUT OF FLOW (absolute, hanging below the wrapper), so it
    * never changes the field's height when it appears — the same treatment
-   * `CheckboxBlock` uses. The trade is that it overlaps whatever sits directly
+   * `CheckboxBlock` uses. That holds only while the wrapper is already a box
+   * when the message arrives — see `errorSlot`. The trade is that it overlaps whatever sits directly
    * below: a form stacking fields needs at least ~20px of vertical gap (e.g.
    * `gap-[var(--spacing-system-lf)]`) for the message to land in clear space.
    */
   error?: string;
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey) */
   errorVariant?: 'error' | 'warning' | 'success' | 'muted';
+  /**
+   * The field is wired for a message: `error` may arrive later, so render the
+   * positioned box from the FIRST render instead of only once it does.
+   *
+   * Without a label the wrapper is `display: contents` while `error` is empty
+   * and a box once it is set — and the parent's spacing lands on a box but not
+   * on `contents`: a `space-y-*` margin, a flex row's sizing. So the control
+   * moved by that spacing the moment a message came, and back when it went.
+   * The controls pass this whenever the caller wrote an `error` attribute at
+   * all (`error={undefined}` included): those are exactly the call sites whose
+   * layout could flip, and a box there is the layout they already got on error.
+   */
+  errorSlot?: boolean;
   /**
    * Label scale. Default is the standard form-label scale (text-h6).
    * 'large' (text-h4) is for screens whose design specifies body-scale field
@@ -47,6 +61,13 @@ export interface FieldWrapperProps {
   children: ReactNode;
 }
 
+/**
+ * The id `FieldWrapper` gives its label when it names a control (`htmlFor`), so
+ * a control that a `<label for>` cannot name (a group of chips) can point at it
+ * with `aria-labelledby`.
+ */
+export const fieldLabelId = (htmlFor: string): string => `${htmlFor}-label`;
+
 const errorVariantClasses = {
   error: 'text-ods-error',
   warning: 'text-ods-warning',
@@ -56,10 +77,20 @@ const errorVariantClasses = {
 
 const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
   (
-    { label, htmlFor, error, errorVariant = 'error', labelVariant = 'default', required = false, className, children },
+    {
+      label,
+      htmlFor,
+      error,
+      errorVariant = 'error',
+      errorSlot = false,
+      labelVariant = 'default',
+      required = false,
+      className,
+      children,
+    },
     ref,
   ) => {
-    const hasChrome = label != null || error != null;
+    const hasChrome = label != null || error != null || errorSlot;
 
     return (
       <div ref={ref} className={cn(hasChrome ? 'relative flex w-full flex-col' : 'contents', className)}>
@@ -69,7 +100,12 @@ const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
           // Field-wrapped controls with `label=`-prop controls showed two label
           // sizes side by side — the exact inconsistency the admin editors kept
           // reporting. One label scale, owned here and in Field together.
-          <Label className="mb-1" htmlFor={htmlFor} variant={labelVariant}>
+          <Label
+            id={htmlFor ? fieldLabelId(htmlFor) : undefined}
+            className="mb-1"
+            htmlFor={htmlFor}
+            variant={labelVariant}
+          >
             {label}
             {required && <RequiredMark />}
           </Label>

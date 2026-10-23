@@ -4,7 +4,7 @@ import com.openframe.api.dto.AgentRegistrationSecretResponse;
 import com.openframe.api.exception.AgentRegistrationSecretNotFoundException;
 import com.openframe.api.service.processor.AgentRegistrationSecretProcessor;
 import com.openframe.core.exception.ErrorCode;
-import com.openframe.core.service.AgentRegistrationSecretGenerator;
+import com.openframe.core.service.SecretKeyGenerator;
 import com.openframe.core.crypto.service.EncryptionService;
 import com.openframe.data.document.agent.AgentRegistrationSecret;
 import com.openframe.data.repository.agent.AgentRegistrationSecretRepository;
@@ -22,7 +22,7 @@ public class AgentRegistrationSecretService {
 
     private final AgentRegistrationSecretRepository secretRepository;
     private final EncryptionService encryptionService;
-    private final AgentRegistrationSecretGenerator secretGenerator;
+    private final SecretKeyGenerator secretGenerator;
     private final AgentRegistrationSecretProcessor secretProcessor;
 
     public AgentRegistrationSecretResponse getActiveSecret() {

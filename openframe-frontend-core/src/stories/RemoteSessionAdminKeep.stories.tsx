@@ -1,0 +1,78 @@
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
+
+import { KeepRecordingModal, ReleaseKeepingModal } from '../components/features/remote-session';
+
+/**
+ * Keep Recording holds a recording past its expiry date until someone releases
+ * it; Release Keeping hands it back to the normal expiry.
+ */
+const meta = {
+  title: 'Remote Session/Admin/Keep Recording',
+  component: KeepRecordingModal,
+  tags: ['autodocs'],
+  args: {
+    isOpen: true,
+    onClose: fn(),
+    keptUsage: '612 MB of 50 GB',
+    onConfirm: fn(),
+  },
+} satisfies Meta<typeof KeepRecordingModal>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** Pick a reason; "Other" asks for a short description. */
+export const Keep: Story = {};
+
+/** The Keep is being saved. */
+export const Keeping: Story = {
+  args: { isPending: true },
+};
+
+/** Releasing a recording already past its date: it gets 3 days' grace. Every ticket assigned to the recording is listed. */
+export const Release: Story = {
+  render: () => (
+    <ReleaseKeepingModal
+      isOpen
+      onClose={fn()}
+      onConfirm={fn()}
+      keptBy="Dana Whitfield"
+      keptOn="09/15/23"
+      reason="Client dispute"
+      tickets={['TKT-4631', 'TKT-4702']}
+      expiresOn="09/18/23"
+      dueOn="09/15/23"
+    />
+  ),
+};
+
+/** Releasing a recording that is still inside its retention period. */
+export const ReleaseBeforeExpiry: Story = {
+  render: () => (
+    <ReleaseKeepingModal
+      isOpen
+      onClose={fn()}
+      onConfirm={fn()}
+      keptBy="Dana Whitfield"
+      keptOn="09/15/23"
+      reason="Internal review"
+      expiresOn="09/15/24"
+    />
+  ),
+};
+
+/** An "Other" reason typed as one long word wraps inside the modal instead of running past its edge. */
+export const ReleaseLongReason: Story = {
+  render: () => (
+    <ReleaseKeepingModal
+      isOpen
+      onClose={fn()}
+      onConfirm={fn()}
+      keptBy="Dana Whitfield"
+      keptOn="10/19/26"
+      reason={'test'.repeat(20)}
+      expiresOn="01/17/27"
+    />
+  ),
+};

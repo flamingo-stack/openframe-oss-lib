@@ -10,6 +10,7 @@
  */
 
 import type { ChatStreamEvent } from './events';
+import { chatProgressOf } from './progress';
 
 /**
  * Escape `<` so markdown renderers that pass HTML through (rehypeRaw)
@@ -50,7 +51,9 @@ export function frameNum(value: unknown): number | undefined {
  */
 export function mapLeadingFrame(meta: Record<string, unknown>, out: ChatStreamEvent[]): void {
   if (meta.status === 'thinking') {
-    out.push({ type: 'status', phase: 'thinking' });
+    // The frame may name the stage the turn is in; an unknown stage is a plain "thinking".
+    const progress = chatProgressOf(meta);
+    out.push(progress ? { type: 'status', phase: 'thinking', progress } : { type: 'status', phase: 'thinking' });
   } else if (meta.kind === 'thinking-delta' && typeof meta.text === 'string') {
     // Wire is ALREADY delta — emit verbatim, append-only contract.
     out.push({ type: 'thinking-delta', text: meta.text });

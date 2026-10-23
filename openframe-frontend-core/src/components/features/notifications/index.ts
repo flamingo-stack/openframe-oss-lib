@@ -9,11 +9,13 @@ export type { NotificationPopupsProps, NotificationPopupsPosition } from './noti
 export { ApprovalRequestNotificationTile } from './approval-request-notification-tile';
 export type { ApprovalRequestNotificationTileProps } from './approval-request-notification-tile';
 export {
-  ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
   approvalMetaToBatchData,
   getApprovalMeta,
   isApprovalNotification,
+  isApprovalNotificationType,
+  MINGO_APPROVAL_REQUEST_TYPE,
   resolutionToStatus,
+  TICKET_APPROVAL_REQUEST_TYPE,
 } from './types';
 export type {
   Notification,

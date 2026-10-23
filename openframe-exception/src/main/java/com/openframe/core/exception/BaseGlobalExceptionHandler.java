@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -86,14 +87,14 @@ public class BaseGlobalExceptionHandler {
      * the generic {@link ResponseStatusException} handler and get mislabeled as INTERNAL_ERROR.
      * <p>
      * The message is built from {@link HandlerMethodValidationException#getAllErrors()} rather than
-     * from the field errors, because {@code getAllValidationResults()} omits cross-parameter
+     * from the field errors, because {@code getParameterValidationResults()} omits cross-parameter
      * violations — relying on it alone would yield an empty message for a cross-parameter-only
      * failure.
      */
     @ExceptionHandler(HandlerMethodValidationException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleHandlerMethodValidation(HandlerMethodValidationException ex) {
-        List<ErrorResponse.FieldError> fieldErrors = ex.getAllValidationResults().stream()
+        List<ErrorResponse.FieldError> fieldErrors = ex.getParameterValidationResults().stream()
                 .flatMap(result -> result.getResolvableErrors().stream()
                         .map(error -> ErrorResponse.FieldError.builder()
                                 .field(resolveFieldName(result.getMethodParameter()))
@@ -122,6 +123,19 @@ public class BaseGlobalExceptionHandler {
     public ErrorResponse handleMissingServletRequestParameter(MissingServletRequestParameterException ex) {
         log.warn("Missing required parameter: {}", ex.getParameterName());
         return ErrorResponse.of(ErrorCode.BAD_REQUEST, "Required parameter '" + ex.getParameterName() + "' is missing");
+    }
+
+    /**
+     * A request parameter or path variable that cannot be converted to its declared type, e.g. an
+     * unknown enum value or text for a number. Without this it falls through to the generic handler
+     * and is reported as a 500.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleMethodArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        log.warn("Type mismatch for parameter '{}': {}", ex.getName(), ex.getMessage());
+        return ErrorResponse.of(ErrorCode.TYPE_MISMATCH,
+                String.format("Invalid value '%s' for parameter '%s'", ex.getValue(), ex.getName()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

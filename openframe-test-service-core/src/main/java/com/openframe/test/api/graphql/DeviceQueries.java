@@ -42,6 +42,7 @@ public class DeviceQueries {
                 device(machineId: $machineId) {
                     id
                     machineId
+                    nickname
                     ip
                     macAddress
                     osUuid
@@ -92,6 +93,15 @@ public class DeviceQueries {
             }
             """;
 
+    // What the agent last reported per package manager (PRESENT, MISSING, UNSUPPORTED, UNKNOWN); software submit refuses MISSING and UNKNOWN.
+    public static final String DEVICE_PACKAGE_MANAGERS = """
+            query($machineId: String!) {
+                device(machineId: $machineId) {
+                    packageManagers { brew winget choco }
+                }
+            }
+            """;
+
     public static final String DEVICES_WITH_FILTER = """
             query($filter: DeviceFilterInput) {
                 devices(filter: $filter) {
@@ -99,6 +109,7 @@ public class DeviceQueries {
                         node {
                             id
                             machineId
+                            nickname
                             hostname
                             displayName
                             ip
@@ -181,6 +192,31 @@ public class DeviceQueries {
                 deviceFilters(filter: $filter) {
                     statuses { value count }
                     filteredCount
+                }
+            }
+            """;
+
+    /** {@code nickname} is nullable: passing null clears it. {@code machineId} is the raw machine id. */
+    public static final String UPDATE_DEVICE_NICKNAME = """
+            mutation UpdateDeviceNickname($machineId: String!, $nickname: String) {
+                updateDeviceNickname(machineId: $machineId, nickname: $nickname) {
+                    id
+                    machineId
+                    hostname
+                    nickname
+                }
+            }
+            """;
+
+    // Machine.remoteAccess is a SaaS extension of the Machine type, so it has a query of its own rather than joining FULL_DEVICE.
+    public static final String DEVICE_REMOTE_ACCESS = """
+            query DeviceRemoteAccess($machineId: String!) {
+                device(machineId: $machineId) {
+                    id
+                    machineId
+                    hostname
+                    organizationId
+                    remoteAccess { mode effectiveMode effectiveScope updatedBy updatedAt }
                 }
             }
             """;

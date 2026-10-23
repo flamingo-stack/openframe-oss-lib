@@ -9,10 +9,7 @@
  * `componentOverrides` exactly as before.
  */
 import type React from 'react';
-import type { ResolveLinkResult } from '../../../types/doc-source';
 import { MarkdownEngine, type MarkdownEngineProps } from './engine';
-
-export type { ResolveLinkResult };
 
 export interface SimpleMarkdownRendererProps extends Omit<MarkdownEngineProps, 'extraAllowedHtmlTags'> {}
 

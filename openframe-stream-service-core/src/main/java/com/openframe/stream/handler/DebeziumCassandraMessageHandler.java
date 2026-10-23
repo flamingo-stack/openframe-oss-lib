@@ -1,6 +1,6 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.cassandra.model.UnifiedLogEvent;
 import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
 import com.openframe.data.model.enums.Destination;
@@ -18,7 +18,7 @@ import java.time.Instant;
 @Slf4j
 @Component
 @ConditionalOnClass(CassandraRepository.class)
-@ConditionalOnProperty(name = "spring.data.cassandra.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.tool-events.store", havingValue = "cassandra")
 public class DebeziumCassandraMessageHandler
         extends DebeziumMessageHandler<UnifiedLogEvent, DeserializedDebeziumMessage> {
 
@@ -61,6 +61,9 @@ public class DebeziumCassandraMessageHandler
             logEvent.setUserId(enrichedData.getUserId());
             logEvent.setDeviceId(enrichedData.getMachineId());
             logEvent.setHostname(enrichedData.getHostname());
+            logEvent.setNickname(enrichedData.getNickname());
+            logEvent.setExecutionSource(enrichedData.getExecutionSource());
+            logEvent.setScriptCreationSource(enrichedData.getScriptCreationSource());
             logEvent.setOrganizationId(enrichedData.getOrganizationId());
             logEvent.setOrganizationName(enrichedData.getOrganizationName());
             logEvent.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());

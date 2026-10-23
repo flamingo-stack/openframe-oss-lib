@@ -19,4 +19,7 @@ public class DialogResponse {
     private String status;
     private String title;
     private String createdAt;
+    private String resolvedAt;
+    // GraphQL only: the caller's side of the unread message counter.
+    private Integer unreadMessageCount;
 }

@@ -5,7 +5,6 @@ export * from './chat';
 export * from './docs';
 export * from './embeds';
 export * from './features';
-export * from './icons';
 export * from './navigation';
 export * from './platform';
 export * from './ui';
@@ -17,9 +16,10 @@ export * from './categories-cart';
 export * from './category-card';
 export * from './comment-card';
 export * from './comment-composer';
+export * from './comment-thread';
 export * from './content-loading-container';
-export * from './dynamic-skeleton';
 export * from './empty-state';
+export * from './list-empty-state';
 export * from './faq-accordion';
 // FaqSection sub-folder. Also exposed via the "./components/faq" subpath export
 // in package.json — that subpath is ALSO `"use client"` (tsup banner), so it
@@ -31,12 +31,9 @@ export * from './faq-accordion';
 export * from './faq';
 export * from './related-content';
 export * from './filter-chip';
-export * from './footer';
 export * from './unified-filter-logic';
 export * from './unified-pagination';
-export * from './footer-waitlist-button';
 export * from './hero-image-uploader';
-export * from './icons-block';
 export * from './image-cropper';
 export * from './media-carousel';
 // Explicit re-export disambiguates the star-export collision with the
@@ -51,6 +48,7 @@ export * from './pagination';
 export * from './persistent-filter-controls';
 export * from './persistent-pagination';
 export * from './pricing-display';
+export * from './agent-identity';
 export * from './agent-mark';
 export * from './results-count';
 export * from './selection-source-badge';
@@ -58,7 +56,6 @@ export * from './social-icon-row';
 export * from './user-display';
 export * from './vendor-display-button';
 export * from './vendor-icon';
-export * from './vendor-page-skeleton';
 export * from './vendor-tag';
 export * from './why-it-matters';
 export * from './yes-no-display';
@@ -96,9 +93,6 @@ export * from './shared/delivery';
 // Legal-document shared component (privacy policy, terms of service)
 export * from './shared/legal-document';
 
-// Detail Page Skeleton
-export { DetailPageSkeleton, type DetailPageSkeletonProps } from './shared/detail-page-skeleton';
-
 // Author byline card (end-of-article author description) — embeddable via
 // embed-shims + optional-runtime avatar proxying; hosts pass their own
 // fallbackBio copy (the hub uses defaultAuthorFallbackBio()).
@@ -109,6 +103,7 @@ export { ArticleAuthorByline, type ArticleAuthorBylineProps } from './shared/art
 // used by product-release + What I Shipped detail pages.
 export {
   MediaGalleryStrip,
+  MEDIA_GALLERY_STRIP_SKELETON_COUNT,
   type MediaGalleryStripItem,
   type MediaGalleryStripProps,
 } from './shared/media-gallery-strip';
@@ -122,3 +117,9 @@ export { AuthorDetailView, type AuthorDetailViewProps } from './authors/author-d
 // Note: These are re-exported from ./ui already, no need to duplicate
 
 export { EntityIcon, type EntityIconValue } from './icon-display';
+// An icon stated as DATA (its name, and a mark's own colours) and loaded when it is drawn: what a table keyed by a
+// string (a platform, a provider, a job) holds in place of imported icon components.
+export { NamedIcon, PlatformMark, type IconRef } from './chat/utils/icon-loading';
+export { AGENT_IDENTITIES_API_PATH } from '../hooks/use-agent-identities';
+export type { AgentIdentityIcon, AgentIdentityIcons } from '../hooks/use-agent-identities';
+export type { SocialIconLink } from '../utils/social-platforms';

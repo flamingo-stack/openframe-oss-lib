@@ -11,13 +11,18 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.ScriptMapper;
+import com.openframe.api.service.rmm.script.ScriptPrivilegeValidator;
 import com.openframe.api.service.rmm.script.ScriptTagService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.rmm.script.ScriptTimeoutValidator;
 import com.openframe.core.exception.BadRequestException;
 import com.openframe.core.exception.ConflictException;
 import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.core.exception.NotFoundException;
+import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.document.rmm.script.ScriptStatus;
@@ -73,6 +78,8 @@ class ScriptServiceTest {
     private ScriptTagService scriptTagService;
     @Mock
     private ScriptTimeoutValidator timeoutValidator;
+    @Mock
+    private ScriptPrivilegeValidator privilegeValidator;
 
     @InjectMocks
     private ScriptService scriptService;
@@ -115,12 +122,13 @@ class ScriptServiceTest {
 
         createInput.setTagIds(List.of("tag-1", "tag-2"));
 
-        ScriptResponse result = scriptService.create(createInput, "user-1");
+        ScriptResponse result = scriptService.create(createInput, "user-1", ScriptCreationSource.MANUAL);
 
         assertThat(result).isSameAs(response);
         verify(scriptRepository).save(mapped);
         // createdBy is stamped from the authenticated caller before save.
         assertThat(mapped.getCreatedBy()).isEqualTo("user-1");
+        assertThat(mapped.getCreationSource()).isEqualTo(ScriptCreationSource.MANUAL);
         // Tag assignments are (re)written from the input after the script is saved.
         verify(scriptTagService).replaceTags(SCRIPT_ID, List.of("tag-1", "tag-2"));
     }
@@ -132,7 +140,7 @@ class ScriptServiceTest {
         doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "timeoutSeconds must not exceed 600 seconds"))
                 .when(timeoutValidator).validate(700);
 
-        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1", ScriptCreationSource.MANUAL))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("600");
 
@@ -156,11 +164,44 @@ class ScriptServiceTest {
     }
 
     @Test
+    @DisplayName("create: a privilege level the declared platforms cannot run throws (400) and nothing is persisted")
+    void create_validatesPrivilegeBeforeSave() {
+        // setup
+        createInput.setPrivilegeLevel(PrivilegeLevel.ELEVATED_USER);
+        createInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "ELEVATED_USER is supported only on Windows"))
+                .when(privilegeValidator).validate(PrivilegeLevel.ELEVATED_USER, List.of(OsType.MAC_OS));
+
+        // execution + verifications
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1", ScriptCreationSource.MANUAL))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Windows");
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("update: a privilege level the declared platforms cannot run throws before the script is even loaded")
+    void update_validatesPrivilegeBeforeSave() {
+        // setup
+        updateInput.setName("Restart Spooler");
+        updateInput.setPrivilegeLevel(PrivilegeLevel.ELEVATED_USER);
+        updateInput.setSupportedPlatforms(List.of(OsType.MAC_OS));
+        doThrow(new BadRequestException(ErrorCode.VALIDATION_ERROR, "ELEVATED_USER is supported only on Windows"))
+                .when(privilegeValidator).validate(PrivilegeLevel.ELEVATED_USER, List.of(OsType.MAC_OS));
+
+        // execution + verifications
+        assertThatThrownBy(() -> scriptService.update(updateInput))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Windows");
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("create: throws ConflictException when a script with the same name already exists in the tenant")
     void create_whenNameAlreadyExists_throwsConflict() {
         when(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(true);
 
-        assertThatThrownBy(() -> scriptService.create(createInput, "user-1"))
+        assertThatThrownBy(() -> scriptService.create(createInput, "user-1", ScriptCreationSource.MANUAL))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining(createInput.getName());
 
@@ -183,9 +224,28 @@ class ScriptServiceTest {
         when(scriptRepository.save(mapped)).thenReturn(saved);
         when(scriptMapper.toResponse(saved)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
 
-        ScriptResponse result = scriptService.create(createInput, "user-1");
+        ScriptResponse result = scriptService.create(createInput, "user-1", ScriptCreationSource.MANUAL);
 
         assertThat(result.getId()).isEqualTo(SCRIPT_ID);
+    }
+
+    @Test
+    @DisplayName("create: the creation source is stamped on the entity before save — AI_ASSISTANT for Mingo-authored scripts")
+    void create_aiAssistant_stampsCreationSource() {
+        // setup
+        Script mapped = new Script();
+        Script saved = new Script();
+        saved.setId(SCRIPT_ID);
+        when(scriptRepository.existsByTenantIdAndNameAndStatusIn(TENANT_ID, createInput.getName(), UNIQUE_STATUSES)).thenReturn(false);
+        when(scriptMapper.toEntity(TENANT_ID, createInput)).thenReturn(mapped);
+        when(scriptRepository.save(mapped)).thenReturn(saved);
+        when(scriptMapper.toResponse(saved)).thenReturn(ScriptResponse.builder().id(SCRIPT_ID).build());
+
+        // execution
+        scriptService.create(createInput, "user-1", ScriptCreationSource.AI_ASSISTANT);
+
+        // verifications
+        assertThat(mapped.getCreationSource()).isEqualTo(ScriptCreationSource.AI_ASSISTANT);
     }
 
     @Test
@@ -726,5 +786,70 @@ class ScriptServiceTest {
 
         verify(scriptRepository, never()).save(any());
         verifyNoInteractions(scriptMapper);
+    }
+
+    @Test
+    @DisplayName("update: system scripts are immutable — rejected before any name check or save")
+    void update_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ACTIVE);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
+        updateInput.setName("renamed");
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.update(updateInput))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Managed scripts");
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("delete: system scripts cannot be deleted")
+    void delete_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ACTIVE);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.delete(SCRIPT_ID))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Managed scripts");
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("archive: system scripts cannot be archived")
+    void archive_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ACTIVE);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.archive(SCRIPT_ID))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Managed scripts");
+
+        verify(scriptRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("unarchive: system scripts cannot be unarchived")
+    void unarchive_rejectsSystemScript() {
+        Script system = new Script();
+        system.setId(SCRIPT_ID);
+        system.setStatus(ScriptStatus.ARCHIVED);
+        system.setType(com.openframe.data.document.rmm.script.ScriptType.SYSTEM);
+        when(scriptRepository.findByTenantIdAndId(TENANT_ID, SCRIPT_ID)).thenReturn(Optional.of(system));
+
+        assertThatThrownBy(() -> scriptService.unarchive(SCRIPT_ID))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Managed scripts");
+
+        verify(scriptRepository, never()).save(any());
     }
 }

@@ -1,5 +1,7 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.graphql.relay.RelayIdCodec;
+import com.openframe.api.dto.device.DeviceEnrollmentResponse;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
 import com.openframe.api.service.device.DeviceFilterService;
 import com.openframe.api.service.device.DeviceService;
@@ -14,11 +16,18 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import org.dataloader.DataLoader;
+
 import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +41,7 @@ class DeviceDataFetcherTest {
     @Mock private GraphQLDeviceMapper mapper;
     @Mock private FleetVulnerabilityStatusService fleetVulnerabilityStatusService;
     @Mock private DgsDataFetchingEnvironment dfe;
+    @Spy private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks private DeviceDataFetcher fetcher;
 
@@ -89,5 +99,25 @@ class DeviceDataFetcherTest {
 
         assertThat(result).isNull();
         verify(fleetVulnerabilityStatusService, never()).getLastCompletedVulnerabilityRunAt();
+    }
+
+    @Test
+    @DisplayName("enrollment: loads the machine's tool connections through toolConnectionDataLoader and maps them")
+    void enrollment_loadsToolConnectionsForTheMachineAndMaps() throws Exception {
+        Machine machine = new Machine();
+        machine.setMachineId("m1");
+        List<ToolConnection> connections = List.of(new ToolConnection());
+        DeviceEnrollmentResponse mapped = DeviceEnrollmentResponse.builder().ready(true).build();
+        when(dfe.getSource()).thenReturn(machine);
+        @SuppressWarnings("unchecked")
+        DataLoader<String, List<ToolConnection>> loader = mock(DataLoader.class);
+        doReturn(loader).when(dfe).getDataLoader("toolConnectionDataLoader");
+        when(loader.load("m1")).thenReturn(CompletableFuture.completedFuture(connections));
+        when(mapper.toEnrollment(machine, connections)).thenReturn(mapped);
+
+        DeviceEnrollmentResponse result = fetcher.enrollment(dfe).get();
+
+        assertThat(result).isSameAs(mapped);
+        verify(mapper).toEnrollment(machine, connections);
     }
 }

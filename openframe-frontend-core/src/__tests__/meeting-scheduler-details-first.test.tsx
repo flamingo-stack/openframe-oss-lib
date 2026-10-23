@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HubSpotMeetingScheduler } from '../components/meeting-scheduler';
+import {
+  HubSpotMeetingScheduler,
+  type HubSpotMeetingSchedulerProps,
+  type SchedulerStage,
+} from '../components/meeting-scheduler';
 import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
-import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
+import { availabilityWith, fillIdentity, typeInto } from './fixtures/meeting-booking';
 
 /** A slot two hours from now, on the hour — inside the month the calendar opens on. */
 const SLOT_MS = Math.ceil((Date.now() + 2 * 3_600_000) / 3_600_000) * 3_600_000;
@@ -14,8 +18,11 @@ const availability: MeetingAvailability = {
 const book = vi.fn<(payload: Record<string, unknown>) => Promise<unknown>>();
 const refetchAvailability = vi.fn(() => Promise.resolve());
 const toast = vi.fn();
-/** Mutable so a test can flip the hook's in-flight flag between renders. */
-const hookState = { isSubmitting: false };
+/** Mutable so a test can flip the hook's in-flight flag or fail the load between renders. */
+const hookState: { isSubmitting: boolean; availabilityError: string | null } = {
+  isSubmitting: false,
+  availabilityError: null,
+};
 
 vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
   // The sentinel keeps its ONE owner: only the hook itself is replaced.
@@ -24,7 +31,7 @@ vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
     availability,
     isLoadingAvailability: false,
     isFetchingAvailability: false,
-    availabilityError: null,
+    availabilityError: hookState.availabilityError,
     monthOffset: 0,
     setMonthOffset: vi.fn(),
     refetchAvailability,
@@ -35,12 +42,12 @@ vi.mock('../hooks/use-meeting-booking', async importOriginal => ({
 vi.mock('../hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 // A factory, not a shared element: React bails out of re-rendering the SAME element object.
-const scheduler = () => (
-  <HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} />
+const scheduler = (props: Partial<HubSpotMeetingSchedulerProps> = {}) => (
+  <HubSpotMeetingScheduler meetingId="1" flow="details-first" initialAvailability={availability} {...props} />
 );
 
-async function continueFromDetails() {
-  const view = render(scheduler());
+async function continueFromDetails(props: Partial<HubSpotMeetingSchedulerProps> = {}) {
+  const view = render(scheduler(props));
   await screen.findByLabelText(/^Email/);
   fillIdentity();
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -60,7 +67,9 @@ const timeChip = async () => {
 };
 
 beforeEach(() => {
+  availability.formFields = [];
   hookState.isSubmitting = false;
+  hookState.availabilityError = null;
   book.mockReset();
   refetchAvailability.mockClear();
   toast.mockClear();
@@ -105,5 +114,95 @@ describe('HubSpotMeetingScheduler — details-first flow', () => {
     const chips = screen.getAllByRole('button').filter(b => /\d{1,2}:\d{2}/.test(b.textContent ?? ''));
     expect(chips.length).toBeGreaterThan(0);
     expect(chips.every(b => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
+  it('onStageChange reports the form, then the calendar, then the form again on Back', async () => {
+    const onStageChange = vi.fn<(stage: SchedulerStage) => void>();
+    await continueFromDetails({ onStageChange });
+    expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['details', 'slot']);
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await screen.findByLabelText(/^Email/);
+    expect(onStageChange).toHaveBeenLastCalledWith('details');
+  });
+
+  it("onStageChange reports 'unavailable' when the degraded box replaces the flow", async () => {
+    hookState.availabilityError = 'Failed to load availability';
+    const onStageChange = vi.fn<(stage: SchedulerStage) => void>();
+    render(scheduler({ onStageChange }));
+    await screen.findByText(/couldn't load available call times/);
+    expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['unavailable']);
+  });
+});
+
+describe('HubSpotMeetingScheduler — which links fall back to HubSpot', () => {
+  const BOOKED_ON_HUBSPOT = 'This meeting type is booked directly on HubSpot.';
+
+  it('a required phone question (any HubSpot type) keeps the native form', async () => {
+    availability.formFields = [
+      { name: 'phone', label: 'Phone number', type: 'phonenumber', dataType: 'string', required: true },
+      { name: 'x', label: 'Brand new type', type: 'hologram', required: true },
+    ];
+    render(scheduler());
+    expect(await screen.findByLabelText(/^Phone number/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Brand new type/)).toBeInTheDocument();
+    expect(screen.queryByText(BOOKED_ON_HUBSPOT)).not.toBeInTheDocument();
+  });
+
+  it('only a REQUIRED question no control can answer shows the degraded card', async () => {
+    availability.formFields = [{ name: 'cv', label: 'Upload', type: 'file', required: true }];
+    const onStageChange = vi.fn<(stage: SchedulerStage) => void>();
+    render(scheduler({ onStageChange, fallbackUrl: 'https://meetings.hubspot.com/x' }));
+    expect(await screen.findByText(BOOKED_ON_HUBSPOT)).toBeInTheDocument();
+    expect(screen.getByText('Open in HubSpot')).toBeInTheDocument();
+    expect(onStageChange.mock.calls.map(([stage]) => stage)).toEqual(['unavailable']);
+  });
+
+  it('an OPTIONAL unanswerable question is skipped, not a reason to fall back', async () => {
+    availability.formFields = [{ name: 'cv', label: 'Upload', type: 'file', required: false }];
+    render(scheduler());
+    expect(await screen.findByLabelText(/^Email/)).toBeInTheDocument();
+    expect(screen.queryByText(BOOKED_ON_HUBSPOT)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Upload/)).not.toBeInTheDocument();
+  });
+  it('fieldCopy replaces a field label and placeholder, and derives the one it is not given', async () => {
+    availability.formFields = [];
+    render(
+      scheduler({
+        detailsFormProps: {
+          fieldCopy: {
+            email: { label: 'Business Email', placeholder: 'username@company.com' },
+            firstName: { label: 'Given Name' },
+          },
+        },
+      }),
+    );
+    const email = await screen.findByLabelText(/^Business Email/);
+    expect(email).toHaveAttribute('placeholder', 'username@company.com');
+    // A label alone still moves the placeholder the TYPE derives from it.
+    expect(screen.getByLabelText(/^Given Name/)).toHaveAttribute('placeholder', 'Enter Given Name');
+    // The overridden field keeps everything else: its own label is gone, and the
+    // untouched one is drawn exactly as the widget declares it.
+    expect(screen.queryByLabelText(/^Email/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Last Name/)).toHaveAttribute('placeholder', 'Enter Last Name');
+  });
+  it('a denied email domain keeps the visitor on the form and says why', async () => {
+    availability.formFields = [];
+    const message = 'Looks like a personal email. Drop your work email instead.';
+    render(scheduler({ detailsFormProps: { deniedEmailDomains: { domains: ['gmail.com'], message } } }));
+    await screen.findByLabelText(/^Email/);
+    fillIdentity();
+    typeInto(screen.getByLabelText(/^Email/), 'ada@gmail.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    // The message lands under the email control, and the form does not advance
+    // (Back exists on the calendar step only).
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    // …and once at the button, where a visitor whose address LOOKS answered is
+    // looking when nothing happens.
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ description: message, variant: 'error' }));
+    // A work address passes the same form.
+    typeInto(screen.getByLabelText(/^Email/), 'ada@acmecorp.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 });

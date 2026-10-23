@@ -40,6 +40,15 @@ public class LogDetailsResponse {
     @Schema(description = "Hostname of the device associated with the event")
     private String hostname;
     
+    @Schema(description = "Nickname of the device associated with the event")
+    private String nickname;
+
+    @Schema(description = "Script and software runs only: how the run was triggered (MANUAL, SCHEDULED or AI_ASSISTANT)")
+    private String executionSource;
+
+    @Schema(description = "Script and software runs only: how the executed script was created (MANUAL or AI_ASSISTANT)")
+    private String scriptCreationSource;
+    
     @Schema(description = "Customer id associated with the event")
     private String customerId;
     

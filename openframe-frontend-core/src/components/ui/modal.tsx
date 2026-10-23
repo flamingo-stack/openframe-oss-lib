@@ -2,6 +2,7 @@
 
 import { usePreventScroll } from '@react-aria/overlays';
 import { type ReactNode, forwardRef, useEffect } from 'react';
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 
 /**
@@ -61,7 +62,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(({ isOpen, onClose, childre
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1300] flex items-center justify-center">
+    <div className="ods-viewport-layer fixed inset-0 z-[1300] flex items-center justify-center">
       <div className="absolute inset-0 bg-ods-overlay" onClick={onClose} aria-hidden="true" />
       <div
         ref={ref}
@@ -72,7 +73,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(({ isOpen, onClose, childre
         role="dialog"
         aria-modal="true"
       >
-        {children}
+        <ViewportBreakpoints>{children}</ViewportBreakpoints>
       </div>
     </div>
   );

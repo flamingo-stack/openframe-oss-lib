@@ -1,10 +1,8 @@
 'use client';
 
-import * as CheckboxPrimitive from '@radix-ui/react-checkbox';
 import { forwardRef } from 'react';
-
 import { cn } from '../../utils/cn';
-import { CheckboxCheckmarkIcon } from '../icons-v2-generated/signs-and-symbols/checkbox-checkmark-icon';
+import { Checkbox } from './checkbox';
 import { Label } from './label';
 
 interface CheckboxWithDescriptionProps {
@@ -14,44 +12,52 @@ interface CheckboxWithDescriptionProps {
   title: string;
   description: string;
   disabled?: boolean;
+  /**
+   * Whether the box is checked is still being read: the title and description are drawn for real and the box is a
+   * skeleton of the box's own size. A loading scope does the same.
+   */
+  loading?: boolean;
   className?: string;
 }
 
+/** The box over the checkbox's own (`CHECKBOX_BOX_CLASS`) at this block's size. `Checkbox` reads it for the box and
+ *  for its skeleton. */
+const CHECKBOX_WITH_DESCRIPTION_BOX_CLASS = 'mt-0.5 size-5';
+
 const CheckboxWithDescription = forwardRef<HTMLDivElement, CheckboxWithDescriptionProps>(
-  ({ id, checked, onCheckedChange, title, description, disabled, className }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        'flex items-start gap-3 rounded-lg border border-ods-border bg-ods-card p-4',
-        disabled && 'cursor-not-allowed opacity-50',
-        className,
-      )}
-    >
-      <CheckboxPrimitive.Root
-        id={id}
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-        disabled={disabled}
+  ({ id, checked, onCheckedChange, title, description, disabled, loading: loadingProp, className }, ref) => {
+    return (
+      <div
+        ref={ref}
         className={cn(
-          'peer mt-0.5 h-5 w-5 shrink-0 rounded-sm border border-ods-border bg-ods-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:border-ods-accent data-[state=checked]:bg-ods-accent',
+          'flex items-start gap-3 rounded-lg border border-ods-border bg-ods-card p-4',
+          disabled && 'cursor-not-allowed opacity-50',
+          className,
         )}
       >
-        <CheckboxPrimitive.Indicator className={cn('flex items-center justify-center text-ods-text-on-accent')}>
-          <CheckboxCheckmarkIcon size={10} />
-        </CheckboxPrimitive.Indicator>
-      </CheckboxPrimitive.Root>
-      <div className="flex flex-col gap-1">
-        <Label
-          htmlFor={id}
-          spacing="tight"
-          className={cn('cursor-pointer leading-none', disabled && 'cursor-not-allowed')}
-        >
-          {title}
-        </Label>
-        <span className="text-ods-text-secondary text-h6">{description}</span>
+        {/* The box switches itself: in a loading scope (or `loading`) it is its skeleton; the copy stays real. */}
+        <Checkbox
+          id={id}
+          checked={checked}
+          onCheckedChange={onCheckedChange}
+          disabled={disabled}
+          loading={loadingProp}
+          boxClassName={CHECKBOX_WITH_DESCRIPTION_BOX_CLASS}
+          className="bg-ods-bg"
+        />
+        <div className="flex flex-col gap-1">
+          <Label
+            htmlFor={id}
+            spacing="tight"
+            className={cn('cursor-pointer leading-none', disabled && 'cursor-not-allowed')}
+          >
+            {title}
+          </Label>
+          <span className="text-ods-text-secondary text-h6">{description}</span>
+        </div>
       </div>
-    </div>
-  ),
+    );
+  },
 );
 CheckboxWithDescription.displayName = 'CheckboxWithDescription';
 

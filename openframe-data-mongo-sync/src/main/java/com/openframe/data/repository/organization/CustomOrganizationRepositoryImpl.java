@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -30,6 +31,7 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
     private static final String ID_FIELD = "_id";
     private static final String UPDATED_AT_FIELD = "updatedAt";
     private static final String CURSOR_SEPARATOR = "_";
+    private static final String ORGANIZATION_ID_FIELD = "organizationId";
     
     private static final List<String> SORTABLE_FIELDS = List.of(
             "_id",
@@ -99,6 +101,11 @@ public class CustomOrganizationRepositoryImpl implements CustomOrganizationRepos
             }
             if (filter.getLastActivityTo() != null) {
                 criteriaList.add(Criteria.where(UPDATED_AT_FIELD).lte(filter.getLastActivityTo()));
+            }
+
+            Set<String> excludedOrganizationIds = filter.getExcludeOrganizationIds();
+            if (excludedOrganizationIds != null && !excludedOrganizationIds.isEmpty()) {
+                criteriaList.add(Criteria.where(ORGANIZATION_ID_FIELD).nin(excludedOrganizationIds));
             }
         } else {
             // No filter provided — default to ACTIVE status

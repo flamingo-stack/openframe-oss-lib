@@ -1,6 +1,6 @@
 package com.openframe.stream.handler.rmm;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.model.enums.Destination;
@@ -113,7 +113,7 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
         row.setStderrTruncated(truncStderr.truncated);
 
         commandExecutionRepository.save(row);
-        executionMetrics.recordCompleted(RmmExecutionMetrics.KIND_COMMAND, newStatus, row.getDispatchedAt(), now);
+        executionMetrics.recordCommandCompleted(newStatus, row.getDispatchedAt(), now);
         log.info("Transitioned CommandExecution row: executionId={} machineId={} status=RUNNING→{} exitCode={} timedOut={}",
                 row.getExecutionId(), row.getMachineId(), newStatus, exitCode, timedOut);
     }
@@ -142,7 +142,7 @@ public class CommandExecutionHandler implements MessageHandler<DeserializedDebez
 
     private static String stringOrNull(JsonNode node, String field) {
         JsonNode v = node.get(field);
-        return v == null || v.isNull() ? null : v.asText();
+        return v == null || v.isNull() ? null : v.asString();
     }
 
     private static Integer intOrNull(JsonNode node, String field) {

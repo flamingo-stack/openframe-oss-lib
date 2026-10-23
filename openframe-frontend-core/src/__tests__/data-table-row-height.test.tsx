@@ -37,13 +37,7 @@ function Table({
   const table = useDataTable({ data, columns });
   return (
     <DataTable table={table}>
-      <DataTable.Body<Row>
-        loading={loading}
-        minRows={4}
-        skeletonRows={4}
-        autoHeight
-        rowHeightClassName={rowHeightClassName}
-      />
+      <DataTable.Body<Row> loading={loading} minRows={4} skeletonRows={4} rowHeightClassName={rowHeightClassName} />
     </DataTable>
   );
 }
@@ -73,7 +67,10 @@ const rows = (n: number): Row[] => Array.from({ length: n }, (_, i) => ({ id: St
  * arbitrary-value class through `querySelectorAll` is its own trap.
  */
 function heightClasses(container: HTMLElement): string[] {
-  return [...container.innerHTML.matchAll(/\b(?:md:)?(?:min-)?h-\[[^\]\s"]+\]/g)].map(m => m[0]);
+  // Text bars are sized in their text's line heights (`TextLineSkeleton`: `h-[1lh]`, `h-[0.7lh]`): not a row height.
+  return [...container.innerHTML.matchAll(/\b(?:md:)?(?:min-)?h-\[[^\]\s"]+\]/g)]
+    .map(m => m[0])
+    .filter(height => !height.endsWith('lh]'));
 }
 
 /** The class list of every row-card slot (real or pad) in the rendered markup. */

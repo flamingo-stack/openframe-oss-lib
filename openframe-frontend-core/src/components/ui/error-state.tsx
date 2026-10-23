@@ -2,7 +2,9 @@
 
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
+import { useLoadingScope } from './loading-scope';
 
 interface ErrorStateProps {
   title?: string;
@@ -29,6 +31,9 @@ export function ErrorState({
   className,
   containerClassName,
 }: ErrorStateProps) {
+  // In a page's loading state the message is read: the title, icon and buttons are the page's own and stay real, the
+  // message's line is its skeleton.
+  const loading = useLoadingScope();
   const getVariantStyles = () => {
     switch (variant) {
       case 'error':
@@ -72,7 +77,9 @@ export function ErrorState({
           {showIcon && <AlertTriangle className={cn('mt-0.5 h-5 w-5 flex-shrink-0', styles.icon)} />}
           <div className="flex-1">
             <h3 className={cn('mb-1 font-semibold', styles.text)}>{title}</h3>
-            <p className={cn('text-h6', styles.text)}>{message}</p>
+            <p className={cn('text-h6', styles.text)}>
+              {loading ? <TextLineSkeleton type="inherit" as="span" className="w-2/3" /> : message}
+            </p>
             {(showRetry || showHome) && (
               <div className="mt-3 flex gap-2">
                 {showRetry && onRetry && (

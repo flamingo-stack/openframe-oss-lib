@@ -4,7 +4,12 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.DeviceFacetDimension;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
+import com.openframe.data.document.tag.Tag;
+import com.openframe.data.document.tag.TagAssignment;
+import com.openframe.data.document.tag.TagEntityType;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -13,9 +18,12 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.aggregation.MatchOperation;
+import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.util.Assert;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,7 +34,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collector;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toMap;
+import static org.springframework.util.CollectionUtils.isEmpty;
+import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 public class CustomMachineRepositoryImpl implements CustomMachineRepository {
@@ -39,10 +54,15 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     private static final String STATUS_FIELD = "status";
     private static final String TYPE_FIELD = "type";
     private static final String ORGANIZATION_ID_FIELD = "organizationId";
+    private static final String PACKAGE_MANAGERS_FIELD = "packageManagers";
     private static final String COUNT_FIELD = "count";
     private static final String BUCKET_FIELD = "_availableBucket";
     private static final String ONLINE_STATUS = "ONLINE";
     private static final String CURSOR_SEPARATOR = "|";
+    private static final String HOSTNAME_FLAG_PREFIX = "h";
+    private static final String NICKNAME_FLAG_PREFIX = "n";
+    private static final List<String> HOSTNAME_FIELDS = List.of("hostname");
+    private static final List<String> VISIBLE_NAME_FIELDS = List.of("nickname", "displayName");
 
     private static final List<String> SORTABLE_FIELDS = List.of(
             "_id",
@@ -60,6 +80,128 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     public CustomMachineRepositoryImpl(MongoTemplate mongoTemplate) {
         this.mongoTemplate = mongoTemplate;
+    }
+
+    @Override
+    public List<Machine> findMachines(String tenantId, MachineQueryFilter filter) {
+        Assert.hasText(tenantId, "tenantId must not be blank");
+        Query query = buildTenantQuery(tenantId, filter, "");
+        return mongoTemplate.find(query, Machine.class);
+    }
+
+    @Override
+    public List<Machine> findMachinesAfter(String tenantId, MachineQueryFilter filter, String afterMachineId, int limit) {
+        Assert.hasText(tenantId, "tenantId must not be blank");
+        Assert.isTrue(limit > 0, "limit must be positive");
+        Query query = buildTenantQuery(tenantId, filter, "");
+        Query page = machineIdPage(query, afterMachineId, limit);
+        return mongoTemplate.find(page, Machine.class);
+    }
+
+    @Override
+    public MachineNameMatches findMatchingNames(String tenantId, MachineQueryFilter filter) {
+        Assert.hasText(tenantId, "tenantId must not be blank");
+        if (filter == null) {
+            return emptyNameMatches();
+        }
+        List<String> hostnames = filter.getHostnames();
+        List<String> nicknames = filter.getNicknames();
+        boolean noExactNames = isEmpty(hostnames) && isEmpty(nicknames);
+        if (noExactNames) {
+            return emptyNameMatches();
+        }
+        List<String> requestedHostnames = namesOrEmpty(hostnames);
+        List<String> requestedNicknames = namesOrEmpty(nicknames);
+        Query query = buildTenantQuery(tenantId, filter, "");
+        Aggregation aggregation = matchingNamesAggregation(query, requestedHostnames, requestedNicknames);
+        AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, Machine.class, Document.class);
+        return results.getMappedResults().stream().findFirst()
+                .map(flags -> matchingNames(flags, requestedHostnames, requestedNicknames))
+                .orElseGet(this::emptyNameMatches);
+    }
+
+    private Query machineIdPage(Query query, String afterMachineId, int limit) {
+        Query page = query;
+        if (hasText(afterMachineId)) {
+            Document predicate = query.getQueryObject();
+            Document cursor = new Document(MACHINE_ID_FIELD, new Document("$gt", afterMachineId));
+            List<Document> conditions = List.of(predicate, cursor);
+            Document combined = new Document("$and", conditions);
+            page = new BasicQuery(combined);
+        }
+        Sort order = Sort.by(Sort.Direction.ASC, MACHINE_ID_FIELD);
+        page.with(order);
+        return page.limit(limit);
+    }
+
+    private Aggregation matchingNamesAggregation(Query query, List<String> hostnames, List<String> nicknames) {
+        Document predicate = query.getQueryObject();
+        List<Document> predicates = List.of(predicate);
+        Criteria scoped = Criteria.where("$and").is(predicates);
+        MatchOperation match = Aggregation.match(scoped);
+        Document group = matchingNameGroup(hostnames, nicknames);
+        AggregationOperation existenceFlags = context -> group;
+        return Aggregation.newAggregation(match, existenceFlags);
+    }
+
+    private Document matchingNameGroup(List<String> hostnames, List<String> nicknames) {
+        Stream<Map.Entry<String, Object>> hosts = nameFlags(HOSTNAME_FLAG_PREFIX, hostnames, HOSTNAME_FIELDS);
+        Stream<Map.Entry<String, Object>> aliases = nameFlags(NICKNAME_FLAG_PREFIX, nicknames, VISIBLE_NAME_FIELDS);
+        Collector<Map.Entry<String, Object>, ?, Map<String, Object>> byFlag = toMap(
+                Map.Entry::getKey, Map.Entry::getValue, (first, duplicate) -> first, LinkedHashMap::new);
+        Map<String, Object> flags = Stream.concat(hosts, aliases).collect(byFlag);
+        Document group = new Document(ID_FIELD, null);
+        group.putAll(flags);
+        return new Document("$group", group);
+    }
+
+    private Stream<Map.Entry<String, Object>> nameFlags(String prefix, List<String> names, List<String> fields) {
+        int count = names.size();
+        return IntStream.range(0, count).mapToObj(index -> nameFlag(prefix, names, fields, index));
+    }
+
+    private Map.Entry<String, Object> nameFlag(String prefix, List<String> names, List<String> fields, int index) {
+        String name = names.get(index);
+        String quoted = Pattern.quote(name);
+        String regex = "\\A" + quoted + "\\z";
+        List<Document> matches = fields.stream().map(field -> regexMatch(field, regex)).toList();
+        Document anyField = new Document("$or", matches);
+        Document exists = new Document("$max", anyField);
+        return Map.entry(prefix + index, exists);
+    }
+
+    private Document regexMatch(String field, String regex) {
+        List<String> nullableField = List.of("$" + field, "");
+        Document input = new Document("$ifNull", nullableField);
+        Document arguments = new Document("input", input).append("regex", regex).append("options", "i");
+        return new Document("$regexMatch", arguments);
+    }
+
+    private MachineNameMatches matchingNames(Document flags, List<String> hostnames, List<String> nicknames) {
+        List<String> matchingHosts = matchingRequestedNames(flags, HOSTNAME_FLAG_PREFIX, hostnames);
+        List<String> matchingNicknames = matchingRequestedNames(flags, NICKNAME_FLAG_PREFIX, nicknames);
+        return new MachineNameMatches(matchingHosts, matchingNicknames);
+    }
+
+    private List<String> matchingRequestedNames(Document flags, String prefix, List<String> names) {
+        int count = names.size();
+        return IntStream.range(0, count).filter(index -> isNameMatched(flags, prefix, index))
+                .mapToObj(names::get).toList();
+    }
+
+    private boolean isNameMatched(Document flags, String prefix, int index) {
+        String key = prefix + index;
+        Object matched = flags.get(key);
+        return Boolean.TRUE.equals(matched);
+    }
+
+    private List<String> namesOrEmpty(List<String> names) {
+        return names == null ? List.of() : names;
+    }
+
+    private MachineNameMatches emptyNameMatches() {
+        List<String> empty = List.of();
+        return new MachineNameMatches(empty, empty);
     }
 
     private static Query withTenant(String tenantId, Query query) {
@@ -238,36 +380,37 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     @Override
     public long countMachines(String tenantId, MachineQueryFilter filter, String search) {
-        return mongoTemplate.count(withTenant(tenantId, buildDeviceQuery(filter, search)), Machine.class);
+        Query query = buildTenantQuery(tenantId, filter, search);
+        return mongoTemplate.count(query, Machine.class);
     }
 
     @Override
     public List<String> findMachineIds(String tenantId, MachineQueryFilter filter, String search) {
-        return mongoTemplate.findDistinct(withTenant(tenantId, buildDeviceQuery(filter, search)),
-                MACHINE_ID_FIELD, Machine.class, String.class);
+        Query query = buildTenantQuery(tenantId, filter, search);
+        return mongoTemplate.findDistinct(query, MACHINE_ID_FIELD, Machine.class, String.class);
     }
 
     @Override
     public List<Machine> findMachinesWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                 String cursor, int limit,
                                                 String sortField, String sortDirection) {
-        return findMachinesWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
-                cursor, limit, sortField, sortDirection);
+        Query query = buildTenantQuery(tenantId, filter, search);
+        return findMachinesWithCursor(query, cursor, limit, sortField, sortDirection);
     }
 
     @Override
     public List<Machine> findAvailableForScheduleWithCursor(String tenantId, MachineQueryFilter filter, String search,
                                                             Collection<String> assignedMachineIds,
                                                             String cursor, int limit) {
-        return findAvailableForScheduleWithCursor(withTenant(tenantId, buildDeviceQuery(filter, search)),
-                assignedMachineIds, cursor, limit);
+        Query query = buildTenantQuery(tenantId, filter, search);
+        return findAvailableForScheduleWithCursor(query, assignedMachineIds, cursor, limit);
     }
 
     @Override
     public Map<String, Integer> facet(String tenantId, MachineQueryFilter filter, String search,
                                       DeviceFacetDimension dimension) {
         String field = dimension.fieldName();
-        Query query = withTenant(tenantId, buildDeviceQuery(filter, search, field));
+        Query query = buildTenantQuery(tenantId, filter, search, field);
         Aggregation agg = Aggregation.newAggregation(
                 ctx -> new Document("$match", query.getQueryObject()),
                 Aggregation.group(field).count().as(COUNT_FIELD));
@@ -300,10 +443,67 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
     }
 
     private Query buildCriteriaQuery(String tenantId, MachineQueryFilter filter, Collection<OsType> osTypeScope) {
-        Query query = buildDeviceQuery(filter, null);
-        query.addCriteria(Criteria.where("tenantId").is(tenantId));
+        Query query = buildTenantQuery(tenantId, filter, "");
         osTypeOrCriteria(osTypeScope).ifPresent(query::addCriteria);
         return query;
+    }
+
+    private Query buildTenantQuery(String tenantId, MachineQueryFilter filter, String search) {
+        return buildTenantQuery(tenantId, filter, search, "");
+    }
+
+    private Query buildTenantQuery(String tenantId, MachineQueryFilter filter, String search, String excludeField) {
+        Query query = buildDeviceQuery(filter, search, excludeField);
+        withTenant(tenantId, query);
+        if (hasTagFilters(filter)) {
+            List<String> machineIds = resolveTaggedMachineIds(tenantId, filter);
+            Criteria taggedMachines = Criteria.where(MACHINE_ID_FIELD).in(machineIds);
+            query.addCriteria(taggedMachines);
+        }
+        return query;
+    }
+
+    private boolean hasTagFilters(MachineQueryFilter filter) {
+        if (filter == null) {
+            return false;
+        }
+        List<String> keys = filter.getTagKeys();
+        List<String> values = filter.getTagValues();
+        return !isEmpty(keys) || !isEmpty(values);
+    }
+
+    private List<String> resolveTaggedMachineIds(String tenantId, MachineQueryFilter filter) {
+        List<String> keys = filter.getTagKeys();
+        List<String> values = filter.getTagValues();
+        Query query = deviceTagQuery(tenantId);
+        if (!isEmpty(keys)) {
+            List<String> tagIds = resolveTagIds(tenantId, keys);
+            if (tagIds.isEmpty()) {
+                return List.of();
+            }
+            Criteria tags = Criteria.where("tagId").in(tagIds);
+            query.addCriteria(tags);
+        }
+        if (!isEmpty(values)) {
+            Criteria matchingValues = Criteria.where("values").in(values);
+            query.addCriteria(matchingValues);
+        }
+        List<TagAssignment> assignments = mongoTemplate.find(query, TagAssignment.class);
+        return assignments.stream().map(TagAssignment::getEntityId).distinct().toList();
+    }
+
+    private List<String> resolveTagIds(String tenantId, List<String> keys) {
+        Query query = deviceTagQuery(tenantId);
+        Criteria matchingKeys = Criteria.where("key").in(keys);
+        query.addCriteria(matchingKeys);
+        List<Tag> tags = mongoTemplate.find(query, Tag.class);
+        return tags.stream().map(Tag::getId).toList();
+    }
+
+    private Query deviceTagQuery(String tenantId) {
+        Criteria deviceType = Criteria.where("entityType").is(TagEntityType.DEVICE);
+        Query query = new Query(deviceType);
+        return withTenant(tenantId, query);
     }
 
     Query buildDeviceQuery(MachineQueryFilter filter, String search) {
@@ -346,6 +546,11 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
                     criteriaList.add(Criteria.where(MACHINE_ID_FIELD).in(restrict));
                 }
             }
+            Collection<PackageManagerType> manageableBy = filter.getManageableByPackageManagers();
+            if (manageableBy != null) {
+                criteriaList.add(softwareManageableCriteria(manageableBy));
+            }
+            addNameCriteria(criteriaList, filter);
         }
 
         if (search != null && !search.isEmpty()) {
@@ -368,6 +573,59 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         return query;
     }
 
+    private void addNameCriteria(List<Criteria> criteriaList, MachineQueryFilter filter) {
+        List<Criteria> exactNames = exactNameCriteria(filter);
+        if (!exactNames.isEmpty()) {
+            Criteria[] alternatives = exactNames.toArray(Criteria[]::new);
+            Criteria nameCriteria = new Criteria().orOperator(alternatives);
+            criteriaList.add(nameCriteria);
+            return;
+        }
+        String pattern = filter.getPattern();
+        if (hasText(pattern)) {
+            String regex = toNameRegex(pattern);
+            Criteria names = namePatternCriteria(regex);
+            criteriaList.add(names);
+        }
+    }
+
+    private List<Criteria> exactNameCriteria(MachineQueryFilter filter) {
+        List<String> hostnames = filter.getHostnames();
+        List<String> nicknames = filter.getNicknames();
+        Stream<Criteria> hosts = exactNameCriterion("hostname", hostnames);
+        Stream<Criteria> aliases = exactNameCriterion("nickname", nicknames);
+        Stream<Criteria> displayNames = exactNameCriterion("displayName", nicknames);
+        Stream<Criteria> visibleNames = Stream.concat(aliases, displayNames);
+        return Stream.concat(hosts, visibleNames).toList();
+    }
+
+    private Stream<Criteria> exactNameCriterion(String field, List<String> names) {
+        if (isEmpty(names)) {
+            return Stream.empty();
+        }
+        Collector<CharSequence, ?, String> alternatives = joining("|", "\\A(?:", ")\\z");
+        String regex = names.stream().map(Pattern::quote).collect(alternatives);
+        Criteria criterion = Criteria.where(field).regex(regex, "i");
+        return Stream.of(criterion);
+    }
+
+    private Criteria namePatternCriteria(String regex) {
+        Criteria hostname = Criteria.where("hostname").regex(regex, "i");
+        Criteria nickname = Criteria.where("nickname").regex(regex, "i");
+        Criteria displayName = Criteria.where("displayName").regex(regex, "i");
+        return new Criteria().orOperator(hostname, nickname, displayName);
+    }
+
+    private String toNameRegex(String pattern) {
+        String trimmed = pattern.trim();
+        boolean hasWildcard = trimmed.indexOf('*') >= 0 || trimmed.indexOf('?') >= 0;
+        if (hasWildcard) {
+            String regex = trimmed.replace(".", "\\.").replace("*", ".*").replace("?", ".");
+            return "^" + regex + "$";
+        }
+        return Pattern.quote(trimmed);
+    }
+
     @Override
     public void updateLastSeen(String machineId, Instant lastSeen) {
         Query query = new Query(Criteria.where(MACHINE_ID_FIELD).is(machineId));
@@ -388,6 +646,14 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
         List<OsType> valid = osTypeScope == null ? List.of() : osTypeScope.stream().filter(Objects::nonNull).toList();
         return valid.isEmpty() ? Optional.empty()
                 : Optional.of(Criteria.where(OS_TYPE_FIELD).in(valid));
+    }
+
+    private static Criteria softwareManageableCriteria(Collection<PackageManagerType> manageableBy) {
+        List<Criteria> anyManageable = new ArrayList<>();
+        anyManageable.add(Criteria.where(PACKAGE_MANAGERS_FIELD).exists(false));
+        manageableBy.forEach(manager -> anyManageable.add(
+                Criteria.where(PACKAGE_MANAGERS_FIELD + "." + manager.name()).in(PackageManagerState.MANAGEABLE)));
+        return new Criteria().orOperator(anyManageable.toArray(new Criteria[0]));
     }
 
 }

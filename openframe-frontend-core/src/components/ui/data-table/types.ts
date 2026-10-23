@@ -1,4 +1,5 @@
 import type { RowData } from '@tanstack/react-table';
+import type { ReactNode } from 'react';
 
 export type TailwindBreakpoint = 'md' | 'lg' | 'xl' | '2xl';
 
@@ -19,6 +20,14 @@ export interface DataTableFilterOption {
    * the moment one is picked — do not feed one in.
    */
   count?: number;
+}
+
+/**
+ * The options a filter UI has selected, per column: the option ids `FiltersDropdown` emits, keyed by column id. What
+ * `FilterModal` and `ListPageLayout`'s mobile filters take and hand back.
+ */
+export interface DataTableFilters {
+  [columnKey: string]: string[];
 }
 
 declare module '@tanstack/react-table' {
@@ -61,5 +70,19 @@ declare module '@tanstack/react-table' {
     cellClassName?: string;
     /** Extra class names applied to the header cell wrapper. */
     headerClassName?: string;
+    /**
+     * A definition shown in an `InfoHint` beside the header label — for a
+     * column whose NAME is a term of art a reader may not know. The header owns
+     * the icon, its spacing and its accessible name (`About <label>`), so every
+     * table explains a column the same way instead of each hand-rolling a node
+     * header to fit one in.
+     */
+    hint?: ReactNode;
+    /**
+     * The header's text is still being read (it names whose data the table shows): the header draws an `h5` bar in
+     * its label's own box, so the header row and the column keep their size. A flag, not an empty header: `''` is a
+     * column with no label.
+     */
+    headerLoading?: boolean;
   }
 }

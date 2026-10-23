@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Read-only git for the headless report run. The run's prompt says the repositories are read
+# only; this is what makes that true. Accepts an optional leading -C <repo>, then one of the
+# read-only subcommands, and refuses the flags and environment that let git execute a command
+# of its own (pager, external diff, exec-path, upload/receive-pack, user config).
+#
+# run-guard.py rejects every Bash call that does not start with this script, so a report run
+# cannot reach plain git at all.
+set -euo pipefail
+
+READ_ONLY=" show grep log ls-tree ls-files cat-file rev-parse rev-list diff diff-tree describe for-each-ref shortlog blame branch tag "
+
+repo=""
+if [ "${1:-}" = "-C" ]; then
+  repo="${2:-}"
+  shift 2
+fi
+
+sub="${1:-}"
+case "$READ_ONLY" in
+  *" $sub "*) ;;
+  *) echo "git-ro: refusing '$sub' — read-only subcommands only" >&2; exit 2 ;;
+esac
+
+# `branch` and `tag` are listed above for their listing forms only.
+case "$sub" in
+  branch|tag)
+    for arg in "${@:2}"; do
+      case "$arg" in
+        -d|-D|-m|-M|-f|--force|--delete|--move|--copy|-c)
+          echo "git-ro: refusing '$sub $arg' — listing only" >&2; exit 2 ;;
+      esac
+    done
+    ;;
+esac
+
+for arg in "$@"; do
+  case "$arg" in
+    -O*|--open-files-in-pager*|--ext-diff|--exec-path*|--upload-pack*|--receive-pack*|-c|--config-env*)
+      echo "git-ro: refusing flag '$arg'" >&2; exit 2 ;;
+  esac
+done
+
+exec env GIT_PAGER=cat PAGER=cat GIT_EXTERNAL_DIFF= GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+  git ${repo:+-C "$repo"} --no-pager "$@"

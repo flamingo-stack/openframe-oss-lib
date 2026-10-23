@@ -19,6 +19,7 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private String ingestDay;
     private String toolEventId;
     private String agentId;
+    private String machineId;
     private String sourceEventType;
     private String message;
     private IntegratedToolType integratedToolType;
@@ -28,5 +29,8 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private Boolean skipProcessing;
     private Boolean isVisible;
     private String tenantId;
+    private String organizationId;
+    private String organizationName;
+    private String userId;
     private Set<Destination> excludedDestinations;
 }

@@ -22,7 +22,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
-import { extractItems, extractItemId } from '../../../utils/extract-items';
+import { extractCardItems, extractItemId } from '../../../utils/extract-items';
 
 export interface UseChatCardItemResult<T = unknown> {
   item: T | undefined;
@@ -59,10 +59,10 @@ export function useChatCardItem<T = unknown>(type: string, id: string): UseChatC
       // nothing, never a false 'deleted' claim). TanStack surfaces the
       // throw as `isError`.
       if (!res.ok) throw new Error(`chat card fetch failed: ${res.status}`);
-      // `.json()` is `any`; `extractItems` already takes `unknown` and does the
+      // `.json()` is `any`; `extractCardItems` already takes `unknown` and does the
       // shape normalization, so keep the boundary honest and let it do its job.
       const data: unknown = await res.json();
-      const items = extractItems(data);
+      const items = extractCardItems(type, data);
       const match = items.find(it => extractItemId(type, it) === id);
       return (match ?? null) as T | null;
     },

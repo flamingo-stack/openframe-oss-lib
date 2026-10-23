@@ -11,6 +11,7 @@ use crate::executor::tempfile::{temp_script_name, TempFileGuard};
 use crate::executor::{ExecResult, ScriptParams};
 
 use process::execute_with_timeout;
+pub(crate) use run_as_user::console_user_present;
 use run_as_user::{configure_preexec, resolve_run_as, RunAs};
 
 pub async fn execute_script(params: ScriptParams<'_>) -> ExecResult {

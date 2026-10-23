@@ -4,6 +4,7 @@ import com.openframe.authz.security.flow.SsoFlowHandler;
 import com.openframe.authz.service.sso.apple.AppleWebTokenCapture;
 import com.openframe.authz.web.AuthErrorResponder;
 import com.openframe.authz.web.AuthStateUtils;
+import com.openframe.core.exception.AuthFlowException;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -15,6 +16,10 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.util.List;
+
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
+import static com.openframe.core.exception.AuthErrorCode.REGISTRATION_FAILED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 
 
 /**
@@ -50,8 +55,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
                 try {
                     microsoftLoginEmailGate.require(authentication);
                 } catch (IllegalStateException e) {
-                    authErrorResponder.send(response, request, "sso-login-unverified-email", e,
-                            "SSO login failed. Please try again.");
+                    authErrorResponder.send(response, request, "sso-login-unverified-email", e, EMAIL_NOT_VERIFIED);
                     return;
                 }
                 super.onAuthenticationSuccess(request, response, authentication);
@@ -64,8 +68,8 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
             // cannot also steal the next attempt.
             AuthStateUtils.clearSsoFlowCookies(response);
             authErrorResponder.send(response, request, "sso-flow-state-mismatch",
-                    new IllegalStateException("SSO session expired. Please try again."),
-                    "SSO session expired. Please try again.");
+                    new AuthFlowException(SSO_SESSION_EXPIRED, "SSO session expired. Please try again."),
+                    SSO_SESSION_EXPIRED);
             return;
         }
 
@@ -77,8 +81,7 @@ public class SsoFlowSuccessHandler extends SavedRequestAwareAuthenticationSucces
             appleWebTokenCapture.captureIfApple(request, authentication);
         } catch (Exception e) {
             AuthStateUtils.clearSsoFlowCookies(response);
-            authErrorResponder.send(response, request, "sso-flow-finalize", e,
-                    "Registration failed. Please try again.");
+            authErrorResponder.send(response, request, "sso-flow-finalize", e, REGISTRATION_FAILED);
         }
     }
 

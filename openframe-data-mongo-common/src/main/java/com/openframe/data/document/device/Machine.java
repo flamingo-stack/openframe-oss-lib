@@ -1,5 +1,7 @@
 package com.openframe.data.document.device;
 import com.openframe.data.document.TenantScoped;
+import com.openframe.data.document.packagesearch.PackageManagerState;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
@@ -10,6 +12,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Document(collection = "machines")
@@ -19,6 +22,7 @@ public class Machine implements TenantScoped {
     @Indexed
     private String tenantId;
     @NotBlank
+    @Indexed
     private String machineId;   // Same as in OAuthClient, used for authentication and as primary ID
     private String ip;
     private String macAddress;
@@ -26,7 +30,11 @@ public class Machine implements TenantScoped {
     private String agentVersion;
     @Indexed
     private DeviceStatus status;
+    // connectivity, kept moving while status is frozen in PENDING_DELETION; null until the first heartbeat after this field appeared
+    @Indexed
+    private TelemetryStatus telemetryStatus;
     private Instant lastSeen;
+    private Instant firstConnectedAt;
     @Indexed
     private String organizationId;
     private String userId;      // User who installed the agent; optional, absent for older registrations
@@ -43,6 +51,7 @@ public class Machine implements TenantScoped {
     private String osVersion;
     private String osBuild;
     private String timezone;
+    private Map<PackageManagerType, PackageManagerState> packageManagers;
     private SecurityState securityState;
     private ComplianceState complianceState;
     private List<SecurityAlert> securityAlerts;
@@ -54,4 +63,5 @@ public class Machine implements TenantScoped {
     @LastModifiedDate
     private Instant updatedAt;     // Last time device info was updated (replaces lastModifiedAt)
     private Instant stuckNotifiedAt; // When DEVICE_STUCK event was sent (null = not yet notified)
+    private Long version = 0L;
 }

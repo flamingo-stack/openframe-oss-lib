@@ -1,6 +1,7 @@
 package com.openframe.test.data.dto.device;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.openframe.test.data.dto.remoteaccess.DeviceRemoteAccess;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +25,7 @@ public class Machine {
     private String lastSeen;
     private String organizationId;
     private String hostname;
+    private String nickname;
     private String displayName;
     private String serialNumber;
     private String manufacturer;
@@ -38,4 +40,5 @@ public class Machine {
     private List<Tag> tags;
     private List<ToolConnection> toolConnections;
     private List<InstalledAgent> installedAgents;
+    private DeviceRemoteAccess remoteAccess;
 }

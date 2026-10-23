@@ -36,9 +36,13 @@ public class AuthEntryPage {
     private static final String SIGN_UP_TAB = "button:has-text('Sign Up')";
     private static final String LOGIN_TAB = "button:has-text('Login')";
     private static final String FORGOT_PWD = "button:has-text('Forgot Password?')";
-    // First auth-method button – used as the "email accepted" signal once the
-    // method picker is revealed after Continue.
-    private static final String SSO_BTN = "button:has-text('OpenFrame SSO')";
+    // The OpenFrame provider button – used as the "email accepted" signal.
+    // It is the only provider that appears in response to the email: Google,
+    // Microsoft and Apple render upfront, before anything is typed, so waiting
+    // on one of those would pass instantly and prove nothing.
+    // Labelled "OpenFrame SSO" until 2026-09; the rename to "Continue with
+    // OpenFrame" is what broke every UI case at BaseUITest.newContext.
+    private static final String SSO_BTN = "button:has-text('Continue with OpenFrame')";
     // Login email form (shown once the Login tab is active)
     private static final String PAGE_HEADING = "h1:has-text('Login to OpenFrame')";
     private static final String EMAIL_INPUT = "input[type='email']";
@@ -87,11 +91,18 @@ public class AuthEntryPage {
 
     /**
      * Selects the "Login" tab and waits for the login email form at
-     * /auth/login to render. The email field and the auth-method buttons
-     * (OpenFrame SSO / Google / Microsoft) render together on this single
-     * screen – there is no separate Continue step – so we wait for both the
-     * email field and the SSO button before returning, to avoid racing input
-     * against hydration.
+     * /auth/login to render.
+     * <p>
+     * Waits for the email field only. The auth-method buttons are <em>not</em>
+     * on screen yet: the provider list renders the OpenFrame SSO option once a
+     * valid email has been entered, so waiting for it here would block on a
+     * button that only this method's caller can cause to appear. That wait
+     * belongs after the email is typed, and {@link #submitEmail(String)} does
+     * it there.
+     * <p>
+     * Racing input against hydration is handled where it actually occurs, in
+     * {@link #enterEmail(String)}, which re-fills until the input reports the
+     * value back.
      */
     public AuthEntryPage switchToLogin() {
         loginTab().click();
@@ -100,9 +111,6 @@ public class AuthEntryPage {
                 new Page.WaitForURLOptions().setTimeout(10_000)
         );
         emailInput().waitFor(new Locator.WaitForOptions()
-                .setState(WaitForSelectorState.VISIBLE)
-                .setTimeout(10_000));
-        ssoButton().waitFor(new Locator.WaitForOptions()
                 .setState(WaitForSelectorState.VISIBLE)
                 .setTimeout(10_000));
         return this;

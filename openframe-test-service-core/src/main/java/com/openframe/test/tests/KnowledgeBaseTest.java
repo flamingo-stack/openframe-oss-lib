@@ -2,6 +2,10 @@ package com.openframe.test.tests;
 
 import com.openframe.test.api.AttachmentApi;
 import com.openframe.test.api.KnowledgeBaseApi;
+import com.openframe.test.api.TagApi;
+import com.openframe.test.data.dto.shared.GraphqlError;
+import com.openframe.test.data.dto.tag.TagDefinition;
+import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.data.dto.knowledgebase.*;
 import com.openframe.test.data.dto.shared.MutationDeletePayload;
 import org.junit.jupiter.api.*;
@@ -10,6 +14,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.openframe.test.data.generator.KnowledgeBaseGenerator.*;
@@ -93,22 +98,6 @@ public class KnowledgeBaseTest extends BaseTest {
             assertThat(folder.getParentId()).as("Root folder parentId should be null for " + folder.getId()).isNull();
             assertThat(folder.getCreatedAt()).as("Folder createdAt should not be blank for " + folder.getId()).isNotBlank();
             assertThat(folder.getUpdatedAt()).as("Folder updatedAt should not be blank for " + folder.getId()).isNotBlank();
-        });
-    }
-
-    @Disabled
-    @Tag("saas")
-    @Tag("read")
-    @Test
-    @Order(4)
-    @DisplayName("Get all knowledge base tags")
-    public void testGetAllTags() {
-        List<KnowledgeBaseTag> tags = KnowledgeBaseApi.getKnowledgeBaseTags(null);
-
-        assertThat(tags).as("Expected at least one knowledge base tag").isNotEmpty();
-        assertThat(tags).allSatisfy(tag -> {
-            assertThat(tag.getId()).as("Tag id should not be blank").isNotBlank();
-            assertThat(tag.getKey()).as("Tag key should not be blank for " + tag.getId()).isNotBlank();
         });
     }
 
@@ -436,5 +425,79 @@ public class KnowledgeBaseTest extends BaseTest {
 
         boolean deleted = KnowledgeBaseApi.deleteFolder(deleteFolderArchivingChildren(folder.getId()));
         assertThat(deleted).as("deleteFolder should return true").isTrue();
+    }
+
+    private static final List<String> createdArticleIds = new ArrayList<>();
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @Order(19)
+    @DisplayName("Tag an article, then remove the tag")
+    public void testTagAndUntagArticle() {
+        KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
+        KnowledgeBaseItem article = KnowledgeBaseApi.createArticle(draftArticle(folder.getId()));
+        createdArticleIds.add(article.getId());
+
+        // createTag is idempotent per (key, entityType), so a fixed key does not accumulate tags.
+        TagDefinition tag = TagApi.createTag("QA_KB_ARTICLE_TAG", "KNOWLEDGE_ARTICLE", null, null);
+        assertThat(tag.getId()).as("Created tag id should not be blank").isNotBlank();
+
+        KnowledgeBaseItem tagged = KnowledgeBaseApi.addTagToItem(article.getId(), tag.getId());
+        assertThat(tagged.getId()).as("Tagged article id should match").isEqualTo(article.getId());
+        assertThat(tagged.getTags()).as("The mutation returns the attached tag")
+                .extracting(KnowledgeBaseTag::getId).contains(tag.getId());
+        assertThat(KnowledgeBaseApi.getKnowledgeBaseItem(article.getId()).getTags())
+                .as("The attached tag is persisted").extracting(KnowledgeBaseTag::getId).contains(tag.getId());
+
+        List<KnowledgeBaseTag> allTags = KnowledgeBaseApi.getKnowledgeBaseTags(null);
+        assertThat(allTags).as("knowledgeBaseTags lists the tag").extracting(KnowledgeBaseTag::getId).contains(tag.getId());
+        assertThat(allTags).allSatisfy(t -> assertThat(t.getKey()).as("Tag key should not be blank for " + t.getId()).isNotBlank());
+        assertThat(KnowledgeBaseApi.getKnowledgeBaseTags(folder.getId()))
+                .as("The folder's subtree lists the tag of the article in it").extracting(KnowledgeBaseTag::getId).contains(tag.getId());
+
+        KnowledgeBaseItem untagged = KnowledgeBaseApi.removeTagFromItem(article.getId(), tag.getId());
+        assertThat(untagged.getTags()).as("The mutation returns the article without the tag")
+                .extracting(KnowledgeBaseTag::getId).doesNotContain(tag.getId());
+        assertThat(KnowledgeBaseApi.getKnowledgeBaseItem(article.getId()).getTags())
+                .as("The removal is persisted").extracting(KnowledgeBaseTag::getId).doesNotContain(tag.getId());
+
+        List<GraphqlError> unknown = KnowledgeBaseApi.attemptAddTagToItemErrors(article.getId(), "e2e-" + RunId.next() + "-no-such-tag");
+        assertThat(unknown).as("Attaching an unknown tag is refused").isNotEmpty();
+    }
+
+    @Tag("feature")
+    @Tag("saas")
+    @Test
+    @Order(20)
+    @DisplayName("Unpublish a published article")
+    public void testUnpublishArticle() {
+        KnowledgeBaseItem folder = KnowledgeBaseApi.anyRootFolder();
+        assertThat(folder).as("Expected at least one existing root folder").isNotNull();
+        KnowledgeBaseItem article = KnowledgeBaseApi.createArticle(draftArticle(folder.getId()));
+        createdArticleIds.add(article.getId());
+
+        KnowledgeBaseItem published = KnowledgeBaseApi.publishArticle(article.getId());
+        assertThat(published.getStatus()).as("Status should be PUBLISHED after publish").isEqualTo(KnowledgeBaseArticleStatus.PUBLISHED);
+        assertThat(published.getPublishedAt()).as("publishedAt is set on publish").isNotBlank();
+
+        KnowledgeBaseItem draft = KnowledgeBaseApi.unpublishArticle(article.getId());
+        assertThat(draft.getId()).as("Unpublished article id should match").isEqualTo(article.getId());
+        assertThat(draft.getStatus()).as("Status returns to DRAFT after unpublish").isEqualTo(KnowledgeBaseArticleStatus.DRAFT);
+        assertThat(KnowledgeBaseApi.getKnowledgeBaseItem(article.getId()).getStatus())
+                .as("The DRAFT status is persisted").isEqualTo(KnowledgeBaseArticleStatus.DRAFT);
+        assertThat(KnowledgeBaseApi.anyDraftArticle()).as("A draft article is discoverable again").isNotNull();
+    }
+
+    @AfterAll
+    public static void archiveCreatedArticles() {
+        for (String id : createdArticleIds) {
+            try {
+                KnowledgeBaseApi.archiveArticle(id);
+            } catch (RuntimeException | AssertionError ignored) {
+                // best effort: a failed cleanup must not mask the case that failed
+            }
+        }
     }
 }

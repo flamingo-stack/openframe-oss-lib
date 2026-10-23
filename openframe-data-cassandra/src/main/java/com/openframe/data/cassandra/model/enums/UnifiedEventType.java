@@ -61,6 +61,9 @@ public enum UnifiedEventType {
     REMOTE_RECORDING_COMPLETED(Severity.INFO, "Remote session recording completed"),
     REMOTE_SESSION_EVENT(Severity.INFO, "Remote session event"),
     REMOTE_SESSION_STATS_UPDATED(Severity.INFO, "Remote session stats updated"),
+    REMOTE_SESSION_DELETED(Severity.INFO, "Remote session deleted"),
+    REMOTE_CLIPBOARD_COPIED(Severity.INFO, "Clipboard copied from the remote device"),
+    REMOTE_CLIPBOARD_PASTED(Severity.INFO, "Clipboard pasted to the remote device"),
 
     // Monitoring and alerting events
     ALERT_TRIGGERED(Severity.INFO, "Alert triggered"),
@@ -163,6 +166,25 @@ public enum UnifiedEventType {
     INTEGRATION_ADDED(Severity.INFO, "Integration added"),
     INTEGRATION_UPDATED(Severity.INFO, "Integration updated"),
     INTEGRATION_DELETED(Severity.INFO, "Integration deleted"),
+
+    // Microsoft 365 directory audit events
+    M365_USER_MANAGEMENT(Severity.INFO, "Microsoft 365 user management"),
+    M365_GROUP_MANAGEMENT(Severity.INFO, "Microsoft 365 group management"),
+    M365_APPLICATION_MANAGEMENT(Severity.INFO, "Microsoft 365 application management"),
+    M365_ROLE_MANAGEMENT(Severity.WARNING, "Microsoft 365 role management"),
+    M365_POLICY(Severity.INFO, "Microsoft 365 policy change"),
+    M365_DIRECTORY_MANAGEMENT(Severity.INFO, "Microsoft 365 directory management"),
+    M365_AUDIT_FAILURE(Severity.WARNING, "Microsoft 365 failed directory operation"),
+    M365_AUDIT_OTHER(Severity.INFO, "Microsoft 365 directory audit event"),
+
+    // Google Workspace directory audit events
+    GWS_USER_MANAGEMENT(Severity.INFO, "Google Workspace user management"),
+    GWS_GROUP_MANAGEMENT(Severity.INFO, "Google Workspace group management"),
+    GWS_SECURITY_SETTINGS(Severity.WARNING, "Google Workspace security settings change"),
+    GWS_DOMAIN_SETTINGS(Severity.INFO, "Google Workspace domain settings change"),
+    GWS_DELEGATED_ADMIN(Severity.WARNING, "Google Workspace delegated admin change"),
+    GWS_AUDIT_FAILURE(Severity.WARNING, "Google Workspace failed directory operation"),
+    GWS_AUDIT_OTHER(Severity.INFO, "Google Workspace directory audit event"),
 
     // Unknown events
     UNKNOWN(Severity.WARNING, "Unknown event");

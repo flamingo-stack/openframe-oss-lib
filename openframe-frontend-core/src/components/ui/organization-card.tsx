@@ -4,7 +4,101 @@ import { Monitor } from 'lucide-react';
 import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
+import { MediaSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { EntityImage } from './entity-image';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
+
+/** The card's corner radius, read by `OrganizationCard` and by its skeleton here. */
+export const ORGANIZATION_CARD_RADIUS_CLASS = 'rounded-[6px]';
+/** The card's layout, read by `OrganizationCard` and by its skeleton here, so the skeleton is the card's size. */
+export const ORGANIZATION_CARD_LAYOUT_CLASS = 'relative flex w-full flex-col gap-3 overflow-clip p-4';
+export const ORGANIZATION_CARD_SURFACE_CLASS = 'border border-ods-border bg-ods-card';
+export const ORGANIZATION_CARD_HEADER_CLASS = 'flex w-full items-start gap-3';
+export const ORGANIZATION_CARD_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col justify-center py-2';
+export const ORGANIZATION_CARD_DESCRIPTION_CLASS = 'h-12 w-full overflow-hidden';
+export const ORGANIZATION_CARD_FOOTER_CLASS = 'flex w-full min-w-0 items-center justify-between gap-2';
+export const ORGANIZATION_CARD_STATS_CLASS = 'flex min-w-0 flex-shrink items-center gap-3 content-md:gap-4';
+export const ORGANIZATION_CARD_STAT_CLASS = 'flex flex-shrink-0 items-center gap-1';
+
+interface OrganizationCardSkeletonProps {
+  /**
+   * Additional CSS classes
+   */
+  className?: string;
+
+  /**
+   * Show footer stats area
+   */
+  showFooter?: boolean;
+
+  /**
+   * Show description area
+   */
+  showDescription?: boolean;
+
+  /** Optional tailwind classes to override the card container background & border */
+  containerClassName?: string;
+  /** `data-*` markers (`data-loading-item` on a grid's cards), on the card's root. */
+  [key: `data-${string}`]: unknown;
+}
+
+/** The two footer stats a loading card draws (a value and its label each). */
+const ORGANIZATION_CARD_SKELETON_STAT_WIDTHS = ['w-16', 'w-20'] as const;
+
+/**
+ * OrganizationCard while its organization is read: the card's own layout constants (frame, header, description
+ * box, footer), so it is the card's size by construction. Drawn only in a loading scope: the logo is `EntityImage` (its own loading form), the name and its
+ * second line `text-h3` and `text-h6` bars, the description two `text-h4` lines, the footer two stats.
+ */
+function OrganizationCardSkeleton({
+  className,
+  containerClassName,
+  showFooter = true,
+  showDescription = true,
+  ...props
+}: OrganizationCardSkeletonProps) {
+  return (
+    <div
+      className={cn(
+        ORGANIZATION_CARD_LAYOUT_CLASS,
+        containerClassName || ORGANIZATION_CARD_SURFACE_CLASS,
+        ORGANIZATION_CARD_RADIUS_CLASS,
+        className,
+      )}
+      aria-hidden
+      {...loadingItemProps(props)}
+    >
+      <div className={ORGANIZATION_CARD_HEADER_CLASS}>
+        <EntityImage src={null} />
+        <div className={ORGANIZATION_CARD_TEXT_CLASS}>
+          <TextLineSkeleton type="h3" className="w-3/4" />
+          <TextLineSkeleton type="h6" className="w-1/2" />
+        </div>
+      </div>
+      {showDescription && (
+        <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS}>
+          <TextLineSkeleton type="h4" lines={2} className="w-full" />
+        </div>
+      )}
+      {showFooter && (
+        <div className={ORGANIZATION_CARD_FOOTER_CLASS}>
+          <div className={ORGANIZATION_CARD_STATS_CLASS}>
+            {ORGANIZATION_CARD_SKELETON_STAT_WIDTHS.map(width => (
+              <div key={width} className={ORGANIZATION_CARD_STAT_CLASS}>
+                <MediaSkeleton.Icon size="sm" />
+                <TextLineSkeleton type="h6" className={width} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** What the description box shows for an organization with no description. */
+const ORGANIZATION_CARD_EMPTY_MARK = '—';
 
 export interface Organization {
   id: string;
@@ -43,6 +137,8 @@ export interface OrganizationCardProps {
   }>;
   customFooter?: React.ReactNode;
   deviceCount?: number;
+  /** `data-*` markers (`data-loading-item` on a grid's cards), on the card's outermost element in both forms. */
+  [key: `data-${string}`]: unknown;
 }
 
 export function OrganizationCard({
@@ -55,7 +151,15 @@ export function OrganizationCard({
   footerStats,
   customFooter,
   deviceCount,
+  ...props
 }: OrganizationCardProps) {
+  const markers = loadingItemProps(props);
+  // In a page's loading state the organization is read: the card is its skeleton.
+  if (useLoadingScope()) {
+    return (
+      <OrganizationCardSkeleton className={className} showFooter={Boolean(customFooter || footerStats)} {...markers} />
+    );
+  }
   const handleActionClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -65,11 +169,14 @@ export function OrganizationCard({
   const card = (
     <div
       className={cn(
-        'relative flex w-full flex-col gap-3 overflow-clip rounded-[6px] border border-ods-border bg-ods-card p-4',
+        ORGANIZATION_CARD_LAYOUT_CLASS,
+        ORGANIZATION_CARD_SURFACE_CLASS,
+        ORGANIZATION_CARD_RADIUS_CLASS,
         'transition-colors',
         href && 'cursor-pointer hover:border-ods-border-hover hover:bg-ods-card-hover',
         className,
       )}
+      {...(href ? {} : markers)}
     >
       {/* Device count (top-right) */}
       {deviceCount !== undefined && (
@@ -81,26 +188,26 @@ export function OrganizationCard({
 
       {/* Action button (top-right) - only if no device count */}
       {!deviceCount && showActionButton && actionButton && (
-        <button
-          className={cn(
-            'absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded transition-colors',
-            actionButton.variant === 'primary'
-              ? 'bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover'
-              : 'text-ods-text-secondary hover:bg-ods-error-secondary hover:text-ods-error',
-          )}
+        <Button
+          variant={actionButton.variant === 'primary' ? 'accent' : 'bare'}
+          // The secondary action is a removal: the error colour on hover.
+          data-tone={actionButton.variant === 'primary' ? undefined : 'danger'}
+          size="icon-sm"
+          type="button"
+          className="absolute right-2 top-2 z-10"
           onClick={handleActionClick}
           disabled={actionButton.disabled}
           aria-label={actionButton.label}
         >
           {actionButton.icon}
-        </button>
+        </Button>
       )}
 
       {/* Header */}
-      <div className="flex w-full items-start gap-3">
+      <div className={ORGANIZATION_CARD_HEADER_CLASS}>
         <EntityImage src={fetchedImageUrl || organization.imageUrl} alt={organization.name} />
 
-        <div className="flex min-w-0 flex-1 flex-col justify-center py-2">
+        <div className={ORGANIZATION_CARD_TEXT_CLASS}>
           <h3 className="truncate text-ods-text-primary transition-colors text-h3" title={organization.name}>
             {organization.name}
           </h3>
@@ -113,23 +220,26 @@ export function OrganizationCard({
         </div>
       </div>
 
-      {/* Description */}
-      {organization.description && (
-        <div className="h-12 w-full overflow-hidden">
+      {/* Description: most organizations have one, so its box is always drawn (the loading card draws it too); an
+          organization with none shows the empty mark. */}
+      <div className={ORGANIZATION_CARD_DESCRIPTION_CLASS}>
+        {organization.description ? (
           <p className="line-clamp-2 text-ods-text-primary text-h4" title={organization.description}>
             {organization.description}
           </p>
-        </div>
-      )}
+        ) : (
+          <p className="text-ods-text-secondary text-h4">{ORGANIZATION_CARD_EMPTY_MARK}</p>
+        )}
+      </div>
 
       {/* Footer */}
       {customFooter ? (
         customFooter
       ) : footerStats && footerStats.length > 0 ? (
-        <div className="flex w-full min-w-0 items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-shrink items-center gap-3 md:gap-4">
+        <div className={ORGANIZATION_CARD_FOOTER_CLASS}>
+          <div className={ORGANIZATION_CARD_STATS_CLASS}>
             {footerStats.map((stat, index) => (
-              <div key={index} className="flex flex-shrink-0 items-center gap-1">
+              <div key={index} className={ORGANIZATION_CARD_STAT_CLASS}>
                 {stat.icon}
                 <span className="text-ods-text-primary text-h6">
                   {typeof stat.value === 'number' ? stat.value.toLocaleString() : stat.value}
@@ -145,7 +255,7 @@ export function OrganizationCard({
 
   if (href) {
     return (
-      <Link href={href} className="block text-inherit no-underline">
+      <Link href={href} className="block text-inherit no-underline" {...markers}>
         {card}
       </Link>
     );

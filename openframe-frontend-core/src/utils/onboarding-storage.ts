@@ -26,7 +26,6 @@ export function saveOnboardingState(key: string, state: OnboardingState): void {
 
   try {
     localStorage.setItem(key, JSON.stringify(state));
-    console.log('💾 Saved onboarding state:', state);
 
     // Dispatch custom event for cross-tab sync
     if (typeof window !== 'undefined') {
@@ -104,6 +103,21 @@ export function dismissOnboarding(key: string): OnboardingState {
   const newState: OnboardingState = {
     ...state,
     dismissed: true,
+    lastUpdated: new Date().toISOString(),
+  };
+  saveOnboardingState(key, newState);
+  return newState;
+}
+
+/**
+ * Reset the walkthrough to its initial state: no step completed or skipped,
+ * not dismissed. How a dismissed walkthrough is brought back.
+ */
+export function resetOnboardingState(key: string): OnboardingState {
+  const newState: OnboardingState = {
+    completedSteps: [],
+    skippedSteps: [],
+    dismissed: false,
     lastUpdated: new Date().toISOString(),
   };
   saveOnboardingState(key, newState);

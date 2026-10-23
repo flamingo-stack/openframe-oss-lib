@@ -118,7 +118,7 @@ export const TimingAndSkeleton: Story = {
   ),
 };
 
-/** The four Status stat states: "-" before a run, then a colored tag. */
+/** The Status stat states: "-" before a run, then a colored tag. */
 export const StatusStates: Story = {
   args: {
     isActive: false,
@@ -131,6 +131,8 @@ export const StatusStates: Story = {
       <TestRunStatusStat status="running" />
       <TestRunStatusStat status="success" />
       <TestRunStatusStat status="error" />
+      <TestRunStatusStat status="timeout" />
+      <TestRunStatusStat status="canceled" />
     </div>
   ),
 };

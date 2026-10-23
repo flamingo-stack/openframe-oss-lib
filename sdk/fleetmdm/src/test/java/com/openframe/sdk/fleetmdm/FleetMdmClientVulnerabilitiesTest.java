@@ -1,6 +1,10 @@
 package com.openframe.sdk.fleetmdm;
 
 import com.openframe.sdk.fleetmdm.exception.FleetMdmApiException;
+import com.openframe.sdk.fleetmdm.model.AffectedSoftware;
+import com.openframe.sdk.fleetmdm.model.FleetSoftware;
+import com.openframe.sdk.fleetmdm.model.FleetVulnerability;
+import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.VulnerabilitiesResponse;
 import com.openframe.sdk.fleetmdm.model.Vulnerability;
 import org.junit.jupiter.api.Test;
@@ -138,6 +142,121 @@ class FleetMdmClientVulnerabilitiesTest {
         // verifications
         assertTrue(ex.getMessage().contains("list Fleet vulnerabilities failed with HTTP 500"));
         assertEquals(500, ex.getStatusCode());
+    }
+
+    @Test
+    void getVulnerability_noContentResponse_returnsNull() throws Exception {
+        // setup
+        when(httpResponse.statusCode()).thenReturn(204);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution
+        Vulnerability vulnerability = client.getVulnerability("CVE-2026-0001");
+
+        // verifications
+        assertNull(vulnerability);
+    }
+
+    @Test
+    void getVulnerability_topLevelSoftware_attachedToTheVulnerability() throws Exception {
+        // setup
+        stubResponse(200, """
+                {
+                  "vulnerability": {"cve": "CVE-2024-38063", "hosts_count": 5},
+                  "os_versions": [],
+                  "software": [
+                    {"id": 7, "name": "WinRAR", "version": "6.22", "source": "programs",
+                     "hosts_count": 3, "resolved_in_version": "6.23"}
+                  ]
+                }
+                """);
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution
+        Vulnerability vulnerability = client.getVulnerability("CVE-2024-38063");
+
+        // verifications
+        assertEquals(5, vulnerability.getHostsCount());
+        assertEquals(1, vulnerability.getSoftware().size());
+        AffectedSoftware software = vulnerability.getSoftware().get(0);
+        assertEquals(7L, software.getId());
+        assertEquals(3, software.getHostsCount());
+        assertEquals("6.23", software.getResolvedInVersion());
+    }
+
+    @Test
+    void getVulnerability_noSoftwareField_emptySoftwareList() throws Exception {
+        // setup
+        stubResponse(200, "{\"vulnerability\": {\"cve\": \"CVE-2024-38063\"}}");
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution
+        Vulnerability vulnerability = client.getVulnerability("CVE-2024-38063");
+
+        // verifications
+        assertTrue(vulnerability.getSoftware().isEmpty());
+    }
+
+    @Test
+    void getSoftwareVersion_body_cvesCarryDiscoveryDates() throws Exception {
+        // setup
+        stubResponse(200, """
+                {
+                  "software": {
+                    "id": 7, "name": "WinRAR", "version": "6.22", "source": "programs",
+                    "vulnerabilities": [
+                      {"cve": "CVE-2024-38063", "created_at": "2026-09-01T00:00:00Z", "resolved_in_version": "6.23"}
+                    ]
+                  }
+                }
+                """);
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution
+        FleetSoftware version = client.getSoftwareVersion(7L);
+
+        // verifications
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        assertTrue(requestCaptor.getValue().uri().toString().endsWith("/api/latest/fleet/software/versions/7"));
+        FleetVulnerability cve = version.getVulnerabilities().get(0);
+        assertEquals("CVE-2024-38063", cve.getCve());
+        assertEquals("2026-09-01T00:00:00Z", cve.getCreatedAt());
+        assertEquals("6.23", cve.getResolvedInVersion());
+    }
+
+    @Test
+    void getSoftwareVersion_notFound_returnsNull() throws Exception {
+        // setup
+        when(httpResponse.statusCode()).thenReturn(404);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(httpResponse);
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+
+        // execution
+        FleetSoftware version = client.getSoftwareVersion(7L);
+
+        // verifications
+        assertNull(version);
+    }
+
+    @Test
+    void countHosts_vulnerabilityFilter_sentToTheCountEndpoint() throws Exception {
+        // setup
+        stubResponse(200, "{\"count\": 45}");
+        FleetMdmClient client = new FleetMdmClient("https://fleet.example.com", "token", httpClient);
+        HostSearchRequest request = new HostSearchRequest("host", 0, 20);
+        request.setCve("CVE-2024-38063");
+
+        // execution
+        int count = client.countHosts(request);
+
+        // verifications
+        assertEquals(45, count);
+        verify(httpClient).send(requestCaptor.capture(), any(HttpResponse.BodyHandler.class));
+        String url = requestCaptor.getValue().uri().toString();
+        assertTrue(url.startsWith("https://fleet.example.com/api/v1/fleet/hosts/count?"));
+        assertTrue(url.contains("query=host"));
+        assertTrue(url.contains("vulnerability=CVE-2024-38063"));
     }
 
     private void stubResponse(int statusCode, String body) throws Exception {

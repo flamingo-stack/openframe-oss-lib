@@ -13,6 +13,11 @@ public class MicrosoftSSOProperties extends AbstractOidcProviderProperties {
 
     public static final String MICROSOFT = "microsoft";
 
+    @Override
+    public String providerId() {
+        return MICROSOFT;
+    }
+
     /**
      * Verified-email gate for the tenant-scoped login through the generic app (the nOAuth
      * defense). Off by default: enable per environment only after xms_edov is configured on the

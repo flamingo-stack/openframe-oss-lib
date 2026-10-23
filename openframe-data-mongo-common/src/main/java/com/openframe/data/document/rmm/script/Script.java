@@ -91,6 +91,8 @@ public class Script implements TenantScoped {
      * Surfaced on read via the GraphQL {@code author} field, resolved to a User.
      */
     private String createdBy;
+    // Null on scripts created before the field existed; the API reads that as MANUAL.
+    private ScriptCreationSource creationSource;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate
@@ -103,8 +105,12 @@ public class Script implements TenantScoped {
     @Indexed
     @Builder.Default
     private ScriptStatus status = ScriptStatus.ACTIVE;
+
+    @Builder.Default
+    private ScriptType type = ScriptType.USER;
     /**
      * Timestamp of the most recent {@link #status} transition.
      */
     private Instant statusChangedAt;
+    private String contentHash;
 }

@@ -1,5 +1,5 @@
 use super::*;
-use crate::models::{PrivilegeLevel, ScriptShell};
+use crate::models::{PrivilegeLevel, PrivilegePolicy, ScriptShell};
 
 fn req(code: &str) -> ExecutionRequest<'_> {
     ExecutionRequest {
@@ -12,6 +12,7 @@ fn req(code: &str) -> ExecutionRequest<'_> {
         env_vars: Vec::new(),
         script_id: None,
         schedule_id: None,
+        privilege_policy: PrivilegePolicy::default(),
     }
 }
 
@@ -45,4 +46,27 @@ async fn maps_spawn_failure_to_error() {
     assert_eq!(r.exit_code, 85);
     assert!(r.error.is_some());
     assert!(!r.timed_out);
+}
+
+#[tokio::test]
+async fn a_script_counts_as_running_until_it_finishes() {
+    let service = ExecutionService::new();
+    let running = service.running_scripts();
+    assert!(!running.any());
+
+    let script = tokio::spawn({
+        let service = service.clone();
+        async move { service.execute(&req("#!/bin/sh\nsleep 1\n"), "m").await }
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while !running.any() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the script never started");
+
+    let result = script.await.unwrap();
+    assert_eq!(result.exit_code, 0);
+    assert!(!running.any());
 }

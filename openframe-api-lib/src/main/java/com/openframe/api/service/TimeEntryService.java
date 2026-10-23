@@ -19,7 +19,6 @@ import com.openframe.core.exception.ErrorCode;
 import com.openframe.core.exception.NotFoundException;
 import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.ticket.Ticket;
-import com.openframe.data.document.ticket.TicketStatus;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.TimeEntrySource;
@@ -406,10 +405,7 @@ public class TimeEntryService {
     }
 
     private boolean isArchived(Ticket ticket) {
-        if (ticket.getStatusKind() != null) {
-            return ticket.getStatusKind() == TicketStatusKind.ARCHIVED;
-        }
-        return ticket.getStatus() == TicketStatus.ARCHIVED;
+        return ticket.getStatusKind() == TicketStatusKind.ARCHIVED;
     }
 
     private long secondsBetween(Instant from, Instant to) {

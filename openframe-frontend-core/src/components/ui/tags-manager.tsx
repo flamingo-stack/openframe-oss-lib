@@ -17,6 +17,7 @@ import {
 import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
+import { Label } from './label';
 import { Tag } from './tag';
 
 export interface TagItem {
@@ -167,9 +168,10 @@ export function TagsManager({
         <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
           {/* Anchor container */}
           <PopoverPrimitive.Anchor asChild>
-            <label
+            <Label
+              variant="surface"
               className={cn(
-                'flex min-h-11 w-full cursor-text flex-wrap items-center gap-2 rounded-[6px] border px-3 py-1 md:min-h-12',
+                'flex min-h-11 w-full cursor-text flex-wrap items-center gap-2 rounded-[6px] border px-3 py-1 content-md:min-h-12',
                 'transition-colors duration-200',
                 'border-ods-border bg-ods-card',
                 'group',
@@ -185,7 +187,7 @@ export function TagsManager({
               {/* Search adornment */}
               <span
                 className={cn(
-                  'flex-shrink-0 text-ods-text-secondary transition-colors duration-200 [&_svg]:size-4 md:[&_svg]:size-6',
+                  'flex-shrink-0 text-ods-text-secondary transition-colors duration-200 [&_svg]:size-4 content-md:[&_svg]:size-6',
                   open && 'text-ods-accent',
                 )}
               >
@@ -234,16 +236,18 @@ export function TagsManager({
 
               {/* Clear all button — shown when tags are selected */}
               {selectedTags.length > 0 && !disabled && (
-                <button
+                <Button
+                  variant="transparent"
+                  size="icon-sm"
                   type="button"
                   onClick={handleClearAll}
-                  className="flex flex-shrink-0 items-center justify-center transition-opacity hover:opacity-70 [&_svg]:size-4 md:[&_svg]:size-6"
+                  className="shrink-0"
                   aria-label="Clear all tags"
                 >
                   <XmarkCircleIcon className="text-ods-text-secondary" />
-                </button>
+                </Button>
               )}
-            </label>
+            </Label>
           </PopoverPrimitive.Anchor>
 
           {/* Dropdown */}
@@ -287,6 +291,7 @@ export function TagsManager({
                           className="flex items-center gap-1 border-b border-ods-border px-2 py-1 last:border-b-0"
                         >
                           <Input
+                            userValue
                             ref={editInputRef}
                             value={editingName}
                             onChange={e => setEditingName(e.target.value)}
@@ -319,7 +324,7 @@ export function TagsManager({
                         aria-selected={isSelected}
                         tabIndex={0}
                         className={cn(
-                          'flex h-11 cursor-pointer items-center border-b border-ods-border px-4 transition-colors last:border-b-0 md:h-12',
+                          'flex h-11 cursor-pointer items-center border-b border-ods-border px-4 transition-colors last:border-b-0 content-md:h-12',
                           'text-h4',
                           isSelected ? 'text-ods-accent' : 'text-ods-text-primary',
                           'group/item hover:bg-ods-bg-hover',
@@ -383,7 +388,7 @@ export function TagsManager({
                       aria-selected={false}
                       tabIndex={0}
                       className={cn(
-                        'flex h-11 cursor-pointer items-center gap-2 px-4 transition-colors text-h4 md:h-12',
+                        'flex h-11 cursor-pointer items-center gap-2 px-4 transition-colors text-h4 content-md:h-12',
                         'hover:bg-ods-bg-hover',
                         isCreating && 'pointer-events-none opacity-50',
                       )}

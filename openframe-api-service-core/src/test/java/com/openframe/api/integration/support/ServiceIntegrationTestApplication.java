@@ -2,8 +2,6 @@ package com.openframe.api.integration.support;
 
 import com.openframe.api.mapper.GraphQLNotificationMapper;
 import com.openframe.api.service.NotificationService;
-import com.openframe.data.config.NotificationContextMongoConfig;
-import com.openframe.data.document.notification.NotificationContextDescriptorRegistry;
 import com.openframe.notification.service.NotificationBroadcaster;
 import com.openframe.data.repository.notification.NotificationRepository;
 import com.openframe.data.repository.notification.impl.CustomNotificationReadStateRepositoryImpl;
@@ -11,10 +9,10 @@ import com.openframe.data.repository.notification.impl.CustomNotificationReposit
 import com.openframe.notification.readstate.NotificationReadStateService;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration;
-import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration;
-import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
+import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
+import org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration;
+import org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration;
+import org.springframework.boot.data.mongodb.autoconfigure.DataMongoRepositoriesAutoConfiguration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
@@ -22,8 +20,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 @SpringBootConfiguration
 @ImportAutoConfiguration({
         MongoAutoConfiguration.class,
-        MongoDataAutoConfiguration.class,
-        MongoRepositoriesAutoConfiguration.class,
+        DataMongoAutoConfiguration.class,
+        DataMongoRepositoriesAutoConfiguration.class,
         JacksonAutoConfiguration.class
 })
 @EnableMongoAuditing
@@ -32,11 +30,9 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomNotificationRepositoryImpl.class,
         CustomNotificationReadStateRepositoryImpl.class,
         NotificationBroadcaster.class,
-        NotificationContextDescriptorRegistry.class,
         NotificationReadStateService.class,
         NotificationService.class,
-        GraphQLNotificationMapper.class,
-        NotificationContextMongoConfig.class
+        GraphQLNotificationMapper.class
 })
 public class ServiceIntegrationTestApplication {
 }

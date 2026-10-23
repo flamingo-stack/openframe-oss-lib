@@ -1,3 +1,4 @@
+import type { AgentName } from '../../agent-mark';
 import type { PendingToolCallData } from '../../chat/types';
 import type { TicketStatus } from '../../ui/ticket-status-tag';
 
@@ -35,7 +36,7 @@ export interface BoardTicketActivity {
   /**
    * Overrides the built-in label for the kind. Required in practice for
    * 'stale', whose label carries the computed duration ("No activity for
-   * 2 hours") that only the consumer can know — and tick over time.
+   * 30 minutes") that only the consumer can know — and tick over time.
    */
   label?: string;
 }
@@ -43,6 +44,11 @@ export interface BoardTicketActivity {
 export interface BoardTicket {
   id: string;
   title: string;
+  /**
+   * Display-ready ticket number (`'3891'`, no `#` - the design never prefixes
+   * it), shown before the relative time on the card's last details line.
+   * `''` hides it; the hub hero card passes that.
+   */
   ticketNumber: string;
   status: string;
 
@@ -63,7 +69,12 @@ export interface BoardTicket {
   escalatedByUser?: boolean;
   /** Single live-activity indicator rendered as the card's footer row. */
   activity?: BoardTicketActivity;
+  /** The AI agent that owns the ticket: its mark is shown with the assignees. */
+  agent?: AgentName;
 }
+
+/** Tickets a lane reads per page when its host names no `pageSize` (its loading form draws this many cards). */
+export const BOARD_COLUMN_PAGE_SIZE = 20;
 
 export interface BoardColumnDef {
   id: string;
@@ -87,6 +98,9 @@ export interface BoardColumnDef {
   total?: number;
   hasMore?: boolean;
   isLoading?: boolean;
+  /** How many tickets the lane reads per page: its loading form draws that many cards. Default
+   *  {@link BOARD_COLUMN_PAGE_SIZE}. */
+  pageSize?: number;
   isLoadingMore?: boolean;
 
   system?: boolean;

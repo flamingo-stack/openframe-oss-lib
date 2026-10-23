@@ -24,7 +24,7 @@ const meta = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['accent', 'outline', 'transparent', 'destructive', 'warning'],
+      options: ['accent', 'outline', 'transparent', 'destructive', 'warning', 'glyph', 'overlay', 'link'],
     },
     size: {
       control: 'select',
@@ -59,6 +59,11 @@ export const Destructive: Story = {
 
 export const Warning: Story = {
   args: { children: 'Proceed with caution', variant: 'warning', leftIcon: <AlertTriangle /> },
+};
+
+/** Quiet inline text action, e.g. the FadePreview "Show all" / "Show less" disclosure. */
+export const Link: Story = {
+  args: { children: 'Show all', variant: 'link', size: 'compact', noPaddingX: true, rightIcon: <ChevronDown /> },
 };
 
 // === Sizes ===

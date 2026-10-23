@@ -8,6 +8,8 @@
  * implementation of response-shape normalization across both repos.
  */
 
+import { TRUST_CENTER_CARD_ID, TRUST_CENTER_DOCUMENT_TYPE } from '../types/trust-center';
+
 /** Extract the items array from each endpoint's response shape (some
  *  return `{ items }`, others `{ posts }`, etc.). Single normalization
  *  point — callers always read `Item[]`. */
@@ -48,4 +50,28 @@ export function extractItemId(type: string, item: unknown): string | null {
   if (typeof id === 'string') return id;
   if (typeof id === 'number') return String(id);
   return null;
+}
+
+/**
+ * Single-record card types: the type's endpoint returns ONE object (not a
+ * list) and the card id is fixed. `extractItems` must not be pointed at such a
+ * payload — it would pick up a nested array (the trust center's `faqs`) as the
+ * "items" and the card would read as deleted.
+ */
+const SINGLE_RECORD_CARD_IDS: Record<string, string> = {
+  [TRUST_CENTER_DOCUMENT_TYPE]: TRUST_CENTER_CARD_ID,
+};
+
+/**
+ * `extractItems`, type-aware: a single-record type's object payload becomes a
+ * one-element list carrying the type's fixed card id, so the loader's
+ * `extractItemId` match finds it. Every other type is `extractItems` unchanged.
+ */
+export function extractCardItems(type: string, data: unknown): unknown[] {
+  const singleId = Object.prototype.hasOwnProperty.call(SINGLE_RECORD_CARD_IDS, type)
+    ? SINGLE_RECORD_CARD_IDS[type]
+    : undefined;
+  if (singleId === undefined) return extractItems(data);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  return [{ ...(data as Record<string, unknown>), id: singleId }];
 }

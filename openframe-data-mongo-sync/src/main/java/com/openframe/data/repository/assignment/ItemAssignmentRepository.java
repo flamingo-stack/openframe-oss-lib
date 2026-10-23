@@ -6,9 +6,17 @@ import com.openframe.data.repository.TenantAwareRepository;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
+
 @Repository
 @TenantAwareRepository
 public interface ItemAssignmentRepository extends MongoRepository<ItemAssignment, String>, CustomItemAssignmentRepository {
+
+    List<ItemAssignment> findByItemIdAndTargetType(String itemId, AssignmentTargetType targetType);
+
+    Optional<ItemAssignment> findByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType,
+                                                                  String targetId);
 
     void deleteByItemIdAndTargetTypeAndTargetId(String itemId, AssignmentTargetType targetType, String targetId);
 

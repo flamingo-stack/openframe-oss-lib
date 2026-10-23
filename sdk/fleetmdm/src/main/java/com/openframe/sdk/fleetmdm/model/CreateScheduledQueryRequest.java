@@ -17,4 +17,7 @@ public class CreateScheduledQueryRequest {
     private Integer interval;
     private String platform;
 
+    @JsonProperty("openframe_managed")
+    private Boolean openframeManaged;
+
 }

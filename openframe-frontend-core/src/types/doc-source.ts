@@ -1,3 +1,4 @@
+import type { DataSync } from './data-sync';
 /**
  * Single home for doc-source tree + content types.
  *
@@ -55,6 +56,9 @@ export interface DocContent {
    *  from the underlying row's sync/update timestamp. Undefined when unknown. */
   publishedAt?: string;
   updatedAt?: string;
+  /** Where the document is mirrored from and when it was last read (a synced docs source only); the viewer draws
+   *  it as the shared sync line. */
+  sync?: DataSync;
 }
 
 /**

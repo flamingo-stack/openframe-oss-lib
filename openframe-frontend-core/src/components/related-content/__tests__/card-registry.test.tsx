@@ -63,6 +63,13 @@ const ROWS: Record<string, unknown> = {
   onboarding_guide: { id: 'g1', title: 'Guide Title', section: 'Start', step_order: 1, content: 'c' },
   what_i_shipped: { title: 'Shipped Title', summary: 's', entry_month: '2026-01-01' },
   how_i_work: { title: 'How Title', summary: 's', session_date: '2026-01-01' },
+  ai_prompt: {
+    title: 'Prompt Title',
+    summary: 's',
+    published_at: '2026-01-01',
+    department: { name: 'Sales' },
+    step_count: 2,
+  },
   roadmap_item: { id: 'r1', title: 'Roadmap Title', description: 'd', status: 'open', quarter: 'Q1' },
 };
 

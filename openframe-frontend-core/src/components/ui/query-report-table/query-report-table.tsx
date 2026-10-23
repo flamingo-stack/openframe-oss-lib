@@ -5,20 +5,28 @@ import { useHorizontalScrollbar } from '../../../hooks/ui/use-horizontal-scrollb
 import { cn } from '../../../utils/cn';
 import { Download02Icon } from '../../icons-v2-generated/interface/download-02-icon';
 import { Button } from '../button';
-import { TableEmptyState } from '../table/table-empty-state';
+import { DataTableEmpty } from '../data-table/data-table-empty';
+import { InertWhileLoading, useLoadingScope } from '../loading-scope';
 import { QueryReportTableHeader } from './query-report-table-header';
-import { QueryReportTableRow } from './query-report-table-row';
+import { QueryReportTableRow, queryReportRowsClass } from './query-report-table-row';
 import { QueryReportTableSkeleton } from './query-report-table-skeleton';
 import type { QueryReportTableProps } from './types';
 import { deriveColumns, exportToCSV } from './utils';
 
+/** The rows a loading report draws when the host states none: a typical report, since a report has no page size. */
+const QUERY_REPORT_TABLE_SKELETON_ROWS = 8;
+/** The columns a loading report draws when the host states none: a typical result (the columns are the data's). */
+const QUERY_REPORT_TABLE_SKELETON_COLUMNS = 6;
+
 export function QueryReportTable({
   title,
   data,
-  loading = false,
-  skeletonRows = 8,
-  skeletonColumns = 6,
+  loading: loadingProp = false,
+  loadingRegion = true,
+  skeletonRows = QUERY_REPORT_TABLE_SKELETON_ROWS,
+  skeletonColumns = QUERY_REPORT_TABLE_SKELETON_COLUMNS,
   emptyMessage,
+  emptyState,
   columnWidth = 160,
   columnOrder,
   showExport = true,
@@ -29,7 +37,9 @@ export function QueryReportTable({
   className,
   tableClassName,
 }: QueryReportTableProps) {
+  const loading = useLoadingScope() || loadingProp;
   const isCompact = variant === 'compact';
+  const showExportButton = showExport && (loading || data.length > 0);
   const columns = useMemo(() => deriveColumns(data, columnOrder), [data, columnOrder]);
 
   const handleExport = () => {
@@ -52,45 +62,53 @@ export function QueryReportTable({
     onThumbPointerDown,
     onThumbPointerMove,
     onThumbPointerUp,
+    onThumbPointerCancel,
   } = useHorizontalScrollbar();
 
   return (
     <div className={cn('flex w-full flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-l)]', className)}>
-      {/* Title bar — hidden in compact mode and when empty */}
-      {!isCompact && (title || headerActions || (showExport && data.length > 0)) && (
+      {/* Title bar — hidden in compact mode and when there is nothing to show in it. Export is drawn while the rows
+          are read too (real and inert: they will hold data), so the bar does not appear when they land. */}
+      {!isCompact && (title || headerActions || showExportButton) && (
         <div className="flex items-end justify-between pt-[var(--spacing-system-l)]">
           <h2 className="text-ods-text-primary text-h2">{title}</h2>
           <div className="flex items-center gap-[var(--spacing-system-s)]">
             {headerActions}
-            {showExport && data.length > 0 && (
-              <Button
-                className="bg-ods-card max-md:hidden"
-                variant="outline"
-                leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
-                onClick={handleExport}
-              >
-                Export CSV
-              </Button>
+            {showExportButton && (
+              <InertWhileLoading loading={loading} className="inline-flex shrink-0 content-max-md:hidden">
+                <Button
+                  className="bg-ods-card"
+                  variant="outline"
+                  leftIcon={<Download02Icon size={18} className="text-ods-text-secondary" />}
+                  onClick={handleExport}
+                >
+                  Export CSV
+                </Button>
+              </InertWhileLoading>
             )}
           </div>
         </div>
       )}
 
-      {/* Loading state */}
-      {loading && (
+      {/* One slot, three forms: loading (the rows' skeleton), empty (the same mapping `DataTable.Body` makes:
+          `emptyState` wins; `emptyMessage` is its title), and the table. */}
+      {loading ? (
         <QueryReportTableSkeleton
           rows={skeletonRows}
           columns={skeletonColumns}
           columnWidth={columnWidth}
           variant={variant}
+          region={loadingRegion}
         />
-      )}
-
-      {/* Empty state */}
-      {!loading && data.length === 0 && <TableEmptyState message={emptyMessage} />}
-
-      {/* Table content */}
-      {!loading && data.length > 0 && (
+      ) : data.length === 0 ? (
+        emptyState ? (
+          <DataTableEmpty {...emptyState} />
+        ) : emptyMessage != null ? (
+          <DataTableEmpty title={emptyMessage} description={undefined} />
+        ) : (
+          <DataTableEmpty />
+        )
+      ) : (
         <div className="flex flex-col">
           {/* Custom scrollbar track — hidden in compact mode */}
           {!isCompact && thumbRatio > 0 && (
@@ -103,7 +121,7 @@ export function QueryReportTable({
               <div
                 ref={thumbRef}
                 data-scrollbar-thumb
-                className="absolute top-0 h-full rounded-full bg-ods-text-secondary transition-colors"
+                className="absolute top-0 h-full touch-none rounded-full bg-ods-text-secondary transition-colors"
                 style={{
                   width: `${thumbRatio * 100}%`,
                   cursor: 'grab',
@@ -111,6 +129,7 @@ export function QueryReportTable({
                 onPointerDown={onThumbPointerDown}
                 onPointerMove={onThumbPointerMove}
                 onPointerUp={onThumbPointerUp}
+                onPointerCancel={onThumbPointerCancel}
               />
             </div>
           )}
@@ -120,10 +139,11 @@ export function QueryReportTable({
             <div ref={scrollRef} className={cn('overflow-x-auto', tableClassName)} onScroll={onScroll}>
               <div style={{ minWidth: tableMinWidth }}>
                 <QueryReportTableHeader columns={columns} columnWidth={columnWidth} variant={variant} />
-                <div className={cn('flex flex-col', isCompact ? 'gap-0' : 'gap-[var(--spacing-system-xs)]')}>
+                <div className={queryReportRowsClass(isCompact)}>
                   {data.map((row, index) => (
                     <QueryReportTableRow
                       key={index}
+                      data-loading-item
                       row={row}
                       columns={columns}
                       columnWidth={columnWidth}

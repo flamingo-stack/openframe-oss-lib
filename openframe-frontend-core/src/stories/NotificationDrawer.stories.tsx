@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useEffect, useState, useRef } from 'react';
 import {
-  ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
   ApprovalRequestNotificationTile,
+  MINGO_APPROVAL_REQUEST_TYPE,
   NotificationDrawer,
   NotificationPopups,
   NotificationTile,
@@ -70,7 +70,7 @@ const approvalSeed = (
   createdAt: Date.now() - 1_000 * 60 * minutesAgo,
   read: false,
   meta: {
-    contextType: ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+    notificationType: MINGO_APPROVAL_REQUEST_TYPE,
     approvalRequestId: `seed-req-${n}`,
     approvalType: 'ADMIN',
     resolution,
@@ -236,6 +236,45 @@ export const AllTileVariants: Story = {
             ...base,
           }}
           onComplete={() => {}}
+        />
+      </div>
+    );
+  },
+};
+
+/**
+ * `titleLines={2}` for a narrow host that cannot widen (here a 280px column,
+ * the width of a watch-face mock): the title wraps to a second line before
+ * the ellipsis instead of being cut after a few words.
+ */
+export const TwoLineTitleInNarrowHost: Story = {
+  render: () => {
+    const base = { createdAt: Date.now() - 60_000, read: true } as const;
+    const title = 'Disk filling 4x faster than normal on ACME-DC01';
+    return (
+      <div className="flex w-[280px] flex-col gap-2">
+        <NotificationTile
+          notification={{
+            id: 't-one-line',
+            variant: 'success',
+            type: 'Fixed by Mingo',
+            title,
+            description: 'titleLines={1} (default)',
+            ...base,
+          }}
+          onComplete={() => {}}
+        />
+        <NotificationTile
+          notification={{
+            id: 't-two-lines',
+            variant: 'success',
+            type: 'Fixed by Mingo',
+            title,
+            description: 'titleLines={2}',
+            ...base,
+          }}
+          onComplete={() => {}}
+          titleLines={2}
         />
       </div>
     );
@@ -491,7 +530,7 @@ function PlaygroundControls() {
       title,
       description,
       meta: {
-        contextType: ADMIN_APPROVAL_REQUEST_CONTEXT_TYPE,
+        notificationType: MINGO_APPROVAL_REQUEST_TYPE,
         approvalRequestId: `req-${n}`,
         approvalType: 'ADMIN',
         toolCalls: toolCalls.map((tc, i) => ({

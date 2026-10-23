@@ -25,6 +25,10 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
   return {
     endpoints: {
       chatStreamUrl: EP.chatStream,
+      // Conversation history: the rail of past chats, archive and rename. The
+      // hub lists the conversations of the identity the proxy's credentials
+      // resolve to (the /debug page's key and act-as email).
+      chatConversationsUrl: EP.chatConversations,
       approvalToolUrl: EP.approval,
       commandsUrl: EP.commands,
       // Guide-mode empty-state config (greeting + enabled RAG tables + quick-action
@@ -109,7 +113,7 @@ export function buildChatRuntime(): Omit<ChatRuntime, 'source'> {
     }),
     // Per-documentType doc-viewer targets. Doc chips with NO public externalUrl
     // resolve here when their documentType has an entry — the lib emits
-    // `getBaseUrl(platform)/<basePath>/<path>` and opens it in a NEW TAB.
+    // `getPlatformUrl(platform)/<basePath>/<path>` and opens it in a NEW TAB.
     //
     // `markdown` is intentionally OMITTED — this embedder now mounts its OWN
     // `<DocsHubPage>` at /knowledge-base (see app-routes.tsx + pages/knowledge-base.tsx),

@@ -6,17 +6,8 @@ import type { EntityPlatformAssoc } from './entity-platform';
 import type { PlatformRecord } from './platform';
 import type { MSP } from './stack';
 import type { UserProfile } from './user';
-
-// Re-export shared video processing types for backwards compatibility
-export type {
-  VideoTeaser,
-  Speaker,
-  VideoClip,
-  TranscriptWord,
-  SpeakerMapping,
-  ExcludedRange,
-} from './video-processing';
 import type {
+  EntityQuote,
   VideoTeaser,
   Speaker,
   VideoClip,
@@ -43,6 +34,8 @@ export interface CustomerInterview {
   // Video content
   main_video_url: string | null;
   teasers: VideoTeaser[]; // JSONB array
+  /** Short customer quotes (JSONB array, never null — column default `[]`). */
+  quotes: EntityQuote[];
 
   // Highlight video (AI-generated summary video)
   highlight_video_url?: string | null;
@@ -134,6 +127,7 @@ export interface CreateCustomerInterviewData {
   highlight_video_url?: string | null;
   main_video_thumbnail?: string | null;
   teasers?: VideoTeaser[];
+  quotes?: EntityQuote[];
   case_study_id?: number | null;
   seo_title?: string;
   seo_description?: string;

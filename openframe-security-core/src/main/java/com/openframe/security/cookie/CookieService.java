@@ -80,6 +80,9 @@ public class CookieService {
     /**
      * Adds a short-lived signed OAuth state cookie bound to the specific state value.
      * Cookie name format: of_oauth_{state}, Path=/oauth
+     * <p>
+     * Host-only (no Domain): login, continue and callback all run on the host that set it, so a
+     * domain-wide copy would only ride along on every other subdomain's requests.
      */
     public void addOAuthStateCookie(HttpHeaders headers, String state, String jwtValue, int ttlSeconds) {
         String name = OAUTH_STATE_COOKIE_PREFIX + state;
@@ -89,18 +92,35 @@ public class CookieService {
                 .sameSite(cookieSameSite)
                 .path("/oauth")
                 .maxAge(ttlSeconds)
-                .domain(domain)
                 .build();
         headers.add(SET_COOKIE, cookie.toString());
+    }
+
+    /**
+     * Clears every OAuth state cookie the request carries. Each login attempt writes its own
+     * of_oauth_{state} cookie and only its callback clears it, so retried or abandoned logins
+     * pile up until the Cookie header exceeds the gateway limit (431).
+     */
+    public void addClearStaleOAuthStateCookies(HttpHeaders headers, ServerHttpRequest request) {
+        for (String name : request.getCookies().keySet()) {
+            if (name.startsWith(OAUTH_STATE_COOKIE_PREFIX)) {
+                addClearedStateCookie(headers, name);
+            }
+        }
     }
 
     /**
      * Clears the OAuth state cookie for given state.
      */
     public void addClearOAuthStateCookie(HttpHeaders headers, String state) {
-        String name = OAUTH_STATE_COOKIE_PREFIX + state;
-        ResponseCookie cleared = createClearedCookie(name, "/oauth");
-        headers.add(SET_COOKIE, cleared.toString());
+        addClearedStateCookie(headers, OAUTH_STATE_COOKIE_PREFIX + state);
+    }
+
+    // Clears both variants: state cookies used to be set with the shared Domain, and a flow
+    // started before the switch to host-only still carries that copy.
+    private void addClearedStateCookie(HttpHeaders headers, String name) {
+        headers.add(SET_COOKIE, createClearedCookie(name, "/oauth").toString());
+        headers.add(SET_COOKIE, createClearedCookieHostOnly(name, "/oauth").toString());
     }
 
 

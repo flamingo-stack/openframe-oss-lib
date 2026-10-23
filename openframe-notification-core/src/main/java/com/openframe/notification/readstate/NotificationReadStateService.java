@@ -31,6 +31,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class NotificationReadStateService {
 
+    // ARCHIVED is not yet read: any mark-read turns it into READ.
+    private static final List<ReadStatus> UNREAD_OR_ARCHIVED = List.of(ReadStatus.UNREAD, ReadStatus.ARCHIVED);
+
     private final NotificationReadStateRepository repository;
     private final TenantIdProvider tenantIdProvider;
     private final List<NotificationReadEventListener> readEventListeners;
@@ -79,7 +82,7 @@ public class NotificationReadStateService {
     public boolean markRead(@NotBlank String recipientId,
                             @NotNull RecipientType recipientType,
                             @NotBlank String notificationId) {
-        boolean transitioned = repository.markAsRead(recipientId, recipientType, notificationId) > 0;
+        boolean transitioned = repository.markAsRead(recipientId, recipientType, notificationId, UNREAD_OR_ARCHIVED) > 0;
         if (transitioned) {
             publish(recipientId, recipientType, List.of(notificationId), NotificationReadEvent.Transition.READ);
         }
@@ -87,16 +90,16 @@ public class NotificationReadStateService {
     }
 
     public long markAllAsRead(@NotBlank String recipientId, @NotNull RecipientType recipientType) {
-        List<String> unreadIds = notificationIds(
-                repository.findByRecipientIdAndRecipientTypeAndStatus(recipientId, recipientType, ReadStatus.UNREAD));
-        if (unreadIds.isEmpty()) {
+        List<String> notYetReadIds = notificationIds(
+                repository.findByRecipientIdAndRecipientTypeAndStatusIn(recipientId, recipientType, UNREAD_OR_ARCHIVED));
+        if (notYetReadIds.isEmpty()) {
             return 0L;
         }
         // Flip the snapshot, not "everything unread": one arriving in between would turn read with
         // nobody retracting its push. What turns read here is exactly what gets published.
         String tenantId = tenantIdProvider.getTenantId();
-        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, unreadIds);
-        publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
+        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, notYetReadIds, UNREAD_OR_ARCHIVED);
+        publish(recipientId, recipientType, notYetReadIds, NotificationReadEvent.Transition.READ);
         return flipped;
     }
 
@@ -118,6 +121,17 @@ public class NotificationReadStateService {
                     List.of(notificationId), NotificationReadEvent.Transition.READ);
         }
         return flipped;
+    }
+
+    public long archiveEntityForAllRecipients(@NotNull NotificationEntityType entityType, @NotBlank String entityId) {
+        String tenantId = tenantIdProvider.getTenantId();
+        List<NotificationReadState> unreadRows = repository.findUnreadByEntity(entityType, entityId, tenantId);
+        long archived = repository.archiveUnreadByEntity(entityType, entityId, tenantId);
+        for (NotificationReadState row : unreadRows) {
+            publish(row.getRecipientId(), row.getRecipientType(),
+                    List.of(row.getNotificationId()), NotificationReadEvent.Transition.ARCHIVED);
+        }
+        return archived;
     }
 
     public boolean deleteNotification(@NotBlank String recipientId,
@@ -191,16 +205,16 @@ public class NotificationReadStateService {
                                  @NotNull NotificationEntityType entityType,
                                  @NotBlank String entityId) {
         String tenantId = tenantIdProvider.getTenantId();
-        List<NotificationReadState> unreadRows = repository.findByRecipientIdAndRecipientTypeAndEntity(
-                recipientId, recipientType, entityType, entityId, ReadStatus.UNREAD, tenantId);
-        List<String> unreadIds = notificationIds(unreadRows);
-        if (unreadIds.isEmpty()) {
+        List<NotificationReadState> notYetReadRows = repository.findByRecipientIdAndRecipientTypeAndEntity(
+                recipientId, recipientType, entityType, entityId, UNREAD_OR_ARCHIVED, tenantId);
+        List<String> notYetReadIds = notificationIds(notYetReadRows);
+        if (notYetReadIds.isEmpty()) {
             return 0L;
         }
         // Flip the snapshot, not the entity: whatever turns read here is exactly what gets published,
         // so no notification can end up read with its push banner still on someone's phone.
-        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, unreadIds);
-        publish(recipientId, recipientType, unreadIds, NotificationReadEvent.Transition.READ);
+        long flipped = repository.markAsReadByIds(tenantId, recipientId, recipientType, notYetReadIds, UNREAD_OR_ARCHIVED);
+        publish(recipientId, recipientType, notYetReadIds, NotificationReadEvent.Transition.READ);
         return flipped;
     }
 

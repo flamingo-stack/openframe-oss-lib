@@ -154,6 +154,19 @@ body[data-scroll-locked][data-scroll-locked] {
     transform-origin: left top;
     transform: scale(1);
   }
+
+  /* The chat composer (chat-input.tsx) is a contenteditable div, not a
+     textarea, and WebKit's focus auto-zoom keys off its font size the same
+     way. Keyed on its own data-editor rather than [contenteditable]: a global
+     match would also resize consumers' editors (CodeMirror's .cm-content) and
+     drop the composer back to 14px while disabled. Its placeholder and hover
+     preview overlay it as siblings, so they are pinned with it or the text
+     would change size on the first keystroke. Mention chips stay small only
+     because Tag sets its own text-h5. */
+  [data-editor],
+  [data-editor-ghost] {
+    font-size: 16px !important;
+  }
 }
 
 /* Shadcn/ui HSL CSS variables for Tailwind compatibility */

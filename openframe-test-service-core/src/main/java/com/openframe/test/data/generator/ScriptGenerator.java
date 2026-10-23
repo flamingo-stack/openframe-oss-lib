@@ -12,13 +12,23 @@ public class ScriptGenerator {
     private static Faker faker = new Faker();
 
     public static CreateScriptInput createScriptRequest() {
+        return createScriptRequest("WINDOWS");
+    }
+
+    /**
+     * A harmless directory-listing script for one platform (OsType WINDOWS or MAC_OS), with the
+     * shell that platform runs. A schedule's supportedPlatforms must be supported by every script it
+     * runs, so a schedule targeting a Mac needs a script built with {@code "MAC_OS"}.
+     */
+    public static CreateScriptInput createScriptRequest(String osType) {
+        boolean windows = "WINDOWS".equals(osType);
         return CreateScriptInput.builder()
-                .name("Dir".concat(faker.lorem().characters(3)))
+                .name((windows ? "Dir" : "Ls").concat(faker.lorem().characters(3)))
                 .description("List files in folder")
-                .shell("POWERSHELL")
+                .shell(windows ? "POWERSHELL" : "BASH")
                 .privilegeLevel("USER")
-                .scriptBody("dir")
-                .supportedPlatforms(List.of("WINDOWS"))
+                .scriptBody(windows ? "dir" : "ls")
+                .supportedPlatforms(List.of(osType))
                 .defaultTimeoutSeconds(90)
                 .defaultArgs(List.of("dirName"))
                 .envVars(List.of(ScriptEnvVar.builder().name("ENVVAR").value("varValue").secret(false).build()))
@@ -43,6 +53,26 @@ public class ScriptGenerator {
                 .defaultArgs(script.getDefaultArgs())
                 .envVars(script.getEnvVars())
                 .build();
+    }
+
+    public static final String MARKER_VAR = "E2E_MARKER";
+
+    // A harmless PowerShell script for dispatch cases: prints marker=<E2E_MARKER> and nothing else.
+    public static CreateScriptInput echoScriptRequest(String name, String marker) {
+        return CreateScriptInput.builder()
+                .name(name)
+                .description("Prints a marker; dispatched by the E2E suite")
+                .shell("POWERSHELL")
+                .privilegeLevel("ADMIN")
+                .scriptBody("Write-Output \"marker=$env:" + MARKER_VAR + "\"")
+                .supportedPlatforms(List.of("WINDOWS"))
+                .defaultTimeoutSeconds(60)
+                .envVars(List.of(envVar(MARKER_VAR, marker)))
+                .build();
+    }
+
+    public static ScriptEnvVar envVar(String name, String value) {
+        return ScriptEnvVar.builder().name(name).value(value).secret(false).build();
     }
 
     public static RunScriptRequest runSpeedTestScriptRequest(String... agents) {

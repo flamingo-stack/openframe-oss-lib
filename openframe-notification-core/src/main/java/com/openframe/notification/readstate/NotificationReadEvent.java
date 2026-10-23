@@ -13,5 +13,5 @@ public record NotificationReadEvent(String recipientId,
                                     List<String> notificationIds,
                                     Transition transition) {
 
-    public enum Transition {READ, DELETED}
+    public enum Transition {READ, ARCHIVED, DELETED}
 }

@@ -1,6 +1,7 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.listener.rmm.CommandResultListener;
 import com.openframe.client.service.rmm.RmmResultService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
@@ -48,7 +49,7 @@ class CommandResultListenerTest {
         // contract that an agent payload would hit.
         listener = new CommandResultListener(
                 natsConnection,
-                new RmmResultParser(new ObjectMapper()),
+                new RmmResultParser(new JsonMapper()),
                 rmmResultService,
                 new NatsTopicMachineIdExtractor());
     }
@@ -117,7 +118,7 @@ class CommandResultListenerTest {
 
     private MessageHandler captureSubscribedHandler() {
         when(natsConnection.createDispatcher()).thenReturn(dispatcher);
-        listener.subscribeToCommandResults();
+        listener.subscribe();
 
         ArgumentCaptor<MessageHandler> handlerCaptor = ArgumentCaptor.forClass(MessageHandler.class);
         verify(dispatcher).subscribe(eq(SUBJECT), handlerCaptor.capture());

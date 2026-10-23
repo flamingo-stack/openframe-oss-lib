@@ -163,9 +163,9 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     @Test
     @DisplayName("Given two notifications with different titles and a non-blank search term, when listing for the recipient, then only the notification whose title matches the search is returned (case-insensitive)")
     void search_filters_by_title() {
-        Notification welcome = repository.save(NotificationFixtures.basic("welcome", "{}"));
+        Notification welcome = repository.save(NotificationFixtures.basic("welcome"));
         sleepBriefly();
-        Notification alert = repository.save(NotificationFixtures.basic("ALERT", "{}"));
+        Notification alert = repository.save(NotificationFixtures.basic("ALERT"));
         seedReadState(ALICE, U, welcome.getId(), ReadStatus.UNREAD, welcome.getTitle());
         seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD, alert.getTitle());
 
@@ -180,7 +180,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         for (int i = 0; i < 20; i++) {
             boolean isMatch = i % 4 == 0;
             String title = isMatch ? "alert-" + i : "noise-" + i;
-            Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
+            Notification n = repository.save(NotificationFixtures.basic(title));
             seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             if (isMatch) {
                 matching.add(n);
@@ -201,7 +201,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void search_exhausts_when_fewer_matches_than_limit() {
         for (int i = 0; i < 10; i++) {
             String title = i == 3 ? "alert-one" : "noise-" + i;
-            Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
+            Notification n = repository.save(NotificationFixtures.basic(title));
             seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             sleepBriefly();
         }
@@ -217,13 +217,13 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     void search_grows_batch_to_reach_distant_matches() {
         List<Notification> matching = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
-            Notification n = repository.save(NotificationFixtures.basic("alert-" + i, "{}"));
+            Notification n = repository.save(NotificationFixtures.basic("alert-" + i));
             seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             matching.add(n);
             sleepBriefly();
         }
         for (int i = 0; i < 100; i++) {
-            Notification n = repository.save(NotificationFixtures.basic("noise-" + i, "{}"));
+            Notification n = repository.save(NotificationFixtures.basic("noise-" + i));
             seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             sleepBriefly();
         }
@@ -242,7 +242,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
         for (int i = 0; i < 12; i++) {
             boolean isMatch = i % 3 == 0;
             String title = isMatch ? "alert-" + i : "noise-" + i;
-            Notification n = repository.save(NotificationFixtures.basic(title, "{}"));
+            Notification n = repository.save(NotificationFixtures.basic(title));
             seedReadState(ALICE, U, n.getId(), ReadStatus.UNREAD, n.getTitle());
             if (isMatch) {
                 matching.add(n);
@@ -265,7 +265,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     @Test
     @DisplayName("Given a recipient with a single matching read_state for the search term, when search runs, then exactly that one row comes back — flat-query path, no overfetch")
     void search_returns_only_matching_rows() {
-        Notification alert = repository.save(NotificationFixtures.basic("alert", "{}"));
+        Notification alert = repository.save(NotificationFixtures.basic("alert"));
         seedReadState(ALICE, U, alert.getId(), ReadStatus.UNREAD, "alert");
 
         NotificationPage result = repository.findPageForRecipient(ALICE, U, null, "alert", null, false, 10);
@@ -347,7 +347,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     }
 
     private Notification seedNotification(String type) {
-        Notification n = repository.save(NotificationFixtures.basic(type, "{}"));
+        Notification n = repository.save(NotificationFixtures.basic(type));
         sleepBriefly();
         return n;
     }
@@ -355,7 +355,7 @@ class CustomNotificationRepositoryPaginationIT extends BaseMongoIntegrationTest 
     private List<Notification> seedSequentialForRecipient(String recipientId, RecipientType type, int count) {
         List<Notification> saved = new ArrayList<>();
         for (int i = 0; i < count; i++) {
-            Notification n = repository.save(NotificationFixtures.basic("type-" + i, "{}"));
+            Notification n = repository.save(NotificationFixtures.basic("type-" + i));
             seedReadState(recipientId, type, n.getId(), ReadStatus.UNREAD, n.getTitle());
             sleepBriefly();
             saved.add(n);

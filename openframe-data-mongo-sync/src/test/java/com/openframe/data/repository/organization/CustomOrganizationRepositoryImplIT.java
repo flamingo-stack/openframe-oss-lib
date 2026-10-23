@@ -18,6 +18,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -190,6 +191,58 @@ class CustomOrganizationRepositoryImplIT extends BaseMongoIntegrationTest {
         Query query = repository.buildOrganizationQuery(activeFilter(), null);
 
         assertThat(repository.countOrganizations(query)).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("excludeOrganizationIds keeps those organizations out of the page")
+    void excludeOrganizationIdsFiltersThePage() {
+        save("a", 100);
+        save("b", 200);
+        save("c", 300);
+
+        OrganizationQueryFilter filter = OrganizationQueryFilter.builder()
+                .status(OrganizationStatus.ACTIVE.name())
+                .excludeOrganizationIds(Set.of("b"))
+                .build();
+
+        Query query = repository.buildOrganizationQuery(filter, null);
+        List<Organization> result = repository.findOrganizationsWithCursor(query, null, 50, SORT_UPDATED_AT, DESC);
+
+        assertThat(result).extracting(Organization::getName).containsExactly("c", "a");
+    }
+
+    @Test
+    @DisplayName("countOrganizations honours excludeOrganizationIds, so filteredCount matches the page")
+    void countHonoursExcludeOrganizationIds() {
+        for (int i = 1; i <= 5; i++) {
+            save("o" + i, i * 100L);
+        }
+
+        OrganizationQueryFilter filter = OrganizationQueryFilter.builder()
+                .status(OrganizationStatus.ACTIVE.name())
+                .excludeOrganizationIds(Set.of("o2", "o4"))
+                .build();
+
+        Query query = repository.buildOrganizationQuery(filter, null);
+
+        assertThat(repository.countOrganizations(query)).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("an empty excludeOrganizationIds set excludes nobody")
+    void emptyExcludeOrganizationIdsKeepsEveryone() {
+        save("a", 100);
+        save("b", 200);
+
+        OrganizationQueryFilter filter = OrganizationQueryFilter.builder()
+                .status(OrganizationStatus.ACTIVE.name())
+                .excludeOrganizationIds(Set.of())
+                .build();
+
+        Query query = repository.buildOrganizationQuery(filter, null);
+        List<Organization> result = repository.findOrganizationsWithCursor(query, null, 50, SORT_UPDATED_AT, DESC);
+
+        assertThat(result).extracting(Organization::getName).containsExactly("b", "a");
     }
 
     @Test

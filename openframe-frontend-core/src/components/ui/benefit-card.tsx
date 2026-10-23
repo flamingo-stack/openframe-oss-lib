@@ -26,9 +26,9 @@ export const BenefitCard: React.FC<BenefitCardProps> = ({
   const variantStyles = {
     default: {
       container:
-        'gap-[var(--spacing-system-xsf)] bg-ods-bg p-[var(--spacing-system-xsf)] md:p-[var(--spacing-system-mf)]',
-      title: 'font-body font-bold text-body-md md:text-body-lg text-ods-text-primary',
-      description: 'font-body font-medium text-body-sm md:text-body-md text-ods-text-secondary',
+        'gap-[var(--spacing-system-xsf)] bg-ods-bg p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-mf)]',
+      title: 'font-body font-bold text-body-md content-md:text-body-lg text-ods-text-primary',
+      description: 'font-body font-medium text-body-sm content-md:text-body-md text-ods-text-secondary',
     },
     dark: {
       container: 'gap-[var(--spacing-system-xsf)] bg-transparent p-0 shadow-[0px_48px_80px_0px_rgba(0,0,0,0.24)]',
@@ -78,15 +78,15 @@ export function benefitCardBorderClass(
     const isLastInRow = (index + 1) % 4 === 0;
     const isInLastRow = index >= totalItems - 4;
     return cn(
-      !isLastInRow && 'border-ods-border md:border-r',
-      !isInLastRow && 'border-b md:border-b lg:border-b-0',
-      index < 2 && 'lg:border-b-0',
+      !isLastInRow && 'border-ods-border content-md:border-r',
+      !isInLastRow && 'border-b content-md:border-b content-lg:border-b-0',
+      index < 2 && 'content-lg:border-b-0',
     );
   } else if (columns === 3) {
     // 3 columns lay out 1-up / 2-up / 3-up, so the row a card sits in
     // differs per breakpoint and a single rule cannot describe it. The
     // old shared 2-3 branch assumed one row and, at `md` (grid-cols-2),
-    // gave card 1 a trailing `md:border-r` while suppressing the divider
+    // gave card 1 a trailing `content-md:border-r` while suppressing the divider
     // between the two rows.
     const isLastInMdRow = (index + 1) % 2 === 0;
     const isInLastMdRow = index >= totalItems - (totalItems % 2 === 0 ? 2 : 1);
@@ -95,17 +95,17 @@ export function benefitCardBorderClass(
     return cn(
       'border-ods-border',
       !isLastItem && 'border-b',
-      isInLastMdRow && 'md:border-b-0',
-      !isLastInMdRow && !isLastItem && 'md:border-r',
-      isLastInMdRow && 'md:border-r-0',
-      isInLastLgRow && 'lg:border-b-0',
-      !isInLastMdRow && !isInLastLgRow && 'lg:border-b',
-      !isLastInLgRow && !isLastItem && 'lg:border-r',
-      isLastInLgRow && 'lg:border-r-0',
+      isInLastMdRow && 'content-md:border-b-0',
+      !isLastInMdRow && !isLastItem && 'content-md:border-r',
+      isLastInMdRow && 'content-md:border-r-0',
+      isInLastLgRow && 'content-lg:border-b-0',
+      !isInLastMdRow && !isInLastLgRow && 'content-lg:border-b',
+      !isLastInLgRow && !isLastItem && 'content-lg:border-r',
+      isLastInLgRow && 'content-lg:border-r-0',
     );
   } else {
     // 2 columns: a flex row, so one rule genuinely does describe it.
-    return isLastItem ? 'border-b-0' : 'border-b md:border-b-0 md:border-r border-ods-border';
+    return isLastItem ? 'border-b-0' : 'border-b content-md:border-b-0 content-md:border-r border-ods-border';
   }
 }
 
@@ -114,10 +114,10 @@ export const BenefitCardGrid: React.FC<BenefitCardGridProps> = ({ children, clas
 
   const gridClass =
     columns === 4
-      ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4'
+      ? 'grid grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-4'
       : columns === 3
-        ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-        : 'flex flex-col md:flex-row';
+        ? 'grid grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-3'
+        : 'flex flex-col content-md:flex-row';
 
   return (
     <div

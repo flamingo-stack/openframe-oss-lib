@@ -1,75 +1,86 @@
 import { forwardRef, useRef, useEffect } from 'react';
 import type { MouseEvent } from 'react';
 import { cn } from '../../utils/cn';
+import { formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { ChatPlusIcon, ChatsIcon, Chevron02RightIcon } from '../icons-v2-generated';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button';
-import { ChatSidebarSkeleton, DialogListItemSkeleton } from './chat-sidebar-skeleton';
-import type { ChatSidebarProps, DialogListItemProps } from './types';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
+import { CHAT_HISTORY_PAGE_SIZE } from './mingo-chat-history';
+import type { ChatSidebarProps, DialogItem, DialogListItemProps } from './types';
 
+/** A dialog row's box, loaded and loading. */
+const DIALOG_LIST_ITEM_CLASS = 'flex items-center gap-4 overflow-clip px-4 py-3 border-b border-ods-border bg-ods-card';
+
+/**
+ * One dialog row. ONE switch (`useLoadingScope() || loading`): while the dialog is read the SAME row (inert, not
+ * clickable) draws its title and time as bars and its chevron (static) for real.
+ */
 const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
-  ({ className, dialog, isActive, onDialogSelect, onClick, ...props }, ref) => {
+  ({ className, dialog, isActive, onDialogSelect, onClick, loading: loadingProp = false, ...props }, ref) => {
+    const loading = useLoadingScope() || loadingProp;
+
     const handleClick = (e: MouseEvent<HTMLDivElement>) => {
       onDialogSelect?.(dialog.id);
       onClick?.(e);
     };
 
     const formatTimestamp = (timestamp?: Date | string) => {
-      if (!timestamp) return '';
-      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
-      return (
-        date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-        }) +
-        ', ' +
-        date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
-      );
+      // "Your" last-active time in the app shell — the viewer's zone, stated
+      // explicitly, with the date and time rendered together by one renderer.
+      return formatDateWithTimezone(timestamp, VIEWER_TIMEZONE, 'numericDateTime24h');
     };
+
+    const unread = loading ? 0 : (dialog.unreadMessagesCount ?? 0);
 
     return (
       <div
-        ref={ref}
+        ref={loading ? undefined : ref}
+        aria-hidden={loading || undefined}
         className={cn(
-          'flex items-center gap-4 overflow-clip',
-          'px-4 py-3',
-          'cursor-pointer border-b border-ods-border',
-          'bg-ods-card',
-          'transition-colors hover:bg-ods-bg-hover',
-          isActive && 'border-l-2 border-l-ods-accent bg-ods-bg-hover',
+          DIALOG_LIST_ITEM_CLASS,
+          !loading && 'cursor-pointer transition-colors hover:bg-ods-bg-hover',
+          !loading && isActive && 'border-l-2 border-l-ods-accent bg-ods-bg-hover',
           className,
         )}
-        onClick={handleClick}
-        {...props}
+        onClick={loading ? undefined : handleClick}
+        {...(loading ? loadingItemProps(props) : props)}
       >
         {/* Content area */}
         <div className="flex min-w-0 flex-1 flex-col items-start justify-center gap-1">
-          <div className="flex w-full min-w-0 items-center">
-            <h3
-              className={cn(
-                'min-w-0 flex-1 text-h6',
-                isActive ? 'text-ods-accent' : 'text-ods-text-primary',
-                'truncate',
+          {loading ? (
+            <>
+              <TextLineSkeleton type="h6" className="w-full max-w-[200px]" />
+              <TextLineSkeleton type="h6" className="w-32" />
+            </>
+          ) : (
+            <>
+              <div className="flex w-full min-w-0 items-center">
+                <h3
+                  className={cn(
+                    'min-w-0 flex-1 text-h6',
+                    isActive ? 'text-ods-accent' : 'text-ods-text-primary',
+                    'truncate',
+                  )}
+                  title={dialog.title || 'Untitled Chat'}
+                >
+                  {dialog.title || 'Untitled Chat'}
+                </h3>
+              </div>
+              {dialog.timestamp && (
+                <p className="w-full min-w-0 truncate text-ods-text-secondary text-h6">
+                  {formatTimestamp(dialog.timestamp)}
+                </p>
               )}
-              title={dialog.title || 'Untitled Chat'}
-            >
-              {dialog.title || 'Untitled Chat'}
-            </h3>
-          </div>
-          {dialog.timestamp && (
-            <p className="w-full min-w-0 truncate text-ods-text-secondary text-h6">
-              {formatTimestamp(dialog.timestamp)}
-            </p>
+            </>
           )}
         </div>
 
         {/* Right side indicator - always visible */}
         <div className="ml-2 flex-shrink-0">
-          {dialog.unreadMessagesCount && dialog.unreadMessagesCount > 0 ? (
-            <div className="flex size-6 items-center justify-center rounded-md bg-ods-accent p-2">
-              <span className="text-ods-text-on-accent text-h6">
-                {dialog.unreadMessagesCount > 99 ? '99+' : dialog.unreadMessagesCount}
-              </span>
+          {unread > 0 ? (
+            <div className="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)]">
+              <span className="text-ods-text-on-accent text-h6">{unread > 99 ? '99+' : unread}</span>
             </div>
           ) : (
             <Chevron02RightIcon className="size-6 text-ods-text-secondary" />
@@ -81,6 +92,18 @@ const DialogListItem = forwardRef<HTMLDivElement, DialogListItemProps>(
 );
 
 DialogListItem.displayName = 'DialogListItem';
+
+/** A dialog row while the list is read, with no dialog yet. */
+const LOADING_DIALOG: DialogItem = { id: '', title: '' };
+
+/** A page of loading dialog rows (the list's page size), each a list item: the first page and the next one alike. */
+function DialogListItemLoadingPage({ count }: { count: number }) {
+  return (
+    <LoadingItems count={count}>
+      {() => <DialogListItem loading dialog={LOADING_DIALOG} data-loading-item />}
+    </LoadingItems>
+  );
+}
 
 const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
   (
@@ -96,17 +119,24 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
       hasNextPage,
       isFetchingNextPage,
       onLoadMore,
+      pageSize = CHAT_HISTORY_PAGE_SIZE,
       ...props
     },
     ref,
   ) => {
-    const showEmptyState = dialogs.length === 0 && !children;
+    // ONE switch: the first page with nothing to show yet (or the page's loading state) draws the sidebar with one
+    // page of skeleton rows; the shell and its static copy stay real.
+    const loading = useLoadingScope() || (!!isLoading && dialogs.length === 0 && !children);
+    const showEmptyState = !loading && dialogs.length === 0 && !children;
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const loadMoreRef = useRef<HTMLDivElement>(null);
+    // Refreshed in an effect, not during render: the only reader is the IntersectionObserver callback.
     const onLoadMoreRef = useRef(onLoadMore);
-    onLoadMoreRef.current = onLoadMore;
     const isFetchingRef = useRef(isFetchingNextPage);
-    isFetchingRef.current = isFetchingNextPage;
+    useEffect(() => {
+      onLoadMoreRef.current = onLoadMore;
+      isFetchingRef.current = isFetchingNextPage;
+    });
 
     useEffect(() => {
       const scrollContainer = scrollContainerRef.current;
@@ -125,10 +155,6 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
       observer.observe(loadMoreElement);
       return () => observer.disconnect();
     }, [hasNextPage]);
-
-    if (isLoading && dialogs.length === 0 && !children) {
-      return <ChatSidebarSkeleton className={className} dialogCount={8} showNewChatButton={true} />;
-    }
 
     return (
       <div
@@ -160,6 +186,12 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
                 <p className="text-ods-text-secondary text-h6">Previous Mingo sessions will show here</p>
               </div>
             </div>
+          ) : loading ? (
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <div className="flex flex-col">
+                <DialogListItemLoadingPage count={pageSize} />
+              </div>
+            </div>
           ) : children ? (
             /* Custom children content */
             <div className="flex-1 overflow-y-auto overscroll-contain">{children}</div>
@@ -170,23 +202,16 @@ const ChatSidebar = forwardRef<HTMLDivElement, ChatSidebarProps>(
                 {dialogs.map(dialog => (
                   <DialogListItem
                     key={dialog.id}
+                    data-loading-item
                     dialog={dialog}
                     isActive={dialog.id === activeDialogId}
                     onDialogSelect={onDialogSelect}
                   />
                 ))}
 
-                {/* Infinite scroll loading indicator and intersection target */}
+                {/* Infinite scroll intersection target; the next page draws as one page of skeleton rows. */}
                 {hasNextPage && (
-                  <div ref={loadMoreRef}>
-                    {isFetchingNextPage && (
-                      <>
-                        <DialogListItemSkeleton />
-                        <DialogListItemSkeleton />
-                        <DialogListItemSkeleton />
-                      </>
-                    )}
-                  </div>
+                  <div ref={loadMoreRef}>{isFetchingNextPage && <DialogListItemLoadingPage count={pageSize} />}</div>
                 )}
               </div>
             </div>

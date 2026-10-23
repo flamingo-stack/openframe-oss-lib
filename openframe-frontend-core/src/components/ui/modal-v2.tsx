@@ -2,8 +2,11 @@
 
 import { type ReactNode, createContext, forwardRef, useContext, useRef, useEffect, useState } from 'react';
 import { RemoveScroll } from 'react-remove-scroll';
+import { ViewportBreakpoints } from '../../hooks/ui/use-content-breakpoint';
 import { cn } from '../../utils/cn';
 import { XmarkIcon } from '../icons-v2-generated';
+import { Button } from './button';
+import { CollisionBoundaryContext, PortalContainerContext } from './portal-container';
 
 // Duration of the open/close animation in ms — keep in sync with the
 // `duration-200` utilities applied to the backdrop and panel below.
@@ -65,8 +68,9 @@ interface ModalTwoColumnProps {
 // TOP one may contain focus, or they fight each other.
 const modalStack: symbol[] = [];
 
-// Radix popups (Select/DropdownMenu/Popover content) PORTAL to <body>, so a
-// dropdown opened from inside the modal focuses nodes OUTSIDE the panel.
+// Radix popups (Select/DropdownMenu/Popover content) PORTAL out of the panel —
+// to <body> or the modal's own portal host — so a dropdown opened from inside
+// the modal focuses nodes OUTSIDE the panel.
 // Focus landing there is NOT an escape — yanking it back (containFocus /
 // reasserts / Tab trap) fights Radix's own item-focus management and strands
 // stale `data-highlighted` on items it never got to blur-clean (observed:
@@ -81,6 +85,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
   ({ isOpen, onClose, children, className, size = 'default' }, ref) => {
     // Keep the modal mounted while the exit animation plays.
     const [isMounted, setIsMounted] = useState(isOpen);
+    const [portalHost, setPortalHost] = useState<HTMLDivElement | null>(null);
     const panelRef = useRef<HTMLDivElement | null>(null);
     const restoreFocusRef = useRef<HTMLElement | null>(null);
     const stackIdRef = useRef<symbol>(Symbol('modal'));
@@ -235,7 +240,9 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
           mirrored there as INSET_TRANSITION_MS — it delays the app's
           scroll-the-focused-field re-assert until this transition settles. */}
         <div
-          className="fixed inset-0 z-[1300] flex items-end justify-center transition-[padding] duration-200 md:items-center"
+          // `ods-viewport-layer`: a modal follows the window, so a modal opened from a
+          // narrow content area takes the window's tokens, not the area's mobile ones.
+          className="ods-viewport-layer fixed inset-0 z-[1300] flex items-end justify-center transition-[padding] duration-200 md:items-center"
           style={{ paddingBottom: 'var(--of-keyboard-inset, 0px)' }}
         >
           <div
@@ -303,8 +310,21 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
             role="dialog"
             aria-modal="true"
           >
-            <ModalContext.Provider value={{ onClose }}>{children}</ModalContext.Provider>
+            <ModalContext.Provider value={{ onClose }}>
+              {/* Menus and tooltips opened inside portal into this layer, so they
+                  stack over the panel instead of under the `z-[1300]` overlay. The
+                  boundary resets too: a modal follows the window, not the surface
+                  it was opened from. */}
+              <PortalContainerContext.Provider value={portalHost}>
+                <CollisionBoundaryContext.Provider value={null}>
+                  <ViewportBreakpoints>{children}</ViewportBreakpoints>
+                </CollisionBoundaryContext.Provider>
+              </PortalContainerContext.Provider>
+            </ModalContext.Provider>
           </div>
+          {/* Outside the panel: its open/close zoom is a transform, which would
+              anchor the menus' `position: fixed` to the panel. */}
+          <div ref={setPortalHost} className="contents" />
         </div>
       </RemoveScroll>
     );
@@ -355,13 +375,16 @@ const ModalHeader = forwardRef<HTMLDivElement, ModalHeaderProps>(({ children, cl
     <div ref={ref} className={cn('flex items-center gap-[var(--spacing-system-sf)]', className)}>
       <div className="flex min-w-0 flex-1 flex-col">{children}</div>
       {onClose && (
-        <button
+        <Button
+          variant="bare"
+          size="icon-sm"
+          type="button"
           onClick={onClose}
-          className="hidden shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary md:flex"
+          className="hidden shrink-0 md:inline-flex"
           aria-label="Close"
         >
-          <XmarkIcon className="size-6" />
-        </button>
+          <XmarkIcon className="text-ods-text-secondary" />
+        </Button>
       )}
     </div>
   );

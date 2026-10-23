@@ -4,13 +4,13 @@ use std::process::Command;
 use tracing::info;
 use uuid::Uuid;
 
-use super::UpdaterParams;
+use super::{LaunchedUpdater, UpdaterParams};
 use crate::config::update_config::BOOT_MARKER_WAIT_SECS;
 use crate::platform::update_scripts::{UPDATER_PLIST_TEMPLATE, UPDATE_SCRIPT_MACOS};
 
 /// Launch bash updater script on macOS
 /// Creates a temporary launchd job to ensure the script survives service stop
-pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
+pub async fn launch_updater(params: UpdaterParams) -> Result<LaunchedUpdater> {
     info!("Launching macOS bash updater");
 
     let script_path = std::env::temp_dir().join(format!("openframe-updater-{}.sh", Uuid::new_v4()));
@@ -88,5 +88,6 @@ pub async fn launch_updater(params: UpdaterParams) -> Result<()> {
 
     info!("macOS bash updater launched via launchd");
 
-    Ok(())
+    // launchd owns the job, so an early exit is only noticed on the next boot
+    Ok(LaunchedUpdater { exit_watch: None })
 }

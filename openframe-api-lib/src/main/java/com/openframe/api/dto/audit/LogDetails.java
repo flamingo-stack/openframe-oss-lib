@@ -21,6 +21,9 @@ public class LogDetails {
     private String userId;
     private String deviceId;
     private String hostname;
+    private String nickname;
+    private String executionSource;
+    private String scriptCreationSource;
     private String organizationId;
     private String organizationName;
     private String summary;

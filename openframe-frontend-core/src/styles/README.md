@@ -26,7 +26,8 @@ ui-kit/src/styles/
 ├── ods-responsive-tokens.css  # Breakpoints, fluid font-size clamps
 ├── dark_theme.tokens.json     # Source of truth for dark primitives (1:1 with ods-colors.css)
 ├── light_theme.tokens.json    # Source of truth for light primitives
-├── storybook-fonts.css        # Direct font CSS for Storybook (Next.js apps use next/font)
+├── fonts.css                  # THE font loader: self-hosted Azeret Mono + DM Sans (@font-face), all apps
+├── fonts/                     # The woff2 files it serves (SIL OFL 1.1, licenses included)
 ├── vendor-react-easy-crop.css # Vendor override for react-easy-crop
 ├── vendor-react-scroll.css    # Vendor override for react-scroll
 └── README.md                  # This file
@@ -161,12 +162,12 @@ Platforms set **brand accent + link colors only** (and a couple of intentional b
 | `openframe`       | Yellow `--ods-open-yellow-base`     | Cyan links                    |
 | `openmsp`         | Yellow `--ods-open-yellow-base`     |                               |
 | `flamingo`        | Pink `--ods-flamingo-pink-base`     | Dark scrim by-design          |
-| `flamingo-teaser` | Pink `--ods-flamingo-pink-base`     |                               |
 | `tmcg`            | Pink `--ods-flamingo-pink-base`     | Cards share page background; dark scrim |
 | `marketing-hub`   | Pink `--ods-flamingo-pink-base`     |                               |
 | `product-hub`     | Green `--ods-attention-green-success` |                             |
 | `revenue-hub`     | Yellow-warning `--ods-attention-yellow-warning` |                   |
 | `people-hub`      | Cyan `--ods-flamingo-cyan-base`     |                               |
+| `coding-hub`      | White `--ods-system-greys-white`    | Black secondary; mark is white on black |
 | `company-hub`     | Red `--ods-attention-red-error`     |                               |
 
 Adding a new platform = add one `[data-app-type="…"]` block in `ods-colors.css`. Because the block references `--ods-*` primitives (not raw hex), the new platform inherits dark/light flipping for free.
@@ -201,6 +202,9 @@ Adding a new platform = add one `[data-app-type="…"]` block in `ods-colors.css
 --color-accent-primary  /* Platform-set */
 --color-accent-hover
 --color-accent-active
+--color-accent-secondary /* Platform-set — muted accent fill for selected rows */
+--color-accent-secondary-hover
+--color-accent-secondary-active
 --color-focus-ring
 
 --color-success / -hover / -secondary

@@ -34,6 +34,12 @@ import {
 // One normalizer for ask rows, shared with the live decoder — history and the
 // stream must agree on which options are usable.
 import { normalizeAskOptions } from '../../../chat-protocol/nats-decoder';
+import {
+  attachmentsEvent,
+  mergeSourceMetadata,
+  sourceMetadataEvent,
+  type SourceMetadata,
+} from '../../../chat-protocol/source-metadata';
 import { applyApprovalStatusToSegment } from '../stream/message-mutations';
 import {
   MESSAGE_TYPE,
@@ -120,6 +126,16 @@ export function decodeHistoricalMessageData(data: MessageData): ChatStreamEvent 
         return { type: 'thinking-delta', text: data.text };
       }
       return null;
+
+    // Persisted attachments, through the SAME decoder the live chunk uses
+    // (`attachmentsEvent`). That shared parse is the whole reason a reloaded
+    // answer renders identically to the one the reader watched arrive.
+    case MESSAGE_TYPE.ATTACHMENTS:
+      return attachmentsEvent(data);
+
+    // The envelope `ATTACHMENTS` replaced (see `MESSAGE_TYPE.GUIDE`).
+    case MESSAGE_TYPE.GUIDE:
+      return 'payload' in data ? sourceMetadataEvent(data.payload) : null;
 
     // Same completeness gate as the live decoder (`decodeNatsChunk`): a
     // persisted row without a question or without options is not a card the
@@ -596,6 +612,12 @@ export function processHistoricalMessages(
   // MAX persisted seq across the rows grouped into the current assistant turn
   // — carried onto the flushed message's streamSeq for per-role merge coverage.
   let currentAssistantStreamSeq: number | undefined;
+  // Source metadata for the current assistant turn. It is persisted as its OWN
+  // row (the backend saves it when the remote tool returns, before the answer
+  // text exists), so it arrives as a separate history message that groups into
+  // the same turn — and has to be carried across the group rather than applied
+  // where it was read.
+  let currentAssistantSourceMetadata: SourceMetadata | null = null;
 
   /**
    * Flush the current assistant message to processedMessages.
@@ -614,6 +636,7 @@ export function processHistoricalMessages(
         timestamp: currentAssistantTimestamp || new Date(),
         avatar: assistantAvatar,
         ...(currentAssistantStreamSeq !== undefined ? { streamSeq: currentAssistantStreamSeq } : {}),
+        ...(currentAssistantSourceMetadata ?? {}),
       });
       accumulator.resetSegments();
     }
@@ -628,6 +651,10 @@ export function processHistoricalMessages(
     currentAssistantTimestamp = null;
     lastAssistantId = null;
     currentAssistantStreamSeq = undefined;
+    // Reset UNCONDITIONALLY, for the same reason the seq above is: a turn whose
+    // only row was metadata renders nothing, and leaving it set would stamp the
+    // NEXT answer with citations that belong to this one.
+    currentAssistantSourceMetadata = null;
   };
 
   messages.forEach((msg, index) => {
@@ -694,6 +721,12 @@ export function processHistoricalMessages(
       messageDataArray.forEach(data => {
         const event = decodeHistoricalMessageData(data);
         if (!event) return;
+        // Metadata is a property OF the turn, not a segment in it — it never
+        // reaches the accumulator, which would have nothing to do with it.
+        if (event.type === 'sources') {
+          currentAssistantSourceMetadata = mergeSourceMetadata(currentAssistantSourceMetadata, event);
+          return;
+        }
         applyHistoryEvent(
           event,
           accumulator,

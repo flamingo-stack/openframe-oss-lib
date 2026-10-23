@@ -20,11 +20,14 @@ export interface Department {
   parent_department_id?: string | null;
   display_order: number;
   is_active: boolean;
+  /** The department's badge colour: a `BADGE_PALETTE` key (an ODS colour scheme) picked at random (`pickBadgePaletteColor`) when the row is created. */
+  color: string | null;
 }
 
 /** The embedded shape a reader gets through the `department:departments(…)` PostgREST embed. */
 export type DepartmentRef = Pick<Department, 'id' | 'name' | 'slug'> & {
   display_order?: number;
+  color?: string | null;
 };
 
 /** `GET /api/admin/departments?counts=…` row — a department plus how many profiles carry it. */
@@ -32,6 +35,7 @@ export interface DepartmentSummary {
   id: string;
   name: string;
   slug: string;
+  color?: string | null;
   count: number;
 }
 

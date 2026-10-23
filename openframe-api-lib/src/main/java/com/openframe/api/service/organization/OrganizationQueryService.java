@@ -11,7 +11,6 @@ import com.openframe.api.dto.shared.SortDirection;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.organization.filter.OrganizationQueryFilter;
 import com.openframe.data.repository.organization.OrganizationRepository;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.mongodb.core.query.Query;
@@ -56,12 +55,15 @@ public class OrganizationQueryService {
             sort.getDirection() : SortDirection.DESC;
 
         // Total number of documents matching the filter + search, across all
-        // pages. Must be computed on the base query BEFORE fetchPageItems
+        // pages. Must be computed on the base query BEFORE findOrganizationsWithCursor
         // mutates it with the cursor keyset and limit.
         long filteredCount = organizationRepository.countOrganizations(query);
 
-        List<Organization> pageItems = fetchPageItems(query, normalizedPagination, sortField, sortDirection);
-        boolean hasNextPage = pageItems.size() == normalizedPagination.getLimit();
+        int limit = normalizedPagination.getLimit();
+        List<Organization> raw = organizationRepository.findOrganizationsWithCursor(
+            query, normalizedPagination.getCursor(), limit + 1, sortField, sortDirection.name());
+        boolean hasNextPage = raw.size() > limit;
+        List<Organization> pageItems = hasNextPage ? raw.subList(0, limit) : raw;
 
         PageInfo pageInfo = buildPageInfo(pageItems, hasNextPage, normalizedPagination.hasCursor(), sortField);
 
@@ -70,15 +72,6 @@ public class OrganizationQueryService {
                 .pageInfo(pageInfo)
                 .filteredCount((int) filteredCount)
                 .build();
-    }
-
-    private List<Organization> fetchPageItems(@NotNull Query query, CursorPaginationCriteria criteria,
-                                               String sortField, SortDirection sortDirection) {
-        List<Organization> organizations = organizationRepository.findOrganizationsWithCursor(
-            query, criteria.getCursor(), criteria.getLimit() + 1, sortField, sortDirection.name());
-        return organizations.size() > criteria.getLimit()
-            ? organizations.subList(0, criteria.getLimit())
-            : organizations;
     }
 
     private PageInfo buildPageInfo(List<Organization> pageItems, boolean hasNextPage, boolean hasPreviousPage,
@@ -123,6 +116,7 @@ public class OrganizationQueryService {
                 .status(filterOptions.getStatus())
                 .lastActivityFrom(filterOptions.getLastActivityFrom())
                 .lastActivityTo(filterOptions.getLastActivityTo())
+                .excludeOrganizationIds(filterOptions.getExcludeOrganizationIds())
                 .build();
     }
     

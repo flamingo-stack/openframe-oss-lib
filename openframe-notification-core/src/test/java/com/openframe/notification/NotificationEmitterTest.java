@@ -1,8 +1,6 @@
 package com.openframe.notification;
 
-import com.openframe.data.document.notification.GenericContext;
 import com.openframe.data.document.notification.NotificationCategory;
-import com.openframe.data.document.notification.NotificationContext;
 import com.openframe.data.document.notification.NotificationSettingGroup;
 import com.openframe.data.document.notification.NotificationEntityType;
 import com.openframe.data.document.notification.NotificationSeverity;
@@ -67,7 +65,7 @@ class NotificationEmitterTest {
     }
 
     @Test
-    @DisplayName("The pipeline in one pass: typed seed → attrs mapping → compose/audience → command with type, attributes and legacy context")
+    @DisplayName("The pipeline in one pass: typed seed → attrs mapping → compose/audience → command with type and attributes")
     void happy_path_builds_the_full_command() {
         NotificationRequest request = NotificationRequest.of(new TestSeed("t-1", "u-9"));
 
@@ -86,7 +84,6 @@ class NotificationEmitterTest {
         assertThat(sent.getSeverity()).isEqualTo(NotificationSeverity.INFO);
         assertThat(sent.getAudience()).isSameAs(spec.audience);
         assertThat(sent.getCorrelationId()).isEqualTo("corr-1");
-        assertThat(sent.getContext().getType()).isEqualTo("TEST_TYPE");
         assertThat(sent.getApplePushCategory()).isEqualTo("TEST_CATEGORY");
     }
 
@@ -138,10 +135,6 @@ class NotificationEmitterTest {
 
         @Override public Optional<String> getApplePushCategory() {
             return Optional.of("TEST_CATEGORY");
-        }
-
-        @Override public NotificationContext buildLegacyContext(TestSeed seed) {
-            return GenericContext.builder().type(getType().name()).payload("{}").build();
         }
     }
 }

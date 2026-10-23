@@ -7,7 +7,6 @@ import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.ScriptExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
-import com.openframe.data.nats.rmm.publisher.ScriptScheduleNatsPublisher;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +34,7 @@ public class ScriptDeliveryRetryService {
     private final ScheduleJobExecutionWatchdogService headerWatchdogService;
     private final ScriptExecutionWatchdogMetrics watchdogMetrics;
     private final ScriptDeliveryRetryStore retryStore;
-    private final ScriptScheduleNatsPublisher scriptScheduleNatsPublisher;
+    private final DeliveryRepublisherRegistry deliveryRepublisherRegistry;
     private final MachineRepository machineRepository;
 
     @Value("${openframe.rmm.execution.retry.size}")
@@ -86,7 +85,7 @@ public class ScriptDeliveryRetryService {
     }
 
     private List<ScriptExecution> retryDelivery(DeliveryKey delivery, RetryState state) {
-        scriptScheduleNatsPublisher.publish(delivery.machineId(), state.message());
+        deliveryRepublisherRegistry.get(state.channel()).republish(delivery.machineId(), state.messageJson());
         int attempt = retryStore.incrementRetryCount(delivery.executionId(), delivery.machineId(), state);
         watchdogMetrics.recordDeliveryRetried(1);
         log.info("Retried QUEUED delivery: executionId={} machineId={} attempt={}/{}",
@@ -97,14 +96,14 @@ public class ScriptDeliveryRetryService {
     private List<ScriptExecution> failExhaustedDelivery(DeliveryKey delivery, List<ScriptExecution> leaves, Instant now) {
         log.warn("QUEUED delivery exhausted: executionId={} machineId={} — {} leaf(s) FAILED (agent never received)",
                 delivery.executionId(), delivery.machineId(), leaves.size());
-        watchdogMetrics.recordDeliveryFailedExhausted(leaves.size());
+        watchdogMetrics.recordDeliveryFailedExhausted(leaves);
         return failDelivery(delivery, leaves, now, DELIVERY_FAILED_ERROR_FORMAT.formatted(retrySize));
     }
 
     private List<ScriptExecution> failOfflineDelivery(DeliveryKey delivery, List<ScriptExecution> leaves, Instant now) {
         log.info("QUEUED delivery skipped: device offline executionId={} machineId={} — {} leaf(s) FAILED",
                 delivery.executionId(), delivery.machineId(), leaves.size());
-        watchdogMetrics.recordDeliveryFailedOffline(leaves.size());
+        watchdogMetrics.recordDeliveryFailedOffline(leaves);
         return failDelivery(delivery, leaves, now, OFFLINE_ERROR_MESSAGE);
     }
 

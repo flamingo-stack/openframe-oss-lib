@@ -1,16 +1,30 @@
 'use client';
 
-import React, { forwardRef, memo, useEffect, useMemo, useRef } from 'react';
+import React, { forwardRef, memo, type ReactNode, useEffect, useMemo, useRef } from 'react';
+import { createCardMarkerScanner } from '../../chat-protocol/card-marker';
+import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { isToday } from '../../utils/date-utils';
 import { formatDate, formatTime } from '../../utils/format-date';
+import { AgentMark } from '../agent-mark';
 import type { MdRenderProps } from '../ui/markdown/base-components';
 import { SimpleMarkdownRenderer } from '../ui/markdown/simple-markdown-renderer';
 import { SquareAvatar } from '../ui/square-avatar';
 import { ApprovalBatchMessage } from './approval-batch-message';
 import { ApprovalRequestMessage } from './approval-request-message';
 import { AskDisplay } from './ask-display';
+import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
 import { ChatContextChipStrip } from './chat-context-picker';
+import {
+  CHAT_MESSAGE_FACE_PX,
+  CHAT_MESSAGE_HEADER_CLASS,
+  CHAT_MESSAGE_ROW_PADDING_CLASS,
+  CHAT_MESSAGE_SEGMENTS_CLASS,
+  CHAT_MESSAGE_STACK_CLASS,
+  CHAT_MESSAGE_TEXT_CLASS,
+  CHAT_MESSAGE_USER_BUBBLE_CLASS,
+  CHAT_MESSAGE_USER_ROW_CLASS,
+} from './chat-message-layout';
 import type { ChatRef } from './chat-ref.types';
 import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
@@ -19,11 +33,14 @@ import { EscalationOfferMessage } from './escalation-offer-message';
 import { remarkCardLinks } from './remark-card-links';
 import { remarkMentionChips } from './remark-mention-chips';
 import { remarkStripCitations } from './remark-strip-citations';
+import { SuggestionsDisplay } from './suggestions-display';
+import { SystemEventMessage } from './system-event-message';
 import { ThinkingDisplay } from './thinking-display';
 import { TicketEscalatedMessage } from './ticket-escalated-message';
 import { TicketEventMessage } from './ticket-event-message';
 import { ToolExecutionDisplay } from './tool-execution-display';
 import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedProps } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 
 /** Inline `@marker:id` mention token in the message body (sibling of the
  *  `[card://]` grammar) — used to filter out items rendered inline from the
@@ -36,13 +53,10 @@ import type { AskSegment, MessageSegment, MessageContent, ChatMessageEnhancedPro
  *  `scheduledScript`); id is the mention-token charset. */
 const MENTION_MARKER_REGEX = /(^|[^\w@])@[a-zA-Z]+:([A-Za-z0-9_.+/=-]*[A-Za-z0-9_+/=])/g;
 
-/**
- * Same regex shape as `remarkCardLinks` — kept in lockstep so the
- * pre-scan and the remark plugin see the SAME set of markers. If the
- * grammar widens (today: snake_case OR kebab-case; closer `]` OR `)`),
- * both files must update.
- */
-const CARD_MARKER_REGEX = /\[card:\/\/([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+)[\])]/g;
+/** Scanner for `[card://type:id]` in answer text. Built from the shared
+ *  grammar so the body renderer and the metadata decoder cannot disagree on
+ *  what a marker is — see `chat-protocol/card-marker.ts`. */
+const CARD_MARKER_REGEX = createCardMarkerScanner();
 
 /** Timestamp label: today's messages show time only ("2:47 PM"),
  *  older messages prepend a locale-formatted date ("05/05/2026 2:47 PM"
@@ -96,22 +110,36 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       showAvatar = true,
       assistantType,
       approvalVariant,
+      appearance: appearanceProp,
       authorType: authorTypeProp,
+      selfAuthorType,
+      nameEveryTurn = false,
       assistantIcon,
       contextItems,
       resolveContextIcon,
       renderContextItem,
       renderMention,
       renderEntityCard,
+      refs,
       onAskSelect,
       NavLinkAnchor,
       ...props
     },
     ref,
   ) => {
-    const isUser = role === 'user';
+    // A `user` row is a PERSON (the end user, a technician, a system line); the
+    // agent's turns are `assistant`. Which person is the viewer is the thread's
+    // call (`selfAuthorType`): the viewer's own turns draw as the bubble on the
+    // right, another person's as an incoming reply.
+    const isHuman = role === 'user';
     const isError = role === 'error';
-    const authorType = authorTypeProp ?? (isUser ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
+    const inheritedAppearance = useChatAppearance();
+    const appearance = appearanceProp ?? inheritedAppearance;
+    const isV2 = appearance === CHAT_APPEARANCE.V2;
+    const authorType = authorTypeProp ?? (isHuman ? 'user' : assistantType === 'mingo' ? 'mingo' : 'fae');
+    const isOtherPerson =
+      isHuman && selfAuthorType !== undefined && authorType !== 'system' && authorType !== selfAuthorType;
+    const isUser = isHuman && !isOtherPerson;
 
     // Inline-card rendering uses a HOST-PROVIDED `renderEntityCard` function
     // (v6.1 §B.2.7 — DRY duplications #2). The OSS-lib stays data-agnostic:
@@ -180,8 +208,28 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // (and its open menu) survives across chunks. Invalidated per key when the
     // render fn identity changes.
     const renderedCardNodeCache = useRef(
-      new Map<string, { render: ((ref: ChatRef) => React.ReactNode) | undefined; node: React.ReactNode }>(),
+      new Map<
+        string,
+        {
+          render: ((ref: ChatRef) => React.ReactNode) | undefined;
+          /** The descriptor the node was built from. Part of the cache identity
+           *  because metadata can arrive AFTER the marker was first rendered —
+           *  a card mounted from the bare `{type, id}` descriptor has to be
+           *  rebuilt once its real title and URL land. */
+          ref: ChatRef | undefined;
+          node: React.ReactNode;
+        }
+      >(),
     );
+
+    /** The answer's own references, by `type:id`. What turns a bare marker into
+     *  a card with a title and a link, without a per-entity lookup the host may
+     *  not even have an API for. */
+    const refByKey = useMemo(() => {
+      const byKey = new Map<string, ChatRef>();
+      for (const described of refs ?? []) byKey.set(`${described.type}:${described.id}`, described);
+      return byKey;
+    }, [refs]);
 
     /**
      * Per-message rendering plan for `[card://type:id]` markers.
@@ -241,8 +289,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           // stops React from re-mounting the card (and closing its open
           // menu / re-fetching) on every stream chunk. Also dedups the same
           // key emitted twice within one message.
+          // The answer's metadata wins when it described this reference: it
+          // carries the title, URL and source the wire marker cannot.
+          const describedRef = refByKey.get(key);
           let entry = cache.get(key);
-          if (!entry || entry.render !== render) {
+          if (!entry || entry.render !== render || entry.ref !== describedRef) {
             // The marker is the ONLY data on the wire: cards hydrate by id
             // from the host's per-object APIs, so a minimal {type, id}
             // descriptor is all the renderer needs to mount the loader.
@@ -257,13 +308,13 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             // the id rather than `undefined`) and `url` to null (matches
             // the no-link semantics fetch-mode cards rely on — they
             // resolve their own URL after fetch).
-            const refForRender: ChatRef = {
+            const refForRender: ChatRef = describedRef ?? {
               type: cardType,
               id: cardId,
               title: cardId,
               url: null,
             };
-            entry = { render, node: render(refForRender) };
+            entry = { render, ref: describedRef, node: render(refForRender) };
             cache.set(key, entry);
           }
           const rendered = entry.node;
@@ -326,7 +377,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
         }
       });
       return { inlineByKey, partsBySegment, usedKeys };
-    }, [hasMarkerSupport, renderEntityCard, segments]);
+    }, [hasMarkerSupport, renderEntityCard, refByKey, segments]);
 
     // Drop cached nodes for markers no longer present so the cache can't grow
     // unbounded as a long message's markers change. Deliberately an EFFECT,
@@ -420,9 +471,9 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             );
           }
           return (
-            <a href={href} className={linkClassName} {...rest}>
+            <Link href={href} className={linkClassName} {...rest}>
               {children}
-            </a>
+            </Link>
           );
         },
       };
@@ -485,208 +536,232 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       });
     };
 
-    const getAvatarProps = () => {
-      const displayName = name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
-      const isMingo = assistantType === 'mingo';
-
-      return {
-        src: avatar || undefined,
-        alt: `${displayName} avatar`,
-        // Pass the FULL name — SquareAvatar derives first+last initials itself
-        // (passing pre-joined initials like "PS" would collapse to one letter,
-        // since getFirstLastInitials treats it as a single word).
-        fallback: displayName,
-        size: 'sm' as const,
-        variant: 'round' as const,
-        // User avatar: compact 20×20 with 2px padding and a subtle gray fill
-        // (`bg-ods-card`) so the `border-ods-border` ring stays visible — the
-        // brand fill reads poorly for a user. Assistant/Fae keep their brand
-        // fill. Initials are smaller + muted gray for the user placeholder.
-        ...(isUser ? { initialsClassName: 'text-[9px] text-ods-text-secondary' } : {}),
-        className: cn(
-          'flex-shrink-0',
-          isUser ? 'h-5 w-5 bg-ods-card p-0.5' : isMingo ? 'bg-ods-flamingo-cyan' : 'bg-ods-flamingo-pink',
-        ),
-      };
-    };
-
-    const avatarProps = getAvatarProps();
-
     const isSystem = authorType === 'system';
 
+    // A thread can hold several people (a user, a colleague, a technician, two
+    // agents), so every turn says who is speaking with a FACE. The face sits on
+    // its own short line above the message (on the right for the user), never
+    // beside it: a face in the row indents every line of the message by its
+    // width. The NAME is written only where it is the information itself: a
+    // system line and another person answering (a technician in the end
+    // user's thread). Mingo sends the admin's own turns as `admin` too; those
+    // are the user's words and draw as such. Every face carries its name for
+    // assistive tech and on hover. A thread of several parties names every
+    // turn (`nameEveryTurn`: a ticket, where an end user, the agent and any
+    // number of technicians write): the agent's turn as an incoming one, the
+    // viewer's own bubble with the name beside the face, on the bubble's side.
+    const showName =
+      isSystem || isOtherPerson || (authorType === 'admin' && !isUser) || (nameEveryTurn && role === 'assistant');
+    const showSelfName = nameEveryTurn && isUser && !isSystem;
+    const displayName = name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    const nameLabel = <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>;
+    const faceBox = 'h-5 w-5 flex-shrink-0';
+    const face: ReactNode =
+      !showAvatar || isSystem ? null : !isHuman && !avatar && assistantIcon ? (
+        <span title={displayName} className={cn('flex items-center justify-center', faceBox)}>
+          {assistantIcon}
+        </span>
+      ) : !isHuman && !avatar && assistantType ? (
+        // An agent with no picture shows its packaged mark, never initials.
+        <span role="img" aria-label={displayName} title={displayName} className={cn('inline-flex', faceBox)}>
+          <AgentMark agent={assistantType} className="h-full w-full rounded-full" />
+        </span>
+      ) : (
+        <span title={displayName} className="inline-flex flex-shrink-0">
+          <SquareAvatar
+            src={avatar || undefined}
+            alt={displayName}
+            fallback={displayName}
+            variant="round"
+            size="xs"
+            sizePx={CHAT_MESSAGE_FACE_PX}
+            initialsClassName="text-[9px] text-ods-text-secondary"
+          />
+        </span>
+      );
+
+    // v2 draws a system line (e.g. a technician joining) as an in-thread
+    // receipt card rather than as an author row with no body.
+    if (isV2 && isSystem && name) {
+      return (
+        <div
+          ref={ref}
+          className={cn('relative', CHAT_MESSAGE_ROW_PADDING_CLASS[CHAT_APPEARANCE.V2], className)}
+          {...props}
+        >
+          <ChatAppearanceContext.Provider value={appearance}>
+            <SystemEventMessage text={name} timestamp={timestamp} />
+          </ChatAppearanceContext.Provider>
+        </div>
+      );
+    }
+
     return (
-      <div ref={ref} className={cn('relative py-[var(--spacing-system-s)]', className)} {...props}>
-        {/* Message Content — full panel width.
+      <ChatAppearanceContext.Provider value={appearance}>
+        <div
+          ref={ref}
+          className={cn(
+            'relative',
+            CHAT_MESSAGE_ROW_PADDING_CLASS[isV2 ? CHAT_APPEARANCE.V2 : CHAT_APPEARANCE.CLASSIC],
+            className,
+          )}
+          {...props}
+        >
+          {/* Message Content — full panel width.
             Avatar is INLINE in the name row below (2025-2026 chat
             pattern — Claude.ai, ChatGPT, Gemini, Perplexity).
             Legacy hanging-avatar layout (`absolute -left-16`) wasted
-            64px of gutter and clipped in narrow panels. */}
-        <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
-          {/* Avatar + Name + Timestamp Row.
-              Sizing rationale (per design-token measurements):
-                - Name uses `text-h3` = 14px mobile / 18px desktop.
-                - Avatar uses `SquareAvatar size="sm"` = 32px — the
-                  canonical primitive at the smallest preset, giving a
-                  ~1.78x ratio against the 18px name text (Material
-                  Design 3 + Apple HIG inline-avatar standard).
-                - Gap is `var(--spacing-system-xs)` = 8px, the standard
-                  inline-component separator across this design system.
-              For the `assistantIcon` branch (host supplies a JSX icon
-              like the Mingo logo), the wrapper matches `SquareAvatar
-              size="sm"` (h-8 w-8 = 32px) so BOTH branches present at
-              the same visual weight. Host-supplied icons render
-              inside via `flex items-center justify-center` — they
-              should be sized at ~50-60% of the wrapper (h-4 w-4 =
-              16px works well for a 32px circle). */}
-          <div className="flex items-center gap-[var(--spacing-system-xs)]">
-            {/* Avatar rules:
-                - Assistant/Fae always show an avatar — host brand icon when no
-                  image is supplied, else the filled SquareAvatar.
-                - User shows the SquareAvatar ONLY when an avatar image actually
-                  arrived. With no user avatar we hide the block entirely (just
-                  the name), instead of an initials placeholder. TEMPORARY —
-                  restore the user placeholder when user avatars ship. */}
-            {showAvatar &&
-              !isSystem &&
-              !(isUser && !avatar) &&
-              (!isUser && assistantIcon && !avatar ? (
-                // Host-supplied brand icon (e.g. Mingo): render it directly,
-                // no filled pill — the icon carries its own brand accent.
-                <div className="flex flex-shrink-0 items-center justify-center">{assistantIcon}</div>
-              ) : (
-                <SquareAvatar {...avatarProps} />
-              ))}
-            <span
-              className={cn(
-                'flex-1 !font-mono !font-medium text-h3',
-                authorType === 'system'
-                  ? 'text-ods-open-yellow'
-                  : authorType === 'admin'
-                    ? 'text-ods-open-yellow'
-                    : authorType === 'mingo'
-                      ? 'text-ods-flamingo-cyan'
-                      : authorType === 'fae'
-                        ? 'text-ods-flamingo-pink'
-                        : 'text-ods-text-secondary',
-              )}
-            >
-              {name || (isUser ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae')}
-              {!isSystem && ':'}
-            </span>
-            {timestamp && (
-              <span className="shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
+            64px of gutter and clipped in narrow panels.
+
+            Single-column GRID, not `flex flex-col` — here, in the segment
+            stack below, in the thread's per-message wrapper and in the
+            card/video pair (entity-cards/dispatch): WebKit re-lays-out the
+            children of every nested column flexbox to measure them, so the
+            cost compounds per level. One 9-level Mingo reply took ~155ms of
+            layout per drawer-resize frame in Safari / the desktop WKWebView
+            vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
+            no margin collapsing — visually identical. */}
+          <div className={CHAT_MESSAGE_STACK_CLASS}>
+            {(face || showName || showSelfName) && (
+              <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>
+                {showSelfName && nameLabel}
+                {face}
+                {showName && nameLabel}
+                {showName && timestamp && (
+                  <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
+                    {formatMessageTimestamp(timestamp)}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Message segments — hidden for system messages without content */}
+            {(!isSystem || segments.length > 0) && (
+              <div className={CHAT_MESSAGE_SEGMENTS_CLASS}>
+                {segments.map((segment, index) => {
+                  // The engine's streaming path (atomic-block memoization +
+                  // fence tail-completion + aria-live) applies ONLY to the
+                  // actively streaming segment: last segment of a message that
+                  // is still typing. On completion `isTyping` flips false and
+                  // the engine does one authoritative whole-document parse.
+                  const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
+                  if (segment.type === 'text') {
+                    // The layout of Claude and ChatGPT: what the USER said is a
+                    // bubble on the right; what anyone else says is plain text
+                    // across the thread's full width, with no bubble. Nothing
+                    // takes a column, so every line gets the whole width (the
+                    // speaker's face is the short line above).
+                    if (isUser) {
+                      return (
+                        <div key={index} className={CHAT_MESSAGE_USER_ROW_CLASS}>
+                          <div className={CHAT_MESSAGE_USER_BUBBLE_CLASS}>
+                            {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div
+                        key={index}
+                        className={cn(CHAT_MESSAGE_TEXT_CLASS, isError ? 'text-ods-error' : 'text-ods-text-primary')}
+                      >
+                        {renderSegmentBody(index, segment.text, segmentIsStreaming)}
+                      </div>
+                    );
+                  } else if (segment.type === 'ask') {
+                    // Only the run's head draws — the tail segments are pages of
+                    // the card already rendered above them.
+                    const run = askRuns.get(index);
+                    if (!run) return null;
+                    return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />;
+                  } else if (segment.type === 'suggestions') {
+                    return <SuggestionsDisplay key={index} segment={segment} />;
+                  } else if (segment.type === 'tool_execution') {
+                    return (
+                      <ToolExecutionDisplay
+                        key={index}
+                        message={segment.data}
+                        assistantType={assistantType}
+                        variant={approvalVariant}
+                      />
+                    );
+                  } else if (segment.type === 'approval_request') {
+                    return (
+                      <ApprovalRequestMessage
+                        key={index}
+                        data={segment.data}
+                        status={segment.status}
+                        resolvedByName={segment.resolvedByName}
+                        onApprove={segment.onApprove}
+                        onReject={segment.onReject}
+                        assistantType={assistantType}
+                        variant={approvalVariant}
+                      />
+                    );
+                  } else if (segment.type === 'approval_batch') {
+                    return (
+                      <ApprovalBatchMessage
+                        key={index}
+                        data={segment.data}
+                        status={segment.status}
+                        resolvedByName={segment.resolvedByName}
+                        onApprove={segment.onApprove}
+                        onReject={segment.onReject}
+                        assistantType={assistantType}
+                        variant={approvalVariant}
+                      />
+                    );
+                  } else if (segment.type === 'escalation_offer') {
+                    return (
+                      <EscalationOfferMessage
+                        key={index}
+                        data={segment.data}
+                        status={segment.status}
+                        resolvedByName={segment.resolvedByName}
+                        onApprove={segment.onApprove}
+                        onReject={segment.onReject}
+                      />
+                    );
+                  } else if (segment.type === 'ticket_escalated') {
+                    return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />;
+                  } else if (segment.type === 'ticket_event') {
+                    // The card's own event time; the bubble timestamp is the
+                    // turn's FIRST row and lags every later lifecycle event.
+                    return (
+                      <TicketEventMessage key={index} data={segment.data} timestamp={segment.occurredAt ?? timestamp} />
+                    );
+                  } else if (segment.type === 'error') {
+                    return <ErrorMessageDisplay key={index} title={segment.title} details={segment.details} />;
+                  } else if (segment.type === 'context_compaction') {
+                    return <ContextCompactionDisplay key={index} status={segment.status} />;
+                  } else if (segment.type === 'thinking') {
+                    const isStreaming = index === segments.length - 1 && isTyping;
+                    return <ThinkingDisplay key={index} text={segment.text} isStreaming={isStreaming} />;
+                  }
+                  return null;
+                })}
+              </div>
+            )}
+
+            {timestamp && !showName && (
+              <span className={cn('text-ods-text-secondary text-h6', isUser && 'justify-self-end')}>
                 {formatMessageTimestamp(timestamp)}
               </span>
             )}
-          </div>
 
-          {/* Message segments — hidden for system messages without content */}
-          {(!isSystem || segments.length > 0) && (
-            <div className="flex flex-col gap-2">
-              {segments.map((segment, index) => {
-                // The engine's streaming path (atomic-block memoization +
-                // fence tail-completion + aria-live) applies ONLY to the
-                // actively streaming segment: last segment of a message that
-                // is still typing. On completion `isTyping` flips false and
-                // the engine does one authoritative whole-document parse.
-                const segmentIsStreaming = index === segments.length - 1 && !!isTyping;
-                if (segment.type === 'text') {
-                  return (
-                    <div
-                      key={index}
-                      className={cn(
-                        'w-full min-w-0 break-words text-h4',
-                        isError ? 'text-ods-error' : 'text-ods-text-primary',
-                      )}
-                    >
-                      {renderSegmentBody(index, segment.text, segmentIsStreaming)}
-                    </div>
-                  );
-                } else if (segment.type === 'ask') {
-                  // Only the run's head draws — the tail segments are pages of
-                  // the card already rendered above them.
-                  const run = askRuns.get(index);
-                  if (!run) return null;
-                  return <AskDisplay key={index} cards={run} onSelect={onAskSelect} />;
-                } else if (segment.type === 'tool_execution') {
-                  return (
-                    <ToolExecutionDisplay
-                      key={index}
-                      message={segment.data}
-                      assistantType={assistantType}
-                      variant={approvalVariant}
-                    />
-                  );
-                } else if (segment.type === 'approval_request') {
-                  return (
-                    <ApprovalRequestMessage
-                      key={index}
-                      data={segment.data}
-                      status={segment.status}
-                      resolvedByName={segment.resolvedByName}
-                      onApprove={segment.onApprove}
-                      onReject={segment.onReject}
-                      assistantType={assistantType}
-                      variant={approvalVariant}
-                    />
-                  );
-                } else if (segment.type === 'approval_batch') {
-                  return (
-                    <ApprovalBatchMessage
-                      key={index}
-                      data={segment.data}
-                      status={segment.status}
-                      resolvedByName={segment.resolvedByName}
-                      onApprove={segment.onApprove}
-                      onReject={segment.onReject}
-                      assistantType={assistantType}
-                      variant={approvalVariant}
-                    />
-                  );
-                } else if (segment.type === 'escalation_offer') {
-                  return (
-                    <EscalationOfferMessage
-                      key={index}
-                      data={segment.data}
-                      status={segment.status}
-                      resolvedByName={segment.resolvedByName}
-                      onApprove={segment.onApprove}
-                      onReject={segment.onReject}
-                    />
-                  );
-                } else if (segment.type === 'ticket_escalated') {
-                  return <TicketEscalatedMessage key={index} data={segment.data} timestamp={timestamp} />;
-                } else if (segment.type === 'ticket_event') {
-                  // The card's own event time; the bubble timestamp is the
-                  // turn's FIRST row and lags every later lifecycle event.
-                  return (
-                    <TicketEventMessage key={index} data={segment.data} timestamp={segment.occurredAt ?? timestamp} />
-                  );
-                } else if (segment.type === 'error') {
-                  return <ErrorMessageDisplay key={index} title={segment.title} details={segment.details} />;
-                } else if (segment.type === 'context_compaction') {
-                  return <ContextCompactionDisplay key={index} status={segment.status} />;
-                } else if (segment.type === 'thinking') {
-                  const isStreaming = index === segments.length - 1 && isTyping;
-                  return <ThinkingDisplay key={index} text={segment.text} isStreaming={isStreaming} />;
-                }
-                return null;
-              })}
-            </div>
-          )}
-
-          {/* Attached entity-context chips (user bubbles). Read-only — no
+            {/* Attached entity-context chips (user bubbles). Read-only — no
               remove affordance once the message is sent (Figma 31:28709). */}
-          {stripContextItems && stripContextItems.length > 0 && (
-            <ChatContextChipStrip
-              items={stripContextItems}
-              resolveIcon={resolveContextIcon}
-              renderItem={renderContextItem}
-              className="mt-2"
-            />
-          )}
+            {stripContextItems && stripContextItems.length > 0 && (
+              <ChatContextChipStrip
+                items={stripContextItems}
+                resolveIcon={resolveContextIcon}
+                renderItem={renderContextItem}
+                className="mt-2"
+              />
+            )}
+          </div>
         </div>
-      </div>
+      </ChatAppearanceContext.Provider>
     );
   },
 );
@@ -704,7 +779,10 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.showAvatar === nextProps.showAvatar &&
     prevProps.assistantType === nextProps.assistantType &&
     prevProps.approvalVariant === nextProps.approvalVariant &&
+    prevProps.appearance === nextProps.appearance &&
     prevProps.authorType === nextProps.authorType &&
+    prevProps.selfAuthorType === nextProps.selfAuthorType &&
+    prevProps.nameEveryTurn === nextProps.nameEveryTurn &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&
     // Reference equality — the host re-uses the same array instance per
@@ -716,6 +794,9 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     // equality holds across streaming chunks.
     prevProps.renderMention === nextProps.renderMention &&
     prevProps.renderEntityCard === nextProps.renderEntityCard &&
+    // Reference equality: the reducer sets this once per answer and the host
+    // forwards the same array instance, so it holds across streaming chunks.
+    prevProps.refs === nextProps.refs &&
     // Same stability contract as the renderers above: hosts pass a `useCallback`
     // (EmbeddableChat passes its memoized `handleSend`), so this holds across
     // streaming chunks instead of re-rendering every ask card per chunk.

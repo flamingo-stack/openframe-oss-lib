@@ -1,6 +1,6 @@
 package com.openframe.client.listener;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.MachineStatusService;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import io.nats.client.Connection;
@@ -51,8 +51,10 @@ public class MachineHeartbeatListener {
     private void handleMessage(Message message) {
         String subject = message.getSubject();
 
-        String machineId = machineIdExtractor.extract(subject);;
+        String machineId = null;
         try {
+            machineId = machineIdExtractor.extract(subject);
+
             // Generate timestamp at service side
             Instant eventTimestamp = Instant.now();
 

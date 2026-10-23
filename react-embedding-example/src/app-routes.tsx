@@ -16,6 +16,8 @@ import { ScheduleACallPage } from './pages/schedule-a-call'
 import { SingleLinkEmbedPage } from './pages/single-link-embed'
 import { AuthorsPage } from './pages/authors'
 import { FaqsPage } from './pages/faqs'
+import { TrustCenterPage } from './pages/trust-center'
+import { DownloadPage } from './pages/download'
 import { KnowledgeBasePage } from './pages/knowledge-base'
 import { McpPlaygroundPage } from './pages/mcp-playground'
 import { DebugPage } from './pages/debug'
@@ -39,6 +41,8 @@ export function AppRoutes() {
         <Route path="releases/:slug" element={<ReleaseDetailRoute />} />
         <Route path="authors" element={<AuthorsPage />} />
         <Route path="faqs" element={<FaqsPage />} />
+        <Route path="trust-center" element={<TrustCenterPage />} />
+        <Route path="download" element={<DownloadPage />} />
         <Route path="legal/:docType" element={<LegalPage />} />
         <Route path="contact" element={<ContactPage />} />
         <Route path="case-studies" element={<CaseStudiesPage />} />

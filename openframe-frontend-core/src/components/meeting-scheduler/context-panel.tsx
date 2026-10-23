@@ -1,11 +1,16 @@
 'use client';
 
-import { useMemo } from 'react';
 import type { MeetingHost } from '../../schemas/meeting-booking-schema';
 import { cn } from '../../utils/cn';
 import { formatDurationCompact } from '../../utils/format';
 import { BackButton } from '../layout/back-button';
-import { SquareAvatar, AvatarStack, Button, Skeleton, Autocomplete } from '../ui';
+import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui';
+import { LOADING_NOOP, LoadingItems, useLoadingScope } from '../ui/loading-scope';
+import { TimezoneSelect } from '../ui/timezone-select';
+import { HostIdentity } from './host-identity';
+
+/** The skeleton's timezone picker is drawn in its loading form, where nothing can be picked. */
 
 /**
  * ContextPanel — the "who / what / how long" side of the scheduler card
@@ -55,6 +60,8 @@ export interface SchedulerContextPanelProps {
    *  right up to the confirmation — where there is nothing left to re-read. */
   showTimezone?: boolean;
   className?: string;
+  /** The meeting is still being read: the panel draws its own skeleton, as in a loading scope. */
+  loading?: boolean;
 }
 
 /** Panel stack — one rhythm shared by the loaded panel and its skeleton
@@ -70,7 +77,7 @@ const PANEL_STACK = 'flex flex-col gap-[var(--spacing-system-l)]';
  * two children, different axis; nothing is hidden at any width.
  */
 const IDENTITY_ROW =
-  'flex items-center justify-between gap-[var(--spacing-system-m)] lg:flex-col lg:items-stretch lg:gap-[var(--spacing-system-l)]';
+  'flex items-center justify-between gap-[var(--spacing-system-m)] content-lg:flex-col content-lg:items-stretch content-lg:gap-[var(--spacing-system-l)]';
 
 /**
  * Everything under the back edge, in TWO groups: identity/title/duration, and
@@ -85,11 +92,13 @@ const IDENTITY_ROW =
  * Below `md` (phone) and from `lg` up (280px sidebar) there is no horizontal
  * room to spend, so both fall back to the plain stack.
  */
-const STRIP_BODY = 'flex flex-col gap-[var(--spacing-system-l)] md:flex-row md:items-start lg:flex-col';
-const STRIP_MAIN = 'flex min-w-0 flex-col gap-[var(--spacing-system-l)] md:flex-1';
+const STRIP_BODY =
+  'flex flex-col gap-[var(--spacing-system-l)] content-md:flex-row content-md:items-start content-lg:flex-col';
+const STRIP_MAIN = 'flex min-w-0 flex-col gap-[var(--spacing-system-l)] content-md:flex-1';
 /** 280px — the same width this panel has as a sidebar, so the field is the
  *  size the visitor meets at every other breakpoint. */
-const STRIP_ASIDE = 'flex flex-col gap-[var(--spacing-system-xxs)] md:w-[280px] md:shrink-0 lg:w-full';
+const STRIP_ASIDE =
+  'flex flex-col gap-[var(--spacing-system-xxs)] content-md:w-[280px] content-md:shrink-0 content-lg:w-full';
 
 /** The back affordance sits flush with the panel's top padding: `BackButton`'s
  *  own 12px block padding would otherwise double the 24px stack gap under it. */
@@ -100,32 +109,45 @@ const BACK_BUTTON_CLASS = 'py-0';
  *  section headers. */
 const FIELD_LABEL_CLASS = 'text-h4 text-ods-text-primary';
 
-function zoneLabel(tz: string): string {
-  try {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      timeZoneName: 'shortOffset',
-    }).formatToParts(new Date());
-    const offset = parts.find(p => p.type === 'timeZoneName')?.value ?? '';
-    return offset ? `${tz.replace(/_/g, ' ')} (${offset})` : tz.replace(/_/g, ' ');
-  } catch {
-    return tz.replace(/_/g, ' ');
-  }
-}
+/** The static duration line beside the host. */
+const DURATION_LINE_CLASS = 'shrink-0 text-ods-text-secondary text-h6';
+/** The "Duration" field and its chips row. */
+const DURATION_FIELD_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
+const DURATION_CHIPS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-xs)]';
+/** After a slot is chosen the timezone field is drawn only on the 280px sidebar (from `lg`). */
+const TIMEZONE_WIDE_ONLY_CLASS = 'content-max-lg:hidden';
 
 /**
  * Same-footprint skeleton — swaps with the loaded panel with zero shift.
  * STATIC labels ("Duration", "Timezone") render REAL; only data-driven
  * content (host identity, duration chips, the zone value) is skeleton.
  */
-export function ContextPanelSkeleton({
+function ContextPanelSkeleton({
   className,
   onBack,
   backLabel = 'Back',
+  title = true,
+  description = true,
+  durations = 0,
+  timezone = 'shown',
 }: {
   className?: string;
   onBack?: () => void;
   backLabel?: string;
+  /** The loaded panel has the meeting's title line (a bar of it). Default true: a scheduling link has a title. */
+  title?: boolean;
+  /** The loaded panel has the meeting's description line (a bar of it). Default true. */
+  description?: boolean;
+  /**
+   * How many duration chips the loaded panel offers: more than 1 draws the "Duration" row, otherwise the static
+   * duration line beside the host (every link states its length, as chips or as that line). Default 0.
+   */
+  durations?: number;
+  /**
+   * The timezone field, as the loaded panel draws it: `shown`, `wide` (only from `lg`, after a slot is chosen) or
+   * `hidden` (the confirmation). Default `shown`.
+   */
+  timezone?: 'shown' | 'wide' | 'hidden';
 }) {
   return (
     <div className={cn(PANEL_STACK, className)}>
@@ -137,24 +159,38 @@ export function ContextPanelSkeleton({
       <div className={STRIP_BODY}>
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
-            <div className="flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xs)] lg:flex-none">
-              <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
-              <div className="flex flex-1 flex-col gap-[var(--spacing-system-xxs)]">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-4 w-24" />
+            <HostIdentity hosts={[]} loading />
+            {durations <= 1 && <TextLineSkeleton type="h6" className="w-20 shrink-0" />}
+          </div>
+          {title && <TextLineSkeleton type="h3" className="w-3/5" />}
+          {description && <TextLineSkeleton type="h6" className="w-4/5" />}
+          {durations > 1 && (
+            <div className={DURATION_FIELD_CLASS}>
+              <p className={FIELD_LABEL_CLASS}>Duration</p>
+              <div className={DURATION_CHIPS_CLASS}>
+                <LoadingItems count={durations}>
+                  {() => <InteractiveSkeleton.Button data-loading-item size="small-legacy" className="w-16" />}
+                </LoadingItems>
               </div>
             </div>
-            <Skeleton className="h-4 w-20 shrink-0" />
+          )}
+        </div>
+        {timezone !== 'hidden' && (
+          <div className={cn(STRIP_ASIDE, timezone === 'wide' && TIMEZONE_WIDE_ONLY_CLASS)}>
+            <p className={FIELD_LABEL_CLASS}>Timezone</p>
+            <TimezoneSelect value={null} loading onChange={LOADING_NOOP} />
           </div>
-        </div>
-        <div className={STRIP_ASIDE}>
-          <p className={FIELD_LABEL_CLASS}>Timezone</p>
-          <Skeleton className="h-12 w-full" />
-        </div>
+        )}
       </div>
     </div>
   );
 }
+
+/**
+ * How many lengths the panel's skeleton offers while the link is read and its lengths are not known yet: a scheduling
+ * link typically offers more than one (a short and a long call), so the skeleton draws the "Duration" row of chips.
+ */
+const CONTEXT_PANEL_TYPICAL_DURATIONS = 2;
 
 export function SchedulerContextPanel({
   hosts,
@@ -171,22 +207,22 @@ export function SchedulerContextPanel({
   disabled = false,
   showTimezone = true,
   className,
+  loading = false,
 }: SchedulerContextPanelProps) {
-  // All IANA zones with live GMT offsets — computed once, client-only (the
-  // panel renders the picker only after the parent resolves a zone).
-  const zoneOptions = useMemo(() => {
-    if (!timezone) return [];
-    let zones: string[];
-    try {
-      // Older lib targets don't type supportedValuesOf (ES2022) — runtime-guarded.
-      const intl = Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] };
-      zones = intl.supportedValuesOf ? intl.supportedValuesOf('timeZone') : [timezone];
-    } catch {
-      zones = [timezone];
-    }
-    if (!zones.includes(timezone)) zones = [timezone, ...zones];
-    return zones.map(tz => ({ value: tz, label: zoneLabel(tz) }));
-  }, [timezone]);
+  // While the meeting is read the panel is its skeleton (the hosts, title and durations are read data).
+  if (useLoadingScope() || loading) {
+    return (
+      <ContextPanelSkeleton
+        onBack={onBack}
+        backLabel={backLabel}
+        title={title !== undefined}
+        description={description !== undefined && description !== null}
+        durations={locked ? 0 : durationsMs.length || CONTEXT_PANEL_TYPICAL_DURATIONS}
+        timezone={showTimezone ? (locked ? 'wide' : 'shown') : 'hidden'}
+        className={className}
+      />
+    );
+  }
 
   return (
     <div className={cn(PANEL_STACK, className)}>
@@ -198,42 +234,13 @@ export function SchedulerContextPanel({
       <div className={STRIP_BODY}>
         <div className={STRIP_MAIN}>
           <div className={IDENTITY_ROW}>
-            {/* Host identity: full rows up to 3 hosts; larger teams (round-robin
-                links can carry many members) collapse to a stacked-avatar cluster
-                + count so the panel can never overflow. */}
-            {hosts.length > 0 && hosts.length <= 3 && (
-              <div className="flex flex-col gap-[var(--spacing-system-s)]">
-                {hosts.map(host => (
-                  <div key={host.name} className="flex items-center gap-[var(--spacing-system-xs)]">
-                    <SquareAvatar
-                      variant="round"
-                      size="sm"
-                      src={host.avatarUrl ?? undefined}
-                      alt={host.name}
-                      fallback={host.name}
-                    />
-                    <div className="flex min-w-0 flex-col">
-                      <p className="truncate text-ods-text-primary text-h4">{host.name}</p>
-                      {host.title && <p className="truncate text-ods-text-secondary text-h6">{host.title}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {hosts.length > 3 && (
-              <div className="flex flex-col gap-[var(--spacing-system-xs)]">
-                <AvatarStack people={hosts} max={4} size="lg" />
-                <p className="text-ods-text-secondary text-h6">{hosts.length} hosts on this calendar</p>
-              </div>
-            )}
+            <HostIdentity hosts={hosts} />
 
             {locked || durationsMs.length <= 1
               ? // Post-selection, or a link that offers one length: a static line,
                 // which is what sits beside the host on the header-strip layouts.
                 selectedDurationMs != null && (
-                  <p className="shrink-0 text-ods-text-secondary text-h6">
-                    {formatDurationCompact(selectedDurationMs / 1000)} call
-                  </p>
+                  <p className={DURATION_LINE_CLASS}>{formatDurationCompact(selectedDurationMs / 1000)} call</p>
                 )
               : null}
           </div>
@@ -244,12 +251,13 @@ export function SchedulerContextPanel({
           {/* Several lengths on offer: chips, which need a full row of their
               own at every width — so they stay OUT of the identity row. */}
           {!locked && durationsMs.length > 1 && (
-            <div className="flex flex-col gap-[var(--spacing-system-xxs)]">
+            <div className={DURATION_FIELD_CLASS}>
               <p className={FIELD_LABEL_CLASS}>Duration</p>
-              <div className="flex flex-wrap gap-[var(--spacing-system-xs)]">
+              <div className={DURATION_CHIPS_CLASS}>
                 {durationsMs.map(ms => (
                   <Button
                     key={ms}
+                    data-loading-item
                     variant={selectedDurationMs === ms ? undefined : 'outline'}
                     size="small-legacy"
                     disabled={disabled}
@@ -270,23 +278,17 @@ export function SchedulerContextPanel({
           // summary line states the zone one row below — so the fact survives,
           // only the control steps aside. The 280px sidebar has the room, so
           // there it stays.
-          <div className={cn(STRIP_ASIDE, locked && 'max-lg:hidden')}>
+          <div className={cn(STRIP_ASIDE, locked && TIMEZONE_WIDE_ONLY_CLASS)}>
             <p className={FIELD_LABEL_CLASS}>Timezone</p>
-            {timezone ? (
-              <Autocomplete
-                value={timezone}
-                disabled={disabled}
-                onChange={tz => {
-                  if (tz) onTimezoneChange?.(tz);
-                }}
-                options={zoneOptions}
-                placeholder="Search timezone…"
-                noOptionsText="No matching timezone"
-                showClearAll={false}
-              />
-            ) : (
-              <Skeleton className="h-12 w-full" />
-            )}
+            {/* Until the visitor's zone is known the picker draws its own skeleton (`loading`). */}
+            <TimezoneSelect
+              value={timezone ?? null}
+              loading={!timezone}
+              disabled={disabled}
+              onChange={tz => {
+                if (tz) onTimezoneChange?.(tz);
+              }}
+            />
           </div>
         )}
       </div>

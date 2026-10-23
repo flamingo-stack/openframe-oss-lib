@@ -70,6 +70,23 @@ export function readFetchedCardTitle(item: unknown): string | null {
   return null;
 }
 
+/**
+ * Doc-tree path of a fetched row (`metadata.path`), or null.
+ *
+ * A doc card (`markdown`, `data_room_doc`) has no public url: its destination
+ * is its viewer plus this path, the route `resolveSourceRowCTA` composes for a
+ * source chip. A bare `[card://type:id]` marker carries no path, so the loader
+ * reads it from the row once it loads and resolves the card the way the chip
+ * was resolved.
+ */
+export function readFetchedCardPath(item: unknown): string | null {
+  if (!item || typeof item !== 'object') return null;
+  const metadata = (item as { metadata?: unknown }).metadata;
+  if (!metadata || typeof metadata !== 'object') return null;
+  const path = (metadata as { path?: unknown }).path;
+  return typeof path === 'string' && path.trim() ? path.trim() : null;
+}
+
 /** Read the row's platform-association array — the hub composer keys its
  *  cross-platform topology off it; the embedder default ignores it. Hub
  *  list-API rows carry the array under the registry arrayKey

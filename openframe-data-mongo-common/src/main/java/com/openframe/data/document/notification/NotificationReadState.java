@@ -29,7 +29,11 @@ import java.time.Instant;
         // Never edit a live index def in place — startup dies with IndexOptionsConflict.
         @CompoundIndex(
                 name = "tenant_recipient_entity_status",
-                def = "{'tenantId': 1, 'recipientId': 1, 'recipientType': 1, 'entityType': 1, 'status': 1, 'entityId': 1}")
+                def = "{'tenantId': 1, 'recipientId': 1, 'recipientType': 1, 'entityType': 1, 'status': 1, 'entityId': 1}"),
+        // Entity-wide reads (archive) carry no recipient, so the index above stops at tenantId for them.
+        @CompoundIndex(
+                name = "tenant_entity_status",
+                def = "{'tenantId': 1, 'entityType': 1, 'entityId': 1, 'status': 1}")
 })
 @Data
 @Builder

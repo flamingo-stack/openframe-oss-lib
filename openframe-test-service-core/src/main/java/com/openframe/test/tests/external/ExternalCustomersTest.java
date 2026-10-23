@@ -164,8 +164,9 @@ public class ExternalCustomersTest extends ExternalApiBaseTest {
                 .isTrue();
     }
 
+    // Not @Tag("archive"): that tag is the device/policy teardown phase, and a second run there reuses
+    // the static `created` the @AfterAll already archived, so the API rightly refuses it with a 400.
     @Tag("feature")
-    @Tag("archive")
     @Order(6)
     @Test
     @DisplayName("ExtApi: Archive customer")

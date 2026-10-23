@@ -3,10 +3,10 @@
 /**
  * TicketLiveProvider — the ONE client home for support-ticket realtime.
  *
- * DOMAIN logic only — connection lifecycle (subscribed-confirm, server
- * retry grace, failed-reconnect pacing, hidden-tab suspend/resume) is
- * owned entirely by the common SSE client (`createSseSubscription`);
- * this provider consumes its consolidated `onConnectedChange` signal.
+ * DOMAIN logic only — connection lifecycle is owned entirely by the
+ * common SSE client (`createSseSubscription`; its module header lists
+ * the policies); this provider consumes its consolidated
+ * `onConnectedChange` signal.
  *
  * Owns:
  *   - the unread summary — delivered EXCLUSIVELY by the stream
@@ -20,8 +20,9 @@
  *   - the ticket-contract `no-stream` (204) retry policy.
  *
  * There is NO polling anywhere and NO summary endpoint. Hosts whose
- * stream endpoint 404s (terminal) or is absent get no unread indication
- * — the indication IS a realtime feature.
+ * stream endpoint 404s or is absent get no unread indication — the
+ * indication IS a realtime feature (a 404ing endpoint is re-probed on
+ * presence, rate-limited by the client).
  *
  * Invalidation semantics on events — deliberately `invalidateQueries`,
  * NOT `setQueryData` patches: the ticket hooks run `gcTime: 0`, so
@@ -117,15 +118,40 @@ function isSummaryData(value: unknown): value is TicketUnreadSummary {
   );
 }
 
-export function TicketLiveProvider({ children }: { children: React.ReactNode }) {
+export interface TicketLiveProviderProps {
+  children: React.ReactNode;
+  /**
+   * Whether ticket realtime is available to this host at all (feature flag,
+   * session, entitlement). `false` provides NO context — `useOptionalTicketLive()`
+   * reads `null`, `useTicketLive()` throws, and no identity or stream request is
+   * made: byte-for-byte what a host got by not mounting this at all.
+   *
+   * It exists so a host never has to mount this CONDITIONALLY. A host that writes
+   * `enabled ? <TicketLiveProvider>{children}</TicketLiveProvider> : <>{children}</>`
+   * changes the element TYPE at that position the moment its flag answers, and React
+   * tears down and remounts everything below. In openframe-frontend that wrapper sat
+   * around the whole `AppLayout`, so every cold load remounted the app shell and the
+   * page under it — visibly, as a chat drawer opened by a deep link replaying its
+   * open animation. Mount it always and pass the answer here instead.
+   *
+   * One consequence of mounting it always: a `ChatRuntime` must be above it even
+   * while disabled. The identity resolver reads one unconditionally (Rules of
+   * Hooks) and throws without it; `enabled` gates the request, not the read.
+   */
+  enabled?: boolean;
+}
+
+export function TicketLiveProvider({ children, enabled = true }: TicketLiveProviderProps) {
   const runtime = useChatRuntime();
-  const identity = useChatIdentity();
+  const identity = useChatIdentity(enabled);
   const queryClient = useQueryClient();
 
   const streamUrl = runtime?.endpoints.ticketStreamUrl ?? TICKET_STREAM_ENDPOINT;
   const readUrl = runtime?.endpoints.ticketReadUrl ?? TICKET_READ_ENDPOINT;
 
-  const authed = identity.authTier !== 'anon' && !!identity.user?.email;
+  // Gates the stream below (via `streamEnabled`) as well as every surface that
+  // reads `authed` — one predicate, so a disabled provider is also a silent one.
+  const authed = enabled && identity.authTier !== 'anon' && !!identity.user?.email;
 
   const [connected, setConnected] = React.useState(false);
   // The SINGLE unread source — written ONLY from server-computed
@@ -261,11 +287,10 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
   };
 
   const handleStatus = (status: SseTransportStatus) => {
-    // The client owns connection lifecycle (confirm timeout, server
-    // retry grace, failed-reconnect pacing, hidden-suspend). The only
-    // transport status with DOMAIN meaning is the ticket contract's
-    // `no-stream` (204 = zero owned tickets): remember it so a domain
-    // signal (own create_ticket, window focus) can retry.
+    // The client owns connection lifecycle. The only transport status
+    // with DOMAIN meaning is the ticket contract's `no-stream` (204 =
+    // zero owned tickets): remember it so a domain signal (own
+    // create_ticket, window focus) can retry.
     if (status === 'open') noStreamRef.current = false;
     if (status === 'no-stream') noStreamRef.current = true;
   };
@@ -299,7 +324,9 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     });
 
     const retryIfIdle = () => {
-      // After a 204 (no-stream), a focus signal is the retry trigger.
+      // After a 204 (no-stream), a focus signal is the retry trigger. Only
+      // 204 — the client's contract leaves that retry to the caller; it
+      // retries terminal / 401 states on its own.
       if (noStreamRef.current) {
         noStreamRef.current = false;
         subscriptionRef.current?.reconnectNow();
@@ -400,5 +427,5 @@ export function TicketLiveProvider({ children }: { children: React.ReactNode }) 
     };
   }, [summary, authed, connected, openTicketIdState, markRead, setOpenTicketId, notifyTicketCreated]);
 
-  return <TicketLiveContext.Provider value={value}>{children}</TicketLiveContext.Provider>;
+  return <TicketLiveContext.Provider value={enabled ? value : null}>{children}</TicketLiveContext.Provider>;
 }

@@ -25,6 +25,9 @@ public class RedisConfig {
 
     private static volatile String nodes;
     private static volatile String tenant;
+    private static volatile String caCertificate;
+    private static volatile String password;
+    private static volatile Boolean cluster;
 
     public static void setNodes(String csvNodes) {
         nodes = csvNodes;
@@ -32,6 +35,62 @@ public class RedisConfig {
 
     public static void setTenant(String tenantNamespace) {
         tenant = tenantNamespace;
+    }
+
+    /**
+     * PEM of the CA that signed the server certificate. Present only where the cluster runs with
+     * in-transit encryption (Memorystore); a plain in-cluster Redis leaves it unset and the client
+     * connects without TLS.
+     */
+    public static void setCaCertificate(String pem) {
+        caCertificate = pem;
+    }
+
+    public static String getCaCertificate() {
+        String pem = (caCertificate != null && !caCertificate.trim().isEmpty())
+                ? caCertificate
+                : System.getenv("REDIS_SERVER_CA");
+        return (pem != null && !pem.trim().isEmpty()) ? pem : null;
+    }
+
+    /**
+     * AUTH string. Set where the server requires one (Memorystore creates every instance with auth
+     * enabled); a plain in-cluster Redis leaves it unset and the client connects unauthenticated.
+     */
+    public static void setPassword(String authString) {
+        password = authString;
+    }
+
+    public static String getPassword() {
+        String value = (password != null && !password.trim().isEmpty())
+                ? password
+                : System.getenv("REDIS_PASSWORD");
+        return (value != null && !value.trim().isEmpty()) ? value : null;
+    }
+
+    /**
+     * Pins cluster mode instead of letting {@link com.openframe.test.data.redis.Redis} ask the server.
+     * An override for the case where the probe cannot be trusted; leaving it unset is the normal path.
+     */
+    public static void setCluster(boolean enabled) {
+        cluster = enabled;
+    }
+
+    /**
+     * The pinned answer, or {@code null} when nobody pinned one and the server should be asked.
+     *
+     * <p>SaaS Redis is migrating to Memorystore for Valkey — a single node with cluster mode disabled —
+     * one environment at a time, so the answer differs per environment and changes under us as the
+     * migration proceeds. Detecting it costs one {@code CLUSTER INFO}, which both topologies answer, so
+     * an environment moves without anyone editing config, and this override exists only as an escape
+     * hatch.
+     */
+    public static Boolean getConfiguredCluster() {
+        if (cluster != null) {
+            return cluster;
+        }
+        String env = System.getenv("REDIS_CLUSTER");
+        return (env == null || env.trim().isEmpty()) ? null : Boolean.parseBoolean(env);
     }
 
     public static Set<HostAndPort> getClusterNodes() {
@@ -45,6 +104,11 @@ public class RedisConfig {
                 .filter(s -> !s.isEmpty())
                 .forEach(s -> hosts.add(HostAndPort.from(s)));
         return hosts;
+    }
+
+    /** The single address a non-cluster server is reached on; the first entry when several are listed. */
+    public static HostAndPort getNode() {
+        return getClusterNodes().iterator().next();
     }
 
     public static String getTenant() {

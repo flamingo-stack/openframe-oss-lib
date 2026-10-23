@@ -12,21 +12,30 @@ import type {
   Subscription,
 } from 'nats.ws';
 
-export type { JsMsg, Msg, Subscription } from 'nats.ws';
-
 export type JetStreamDeliverPolicy = 'new' | 'byStartSequence';
 
 export interface JetStreamOrderedSubscribeOptions {
   streamName: string;
   filterSubject: string;
+  /**
+   * `'byStartSequence'` delivers every retained message from `optStartSeq` on.
+   * `'new'` delivers only what is published after the server creates the
+   * consumer, which happens after the returned promise resolves: a caller that
+   * acts once subscribed and must see everything that follows uses a start
+   * sequence instead.
+   */
   deliverPolicy: JetStreamDeliverPolicy;
-  /** Required when deliverPolicy === 'byStartSequence'. */
+  /**
+   * First stream sequence to deliver, for `'byStartSequence'`; ignored for
+   * `'new'`. Missing or 0 starts at the first message the stream retains.
+   */
   optStartSeq?: number;
   /**
    * Auto-cleanup the ephemeral consumer after this idle time. Defaults to
-   * nats.ws's own. Applies to the consumer created first: nats.ws only reads it
-   * when the start sequence is the one it was built with, so every consumer it
-   * recreates afterwards reverts to the library default.
+   * nats.ws's own. nats.ws reads it only while it builds the consumer at the
+   * start it was asked for — `'new'`, or `optStartSeq` 0/unset — and has
+   * delivered nothing yet. A consumer created from `optStartSeq` ≥ 1, and any
+   * recreation after a delivery, gets the library default.
    */
   inactiveThresholdMs?: number;
   /** AbortSignal to tear down the consumer. */
@@ -39,10 +48,25 @@ export interface JetStreamOrderedSubscribeOptions {
    * but everything that aged out of the stream while it was gone is
    * unrecoverable from the tail, and no connection event announces it (the
    * WebSocket never dropped). Callers that keep persisted history alongside
-   * the live tail must refetch it here, or they keep showing a snapshot from
-   * before the gap.
+   * the live tail must refetch it, or they keep showing a snapshot from before
+   * the gap — once the recreated consumer has caught up (`onCaughtUp`), not
+   * here.
    */
   onRecovered?: () => void;
+  /**
+   * The consumer has delivered everything the stream held for the subject when
+   * it was created. Fires once for the first consumer and once more for each
+   * one nats.ws recreates (`onRecovered`): after `onMessage` has handled the
+   * last message of that backlog, straight away when it was empty, or when
+   * consuming failed and nothing more will arrive. In that last case a later
+   * consumer replays the gap over a refetch made in the meantime, and the
+   * refetch on ITS `onCaughtUp` clears the copies.
+   *
+   * This is the moment to refetch persisted history after a gap. A refetch
+   * that lands while the backlog is still arriving merges without the turns it
+   * is about to replay, and the replay then renders them a second time.
+   */
+  onCaughtUp?: () => void;
 }
 
 export interface JetStreamSubscriptionHandle {
@@ -187,7 +211,7 @@ export interface NatsClient {
   /**
    * Subscribe to a JetStream subject via an ephemeral OrderedConsumer (no acks).
    * Use `optStartSeq` with `deliverPolicy: 'byStartSequence'` to resume from a known offset,
-   * or `deliverPolicy: 'new'` to live-tail.
+   * or `deliverPolicy: 'new'` to live-tail (see that option for where it starts).
    */
   subscribeJetStreamOrdered(
     onMessage: (msg: JsMsg) => void | Promise<void>,
@@ -355,26 +379,29 @@ function mapNatsTypeToStatus(
 function watchForRecovery(
   iter: ConsumerMessages,
   recreatedEvent: ConsumerEvents.OrderedConsumerRecreated,
-  onRecovered?: () => void,
+  onRecreated: (consumerName: string) => void,
 ): void {
-  if (!onRecovered) return;
   void (async () => {
     try {
       const status = await iter.status();
       for await (const event of status) {
         if (event.type !== recreatedEvent) continue;
-        try {
-          onRecovered();
-        } catch (e) {
-          // A caller that throws must not take the watch down with it — this
-          // loop is the only thing reporting recoveries for this subscription.
-          console.warn('[nats] onRecovered threw:', e);
-        }
+        onRecreated(String(event.data));
       }
     } catch {
       // Status ends with the subscription — nothing left to report.
     }
   })();
+}
+
+/** A caller that throws must not take down the loop reporting to it — that
+ *  loop is the only thing reporting these events for its subscription. */
+function invokeCallback(name: string, callback: (() => void) | undefined): void {
+  try {
+    callback?.();
+  } catch (e) {
+    console.warn(`[nats] ${name} threw:`, e);
+  }
 }
 
 export function createNatsClient(options: NatsClientOptions): NatsClient {
@@ -632,8 +659,11 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
     const js = conn.jetstream();
     const consumer: Consumer = await js.consumers.get(opts.streamName, {
       filterSubjects: opts.filterSubject,
-      deliver_policy: nats.DeliverPolicy.StartSequence,
-      opt_start_seq: opts.optStartSeq ?? 0,
+      // nats.ws turns a start sequence of 0 into 1, so a 'new' that fell back to
+      // StartSequence replayed everything the stream retains for the subject.
+      ...(opts.deliverPolicy === 'new'
+        ? { deliver_policy: nats.DeliverPolicy.New }
+        : { deliver_policy: nats.DeliverPolicy.StartSequence, opt_start_seq: opts.optStartSeq ?? 0 }),
       // Milliseconds, NOT nanoseconds: nats.ws runs this through its own
       // `nanos()` before it reaches the server. Pre-converting here multiplied
       // it by 1e6 twice, putting the threshold ~9.5 years out — so the ephemeral
@@ -673,6 +703,25 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
       return { unsubscribe() {} };
     }
 
+    // Whether the consumer delivering now still owes `onCaughtUp` its backlog.
+    let backlogOwed = true;
+    const reportCaughtUp = () => {
+      if (!backlogOwed || closed) return;
+      backlogOwed = false;
+      invokeCallback('onCaughtUp', opts.onCaughtUp);
+    };
+    // An empty backlog has no message to say so: it shows only in the answer to
+    // CONSUMER.CREATE, which `info(true)` returns without asking the server again.
+    const reportIfNothingPending = async (consumerName?: string) => {
+      try {
+        const info = await consumer.info(true);
+        if (consumerName !== undefined && info.name !== consumerName) return;
+        if (info.num_pending === 0) reportCaughtUp();
+      } catch {
+        // A failed lookup reports nothing: the next message with `pending === 0` does instead.
+      }
+    };
+
     (async () => {
       try {
         const iter = await consumer.consume();
@@ -685,7 +734,19 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           return;
         }
         iterRef.current = iter;
-        watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, opts.onRecovered);
+        if (opts.onRecovered || opts.onCaughtUp) {
+          watchForRecovery(iter, nats.ConsumerEvents.OrderedConsumerRecreated, consumerName => {
+            backlogOwed = true;
+            invokeCallback('onRecovered', opts.onRecovered);
+            // nats.ws announces the recreated consumer before it records it as
+            // the current one (a promise continuation does that), so its answer
+            // is read once those have run — and only if it is the one announced.
+            setTimeout(() => {
+              void reportIfNothingPending(consumerName);
+            }, 0);
+          });
+        }
+        if (opts.onCaughtUp) await reportIfNothingPending();
         for await (const msg of iter) {
           if (closed) break;
           try {
@@ -693,9 +754,17 @@ export function createNatsClient(options: NatsClientOptions): NatsClient {
           } catch (e) {
             emitStatus({ status: 'error', data: e });
           }
+          // `pending` is what the stream still held for this consumer when it
+          // sent this message: 0 means the backlog ends here.
+          if (msg.info.pending === 0) reportCaughtUp();
         }
       } catch (e) {
-        if (!closed) emitStatus({ status: 'error', data: e });
+        if (!closed) {
+          emitStatus({ status: 'error', data: e });
+          // This consumer delivers nothing more: settle what it owed rather than
+          // leave the caller's history at its pre-gap snapshot (see `onCaughtUp`).
+          reportCaughtUp();
+        }
       }
     })().catch((e: unknown) => emitStatus({ status: 'error', data: e }));
 

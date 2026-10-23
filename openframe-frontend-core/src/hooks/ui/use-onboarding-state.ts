@@ -8,6 +8,7 @@ import {
   markStepSkipped as storageMarkSkipped,
   dismissOnboarding as storageDismiss,
   markMultipleComplete as storageMarkMultiple,
+  resetOnboardingState as storageReset,
   type OnboardingState,
 } from '../../utils/onboarding-storage';
 import { readLocalStorageUpdateDetail } from '../../utils/storage-event';
@@ -23,8 +24,6 @@ export interface OnboardingStepConfig {
   onSkip?: () => void;
   checkComplete?: () => boolean | Promise<boolean>;
 }
-
-export type { OnboardingState };
 
 /**
  * Hook for managing onboarding state with localStorage persistence
@@ -42,7 +41,6 @@ export function useOnboardingState(storageKey: string = 'openframe-onboarding-st
       const newState = loadOnboardingState(storageKey);
       setState(newState);
       forceUpdate(prev => prev + 1);
-      console.log('🔄 State updated from storage event:', newState);
     };
 
     window.addEventListener('localStorageUpdate', handleStorageUpdate);
@@ -53,7 +51,6 @@ export function useOnboardingState(storageKey: string = 'openframe-onboarding-st
 
   const markComplete = useCallback(
     (stepId: string) => {
-      console.log(`🎯 markComplete called for: "${stepId}"`);
       const newState = storageMarkComplete(storageKey, stepId);
       setState(newState);
       forceUpdate(prev => prev + 1);
@@ -63,7 +60,6 @@ export function useOnboardingState(storageKey: string = 'openframe-onboarding-st
 
   const markSkipped = useCallback(
     (stepId: string) => {
-      console.log(`⏭️ markSkipped called for: "${stepId}"`);
       const newState = storageMarkSkipped(storageKey, stepId);
       setState(newState);
       forceUpdate(prev => prev + 1);
@@ -72,19 +68,22 @@ export function useOnboardingState(storageKey: string = 'openframe-onboarding-st
   );
 
   const dismissOnboarding = useCallback(() => {
-    console.log(`🚫 dismissOnboarding called`);
     const newState = storageDismiss(storageKey);
+    setState(newState);
+    forceUpdate(prev => prev + 1);
+  }, [storageKey]);
+
+  const resetOnboarding = useCallback(() => {
+    const newState = storageReset(storageKey);
     setState(newState);
     forceUpdate(prev => prev + 1);
   }, [storageKey]);
 
   const markMultipleComplete = useCallback(
     (stepIds: string[]) => {
-      console.log(`🎯 markMultipleComplete called for:`, stepIds);
       const newState = storageMarkMultiple(storageKey, stepIds);
       setState(newState);
       forceUpdate(prev => prev + 1);
-      console.log(`📝 State after batch:`, newState);
     },
     [storageKey],
   );
@@ -115,6 +114,7 @@ export function useOnboardingState(storageKey: string = 'openframe-onboarding-st
     markComplete,
     markSkipped,
     dismissOnboarding,
+    resetOnboarding,
     isStepComplete,
     isStepSkipped,
     allStepsComplete,

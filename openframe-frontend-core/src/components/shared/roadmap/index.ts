@@ -14,7 +14,6 @@
  */
 
 export { RoadmapGrid, type RoadmapGridProps } from './roadmap-grid';
-export { RoadmapGridSkeleton, type RoadmapGridSkeletonProps } from './roadmap-grid-skeleton';
 // `VoteType` deliberately NOT re-exported — `./chat` already exports
 // the same-shape `VoteType` from `roadmap-card.tsx`; a duplicate path
 // triggers TS2308 ambiguous re-export at the top-level

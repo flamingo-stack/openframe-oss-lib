@@ -2,6 +2,12 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { Button } from '../components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { Input } from '../components/ui/input';
 import {
   ModalV2,
@@ -11,6 +17,7 @@ import {
   ModalV2Title,
   ModalV2TwoColumn,
 } from '../components/ui/modal-v2';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Textarea } from '../components/ui/textarea';
 
 type ModalV2StoryMeta = Meta<typeof ModalV2>;
@@ -414,6 +421,57 @@ export const PinnedHeaderAndFooter: Story = {
               <Button onClick={() => setIsOpen(false)}>Save</Button>
             </div>
           </ModalV2Footer>
+        </ModalV2>
+      </>
+    );
+  },
+};
+
+/**
+ * Popups opened inside the modal portal into the modal's own layer, so they
+ * stack over the panel rather than under the `z-[1300]` overlay.
+ */
+export const WithPopups: Story = {
+  args: {
+    isOpen: true,
+    onClose: fn(),
+    size: 'default',
+    children: null,
+  },
+  render: function Render(args) {
+    const [isOpen, setIsOpen] = useState(args.isOpen);
+
+    return (
+      <>
+        <Button onClick={() => setIsOpen(true)} variant="outline">
+          Open modal with popups
+        </Button>
+        <ModalV2 isOpen={isOpen} onClose={() => setIsOpen(false)} size={args.size}>
+          <ModalV2Header>
+            <ModalV2Title>Move vendor</ModalV2Title>
+          </ModalV2Header>
+          <ModalV2Content className="flex gap-[var(--spacing-system-mf)]">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">Pick a folder</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem>Endpoint security</DropdownMenuItem>
+                <DropdownMenuItem>Backup</DropdownMenuItem>
+                <DropdownMenuItem>Identity</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Select>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Pick an owner" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ann">Ann</SelectItem>
+                <SelectItem value="bo">Bo</SelectItem>
+                <SelectItem value="cy">Cy</SelectItem>
+              </SelectContent>
+            </Select>
+          </ModalV2Content>
         </ModalV2>
       </>
     );

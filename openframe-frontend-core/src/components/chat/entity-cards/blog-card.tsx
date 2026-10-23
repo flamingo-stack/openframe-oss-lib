@@ -20,35 +20,40 @@
 
 import { Eye } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
+import Link from '../../../embed-shims/next-link';
+import { AVATAR_SIZE, MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
 import type { BlogPostSummary } from '../../../types/blog';
 import { cn } from '../../../utils/cn';
+import { formatDateWithTimezone } from '../../../utils/format';
+import { MediaSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 import {
   COMPACT_CARD_IMAGE_SLOT,
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUBTITLE,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
+import { CONTENT_CARD_FRAME_CLASS, CONTENT_CARD_SKELETON_FRAME_CLASS } from './content-card-frame';
 import { EntityPortraitCard } from './entity-portrait-card';
 import { useCoverImageFallback } from './use-cover-image-fallback';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
-export interface BlogCardProps {
+interface LoadedBlogCardProps {
   post: BlogPostSummary;
   /** Detail URL resolved by the caller (e.g. `buildContentURL`). */
   href: string;
   /** When `_blank`, opens in a new tab. Set by chat dispatch via
    *  `computeIsNewTab`. Defaults to same-tab. */
   target?: '_blank';
-  rel?: 'noopener noreferrer';
+  rel?: 'noopener' | 'noopener noreferrer';
   /** Platform that owns `href`. Used by parent wrappers; the card
    *  itself doesn't read it but exposes the prop for the standard
    *  pure-presentation contract. */
@@ -68,44 +73,94 @@ export interface BlogCardProps {
   priority?: boolean;
 }
 
-/** `portrait` shares the default skeleton shape (same zone boxes). */
-export function BlogCardSkeleton({ size = 'default' }: { size?: 'default' | 'sm' | 'portrait' }) {
-  if (size === 'sm') {
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope.
+ */
+export type BlogCardProps =
+  (LoadedBlogCardProps & { loading?: boolean }) | (Partial<LoadedBlogCardProps> & { loading: true });
+
+// The default card's boxes, read by the card AND its skeleton, so the two are one size at every width.
+const BLOG_CARD_FRAME = 'flex h-full flex-col';
+const BLOG_CARD_COVER = `relative ${MEDIA_ASPECT.og} w-full overflow-hidden`;
+const BLOG_CARD_BODY = 'flex flex-grow flex-col p-4';
+/** The title row keeps two lines of `text-h3` whatever the title's length. */
+const BLOG_CARD_TITLE_ROW = `mb-3 flex items-center text-h3 ${TEXT_LINES_MIN[2]}`;
+/** The summary row keeps two lines of `text-h6`. */
+const BLOG_CARD_SUMMARY_ROW = `mb-3 flex items-center text-h6 ${TEXT_LINES_MIN[2]}`;
+const BLOG_CARD_BYLINE = 'mt-auto flex items-center justify-between gap-2 text-ods-text-secondary text-h6';
+const BLOG_CARD_BYLINE_PERSON = 'flex min-w-0 items-center gap-2';
+const BLOG_CARD_VIEWS = 'flex shrink-0 items-center gap-1';
+/** The byline avatar's box (32px, the photo cropped to it): an author photo of any shape takes exactly this box, and
+ *  the skeleton draws the same box. */
+const BLOG_CARD_AVATAR = `${AVATAR_SIZE.sm} shrink-0 rounded-full object-cover`;
+/** The content-type chip a portrait blog card shows (a static label). */
+const BLOG_POST_TYPE_LABEL = 'Blog Post';
+
+/**
+ * A blog card while it is read, one per density. `default`: the card's own rows (cover; the title as two `text-h3`
+ * lines; the summary as two `text-h6` lines; the byline's 32px avatar and `text-h6` line; the view count's icon is
+ * drawn for real beside its bar). `portrait`: the shared portrait skeleton with the static chip.
+ */
+function BlogCardSkeleton({
+  size = 'default',
+  showTypeBadge = true,
+  className,
+}: {
+  size?: 'default' | 'sm' | 'portrait';
+  /** `portrait`: the card shows the "Blog Post" chip. */
+  showTypeBadge?: boolean;
+  className?: string;
+}) {
+  if (size === 'portrait') {
     return (
-      <span className={COMPACT_CARD_SKELETON_OUTER}>
-        <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-        <span className={COMPACT_CARD_TEXT_COL}>
-          <span className={COMPACT_CARD_TITLE_ROW}>
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-2/5 rounded bg-ods-bg/70" />
-          </span>
-          <span className={COMPACT_CARD_META_ROW_BOX}>
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
-          </span>
-        </span>
-      </span>
+      <EntityPortraitCard
+        loading
+        href=""
+        imageAlt=""
+        title=""
+        typeLabel={showTypeBadge ? BLOG_POST_TYPE_LABEL : undefined}
+        className={className}
+      />
     );
   }
+  if (size === 'sm') {
+    return <CompactCardSkeleton className={className} />;
+  }
   return (
-    <article className="group flex h-full animate-pulse flex-col overflow-hidden rounded-lg border border-ods-border bg-ods-card">
-      <div className="aspect-[1200/630] bg-ods-bg" />
-      <div className="flex flex-grow flex-col space-y-3 p-4">
-        <div className="h-5 w-3/4 rounded bg-ods-bg" />
-        <div className="h-5 w-1/2 rounded bg-ods-bg" />
-        <div className="h-3 w-full rounded bg-ods-bg/60" />
-        <div className="h-3 w-4/5 rounded bg-ods-bg/60" />
-        <div className="mt-auto flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-ods-bg" />
-          <div className="h-3 w-24 rounded bg-ods-bg/60" />
+    <article className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, BLOG_CARD_FRAME, className)} aria-hidden>
+      <UnifiedSkeleton className={cn(BLOG_CARD_COVER, 'rounded-none')} />
+      <div className={BLOG_CARD_BODY}>
+        <div className={BLOG_CARD_TITLE_ROW}>
+          <TextLineSkeleton type="h3" lines={2} className="w-full" />
+        </div>
+        <div className={BLOG_CARD_SUMMARY_ROW}>
+          <TextLineSkeleton type="h6" lines={2} className="w-full" />
+        </div>
+        <div className={BLOG_CARD_BYLINE}>
+          <div className={BLOG_CARD_BYLINE_PERSON}>
+            <MediaSkeleton.Avatar size="sm" className={BLOG_CARD_AVATAR} />
+            <TextLineSkeleton type="h6" className="w-40" />
+          </div>
+          <div className={BLOG_CARD_VIEWS}>
+            <Eye className="h-4 w-4 shrink-0" />
+            <TextLineSkeleton type="h6" className="w-8" />
+          </div>
         </div>
       </div>
     </article>
   );
 }
 
-export function BlogCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function BlogCard(props: BlogCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <BlogCardSkeleton size={props.size} showTypeBadge={props.showTypeBadge} className={props.className} />;
+  }
+  return <LoadedBlogCard {...props} />;
+}
+
+function LoadedBlogCard({
   post,
   href,
   target: targetProp,
@@ -117,7 +172,7 @@ export function BlogCard({
   className,
   hasEmbeddedVideo = false,
   priority = false,
-}: BlogCardProps) {
+}: LoadedBlogCardProps) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -133,23 +188,10 @@ export function BlogCard({
   const { src: displayImage, onError: onImageError } = useCoverImageFallback(post.featured_image, placeholderUrl);
 
   if (size === 'sm') {
-    const dateStr = post.published_at
-      ? new Date(post.published_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          timeZone: 'UTC',
-        })
-      : '';
+    const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     const firstCategory = post.categories?.find(c => c && c.name)?.name;
     return (
-      <a
-        href={href}
-        target={target}
-        rel={rel}
-        className={cn(COMPACT_CARD_OUTER, className)}
-        aria-label={`Read article: ${post.title}`}
-      >
+      <Link href={href} target={target} rel={rel} className={cn(COMPACT_CARD_OUTER, className)}>
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {displayImage ? (
             <Image
@@ -181,7 +223,7 @@ export function BlogCard({
             <span className={COMPACT_CARD_SUMMARY}>{post.summary || COMPACT_CARD_ROW_FILLER}</span>
           </span>
         </span>
-      </a>
+      </Link>
     );
   }
 
@@ -189,20 +231,13 @@ export function BlogCard({
     // Rail/strip density — shared <EntityPortraitCard> shell. Raw cover +
     // placeholder go in separately; the shell runs the SAME shared
     // useCoverImageFallback chain internally (so its error recovery works).
-    const dateStr = post.published_at
-      ? new Date(post.published_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          timeZone: 'UTC',
-        })
-      : '';
+    const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
     return (
       <EntityPortraitCard
         href={href}
         target={target}
         rel={rel}
-        typeLabel={showTypeBadge ? 'Blog Post' : undefined}
+        typeLabel={showTypeBadge ? BLOG_POST_TYPE_LABEL : undefined}
         imageUrl={post.featured_image}
         placeholderUrl={placeholderUrl}
         imageAlt={post.title}
@@ -218,34 +253,11 @@ export function BlogCard({
   }
 
   // Default: full vertical card.
-  const dateStr = post.published_at
-    ? new Date(post.published_at).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        timeZone: 'UTC',
-      })
-    : '';
+  const dateStr = post.published_at ? formatDateWithTimezone(post.published_at, null, 'medium') : '';
   return (
-    <article
-      className={cn(
-        'group overflow-hidden rounded-lg border border-ods-border bg-ods-card',
-        'transition-all duration-300 ease-out',
-        'transform hover:translate-y-[-2px]',
-        'hover:border-ods-accent hover:shadow-lg hover:shadow-ods-accent/[0.08]',
-        'flex h-full flex-col',
-        className,
-      )}
-      role="article"
-    >
-      <a
-        href={href}
-        target={target}
-        rel={rel}
-        className="flex h-full flex-col focus:outline-none"
-        aria-label={`Read article: ${post.title}`}
-      >
-        <div className="relative aspect-[1200/630] w-full overflow-hidden bg-ods-bg">
+    <article className={cn(CONTENT_CARD_FRAME_CLASS, BLOG_CARD_FRAME, className)} role="article">
+      <Link href={href} target={target} rel={rel} className="flex h-full flex-col focus:outline-none">
+        <div className={cn(BLOG_CARD_COVER, 'bg-ods-bg')}>
           {displayImage ? (
             <Image
               src={displayImage}
@@ -261,8 +273,8 @@ export function BlogCard({
           ) : null}
         </div>
 
-        <div className="flex flex-grow flex-col p-4">
-          <div className="mb-3 flex min-h-[50.4px] items-center md:min-h-[56px] lg:min-h-[61.6px]">
+        <div className={BLOG_CARD_BODY}>
+          <div className={BLOG_CARD_TITLE_ROW}>
             <h3
               className={cn(
                 'text-ods-text-primary text-h3',
@@ -275,19 +287,19 @@ export function BlogCard({
             </h3>
           </div>
 
-          <div className="mb-3 flex min-h-[42px] items-center md:min-h-[45px] lg:min-h-[48px]">
+          <div className={BLOG_CARD_SUMMARY_ROW}>
             <p className={cn('text-ods-text-primary text-h6', 'line-clamp-2')}>{post.summary || ''}</p>
           </div>
 
-          <div className="mt-auto flex items-center justify-between gap-2 text-ods-text-secondary text-h6">
-            <div className="flex min-w-0 items-center gap-2">
+          <div className={BLOG_CARD_BYLINE}>
+            <div className={BLOG_CARD_BYLINE_PERSON}>
               {post.author_avatar ? (
                 <Image
                   src={post.author_avatar}
                   alt={post.author_name || ''}
                   width={32}
                   height={32}
-                  className="shrink-0 rounded-full"
+                  className={BLOG_CARD_AVATAR}
                   unoptimized
                 />
               ) : null}
@@ -297,7 +309,7 @@ export function BlogCard({
               </span>
             </div>
             <div
-              className="flex shrink-0 items-center gap-1"
+              className={BLOG_CARD_VIEWS}
               aria-label={`View count: ${(post.view_count ?? 0).toLocaleString('en-US')} views`}
             >
               <Eye className="h-4 w-4 shrink-0" />
@@ -305,7 +317,7 @@ export function BlogCard({
             </div>
           </div>
         </div>
-      </a>
+      </Link>
     </article>
   );
 }

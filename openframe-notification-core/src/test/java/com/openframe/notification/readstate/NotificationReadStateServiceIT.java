@@ -27,6 +27,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
+import static org.springframework.data.mongodb.core.query.Criteria.where;
+import static org.springframework.data.mongodb.core.query.Query.query;
+import org.springframework.data.mongodb.core.query.Update;
 
 @SpringBootTest(classes = ReadStateIntegrationTestApplication.class)
 @Tag("integration")
@@ -262,4 +265,66 @@ class NotificationReadStateServiceIT extends BaseMongoIntegrationTest {
         assertThat(rows).singleElement().extracting(NotificationReadState::getStatus).isEqualTo(ReadStatus.DELETED);
     }
 
+    @Test
+    @DisplayName("Given an ARCHIVED row, when the recipient marks it read, then it flips to READ — interaction in history lands on read")
+    void archived_row_turns_read_on_interaction() {
+        service.createForAudience("n1", CAT_TICKETS, "title", U, Set.of(ALICE));
+        archive("n1");
+        assertThat(service.hasUnread(ALICE, U)).isFalse();
+
+        assertThat(service.markRead(ALICE, U, "n1")).isTrue();
+
+        assertThat(statusOf("n1")).isEqualTo(ReadStatus.READ);
+    }
+
+    @Test
+    @DisplayName("Given an UNREAD and an ARCHIVED row, when markAllAsRead runs, then both end up READ")
+    void mark_all_as_read_flips_archived_rows() {
+        service.createForAudience("n1", CAT_TICKETS, "title", U, Set.of(ALICE));
+        service.createForAudience("n2", CAT_TICKETS, "title", U, Set.of(ALICE));
+        archive("n2");
+
+        assertThat(service.markAllAsRead(ALICE, U)).isEqualTo(2L);
+
+        assertThat(statusOf("n2")).isEqualTo(ReadStatus.READ);
+    }
+
+    @Test
+    @DisplayName("Given a READ and an ARCHIVED row, when deleteAllRead sweeps, then only the read row goes — nobody has read the archived one yet")
+    void delete_all_read_leaves_archived_rows() {
+        service.createForAudience("n1", CAT_TICKETS, "title", U, Set.of(ALICE));
+        service.createForAudience("n2", CAT_TICKETS, "title", U, Set.of(ALICE));
+        service.markRead(ALICE, U, "n1");
+        archive("n2");
+
+        assertThat(service.deleteAllRead(ALICE, U)).isEqualTo(1L);
+
+        assertThat(statusOf("n2")).isEqualTo(ReadStatus.ARCHIVED);
+    }
+
+    @Test
+    @DisplayName("Given two notifications about one ticket unread for two users and a machine, plus another ticket, when archiveEntityForAllRecipients runs for the first ticket, then every row on it is ARCHIVED and the other ticket stays unread")
+    void archive_entity_for_all_recipients_archives_every_row_on_the_entity() {
+        NotificationEntityRef ticket = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-1").orElseThrow();
+        NotificationEntityRef other = NotificationEntityRef.of(NotificationEntityType.TICKET, "ticket-2").orElseThrow();
+        service.createForAudience("n1", CAT_TICKETS, "title", ticket, U, Set.of(ALICE, BOB));
+        service.createForAudience("n2", CAT_TICKETS, "title", ticket, M, Set.of(MACHINE_1));
+        service.createForAudience("n3", CAT_TICKETS, "title", other, U, Set.of(ALICE));
+
+        assertThat(service.archiveEntityForAllRecipients(NotificationEntityType.TICKET, "ticket-1")).isEqualTo(3L);
+
+        assertThat(statusOf("n2")).isEqualTo(ReadStatus.ARCHIVED);
+        assertThat(service.hasUnread(BOB, U)).isFalse();
+        assertThat(service.unreadCountsByEntity(ALICE, U, NotificationEntityType.TICKET)).containsOnly(entry("ticket-2", 1L));
+    }
+
+    private void archive(String notificationId) {
+        mongoTemplate.updateMulti(query(where("notificationId").is(notificationId)),
+                Update.update("status", ReadStatus.ARCHIVED), NotificationReadState.class);
+    }
+
+    private ReadStatus statusOf(String notificationId) {
+        NotificationReadState row = mongoTemplate.findOne(query(where("notificationId").is(notificationId)), NotificationReadState.class);
+        return row.getStatus();
+    }
 }

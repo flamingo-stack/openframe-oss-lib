@@ -59,7 +59,7 @@ export interface TopNavigationProps extends React.HTMLAttributes<HTMLElement> {
   sideActions?: React.ReactNode;
   /** Opaque ODS background class. Defaults to `bg-ods-card`. Keep it opaque —
    *  translucent backgrounds under a sticky bar need a deliberate
-   *  backdrop-blur treatment (see the note in `header.tsx`). */
+   *  backdrop-blur treatment (see the note in `site-header.tsx`). */
   backgroundClassName?: string;
   /** Top border on mobile (the ODS spec bar shows it below md). Default true. */
   mobileTopBorder?: boolean;
@@ -73,7 +73,7 @@ const hasContent = (node: React.ReactNode): boolean => node !== null && node !==
 /**
  * Unified ODS top-navigation bar (Figma `[UPD] top-navigation`, node
  * 2797-5978): the single 48px/56px (mobile / md+) cell-based header shell
- * shared by the console `AppHeader` and the marketing `Header` across all
+ * shared by the console `AppHeader` and the `SiteHeader` across all
  * platforms.
  *
  * The shell owns the bar geometry only — height, borders, background, and the

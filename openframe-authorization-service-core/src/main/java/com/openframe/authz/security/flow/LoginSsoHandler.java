@@ -8,9 +8,12 @@ import com.openframe.authz.security.SsoLoginCookiePayload;
 import com.openframe.authz.service.sso.SSOConfigService;
 import com.openframe.authz.service.sso.SignupTicketService;
 import com.openframe.authz.service.sso.SsoIdentityService;
+import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
+import com.openframe.authz.util.SsoAuthentication;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
@@ -20,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -28,6 +30,11 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static com.openframe.authz.web.Redirects.foundAtRoot;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
+import static com.openframe.core.exception.AuthErrorCode.ORGANIZATION_SSO_REQUIRED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.springframework.util.StringUtils.hasText;
@@ -46,6 +53,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private final SsoCookieCodec ssoCookieCodec;
     private final SignupTicketService signupTicketService;
     private final SsoIdentityService ssoIdentityService;
+    private final SsoOidcUserService ssoOidcUserService;
     private final EmailTrustPolicy emailTrustPolicy;
     private final UserService userService;
     private final TenantService tenantService;
@@ -57,6 +65,18 @@ public class LoginSsoHandler implements SsoFlowHandler {
      */
     @Value("${openframe.sso.login.signup-continue-url:}")
     private String signupContinueUrl;
+
+    /** "One last step" consent page for a shared-domain first login — see {@code SsoJoinController}. */
+    @Value("${openframe.sso.join-confirm-url:}")
+    private String joinConfirmUrl;
+
+    /**
+     * Extra gate for the LOGIN (auto-provision) confirm redirect only — lets it roll out per
+     * environment independently of the invitation gate (which needs only the URL above). Off by
+     * default; the redirect fires only when this is true AND the URL is set.
+     */
+    @Value("${openframe.sso.login.join-confirm-enabled:false}")
+    private boolean loginJoinConfirmEnabled;
 
     @Override
     public String cookieName() {
@@ -75,7 +95,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         String email = requireEmail(user);
 
         SsoLoginCookiePayload payload = ssoCookieCodec.decodeLogin(cookie.getValue())
-                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
+                .orElseThrow(() -> new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again."));
 
         String provider = registrationId(authentication, payload);
 
@@ -90,8 +110,22 @@ public class LoginSsoHandler implements SsoFlowHandler {
             requireEmailTrustedForRouting(provider, user);
             authUser = userService.findActiveByEmail(email).orElse(null);
             if (authUser == null) {
-                continueIntoRegistration(request, response, authentication, payload, provider, user, email);
-                return;
+                // Shared-domain tenants (global domain policy, no custom app) auto-provision on
+                // first login. If a consent page is configured, defer the CREATE: send the user to
+                // confirm the account + accept Terms (SsoJoinController finalizes), keeping the
+                // flow cookie. Otherwise provision immediately (email already trusted above).
+                Optional<String> provisionTenant = ssoOidcUserService.autoProvisionTenantForDomain(email);
+                if (provisionTenant.isPresent()) {
+                    if (loginJoinConfirmEnabled && hasText(joinConfirmUrl)) {
+                        redirectToJoinConfirm(response, joinConfirmUrl, payload.redirectTo(), payload.authMobile());
+                        return;
+                    }
+                    authUser = ssoOidcUserService.autoProvisionByGlobalDomain(provider, user).orElse(null);
+                }
+                if (authUser == null) {
+                    continueIntoRegistration(request, response, authentication, payload, provider, user, email);
+                    return;
+                }
             }
         }
 
@@ -100,7 +134,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
         tenantService.findById(tenantId)
                 .filter(Tenant::isActive)
-                .orElseThrow(() -> new IllegalStateException("Your account is not active. Please contact your administrator."));
+                .orElseThrow(() -> new AuthFlowException(ACCOUNT_INACTIVE, "Your account is not active. Please contact your administrator."));
 
         // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
         // active). A link written before these checks would outlive a REJECTED login and later
@@ -111,9 +145,8 @@ public class LoginSsoHandler implements SsoFlowHandler {
     }
 
     private String registrationId(Authentication authentication, SsoLoginCookiePayload payload) {
-        return authentication instanceof OAuth2AuthenticationToken token
-                ? token.getAuthorizedClientRegistrationId()
-                : payload.provider();
+        String rid = SsoAuthentication.registrationId(authentication);
+        return rid != null ? rid : payload.provider();
     }
 
     /**
@@ -128,7 +161,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         if (!emailTrustPolicy.emailTrustedForRouting(provider, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider={} sub={} {}",
                     provider, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
-            throw new IllegalStateException(
+            throw new AuthFlowException(EMAIL_NOT_VERIFIED,
                     "This account's email is not verified by the provider. Please try a different sign-in method, or contact your administrator.");
         }
     }
@@ -142,18 +175,11 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private void ensureGenericProviderAllowed(String tenantId, String provider) {
         if (ssoConfigService.getSSOConfig(tenantId, provider).isPresent()) {
             log.warn("event=sso-login-forbidden-provider tenant={} provider={}", tenantId, provider);
-            throw new IllegalStateException(
+            throw new AuthFlowException(ORGANIZATION_SSO_REQUIRED,
                     "Your organization uses its own sign-in for this provider. Enter your email on the login page to be redirected to it.");
         }
     }
 
-    /**
-     * Unknown email, verified identity: too valuable to throw away. The SAS session already holds
-     * the authenticated OidcUser, so the frontend continuation page only needs to collect what SSO
-     * cannot provide (organization name and domain) and call the completion endpoint, which reads
-     * the identity from the session. The flow cookie is deliberately KEPT — the completion endpoint
-     * uses it for redirectTo/authMobile and as proof the request belongs to this flow.
-     */
     private void continueIntoRegistration(HttpServletRequest request,
                                           HttpServletResponse response,
                                           Authentication authentication,
@@ -176,7 +202,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
             return;
         }
         if (!hasText(signupContinueUrl)) {
-            throw new IllegalStateException(
+            throw AuthFlowException.withDetail(ACCOUNT_NOT_FOUND,
                     "No account found for " + email + ". Please sign up first.");
         }
         log.info("event=sso-login-continue-registration email={}", email);

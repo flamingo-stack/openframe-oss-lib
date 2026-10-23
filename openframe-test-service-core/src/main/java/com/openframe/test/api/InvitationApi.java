@@ -28,6 +28,15 @@ public class InvitationApi {
                 .extract().as(InvitationConflictResponse.class);
     }
 
+    public static InvitationPageResponse listInvitations(int page, int size) {
+        return given(getAuthorizedSpec())
+                .queryParam("page", page)
+                .queryParam("size", size)
+                .get(INVITATIONS)
+                .then().statusCode(200)
+                .extract().as(InvitationPageResponse.class);
+    }
+
     public static AcceptInvitationResponse acceptInvitation(AcceptInvitationRequest request) {
         return given(getUnAuthorizedAuthSpec())
                 .body(request)
@@ -49,5 +58,30 @@ public class InvitationApi {
         given(getAuthorizedSpec())
                 .delete(REVOKE_INVITATION)
                 .then().statusCode(204);
+    }
+
+    // A revoke for teardown, where the invitation may already be revoked or accepted: returns the HTTP status.
+    public static int attemptRevokeInvitation(String invitationId) {
+        final String REVOKE_INVITATION = INVITATIONS.concat("/").concat(invitationId);
+        return given(getAuthorizedSpec())
+                .delete(REVOKE_INVITATION)
+                .then().extract().statusCode();
+    }
+
+    /** POST /invitations/{id}/resend: renews an expired pending invitation and returns the new one (201). */
+    public static Invitation resendInvitation(String invitationId) {
+        final String RESEND_INVITATION = INVITATIONS.concat("/").concat(invitationId).concat("/resend");
+        return given(getAuthorizedSpec())
+                .post(RESEND_INVITATION)
+                .then().statusCode(201)
+                .extract().as(Invitation.class);
+    }
+
+    /** A resend expected to be refused (the invitation is not expired, or not pending): returns the HTTP status. */
+    public static int attemptResendInvitation(String invitationId) {
+        final String RESEND_INVITATION = INVITATIONS.concat("/").concat(invitationId).concat("/resend");
+        return given(getAuthorizedSpec())
+                .post(RESEND_INVITATION)
+                .then().extract().statusCode();
     }
 }

@@ -3,7 +3,23 @@
 import { Trash2, Plus, ChevronDown, ChevronUp, Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
-import { Button, Input, Textarea, Label } from '../ui';
+import {
+  Button,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  StatusBadge,
+  Textarea,
+} from '../ui';
+
+export interface ChangelogTagOption {
+  value: string;
+  label: string;
+}
 
 interface ChangelogManagerProps {
   title: string;
@@ -18,6 +34,18 @@ interface ChangelogManagerProps {
    * — leave undefined for product releases so they keep their existing UX.
    */
   showVisibilityToggle?: boolean;
+  /**
+   * When given, each entry gets a tag select (stored as `entry.tag`) and its header
+   * shows the chosen tag as a badge. New entries start on the first option.
+   */
+  tagOptions?: readonly ChangelogTagOption[];
+  /** Label of the tag select. Default "Tag". */
+  tagLabel?: string;
+  /** Entry field labels and placeholders. Defaults are the product-release wording. */
+  titleLabel?: string;
+  titlePlaceholder?: string;
+  descriptionLabel?: string;
+  descriptionPlaceholder?: string;
 }
 
 export function ChangelogManager({
@@ -27,7 +55,14 @@ export function ChangelogManager({
   className = '',
   expandAll = false,
   showVisibilityToggle = false,
+  tagOptions,
+  tagLabel = 'Tag',
+  titleLabel = 'Title',
+  titlePlaceholder = 'e.g., New dark mode theme support',
+  descriptionLabel = 'Description',
+  descriptionPlaceholder = 'Detailed explanation of the change...',
 }: ChangelogManagerProps) {
+  const tagLabelOf = (value?: string) => tagOptions?.find(o => o.value === value)?.label;
   const entryCount = entries.length;
   const allExpanded = () => new Set(Array.from({ length: entryCount }, (_, i) => i));
 
@@ -55,6 +90,7 @@ export function ChangelogManager({
       title: '',
       description: '',
       ...(showVisibilityToggle && { visibility: 'public' as const }),
+      ...(tagOptions?.length && { tag: tagOptions[0].value }),
     };
     onChange([...entries, newEntry]);
     // Expand the newly added entry
@@ -141,6 +177,15 @@ export function ChangelogManager({
                 )}
               </div>
 
+              {tagOptions && tagLabelOf(entry.tag) && (
+                <StatusBadge
+                  variant="button"
+                  singleLine
+                  text={tagLabelOf(entry.tag) as string}
+                  className="shrink-0 whitespace-nowrap"
+                />
+              )}
+
               {showVisibilityToggle && (
                 <Button
                   type="button"
@@ -174,9 +219,9 @@ export function ChangelogManager({
               <div className="space-y-3 border-t border-ods-border px-3 pb-3 pt-3">
                 {/* Title */}
                 <div className="space-y-1">
-                  <Label className="text-ods-text-secondary">Title *</Label>
+                  <Label className="text-ods-text-secondary">{titleLabel} *</Label>
                   <Input
-                    placeholder="e.g., New dark mode theme support"
+                    placeholder={titlePlaceholder}
                     value={entry.title}
                     onChange={e => updateEntry(index, 'title', e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && e.preventDefault()}
@@ -186,15 +231,34 @@ export function ChangelogManager({
 
                 {/* Description */}
                 <div className="space-y-1">
-                  <Label className="text-ods-text-secondary">Description</Label>
+                  <Label className="text-ods-text-secondary">{descriptionLabel}</Label>
                   <Textarea
-                    placeholder="Detailed explanation of the change..."
+                    placeholder={descriptionPlaceholder}
                     value={entry.description || ''}
                     onChange={e => updateEntry(index, 'description', e.target.value)}
                     rows={2}
                     className="bg-ods-bg"
                   />
                 </div>
+
+                {/* Tag */}
+                {tagOptions && (
+                  <div className="space-y-1">
+                    <Label className="text-ods-text-secondary">{tagLabel}</Label>
+                    <Select value={entry.tag ?? ''} onValueChange={value => updateEntry(index, 'tag', value)}>
+                      <SelectTrigger className="bg-ods-bg">
+                        <SelectValue placeholder={tagLabel} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tagOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
           </div>

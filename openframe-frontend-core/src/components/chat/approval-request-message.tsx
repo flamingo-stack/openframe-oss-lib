@@ -1,12 +1,13 @@
 'use client';
 
-import { Ban, CheckCircle, XCircle } from 'lucide-react';
 import { forwardRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { Button } from '../ui/button';
-import { Tag } from '../ui/tag';
-import { ApprovalStatusTag } from './approval-batch-message';
+import { ApprovalStatusTag, ApprovalWaitingLine } from './approval-batch-message';
+import { useChatAppearance } from './chat-appearance-context';
+import { CHAT_BLOCK_CLASS } from './chat-block-frame';
 import type { ApprovalRequestMessageProps } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 import type { ApprovalRequestField } from './types/message.types';
 
 /**
@@ -77,6 +78,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
     ref,
   ) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
 
     const handleApprove = async () => {
       setIsProcessing(true);
@@ -104,7 +106,9 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
         <div
           ref={ref}
           className={cn(
-            'mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
+            CHAT_BLOCK_CLASS,
+            // v2: the thread owns the space below the card.
+            !isV2 && 'mb-[var(--spacing-system-xsf)]',
             className,
           )}
           {...props}
@@ -112,8 +116,9 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           <p className="w-full whitespace-pre-line break-words text-ods-text-primary text-h4">
             {data.explanation?.trim() || 'Approval required'}
           </p>
+          {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
           {!showFooterActions ? null : status === 'pending' ? (
-            <div className="flex w-full items-center gap-[var(--spacing-system-mf)]">
+            <div className="flex w-full items-center gap-[var(--spacing-system-xsf)]">
               <Button
                 size="small-legacy"
                 variant="accent"
@@ -151,17 +156,11 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
     }
 
     return (
-      <div
-        ref={ref}
-        className={cn(
-          'mb-[var(--spacing-system-xsf)] flex flex-col gap-[var(--spacing-system-mf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-mf)]',
-          className,
-        )}
-        {...props}
-      >
+      <div ref={ref} className={cn('mb-[var(--spacing-system-xsf)]', CHAT_BLOCK_CLASS, className)} {...props}>
         <ApprovalCardBody data={data} />
+        {showFooterActions && status === 'pending' && <ApprovalWaitingLine />}
         {!showFooterActions ? null : status === 'pending' ? (
-          <div className="flex items-center gap-[var(--spacing-system-mf)]">
+          <div className="flex items-center gap-[var(--spacing-system-xsf)]">
             <Button
               size="small-legacy"
               variant="accent"
@@ -191,13 +190,7 @@ const ApprovalRequestMessage = forwardRef<HTMLDivElement, ApprovalRequestMessage
           </div>
         ) : (
           <div className="flex">
-            {status === 'approved' ? (
-              <Tag label="Approved" variant="success" icon={<CheckCircle className="h-4 w-4" />} />
-            ) : status === 'cancelled' ? (
-              <Tag label="Canceled" variant="grey" icon={<Ban className="h-4 w-4" />} />
-            ) : (
-              <Tag label="Rejected" variant="error" icon={<XCircle className="h-4 w-4" />} />
-            )}
+            <ApprovalStatusTag status={status} resolvedByName={resolvedByName} inlineResolver />
           </div>
         )}
       </div>

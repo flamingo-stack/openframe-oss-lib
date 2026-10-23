@@ -2,6 +2,7 @@
 
 import { Upload } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { formatDuration } from '../../utils/format-duration';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -67,12 +68,6 @@ export function HighlightVideoPreview({
       await onUpload(file);
     };
     input.click();
-  };
-
-  const formatDuration = (ms: number) => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${String(seconds).padStart(2, '0')}`;
   };
 
   return (

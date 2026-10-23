@@ -1,8 +1,8 @@
 package com.openframe.stream.deserializer;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -100,17 +100,30 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
         }
     }
 
+    protected boolean isFailed(JsonNode after) {
+        return hasTimedOut(after) || hasNonZeroExitCode(after) || parseStringField(after, FIELD_ERROR).isPresent();
+    }
+
+    private boolean hasTimedOut(JsonNode after) {
+        return parseStringField(after, FIELD_TIMED_OUT).map(Boolean::parseBoolean).orElse(false);
+    }
+
+    private boolean hasNonZeroExitCode(JsonNode after) {
+        return parseStringField(after, FIELD_EXIT_CODE).map(RmmResultDeserializer::isNonZero).orElse(false);
+    }
+
+    private static boolean isNonZero(String exitCode) {
+        try {
+            return Integer.parseInt(exitCode) != 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
     @Override
     protected String getError(JsonNode after) {
-        boolean timedOut = parseStringField(after, FIELD_TIMED_OUT).map(Boolean::parseBoolean).orElse(false);
-        boolean failed = parseStringField(after, FIELD_EXIT_CODE)
-                .map(rc -> {
-                    try {
-                        return Integer.parseInt(rc) != 0;
-                    } catch (NumberFormatException e) {
-                        return false;
-                    }
-                }).orElse(false);
+        boolean timedOut = hasTimedOut(after);
+        boolean failed = hasNonZeroExitCode(after);
         Optional<String> stderr = parseStringField(after, FIELD_STDERR);
         Optional<String> error = parseStringField(after, FIELD_ERROR);
 
@@ -151,6 +164,14 @@ public abstract class RmmResultDeserializer extends IntegratedToolEventDeseriali
             log.error("Failed to build details JSON for command result", e);
             return null;
         }
+    }
+
+    protected ObjectNode toObjectNode(String json) {
+        if (json == null) {
+            return mapper.createObjectNode();
+        }
+        JsonNode parsed = mapper.readTree(json);
+        return parsed.isObject() ? (ObjectNode) parsed : mapper.createObjectNode();
     }
 
     private static void putIntOrString(ObjectNode node, String key, String value) {

@@ -1,7 +1,15 @@
 /* Open Design System – Responsive Design Tokens */
 /* Mobile-first approach: base = mobile, then scale up with min-width */
+/*
+ * `.ods-viewport-layer` restates the same values on an element: chrome that
+ * follows the WINDOW (a modal, a drawer) but renders inside a narrow content
+ * area, whose scope re-declares the mobile values
+ * (ods-content-area-tokens.css), gets the viewport's tokens back for its own
+ * subtree.
+ */
 
-:root {
+:root,
+.ods-viewport-layer {
   /* =================================================== */
   /* DEVICE CONTEXT */
   /* =================================================== */
@@ -57,6 +65,14 @@
   --font-size-badge: 0.625rem; /* 10px */
   --font-line-space-badge: 0.75rem; /* 12px */
 
+  /* CHIP WALL PITCH — THE gap between quick-action chips, wherever a wall of
+   * them is drawn: the in-app QuickActionWall (its `copyGap` default, which
+   * also sets the clone seam and the row stack) and the marketing decks' own
+   * walls. These are one component, so they get one gap and it is defined
+   * here, once. Following the spacing scale's `m` step, so it breathes on a
+   * wide viewport and tightens on a phone. */
+  --chip-wall-gap: var(--spacing-system-m);
+
   /* =================================================== */
   /* RESPONSIVE ICON SYSTEM */
   /* =================================================== */
@@ -69,7 +85,8 @@
 /* =================================================== */
 
 @media (min-width: 800px) {
-  :root {
+  :root,
+  .ods-viewport-layer {
     /* Device Context */
     --device-type: tablet;
     --device-screen-width: 50rem;
@@ -114,7 +131,8 @@
 /* =================================================== */
 
 @media (min-width: 1280px) {
-  :root {
+  :root,
+  .ods-viewport-layer {
     /* Device Context */
     --device-type: desktop;
     --device-screen-width: 80rem;

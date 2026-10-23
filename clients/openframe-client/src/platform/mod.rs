@@ -1,12 +1,16 @@
 pub mod binary_writer;
 pub mod console;
+pub mod detached_process;
 pub mod directories;
 pub mod dmg_extractor;
 pub mod file_acl;
 pub mod file_lock;
 pub mod installation_detector;
+pub mod lock_recovery;
 pub mod machine_info_persistence;
+pub mod orphan_reaper;
 pub mod permissions;
+pub mod process_tree;
 pub mod system_service;
 pub mod tool_updater;
 pub mod uninstall;
@@ -14,6 +18,8 @@ pub mod update_scripts;
 pub mod updater_launcher;
 pub mod user_session;
 
+#[cfg(target_os = "windows")]
+pub mod apps_entry;
 #[cfg(target_os = "windows")]
 pub mod powershell;
 #[cfg(target_os = "macos")]

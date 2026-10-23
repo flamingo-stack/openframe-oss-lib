@@ -11,12 +11,13 @@ import com.openframe.data.document.rmm.schedule.ScheduleScriptMachineAssigned;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.ScriptScheduleMachineAssignedRepository;
+import com.openframe.data.service.rmm.ScheduleCriteriaDeviceResolver;
 import com.openframe.data.service.rmm.ScheduleDeviceTargetResolver;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -40,7 +41,12 @@ class ScheduleDeviceTargetResolverTest {
     @Mock private MachineRepository machineRepository;
     @Mock private ScriptScheduleMachineAssignedRepository assignedRepository;
 
-    @InjectMocks private ScheduleDeviceTargetResolver resolver;
+    private ScheduleDeviceTargetResolver resolver;
+
+    @BeforeEach
+    void setUp() {
+        resolver = new ScheduleDeviceTargetResolver(machineRepository, assignedRepository, new ScheduleCriteriaDeviceResolver(machineRepository));
+    }
 
     @Test
     @DisplayName("resolveTargetMachineIds: SPECIFIC reads the join rows (deduped) and keeps active machines in input order")

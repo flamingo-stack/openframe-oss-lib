@@ -56,4 +56,8 @@ public class ApprovalApi {
 
         throw new AssertionError(detail);
     }
+
+    public static void reject(String approvalRequestId) {
+        approve(approvalRequestId, false);
+    }
 }

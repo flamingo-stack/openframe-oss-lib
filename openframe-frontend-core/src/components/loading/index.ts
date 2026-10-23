@@ -1,69 +1,23 @@
 'use client';
 
-// Page layout skeletons
+// The skeleton PARTS a component draws its own loading form from (a component switches itself; nothing here is a
+// whole component's or a whole view's skeleton).
 export {
-  AnnouncementBarSkeleton,
-  HeroSkeleton,
-  SearchContainerSkeleton,
-  CategorySidebarSkeleton,
-  BreadcrumbSkeleton,
-  ResultsHeaderSkeleton,
-  TwoColumnLayoutSkeleton,
-  ArticleLayoutSkeleton,
-  VendorDetailLayoutSkeleton,
-  StatsSectionSkeleton,
-  SlackCommunitySkeleton,
-  BlogCardGridSkeleton,
-  VendorGridSkeleton,
-} from './page-layout-skeleton';
-
-// Card skeleton components
-export { CardSkeleton, CardSkeletonGrid } from './card-skeleton';
-
-// Unified skeleton components
-export { UnifiedSkeleton, TextSkeleton, MediaSkeleton, InteractiveSkeleton } from './unified-skeleton';
+  UnifiedSkeleton,
+  TextSkeleton,
+  TextLineSkeleton,
+  MediaSkeleton,
+  InteractiveSkeleton,
+} from './unified-skeleton';
 
 // New unified loading components
 export { ContentLoadingContainer, useContentLoading } from '../content-loading-container';
-
-// Content skeleton components
-export {
-  ParagraphSkeleton,
-  ListSkeleton,
-  TableSkeleton,
-  FormSkeleton,
-  NavigationSkeleton,
-  ProfileSkeleton,
-  CommentSkeleton,
-  FeatureListSkeleton,
-  TimelineSkeleton,
-  PricingSkeleton,
-} from './content-skeleton';
-
-// Profile system loading skeleton
-export { ProfileLoadingSkeleton } from '../profile/ProfileLoadingSkeleton';
-
-export { MspProfileFormSkeleton } from './msp-profile-form-skeleton';
-
-export { CategoryCardSkeleton } from './category-card-skeleton';
-
-export { CategoryVendorSelectorSkeleton } from './category-vendor-selector-skeleton';
-
-export { WizardLayoutSkeleton } from './wizard-layout-skeleton';
 
 // Note: OpenmspHeartbeatLoader is a client-only component and should be
 // imported directly from "./openmsp-heartbeat" in client components. Do NOT
 // export it here, otherwise server components that import this index will
 // break due to client-only code.
 
-export { MarginReportSkeleton } from './margin-report-skeleton';
-
-export { UsersGridSkeleton } from './users-grid-skeleton';
-
-// Dynamic ODS-aware skeleton components
-export { DynamicSkeleton, SkeletonPresets, PlatformSkeletonContainer, ProgressiveSkeleton } from '../dynamic-skeleton';
-
-// Organization & Device skeleton components
-export { OrganizationIconSkeleton } from './organization-icon-skeleton';
-export { OrganizationCardSkeleton, OrganizationCardSkeletonGrid } from './organization-card-skeleton';
-export { DeviceCardSkeleton, DeviceCardSkeletonGrid } from './device-card-skeleton';
+export { LoadingRegion, type LoadingRegionProps } from './loading-region';
+export { LoadingStatus } from '../ui/loading-scope';
+export { LoadingFallback, LoadingSuspense } from './loading-fallback';

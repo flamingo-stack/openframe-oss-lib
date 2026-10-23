@@ -1,5 +1,8 @@
 package com.openframe.api.service.ticket;
 
+import com.openframe.api.exception.ticket.TicketNotFoundException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -10,6 +13,7 @@ import com.openframe.security.authentication.AuthPrincipal;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -41,6 +45,16 @@ public class TicketTagService {
 
     public List<Tag> getTags() {
         return tagRepository.findByEntityType(TagEntityType.TICKET);
+    }
+
+    /** One page of ticket tags, oldest first: from the start when afterTagId is null, otherwise after that tag. */
+    public List<Tag> getTagsPage(AuthPrincipal principal, String afterTagId, int limit) {
+        validateAdminAccess(principal);
+        Limit page = Limit.of(limit);
+        if (afterTagId == null) {
+            return tagRepository.findByEntityTypeOrderByIdAsc(TagEntityType.TICKET, page);
+        }
+        return tagRepository.findByEntityTypeAndIdGreaterThanOrderByIdAsc(TagEntityType.TICKET, afterTagId, page);
     }
 
     @Transactional
@@ -144,7 +158,7 @@ public class TicketTagService {
             List<String> notFound = tagIds.stream()
                     .filter(id -> !existingIds.contains(id))
                     .toList();
-            throw new IllegalArgumentException("Tags not found: " + notFound);
+            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tags not found: " + notFound);
         }
     }
 
@@ -177,7 +191,7 @@ public class TicketTagService {
 
     private void validateTicketExists(String ticketId) {
         if (!ticketRepository.existsById(ticketId)) {
-            throw new IllegalArgumentException("Ticket not found: " + ticketId);
+            throw new TicketNotFoundException(ticketId);
         }
     }
 }

@@ -27,6 +27,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -213,7 +214,7 @@ public class DeviceController {
     public void updateDeviceStatus(
             @Parameter(description = "Machine ID of the device")
             @PathVariable String machineId,
-            @RequestBody UpdateDeviceStatusRequest request,
+            @Valid @RequestBody UpdateDeviceStatusRequest request,
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.info("Updating device {} status to {} - userId: {}, apiKeyId: {}", machineId, request.status(), caller.userId(), caller.apiKeyId());
@@ -229,7 +230,7 @@ public class DeviceController {
     public void updateDeviceNickname(
             @Parameter(description = "Machine ID of the device")
             @PathVariable String machineId,
-            @RequestBody UpdateDeviceNicknameRequest request,
+            @Valid @RequestBody UpdateDeviceNicknameRequest request,
             @Parameter(hidden = true) ApiCaller caller) {
 
         log.info("Updating device {} nickname - userId: {}, apiKeyId: {}", machineId, caller.userId(), caller.apiKeyId());

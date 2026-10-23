@@ -35,6 +35,15 @@ public class UnifiedLogEvent {
     @Column("hostname")
     private String hostname;
 
+    @Column("nickname")
+    private String nickname;
+
+    @Column("execution_source")
+    private String executionSource;
+
+    @Column("script_creation_source")
+    private String scriptCreationSource;
+
     /**
      * Organization ID associated with the event.
      */

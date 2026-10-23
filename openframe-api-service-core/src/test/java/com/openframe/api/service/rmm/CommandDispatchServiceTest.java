@@ -9,8 +9,6 @@ import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.command.CommandDispatchService;
 import com.openframe.api.service.rmm.command.CommandExecutionService;
 import com.openframe.core.exception.BadRequestException;
-import com.openframe.data.document.device.DeviceStatus;
-import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
 import com.openframe.data.document.rmm.script.ScriptShell;
 import com.openframe.data.nats.rmm.model.CancelMessage;
@@ -27,18 +25,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class CommandDispatchServiceTest {
@@ -60,9 +56,6 @@ class CommandDispatchServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Target machine exists (happy path). lenient: cancelExecution tests do not look up a machine.
-        lenient().when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machineWithStatus(DeviceStatus.ONLINE)));
-
         input = new RunCommandInput();
         input.setMachineId(MACHINE_ID);
         input.setShell(ScriptShell.BASH);
@@ -73,7 +66,8 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("runCommand: a non-existent machine is rejected (DeviceNotFoundException) and nothing is published")
     void runCommand_rejectsUnknownMachine() {
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.empty());
+        doThrow(new DeviceNotFoundException("Machine not found: " + MACHINE_ID))
+                .when(deviceService).verifyDispatchable(MACHINE_ID);
 
         assertThatThrownBy(() -> commandDispatchService.runCommand(input))
                 .isInstanceOf(DeviceNotFoundException.class);
@@ -84,7 +78,9 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("runCommand: a machine in PENDING_DELETION is rejected (BadRequestException) — no publish")
     void runCommand_rejectsPendingDeletionMachine() {
-        when(deviceService.findByMachineId(MACHINE_ID)).thenReturn(Optional.of(machineWithStatus(DeviceStatus.PENDING_DELETION)));
+        doThrow(new BadRequestException(
+                "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): " + MACHINE_ID))
+                .when(deviceService).verifyDispatchable(MACHINE_ID);
 
         assertThatThrownBy(() -> commandDispatchService.runCommand(input))
                 .isInstanceOf(BadRequestException.class)
@@ -211,8 +207,6 @@ class CommandDispatchServiceTest {
     @SuppressWarnings("unchecked")
     void batchRunCommand_persistsPendingThenFansOut() {
         List<String> machines = List.of("machine-1", "machine-2", "machine-3");
-        machines.forEach(id ->
-                when(deviceService.findByMachineId(id)).thenReturn(Optional.of(machineWithStatus(DeviceStatus.ONLINE))));
 
         DispatchResponse response = commandDispatchService.batchRunCommand(batchInput(machines), INITIATED_BY);
 
@@ -244,8 +238,6 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("batchRunCommand: rows are saved BEFORE the first NATS publish — never in flight without a durable record")
     void batchRunCommand_savesBeforePublishing() {
-        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(machineWithStatus(DeviceStatus.ONLINE)));
-
         commandDispatchService.batchRunCommand(batchInput(List.of("machine-1")), INITIATED_BY);
 
         InOrder order = inOrder(commandExecutionService, commandNatsPublisher);
@@ -258,8 +250,6 @@ class CommandDispatchServiceTest {
     @DisplayName("batchRunCommand: duplicate machineIds collapse to one row / one publish — the (machineId, executionId) key stays unique")
     @SuppressWarnings("unchecked")
     void batchRunCommand_dedupsMachineIds() {
-        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(machineWithStatus(DeviceStatus.ONLINE)));
-
         commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-1")), INITIATED_BY);
 
         verify(commandExecutionService).createBatch(any(), any(), any(),
@@ -270,8 +260,8 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("batchRunCommand: an unknown machine rejects the whole batch — nothing is persisted and nothing is published")
     void batchRunCommand_rejectsUnknownMachineBeforeAnySideEffect() {
-        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(machineWithStatus(DeviceStatus.ONLINE)));
-        when(deviceService.findByMachineId("machine-missing")).thenReturn(Optional.empty());
+        doThrow(new DeviceNotFoundException("Machine not found: machine-missing"))
+                .when(deviceService).verifyDispatchable(org.mockito.ArgumentMatchers.anyList());
 
         assertThatThrownBy(() ->
                 commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-missing")), INITIATED_BY))
@@ -284,8 +274,9 @@ class CommandDispatchServiceTest {
     @Test
     @DisplayName("batchRunCommand: any PENDING_DELETION target rejects the whole batch — no half-dispatch")
     void batchRunCommand_rejectsBatchWithPendingDeletionMachine() {
-        when(deviceService.findByMachineId("machine-1")).thenReturn(Optional.of(machineWithStatus(DeviceStatus.ONLINE)));
-        when(deviceService.findByMachineId("machine-decom")).thenReturn(Optional.of(machineWithStatus(DeviceStatus.PENDING_DELETION)));
+        doThrow(new BadRequestException(
+                "Machine is not in a dispatchable state (must be ONLINE or OFFLINE): machine-decom"))
+                .when(deviceService).verifyDispatchable(org.mockito.ArgumentMatchers.anyList());
 
         assertThatThrownBy(() ->
                 commandDispatchService.batchRunCommand(batchInput(List.of("machine-1", "machine-decom")), INITIATED_BY))
@@ -296,9 +287,4 @@ class CommandDispatchServiceTest {
         verifyNoInteractions(commandNatsPublisher);
     }
 
-    private static Machine machineWithStatus(DeviceStatus status) {
-        Machine m = new Machine();
-        m.setStatus(status);
-        return m;
-    }
 }
