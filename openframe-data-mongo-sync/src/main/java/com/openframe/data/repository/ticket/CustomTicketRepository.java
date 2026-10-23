@@ -38,6 +38,8 @@ public interface CustomTicketRepository {
 
     void updateTitle(String ticketId, String title);
 
+    void updatePendingApproval(String ticketId, boolean pending);
+
     /**
      * Stamps the ticket's last activity and returns the stamped document, so a caller that has to
      * broadcast the change gets {@code statusId} and {@code awaitingClientSince} from the same round
