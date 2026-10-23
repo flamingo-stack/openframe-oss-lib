@@ -57,14 +57,22 @@ describe('SnapCarousel', () => {
   const renderCarousel = () =>
     render(<SnapCarousel items={ITEMS} label="Example requests" renderItem={item => <p>{item}</p>} />);
 
-  it('says where it is and disables the arrow at each end', () => {
+  it('says where it is, and its arrows loop: back from the first is the last, next from the last is the first', () => {
     renderCarousel();
     expect(screen.getByText('1 / 3')).toBeTruthy();
-    expect(screen.getByLabelText<HTMLButtonElement>('Previous').disabled).toBe(true);
-    expect(screen.getByLabelText<HTMLButtonElement>('Next').disabled).toBe(false);
     expect(screen.getByRole('group', { name: 'Example requests' }).getAttribute('aria-roledescription')).toBe(
       'carousel',
     );
+    expect(screen.getByLabelText<HTMLButtonElement>('Previous').disabled).toBe(false);
+    expect(screen.getByLabelText<HTMLButtonElement>('Next').disabled).toBe(false);
+
+    fireEvent.click(screen.getByLabelText('Previous'));
+    expect(scrolledTo[scrolledTo.length - 1]).toBe(2 * STEP);
+    expect(screen.getByText('3 / 3')).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText('Next'));
+    expect(scrolledTo[scrolledTo.length - 1]).toBe(0);
+    expect(screen.getByText('1 / 3')).toBeTruthy();
   });
 
   it("draws its arrows as the shared round step arrows, never the strip's square outline icon button", () => {
@@ -100,7 +108,7 @@ describe('SnapCarousel', () => {
       }
       // Three advances: the third hits the end of the track, which is the last slide.
       expect(screen.getByText('5 / 5')).toBeTruthy();
-      expect(screen.getByLabelText<HTMLButtonElement>('Next').disabled).toBe(true);
+      expect(screen.getByLabelText<HTMLButtonElement>('Next').disabled).toBe(false);
 
       // Back from the end moves the track one slide back from where it stands.
       fireEvent.click(screen.getByLabelText('Previous'));
@@ -113,6 +121,14 @@ describe('SnapCarousel', () => {
       act(() => {
         vi.advanceTimersByTime(5000);
       });
+      expect(scrolledTo[scrolledTo.length - 1]).toBe(0);
+      expect(screen.getByText('1 / 5')).toBeTruthy();
+
+      // The arrows loop too: back from the first slide is the last, next from the last is the first.
+      fireEvent.click(screen.getByLabelText('Previous'));
+      expect(scrolledTo[scrolledTo.length - 1]).toBe(maxScroll);
+      expect(screen.getByText('5 / 5')).toBeTruthy();
+      fireEvent.click(screen.getByLabelText('Next'));
       expect(scrolledTo[scrolledTo.length - 1]).toBe(0);
       expect(screen.getByText('1 / 5')).toBeTruthy();
     } finally {

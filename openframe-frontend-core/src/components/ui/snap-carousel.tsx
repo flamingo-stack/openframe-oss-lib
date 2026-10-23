@@ -118,15 +118,10 @@ export function SnapCarouselControls({
       <StepArrowButton
         direction="previous"
         aria-label={prevLabel}
-        disabled={loading || index === 0}
+        disabled={loading || count < 2}
         onClick={onPrevious}
       />
-      <StepArrowButton
-        direction="next"
-        aria-label={nextLabel}
-        disabled={loading || index === count - 1}
-        onClick={onNext}
-      />
+      <StepArrowButton direction="next" aria-label={nextLabel} disabled={loading || count < 2} onClick={onNext} />
     </div>
   );
 }
@@ -249,14 +244,20 @@ export function SnapCarousel<T>({
     setIndex(atEnd ? count - 1 : Math.min(count - 1, Math.round(track.scrollLeft / step)));
   }, [count, slideStep]);
 
-  // Back one slide from where the track stands: at the end the index is the last slide, which sits further right
-  // than the track can scroll, so stepping back from the index alone would not move it.
+  // The arrows loop like auto-advance: back from the first slide is the last, next from the last is the first.
+  // Back steps from where the track stands: at the end the index is the last slide, which sits further right than
+  // the track can scroll, so stepping back from the index alone would not move it.
   const goBack = useCallback(() => {
     const track = trackRef.current;
     const step = slideStep();
     if (!track || step === 0) return;
+    if (index === 0) {
+      goTo(count - 1);
+      return;
+    }
     goTo(Math.min(index, Math.round(track.scrollLeft / step)) - 1);
-  }, [goTo, index, slideStep]);
+  }, [count, goTo, index, slideStep]);
+  const goNext = useCallback(() => goTo(index >= count - 1 ? 0 : index + 1), [count, goTo, index]);
 
   const canAutoAdvance = autoAdvanceMs > 0 && count > 1;
   const playing = auto.playing && canAutoAdvance;
@@ -311,7 +312,7 @@ export function SnapCarousel<T>({
         prevLabel={prevLabel}
         nextLabel={nextLabel}
         onPrevious={goBack}
-        onNext={() => goTo(index + 1)}
+        onNext={goNext}
         wait={showsWait ? { durationMs: autoAdvanceMs, ranMs, running: playing } : null}
         announce={!playing}
       />
