@@ -30,7 +30,7 @@ public class CommandDataFetcher {
 
     @DgsMutation
     public DispatchResponse runCommand(@InputArgument @Valid RunCommandInput input) {
-        return commandDispatchService.runCommand(input);
+        return commandDispatchService.runCommand(input, getCurrentUserId());
     }
 
     @DgsMutation

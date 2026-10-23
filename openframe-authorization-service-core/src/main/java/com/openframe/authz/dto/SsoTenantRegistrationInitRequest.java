@@ -43,6 +43,6 @@ public class SsoTenantRegistrationInitRequest {
      */
     private boolean authMobile;
 
-    private RegistrationAttribution attribution;
+    private Touchpoint attribution;
 }
 

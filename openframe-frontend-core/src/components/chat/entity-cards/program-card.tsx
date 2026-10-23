@@ -342,8 +342,12 @@ function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; tit
     setIsModalOpen(false);
     setSelectedImageIndex(null);
   };
+  // A whole-card link (`wholeCardClickable`) puts the gallery INSIDE its anchor, the gallery's modal too (it renders
+  // in place). `stopPropagation` does not stop an anchor from navigating, so a thumbnail opened the gallery and then
+  // followed the card's link. Every click in the gallery is the gallery's own: cancel the link in the capture phase,
+  // before any of its handlers runs, and let the handlers run.
   return (
-    <>
+    <div className="contents" onClickCapture={e => e.preventDefault()}>
       <div className="overflow-x-auto" data-loading-optional={optional || undefined}>
         <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
           {images.map((mediaItem, index) => (
@@ -372,7 +376,7 @@ function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; tit
         onClose={closeImageModal}
         initialIndex={selectedImageIndex || 0}
       />
-    </>
+    </div>
   );
 }
 

@@ -114,7 +114,7 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
         openInNewTab={action.openInNewTab}
         aria-label={action['aria-label']}
         disabled={action.disabled}
-        className={cn('h-auto self-stretch', action.openInNewTab && 'max-md:hidden')}
+        className={cn(action.openInNewTab && 'max-md:hidden')}
         onClick={handleClick}
       >
         {action.icon}

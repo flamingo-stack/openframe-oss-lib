@@ -80,9 +80,8 @@ function LoadedNavigationSidebarItemButton({
   const content: ReactNode = (
     <>
       <div className="relative flex flex-shrink-0 items-center justify-center">
-        {cloneElement(item.icon as ReactElement<IconProps>, {
-          color: isActive && !disabled ? 'text-ods-accent' : 'text-ods-text-secondary',
-        })}
+        {/* The glyph's colour is the rail kind's (`[&_svg]:fill-*`, by `data-state`): its paths inherit it. */}
+        {cloneElement(item.icon as ReactElement<IconProps>, { color: 'inherit' })}
         {hasUnread && !showLabel && <UnreadDot size="fixed" />}
       </div>
 
