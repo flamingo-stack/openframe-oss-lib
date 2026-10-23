@@ -461,7 +461,7 @@
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "19.3.0",
     "@uiw/react-md-editor": "^4.1.0",
-    "@vitest/eslint-plugin": "^1.6.27",
+    "@vitest/eslint-plugin": "1.6.27",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.4",
