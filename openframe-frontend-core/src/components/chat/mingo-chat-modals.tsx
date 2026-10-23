@@ -1,17 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { cn } from '../../utils/cn';
+import { Button } from '../ui/button';
+import { Label } from '../ui/label';
 import { ModalV2, ModalV2Header, ModalV2Title, ModalV2Footer } from '../ui/modal-v2';
 import type { DialogItem } from './types/component.types';
 
-// Shared button styling for the modal footers (Figma `button-full`):
-// full-width, `text-h3` (DM Sans Bold 18px), 12/16 padding, rounded-md.
-const footerBtn =
-  'flex-1 min-w-0 rounded-md px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent disabled:opacity-50 disabled:cursor-not-allowed';
-const cancelBtn = cn(footerBtn, 'border border-ods-border bg-transparent text-ods-text-primary hover:bg-ods-bg-hover');
-const saveBtn = cn(footerBtn, 'bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover');
-const dangerBtn = cn(footerBtn, 'bg-ods-error text-ods-text-on-accent hover:opacity-90');
+// The footer buttons share the row equally (Figma `button-full`).
+const footerBtn = 'min-w-0 flex-1';
 
 // =============================================================================
 // Rename
@@ -50,9 +46,9 @@ export function RenameChatModal({ isOpen, initialName = '', onClose, onSave }: R
         <ModalV2Title>Rename Chat</ModalV2Title>
       </ModalV2Header>
       <div className="flex w-full flex-col gap-[var(--spacing-system-xxs)]">
-        <label htmlFor="rename-chat-input" className="text-ods-text-primary text-h4">
+        <Label htmlFor="rename-chat-input" variant="large">
           Chat Name
-        </label>
+        </Label>
         <input
           id="rename-chat-input"
           autoFocus
@@ -65,12 +61,12 @@ export function RenameChatModal({ isOpen, initialName = '', onClose, onSave }: R
         />
       </div>
       <ModalV2Footer>
-        <button type="button" onClick={onClose} className={cancelBtn}>
+        <Button variant="outline" type="button" onClick={onClose} className={footerBtn}>
           Cancel
-        </button>
-        <button type="button" onClick={save} disabled={!canSave} className={saveBtn}>
+        </Button>
+        <Button variant="accent" type="button" onClick={save} disabled={!canSave} className={footerBtn}>
           Save
-        </button>
+        </Button>
       </ModalV2Footer>
     </ModalV2>
   );
@@ -96,12 +92,12 @@ export function ArchiveChatModal({ isOpen, onClose, onConfirm }: ArchiveChatModa
       </ModalV2Header>
       <p className="w-full text-ods-text-primary text-h4">This chat will be hidden from your current chats.</p>
       <ModalV2Footer>
-        <button type="button" onClick={onClose} className={cancelBtn}>
+        <Button variant="outline" type="button" onClick={onClose} className={footerBtn}>
           Cancel
-        </button>
-        <button type="button" onClick={onConfirm} className={dangerBtn}>
+        </Button>
+        <Button variant="destructive" type="button" onClick={onConfirm} className={footerBtn}>
           Archive Chat
-        </button>
+        </Button>
       </ModalV2Footer>
     </ModalV2>
   );
@@ -128,12 +124,12 @@ export function UnarchiveChatModal({ isOpen, onClose, onConfirm }: UnarchiveChat
       </ModalV2Header>
       <p className="w-full text-ods-text-primary text-h4">This chat will be moved back to your current chats.</p>
       <ModalV2Footer>
-        <button type="button" onClick={onClose} className={cancelBtn}>
+        <Button variant="outline" type="button" onClick={onClose} className={footerBtn}>
           Cancel
-        </button>
-        <button type="button" onClick={onConfirm} className={saveBtn}>
+        </Button>
+        <Button variant="accent" type="button" onClick={onConfirm} className={footerBtn}>
           Unarchive Chat
-        </button>
+        </Button>
       </ModalV2Footer>
     </ModalV2>
   );

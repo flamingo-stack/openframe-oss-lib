@@ -15,7 +15,6 @@ export type {
   DeviceSelectorServer,
   SubTab,
 } from './device-selector/device-selector.types';
-export { DeviceSelectorSkeleton } from './device-selector/device-selector-skeleton';
 export { EMPTY_NARROWING, narrowingToFilter } from './device-selector/narrowing';
 export {
   type DeviceCardStatus,

@@ -6,11 +6,13 @@ import { useDebounce } from '../../hooks/ui/use-debounce';
 import { cn } from '../../utils/cn';
 import { Filter02Icon, SearchIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
+import type { DataTableFilters } from '../ui/data-table/types';
 import { PageError } from '../ui/error-state';
-import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal';
+import { FilterModal, type FilterGroup } from '../ui/filter-modal';
 import { Input } from '../ui/input';
-import type { TableFilters } from '../ui/table/types';
-import { ListPageContainer, type PageActionButton } from './page-container';
+import type { PageActionButton } from '../ui/page-actions';
+import type { SortConfig, SortDirection } from '../ui/sort-column-item';
+import { ListPageContainer } from './page-container';
 
 export interface ListPageLayoutProps {
   title: string;
@@ -25,8 +27,8 @@ export interface ListPageLayoutProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   background?: 'default' | 'card' | 'transparent';
   mobileFilterGroups?: FilterGroup[];
-  onMobileFilterChange?: (filters: TableFilters) => void;
-  currentMobileFilters?: TableFilters;
+  onMobileFilterChange?: (filters: DataTableFilters) => void;
+  currentMobileFilters?: DataTableFilters;
   mobileSortConfig?: SortConfig;
   onMobileSort?: (column: string, direction: SortDirection) => void;
   mobileFilterTitle?: string;
@@ -161,6 +163,7 @@ export function ListPageLayout({
           )}
         >
           <Input
+            userValue
             placeholder={searchPlaceholder}
             onChange={e => setLocalSearchValue(e.target.value)}
             value={localSearchValue}
@@ -202,9 +205,6 @@ export function ListPageLayout({
     </ListPageContainer>
   );
 }
-
-// Re-export PageActionButton type for convenience
-export type { PageActionButton } from './page-container';
 
 /** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default ListPageLayout;

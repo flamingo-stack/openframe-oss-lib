@@ -103,7 +103,6 @@ public class ToolInstallationDeliverySpec implements DeliverySpec<ToolInstallati
             return null;
         }
         return switch (source) {
-            case ARTIFACTORY -> ToolInstallationMessage.AssetSource.ARTIFACTORY;
             case TOOL_API -> ToolInstallationMessage.AssetSource.TOOL_API;
             case GITHUB -> ToolInstallationMessage.AssetSource.GITHUB;
         };

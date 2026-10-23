@@ -314,7 +314,9 @@ export function SiteHeader({
                 />
               )}
               {nav.signIn && (
-                <div className="hidden lg:flex">
+                // `data-site-signin`: a host whose page is the same for every visitor (served from a CDN) hides it
+                // before paint for a visitor with a session, so a signed-in visitor never sees it flash.
+                <div className="hidden lg:flex" data-site-signin="">
                   <Button
                     asChild
                     variant="transparent"

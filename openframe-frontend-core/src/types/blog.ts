@@ -200,10 +200,6 @@ export interface BlogPostStats {
   recent_posts: BlogPost[];
 }
 
-// Import unified platform configuration (removed duplicate definition)
-// PLATFORM_CONFIGS removed - all platform data now comes from database via getPlatformsConfig()
-export type { PlatformConfig } from './platform';
-
 // SEO Analysis Types
 export interface SEOAnalysisResult {
   overall_score: number;

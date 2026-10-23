@@ -4,6 +4,7 @@ import React from 'react';
 import Image from '../../embed-shims/next-image';
 import { cn } from '../../utils/cn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
+import { Button } from '../ui/button';
 import { Tag, type TagProps } from '../ui/tag';
 
 export interface SelectButtonProps {
@@ -39,26 +40,17 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
     ref,
   ) => {
     return (
-      <button
+      <Button
+        // A selectable option drawn as a field: the picked one (`aria-selected`) takes the accent border on the
+        // accent's light fill.
+        variant="field"
         ref={ref}
         type="button"
         role="option"
         aria-selected={selected}
         disabled={disabled}
         onClick={onClick}
-        className={cn(
-          'group flex h-11 items-center gap-1 rounded-[6px] border px-3 py-3 transition-colors duration-200 content-md:h-16 content-md:gap-2 content-md:px-4',
-          'w-full text-left font-body',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-          'disabled:pointer-events-none disabled:opacity-50',
-          // Hover / active move the BACKGROUND only, like Input — the accent
-          // border is reserved for the selected state, so an unselected button
-          // no longer flashes "selected" under the cursor.
-          selected
-            ? 'border-ods-accent bg-ods-open-yellow-light hover:bg-ods-open-yellow-light-hover active:bg-ods-open-yellow-light-action'
-            : 'border-ods-border bg-ods-card hover:bg-ods-bg-hover active:bg-ods-bg-active',
-          className,
-        )}
+        className={cn('content-md:h-16', className)}
       >
         {icon && (
           <span
@@ -104,7 +96,7 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
         {tag && <Tag variant={tagVariant} className="shrink-0" label={tag} />}
 
         {selected && <CheckCircleIcon className="size-4 shrink-0 text-ods-accent content-md:size-6" />}
-      </button>
+      </Button>
     );
   },
 );

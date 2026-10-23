@@ -4,6 +4,7 @@ import { forwardRef, useEffect, useId, useState } from 'react';
 
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon, Chevron02RightIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 import type { AskDisplayProps } from './types';
 
 /** Why the card is locked. Surfaced twice on purpose: as the veil's `title`
@@ -67,27 +68,29 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
         <p className="min-w-0 flex-1 break-words text-ods-text-primary text-h4">{active.question}</p>
         {showPager && (
           <div className="flex shrink-0 items-center gap-[var(--spacing-system-xxs)]">
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               aria-label="Previous question"
               disabled={index === 0}
               onClick={() => setIndex(current => Math.max(0, current - 1))}
-              className="text-ods-text-secondary transition-colors hover:text-ods-text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary"
             >
               <Chevron02LeftIcon size={16} />
-            </button>
+            </Button>
             <span className="whitespace-nowrap text-ods-text-secondary text-h6">
               {index + 1} of {cards.length}
             </span>
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               aria-label="Next question"
               disabled={index === cards.length - 1}
               onClick={() => setIndex(current => Math.min(cards.length - 1, current + 1))}
-              className="text-ods-text-secondary transition-colors hover:text-ods-text-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary"
             >
               <Chevron02RightIcon size={16} />
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -106,16 +109,12 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
                 list never ends on a hanging border (the design's trailing rule
                 belongs to the custom-answer input, which this card does not have). */}
           {active.options.map((option, optionIndex) => (
-            <button
+            <Button
+              variant="row"
               key={`${option.label}-${optionIndex}`}
               type="button"
               disabled={!isInteractive}
               onClick={() => onSelect?.(option.label)}
-              className={cn(
-                'flex w-full items-start gap-[var(--spacing-system-s)] bg-ods-card p-[var(--spacing-system-s)] text-left transition-colors',
-                optionIndex > 0 && 'border-t border-ods-border',
-                'hover:bg-ods-bg-hover disabled:cursor-not-allowed disabled:hover:bg-ods-card',
-              )}
             >
               <span className="shrink-0 text-ods-text-secondary text-h4">{optionIndex + 1}.</span>
               <span className="flex min-w-0 flex-1 flex-col">
@@ -124,7 +123,7 @@ const AskDisplay = forwardRef<HTMLDivElement, AskDisplayProps>(({ className, car
                   <span className="break-words text-ods-text-secondary text-h6">{option.description}</span>
                 )}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
         {!isInteractive && (

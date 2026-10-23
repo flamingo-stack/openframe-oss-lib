@@ -77,3 +77,18 @@ describe('ChatTicketItem subtitle', () => {
     expect(screen.getByTestId('chat-ticket-item-chevron')).toHaveClass('bg-ods-card');
   });
 });
+
+describe('ChatTicketItem loading', () => {
+  it('draws the same row inert, its markers kept, no read text and no button', () => {
+    render(<ChatTicketItem loading data-loading-item data-testid="ticket-row" />);
+    const row = screen.getByTestId('ticket-row');
+
+    expect(row.tagName).toBe('DIV');
+    expect(row).toHaveAttribute('aria-hidden', 'true');
+    expect(row).toHaveAttribute('data-loading-item');
+    expect(screen.queryByRole('button', { hidden: true })).toBeNull();
+    // The chevron is static: drawn for real.
+    expect(screen.getByTestId('chat-ticket-item-chevron')).toBeInTheDocument();
+    expect(row).toHaveTextContent(/^$/);
+  });
+});

@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { MOBILE_NAV_SHEET_ID, MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
+import { MobileNavSheet } from '../components/navigation/mobile-nav-sheet';
+import { MOBILE_NAV_SHEET_ID } from '../components/navigation/mobile-nav-sheet-id';
 import { SiteFooter } from '../components/navigation/site-footer';
 import { SiteHeader } from '../components/navigation/site-header';
 import { adminNav, simpleNav, siteNav } from '../stories/site-nav-fixtures';
@@ -48,13 +49,14 @@ describe('SiteHeader', () => {
     expect(screen.getByRole('button', { name: 'Product' })).not.toHaveAttribute('aria-current');
   });
 
-  it('fills the {count} token and renders the lib CTA, Sign in and feature cards', () => {
+  it('fills the {count} token and renders the lib CTA, Sign in and feature cards', async () => {
     renderHeader('/pricing');
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: /All 21 customer stories/, hidden: true })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start free trial' })).toHaveAttribute('href', '/signup');
     expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/sign-in');
-    expect(screen.getAllByText('Read the story')).toHaveLength(2);
+    // The feature cards' component loads after the page (NavPanel), so they arrive a moment after the first draw.
+    expect(await screen.findAllByText('Read the story', {}, { timeout: 5000 })).toHaveLength(2);
   });
 
   it('renders the cta slot for a named CTA, live counters, and nothing extra for an admin bar', () => {

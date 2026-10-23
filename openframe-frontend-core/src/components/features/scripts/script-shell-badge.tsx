@@ -1,6 +1,8 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { scriptShellType } from './shell-types';
 
 export interface ScriptShellBadgeProps {
@@ -12,6 +14,15 @@ export interface ScriptShellBadgeProps {
 
 /** A script's shell: its icon and label from `SCRIPT_SHELL_TYPES`. */
 export function ScriptShellBadge({ value, className, iconClassName }: ScriptShellBadgeProps) {
+  // The shell is still being read (empty, in a loading scope): its icon box and its label as bars.
+  if (useLoadingScope() && !value) {
+    return (
+      <span className={cn('flex items-center gap-2', className)}>
+        <UnifiedSkeleton className={cn('h-5 w-5', iconClassName)} />
+        <TextLineSkeleton type="inherit" as="span" className="w-20" />
+      </span>
+    );
+  }
   const shell = scriptShellType(value);
   const Icon = shell?.icon;
 

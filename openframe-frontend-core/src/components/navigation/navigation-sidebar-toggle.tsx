@@ -2,6 +2,7 @@
 
 import { cn } from '../../utils';
 import { Chevrons03LeftIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 
 export interface NavigationSidebarToggleProps {
   minimized: boolean;
@@ -12,15 +13,11 @@ export interface NavigationSidebarToggleProps {
 export function NavigationSidebarToggle({ minimized, showLabel, onToggle }: NavigationSidebarToggleProps) {
   return (
     <div className="border-t border-ods-border">
-      <button
+      <Button
+        variant="row"
         onClick={onToggle}
-        className={cn(
-          'relative flex w-full items-center justify-start',
-          'h-14 p-[var(--spacing-system-m)]',
-          'transition-colors duration-300',
-          '[&_svg]:transition-colors [&_svg]:duration-300',
-          'text-ods-text-primary hover:bg-ods-bg-hover',
-        )}
+        // The sidebar's row height (its entries are `h-14` too).
+        className="h-14"
         title={minimized ? 'Hide Menu' : undefined}
         aria-label={'Hide Menu'}
       >
@@ -46,7 +43,7 @@ export function NavigationSidebarToggle({ minimized, showLabel, onToggle }: Navi
         >
           Hide Menu
         </span>
-      </button>
+      </Button>
     </div>
   );
 }

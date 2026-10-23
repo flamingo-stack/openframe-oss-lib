@@ -20,10 +20,12 @@ import { Refresh02VrIcon } from '../icons-v2-generated/media-playback/refresh-02
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Autocomplete, type AutocompleteOption } from '../ui/autocomplete';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { Label } from '../ui/label';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { Slider } from '../ui/slider';
 import { TabSelector } from '../ui/tab-selector';
 import { PushButtonSelector } from './push-button-selector';
@@ -115,6 +117,18 @@ function providerMark(providerType: string, stated: string | null | undefined, c
 
 const PAD_X = 'px-[var(--spacing-system-s)]';
 const ROW = 'flex items-center gap-[var(--spacing-system-s)]';
+/** The table's header row, body row and unit line, read by the table and by its skeleton. */
+const HEADER_ROW_CLASS = cn(
+  ROW,
+  PAD_X,
+  'shrink-0 py-[var(--spacing-system-xs)] uppercase tracking-[-0.02em] text-ods-text-secondary text-h5',
+);
+const BODY_ROW_CLASS = cn(ROW, PAD_X, 'py-[var(--spacing-system-xxs)] text-ods-text-primary text-h6');
+const UNIT_LINE_CLASS = cn(
+  'shrink-0 border-t border-ods-border py-[var(--spacing-system-xs)] text-ods-text-secondary text-h6',
+  PAD_X,
+);
+const TABS_ROW_CLASS = cn('shrink-0 border-b border-ods-border py-[var(--spacing-system-xs)]', PAD_X);
 /** Fixed width, so the figures of separate rows line up as columns. */
 const NUMBER_CELL = 'w-16 shrink-0 whitespace-nowrap text-right tabular-nums';
 
@@ -171,7 +185,7 @@ export interface ModelTokenRatesProps {
   className?: string;
 }
 
-/** How many rows the table's skeleton draws: about what the panel's height shows. */
+/** Rows the table's skeleton draws: a typical count (a provider's tab lists every rate it has, with no page or limit). */
 const TABLE_SKELETON_ROWS = 8;
 
 /**
@@ -180,6 +194,7 @@ const TABLE_SKELETON_ROWS = 8;
  * about the subscription, not about the rates.
  */
 export function ModelTokenRates({ rates = [], status = 'ready', autoTopUpEnabled, className }: ModelTokenRatesProps) {
+  const loading = useLoadingScope() || status === 'loading';
   return (
     <div
       className={cn(
@@ -188,7 +203,7 @@ export function ModelTokenRates({ rates = [], status = 'ready', autoTopUpEnabled
       )}
     >
       {autoTopUpEnabled != null && <AutoTopUpLine enabled={autoTopUpEnabled} />}
-      {status === 'loading' ? (
+      {loading ? (
         <ModelTokenRatesSkeleton />
       ) : status === 'error' ? (
         <ModelTokenRatesUnavailable className="flex-1" />
@@ -217,16 +232,15 @@ export function ModelTokenRatesPopover({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
+          variant="bare"
+          size="icon-sm"
           type="button"
           aria-label={MODEL_TOKEN_RATES_COPY.trigger}
-          className={cn(
-            'shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary',
-            triggerClassName,
-          )}
+          className={cn('shrink-0', triggerClassName)}
         >
-          <QuestionCircleIcon className="size-6" />
-        </button>
+          <QuestionCircleIcon />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={8} className="border-0 bg-transparent p-0 shadow-none">
         {children ?? <ModelTokenRates {...panel} />}
@@ -268,22 +282,10 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
   return (
     <>
       {groups.length > 1 && (
-        <ProviderTabs
-          groups={groups}
-          value={group.providerType}
-          onValueChange={setPicked}
-          className={cn('shrink-0 border-b border-ods-border py-[var(--spacing-system-xs)]', PAD_X)}
-        />
+        <ProviderTabs groups={groups} value={group.providerType} onValueChange={setPicked} className={TABS_ROW_CLASS} />
       )}
       <div role="table" aria-label={MODEL_TOKEN_RATES_COPY.unit} className="flex min-h-0 flex-1 flex-col">
-        <div
-          role="row"
-          className={cn(
-            ROW,
-            PAD_X,
-            'shrink-0 py-[var(--spacing-system-xs)] uppercase tracking-[-0.02em] text-ods-text-secondary text-h5',
-          )}
-        >
+        <div role="row" className={HEADER_ROW_CLASS}>
           <span role="columnheader" className="min-w-0 flex-1 truncate">
             {MODEL_TOKEN_RATES_COPY.model}
           </span>
@@ -297,11 +299,7 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
         {/* Every model of the provider, scrolling under the pinned header. */}
         <div role="rowgroup" className="min-h-0 flex-1 overflow-y-auto">
           {group.rates.map(rate => (
-            <div
-              key={rate.modelName}
-              role="row"
-              className={cn(ROW, PAD_X, 'py-[var(--spacing-system-xxs)] text-ods-text-primary text-h6')}
-            >
+            <div key={rate.modelName} data-loading-item role="row" className={BODY_ROW_CLASS}>
               <span role="rowheader" className="min-w-0 flex-1 truncate">
                 {rate.displayName || rate.modelName}
               </span>
@@ -316,14 +314,7 @@ function ModelTokenRatesTable({ rates }: { rates: readonly ModelTokenRate[] }) {
         </div>
       </div>
       {/* The unit, stated once, where it has room to wrap. */}
-      <p
-        className={cn(
-          'shrink-0 border-t border-ods-border py-[var(--spacing-system-xs)] text-ods-text-secondary text-h6',
-          PAD_X,
-        )}
-      >
-        {MODEL_TOKEN_RATES_COPY.unit}
-      </p>
+      <p className={UNIT_LINE_CLASS}>{MODEL_TOKEN_RATES_COPY.unit}</p>
     </>
   );
 }
@@ -348,35 +339,38 @@ export function ModelTokenRatesUnavailable({ className }: { className?: string }
 }
 
 /** The table's loading footprint: the provider tabs, the header and rows of the boxes the loaded rows use. */
-export function ModelTokenRatesSkeleton({
+function ModelTokenRatesSkeleton({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
 } = {}) {
-  const cells = (
-    <>
-      <div className="flex-1" />
-      <UnifiedSkeleton className="h-4 w-12" />
-      <UnifiedSkeleton className="h-4 w-12" />
-    </>
-  );
   return (
     <LoadingRegion label="Loading the model token rates" announce={region} className="min-h-0 flex-1 overflow-hidden">
-      <div className={cn('border-b border-ods-border py-[var(--spacing-system-xs)]', PAD_X)}>
+      <div className={TABS_ROW_CLASS}>
         <UnifiedSkeleton className={TABS_SKELETON_CLASS} />
       </div>
-      <div className={cn(ROW, PAD_X, 'py-[var(--spacing-system-xs)]')}>
-        <UnifiedSkeleton className="h-4 w-14" />
-        {cells}
+      {/* The column headings are the table's own words. */}
+      <div className={HEADER_ROW_CLASS}>
+        <span className="min-w-0 flex-1 truncate">{MODEL_TOKEN_RATES_COPY.model}</span>
+        <span className={NUMBER_CELL}>{MODEL_TOKEN_RATES_COPY.input}</span>
+        <span className={NUMBER_CELL}>{MODEL_TOKEN_RATES_COPY.output}</span>
       </div>
-      {Array.from({ length: TABLE_SKELETON_ROWS }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: identical placeholder rows
-        <div key={index} className={cn(ROW, PAD_X, 'py-[var(--spacing-system-xxs)]')}>
-          <UnifiedSkeleton className="h-4 w-36" />
-          {cells}
-        </div>
-      ))}
+      <LoadingItems count={TABLE_SKELETON_ROWS}>
+        {() => (
+          <div data-loading-item className={BODY_ROW_CLASS}>
+            <span className="min-w-0 flex-1">
+              <TextLineSkeleton type="inherit" as="span" className="w-36 max-w-full" />
+            </span>
+            <span className={NUMBER_CELL}>
+              <TextLineSkeleton type="inherit" as="span" className="ml-auto w-12" />
+            </span>
+            <span className={NUMBER_CELL}>
+              <TextLineSkeleton type="inherit" as="span" className="ml-auto w-12" />
+            </span>
+          </div>
+        )}
+      </LoadingItems>
     </LoadingRegion>
   );
 }
@@ -421,11 +415,8 @@ export interface ModelTokenExchangeProps {
 export const MODEL_TOKEN_EXCHANGE_BALANCE = 1_000_000;
 export const MODEL_TOKEN_EXCHANGE_RANGE = { min: 1_000_000, max: 50_000_000, step: 1_000_000 } as const;
 
-/** The provider rows drawn while the providers load: as many as OpenFrame has had. */
-const PROVIDER_PLACEHOLDERS = ['loading-1', 'loading-2', 'loading-3'] as const;
-
-/** A figure while it loads: a bar of the surrounding text's own line, inside its phrasing span. */
-const FIGURE_SKELETON_CLASS = 'inline-block h-[0.8lh] rounded align-middle';
+/** The provider rows drawn while the providers load: a typical count (the host lists every provider with a rate). */
+const PROVIDER_SKELETON_ROWS = 3;
 
 /** A model as a picker option: its name, its provider under it, the provider's mark beside it. */
 function modelOption(rate: ModelTokenRate): AutocompleteOption<string> {
@@ -469,19 +460,16 @@ function ExchangeFigure({
   loading?: boolean;
   size?: 'hero' | 'plain';
 }) {
+  const drawLoading = useLoadingScope() || loading;
   return (
     <div className="flex min-w-0 flex-col">
       <span
         className={cn('whitespace-nowrap tabular-nums text-ods-text-primary', size === 'hero' ? 'text-h1' : 'text-h2')}
       >
-        {loading ? <UnifiedSkeleton as="span" aria-hidden className={cn(FIGURE_SKELETON_CLASS, 'w-20')} /> : figure}
+        {drawLoading ? <TextLineSkeleton type="inherit" as="span" className="w-20" /> : figure}
       </span>
       <span className="min-h-[2lh] text-ods-text-secondary text-h4">
-        {loading ? (
-          <UnifiedSkeleton as="span" aria-hidden className={cn(FIGURE_SKELETON_CLASS, 'w-full max-w-xs')} />
-        ) : (
-          words
-        )}
+        {drawLoading ? <TextLineSkeleton type="inherit" as="span" className="w-full max-w-xs" /> : words}
       </span>
     </div>
   );
@@ -524,8 +512,8 @@ export function ModelTokenExchange({
   className,
 }: ModelTokenExchangeProps) {
   const copy = MODEL_TOKEN_RATES_COPY.exchange;
-  const loading = status === 'loading';
-  const failed = status === 'error' || (status === 'ready' && !rate);
+  const loading = useLoadingScope() || status === 'loading';
+  const failed = !loading && (status === 'error' || (status === 'ready' && !rate));
   const sliderId = useId();
   // The amount bought: what the visitor set, else what the host opens on. The slider reaches every preset.
   const [chosen, setChosen] = useState<number | null>(null);
@@ -546,7 +534,8 @@ export function ModelTokenExchange({
         <ExchangeFigure figure={balancePrice ?? tokens} words={balancePrice ? copy.buy.words(tokens) : copy.buy.unit} />
         {/* The calculator: move the amount and every figure in step 3 follows. */}
         <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-          <label
+          <Label
+            variant="surface"
             htmlFor={sliderId}
             className="flex items-baseline justify-between gap-[var(--spacing-system-sf)] text-ods-text-secondary text-h4"
           >
@@ -554,7 +543,7 @@ export function ModelTokenExchange({
             <output htmlFor={sliderId} className="tabular-nums text-ods-text-primary text-h3">
               {tokens}
             </output>
-          </label>
+          </Label>
           <Slider
             id={sliderId}
             min={amountRange.min}
@@ -586,31 +575,22 @@ export function ModelTokenExchange({
       </ExchangeStep>
 
       <ExchangeStep step={2} title={copy.use.title}>
-        {/*
-          While the providers load, the SAME selector draws placeholder rows (not its own skeleton,
-          whose rows are a different height), so the step is one height loading and loaded.
-        */}
+        {/* While the providers load the selector draws its own skeleton (its rows, the option row's own boxes). */}
         <PushButtonSelector<string>
-          options={
-            providers.length === 0 && !failed
-              ? PROVIDER_PLACEHOLDERS.map(id => ({
-                  id,
-                  name: '\u00a0',
-                  icon: <UnifiedSkeleton className="size-8 rounded" />,
-                  disabled: true,
-                }))
-              : providers.map(providerType => {
-                  // What the server stated for the provider rides its models' rows.
-                  const stated =
-                    models.find(option => option.providerType === providerType) ??
-                    (rate?.providerType === providerType ? rate : null);
-                  return {
-                    id: providerType,
-                    name: tokenRateProviderLabel(providerType, stated?.providerLabel),
-                    icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
-                  };
-                })
-          }
+          isLoading={providers.length === 0 && !failed}
+          skeletonCount={PROVIDER_SKELETON_ROWS}
+          optionDescriptions={false}
+          options={providers.map(providerType => {
+            // What the server stated for the provider rides its models' rows.
+            const stated =
+              models.find(option => option.providerType === providerType) ??
+              (rate?.providerType === providerType ? rate : null);
+            return {
+              id: providerType,
+              name: tokenRateProviderLabel(providerType, stated?.providerLabel),
+              icon: providerMark(providerType, stated?.providerIcon, 'size-8 text-ods-text-secondary'),
+            };
+          })}
           selectedIds={provider ? [provider] : []}
           onSelectionChange={ids => {
             // A single choice that cannot be cleared: choosing the chosen provider changes nothing.
@@ -618,7 +598,10 @@ export function ModelTokenExchange({
           }}
           multiSelect={false}
         />
+        {/* While the rates load (the priming search included) the field draws its own skeleton, its label real. A
+            spinner is for a search the reader typed. */}
         <Autocomplete<string>
+          fieldLoading={loading}
           label={copy.use.model}
           value={rate?.modelName ?? null}
           onChange={modelName => {
@@ -628,7 +611,7 @@ export function ModelTokenExchange({
           inputValue={query}
           onInputChange={value => onQueryChange?.(value)}
           disableClientFilter
-          loading={searching}
+          loading={searching && Boolean(query)}
           disabled={providers.length === 0}
           placeholder={copy.use.search}
           noOptionsText={copy.use.noMatch}
@@ -658,7 +641,7 @@ export function ModelTokenExchange({
         >
           <span className="min-h-[2lh] text-ods-text-secondary text-h4">
             {loading || !rate ? (
-              <UnifiedSkeleton as="span" aria-hidden className={cn(FIGURE_SKELETON_CLASS, 'w-full max-w-xs')} />
+              <TextLineSkeleton type="inherit" as="span" className="w-full max-w-xs" />
             ) : (
               copy.charge.so(balancePrice ?? copy.buy.tokens(tokens), model)
             )}
@@ -666,7 +649,7 @@ export function ModelTokenExchange({
           {/* The number is the headline, alone on its line: a longer number never pushes its unit to a new line and the box taller. */}
           <span className="min-h-[1lh] whitespace-nowrap tabular-nums text-ods-text-primary text-h1">
             {loading || !rate ? (
-              <UnifiedSkeleton as="span" aria-hidden className={cn(FIGURE_SKELETON_CLASS, 'w-40')} />
+              <TextLineSkeleton type="inherit" as="span" className="w-40" />
             ) : (
               formatTokenAmount(tokensForBalance(balance, rate.inputTokenRate))
             )}
@@ -674,7 +657,7 @@ export function ModelTokenExchange({
           <span className="min-h-[1lh] text-ods-text-primary text-h3">{copy.charge.read}</span>
           <span className="min-h-[1lh] text-ods-text-secondary text-h4">
             {loading || !rate ? (
-              <UnifiedSkeleton as="span" aria-hidden className={cn(FIGURE_SKELETON_CLASS, 'w-48')} />
+              <TextLineSkeleton type="inherit" as="span" className="w-48" />
             ) : (
               copy.charge.orWritten(formatTokenAmount(tokensForBalance(balance, rate.outputTokenRate)))
             )}
