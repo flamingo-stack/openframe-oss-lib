@@ -67,14 +67,12 @@ describe('SnapCarousel', () => {
     );
   });
 
-  it("draws its arrows as the carousel's step buttons: round, no fill, never the strip's outline icon button", () => {
+  it("draws its arrows as the shared round step arrows, never the strip's square outline icon button", () => {
     renderCarousel();
     for (const name of ['Previous', 'Next']) {
       const arrow = screen.getByLabelText(name);
-      expect(arrow.classList.contains('rounded-full')).toBe(true);
-      expect(arrow.classList.contains('bg-transparent')).toBe(true);
-      expect(arrow.classList.contains('bg-ods-card')).toBe(false);
-      expect(arrow.classList.contains('rounded-md')).toBe(false);
+      for (const cls of ['rounded-full', 'h-9', 'w-9']) expect(arrow.classList.contains(cls)).toBe(true);
+      for (const cls of ['rounded-md', 'h-11']) expect(arrow.classList.contains(cls)).toBe(false);
     }
   });
 

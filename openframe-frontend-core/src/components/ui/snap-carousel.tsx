@@ -6,8 +6,8 @@ import { useInView } from '../../hooks/ui/use-in-view';
 import { useResumableTimeout } from '../../hooks/ui/use-resumable-timeout';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { CarouselStepButton } from './carousel-step-button';
 import { useLoadingScope } from './loading-scope';
+import { StepArrowButton } from './step-arrow-button';
 
 /** The row under the track: the dots, the counter, the pause and the two arrows (the arrows set its height). */
 const SNAP_CAROUSEL_CONTROLS_CLASS = 'mt-3 flex items-center gap-2';
@@ -115,13 +115,13 @@ export function SnapCarouselControls({
           {index + 1} / {count}
         </span>
       )}
-      <CarouselStepButton
+      <StepArrowButton
         direction="previous"
         aria-label={prevLabel}
         disabled={loading || index === 0}
         onClick={onPrevious}
       />
-      <CarouselStepButton
+      <StepArrowButton
         direction="next"
         aria-label={nextLabel}
         disabled={loading || index === count - 1}

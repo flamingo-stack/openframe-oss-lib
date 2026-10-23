@@ -96,7 +96,7 @@ export * from './benefit-card';
 export * from './brand-association-card';
 export * from './brand-association-grid';
 export * from './bullet-list';
-export * from './carousel-step-button';
+export * from './step-arrow-button';
 export * from './chevron-button';
 export * from './circular-progress';
 export {

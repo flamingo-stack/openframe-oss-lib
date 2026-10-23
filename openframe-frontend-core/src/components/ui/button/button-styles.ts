@@ -302,15 +302,16 @@ export const BUTTON_KIND_CLASS = {
     KIND_FOCUS_INSET,
     '[&_svg]:h-6 [&_svg]:w-6 [&_svg]:shrink-0',
   ].join(' '),
-  // A carousel's step arrow (previous / next under a carousel's track): a round outline with no fill, the card fill on
-  // hover, faded at either end of the track. Drawn through `CarouselStepButton`, never set at a call site.
+  // A round step control: the previous / next arrow of a carousel's controls row and of a presentation's navbar (the
+  // company-hub deck's prev / next, pause and fullscreen). 36px, the card surface with a border, the accent border and
+  // glyph on hover, faded when disabled (a carousel at either end of its track). Arrows go through `StepArrowButton`.
   stepper: [
-    'grid h-11 w-11 shrink-0 place-items-center rounded-full border border-ods-border',
-    'bg-transparent text-ods-text-primary transition-colors duration-200',
-    'hover:bg-ods-card',
-    'disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:bg-transparent',
+    'grid h-9 w-9 shrink-0 place-items-center rounded-full border-[1.5px] border-ods-border',
+    'bg-ods-card text-ods-text-primary transition-colors duration-150',
+    'hover:border-ods-accent hover:text-ods-accent',
+    'disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:border-ods-border disabled:hover:text-ods-text-secondary',
     KIND_FOCUS,
-    '[&_svg]:h-5 [&_svg]:w-5 [&_svg]:shrink-0',
+    '[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0',
   ].join(' '),
 } as const;
 
