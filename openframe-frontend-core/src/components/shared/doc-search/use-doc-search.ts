@@ -238,7 +238,7 @@ export function useDocSearch(config: UseDocSearchConfig) {
   }, [debouncedQuery, searchable, source, tableIdsKey, resolvedSearchEndpoint]);
 
   // Derived loading state — single source of truth for "should the
-  // dropdown show 'Loading...' instead of 'No results found'":
+  // dropdown draw its loading rows instead of 'No results found'":
   const isLoading = query.trim().length >= 2 && (query !== debouncedQuery || isFetching);
 
   // Track whether dropdown should stay open (external link opened in new tab).

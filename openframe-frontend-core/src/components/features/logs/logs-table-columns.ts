@@ -1,7 +1,6 @@
 /**
- * Column widths of the logs table. Data-only, read by the live table and by
- * `LogsTableSkeleton`, so the header row cannot drift from the rows it stands in
- * for and a width is changed in one place.
+ * Column widths of the logs table. Data-only, read by the table's columns (loaded and loading alike, the table
+ * draws its own skeleton rows), so a width is changed in one place.
  */
 export const LOG_COLUMN_WIDTHS = {
   logId: 'w-[200px]',

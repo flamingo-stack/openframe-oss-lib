@@ -8,6 +8,7 @@ import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { XmarkIcon } from '../icons-v2-generated/signs-and-symbols/xmark-icon';
 import { ToolIcon } from '../tool-icon';
+import { Button } from './button';
 
 export type ToastVariant = 'default' | 'success' | 'warning' | 'error' | 'info';
 
@@ -57,7 +58,7 @@ function ToastHeader({
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         {title ? (
           <p
-            className="truncate pr-5 text-ods-text-primary text-h4"
+            className="truncate pr-6 text-ods-text-primary text-h4"
             title={typeof title === 'string' ? title : undefined}
           >
             {title}
@@ -74,14 +75,16 @@ function ToastHeader({
       </div>
 
       {dismissible ? (
-        <button
+        <Button
+          variant="bare"
+          size="icon-sm"
           type="button"
           aria-label="Close"
           onClick={() => sonnerToast.dismiss(id)}
-          className="absolute right-[7px] top-[7px] flex size-4 items-center justify-center text-ods-text-secondary transition-colors hover:text-ods-text-primary"
+          className="absolute right-[var(--spacing-system-xxs)] top-[var(--spacing-system-xxs)]"
         >
           <XmarkIcon size={16} />
-        </button>
+        </Button>
       ) : null}
 
       {showProgress && duration !== Infinity && duration > 0 ? (
@@ -217,37 +220,36 @@ export function CommandApprovalToast({
           <div className="flex flex-col gap-2 bg-ods-bg p-3">
             {approvalDescription ? <p className="text-ods-text-secondary text-h6">{approvalDescription}</p> : null}
             <div className="flex items-center gap-4">
-              <button
+              <Button
+                variant="accent"
+                size="small"
                 type="button"
                 onClick={handleApprove}
                 tabIndex={expanded ? 0 : -1}
-                className="flex flex-1 items-center justify-center rounded-md bg-ods-accent px-2 py-2 text-ods-text-on-accent transition-colors text-h5 hover:bg-ods-accent-hover active:bg-ods-accent-active"
+                className="flex-1"
               >
                 {approveLabel}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="outline"
+                size="small"
                 type="button"
                 onClick={handleReject}
                 tabIndex={expanded ? 0 : -1}
-                className="flex flex-1 items-center justify-center rounded-md border border-ods-border bg-ods-card px-2 py-2 text-ods-text-primary transition-colors text-h5 hover:bg-ods-bg-hover"
+                className="flex-1"
               >
                 {rejectLabel}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </div>
 
       {expanded ? null : (
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="flex w-full items-center gap-2 bg-ods-card px-3 py-2 text-left text-ods-text-primary transition-colors text-h6 hover:bg-ods-bg-hover"
-          aria-expanded={false}
-        >
+        <Button variant="row" type="button" onClick={() => setExpanded(true)} aria-expanded={false}>
           <span className="flex-1">Show Command</span>
           <Chevron02DownIcon size={16} />
-        </button>
+        </Button>
       )}
     </div>
   );

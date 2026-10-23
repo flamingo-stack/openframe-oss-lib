@@ -48,7 +48,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import type { PageActionButton } from '../ui/page-actions';
-import { TitleBlock } from './title-block';
+import { TitleBlock, type TitleSkeletonLines } from './title-block';
 
 export interface PageLayoutProps {
   children: React.ReactNode;
@@ -84,6 +84,8 @@ export interface PageLayoutProps {
    *  ellipsis clamp (forwarded to `TitleBlock`). For content detail pages whose h1 is CMS
    *  data of arbitrary length. Additive + default-preserving. */
   titleWrap?: boolean;
+  /** With `titleWrap`, the loading title's lines per breakpoint (forwarded to `TitleBlock`). */
+  titleSkeletonLines?: TitleSkeletonLines;
 }
 
 /**
@@ -111,6 +113,7 @@ export function PageLayout({
   loadingActions,
   subtitleRow,
   titleWrap,
+  titleSkeletonLines,
 }: PageLayoutProps) {
   const hasActions = actions && actions.length > 0;
   const needsBottomPadding = hasActions && actionsVariant === 'primary-buttons';
@@ -135,6 +138,7 @@ export function PageLayout({
           loadingActions={loadingActions}
           subtitleRow={subtitleRow}
           titleWrap={titleWrap}
+          titleSkeletonLines={titleSkeletonLines}
         />
       )}
 
@@ -150,8 +154,4 @@ export function PageLayout({
     </div>
   );
 }
-
-export type { PageActionButton } from '../ui/page-actions';
-export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from './title-block';
-export type { TitleBlockProps } from './title-block';
 export default PageLayout;

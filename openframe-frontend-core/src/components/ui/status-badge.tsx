@@ -3,6 +3,8 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import type React from 'react';
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
 
 const statusBadgeVariants = cva('inline-flex items-center justify-center rounded', {
   variants: {
@@ -91,9 +93,46 @@ export interface StatusBadgeProps
    * gen badge — do NOT build a parallel component.
    */
   gen?: number;
+  /** The badge's text is still being read: it draws its skeleton (its own padding and type step). A loading scope does
+   *  the same. */
+  loading?: boolean;
+  /** The text is written copy (a content-type chip, "Beta"), not read data: the badge stays real in a loading scope.
+   *  `loading` still switches it. */
+  staticText?: boolean;
 }
 
-function StatusBadge({ text, variant, colorScheme, className, singleLine, gen, style, ...props }: StatusBadgeProps) {
+/**
+ * A badge while its text is read: one skeleton box with the badge's own padding and type step, its content one line
+ * of that step (`box-content`: the padding adds to the line, as it does around the badge's text).
+ */
+function StatusBadgeSkeleton({ variant, className }: { variant?: 'card' | 'button' | null; className?: string }) {
+  return (
+    <UnifiedSkeleton
+      as="span"
+      className={cn(
+        statusBadgeVariants({ variant, colorScheme: null }),
+        'box-content h-[1lh] w-12 border-transparent',
+        className,
+      )}
+    />
+  );
+}
+
+function StatusBadge({
+  text,
+  variant,
+  colorScheme,
+  className,
+  singleLine,
+  gen,
+  style,
+  loading: loadingProp,
+  staticText = false,
+  ...props
+}: StatusBadgeProps) {
+  const inScope = useLoadingScope();
+  const loading = (inScope && !staticText) || !!loadingProp;
+  if (loading) return <StatusBadgeSkeleton variant={variant} className={className} />;
   // Generation mode: constant full-accent text, progressive-opacity accent bg,
   // SSOT casing (textTransform:none overrides the base `uppercase`). Inline
   // style so it wins over any colorScheme class regardless of CSS source order.

@@ -13,6 +13,7 @@ import { OpenframeTextIcon } from '../icons-v2-generated/logos/openframe-text-ic
 import { UserClassicIcon } from '../icons-v2-generated/users/user-classic-icon';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, SquareAvatar } from '../ui';
+import { useLoadingScope } from '../ui/loading-scope';
 import { HeaderButton } from './header-button';
 import { HeaderGlobalSearch } from './header-global-search';
 import { HeaderMingoButton } from './header-mingo-button';
@@ -150,12 +151,13 @@ export const AppHeader = React.memo(function AppHeaderImpl({
   isMobileMenuOpen,
   onToggleMobileMenu,
   disabled = false,
-  loading = false,
+  loading: loadingProp = false,
   loadingActionCells,
 }: AppHeaderProps) {
   const isMdUp = useMdUp() ?? false;
+  const loading = useLoadingScope() || loadingProp;
 
-  // After the only hook above, so the hook order is identical in both branches.
+  // After the only hooks above, so the hook order is identical in both branches.
   if (loading) {
     return (
       <AppHeaderSkeleton

@@ -31,5 +31,15 @@ export interface PolicyConfigurationPanelProps {
   onPolicyPermissionChange: (categoryId: string, policyId: string, level: ApprovalLevel) => void;
   /** Bulk-apply an approval level to every policy in a category. */
   onCategoryPermissionChange: (categoryId: string, level: ApprovalLevel) => void;
+  /**
+   * The policies are still being read: each category is drawn collapsed, its name real when the host already
+   * passes it (a bar otherwise) and its configuration count a bar. A loading scope does the same.
+   */
+  loading?: boolean;
+  /**
+   * How many collapsed category rows to draw while loading when the host passes no categories (defaults to
+   * `POLICY_CONFIGURATION_PANEL_SKELETON_CATEGORIES`).
+   */
+  skeletonCount?: number;
   className?: string;
 }

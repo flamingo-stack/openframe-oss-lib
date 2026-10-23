@@ -21,7 +21,7 @@
     <url>https://github.com/flamingo-stack/openframe-oss-lib</url>
 
     <properties>
-        <revision>7.0.15</revision>
+        <revision>7.0.30</revision>
         <java.version>25</java.version>
         <lombok.version>1.18.48</lombok.version>
         <spring-data-mongodb.version>4.2.0</spring-data-mongodb.version>
@@ -59,6 +59,7 @@
         <module>openframe-data-mongo-sync</module>
         <module>openframe-event-processing</module>
         <module>openframe-event-jobs</module>
+        <module>openframe-agent-key</module>
         <module>openframe-machine-delivery</module>
         <module>openframe-data-mongo-reactive</module>
         <module>openframe-data-redis</module>
@@ -67,6 +68,7 @@
         <module>openframe-notification-core</module>
         <module>openframe-data-kafka</module>
         <module>openframe-graphql-relay</module>
+        <module>openframe-graphql-node</module>
         <module>openframe-api-lib</module>
         <module>openframe-data-cassandra</module>
         <module>openframe-data-pinot</module>
@@ -152,6 +154,11 @@
             </dependency>
             <dependency>
                 <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-agent-key</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-data-mongo-reactive</artifactId>
                 <version>${revision}</version>
             </dependency>
@@ -188,6 +195,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-graphql-relay</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-graphql-node</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>

@@ -5,6 +5,7 @@ import { useCallback, useMemo } from 'react';
 import { Controller, useFormContext, useWatch } from 'react-hook-form';
 import { cn } from '../../../../utils/cn';
 import { XmarkCircleIcon } from '../../../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { Button } from '../../../ui/button';
 import { CheckboxBlock } from '../../../ui/checkbox-block';
 import { DatePickerInputSimple } from '../../../ui/date-picker';
 import { Label } from '../../../ui/label';
@@ -304,14 +305,16 @@ export function ScheduleTimingFields({
                     invalid={!!dateError || (showErrors && !!fieldState.error)}
                   />
                   {field.value && !fieldsDisabled && (
-                    <button
+                    <Button
+                      variant="bare"
+                      size="icon-sm"
                       type="button"
                       onClick={() => field.onChange(null)}
                       aria-label="Clear date"
-                      className="absolute right-3 top-6 -translate-y-1/2 text-ods-text-secondary hover:text-ods-text-primary"
+                      className="absolute right-2 top-6 -translate-y-1/2"
                     >
                       <XmarkCircleIcon size={24} />
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}

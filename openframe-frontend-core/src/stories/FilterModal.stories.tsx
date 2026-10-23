@@ -2,8 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
 import { Button } from '../components/ui/button';
+import type { DataTableFilters } from '../components/ui/data-table/types';
 import { FilterModal, type FilterGroup, type SortConfig, type TagKeyConfig } from '../components/ui/filter-modal';
-import type { TableFilters } from '../components/ui/table/types';
 
 const meta = {
   title: 'UI/FilterModal',
@@ -54,7 +54,7 @@ const defaultFilterGroups: FilterGroup[] = [
   },
 ];
 
-const defaultCurrentFilters: TableFilters = {
+const defaultCurrentFilters: DataTableFilters = {
   statuses: ['active', 'inactive', 'decommissioned'],
 };
 
@@ -90,9 +90,9 @@ export const Default: Story = {
 export const Interactive: Story = {
   render: function InteractiveStory() {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters);
+    const [currentFilters, setCurrentFilters] = useState<DataTableFilters>(defaultCurrentFilters);
 
-    const handleFilterChange = (filters: TableFilters) => {
+    const handleFilterChange = (filters: DataTableFilters) => {
       setCurrentFilters(filters);
     };
 
@@ -259,7 +259,7 @@ export const SortingOnly: Story = {
 export const InteractiveWithSorting: Story = {
   render: function InteractiveWithSortingStory() {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters);
+    const [currentFilters, setCurrentFilters] = useState<DataTableFilters>(defaultCurrentFilters);
     const [sortBy, setSortBy] = useState<string>('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -273,7 +273,7 @@ export const InteractiveWithSorting: Story = {
       sortDirection,
     };
 
-    const handleFilterChange = (filters: TableFilters) => {
+    const handleFilterChange = (filters: DataTableFilters) => {
       setCurrentFilters(filters);
     };
 
@@ -471,7 +471,7 @@ export const FullFeatured: Story = {
 export const InteractiveWithTags: Story = {
   render: function InteractiveWithTagsStory() {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentFilters, setCurrentFilters] = useState<TableFilters>(defaultCurrentFilters);
+    const [currentFilters, setCurrentFilters] = useState<DataTableFilters>(defaultCurrentFilters);
     const [selectedTags, setSelectedTags] = useState<string[]>(['site:chicago']);
     const [sortBy, setSortBy] = useState<string>('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');

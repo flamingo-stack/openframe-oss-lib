@@ -13,10 +13,18 @@ import {
 import { useStickToBottom } from 'use-stick-to-bottom';
 import { cn } from '../../utils/cn';
 import { DotsLoaderIcon, Arrow02DownIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { OverlayOpenRegistryProvider } from '../ui/overlay-open-registry';
 import { ChatAppearanceContext } from './chat-appearance-context';
 import { ChatMessageEnhanced } from './chat-message-enhanced';
-import { ChatMessageListSkeleton } from './chat-message-skeleton';
+import {
+  CHAT_MESSAGE_LIST_COLUMN_CLASS,
+  CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
+  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
+} from './chat-message-layout';
+import { CHAT_MESSAGE_LIST_SKELETON_MESSAGES, ChatMessageListSkeleton } from './chat-message-skeleton';
 import { CyclingPhrase } from './cycling-phrase';
 import type { ChatMessageListProps } from './types';
 import { CHAT_APPEARANCE } from './types/chat.types';
@@ -129,7 +137,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       className,
       messages,
       dialogId,
-      isLoading = false,
+      isLoading: isLoadingProp = false,
+      pageSize = CHAT_MESSAGE_LIST_SKELETON_MESSAGES,
+      fill = false,
       isTyping = false,
       typingMessage,
       autoScroll = true,
@@ -141,6 +151,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
       assistantType,
       approvalVariant,
       selfAuthorType,
+      nameEveryTurn,
       appearance = CHAT_APPEARANCE.CLASSIC,
       assistantIcon,
       pendingApprovals,
@@ -158,6 +169,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
     },
     ref,
   ) => {
+    // ONE switch: in a page's loading state (or while the host reads the thread) the list is its skeleton. Every
+    // effect below keys on `isLoading`, so the switch is resolved before any of them.
+    const isLoading = useLoadingScope() || isLoadingProp;
+
     // ---- Library: useStickToBottom -----------------------------------
     // `resize: 'smooth'` — during streaming, content grows token-by-
     // token; library uses spring physics to follow the bottom for a
@@ -936,7 +951,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
           showAvatars={showAvatars}
           fullWidth={fullWidth}
           contentClassName={contentClassName}
-          messageCount={6}
+          fill={fill}
+          messageCount={pageSize}
+          appearance={appearance}
+          namedOthers={selfAuthorType === 'admin'}
         />
       );
     }
@@ -974,7 +992,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               <div
                 ref={setScrollRef}
                 className={cn(
-                  'flex h-full w-full flex-1 flex-col overflow-y-auto overflow-x-hidden',
+                  CHAT_MESSAGE_LIST_SCROLLER_CLASS,
                   // `overscroll-contain` (default ON, opt-out via `overscrollContain={false}`):
                   // reaching the top/bottom of the thread must NOT chain the wheel/
                   // touch scroll to the page behind the chat — e.g. the company-hub
@@ -984,7 +1002,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                   // the surrounding page keeps scrolling normally when the pointer is
                   // over the (non-interactive) thread.
                   overscrollContain && 'overscroll-contain',
-                  'scrollbar-thin scrollbar-track-transparent scrollbar-thumb-ods-border/30 hover:scrollbar-thumb-ods-text-secondary/30',
+                  CHAT_MESSAGE_LIST_SCROLLBAR_CLASS,
                   className,
                 )}
                 {...props}
@@ -995,10 +1013,8 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // `fullWidth=true` drops the centered-narrow column for
                     // side-panel hosts (e.g. multi-platform-hub Mingo). Same
                     // semantics as ChatHeader / ChatInput / ChatFooter.
-                    fullWidth
-                      ? 'flex w-full min-w-0 flex-col pb-[var(--spacing-system-xs)]'
-                      : 'mx-auto flex w-full min-w-0 max-w-ods-content-narrow flex-col pb-[var(--spacing-system-xs)]',
-                    contentClassName ?? 'px-[var(--spacing-system-m)]',
+                    CHAT_MESSAGE_LIST_COLUMN_CLASS[fullWidth ? 'full' : 'narrow'],
+                    contentClassName ?? CHAT_MESSAGE_LIST_CONTENT_PADDING_CLASS,
                   )}
                   style={{ minHeight: '100%' }}
                 >
@@ -1049,6 +1065,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         approvalVariant={approvalVariant}
                         authorType={message.authorType}
                         selfAuthorType={selfAuthorType}
+                        nameEveryTurn={nameEveryTurn}
                         assistantIcon={message.role !== 'user' ? assistantIcon : undefined}
                         contextItems={message.contextItems}
                         resolveContextIcon={resolveContextIcon}
@@ -1058,6 +1075,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                         refs={message.refs}
                         onAskSelect={index > lastUserMessageIndex ? onAskSelect : undefined}
                         NavLinkAnchor={NavLinkAnchor}
+                        // One message of a read thread (the height gate counts them); the wrapper carries it instead
+                        // when the row has content of its own below it.
+                        data-loading-item={ownedContent ? undefined : ''}
                       />
                     );
                     // Only wrap when there IS owned content: the bare row keeps
@@ -1065,7 +1085,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     // thread without any stays byte-identical to before.
                     if (!ownedContent) return row;
                     return (
-                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1">
+                      <div key={message.id} className="grid w-full min-w-0 grid-cols-1" data-loading-item>
                         {row}
                         {ownedContent}
                       </div>
@@ -1086,7 +1106,9 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
               move the very bottom it points at. Hidden while at the bottom
               and in passive demo hosts. */}
               {autoScroll && !atBottom && messages.length > 0 && (
-                <button
+                <Button
+                  variant="outline"
+                  size="icon-sm"
                   type="button"
                   onClick={() => {
                     // Clicking IS the intent to return to the live end, so it
@@ -1095,15 +1117,10 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(
                     void scrollToBottom({ animation: 'smooth' });
                   }}
                   aria-label="Scroll to latest message"
-                  className={cn(
-                    'absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2',
-                    'flex size-9 items-center justify-center rounded-full',
-                    'border border-ods-border bg-ods-card text-ods-text-primary shadow-lg',
-                    'transition-colors hover:bg-ods-bg-hover',
-                  )}
+                  className="absolute bottom-[var(--spacing-system-s)] left-1/2 z-10 -translate-x-1/2"
                 >
                   <Arrow02DownIcon size={16} />
-                </button>
+                </Button>
               )}
             </div>
 

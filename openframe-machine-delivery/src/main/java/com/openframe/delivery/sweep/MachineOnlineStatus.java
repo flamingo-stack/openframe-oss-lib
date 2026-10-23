@@ -5,7 +5,6 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.repository.device.MachineRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,10 +16,14 @@ import static java.util.stream.Collectors.toSet;
 
 @Component
 @RequiredArgsConstructor
-@ConditionalOnProperty(name = "openframe.delivery.sweep.enabled", havingValue = "true")
 public class MachineOnlineStatus {
 
     private final MachineRepository machineRepository;
+
+    public boolean isOnline(String machineId) {
+        Set<String> online = online(Set.of(machineId));
+        return online.contains(machineId);
+    }
 
     public Set<String> online(Set<String> machineIds) {
         List<Machine> online = machineRepository.findByMachineIdInAndTelemetryStatus(machineIds, TelemetryStatus.ONLINE);

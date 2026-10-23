@@ -24,8 +24,12 @@ import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-
 import { TrashIcon } from '../icons-v2-generated/interface/trash-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { XmarkCircleIcon } from '../icons-v2-generated/signs-and-symbols/xmark-circle-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from './button';
 import { FieldWrapper } from './field-wrapper';
 import { HiddenTagsPopup } from './hidden-tags-popup';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 import { TruncateText } from './truncate-text';
 
@@ -99,6 +103,16 @@ interface AutocompleteBaseProps<T = string> {
   loading?: boolean;
   /** Loading text */
   loadingText?: string;
+  /**
+   * Option rows the list draws while `loading`: the options the host reads (its search's limit). Default a typical
+   * count.
+   */
+  loadingRows?: number;
+  /**
+   * The field itself is read and has not arrived (its value and its options): it draws its skeleton, as in a
+   * loading scope. DISTINCT from `loading`, a search in flight under a field that stays up.
+   */
+  fieldLoading?: boolean;
   /** When true, shows a clickable "+ Create" option when no results match the input */
   creatable?: boolean;
   /** Callback fired after a new option is created via creatable. Use it to persist the new option server-side, etc. */
@@ -159,7 +173,37 @@ const innerInputStyles = cn(
   'disabled:cursor-not-allowed disabled:text-ods-text-disabled disabled:placeholder:text-ods-border',
 );
 
+/** The field's height, read by the field and by its skeleton. */
+const AUTOCOMPLETE_ANCHOR_HEIGHT_CLASS = 'min-h-11 md:min-h-12';
+/** An option row's frame, read by the rows and by the list's loading state. */
+const AUTOCOMPLETE_OPTION_ROW_CLASS =
+  'flex min-h-11 items-center border-b border-ods-border px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] last:border-b-0 md:min-h-12 text-h4';
+/**
+ * Option rows the list's loading state draws when its host states no `loadingRows`: a typical count. A host that
+ * reads its options with a limit (a server search) passes that limit.
+ */
+const AUTOCOMPLETE_LOADING_ROWS = 5;
+const AUTOCOMPLETE_ANCHOR_SHAPE_CLASS = 'rounded-[6px]';
+
+interface AutocompleteSkeletonProps {
+  /** The field's label: the page's own words, drawn as they are. */
+  label?: string;
+  labelVariant?: 'default' | 'large';
+  className?: string;
+}
+
+/** A field while its options are read: its label for real, its control a box of the control's height. */
+function AutocompleteSkeleton({ label, labelVariant, className }: AutocompleteSkeletonProps) {
+  return (
+    <FieldWrapper label={label} labelVariant={labelVariant} className={className}>
+      <UnifiedSkeleton className={cn('w-full', AUTOCOMPLETE_ANCHOR_SHAPE_CLASS, AUTOCOMPLETE_ANCHOR_HEIGHT_CLASS)} />
+    </FieldWrapper>
+  );
+}
+
 function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: ForwardedRef<HTMLDivElement>) {
+  // In a loading scope the field is its skeleton (drawn at the end, after every hook has run).
+  const inScope = useLoadingScope();
   const {
     options,
     disabled = false,
@@ -178,7 +222,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
     inputValue: inputValueProp,
     onInputChange,
     loading = false,
-    loadingText = 'Loading...',
+    loadingText = 'Loading options',
+    loadingRows = AUTOCOMPLETE_LOADING_ROWS,
+    fieldLoading = false,
     creatable = false,
     onCreateOption,
     maxCreateLength,
@@ -470,7 +516,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
           data-invalid={isInvalid || undefined}
           className={cn(
             // Layout — single line, no wrapping
-            'flex min-h-11 cursor-text items-center rounded-[6px] border md:min-h-12',
+            'flex cursor-text items-center border',
+            AUTOCOMPLETE_ANCHOR_SHAPE_CLASS,
+            AUTOCOMPLETE_ANCHOR_HEIGHT_CLASS,
             'focus-within:outline-none',
             'transition-colors duration-200',
             'border-ods-border bg-ods-card',
@@ -543,9 +591,11 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
             {/* Overflow indicator button (multiple mode only) */}
             {multiple && hiddenTagsCount > 0 && (
               <div ref={hiddenTagsRef} className="shrink-0">
-                <button
+                <Button
+                  variant="chip"
                   ref={badgeRef}
                   type="button"
+                  aria-expanded={showHiddenTags}
                   onClick={e => {
                     e.stopPropagation();
                     setShowHiddenTags(prev => {
@@ -553,15 +603,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                       return !prev;
                     });
                   }}
-                  className={cn(
-                    'flex h-8 items-center px-2',
-                    'rounded-[6px] border border-ods-border bg-ods-card',
-                    'text-ods-text-secondary text-h5',
-                    'cursor-pointer transition-colors hover:bg-ods-bg-hover',
-                  )}
                 >
                   {getLimitTagsText(hiddenTagsCount)}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -584,14 +628,15 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
           {/* Clear / Chevron — pinned right */}
           <div className="flex shrink-0 items-center gap-1 pr-3">
             {showClearAll && (hasValue || inputValue.length > 0) && !disabled && isOpen && (
-              <button
+              <Button
+                variant="transparent"
+                size="icon-sm"
                 type="button"
                 onClick={handleClearAll}
-                className="flex items-center justify-center transition-opacity hover:opacity-70"
                 aria-label="Clear all"
               >
-                <XmarkCircleIcon className="size-4 text-ods-text-secondary md:size-6" />
-              </button>
+                <XmarkCircleIcon className="text-ods-text-secondary" />
+              </Button>
             )}
             {loading ? (
               <Loader2
@@ -645,9 +690,21 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
       >
         <ScrollAreaPrimitive.Root className="flex min-h-0 flex-col overflow-hidden">
           <ScrollAreaPrimitive.Viewport className="max-h-[240px] min-h-0 w-full [&>div]:!block">
-            <div role="listbox">
+            {/* A listbox owns options only: while they are read the box is the loading region's (a status and
+                hidden rows), with no listbox role around it. */}
+            <div role={loading ? undefined : 'listbox'}>
               {loading ? (
-                <div className="px-3 py-2 text-ods-text-secondary text-h6">{loadingText}</div>
+                // The options while they are read: the list's own rows, a label bar each (`loadingText` is what a
+                // screen reader hears).
+                <LoadingRegion label={loadingText}>
+                  <LoadingItems count={loadingRows}>
+                    {() => (
+                      <div className={AUTOCOMPLETE_OPTION_ROW_CLASS} aria-hidden data-loading-item>
+                        <TextLineSkeleton type="inherit" className="w-2/3" />
+                      </div>
+                    )}
+                  </LoadingItems>
+                </LoadingRegion>
               ) : filteredOptions.length === 0 ? (
                 showCreateOption ? (
                   isCreateTooLong ? (
@@ -686,13 +743,14 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                   return (
                     <div
                       key={String(option.value)}
+                      data-loading-item
                       role="option"
                       aria-selected={isSelected}
                       className={cn(
                         // `min-h` rather than a fixed height: an option may carry
                         // a second line, and a clipped one is worse than a taller row.
-                        'group/item flex min-h-11 cursor-pointer items-center border-b border-ods-border px-[var(--spacing-system-mf)] py-[var(--spacing-system-xsf)] transition-colors last:border-b-0 md:min-h-12',
-                        'text-h4',
+                        AUTOCOMPLETE_OPTION_ROW_CLASS,
+                        'group/item cursor-pointer transition-colors',
                         isHighlighted && 'bg-ods-bg-surface',
                         isSelected ? 'text-ods-accent' : 'text-ods-text-primary',
                         !isHighlighted && 'hover:bg-ods-bg-hover',
@@ -725,7 +783,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                           <div className="flex shrink-0 items-center gap-[var(--spacing-system-xsf)]">
                             {isSelected && <CheckIcon className="text-ods-accent" size={20} />}
                             {onDeleteOption && !isSelected && (
-                              <button
+                              <Button
+                                variant="transparent"
+                                size="icon-sm"
                                 type="button"
                                 aria-label={`Delete ${option.label}`}
                                 onClick={e => {
@@ -733,10 +793,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                                   onDeleteOption(option.value);
                                 }}
                                 disabled={isDeletingOption}
-                                className="opacity-0 transition-opacity focus-visible:opacity-100 disabled:pointer-events-none disabled:opacity-50 group-hover/item:opacity-100"
                               >
-                                <TrashIcon className="size-4 text-ods-error" />
-                              </button>
+                                <TrashIcon className="text-ods-error" />
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -754,6 +813,9 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
       </PopoverPrimitive.Content>
     </PopoverPrimitive.Root>
   );
+
+  if (inScope || fieldLoading)
+    return <AutocompleteSkeleton label={label} labelVariant={labelVariant} className={className} />;
 
   return (
     <FieldWrapper

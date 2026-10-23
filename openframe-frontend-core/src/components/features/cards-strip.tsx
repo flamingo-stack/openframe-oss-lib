@@ -53,6 +53,7 @@ import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-
 import { Chevron02RightIcon } from '../icons-v2-generated/arrows/chevron-02-right-icon';
 import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../layout/page-heading';
 import { Button } from '../ui/button';
+import { useLoadingScope } from '../ui/loading-scope';
 
 // =============================================================================
 // Types
@@ -117,6 +118,12 @@ interface CardsStripEngineProps {
   /** Merged into the engine's wrapper ref (e.g. `useVideoWarmup().ref`). */
   rootRef?: (el: HTMLDivElement | null) => void;
   className?: string;
+  /**
+   * The strip in a page's loading state, when its items are read (none handed in yet): `count` copies of `card`, the
+   * strip's cards' own skeleton (in children mode each in the managed cell's width). `count` is the number of cards
+   * the host reads (its limit), drawn at every width. Absent: an empty strip draws nothing, in a scope too.
+   */
+  skeleton?: { card: React.ReactNode; count: number };
 }
 
 // The two mode interfaces hand-mirror each other's field names as `never` —
@@ -229,6 +236,17 @@ function measureBleedInsets(el: HTMLElement): BleedInsets {
 // (Clone focus suppression lives in hooks/ui/use-suppress-clone-focus — shared
 // with <MarqueeWall>, which renders the same 2-copy endless-loop structure.)
 
+/** The managed cell's width, CSS's (the engine's own 767px line): read by the cell and by the strip's skeleton. */
+const STRIP_CELL_CLASS = 'w-[var(--strip-cell-mobile)] shrink-0 self-stretch min-[768px]:w-[var(--strip-cell-desktop)]';
+const stripCellStyle = (mobile: number, desktop: number) =>
+  ({
+    '--strip-cell-mobile': `${mobile}px`,
+    '--strip-cell-desktop': `${desktop}px`,
+    maxWidth: STRIP_CELL_MAX_WIDTH,
+  }) as React.CSSProperties;
+const STRIP_ROOT_CLASS = 'flex w-full min-w-0 flex-col gap-6';
+const STRIP_TRACK_CLASS = 'flex w-max items-stretch gap-4';
+
 /**
  * Children-mode cell: fixed width + hover/keyboard activation (wired here, never
  * on the card — the single-place activation invariant). The OUTER cell is never
@@ -262,14 +280,8 @@ function ManagedCell({
       // The width is CSS's (the engine's own 767px line), never a script's: the
       // first paint is the cell's final width, so a phone's strip never resizes
       // when the page hydrates.
-      className="w-[var(--strip-cell-mobile)] shrink-0 self-stretch min-[768px]:w-[var(--strip-cell-desktop)]"
-      style={
-        {
-          '--strip-cell-mobile': `${cardWidthMobile}px`,
-          '--strip-cell-desktop': `${desktopWidth}px`,
-          maxWidth: STRIP_CELL_MAX_WIDTH,
-        } as React.CSSProperties
-      }
+      className={STRIP_CELL_CLASS}
+      style={stripCellStyle(cardWidthMobile, desktopWidth)}
       data-strip-card-key={ctx.cardKey}
       onPointerEnter={ctx.isTouch ? undefined : () => ctx.onActivate(ctx.cardKey)}
       onPointerLeave={ctx.isTouch ? undefined : () => ctx.onDeactivate(ctx.cardKey)}
@@ -310,7 +322,9 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     nextLabel = 'Next items',
     rootRef,
     className,
+    skeleton,
   } = props;
+  const inScope = useLoadingScope();
 
   // ---- input-mode normalization ---------------------------------------------
   // Children mode feeds the SAME engine path as render-prop mode — one
@@ -786,7 +800,36 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
     return <ManagedCell item={item} ctx={ctx} cardWidthMobile={cardWidthMobile} cardWidthDesktop={cardWidthDesktop} />;
   };
 
-  if (items.length === 0) return null;
+  const heading = showTitle && title && (
+    <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{accentSentenceMarks(title)}</h2>
+  );
+  if (items.length === 0) {
+    // Outside a loading state an empty strip is nothing; inside one, a strip whose host states a skeleton draws it
+    // (a host that states none expects no strip, e.g. a record with no bites).
+    if (!inScope || !skeleton) return null;
+    // The items are read: the heading (the page's own words), the slot, and `count` of the cards' own skeleton.
+    return (
+      <div className={cn(STRIP_ROOT_CLASS, className)}>
+        {heading}
+        {headerSlot}
+        <div className="overflow-hidden">
+          <div className={STRIP_TRACK_CLASS}>
+            {Array.from({ length: skeleton.count }, (_, i) =>
+              childrenMode ? (
+                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+                <div key={i} className={STRIP_CELL_CLASS} style={stripCellStyle(cardWidthMobile, cardWidthDesktop)}>
+                  {skeleton.card}
+                </div>
+              ) : (
+                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cards never reorder
+                <React.Fragment key={i}>{skeleton.card}</React.Fragment>
+              ),
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const copies = marqueeActive ? 2 : 1;
 
@@ -804,9 +847,9 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         wrapperRef.current = node;
         rootRef?.(node);
       }}
-      className={cn('flex w-full min-w-0 flex-col gap-6', className)}
+      className={cn(STRIP_ROOT_CLASS, className)}
     >
-      {showTitle && title && <h2 className={`${SECTION_HEADING_CLASS} break-words`}>{accentSentenceMarks(title)}</h2>}
+      {heading}
       {headerSlot}
 
       <div className="relative" style={bled ? { marginLeft: -insets.left, marginRight: -insets.right } : undefined}>
@@ -833,7 +876,7 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
           onPointerCancel={clearHover}
           onScroll={onSeamWarp}
         >
-          <div ref={trackRef} data-copies={copies} className="flex w-max items-stretch gap-4">
+          <div ref={trackRef} data-copies={copies} className={STRIP_TRACK_CLASS}>
             {Array.from({ length: copies }, (_, copyIndex) =>
               items.map((item, i) => {
                 const key = `${getItemKey(item, i)}__${copyIndex}__${i}`;
