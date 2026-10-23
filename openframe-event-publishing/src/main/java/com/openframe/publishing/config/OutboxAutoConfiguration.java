@@ -2,6 +2,7 @@ package com.openframe.publishing.config;
 
 import com.openframe.publishing.api.OutboxPublisher;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.registry.PublishedAggregates;
 import com.openframe.publishing.repository.PublishingRepositoryPostProcessor;
 import com.openframe.publishing.repository.PublishingRepositoryStartupCheck;
 import org.springframework.beans.factory.ObjectProvider;
@@ -14,7 +15,7 @@ import org.springframework.context.annotation.Import;
 @AutoConfiguration(after = AggregateSpecAutoConfiguration.class)
 @ConditionalOnBooleanProperty(name = {"spring.data.mongodb.enabled", "openframe.events.publishing.enabled"})
 @Import({EventsConfiguration.class, PublishedAggregateTopics.class, PublishedAggregateStartupCheck.class, OutboxPublisher.class,
-        PublishingRepositoryStartupCheck.class})
+        PublishedAggregates.class, PublishingRepositoryStartupCheck.class})
 public class OutboxAutoConfiguration {
 
     // Static: a BeanPostProcessor must not wait for its configuration class.
