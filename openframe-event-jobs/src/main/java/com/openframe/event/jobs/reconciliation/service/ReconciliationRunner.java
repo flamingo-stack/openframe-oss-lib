@@ -1,5 +1,7 @@
 package com.openframe.event.jobs.reconciliation.service;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.openframe.event.jobs.core.persistence.EventJob;
 import com.openframe.event.jobs.core.persistence.EventJobStatus;
 import com.openframe.event.jobs.core.service.EventJobService;
@@ -14,17 +16,22 @@ import com.openframe.publishing.registry.PublishedAggregates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 // Checks one tick of a run: projected items in _id batches, each batch reconciled by its projection, its mismatches repaired
 // and its count saved.
 @Slf4j
 @RequiredArgsConstructor
 public class ReconciliationRunner {
+
+    private static final Duration REPUBLISHED_SOURCES_TTL = Duration.ofHours(1);
 
     private final ReconciliationProperties properties;
     private final ProjectedItemRepository itemRepository;
@@ -33,6 +40,11 @@ public class ReconciliationRunner {
     private final ReconciliationMetrics metrics;
     private final AggregateSpecRegistry specRegistry;
     private final PublishedAggregates publishedAggregates;
+    // Per projection: a source whose items span many batches is published again once per run, not once per batch. Expires an hour
+    // after its last batch on this pod, so a run that failed or finished on another pod leaves nothing behind.
+    private final Cache<String, RunSources> republishedSources = Caffeine.newBuilder()
+            .expireAfterAccess(REPUBLISHED_SOURCES_TTL)
+            .build();
 
     public void checkBatches(Projection<?, ?> projection, EventJob job) {
         String jobName = "Reconciliation of " + projection.name();
@@ -52,7 +64,7 @@ public class ReconciliationRunner {
         List<Mismatch> suspects = result.getMismatches();
         List<Mismatch> mismatches = confirm(projection, suspects);
         logMismatches(projection, mismatches);
-        republishSources(projection, mismatches);
+        republishSources(projection, job, mismatches);
 
         T lastItem = projectedItems.getLast();
         String batchLastId = itemRepository.idOf(lastItem);
@@ -79,18 +91,27 @@ public class ReconciliationRunner {
 
     // The repair: the sources' current state is published again, and the projection re-applies it, as the version store applies
     // an equal version. A source that is gone has nothing to publish. The run still counts the mismatches it found.
-    private void republishSources(Projection<?, ?> projection, List<Mismatch> mismatches) {
-        List<String> sourceIds = mismatches.stream()
+    private void republishSources(Projection<?, ?> projection, EventJob job, List<Mismatch> mismatches) {
+        List<String> mismatchedSourceIds = mismatches.stream()
                 .map(Mismatch::getSourceId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
+        List<String> sourceIds = keepNotRepublished(projection, job, mismatchedSourceIds);
         if (sourceIds.isEmpty()) {
             return;
         }
         String type = specRegistry.resolveType(projection);
         publishedAggregates.publishCurrent(type, sourceIds);
         log.info("Reconciliation of {} published {} {} source(s) again to repair them", projection.name(), sourceIds.size(), type);
+    }
+
+    private List<String> keepNotRepublished(Projection<?, ?> projection, EventJob job, List<String> sourceIds) {
+        String projectionName = projection.name();
+        String runId = job.getRunId();
+        RunSources run = republishedSources.asMap().compute(projectionName,
+                (name, current) -> current != null && current.isOf(runId) ? current : new RunSources(runId));
+        return run.addNew(sourceIds);
     }
 
     private void logMismatches(Projection<?, ?> projection, List<Mismatch> mismatches) {
@@ -114,6 +135,8 @@ public class ReconciliationRunner {
     // A run that checked nothing is not reported as a clean result in silence.
     private EventJob finish(Projection<?, ?> projection, EventJob job) {
         EventJob finished = jobService.finishRun(job, EventJobStatus.DONE);
+        String projectionName = projection.name();
+        republishedSources.invalidate(projectionName);
         if (finished.getProcessed() == 0) {
             Class<?> projectedClass = projection.projectedClass();
             boolean collectionExists = itemRepository.collectionExists(projectedClass);
@@ -128,5 +151,20 @@ public class ReconciliationRunner {
         log.info("Reconciliation of {} done, run {}: {} mismatch(es)", projection.name(), finished.getRunId(),
                 finished.getLastMismatches());
         return finished;
+    }
+
+    @RequiredArgsConstructor
+    private static class RunSources {
+
+        private final String runId;
+        private final Set<String> published = new HashSet<>();
+
+        boolean isOf(String otherRunId) {
+            return runId.equals(otherRunId);
+        }
+
+        List<String> addNew(List<String> sourceIds) {
+            return sourceIds.stream().filter(published::add).toList();
+        }
     }
 }

@@ -35,6 +35,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -114,6 +115,50 @@ class ReconciliationRunnerTest {
         // verifications
         verify(publishedAggregates).publishCurrent("organizations", List.of("org-1"));
         assertThat(lastSaved().getLastMismatches()).isEqualTo(2);
+    }
+
+    @Test
+    void aSourceWhoseItemsSpanManyBatches_isPublishedAgainOncePerRun() {
+        // setup
+        List<Item> first = List.of(new Item("t1"), new Item("t2"), new Item("t3"));
+        List<Item> second = List.of(new Item("t4"), new Item("t5"));
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(first);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t3", 3)).thenReturn(second);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t5", 3)).thenReturn(List.of());
+        when(projection.reconcile(first)).thenReturn(result(new Mismatch("tenant-a", "t1", "org-1", "name differs")));
+        when(projection.reconcile(second)).thenReturn(result(new Mismatch("tenant-a", "t4", "org-1", "name differs"),
+                new Mismatch("tenant-a", "t5", "org-2", "name differs")));
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1"))).thenReturn(first);
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t4", "t5"))).thenReturn(second);
+
+        // execution
+        runner.checkBatches(projection, running(null));
+
+        // verifications
+        verify(publishedAggregates).publishCurrent("organizations", List.of("org-1"));
+        verify(publishedAggregates).publishCurrent("organizations", List.of("org-2"));
+        assertThat(lastSaved().getLastMismatches()).isEqualTo(3);
+    }
+
+    @Test
+    void aNewRun_publishesTheSourceAgain_evenAfterAFailedRunThatPublishedIt() {
+        // setup
+        List<Item> batch = List.of(new Item("t1"), new Item("t2"), new Item("t3"));
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(batch);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t3", 3))
+                .thenThrow(new IllegalStateException("bad query"))
+                .thenReturn(List.of());
+        when(projection.reconcile(batch)).thenReturn(result(new Mismatch("tenant-a", "t1", "org-1", "name differs")));
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1"))).thenReturn(batch);
+        EventJob failing = running(null, "run-1");
+        failing.setFailures(2);
+
+        // execution
+        runner.checkBatches(projection, failing);
+        runner.checkBatches(projection, running(null, "run-2"));
+
+        // verifications
+        verify(publishedAggregates, times(2)).publishCurrent("organizations", List.of("org-1"));
     }
 
     @Test
@@ -199,7 +244,11 @@ class ReconciliationRunnerTest {
     }
 
     private static EventJob running(String lastId) {
-        EventJob job = EventJob.neverRun(JOB).startRun("run-1", NOW);
+        return running(lastId, "run-1");
+    }
+
+    private static EventJob running(String lastId, String runId) {
+        EventJob job = EventJob.neverRun(JOB).startRun(runId, NOW);
         job.setLastId(lastId);
         return job;
     }
