@@ -31,7 +31,7 @@ class EventJobTest {
         EventJob job = EventJob.neverRun("backfill:organizations");
 
         // execution
-        boolean runOf = job.isRunOf("run-1");
+        boolean runOf = job.hasRunId("run-1");
 
         // verifications
         assertThat(runOf).isFalse();
@@ -50,7 +50,7 @@ class EventJobTest {
         job = job.startRun("run-2", LATER);
 
         // verifications
-        assertThat(job.isRunOf("run-2")).isTrue();
+        assertThat(job.hasRunId("run-2")).isTrue();
         assertThat(job.getStatus()).isEqualTo(EventJobStatus.RUNNING);
         assertThat(job.getLastId()).isNull();
         assertThat(job.getProcessed()).isZero();
@@ -152,32 +152,34 @@ class EventJobTest {
     }
 
     @Test
-    void aNewRunId_remembersTheReplacedOne_butNotTheSameRunAgain() {
+    void startRun_isANewDocument_namedByTheJobAndTheRun() {
         // setup
-        EventJob job = EventJob.neverRun("backfill:organizations").startRun("run-1", NOW);
+        EventJob first = EventJob.neverRun("backfill:organizations").startRun("run-1", NOW);
+        first.setVersion(3L);
 
         // execution
-        EventJob same = job.startRun("run-1", LATER);
-        EventJob replaced = job.startRun("run-2", LATER);
+        EventJob second = first.startRun("run-2", LATER);
 
         // verifications
-        assertThat(same.getReplacedRunIds()).isEmpty();
-        assertThat(replaced.getReplacedRunIds()).containsExactly("run-1");
-        assertThat(replaced.wasReplaced("run-1")).isTrue();
-        assertThat(replaced.wasReplaced("run-2")).isFalse();
+        assertThat(first.getId()).isEqualTo("backfill:organizations:run-1");
+        assertThat(second.getId()).isEqualTo("backfill:organizations:run-2");
+        assertThat(second.getJobId()).isEqualTo("backfill:organizations");
+        assertThat(second.getVersion()).isNull();
     }
 
     @Test
-    void onlyTheLastTenReplacedRunIds_areKept() {
+    void onlyARunningRun_isRunning() {
         // setup
-        EventJob job = EventJob.neverRun("reconciliation:tickets").startRun("run-0", NOW);
+        EventJob running = EventJob.neverRun("backfill:organizations").startRun("run-1", NOW);
+
+        EventJob neverRan = EventJob.neverRun("backfill:organizations");
 
         // execution
-        for (int run = 1; run <= 12; run++) {
-            job = job.startRun("run-" + run, NOW);
-        }
+        EventJob failed = running.finishRun(EventJobStatus.FAILED, LATER);
 
         // verifications
-        assertThat(job.getReplacedRunIds()).hasSize(10).startsWith("run-2").endsWith("run-11");
+        assertThat(running.isRunning()).isTrue();
+        assertThat(failed.isRunning()).isFalse();
+        assertThat(neverRan.isRunning()).isFalse();
     }
 }

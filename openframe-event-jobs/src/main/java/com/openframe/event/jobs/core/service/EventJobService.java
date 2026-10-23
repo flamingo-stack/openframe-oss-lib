@@ -8,21 +8,33 @@ import lombok.RequiredArgsConstructor;
 import java.time.Clock;
 import java.time.Instant;
 
-// Saves the copies EventJob makes; a save throws OptimisticLockingFailureException when another pod saved a newer one.
+// Saves the copies EventJob makes, one document per run; a save throws OptimisticLockingFailureException when another pod
+// saved a newer copy of the run.
 @RequiredArgsConstructor
 public class EventJobService implements EventJobProgressStore<EventJob> {
 
     private final EventJobRepository jobRepository;
     private final Clock clock;
 
-    public EventJob jobOf(String jobId) {
-        return jobRepository.findById(jobId).orElseGet(() -> EventJob.neverRun(jobId));
+    // The job's newest run, or a job that never ran.
+    public EventJob findCurrentRun(String jobId) {
+        return jobRepository.findFirstByJobIdOrderByStartedAtDesc(jobId).orElseGet(() -> EventJob.neverRun(jobId));
     }
 
-    public EventJob startRun(EventJob job, String runId) {
+    public boolean hasRun(String jobId, String runId) {
+        return jobRepository.existsByJobIdAndRunId(jobId, runId);
+    }
+
+    // The newest run, while still RUNNING, ends REPLACED (a FAILED one has already ended); the new run is inserted, so a
+    // second pod starting it fails with DuplicateKeyException.
+    public EventJob startRun(EventJob newest, String runId) {
         Instant now = clock.instant();
-        EventJob started = job.startRun(runId, now);
-        return jobRepository.save(started);
+        if (newest.isRunning()) {
+            EventJob replaced = newest.finishRun(EventJobStatus.REPLACED, now);
+            jobRepository.save(replaced);
+        }
+        EventJob started = newest.startRun(runId, now);
+        return jobRepository.insert(started);
     }
 
     public EventJob resumeRun(EventJob job) {

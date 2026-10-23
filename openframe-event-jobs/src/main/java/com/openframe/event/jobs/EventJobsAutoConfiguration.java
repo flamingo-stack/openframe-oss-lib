@@ -4,6 +4,7 @@ import com.openframe.event.jobs.backfill.config.BackfillConfiguration;
 import com.openframe.event.jobs.backfill.config.properties.EventBackfillProperties;
 import com.openframe.event.jobs.core.lock.EventJobLock;
 import com.openframe.event.jobs.core.persistence.EventJob;
+import com.openframe.event.jobs.core.persistence.EventJobRunIndexInitializer;
 import com.openframe.event.jobs.core.repository.EventJobRepository;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobShutdown;
@@ -30,7 +31,8 @@ import java.time.Clock;
 @ConditionalOnBooleanProperty(name = "openframe.events.enabled")
 @EnableMongoRepositories(basePackageClasses = {EventJobRepository.class, ProjectionTaskRepository.class})
 @EnableConfigurationProperties({EventBackfillProperties.class, ReconciliationProperties.class, ProjectionTaskProperties.class})
-@Import({BackfillConfiguration.class, ReconciliationConfiguration.class, ProjectionTaskConfiguration.class})
+@Import({EventJobRunIndexInitializer.class, BackfillConfiguration.class, ReconciliationConfiguration.class,
+        ProjectionTaskConfiguration.class})
 public class EventJobsAutoConfiguration {
 
     // Ours, not a LockingTaskExecutor bean, so a service's own ShedLock setup stays as it is.

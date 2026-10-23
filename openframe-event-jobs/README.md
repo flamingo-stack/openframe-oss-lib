@@ -24,14 +24,17 @@ EventBackfillService / ReconciliationService     start a run, continue it, or wa
 EventJobTicker                                   batches until DONE, half of lock-at-most-for, or shutdown
    │  one batch: EventBackfillRunner / ReconciliationRunner
    ▼
-EventJobService ──> event_job_runs              one document per job: run id, status, lastId, counts
+EventJobService ──> event_job_runs              one document per run: run id, status, lastId, counts
 ```
 
 - One pod runs a job at a time: the lock is ShedLock's, with the stream's `LockProvider` (Redis). A dead pod's lock
   expires after `lock-at-most-for`, and the next tick on any pod continues from the saved `lastId`.
 - [`EventJob`](src/main/java/com/openframe/event/jobs/core/persistence/EventJob.java#L21) holds the progress rules; each change returns a copy, and
-  [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. The document has `@Version`, so a pod still busy
-  with an older copy fails its save and stops. `event_job_runs` is read from the primary.
+  [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. Each run is its own document, `_id: "<job>:<run id>"`;
+  the job's current run is its newest by `startedAt`. A new run ends a RUNNING one as REPLACED, and the documents have
+  `@Version`, so a pod still busy with an older copy fails its save and stops. `event_job_runs` is read from the primary.
+- Finished runs stay for good, as the jobs' history; they are small, and reconciliation adds one per projection a night.
+  [`EventJobRunIndexInitializer`](src/main/java/com/openframe/event/jobs/core/persistence/EventJobRunIndexInitializer.java) creates the `{jobId, startedAt}` index that finds the current run.
 - [`EventJobTicker`](src/main/java/com/openframe/event/jobs/core/service/EventJobTicker.java#L17) runs both jobs' batches. It stops after the current batch when
   the service shuts down ([`EventJobShutdown`](src/main/java/com/openframe/event/jobs/core/service/EventJobShutdown.java#L7)): Spring does not interrupt a
   running `@Scheduled` task.
@@ -106,18 +109,18 @@ libraries it scans.
 a date is easy to read. The log shows `Backfill of <type> started, run <id>`, then `done` at the end.
 
 **Repeat** it: set a new run id and restart. The new run starts again from the first document. Leaving the same run id
-changes nothing: a DONE run stays done. A run id once replaced is never started again, so pods that still have the old
-config during a rolling restart leave the new run alone; always use a new value.
+changes nothing: a DONE run stays done. A run id the job already had is never started again, so pods that still have
+the old config during a rolling restart leave the new run alone; always use a new value.
 
 Each batch is written from the documents' current state, then their versions are read again from the primary. A
 document written meanwhile is published once more, so its newest state is the last record on the compacted topic
 ([`republishChanged`](src/main/java/com/openframe/event/jobs/backfill/service/EventBackfillRunner.java#L55)).
 
-**Follow** it in `event_job_runs`, `_id: "backfill:<type>"`:
+**Follow** it in `event_job_runs`, newest run first:
 
 ```javascript
-db.event_job_runs.findOne({_id: "backfill:organizations"})
-// runId, status (RUNNING, DONE, FAILED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
+db.event_job_runs.find({jobId: "backfill:organizations"}).sort({startedAt: -1})
+// runId, status (RUNNING, DONE, FAILED, REPLACED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
 ```
 
 and with the metric `openframe.events.backfill.documents{type}`.

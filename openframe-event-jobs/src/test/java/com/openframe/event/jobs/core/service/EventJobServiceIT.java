@@ -1,6 +1,7 @@
 package com.openframe.event.jobs.core.service;
 
 import com.openframe.event.jobs.core.persistence.EventJob;
+import com.openframe.event.jobs.core.persistence.EventJobRunIndexInitializer;
 import com.openframe.event.jobs.core.persistence.EventJobStatus;
 import com.openframe.event.jobs.core.repository.EventJobRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.IndexInfo;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -23,6 +27,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
@@ -48,6 +53,9 @@ class EventJobServiceIT {
     @Autowired
     private EventJobRepository repository;
 
+    @Autowired
+    private MongoTemplate mongoTemplate;
+
     private EventJobService service;
 
     @BeforeEach
@@ -59,10 +67,10 @@ class EventJobServiceIT {
     @Test
     void aJobThatNeverRan_isNewAndUnsaved() {
         // execution
-        EventJob job = service.jobOf(JOB);
+        EventJob job = service.findCurrentRun(JOB);
 
         // verifications
-        assertThat(job.getId()).isEqualTo(JOB);
+        assertThat(job.getJobId()).isEqualTo(JOB);
         assertThat(job.getStatus()).isNull();
         assertThat(repository.count()).isZero();
     }
@@ -70,11 +78,11 @@ class EventJobServiceIT {
     @Test
     void theProgressOfARun_isSavedAndReadBack() {
         // setup
-        EventJob started = service.startRun(service.jobOf(JOB), "run-1");
+        EventJob started = service.startRun(service.findCurrentRun(JOB), "run-1");
 
         // execution
         service.saveBatch(started, "id-500", 500, 2);
-        EventJob stored = service.jobOf(JOB);
+        EventJob stored = service.findCurrentRun(JOB);
 
         // verifications
         assertThat(stored.getRunId()).isEqualTo("run-1");
@@ -86,29 +94,54 @@ class EventJobServiceIT {
     }
 
     @Test
-    void aPodWithAnOlderCopy_cannotOverwriteANewerRun_andItsCopyStaysStale() {
+    void aNewRun_endsTheRunningOneReplaced_keepsBoth_andAPodWithTheOldCopyCannotOverwriteIt() {
         // setup
-        EventJob podA = service.startRun(service.jobOf(JOB), "run-1");
-        EventJob podB = service.jobOf(JOB);
-        service.startRun(podB, "run-2");
+        EventJob podA = service.startRun(service.findCurrentRun(JOB), "run-1");
+        EventJob podB = service.findCurrentRun(JOB);
+        Clock aMinuteLater = Clock.fixed(NOW.plusSeconds(60), ZoneOffset.UTC);
+        EventJobService serviceOfPodB = new EventJobService(repository, aMinuteLater);
 
         // execution
-        Throwable firstSave = catchThrowable(() -> service.saveBatch(podA, "id-500", 500, 0));
-        Throwable secondSave = catchThrowable(() -> service.finishRun(podA, EventJobStatus.DONE));
+        serviceOfPodB.startRun(podB, "run-2");
+        Throwable staleSave = catchThrowable(() -> service.saveBatch(podA, "id-500", 500, 0));
 
         // verifications
-        assertThat(firstSave).isInstanceOf(OptimisticLockingFailureException.class);
-        assertThat(secondSave).isInstanceOf(OptimisticLockingFailureException.class);
-        EventJob stored = service.jobOf(JOB);
-        assertThat(stored.getRunId()).isEqualTo("run-2");
-        assertThat(stored.getStatus()).isEqualTo(EventJobStatus.RUNNING);
-        assertThat(stored.getLastId()).isNull();
+        assertThat(staleSave).isInstanceOf(OptimisticLockingFailureException.class);
+        assertThat(repository.count()).isEqualTo(2);
+        assertThat(repository.findById(JOB + ":run-1")).get().extracting(EventJob::getStatus).isEqualTo(EventJobStatus.REPLACED);
+        assertThat(service.findCurrentRun(JOB).getRunId()).isEqualTo("run-2");
+        assertThat(service.hasRun(JOB, "run-1")).isTrue();
+        assertThat(service.hasRun(JOB, "run-3")).isFalse();
+    }
+
+    @Test
+    void aSecondPodStartingTheSameRun_failsItsInsert() {
+        // setup
+        EventJob neverRan = service.findCurrentRun(JOB);
+        service.startRun(neverRan, "run-1");
+
+        // execution
+        Throwable secondStart = catchThrowable(() -> service.startRun(neverRan, "run-1"));
+
+        // verifications
+        assertThat(secondStart).isInstanceOf(DuplicateKeyException.class);
+        assertThat(repository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void theIndexInitializer_createsTheNewestRunIndex() {
+        // execution
+        new EventJobRunIndexInitializer(mongoTemplate).start();
+
+        // verifications
+        List<IndexInfo> indexes = mongoTemplate.indexOps(EventJob.class).getIndexInfo();
+        assertThat(indexes).extracting(IndexInfo::getName).contains("event_job_runs_jobId_startedAt");
     }
 
     @Test
     void recordFailure_countsTheFailuresInARow() {
         // setup
-        EventJob job = service.startRun(service.jobOf(JOB), "run-1");
+        EventJob job = service.startRun(service.findCurrentRun(JOB), "run-1");
         EventJob once = service.recordFailure(job, "first");
 
         // execution
@@ -116,7 +149,7 @@ class EventJobServiceIT {
 
         // verifications
         assertThat(twice.getFailures()).isEqualTo(2);
-        assertThat(service.jobOf(JOB).getLastError()).isEqualTo("second");
+        assertThat(service.findCurrentRun(JOB).getLastError()).isEqualTo("second");
     }
 
     @SpringBootConfiguration

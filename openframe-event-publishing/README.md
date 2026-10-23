@@ -221,7 +221,7 @@ Collection `event_outbox`, document [`OutboxEvent`](src/main/java/com/openframe/
 | `occurredAt` | When the row was written. |
 | `payload` | The `PublishedRecord` envelope as JSON (Jackson names, ISO dates); `null` for the second delete row; the key is always written, because Debezium's router needs it. |
 
-`OutboxIndexInitializer` creates the TTL index `outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
+`OutboxIndexInitializer` creates the TTL index `event_outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
 change the TTL later, write a migration that drops the index first; `createIndex` with other options fails at
 startup with `IndexOptionsConflict`.
 

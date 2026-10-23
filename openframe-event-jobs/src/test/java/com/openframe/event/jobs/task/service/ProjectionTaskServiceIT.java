@@ -77,11 +77,11 @@ class ProjectionTaskServiceIT {
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "New name", RENAMED_AT));
 
         // verifications
-        ProjectionTask stored = service.taskOf(TASK_ID);
+        ProjectionTask stored = service.findTask(TASK_ID);
         assertThat(stored.getStatus()).isEqualTo(EventJobStatus.RUNNING);
         assertThat(stored.getTenantId()).isEqualTo("tenant-a");
         assertThat(stored.getSourceId()).isEqualTo("widget-doc-1");
-        PublishedRecord<?> read = envelopes.recordOf(stored);
+        PublishedRecord<?> read = envelopes.toRecord(stored);
         assertThat(read.getTenantId()).isEqualTo("tenant-a");
         assertThat(read.getVersion()).isEqualTo(4L);
         assertThat(read.getEvent()).isInstanceOf(WidgetEvent.class);
@@ -94,19 +94,19 @@ class ProjectionTaskServiceIT {
     void aNewerEvent_startsTheTaskAgainFromTheFirstItem_withItsEnvelope() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask opened = service.taskOf("widget-copies:tenant-a:widget-doc-1");
+        ProjectionTask opened = service.findTask("widget-copies:tenant-a:widget-doc-1");
         service.saveBatch(opened, "w500");
 
         // execution
         serviceAt(NOW.plusSeconds(60)).submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // verifications
-        ProjectionTask stored = service.taskOf(TASK_ID);
+        ProjectionTask stored = service.findTask(TASK_ID);
         assertThat(stored.getLastId()).isNull();
         assertThat(stored.getEventVersion()).isEqualTo(5L);
         assertThat(stored.getCreatedAt()).isEqualTo(NOW);
         assertThat(stored.getStartedAt()).isEqualTo(NOW.plusSeconds(60));
-        WidgetEvent event = (WidgetEvent) envelopes.recordOf(stored).getEvent();
+        WidgetEvent event = (WidgetEvent) envelopes.toRecord(stored).getEvent();
         assertThat(event.getName()).isEqualTo("Newer");
         assertThat(repository.count()).isEqualTo(1);
     }
@@ -115,7 +115,7 @@ class ProjectionTaskServiceIT {
     void afterANewerEvent_aWorkersOlderCopyFailsToSave() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask workerCopy = service.taskOf("widget-copies:tenant-a:widget-doc-1");
+        ProjectionTask workerCopy = service.findTask("widget-copies:tenant-a:widget-doc-1");
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // execution
@@ -123,17 +123,17 @@ class ProjectionTaskServiceIT {
 
         // verifications
         assertThat(failure).isInstanceOf(OptimisticLockingFailureException.class);
-        assertThat(service.taskOf(TASK_ID).getLastId()).isNull();
+        assertThat(service.findTask(TASK_ID).getLastId()).isNull();
     }
 
     @Test
     void aFinishedTask_isDeleted_unlessANewerEventStartedItAgain() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask done = service.taskOf("widget-copies:tenant-a:widget-doc-1");
+        ProjectionTask done = service.findTask("widget-copies:tenant-a:widget-doc-1");
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-2",
                 record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask finishedMeanwhile = service.taskOf("widget-copies:tenant-a:widget-doc-2");
+        ProjectionTask finishedMeanwhile = service.findTask("widget-copies:tenant-a:widget-doc-2");
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-2", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // execution
@@ -145,14 +145,14 @@ class ProjectionTaskServiceIT {
         assertThat(restarted.getStatus()).isEqualTo(EventJobStatus.DONE);
         assertThat(service.hasTask(PROJECTION, "tenant-a", "widget-doc-1")).isFalse();
         assertThat(service.hasTask(PROJECTION, "tenant-a", "widget-doc-2")).isTrue();
-        assertThat(service.taskOf("widget-copies:tenant-a:widget-doc-2").getStatus()).isEqualTo(EventJobStatus.RUNNING);
+        assertThat(service.findTask("widget-copies:tenant-a:widget-doc-2").getStatus()).isEqualTo(EventJobStatus.RUNNING);
     }
 
     @Test
     void aFailedTask_stillTakesTheEventsOfItsSource_andTheNextOneRunsItAgain() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask opened = service.taskOf("widget-copies:tenant-a:widget-doc-1");
+        ProjectionTask opened = service.findTask("widget-copies:tenant-a:widget-doc-1");
         service.finishRun(opened, EventJobStatus.FAILED);
 
         // execution

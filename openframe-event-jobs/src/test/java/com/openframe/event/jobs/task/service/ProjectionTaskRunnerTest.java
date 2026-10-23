@@ -182,7 +182,7 @@ class ProjectionTaskRunnerTest {
 
     private ProjectionTask task(String projectionName) {
         PublishedRecord<WidgetEvent> record = record("tenant-a", 4, "New name", NOW);
-        Map<String, Object> envelope = envelopes.envelopeOf(record);
+        Map<String, Object> envelope = envelopes.toEnvelope(record);
         ProjectionTask opened = ProjectionTask.open(projectionName, Widgets.TYPE, "tenant-a", "widget-doc-1", envelope, 4, NOW);
         return opened.toBuilder().id(TASK_ID).version(3L).build();
     }

@@ -29,7 +29,7 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
 
     // A RUNNING or FAILED task: every event of its source goes to it, so an older value never lands after a newer one.
     public boolean hasTask(String projection, String tenantId, String sourceId) {
-        String id = ProjectionTask.idOf(projection, tenantId, sourceId);
+        String id = ProjectionTask.buildId(projection, tenantId, sourceId);
         return taskRepository.existsById(id);
     }
 
@@ -37,7 +37,7 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
     public void submit(String projection, String type, String sourceId, PublishedRecord<?> record) {
         String tenantId = record.getTenantId();
         long eventVersion = record.getVersion();
-        Map<String, Object> envelope = envelopes.envelopeOf(record);
+        Map<String, Object> envelope = envelopes.toEnvelope(record);
         Instant now = clock.instant();
         ProjectionTask opened = ProjectionTask.open(projection, type, tenantId, sourceId, envelope, eventVersion, now);
         for (int attempt = 1; ; attempt++) {
@@ -68,7 +68,7 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
     }
 
     // The task as saved now, or a gone one without status.
-    public ProjectionTask taskOf(String id) {
+    public ProjectionTask findTask(String id) {
         return taskRepository.findById(id).orElseGet(() -> ProjectionTask.gone(id));
     }
 

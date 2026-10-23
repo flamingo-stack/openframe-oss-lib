@@ -66,7 +66,7 @@ class ReconciliationRunnerTest {
         when(projection.reconcile(any())).thenReturn(ReconciliationResult.allMatch());
         when(jobRepository.save(any(EventJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(itemRepository.collectionExists(ItemDocument.class)).thenReturn(true);
-        when(itemRepository.idOf(any())).thenAnswer(invocation -> invocation.<Item>getArgument(0).getId());
+        when(itemRepository.resolveId(any())).thenAnswer(invocation -> invocation.<Item>getArgument(0).getId());
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         EventJobService jobService = new EventJobService(jobRepository, clock);
         EventJobTicker<EventJob> ticker = new EventJobTicker<>(jobService, new EventJobShutdown(), clock);

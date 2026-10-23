@@ -52,7 +52,7 @@ public class ProjectionTask implements EventJobProgress {
     private Instant startedAt;
     private Instant updatedAt;
 
-    public static String idOf(String projection, String tenantId, String sourceId) {
+    public static String buildId(String projection, String tenantId, String sourceId) {
         return projection + ID_SEPARATOR + tenantId + ID_SEPARATOR + sourceId;
     }
 
@@ -63,7 +63,7 @@ public class ProjectionTask implements EventJobProgress {
 
     public static ProjectionTask open(String projection, String type, String tenantId, String sourceId,
                                       Map<String, Object> envelope, long eventVersion, Instant now) {
-        String id = idOf(projection, tenantId, sourceId);
+        String id = buildId(projection, tenantId, sourceId);
         ProjectionTask task = ProjectionTask.builder()
                 .id(id)
                 .projection(projection)

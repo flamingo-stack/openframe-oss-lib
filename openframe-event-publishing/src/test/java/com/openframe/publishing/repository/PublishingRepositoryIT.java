@@ -95,7 +95,7 @@ class PublishingRepositoryIT {
         List<IndexInfo> indexes = mongoTemplate.indexOps(OutboxEvent.class).getIndexInfo();
 
         assertThat(indexes).anySatisfy(index -> {
-            assertThat(index.getName()).isEqualTo("outbox_occurredAt_ttl");
+            assertThat(index.getName()).isEqualTo("event_outbox_occurredAt_ttl");
             assertThat(index.getExpireAfter()).contains(Duration.ofDays(7));
         });
     }
