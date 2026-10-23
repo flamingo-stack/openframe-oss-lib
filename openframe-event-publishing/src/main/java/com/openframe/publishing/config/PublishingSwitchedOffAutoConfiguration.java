@@ -10,10 +10,10 @@ import org.springframework.core.env.Environment;
 
 import java.util.Map;
 
-// With the module switched off, a topic's publish: true publishes nothing; this says so at startup instead of staying silent.
+// With the feature switched off, a topic's enabled: true does nothing; this says so at startup instead of staying silent.
 @Slf4j
 @AutoConfiguration
-@ConditionalOnBooleanProperty(name = "openframe.events.publishing.enabled", havingValue = false, matchIfMissing = true)
+@ConditionalOnBooleanProperty(name = "openframe.events.enabled", havingValue = false, matchIfMissing = true)
 public class PublishingSwitchedOffAutoConfiguration implements SmartInitializingSingleton {
 
     private static final String TOPICS_PREFIX = "openframe.events.topics";
@@ -30,8 +30,8 @@ public class PublishingSwitchedOffAutoConfiguration implements SmartInitializing
         Bindable<Map<String, EventsProperties.Topic>> topicsType = Bindable.mapOf(String.class, EventsProperties.Topic.class);
         Map<String, EventsProperties.Topic> topics = binder.bind(TOPICS_PREFIX, topicsType).orElse(Map.of());
         topics.forEach((type, topic) -> {
-            if (topic.isPublish()) {
-                log.warn("{}.{}.publish is true, but openframe.events.publishing.enabled is off, so nothing is published",
+            if (topic.isEnabled()) {
+                log.warn("{}.{}.enabled is true, but openframe.events.enabled is off, so nothing is published or processed",
                         TOPICS_PREFIX, type);
             }
         });

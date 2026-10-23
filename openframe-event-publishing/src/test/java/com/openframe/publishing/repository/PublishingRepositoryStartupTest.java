@@ -13,6 +13,7 @@ import com.openframe.publishing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.persistence.OutboxIndexInitializer;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.aop.framework.Advised;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration;
@@ -20,6 +21,8 @@ import org.springframework.boot.mongodb.autoconfigure.MongoAutoConfiguration;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.ContextConsumer;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.ComponentScan.Filter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
@@ -32,19 +35,40 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 import static org.assertj.core.api.Assertions.assertThat;
 
 // Through OutboxAutoConfiguration, as a service loads it. No Mongo is needed: repositories are created without a connection.
+@ExtendWith(OutputCaptureExtension.class)
 class PublishingRepositoryStartupTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(MongoAutoConfiguration.class, DataMongoAutoConfiguration.class,
                     AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class))
             .withPropertyValues("spring.mongodb.uri=mongodb://localhost:1/startup-test", "spring.data.mongodb.enabled=true",
-                    "openframe.events.publishing.enabled=true");
+                    "openframe.events.enabled=true");
 
     @Test
     void aRepositoryWithItsSpecBean_starts() {
         runner.withUserConfiguration(WidgetRepositories.class)
                 .withBean(WidgetSpec.class)
                 .run(context -> assertThat(context).hasNotFailed().hasSingleBean(WidgetRepository.class));
+    }
+
+    @Test
+    void aTypeSwitchedOn_logsThatItsRepositoryPublishesIt(CapturedOutput output) {
+        runner.withUserConfiguration(WidgetRepositories.class)
+                .withBean(WidgetSpec.class)
+                .withPropertyValues("openframe.events.topics.organizations.enabled=true")
+                .run(context -> assertThat(context).hasNotFailed());
+
+        assertThat(output).contains("WidgetRepository] publish organizations");
+    }
+
+    @Test
+    void aTypeSwitchedOff_logsThatItsRepositoryPublishesNothing(CapturedOutput output) {
+        runner.withUserConfiguration(WidgetRepositories.class)
+                .withBean(WidgetSpec.class)
+                .run(context -> assertThat(context).hasNotFailed());
+
+        assertThat(output).contains("WidgetRepository] publish no organizations writes")
+                .doesNotContain("WidgetRepository] publish organizations");
     }
 
     // Shaped like saas-infra: Mongo on, only its own repositories, no spec at all.

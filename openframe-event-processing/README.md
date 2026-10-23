@@ -16,7 +16,7 @@ events.organizations ──> PublishedTypeListener             one per spec type
                            │  (a tombstone, the second record of a delete, is skipped here)
                            ▼
                          ProjectionRunner                  a delete envelope calls applyDelete (a no-op by default)
-                           │  for each projection of the type's spec, unless its mode is aspect
+                           │  for each projection of the type's spec
                            ▼
                          projection.apply(record)          writes its projected items through its own repository
                            │
@@ -27,7 +27,7 @@ events.organizations ──> PublishedTypeListener             one per spec type
 - A record's Kafka key is the aggregate's Mongo `_id` (the outbox `aggregateId`), not a business id such as
   `organizationId`. The listener passes it to the runner for the logs.
 - [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L16)
-  registers one listener per spec type whose `openframe.events.topics.<type>.publish` is on in this service's config, so a
+  registers one listener per spec type whose `openframe.events.topics.<type>.enabled` is on in this service's config, so a
   new published type needs no listener class.
 - The value is the `PublishedRecord` envelope: `tenantId`, `version`, `deleted`, `schemaVersion` and `event`. It is
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
@@ -42,16 +42,19 @@ events.organizations ──> PublishedTypeListener             one per spec type
   backfill race, a connector re-snapshot, a DLT replay and a group reset harmless.
 - Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
   writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
-  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. With projection
-  tasks off, a large event is still applied inline, with a WARN.
+  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. Without that
+  module's beans, a large event is still applied inline, with a WARN.
 
 ## Configuration
 
 ```yaml
 openframe:
   events:
+    enabled: false                      # the whole feature (default false); a change needs a pod restart
+    topics:
+      organizations:
+        enabled: false                  # per type: its topics, listener and projections in this service
     processing:
-      enabled: false                    # the whole module (default false); a change needs a pod restart
       kafka:                            # Spring's KafkaProperties keys, for the processing cluster only
         bootstrap-servers: ${spring.saas.kafka.bootstrap-servers}               # required, no localhost default
         topic-prefix: ${SHARED_DOMAIN:}events.                                   # required, no default
@@ -78,9 +81,6 @@ openframe:
             config: {cleanup.policy: delete, retention.ms: 2592000000}
       large-updates:
         inline-limit: 5000              # default; an event that changes this many items or more goes to a projection task
-      projections:
-        organization-on-tickets:        # one key per projection name(); an unknown name logs an ERROR
-          mode: aspect                  # aspect (default), both or events; a change needs a pod restart
 ```
 
 - `kafka` is separate from `spring.kafka` and from the stream's `spring.saas.kafka`. The module adds its own Kafka
@@ -88,19 +88,17 @@ openframe:
 - A topic is `topic-prefix` + the type name (`events.organizations`), its DLT is the topic + `-dlt`, and its group
   is `group-prefix` + the type name. Each service names its own group: two services in one group would split the
   events, and each would miss half of them.
-- The config is read at startup. A config refresh (the AI agent's `ContextRefresher`) does not change the modes of a
-  running pod.
+- The config is read at startup. A config refresh (the AI agent's `ContextRefresher`) does not switch a type on or
+  off in a running pod.
 
 ## Topics
 
-With `enabled: true` and `kafka.topics.create: true`,
+With `openframe.events.enabled: true`,
 [`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L31) creates
 `<topic-prefix><type>` and `<topic-prefix><type>-dlt` at startup, before the listeners start, for every spec whose
-`openframe.events.topics.<type>.publish` is on in this service's own config: the stream keeps the same switches as the
-publishing services, so a type nobody publishes gets no topic and no listener. With processing off, nothing is
-created: off means no infrastructure. So the
-rollout enables processing (every processor on `aspect`) before the outbox connector is registered, and the topics
-exist before the connector writes.
+`openframe.events.topics.<type>.enabled` is on in this service's own config: a type switched off gets no topic and no
+listener. The rollout switches a type on in the stream before the tenant services, so its topics exist before the
+first outbox row of that type.
 
 - It creates only what is missing and never changes an existing topic, not even its partitions. Another pod creating
   the same topic at the same moment is fine.
@@ -110,20 +108,13 @@ exist before the connector writes.
 - A plain `AdminClient`, not `NewTopic` beans: every `KafkaAdmin` in the context would create those too, on its own
   cluster.
 
-## Modes
+## Switching a type
 
-The mode says who updates a projection: the old aspect in the tenant services, or the projection's `apply`.
-
-| Mode | Aspect | Projection |
-|---|---|---|
-| `aspect` (default) | writes | skipped |
-| `both` | writes | writes |
-| `events` | skipped | writes |
-
-Switch in two steps, each a config change plus a pod restart: `aspect` → `both`, and once every pod runs `both`,
-`both` → `events`. Roll back the same way. In `both` someone always writes, whatever the order of the stream's and
-the tenant services' configs inside a step. The cost: a projection that is behind can write an older value over the
-aspect's newer one, until it reads the newer event. The aspects read the mode from stage 6 on.
+A type moves with all its projections. Switch it on in the stream's config first, then in the tenant services'
+configs, each a config change plus a pod restart; roll back in the reverse order. While only the stream has it on, the
+aspects still write and the stream gets no events of that type; once the tenant services have it on, they publish it
+and their aspect cascades from it stop. A type on in the tenant services but off in the stream leaves the copies
+stale: reconciliation and the consumer lag alert show it.
 
 ## Add a projection
 
@@ -137,7 +128,7 @@ aspect's newer one, until it reads the newer event. The aspects read the mode fr
    }
    ```
 
-   - `name()` is unique. It is the key of its mode, its metrics tag, and its name in logs and DLT messages.
+   - `name()` is unique. It is its metrics tag, and its name in logs and DLT messages.
    - `apply` gets the whole envelope, never a delete.
    - It writes through its own repository, never `MongoTemplate`, with a version guard.
    - The guard writes an item unless its stored version is the same as or newer than the event's
@@ -145,10 +136,10 @@ aspect's newer one, until it reads the newer event. The aspects read the mode fr
    - The guard makes duplicates, replays and out-of-order events harmless.
    - It retries its own write conflicts (`@RetryOnOptimisticLockingFailure`). A conflict that reaches the runner
      sends the record to the DLT.
-2. Add its mode under `openframe.events.processing.projections`, with `mode: aspect`, and switch it per environment
-   (see [Modes](#modes)).
+2. It runs as soon as its type is switched on in the stream (see [Switching a type](#switching-a-type)). The aspect
+   that writes the same copy skips its cascade while `PublishedAggregateTopics.isPublishing(<type>)` is true.
 
-A new published type needs only its spec and its `publish` switch in the stream's config: the listener of its topic is
+A new published type needs only its spec and its `enabled` switch in the stream's config: the listener of its topic is
 registered from the spec at startup.
 
 ## Errors and the DLT
@@ -190,13 +181,9 @@ The service does not start when:
 | Problem | Fix |
 |---|---|
 | Two projections have the same `name()` | Rename one (checked by `AggregateSpecRegistry`). |
-| A `mode` is not `aspect`, `both` or `events` | Fix the value. |
 | `bootstrap-servers`, `topic-prefix` or `group-prefix` is missing | Set all three. |
-| Topic creation is on and Kafka cannot be reached | Check `bootstrap-servers` and the network. |
+| Kafka cannot be reached to create the topics | Check `bootstrap-servers` and the network. |
 | A listener's topic does not exist | Create the topics first (`missing-topics-fatal`). |
-
-A name under `projections` that matches no projection only logs an ERROR: an image rolled back under a newer config
-must still start. That projection, if it exists, stays on `aspect`.
 
 ## Metrics
 
@@ -215,11 +202,9 @@ logging:
 | Line | Meaning |
 |---|---|
 | `Registered N published aggregate spec(s): [...]` (INFO, at startup) | The specs, and so the topics, this service listens to. |
-| `Projection X skipped: mode aspect` | The aspect still does the work for X. |
 | `Projection X applied <id> version V of tenant T` | Applied. |
 | `Projection X failed for <id> version V of tenant T` (WARN, with the stack trace) | That projection failed; the record goes to the DLT after the others ran. |
 | `Record <id> of <topic>-<partition> at offset O goes to <topic>-dlt` (ERROR) | Sent to the DLT. |
-| `openframe.events.processing.projections names [...], but no projection has that name` (ERROR, at startup) | A typo, or a config newer than this image. |
 | `Tombstone of ... skipped` | The second record of a delete; the first one already reached `applyDelete`. |
 | `Created the event topic <name>` (INFO, at startup) | The topic did not exist; it now has the configured settings. |
 | `Event topic <name> exists with cleanup.policy=delete, not compact` (WARN, at startup) | Fix the topic by hand. |

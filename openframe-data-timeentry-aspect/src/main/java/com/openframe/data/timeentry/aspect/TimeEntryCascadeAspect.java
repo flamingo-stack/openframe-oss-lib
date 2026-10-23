@@ -2,6 +2,8 @@ package com.openframe.data.timeentry.aspect;
 
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.ticket.TicketRepository;
+import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -19,9 +21,13 @@ public class TimeEntryCascadeAspect {
 
     private final TimeEntryCascadeService timeEntryCascadeService;
     private final TicketRepository ticketRepository;
+    private final PublishedAggregateTopics publishedTopics;
 
     @Around("execution(* com.openframe.data.repository.ticket.TicketRepository.save(..)) && args(ticket)")
     public Object aroundTicketSave(ProceedingJoinPoint joinPoint, Ticket ticket) throws Throwable {
+        if (isTicketPublished()) {
+            return joinPoint.proceed();
+        }
         String oldTitle = captureTicketTitle(ticket);
 
         Ticket savedTicket = (Ticket) joinPoint.proceed();
@@ -36,6 +42,9 @@ public class TimeEntryCascadeAspect {
 
     @Around("execution(* com.openframe.data.repository.ticket.TicketRepository.saveAll(..)) && args(tickets)")
     public Object aroundTicketSaveAll(ProceedingJoinPoint joinPoint, Iterable<Ticket> tickets) throws Throwable {
+        if (isTicketPublished()) {
+            return joinPoint.proceed();
+        }
         Map<String, String> oldTitles = captureTicketTitles(tickets);
 
         @SuppressWarnings("unchecked")
@@ -49,6 +58,11 @@ public class TimeEntryCascadeAspect {
             }
         }
         return result;
+    }
+
+    // Published tickets reach the time entries through the stream's projection instead.
+    private boolean isTicketPublished() {
+        return publishedTopics.isPublishing(TicketAggregateSpec.TYPE);
     }
 
     private String captureTicketTitle(Ticket ticket) {

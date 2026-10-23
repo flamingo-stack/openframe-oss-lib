@@ -107,7 +107,7 @@ class EventTopicCreatorIT {
     }
 
     @Test
-    void aTypeWhosePublishIsOff_getsNoTopic() throws Exception {
+    void aTypeSwitchedOff_getsNoTopic() throws Exception {
         // setup
         String prefix = newPrefix();
         EventsProperties events = new EventsProperties();
@@ -123,8 +123,9 @@ class EventTopicCreatorIT {
 
     private static EventTopicCreator creator(String prefix) {
         EventsProperties events = new EventsProperties();
+        events.setEnabled(true);
         EventsProperties.Topic organizations = new EventsProperties.Topic();
-        organizations.setPublish(true);
+        organizations.setEnabled(true);
         events.getTopics().put("organizations", organizations);
         PublishedAggregateTopics organizationsPublished = new PublishedAggregateTopics(events);
         return creator(prefix, organizationsPublished);

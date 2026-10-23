@@ -4,8 +4,8 @@ Three scheduled jobs around the published events:
 
 - the **backfill** writes the current state of every document of a published type to the outbox, so its compacted
   topic holds the latest event of each one;
-- the **reconciliation** asks every projection, such as the organization name on tickets, which of its projected items
-  differ from their source, and reports them. It repairs nothing; a new backfill run does;
+- the **reconciliation** asks every projection of a type switched on, such as the organization name on tickets,
+  which of its projected items differ from their source, and reports them. It repairs nothing; a new backfill run does;
 - the **projection tasks** apply the large updates of a projection, for example a new organization name on 50,000
   tickets, in batches instead of inside one Kafka record. One task per projection, tenant and source document, in
   `projection_tasks`; a newer event of that source starts its task again from the first item.
@@ -58,9 +58,9 @@ EventJobService ──> event_jobs                  one document per job: run id
 ```yaml
 openframe:
   events:
+    enabled: false                      # the whole feature (default false); a change needs a pod restart
     jobs:
-      enabled: false                    # the whole module (default false); a change needs a pod restart
-      backfill:                         # only with openframe.events.publishing.enabled: true
+      backfill:
         runs:
           organizations: "2026-10-21"   # a run id per type; a new value starts the type again from its first document
         batch-size: 500
@@ -69,7 +69,6 @@ openframe:
         lock-at-most-for: 2m            # a tick works for half of it
         max-failures: 3                 # errors in a row before the run is FAILED
       reconciliation:
-        enabled: false                  # its own switch (default false); needs the module switch too
         cron: "0 0 3 * * *"             # UTC; when a new run is due. The first run starts at once
         batch-size: 1000
         pause: 200ms
@@ -78,7 +77,6 @@ openframe:
         max-failures: 3
         sample-size: 5                  # sample ids per ERROR line
       projection-tasks:
-        enabled: false                  # its own switch (default false); needs the module switch too
         batch-size: 1000
         pause: 200ms
         poll-interval: 10s
@@ -88,14 +86,14 @@ openframe:
 
 The type keys are the specs' `getType()` names; a key no spec has stops the service.
 
-The service that turns the module on also provides:
+Only `openframe-saas-stream` has this module, so `openframe.events.enabled` runs all three jobs there. It also provides:
 
 - `@EnableScheduling`; the module does not switch scheduling on for every service that adds it;
 - a ShedLock `LockProvider` bean;
-- for the backfill, `openframe.events.publishing.enabled: true` and `openframe.events.topics.<type>.publish: true`.
-  Without publishing the module starts with reconciliation only, and logs a WARN when run ids are set. A type whose
-  publish is off is skipped with a WARN, because the outbox write would do nothing;
-- for the reconciliation, the `AggregateSpec` beans of the published types: every projection they return is reconciled
+- for the backfill, `openframe.events.topics.<type>.enabled: true`. A type switched off is skipped with a WARN,
+  because the outbox write would do nothing;
+- for the reconciliation, the `AggregateSpec` beans of the published types: the projections of each type switched on
+  with `openframe.events.topics.<type>.enabled` are reconciled; a type switched off is not checked
   (see [Projections](../openframe-event-publishing/README.md#projections)).
 
 In `openframe-saas-stream` the scheduling and the lock provider are in `EventJobsConfiguration`, with locks under the

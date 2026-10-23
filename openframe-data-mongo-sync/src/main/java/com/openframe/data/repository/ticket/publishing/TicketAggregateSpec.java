@@ -13,11 +13,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TicketAggregateSpec implements AggregateSpec<Ticket, TicketEvent> {
 
+    public static final String TYPE = "tickets";
+
     private final TicketOnTimeEntriesProjection ticketOnTimeEntries;
 
     @Override
     public String getType() {
-        return "tickets";
+        return TYPE;
     }
 
     @Override
