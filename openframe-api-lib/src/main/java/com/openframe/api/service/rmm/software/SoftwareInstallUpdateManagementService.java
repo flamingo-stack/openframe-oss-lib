@@ -4,6 +4,7 @@ import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
 import com.openframe.data.document.rmm.script.OsType;
@@ -39,6 +40,7 @@ public class SoftwareInstallUpdateManagementService {
     private final MachinePlatformResolver machinePlatformResolver;
     private final PackageUpdateEligibilityService packageUpdateEligibility;
     private final PackageUpdateDispatchService packageUpdateDispatchService;
+    private final DeviceService deviceService;
 
     public List<SoftwareDispatchResult> install(SoftwareManagementInput input, String initiatedBy, ExecutionSource source) {
         return dispatch(SoftwareAction.INSTALL, input, initiatedBy, source);
@@ -75,6 +77,9 @@ public class SoftwareInstallUpdateManagementService {
             List<String> scriptTargets = targets.stream().filter(id -> !orderMachines.contains(id)).toList();
             String executionId = UUID.randomUUID().toString();
 
+            if (!orderTargets.isEmpty()) {
+                deviceService.verifyDispatchable(orderTargets);
+            }
             if (!scriptTargets.isEmpty()) {
                 softwareDispatchService.dispatch(executionId, script, scriptTargets, args, initiatedBy, source,
                         pkg.getPackageManager(), pkg.getPackageName(), action);

@@ -4,7 +4,9 @@ import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.software.SoftwareDispatchResult;
 import com.openframe.api.dto.rmm.software.SoftwareManagementInput;
 import com.openframe.api.dto.rmm.software.SoftwarePackageInput;
+import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.script.ScriptService;
+import com.openframe.core.exception.BadRequestException;
 import com.openframe.data.config.PackageManagerProperties;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.packagesearch.BrewPackageType;
@@ -35,9 +37,11 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -59,6 +63,7 @@ class SoftwareInstallUpdateManagementServiceTest {
     @Mock private TenantIdProvider tenantIdProvider;
     @Mock private PackageUpdateEligibilityService packageUpdateEligibility;
     @Mock private PackageUpdateDispatchService packageUpdateDispatchService;
+    @Mock private DeviceService deviceService;
 
     private SoftwareInstallUpdateManagementService service;
 
@@ -69,7 +74,7 @@ class SoftwareInstallUpdateManagementServiceTest {
         MachinePlatformResolver platformResolver =
                 new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
         service = new SoftwareInstallUpdateManagementService(registry, scriptService, softwareDispatchService,
-                platformResolver, packageUpdateEligibility, packageUpdateDispatchService);
+                platformResolver, packageUpdateEligibility, packageUpdateDispatchService, deviceService);
         // A real brew handler so we exercise real script-code + arg building.
         when(registry.handlerFor(PackageManagerType.BREW)).thenReturn(new BrewPackageManagerHandler());
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
@@ -209,6 +214,23 @@ class SoftwareInstallUpdateManagementServiceTest {
         assertThat(rows.getPackageManager()).isEqualTo(PackageManagerType.BREW);
         assertThat(rows.getPackageName()).isEqualTo("slack");
         assertThat(rows.getSoftwareAction()).isEqualTo(SoftwareAction.UPDATE);
+        verify(deviceService).verifyDispatchable(List.of("m1"));   // the script path checks m2 itself
+    }
+
+    @Test
+    @DisplayName("update: a feature-enabled device that is not dispatchable is refused and nothing is sent for the package")
+    void update_orderTargetNotDispatchable_nothingSent() {
+        allMacTargets();
+        when(scriptService.getSoftwareScript(SoftwareScriptCode.BREW_UPDATE)).thenReturn(systemScript("brew-update-id"));
+        when(packageUpdateEligibility.eligibleMachines(SoftwareAction.UPDATE, MACHINES)).thenReturn(Set.of("m1"));
+        doThrow(new BadRequestException("Machine is not in a dispatchable state: m1"))
+                .when(deviceService).verifyDispatchable(List.of("m1"));
+
+        assertThatThrownBy(() -> service.update(
+                        input(pkg(PackageManagerType.BREW, "slack", BrewPackageType.CASK)), USER, ExecutionSource.MANUAL))
+                .isInstanceOf(BadRequestException.class);
+
+        verifyNoInteractions(softwareDispatchService, packageUpdateDispatchService);
     }
 
     private static SoftwareManagementInput input(SoftwarePackageInput... packages) {

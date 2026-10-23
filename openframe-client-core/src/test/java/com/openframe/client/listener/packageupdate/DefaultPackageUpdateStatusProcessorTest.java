@@ -166,6 +166,25 @@ class DefaultPackageUpdateStatusProcessorTest {
     }
 
     @Test
+    void duplicateEvent_afterAFailedRollUp_rollsUpAgain() {
+        // the state was saved, the roll-up then failed and the event came back: the request must still roll up
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.COMPLETED);
+        st.setLastEventId("e1");
+        PackageUpdateRequest req = request(PackageUpdateSource.ADMIN, PackageUpdateMode.WAIT, null);   // still SCHEDULED
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
+        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(st));
+
+        processor.process("m1", base("e1", T, PackageUpdateStatusMessage.State.DONE));
+
+        verify(requestRepository).save(req);
+        assertThat(req.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        verify(deviceStateRepository, never()).save(any());
+        verifyNoInteractions(executionRecorder);
+    }
+
+    @Test
     void staleEvent_isSkipped() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.COMPLETED);

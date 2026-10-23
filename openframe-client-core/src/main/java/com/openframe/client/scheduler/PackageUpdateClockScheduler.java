@@ -9,7 +9,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"openframe.rmm.software.enabled", "openframe.rmm.software.package-update.enabled"},
+        havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class PackageUpdateClockScheduler {

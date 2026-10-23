@@ -22,7 +22,8 @@ import java.util.List;
 
 @Slf4j
 @Service
-@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
+@ConditionalOnProperty(name = {"openframe.rmm.software.enabled", "openframe.rmm.software.package-update.enabled"},
+        havingValue = "true")
 @RequiredArgsConstructor
 public class PackageUpdateClockService {
 

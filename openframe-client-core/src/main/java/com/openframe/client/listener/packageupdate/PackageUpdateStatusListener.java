@@ -7,6 +7,7 @@ import io.nats.client.Connection;
 import io.nats.client.Message;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -17,6 +18,7 @@ import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = {"openframe.rmm.software.enabled", "openframe.rmm.software.package-update.enabled"}, havingValue = "true")
 public class PackageUpdateStatusListener extends AbstractJetStreamPushListener {
 
     private static final String REJECTED_INCOMPLETE = "incomplete";

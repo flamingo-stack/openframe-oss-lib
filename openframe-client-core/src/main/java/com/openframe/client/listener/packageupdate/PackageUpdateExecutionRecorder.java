@@ -9,6 +9,7 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
 import com.openframe.data.repository.rmm.ScriptExecutionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -17,6 +18,7 @@ import static org.springframework.util.StringUtils.hasText;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = {"openframe.rmm.software.enabled", "openframe.rmm.software.package-update.enabled"}, havingValue = "true")
 @RequiredArgsConstructor
 public class PackageUpdateExecutionRecorder {
 

@@ -16,6 +16,7 @@ import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -23,6 +24,8 @@ import java.util.List;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = {"openframe.rmm.software.enabled", "openframe.rmm.software.package-update.enabled"},
+        havingValue = "true")
 @RequiredArgsConstructor
 public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusProcessor {
 
@@ -46,8 +49,15 @@ public class DefaultPackageUpdateStatusProcessor implements PackageUpdateStatusP
                 .findByTenantIdAndRequestIdAndMachineId(tenantId, requestId, machineId)
                 .orElseGet(() -> newState(tenantId, requestId, machineId));
 
-        if (isDuplicate(state, event) || isStale(state, event)) {
-            log.debug("[package-update] skipping duplicate/stale event {} requestId={} machineId={}",
+        if (isDuplicate(state, event)) {
+            // a redelivery after the state was saved: the roll-up that follows the save may not have run
+            log.debug("[package-update] duplicate event {} requestId={} machineId={} — re-checking the roll-up",
+                    event.getEventId(), requestId, machineId);
+            rollUp(tenantId, requestId, requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null));
+            return;
+        }
+        if (isStale(state, event)) {
+            log.debug("[package-update] skipping stale event {} requestId={} machineId={}",
                     event.getEventId(), requestId, machineId);
             return;
         }
