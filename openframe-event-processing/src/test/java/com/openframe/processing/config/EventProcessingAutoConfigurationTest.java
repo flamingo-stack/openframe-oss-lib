@@ -18,6 +18,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.FilterType;
@@ -26,6 +27,7 @@ import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 // Through EventProcessingAutoConfiguration, as a service loads it.
 @ExtendWith(OutputCaptureExtension.class)
@@ -35,13 +37,15 @@ class EventProcessingAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
             .withUserConfiguration(AggregateSpecRegistry.class)
             .withPropertyValues("openframe.events.processing.enabled=true")
-            .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+            .withBean(MongoOperations.class, () -> mock(MongoOperations.class));
 
     @Test
     void eventProcessing_isOffByDefault_soNoneOfItsBeansExist() {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
                 .run(context -> assertThat(context).hasNotFailed()
                         .doesNotHaveBean(ProjectionRunner.class)
                         .doesNotHaveBean(EventProcessingKafkaProperties.class));
@@ -52,6 +56,7 @@ class EventProcessingAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withUserConfiguration(ScansEverything.class)
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+                .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
                 .run(context -> assertThat(context).hasNotFailed()
                         .doesNotHaveBean(ProjectionRunner.class));
     }
