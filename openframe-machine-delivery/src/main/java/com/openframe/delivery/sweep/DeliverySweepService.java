@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static java.util.stream.Collectors.toSet;
 
@@ -127,6 +128,10 @@ public class DeliverySweepService {
     }
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {
+        if (isRerunStart(delivery)) {
+            publishRerun(delivery, policy, now);
+            return;
+        }
         DeliveryType type = delivery.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
@@ -153,6 +158,41 @@ public class DeliverySweepService {
         metrics.recordRetried(type);
         log.info("Delivery re-published: type={} targetId={} machineId={} attempt={} dueAt={}",
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
+    }
+
+    // a rerun goes out under a new dispatchId: the agent keeps the result of the old one and would answer with it
+    // instead of running again
+    private void publishRerun(MachineDelivery delivery, Policy policy, Instant now) {
+        DeliveryType type = delivery.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
+        DeliveryPayload payload = payloadJson.read(delivery.getPayloadJson(), payloadClass);
+        String dispatchId = UUID.randomUUID().toString();
+        payload.getDelivery().setDispatchId(dispatchId);
+        String json = payloadJson.write(payload);
+        String machineId = delivery.getMachineId();
+        boolean published = publish(spec, machineId, payload);
+        if (!published) {
+            metrics.recordPublishFailed(type);
+            backOff(delivery, now);
+            return;
+        }
+        long delaySeconds = retryBackoff.delaySeconds(1, policy);
+        Instant dueAt = now.plusSeconds(delaySeconds);
+        String id = delivery.getId();
+        Instant dispatchedAt = delivery.getDispatchedAt();
+        boolean counted = repository.markRerunPublished(id, DeliveryStatus.UNACKED, dispatchedAt, dispatchId, json, now, dueAt);
+        if (!counted) {
+            log.debug("Delivery moved on while its re-run was being published: id={}", id);
+            return;
+        }
+        metrics.recordRetried(type);
+        log.info("Delivery re-run published: type={} targetId={} machineId={} run={} dispatchId={} dueAt={}",
+                type, delivery.getTargetId(), machineId, delivery.getReruns() + 1, dispatchId, dueAt);
+    }
+
+    private static boolean isRerunStart(MachineDelivery delivery) {
+        return delivery.getReruns() > 0 && delivery.getAttempts() == 0;
     }
 
     private boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {

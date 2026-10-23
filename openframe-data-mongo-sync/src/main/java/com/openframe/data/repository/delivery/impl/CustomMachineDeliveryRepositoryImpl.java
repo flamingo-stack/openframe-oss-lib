@@ -32,6 +32,7 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
     private static final String FIELD_TYPE = "type";
     private static final String FIELD_ATTEMPTS = "attempts";
     private static final String FIELD_ERRORS = "errors";
+    private static final String FIELD_RERUNS = "reruns";
     private static final String FIELD_DISPATCH_ID = "dispatchId";
     private static final String FIELD_SEQUENCE = "sequence";
     private static final String FIELD_PAYLOAD_JSON = "payloadJson";
@@ -174,6 +175,44 @@ public class CustomMachineDeliveryRepositoryImpl extends TenantAwareRepositorySu
                 .set(FIELD_FAILURE, failure)
                 .set(FIELD_ERROR, error);
         return updateOne(thisDispatch(id, from, dispatchId), update);
+    }
+
+    // back to PENDING for a later run; the dispatchId stays until the run is published, so a late result of the
+    // last dispatch still closes the row meanwhile
+    @Override
+    public boolean scheduleRerun(String id, Set<DeliveryStatus> from, Instant dispatchedAt, Instant dueAt) {
+        return updateOne(sameDispatch(id, from, dispatchedAt), rerun(dueAt));
+    }
+
+    @Override
+    public boolean scheduleRerun(String id, String dispatchId, Set<DeliveryStatus> from, Instant dueAt) {
+        return updateOne(thisDispatch(id, from, dispatchId), rerun(dueAt));
+    }
+
+    // the first publish of a rerun: a new dispatch of the same row, counted as its first attempt
+    @Override
+    public boolean markRerunPublished(String id, Set<DeliveryStatus> from, Instant dispatchedAt, String dispatchId, String payloadJson, Instant publishedAt, Instant dueAt) {
+        Criteria notYetPublished = sameDispatch(id, from, dispatchedAt).and(FIELD_ATTEMPTS).is(0);
+        Update update = new Update()
+                .set(FIELD_DISPATCH_ID, dispatchId)
+                .set(FIELD_DISPATCHED_AT, publishedAt)
+                .set(FIELD_PAYLOAD_JSON, payloadJson)
+                .set(FIELD_ATTEMPTS, 1)
+                .set(FIELD_DUE_AT, dueAt);
+        return updateOne(notYetPublished, update);
+    }
+
+    private static Update rerun(Instant dueAt) {
+        return new Update()
+                .set(FIELD_STATUS, DeliveryStatus.PENDING)
+                .set(FIELD_ATTEMPTS, 0)
+                .set(FIELD_ERRORS, 0)
+                .inc(FIELD_RERUNS, 1)
+                .set(FIELD_DUE_AT, dueAt)
+                .unset(FIELD_ACKED_AT)
+                .unset(FIELD_FINISHED_AT)
+                .unset(FIELD_FAILURE)
+                .unset(FIELD_ERROR);
     }
 
     private static void setField(Update update, String field, Object value) {
