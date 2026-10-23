@@ -53,6 +53,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
     private static final String FIELD_DISPATCHED_AT = "dispatchedAt";
     private static final String FIELD_FINISHED_AT = "finishedAt";
     private static final String FIELD_STATUS_CHANGED_AT = "statusChangedAt";
+    private static final String FIELD_TEST_RUN = "testRun";
     private static final String FIELD_COUNT = "count";
 
     private static final Set<String> SORTABLE_FIELDS = Set.of(
@@ -97,6 +98,7 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
                         .softwareAction(request.getSoftwareAction())
                         .softwareBundleId(request.getSoftwareBundleId())
                         .softwareScheduleId(request.getSoftwareScheduleId())
+                        .testRun(request.isTestRun())
                         .status(initialStatus)
                         .dispatchedAt(now)
                         .statusChangedAt(now)
@@ -214,6 +216,9 @@ public class CustomScriptExecutionRepositoryImpl implements CustomScriptExecutio
         // exclusion must hold in every counted bucket
         if (filter.getExcludedSources() != null && !filter.getExcludedSources().isEmpty()) {
             criteria.and(FIELD_SOURCE).nin(filter.getExcludedSources());
+        }
+        if (filter.isExcludeTestRuns()) {
+            criteria.and(FIELD_TEST_RUN).ne(true);
         }
         if (!FIELD_STATUS.equals(excludedField)
                 && filter.getStatuses() != null && !filter.getStatuses().isEmpty()) {
