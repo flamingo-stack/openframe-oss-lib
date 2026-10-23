@@ -22,7 +22,7 @@ const loadingTenant = (id: string): TenantRow => ({
   id,
   name: '',
   provider: '',
-  customer: { name: '' },
+  customers: [{ name: '' }],
   accessState: '',
 });
 
@@ -100,11 +100,7 @@ export function TenantsTableView({
         id: TENANT_COLUMNS.customer.id,
         header: TENANT_COLUMNS.customer.header,
         cell: ({ row }: { row: Row<TenantRow> }) => (
-          <TenantCustomerCell
-            name={row.original.customer.name}
-            imageUrl={row.original.customer.imageUrl}
-            userCount={row.original.userCount}
-          />
+          <TenantCustomerCell customers={row.original.customers} userCount={row.original.userCount} />
         ),
         enableSorting: false,
         meta: columnMeta(TENANT_COLUMNS.customer),

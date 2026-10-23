@@ -1,3 +1,10 @@
+/** A customer a tenant's directory serves. */
+export interface TenantCustomer {
+  name: string;
+  /** A URL the browser can load as is. */
+  imageUrl?: string | null;
+}
+
 /** One connected directory tenant, as the tenants list shows it. */
 export interface TenantRow {
   id: string;
@@ -6,12 +13,8 @@ export interface TenantRow {
   /** The directory provider (`MICROSOFT_365`, `GOOGLE_WORKSPACE`); an unknown value keeps its raw name. */
   provider: string;
   domain?: string | null;
-  /** The customer the tenant belongs to. */
-  customer: {
-    name: string;
-    /** A URL the browser can load as is. */
-    imageUrl?: string | null;
-  };
+  /** The customers the directory serves, earliest attached first; empty while it serves none. */
+  customers: readonly TenantCustomer[];
   /** Users read from the directory; absent before the first read. */
   userCount?: number | null;
   /** What the last access probe found (`WRITE_ENABLED`, `DISCONNECTED`, ...). */
