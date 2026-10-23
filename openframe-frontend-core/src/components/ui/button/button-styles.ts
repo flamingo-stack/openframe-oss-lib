@@ -306,7 +306,7 @@ export const BUTTON_KIND_CLASS = {
   // company-hub deck's prev / next, pause and fullscreen). 36px, the card surface with a border, the accent border and
   // glyph on hover, faded when disabled (a carousel at either end of its track). Arrows go through `StepArrowButton`.
   stepper: [
-    'grid h-9 w-9 shrink-0 place-items-center rounded-full border-[1.5px] border-ods-border',
+    'grid h-9 w-9 shrink-0 place-items-center rounded-full border-[length:1.5px] border-ods-border',
     'bg-ods-card text-ods-text-primary transition-colors duration-150',
     'hover:border-ods-accent hover:text-ods-accent',
     'disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:border-ods-border disabled:hover:text-ods-text-secondary',
