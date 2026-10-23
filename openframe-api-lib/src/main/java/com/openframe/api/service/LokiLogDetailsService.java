@@ -32,7 +32,6 @@ public class LokiLogDetailsService implements LogDetailsService {
         Optional<LogDetails> details = lokiLogEventRepository
                 .find(tenantId, toolType, timestamp, toolEventId)
                 .map(logDetailsMapper::toLogDetails);
-        log.debug("Log details found: {}", details.isPresent());
         if (details.isEmpty()) {
             log.warn("Tool event not found in Loki: tenantId={}, toolType={}, timestamp={}, toolEventId={}",
                     tenantId, toolType, timestamp, toolEventId);
