@@ -19,6 +19,7 @@ public class EventProcessingMetrics {
     private static final String TAG_PROJECTION = "projection";
     private static final String TAG_OUTCOME = "outcome";
     static final String OUTCOME_APPLIED = "applied";
+    static final String OUTCOME_HANDED_OVER = "handed_over";
     static final String OUTCOME_FAILED = "failed";
     static final String OUTCOME_MONGO_UNAVAILABLE = "mongo_unavailable";
 
@@ -41,6 +42,11 @@ public class EventProcessingMetrics {
         sample.stop(meters.applied);
     }
 
+    void recordHandedOver(Timer.Sample sample, String projectionName) {
+        ProjectionMeters meters = metersByProjection.get(projectionName);
+        sample.stop(meters.handedOver);
+    }
+
     void recordFailed(Timer.Sample sample, String projectionName) {
         ProjectionMeters meters = metersByProjection.get(projectionName);
         sample.stop(meters.failed);
@@ -53,9 +59,10 @@ public class EventProcessingMetrics {
 
     private ProjectionMeters metersOf(String projectionName) {
         Timer applied = timerOf(projectionName, OUTCOME_APPLIED);
+        Timer handedOver = timerOf(projectionName, OUTCOME_HANDED_OVER);
         Timer failed = timerOf(projectionName, OUTCOME_FAILED);
         Timer mongoUnavailable = timerOf(projectionName, OUTCOME_MONGO_UNAVAILABLE);
-        return new ProjectionMeters(applied, failed, mongoUnavailable);
+        return new ProjectionMeters(applied, handedOver, failed, mongoUnavailable);
     }
 
     private Timer timerOf(String projectionName, String outcome) {
@@ -66,6 +73,7 @@ public class EventProcessingMetrics {
     private static class ProjectionMeters {
 
         private final Timer applied;
+        private final Timer handedOver;
         private final Timer failed;
         private final Timer mongoUnavailable;
     }

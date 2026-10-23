@@ -2,6 +2,7 @@ package com.openframe.processing.runner;
 
 import com.mongodb.MongoNotPrimaryException;
 import com.mongodb.ServerAddress;
+import com.openframe.event.jobs.task.service.ProjectionTaskService;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
@@ -26,6 +27,12 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 // Through EventProcessingAutoConfiguration: real spec registry, modes and metrics; projections that record what reached them.
 class ProjectionRunnerTest {
@@ -232,6 +239,80 @@ class ProjectionRunnerTest {
                             .hasMessageContaining("[widget-alpha, widget-zulu]")
                             .hasCause(alpha);
                 });
+    }
+
+    @Test
+    void anEventBelowTheInlineLimit_isAppliedInline() {
+        onTickets.changes = 4999;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    process(context, record(false));
+
+                    assertThat(onTickets.records).hasSize(1);
+                    verify(tasks, never()).submit(any(), any(), any(), any());
+                    assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_APPLIED)).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void anEventAtTheInlineLimit_goesToAProjectionTask_insteadOfInline() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    PublishedRecord<WidgetEvent> record = record(false);
+                    process(context, record);
+
+                    assertThat(onTickets.records).isEmpty();
+                    verify(tasks).submit(ON_TICKETS, ORGANIZATIONS, "organization-document-1", record);
+                    assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_HANDED_OVER)).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void whileItsSourceHasATask_evenASmallEventGoesToTheTask() {
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        when(tasks.hasTask(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(true);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+                .run(context -> {
+                    process(context, record(false));
+
+                    assertThat(onTickets.records).isEmpty();
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                });
+    }
+
+    @Test
+    void withProjectionTasksOff_aLargeEventIsStillAppliedInline() {
+        onTickets.changes = 10000;
+        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+            process(context, record(false));
+
+            assertThat(onTickets.records).hasSize(1);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_APPLIED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void theInlineLimit_comesFromConfig() {
+        onTickets.changes = 5;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .withPropertyValues(onEvents(ON_TICKETS), "openframe.events.processing.large-updates.inline-limit=5")
+                .run(context -> {
+                    process(context, record(false));
+
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                });
+    }
+
+    @Test
+    void anInlineLimitBelowOne_stopsTheService() {
+        runnerWith(onTickets).withPropertyValues("openframe.events.processing.large-updates.inline-limit=0")
+                .run(context -> assertThat(context).hasFailed()
+                        .getFailure().hasStackTraceContaining("openframe.events.processing.large-updates")
+                        .hasStackTraceContaining("inlineLimit"));
     }
 
     @SafeVarargs

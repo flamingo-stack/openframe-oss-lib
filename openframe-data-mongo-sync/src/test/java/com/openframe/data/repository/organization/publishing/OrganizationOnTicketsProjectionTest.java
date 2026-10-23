@@ -3,6 +3,8 @@ package com.openframe.data.repository.organization.publishing;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.ticket.TicketProjectionRepository;
+import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
 import com.openframe.publishing.api.model.ReconciliationResult;
 import org.junit.jupiter.api.Test;
@@ -16,7 +18,6 @@ import java.util.List;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -26,7 +27,9 @@ import static org.mockito.Mockito.when;
 class OrganizationOnTicketsProjectionTest {
 
     private final OrganizationRepository organizationRepository = mock(OrganizationRepository.class);
-    private final OrganizationOnTicketsProjection projection = new OrganizationOnTicketsProjection(organizationRepository);
+    private final TicketProjectionRepository ticketProjectionRepository = mock(TicketProjectionRepository.class);
+    private final OrganizationOnTicketsProjection projection = new OrganizationOnTicketsProjection(organizationRepository,
+            ticketProjectionRepository);
 
     @Test
     void aTicketWithTheOrganizationsCurrentName_matches() {
@@ -85,15 +88,52 @@ class OrganizationOnTicketsProjectionTest {
     }
 
     @Test
-    void theProjection_isNamedAndReadsTickets_butDoesNotApplyEventsYet() {
+    void theProjection_isNamedAndReadsTickets() {
         // verifications
         assertThat(projection.name()).isEqualTo("organization-on-tickets");
         assertThat(projection.projectedClass()).isEqualTo(Ticket.class);
         assertThat(projection.projectedViewClass()).isEqualTo(TicketOrganizationView.class);
-        assertThatThrownBy(() -> projection.apply(null)).isInstanceOf(UnsupportedOperationException.class);
     }
 
-    // A view field that is not a Ticket property would be read as null without an error.
+    @Test
+    void anEvent_setsTheNameOnTheTicketsOfItsTenantAndOrganization() {
+        // setup
+        PublishedRecord<OrganizationEvent> record = record("tenant-a", "org-1", "New name");
+
+        // execution
+        projection.apply(record);
+
+        // verifications
+        verify(ticketProjectionRepository).updateOrganizationName("tenant-a", "org-1", "New name");
+    }
+
+    @Test
+    void theChanges_areCountedOnTheTicketsOfItsTenantAndOrganization_upToTheLimit() {
+        // setup
+        PublishedRecord<OrganizationEvent> record = record("tenant-a", "org-1", "New name");
+        when(ticketProjectionRepository.countOutdatedOrganizationNames("tenant-a", "org-1", "New name", 1000)).thenReturn(1000L);
+
+        // execution
+        long changes = projection.countChanges(record, 1000);
+
+        // verifications
+        assertThat(changes).isEqualTo(1000L);
+    }
+
+    @Test
+    void aBatch_setsTheNameAfterTheLastId_andReturnsTheNextLastId() {
+        // setup
+        PublishedRecord<OrganizationEvent> record = record("tenant-a", "org-1", "New name");
+        when(ticketProjectionRepository.updateOrganizationNameBatch("tenant-a", "org-1", "New name", "t5", 5000))
+                .thenReturn("t9");
+
+        // execution
+        String lastId = projection.applyBatch(record, "t5", 5000);
+
+        // verifications
+        assertThat(lastId).isEqualTo("t9");
+    }
+
     @Test
     void everyViewField_isATicketProperty_storedUnderTheSameName() {
         // setup
@@ -114,6 +154,11 @@ class OrganizationOnTicketsProjectionTest {
 
     private static TicketOrganizationView ticket(String id, String tenantId, String organizationId, String organizationName) {
         return new TicketOrganizationView(id, tenantId, organizationId, organizationName);
+    }
+
+    private static PublishedRecord<OrganizationEvent> record(String tenantId, String organizationId, String name) {
+        OrganizationEvent event = OrganizationEvent.builder().organizationId(organizationId).name(name).build();
+        return PublishedRecord.<OrganizationEvent>builder().tenantId(tenantId).version(4L).schemaVersion(1).event(event).build();
     }
 
     private static Organization organization(String tenantId, String organizationId, String name) {
