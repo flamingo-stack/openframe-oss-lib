@@ -5,7 +5,7 @@
  * transcription, summarization, and video clip extraction.
  */
 
-import type { Speaker, VideoClip } from './customer-interview';
+import type { Speaker, VideoClip } from './video-processing';
 
 // ============================================================================
 // Status Types
@@ -216,6 +216,3 @@ export interface VideoAIConfig {
     retryAttempts: number;
   };
 }
-
-// Re-export types from customer-interview for convenience
-export type { Speaker, VideoClip } from './customer-interview';

@@ -1,9 +1,11 @@
 'use client';
 
 import { personFirstName } from '../../utils/format';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { AvatarStack } from './avatar-stack';
 import { Button } from './button';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 import { SquareAvatar } from './square-avatar';
 import { TruncateText } from './truncate-text';
 
@@ -44,12 +46,17 @@ export interface PersonCellProps {
    * (the landing quote chips).
    */
   size?: 'sm' | 'lg';
+  /** The person is still being read: the cell draws its skeleton at its size. A loading scope does the same. */
+  loading?: boolean;
 }
 
 const PERSON_CELL_SIZE = {
   sm: { avatar: 'sm', gap: 'gap-3', primary: 'h6' },
   lg: { avatar: 'lg', gap: 'gap-[var(--spacing-system-sf)]', primary: 'h3' },
 } as const;
+
+/** The cell's row: avatar, then its two lines. Read by the cell and by its skeleton. */
+const PERSON_ROW_CLASS = 'flex min-w-0 items-center';
 
 export function PersonCell({
   name,
@@ -59,11 +66,14 @@ export function PersonCell({
   onClick,
   actionTitle,
   size = 'sm',
+  loading,
 }: PersonCellProps) {
+  // In a page's loading state (or while the host reads the person) the cell is its skeleton.
+  if (useLoadingScope() || loading) return <PersonCellSkeleton size={size} />;
   const displayName = name || fallbackName;
   const scale = PERSON_CELL_SIZE[size];
   const row = (
-    <div className={`group/person-cell flex min-w-0 items-center ${scale.gap}`}>
+    <div className={`group/person-cell ${PERSON_ROW_CLASS} ${scale.gap}`}>
       <SquareAvatar size={scale.avatar} src={avatarUrl ?? undefined} alt={displayName} fallback={displayName} />
       <div className="min-w-0 flex-1">
         <TruncateText
@@ -93,6 +103,20 @@ export function PersonCell({
   );
 }
 
+/** The cell while it loads: the SAME avatar box, gap and two lines (the name's type step, then the caption's). */
+function PersonCellSkeleton({ size = 'sm' }: { size?: PersonCellProps['size'] }) {
+  const scale = PERSON_CELL_SIZE[size];
+  return (
+    <div className={`${PERSON_ROW_CLASS} ${scale.gap}`} aria-hidden>
+      <SquareAvatar loading size={scale.avatar} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TextLineSkeleton type={scale.primary} className="w-3/4" />
+        <TextLineSkeleton type="h6" className="w-1/2" />
+      </div>
+    </div>
+  );
+}
+
 export interface PeopleCellPerson {
   /** Stable render key (a profile id) — names can collide or be blank. */
   key?: string | number;
@@ -112,6 +136,8 @@ export interface PeopleCellProps {
 const PEOPLE_CELL_STACK_SLOTS = 2;
 
 export function PeopleCell({ people, fallbackName = 'Unassigned' }: PeopleCellProps) {
+  // In a page's loading state the people are read: the cell is a person cell's skeleton.
+  if (useLoadingScope()) return <PersonCellSkeleton />;
   if (people.length <= 1) {
     const [person] = people;
     return (

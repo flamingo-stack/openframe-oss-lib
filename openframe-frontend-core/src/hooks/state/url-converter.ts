@@ -5,9 +5,9 @@
  * Handles type coercion, nested paths, and array parameters.
  */
 
-import { positiveInt } from '../../utils/search-params';
+import { positiveInt, shouldIncludeInUrl } from '../../utils/search-params';
 import type { JSType } from '../../utils/search-params';
-import { type FlattenedParam, shouldIncludeInUrl } from './flatten-schema';
+import type { FlattenedParam } from './flatten-schema';
 
 /** A single URL-decodable value. */
 export type UrlScalar = string | number | boolean | null;

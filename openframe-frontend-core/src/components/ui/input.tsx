@@ -3,7 +3,11 @@
 import { Loader2 } from 'lucide-react';
 import { type InputHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '../../utils/cn';
+import { FieldValueSkeleton } from './field-value-skeleton';
 import { FieldWrapper } from './field-wrapper';
+import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from './input-styles';
+import { Label } from './label';
+import { useLoadingScope } from './loading-scope';
 
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** When true, renders error border & ring */
@@ -21,8 +25,14 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   /** Color variant for the message: "error" (red), "warning" (yellow), "success" (green) or "muted" (grey).
       Only "error" and "warning" mark the field invalid (colored border). */
   errorVariant?: 'error' | 'warning' | 'success' | 'muted';
-  /** When true, shows a loading spinner as end adornment */
+  /** An action on the field is in progress (e.g. a check of what was typed): a spinner as the end adornment. Not a
+   *  loading state: the field's own loading state is a loading scope's (the label and adornments drawn for real, the
+   *  value a bar in the field's box). */
+  pending?: boolean;
+  /** @deprecated Use `pending`: this is an action's spinner, not the field's loading state (a loading scope). */
   loading?: boolean;
+  /** The value is typed by the person (a search or filter box), never read: drawn as is in a loading scope. */
+  userValue?: boolean;
 }
 
 const invalidBorderClasses = {
@@ -41,14 +51,20 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
     labelVariant,
     error,
     errorVariant = 'error',
-    loading = false,
+    pending: pendingProp = false,
+    loading: deprecatedLoading = false,
+    userValue = false,
     ...props
   } = allProps;
+  const pending = pendingProp || deprecatedLoading;
   // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
   const errorSlot = 'error' in allProps;
   // success/muted are informational — they never paint the invalid border
   const variantIsInvalid = errorVariant === 'error' || errorVariant === 'warning';
   const isInvalid = invalid || (!!error && variantIsInvalid);
+  // ONE switch: in a page's loading state the field draws its box, its label and adornments for real, and its value
+  // as a bar (the placeholder hidden). The input stays mounted, hidden, so nothing re-registers when the scope ends.
+  const inScope = useLoadingScope() && !userValue;
 
   // Range inputs get a clean slider rendering — no label wrapper, borders, or adornments
   if (type === 'range') {
@@ -92,11 +108,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
   }
 
   const content = (
-    <label
+    <Label
+      variant="surface"
       data-invalid={isInvalid || undefined}
       className={cn(
         // Layout & spacing
-        'flex h-11 w-full cursor-text items-center gap-2 rounded-[6px] border px-3 md:h-12',
+        'flex w-full cursor-text items-center gap-2 border px-3',
+        INPUT_HEIGHT_CLASS,
+        INPUT_RADIUS_CLASS,
         // Focus-within states
         'has-[:focus-visible]:outline-none',
         'group',
@@ -126,8 +145,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
           {startAdornment}
         </span>
       )}
+      {inScope && <FieldValueSkeleton />}
       <input
         type={type}
+        hidden={inScope || props.hidden}
         className={cn(
           // Layout
           'min-w-0 flex-1 border-none bg-transparent outline-none',
@@ -147,13 +168,13 @@ const Input = forwardRef<HTMLInputElement, InputProps>((allProps, ref) => {
         ref={ref}
         {...props}
       />
-      {loading && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
-      {!loading && endAdornment && (
+      {pending && <Loader2 className="size-4 flex-shrink-0 animate-spin text-ods-text-secondary md:size-6" />}
+      {!pending && endAdornment && (
         <span className="flex-shrink-0 text-ods-text-secondary transition-colors duration-200 text-h6 group-has-[:focus]:text-ods-accent group-data-[invalid]:text-ods-error [&_svg]:size-4 md:[&_svg]:size-6">
           {endAdornment}
         </span>
       )}
-    </label>
+    </Label>
   );
 
   return (

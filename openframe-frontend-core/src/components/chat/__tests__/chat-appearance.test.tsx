@@ -73,6 +73,62 @@ describe('chat appearance', () => {
     expect(screen.queryByText('You')).toBeNull();
   });
 
+  it("a technician's own turn in a ticket thread is a bubble on the right that names its author", () => {
+    render(
+      <ChatAppearanceContext.Provider value="v2">
+        <ChatMessageEnhanced
+          role="user"
+          authorType="admin"
+          selfAuthorType="admin"
+          nameEveryTurn
+          name="Test Owner"
+          content="On it"
+          timestamp={new Date(2026, 9, 13, 12, 26)}
+        />
+      </ChatAppearanceContext.Provider>,
+    );
+    expect(screen.getByText('Test Owner')).toBeTruthy();
+    expect(screen.getByTitle('Test Owner')).toBeTruthy();
+    expect(document.body).toContainHTML('bg-ods-bg-active');
+    expect(document.body).toContainHTML('justify-end');
+    // The time stays under the bubble, as on every own turn.
+    expect(document.body).toContainHTML('justify-self-end');
+  });
+
+  it('an incoming turn is named once when the thread names every turn', () => {
+    render(
+      <ChatMessageEnhanced
+        role="user"
+        authorType="user"
+        selfAuthorType="admin"
+        nameEveryTurn
+        name="LAPTOP-88Q44ERC"
+        content="I want Call of Duty"
+      />,
+    );
+    expect(screen.getAllByText('LAPTOP-88Q44ERC')).toHaveLength(1);
+    expect(document.body).not.toContainHTML('bg-ods-bg-active');
+  });
+
+  it("the agent's turn is named beside its mark when the thread names every turn", () => {
+    render(
+      <ChatMessageEnhanced
+        role="assistant"
+        assistantType="fae"
+        selfAuthorType="admin"
+        nameEveryTurn
+        name="Ava"
+        content="Hi"
+        timestamp={new Date(2026, 9, 13, 12, 26)}
+      />,
+    );
+    expect(screen.getByRole('img', { name: 'Ava' })).toBeTruthy();
+    expect(screen.getByText('Ava')).toBeTruthy();
+    // An incoming turn: the time sits on the name row, not under the text.
+    expect(document.body).toContainHTML('ml-auto');
+    expect(document.body).not.toContainHTML('bg-ods-bg-active');
+  });
+
   it("a user turn with no author type is the user's own in a thread the user owns", () => {
     render(<ChatMessageEnhanced role="user" selfAuthorType="user" content="Hi" />);
     expect(document.body).toContainHTML('bg-ods-bg-active');

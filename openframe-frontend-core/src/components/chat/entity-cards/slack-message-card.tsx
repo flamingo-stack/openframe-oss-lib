@@ -15,6 +15,7 @@ import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { SlackIcon } from '../../icons-v2-generated/brand-logos/slack-icon';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import type { SlackMessageItem } from '../types/entities/slack-message';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -23,14 +24,13 @@ import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_OUTER_STATIC,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
   safeHref,
 } from '../utils/compact-card-classes';
+import { ActivityRowSkeleton, CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 export interface SlackMessageCardAnchorProps {
   href: string;
@@ -61,6 +61,7 @@ function parseChannelFromUrl(url: string | null | undefined): string | null {
 }
 
 export function SlackMessageCard({ item, variant = 'compact', className, anchorProps }: SlackMessageCardProps) {
+  if (useLoadingScope()) return <SlackMessageCardSkeleton variant={variant} className={className} />;
   const channel = item.channel ?? parseChannelFromUrl(item.url) ?? null;
   const dateText = formatDate(item.dateUpdated, { fallback: '', timezone: 'local' });
 
@@ -152,7 +153,7 @@ export function SlackMessageCard({ item, variant = 'compact', className, anchorP
   );
 }
 
-export function SlackMessageCardSkeleton({
+function SlackMessageCardSkeleton({
   variant = 'compact',
   className,
 }: {
@@ -161,32 +162,24 @@ export function SlackMessageCardSkeleton({
 }) {
   if (variant === 'row') {
     return (
-      <div className={`flex min-w-0 items-center gap-3 ${className ?? ''}`}>
-        <UnifiedSkeleton className="h-3.5 w-3.5 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-32 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-2/3 flex-1 rounded" />
-        <UnifiedSkeleton className="h-3 w-24 shrink-0 rounded" />
-        <UnifiedSkeleton className="h-3 w-20 shrink-0 rounded" />
-      </div>
+      <ActivityRowSkeleton
+        lead={
+          <>
+            <UnifiedSkeleton className="h-3.5 w-3.5 shrink-0 rounded" />
+            <UnifiedSkeleton className="h-3 w-32 shrink-0 rounded" />
+          </>
+        }
+        trailingWidths={['w-24', 'w-20']}
+        className={className}
+      />
     );
   }
   return (
-    <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <UnifiedSkeleton as="span" className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-      <span className={COMPACT_CARD_TEXT_COL}>
-        <span className={COMPACT_CARD_TITLE_ROW}>
-          <UnifiedSkeleton as="span" className="h-3.5 w-2/3 rounded" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <UnifiedSkeleton as="span" className="h-3 w-5/6 rounded" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <UnifiedSkeleton as="span" className="h-3 w-1/3 rounded" />
-        </span>
-      </span>
-      <span className="flex h-5 shrink-0 items-center self-start">
-        <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
-      </span>
-    </span>
+    <CompactCardSkeleton
+      titleWidth="w-2/3"
+      rows={[{ width: 'w-5/6' }, { width: 'w-1/3' }]}
+      trailingIcon
+      className={className}
+    />
   );
 }

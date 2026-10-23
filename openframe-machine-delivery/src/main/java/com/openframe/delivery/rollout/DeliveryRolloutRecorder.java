@@ -5,7 +5,9 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDeliveryRollout;
 import com.openframe.data.repository.delivery.MachineDeliveryRolloutRepository;
 import com.openframe.data.repository.delivery.MachineDeliverySequenceRepository;
+import com.openframe.data.service.TenantIdProvider;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
+import com.openframe.delivery.metrics.DeliveryMetrics;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRequest;
 import com.openframe.delivery.track.DeliveryId;
@@ -27,13 +29,16 @@ public class DeliveryRolloutRecorder {
     private final MachineDeliveryRolloutRepository repository;
     private final MachineDeliverySequenceRepository sequences;
     private final DeliveryPayloadJson payloadJson;
+    private final TenantIdProvider tenants;
+    private final DeliveryMetrics metrics;
 
     // the sequence is taken once, when the rollout starts: a dispatch recorded later outranks every row of this
     // rollout on the agent, however long the batches take
     public void record(DeliveryRequest<?> request) {
         DeliveryType type = request.getType();
         String targetId = request.getTargetId();
-        String id = DeliveryId.of(type, targetId);
+        String tenantId = tenants.getTenantId();
+        String id = DeliveryId.rollout(tenantId, type, targetId);
         int sequence = sequences.next();
         DeliveryPayload payload = request.getPayload();
         String json = payloadJson.write(payload);
@@ -49,6 +54,7 @@ public class DeliveryRolloutRecorder {
                 .startedAt(Instant.now())
                 .build();
         repository.save(rollout);
+        metrics.recordRolloutStarted(type);
         log.info("Delivery rollout started: type={} targetId={} sequence={}", type, targetId, sequence);
     }
 }

@@ -4,7 +4,8 @@ import { type ReactNode, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { accentFromIdentityIcon, type QuickActionAccent } from './quick-action-chip';
 import { QuickActionWall } from './quick-action-wall';
@@ -44,7 +45,7 @@ export interface GuideWelcomeProps {
   subtitle?: ReactNode;
   /** While the admin greeting is still being fetched, render a one-line
    *  subtitle skeleton instead of flashing empty → text. Ignored once a
-   *  `subtitle` is present. */
+   *  `subtitle` is present. A loading scope draws the skeleton too. */
   subtitleLoading?: boolean;
   /** Quick-action chips — caller-provided; there are no built-in defaults, so
    *  the chip row is omitted entirely unless the host supplies actions. ALL
@@ -107,6 +108,8 @@ export function GuideWelcome({
   // scroll region, shown only while content is actually hidden in that
   // direction. (Same behaviour as MingoWelcome.)
   const { scrollRef, fadeTop, fadeBottom, update: updateScrollFade } = useScrollFade<HTMLDivElement>();
+  // ONE switch for the greeting (read data): a loading scope, or the host still fetching it with none to show yet.
+  const subtitleIsLoading = useLoadingScope() || (subtitleLoading && !subtitle);
 
   // Map to the shared {@link QuickActionChip} shape consumed by the unified
   // `QuickActionWall` — the SAME chip wall the website hero + deck render, so
@@ -171,12 +174,12 @@ export function GuideWelcome({
                   one-line skeleton; once settled, render the greeting (admin
                   copy / host override) or nothing — no built-in default, so by
                   default the empty state shows the title alone. */}
-              {subtitle ? (
-                <p className="text-ods-text-secondary text-h4">{subtitle}</p>
-              ) : subtitleLoading ? (
+              {subtitleIsLoading ? (
                 <div className="flex w-full justify-center">
-                  <UnifiedSkeleton className="h-5 w-3/4 max-w-80 rounded-sm" />
+                  <TextLineSkeleton type="h4" className="w-3/4 max-w-80" />
                 </div>
+              ) : subtitle ? (
+                <p className="text-ods-text-secondary text-h4">{subtitle}</p>
               ) : null}
             </div>
           </div>

@@ -40,14 +40,16 @@ export function InviteLinkInvalidModal({
         <div className="flex items-center gap-[var(--spacing-system-mf)]">
           <h1 className="flex-1 tracking-[-0.64px] text-ods-text-primary text-h2">{accentSentenceMarks(title)}</h1>
           {/* Close (X) — desktop/tablet only, per design */}
-          <button
+          <Button
+            variant="transparent"
+            size="icon-sm"
             type="button"
             aria-label="Close"
             onClick={onClose ?? onBackToLogin}
-            className="hidden shrink-0 text-ods-text-primary md:block"
+            className="hidden shrink-0 md:inline-flex"
           >
-            <XmarkIcon className="h-6 w-6" />
-          </button>
+            <XmarkIcon />
+          </Button>
         </div>
 
         <p className="text-ods-text-primary text-h4">{description}</p>

@@ -65,7 +65,7 @@ public class DeliveryCloser {
         String id = delivery.getId();
         boolean cancelled = repository.markCancelled(id, from, dispatchedAt, now, expiresAt);
         if (cancelled) {
-            log.info("Delivery CANCELLED by sweep: type={} targetId={} machineId={} reason={}",
+            log.info("Delivery CANCELLED: type={} targetId={} machineId={} reason={}",
                     type, delivery.getTargetId(), delivery.getMachineId(), reason);
         }
     }

@@ -1,7 +1,9 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo } from 'react';
-import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
+import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
+import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import {
   ExecutionDeviceCell,
@@ -35,6 +37,17 @@ export interface ScriptExecutionTableRow {
   /** The execution's page: the row's link and the open-in-new-tab button. */
   href?: string;
 }
+
+/** An execution still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
+const loadingExecution = (id: string): ScriptExecutionTableRow => ({
+  id,
+  executionId: '',
+  timestamp: '',
+  status: '',
+  machineName: '',
+  initiator: { name: '', initials: '' },
+  href: '',
+});
 
 export interface ScriptExecutionsTableProps {
   rows: ScriptExecutionTableRow[];
@@ -75,8 +88,11 @@ export function ScriptExecutionsTable({
   emptyMessage = 'No executions found.',
   showHeader: withHeader = true,
   rightSlot,
-  skeletonRows = 10,
+  skeletonRows,
 }: ScriptExecutionsTableProps) {
+  // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
+  // rows alike.
+  const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptExecutionTableRow>[]>(() => {
     const renderers: Record<string, (row: ScriptExecutionTableRow) => ReactNode> = {
       [EXECUTION_COLUMNS.executionId.id]: row => (
@@ -104,7 +120,7 @@ export function ScriptExecutionsTable({
         />
       ),
       [EXECUTION_COLUMNS.result.id]: row => <ExecutionResultCell result={row.result} />,
-      [EXECUTION_COLUMNS.open.id]: row => (row.href ? <OpenInNewTabCell href={row.href} /> : null),
+      [EXECUTION_COLUMNS.open.id]: row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null),
     };
     // No row menu here: its one action (copy the id) is the product's, so the actions column is left out.
     return layout
@@ -118,21 +134,27 @@ export function ScriptExecutionsTable({
       }));
   }, [layout, hideColumns]);
 
+  // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loadingRows = useMemo(
+    () => (loading ? dataTableLoadingRows(skeletonRows ?? DATA_TABLE_SKELETON_ROWS, loadingExecution) : null),
+    [loading, skeletonRows],
+  );
   const table = useDataTable<ScriptExecutionTableRow>({
-    data: rows,
+    data: loadingRows ?? rows,
     columns,
     getRowId: (row: ScriptExecutionTableRow) => row.id,
     enableSorting: false,
   });
 
-  const rowHref = useCallback((row: ScriptExecutionTableRow) => row.href, []);
-  const showHeader = withHeader && (isLoading || rows.length > 0);
+  const rowHref = useCallback((row: ScriptExecutionTableRow) => row.href || undefined, []);
+  const showHeader = withHeader && (loading || rows.length > 0);
 
   return (
     <DataTable table={table}>
       {showHeader && <DataTable.Header rightSlot={rightSlot} />}
       <DataTable.Body
-        loading={isLoading}
+        loading={loading}
+        loadingCells
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         rowClassName="mb-1"

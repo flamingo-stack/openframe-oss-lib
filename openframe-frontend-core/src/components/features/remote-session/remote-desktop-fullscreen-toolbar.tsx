@@ -63,19 +63,11 @@ export function RemoteDesktopFullscreenToolbar({
             <ActionsMenuDropdown
               groups={displayMenuGroups}
               customTrigger={
-                <button
-                  type="button"
-                  aria-label="Switch display"
-                  className={
-                    'flex h-8 flex-shrink-0 items-center gap-[var(--spacing-system-xs)] rounded-[6px] ' +
-                    'border border-ods-border bg-ods-card p-[var(--spacing-system-xsf)] ' +
-                    'text-ods-text-primary hover:border-ods-border-hover'
-                  }
-                >
-                  <MonitorIcon className="h-4 w-4" />
-                  <span className="whitespace-nowrap text-h5">{currentDisplayLabel}</span>
-                  <Chevron02DownIcon className="h-4 w-4" />
-                </button>
+                <Button variant="outline" size="small" type="button" aria-label="Switch display" className="shrink-0">
+                  <MonitorIcon />
+                  <span className="whitespace-nowrap">{currentDisplayLabel}</span>
+                  <Chevron02DownIcon />
+                </Button>
               }
             />
           )}
