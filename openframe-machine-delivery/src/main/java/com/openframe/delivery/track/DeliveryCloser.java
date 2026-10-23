@@ -30,7 +30,7 @@ public class DeliveryCloser {
         Policy policy = properties.resolve(type);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
-        if (policy.hasRunsLeft(delivery.getReruns())) {
+        if (canRerun(failure) && policy.hasRunsLeft(delivery.getReruns())) {
             Instant dueAt = rerunAt(policy, now);
             boolean scheduled = repository.scheduleRerun(id, from, dispatchedAt, dueAt);
             if (scheduled) {
@@ -102,6 +102,12 @@ public class DeliveryCloser {
         metrics.recordRerun(type, failure);
         log.warn("Delivery re-run scheduled: type={} targetId={} machineId={} reason={} error={} run={} dueAt={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), failure, delivery.getError(), run, dueAt);
+    }
+
+    // an offline machine never had the run: the reconnect window is the decision, and it is counted from the
+    // dispatchedAt a scheduled rerun keeps, so the next tick would only fail the row again
+    private static boolean canRerun(DeliveryFailure failure) {
+        return failure != DeliveryFailure.OFFLINE;
     }
 
     private static Instant rerunAt(Policy policy, Instant now) {

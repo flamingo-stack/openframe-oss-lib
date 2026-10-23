@@ -103,6 +103,26 @@ class DeliveryCloserTest {
     }
 
     @Test
+    void fail_offlineWindowOver_rowFailedEvenWithRunsLeft() {
+        // setup
+        DeliveryProperties properties = DeliveryTestPolicies.properties();
+        properties.getDefaults().setMaxRuns(MAX_RUNS);
+        closer = new DeliveryCloser(repository, properties, metrics);
+        Instant expiresAt = now.plusSeconds(TTL);
+        when(repository.markFailed(DELIVERY_ID, DeliveryStatus.UNACKED, dispatchedAt, DeliveryFailure.OFFLINE, now, expiresAt)).thenReturn(true);
+
+        // execution
+        closer.fail(delivery, DeliveryFailure.OFFLINE, DeliveryStatus.UNACKED, now);
+
+        // verifications
+        verify(repository, never()).scheduleRerun(any(), any(), any(Instant.class), any());
+        verify(metrics, never()).recordRerun(any(), any());
+        verify(metrics).recordFailed(DeliveryType.CLIENT_UNINSTALL, DeliveryFailure.OFFLINE);
+        assertThat(delivery.getStatus()).isEqualTo(DeliveryStatus.FAILED);
+        assertThat(delivery.getReruns()).isZero();
+    }
+
+    @Test
     void fail_lastRunDone_rowFailedAsBefore() {
         // setup
         DeliveryProperties properties = DeliveryTestPolicies.properties();
