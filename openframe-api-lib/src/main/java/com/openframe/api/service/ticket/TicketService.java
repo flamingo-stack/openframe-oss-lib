@@ -423,7 +423,14 @@ public class TicketService {
                 .deviceIds(filter.getDeviceIds())
                 .assigneeIds(filter.getAssigneeIds())
                 .activity(ticketStalenessResolver.resolve(filter.getActivity()))
+                .escalatedByUser(filter.getEscalatedByUser())
+                .hasPendingApproval(filter.getHasPendingApproval())
                 .build();
+    }
+
+    public void setPendingApproval(String ticketId, boolean pending) {
+        ticketRepository.updatePendingApproval(ticketId, pending);
+        log.debug("Ticket {} pending-approval flag set to {}", ticketId, pending);
     }
 
     private PageInfo buildPageInfo(List<Ticket> pageItems, boolean hasNextPage, boolean hasPreviousPage) {
