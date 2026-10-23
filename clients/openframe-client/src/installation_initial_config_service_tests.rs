@@ -4,6 +4,7 @@ fn params() -> InstallConfigParams {
     InstallConfigParams {
         server_url: None,
         initial_key: None,
+        log_key: None,
         org_id: None,
         user_id: None,
         local_mode: false,
@@ -57,12 +58,22 @@ fn extra_arguments_alone_are_parameterized() {
     let mut p = params();
     p.remote_access_mode = Some(RemoteAccessMode::SilentAccess);
     assert!(!p.is_parameterless());
+
+    let mut p = params();
+    p.log_key = Some("log".to_string());
+    assert!(!p.is_parameterless());
 }
 
 fn saved_config(remote_access_mode: Option<RemoteAccessMode>) -> InitialConfiguration {
+    save(params(), remote_access_mode)
+}
+
+fn save(
+    mut p: InstallConfigParams,
+    remote_access_mode: Option<RemoteAccessMode>,
+) -> InitialConfiguration {
     let dir = tempfile::tempdir().unwrap();
     let dm = crate::test_support::directories(&dir);
-    let mut p = params();
     p.server_url = Some("acme.openframe.ai".to_string());
     p.initial_key = Some("key".to_string());
     p.org_id = Some("org".to_string());
@@ -84,4 +95,22 @@ fn remote_access_mode_is_persisted_by_its_backend_name() {
 #[test]
 fn no_remote_access_mode_persists_nothing_pending() {
     assert_eq!(saved_config(None).remote_access_mode, None);
+}
+
+#[test]
+fn the_log_key_from_the_command_is_stored_next_to_the_initial_key() {
+    let mut p = params();
+    p.log_key = Some("log".to_string());
+    let cfg = save(p, None);
+    assert_eq!(cfg.log_key, "log");
+    assert_eq!(cfg.initial_key, "key");
+}
+
+#[test]
+fn a_missing_or_blank_log_key_is_stored_empty() {
+    assert_eq!(saved_config(None).log_key, "");
+
+    let mut p = params();
+    p.log_key = Some("  ".to_string());
+    assert_eq!(save(p, None).log_key, "");
 }

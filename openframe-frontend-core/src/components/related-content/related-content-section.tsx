@@ -817,7 +817,7 @@ export function RelatedContentSection({
   );
 }
 
-export interface RelatedContentSectionSkeletonProps extends Pick<
+interface RelatedContentSectionSkeletonProps extends Pick<
   RelatedContentSectionProps,
   'title' | 'entityType' | 'minResults' | 'sameTypeMinResults' | 'columns' | 'adminCampaignCard' | 'extras'
 > {
@@ -834,7 +834,7 @@ export interface RelatedContentSectionSkeletonProps extends Pick<
  * group per type in the loaded rail's order, each with its real label heading and its cards' own skeletons in the
  * group's layout: `sameTypeMinResults` for the host's type, `minResults` for the others (a page never needs a pager).
  */
-export function RelatedContentSectionSkeleton({
+function RelatedContentSectionSkeleton({
   title = 'Related Content',
   types,
   entityType,

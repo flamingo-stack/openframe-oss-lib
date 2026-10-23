@@ -17,6 +17,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { cn } from '../../utils/cn';
 import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
 import { AvatarStack } from '../ui/avatar-stack';
+import { Button } from '../ui/button';
 import { Tag } from '../ui/tag';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 import { SlashCommandSuggestions } from './slash-command-suggestions';
@@ -744,26 +745,19 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               />
             </div>
 
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               aria-label={isStopMode ? 'Stop generation' : 'Send message'}
+              // Send is armed (the accent) while the editor has focus. Stop stays neutral wherever focus sits.
+              data-state={focused && !isStopMode ? 'active' : undefined}
               onClick={isStopMode ? handleStop : handleSubmit}
               disabled={isStopMode ? isStopping : sendDisabled}
-              className={cn(
-                'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
-                // Focus accent applies to the SEND icon only. Stop stays neutral
-                // regardless of where focus sits — otherwise it reads yellow after
-                // an Enter-send (editor keeps focus) but gray after an approve
-                // click (focus moved to the card button).
-                focused && !isStopMode && 'text-ods-accent',
-                '[&_svg]:size-4 md:[&_svg]:size-6',
-                'cursor-pointer hover:text-ods-text-primary',
-                'focus-visible:text-ods-accent focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
-              )}
+              className="shrink-0"
             >
               {isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
-            </button>
+            </Button>
           </div>
         </div>
       )}

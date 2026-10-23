@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { Button } from '../../ui/button';
 import type { RemoteSessionEvent } from './types';
 
 /** `mm:ss` from the start of a recording; `h:mm:ss` from the first hour on. */
@@ -29,15 +30,15 @@ export function RemoteSessionEventList({ events, activeEventId, onSelect, classN
       <ol className="flex w-full flex-col gap-[var(--spacing-system-xxs)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-m)]">
         {events.map(event => (
           <li key={event.id}>
-            <button
+            <Button
+              variant="row"
               type="button"
               aria-current={event.id === activeEventId || undefined}
+              data-state={event.id === activeEventId ? 'active' : undefined}
+              // The current event holds the border-grey fill under the cursor.
+              data-tone="muted"
               onClick={() => onSelect?.(event)}
-              className={cn(
-                'flex w-full items-start gap-[var(--spacing-system-xxs)] rounded-md p-[var(--spacing-system-xxs)] text-left outline-none transition-colors',
-                'hover:bg-ods-bg-hover focus-visible:ring-2 focus-visible:ring-ods-focus',
-                event.id === activeEventId && 'bg-ods-border hover:bg-ods-border',
-              )}
+              className="items-start"
             >
               <span className="w-[84px] shrink-0 text-ods-text-secondary text-h4">
                 {formatRemoteSessionOffset(event.offsetMs)}
@@ -46,7 +47,7 @@ export function RemoteSessionEventList({ events, activeEventId, onSelect, classN
                 <span className="text-ods-text-primary text-h4">{event.title}</span>
                 {event.detail && <span className="text-ods-text-secondary text-h6">{event.detail}</span>}
               </span>
-            </button>
+            </Button>
           </li>
         ))}
       </ol>
@@ -77,15 +78,18 @@ export function RemoteSessionTimelineMarkers({
         const share = Math.min(1, Math.max(0, event.offsetMs / durationMs));
         const label = `${event.title} at ${formatRemoteSessionOffset(event.offsetMs)}`;
         return (
-          <button
+          <Button
+            variant="card"
             key={event.id}
             type="button"
             aria-label={label}
             title={label}
             onClick={() => onSelect?.(event)}
             style={{ left: `${share * 100}%` }}
-            className="absolute top-0 h-4 w-1 -translate-x-1/2 rounded-md bg-ods-text-secondary outline-none transition-colors hover:bg-ods-text-primary focus-visible:ring-2 focus-visible:ring-ods-focus"
-          />
+            className="absolute top-0 h-4 w-1 -translate-x-1/2"
+          >
+            <span className="block size-full rounded-md bg-ods-text-secondary" />
+          </Button>
         );
       })}
     </div>

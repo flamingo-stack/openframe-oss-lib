@@ -23,7 +23,7 @@ import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge, StatusBadgeSkeleton, generationTierFromLabel } from '../../ui/status-badge';
+import { StatusBadge, generationTierFromLabel } from '../../ui/status-badge';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import type { RoadmapItem } from '../types/entities/roadmap-item';
 import { getStatusColorScheme } from '../utils/agent-status-message';
@@ -71,7 +71,7 @@ const ROADMAP_CARD_FOOTER_END = 'flex min-w-0 items-center gap-2';
  * below), the description as three `text-h4` lines and the vote buttons' 48px box (with `votes`); the assignees and
  * target version are drawn only when an item has them, so the skeleton leaves them out. `sm`: the compact card's rows.
  */
-export function RoadmapCardSkeleton({
+function RoadmapCardSkeleton({
   size = 'default',
   votes = true,
   className,
@@ -109,11 +109,11 @@ export function RoadmapCardSkeleton({
           </div>
         </div>
         <div className="hidden md:block">
-          <StatusBadgeSkeleton />
+          <StatusBadge loading text="" />
         </div>
       </div>
       <div className="md:hidden">
-        <StatusBadgeSkeleton />
+        <StatusBadge loading text="" />
       </div>
       <div className={ROADMAP_CARD_SUMMARY_ROW}>
         <TextLineSkeleton type="h4" lines={3} className="w-full" />
@@ -126,7 +126,7 @@ export function RoadmapCardSkeleton({
   );
 }
 
-export interface RoadmapCardProps {
+interface LoadedRoadmapCardProps {
   item: RoadmapItem;
   /** Detail URL for the compact branch (`sm`). Used by the parent
    *  wrapper to drive nav. Default-branch cards don't need href —
@@ -153,6 +153,13 @@ export interface RoadmapCardProps {
   isVoting?: boolean;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope.
+ */
+export type RoadmapCardProps =
+  (LoadedRoadmapCardProps & { loading?: boolean }) | (Partial<LoadedRoadmapCardProps> & { loading: true });
+
 /** Wire assignees → AvatarStack people (name+avatar only on the wire). */
 function assigneePeople(
   assignees: Array<{ id: number; name: string | null; avatarUrl: string | null }> | undefined,
@@ -164,7 +171,15 @@ function assigneePeople(
   }));
 }
 
-export function RoadmapCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function RoadmapCard(props: RoadmapCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <RoadmapCardSkeleton size={props.size} votes={!!props.onVote} className={props.className} />;
+  }
+  return <LoadedRoadmapCard {...props} />;
+}
+
+function LoadedRoadmapCard({
   item,
   href,
 
@@ -178,13 +193,11 @@ export function RoadmapCard({
   userVote,
   onVote,
   isVoting = false,
-}: RoadmapCardProps) {
+}: LoadedRoadmapCardProps) {
   const [showScreenshots, setShowScreenshots] = useState(false);
-  const loading = useLoadingScope();
 
   const logoUrl = item.icon && item.icon.startsWith('http') ? item.icon : null;
   const iconSrc = useProxiedImageUrl(logoUrl) || null;
-  if (loading) return <RoadmapCardSkeleton size={size} votes={!!onVote} className={className} />;
 
   if (size === 'sm') {
     const compactHref = safeHref(href ?? null);
@@ -396,7 +409,11 @@ export function RoadmapCard({
             ) : null;
           })()}
           {item.targetVersion && (
-            <StatusBadge gen={generationTierFromLabel(item.targetVersion)} text={item.targetVersion} />
+            <StatusBadge
+              data-loading-optional
+              gen={generationTierFromLabel(item.targetVersion)}
+              text={item.targetVersion}
+            />
           )}
         </div>
       </div>

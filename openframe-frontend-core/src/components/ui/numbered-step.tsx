@@ -39,6 +39,12 @@ export interface NumberedStepProps extends StepNumberProps {
   description?: string;
   /** The title's element. Default `h3`. */
   titleAs?: 'h3' | 'h4' | 'p';
+  /**
+   * The step's words are still being read: its number drawn for real, its title a bar and (when the loaded step has
+   * one, `{ description: true }`) its description a bar. The step renders on the server and cannot read a loading
+   * scope: a host passes its own switch (`useLoadingScope() || loading`).
+   */
+  loading?: boolean | { description?: boolean };
 }
 
 /**
@@ -56,7 +62,18 @@ export function NumberedStep({
   accent,
   titleAs: Title = 'h3',
   className,
+  loading,
 }: NumberedStepProps) {
+  // loading-standard-ok(PROP_ONLY_SWITCH): a server component cannot read the scope; the host passes its own switch
+  if (loading) {
+    return (
+      <NumberedStepSkeleton
+        number={number}
+        description={loading === true ? true : loading.description}
+        className={className}
+      />
+    );
+  }
   return (
     <div className={cn(STEP_CLASS, className)}>
       <StepNumber number={number} current={current} accent={accent} />
@@ -89,7 +106,7 @@ export function NumberedStep({
  * A numbered step while its words are read: its number drawn for real (it is the step's place), its title a
  * `text-h3` bar and its description, when it carries one, a `text-h4` bar.
  */
-export function NumberedStepSkeleton({
+function NumberedStepSkeleton({
   number,
   description = true,
   className,

@@ -131,17 +131,17 @@ export function ScheduleScriptPickerCard({
           }`}
         >
           {dragAndDropEnabled && (
-            <button
+            <Button
+              variant="bare"
+              size="icon"
               type="button"
               {...dragHandleProps}
               disabled={disabled}
               aria-label={`Reorder ${selected?.name || `script ${index + 1}`}`}
-              className={`flex size-12 shrink-0 items-center justify-center rounded-[6px] text-ods-text-secondary hover:text-ods-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ods-border-focus disabled:cursor-not-allowed disabled:opacity-30 ${
-                isDragging ? 'cursor-grabbing text-ods-text-primary' : 'cursor-grab'
-              }`}
+              className={`shrink-0 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
             >
               <DraggerIcon size={24} />
-            </button>
+            </Button>
           )}
 
           <Controller

@@ -2,7 +2,7 @@ import { ExternalLink } from 'lucide-react';
 import type React from 'react';
 import { cn } from '../../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
-import { StatusBadgeSkeleton } from '../../ui/status-badge';
+import { StatusBadge } from '../../ui/status-badge';
 import {
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_SKELETON_IMAGE_SLOT,
@@ -46,7 +46,7 @@ export function CompactCardSkeleton({
   /** A card whose slot is not the standard image slot (the roadmap's bordered logo box). */
   slotClassName?: string;
   titleWidth?: string;
-  /** Width classes of the status stamps after the title (`StatusBadgeSkeleton variant="button"`); the title row then wraps like the card's. */
+  /** Width classes of the status stamps after the title (`StatusBadge loading variant="button"`); the title row then wraps like the card's. */
   titleBadges?: string[];
   rows?: CompactCardSkeletonRow[];
   /** The card shows the trailing external-link icon. */
@@ -61,7 +61,7 @@ export function CompactCardSkeleton({
           <TextLineSkeleton as="span" type="inherit" className={cn(COMPACT_CARD_TITLE_TYPE, titleWidth)} />
           {titleBadges.map((width, i) => (
             // The compact cards' title badges are `StatusBadge variant="button"` stamps: their own skeleton.
-            <StatusBadgeSkeleton key={i} variant="button" className={cn('shrink-0', width)} />
+            <StatusBadge loading text="" key={i} variant="button" className={cn('shrink-0', width)} />
           ))}
         </span>
         {rows.map((row, i) =>

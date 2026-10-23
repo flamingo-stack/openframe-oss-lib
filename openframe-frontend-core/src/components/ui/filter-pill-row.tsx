@@ -109,16 +109,19 @@ export function FilterPillRow({
   );
 }
 
+/** Pill boxes a loading row draws when the page states no options: a typical facet. */
+const FILTER_PILL_ROW_SKELETON_PILLS = 5;
+
 /**
  * The loading state of a SERVED pill row (facets that arrive with the data):
  * the same row shell, its label real, the `options` it states as real pills,
  * else `pills` boxes of a pill's size, so the filters never pop in under the
  * content. With `count` the count line is a bar.
  */
-export function FilterPillRowSkeleton({
+function FilterPillRowSkeleton({
   label,
   options,
-  pills = 5,
+  pills = FILTER_PILL_ROW_SKELETON_PILLS,
   count = false,
 }: {
   label: string;

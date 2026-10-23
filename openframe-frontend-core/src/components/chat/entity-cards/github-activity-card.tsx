@@ -288,7 +288,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
   );
 }
 
-export function GitHubActivityCardSkeleton({
+function GitHubActivityCardSkeleton({
   variant = 'compact',
   className,
 }: {
