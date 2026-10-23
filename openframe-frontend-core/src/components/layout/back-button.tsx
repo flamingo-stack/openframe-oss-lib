@@ -4,6 +4,7 @@ import type React from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { Chevron02LeftIcon } from '../icons-v2-generated/arrows/chevron-02-left-icon';
+import { Button } from '../ui/button';
 
 export interface BackButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   label?: string;
@@ -15,16 +16,14 @@ export interface BackButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLBut
   href?: string;
 }
 
-const BACK_BUTTON_CLASS = cn(
-  'group inline-flex items-center justify-center self-start rounded-md',
-  'gap-[var(--spacing-system-xsf)] py-[var(--spacing-system-sf)]',
-  'text-ods-text-secondary hover:text-ods-text-primary',
-  'transition-colors duration-200',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus',
-);
+/** Its place in the page: the start of the column, above the title. The box is the `link` button's at `default` size. */
+const BACK_BUTTON_LAYOUT_CLASS = 'self-start';
 
-/** The footprint of a `BackButton`, for a loading skeleton that must not move the page. */
-export const BACK_BUTTON_SKELETON_CLASS = 'h-12 w-40 rounded-md';
+/**
+ * The footprint of a `BackButton`, for a loading skeleton that must not move the page: the `default` button's height
+ * (44px, 48px from md), and a typical label's width.
+ */
+export const BACK_BUTTON_SKELETON_CLASS = 'h-11 w-40 rounded-md md:h-12';
 
 /**
  * THE back navigation of a page: the chevron and its label, above the title.
@@ -54,19 +53,17 @@ export function BackButton({ label = 'Back', className, type = 'button', href, .
       ...shared
     } = props;
     return (
-      <Link
-        {...(shared as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
-        href={href}
-        className={cn(BACK_BUTTON_CLASS, className)}
-      >
-        {content}
-      </Link>
+      <Button asChild variant="link" noPaddingX className={cn(BACK_BUTTON_LAYOUT_CLASS, className)}>
+        <Link {...(shared as unknown as React.AnchorHTMLAttributes<HTMLAnchorElement>)} href={href}>
+          {content}
+        </Link>
+      </Button>
     );
   }
   return (
-    <button type={type} className={cn(BACK_BUTTON_CLASS, className)} {...props}>
+    <Button variant="link" noPaddingX type={type} className={cn(BACK_BUTTON_LAYOUT_CLASS, className)} {...props}>
       {content}
-    </button>
+    </Button>
   );
 }
 

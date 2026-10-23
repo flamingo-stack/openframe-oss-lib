@@ -48,31 +48,27 @@ import type { CustomerInterview } from '../../types/customer-interview';
 import type { EntityAuthor } from '../../types/entity-author';
 import type { MSP } from '../../types/stack';
 import type { UserProfile } from '../../types/user';
-import { AiPromptCard, AiPromptCardSkeleton, type AiPromptCardData } from '../chat/entity-cards/ai-prompt-card';
+import { AiPromptCard, type AiPromptCardData } from '../chat/entity-cards/ai-prompt-card';
 // DEEP card imports — NOT the `../chat` barrel. See the import note in
 // `related-content-section.tsx`: the barrel statically reaches
 // @tanstack/react-query, deep paths keep this module's source graph free of it.
-import { BlogCard, BlogCardSkeleton } from '../chat/entity-cards/blog-card';
-import { CaseStudyCard, CaseStudyCardSkeleton } from '../chat/entity-cards/case-study-card';
-import { CustomerInterviewCard, CustomerInterviewCardSkeleton } from '../chat/entity-cards/customer-interview-card';
+import { BlogCard } from '../chat/entity-cards/blog-card';
+import { CaseStudyCard } from '../chat/entity-cards/case-study-card';
+import { CustomerInterviewCard } from '../chat/entity-cards/customer-interview-card';
 // Type-only — erased at build, no runtime dependency on the dispatch module.
 import type { ChatCardDispatchExtras } from '../chat/entity-cards/dispatch';
-import { HowIWorkCard, HowIWorkCardSkeleton, type HowIWorkCardData } from '../chat/entity-cards/how-i-work-card';
-import { InvestorUpdateCard, InvestorUpdateCardSkeleton } from '../chat/entity-cards/investor-update-card';
-import { OnboardingGuideCard, OnboardingGuideCardSkeleton } from '../chat/entity-cards/onboarding-guide-card';
-import { ProductReleaseCard, ProductReleaseCardSkeleton } from '../chat/entity-cards/product-release-card';
+import { HowIWorkCard, type HowIWorkCardData } from '../chat/entity-cards/how-i-work-card';
+import { InvestorUpdateCard } from '../chat/entity-cards/investor-update-card';
+import { OnboardingGuideCard } from '../chat/entity-cards/onboarding-guide-card';
 import { buildProductReleaseCardProps } from '../chat/entity-cards/product-release-card-defaults';
-import { ProgramCard, ProgramCardSkeleton } from '../chat/entity-cards/program-card';
-import { RoadmapCard, RoadmapCardSkeleton } from '../chat/entity-cards/roadmap-card';
-import {
-  WhatIShippedCard,
-  WhatIShippedCardSkeleton,
-  type WhatIShippedCardData,
-} from '../chat/entity-cards/what-i-shipped-card';
+import { ProgramCard } from '../chat/entity-cards/program-card';
+import { RoadmapCard } from '../chat/entity-cards/roadmap-card';
+import { WhatIShippedCard, type WhatIShippedCardData } from '../chat/entity-cards/what-i-shipped-card';
 import type { InvestorUpdate } from '../chat/types/entities/investor-update';
 import type { OnboardingGuide } from '../chat/types/entities/onboarding-guide';
 import type { BaseProgramItem, ProgramHost, ProgramMedia } from '../chat/types/entities/program-types';
 import type { RoadmapItem } from '../chat/types/entities/roadmap-item';
+import { ProductReleaseCard } from '../shared/product-release/product-release-card';
 
 export type CardSize = 'lg' | 'default' | 'sm';
 
@@ -579,14 +575,20 @@ export interface RelatedCardContext {
   anchorAttrs: Pick<CardLinkAnchorProps, 'target' | 'rel'>;
   /** Branded OG fallback for cards whose row has no featured image. */
   placeholderUrl?: string;
+  /**
+   * The rail's first card: its image is likely the page's largest paint (an author page opens on it), so a card that
+   * can rank its image fetches it at once instead of lazily.
+   */
+  priority?: boolean;
   extras?: ChatCardDispatchExtras;
 }
 
 /** One registered content type. `Row` is erased here — `cardEntry` below is
  *  what keeps each branch's row type concrete. */
 export interface RelatedCardRegistryEntry {
-  /** Sized to match the resolved card exactly (zero layout shift). */
-  skeleton: (size: CardSize) => React.ReactNode;
+  /** Sized to match the resolved card exactly (zero layout shift). `extras` are the host's (a program's config says
+   *  whether its cards show hosts). */
+  skeleton: (size: CardSize, extras?: ChatCardDispatchExtras) => React.ReactNode;
   render: (row: unknown, ctx: RelatedCardContext) => React.ReactNode;
 }
 
@@ -600,7 +602,7 @@ export interface RelatedCardRegistryEntry {
  * used to do, minus the promise it could not keep.
  */
 function cardEntry<Row>(definition: {
-  skeleton: (size: CardSize) => React.ReactNode;
+  skeleton: (size: CardSize, extras?: ChatCardDispatchExtras) => React.ReactNode;
   decode: (row: unknown) => Row;
   render: (row: Row, ctx: RelatedCardContext) => React.ReactNode;
 }): RelatedCardRegistryEntry {
@@ -614,9 +616,14 @@ function cardEntry<Row>(definition: {
  *  which host-supplied `ProgramConfig` they render with. A group whose config
  *  the host didn't supply renders nothing (the skeleton still reserves its
  *  height, so a rail that never resolves collapses instead of flickering). */
+
 function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRegistryEntry {
   return cardEntry({
-    skeleton: size => <ProgramCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    // The gallery and hosts rows are drawn only for a type whose cards show them (its config's `cardShowsGallery`,
+    // `cardShowsHosts`), as `ProgramCard` decides in a scope: elsewhere a record may have none.
+    skeleton: (size, extras) => (
+      <ProgramCard loading config={extras?.programConfigs?.[configKey]} size={size === 'sm' ? 'sm' : 'default'} />
+    ),
     decode: decodeProgramRow,
     render: (item, ctx) => {
       const config = ctx.extras?.programConfigs?.[configKey];
@@ -631,6 +638,7 @@ function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRe
           href={ctx.href}
           targetPlatform={ctx.targetPlatform}
           placeholderUrl={ctx.placeholderUrl}
+          priority={ctx.priority}
           {...ctx.anchorAttrs}
         />
       );
@@ -642,7 +650,7 @@ function programEntry(configKey: 'podcast' | 'webinar' | 'event'): RelatedCardRe
  *  `cardType` (drives the compact icon slot). */
 function roadmapEntry(cardType: 'roadmap_item' | 'delivery_item' | 'internal_task'): RelatedCardRegistryEntry {
   return cardEntry({
-    skeleton: size => <RoadmapCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    skeleton: size => <RoadmapCard loading size={size === 'sm' ? 'sm' : 'default'} />,
     decode: decodeRoadmapRow,
     render: (item, ctx) => (
       <RoadmapCard
@@ -661,7 +669,7 @@ function roadmapEntry(cardType: 'roadmap_item' | 'delivery_item' | 'internal_tas
 
 export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
   blog_post_existing: cardEntry({
-    skeleton: size => <BlogCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    skeleton: size => <BlogCard loading size={size === 'sm' ? 'sm' : 'default'} />,
     decode: decodeBlogRow,
     render: (post, ctx) => (
       <BlogCard
@@ -670,13 +678,14 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
         href={ctx.href}
         targetPlatform={ctx.targetPlatform}
         placeholderUrl={ctx.placeholderUrl}
+        priority={ctx.priority}
         {...ctx.anchorAttrs}
       />
     ),
   }),
 
   case_study: cardEntry({
-    skeleton: size => <CaseStudyCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    skeleton: size => <CaseStudyCard loading size={size === 'sm' ? 'sm' : 'default'} />,
     decode: decodeCaseStudyRow,
     render: (study, ctx) => (
       <CaseStudyCard
@@ -691,7 +700,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
   }),
 
   customer_interview: cardEntry({
-    skeleton: size => <CustomerInterviewCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    skeleton: size => <CustomerInterviewCard loading size={size === 'sm' ? 'sm' : 'default'} />,
     decode: decodeCustomerInterviewRow,
     render: (interview, ctx) => (
       <CustomerInterviewCard
@@ -712,7 +721,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
    * record, and the three props the rail sets itself are read off it.
    */
   product_release: cardEntry({
-    skeleton: size => <ProductReleaseCardSkeleton size={size === 'sm' ? 'sm' : 'lg'} />,
+    skeleton: size => <ProductReleaseCard loading size={size === 'sm' ? 'sm' : 'lg'} />,
     decode: asRecord,
     render: (release, ctx) => {
       const buildReleaseProps = ctx.extras?.buildProductReleaseCardProps ?? buildProductReleaseCardProps;
@@ -743,7 +752,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
   event: programEntry('event'),
 
   investor_update: cardEntry({
-    skeleton: size => <InvestorUpdateCardSkeleton size={size === 'sm' ? 'sm' : 'default'} />,
+    skeleton: size => <InvestorUpdateCard loading size={size === 'sm' ? 'sm' : 'default'} />,
     decode: decodeInvestorUpdateRow,
     render: (update, ctx) => (
       <InvestorUpdateCard
@@ -761,7 +770,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
    *  step-numbered 'default' variant is for the guide detail page's "More in
    *  section" rail, not this full-width row. */
   onboarding_guide: cardEntry({
-    skeleton: size => <OnboardingGuideCardSkeleton size={size === 'sm' ? 'sm' : 'catalog'} />,
+    skeleton: size => <OnboardingGuideCard loading size={size === 'sm' ? 'sm' : 'catalog'} published={false} />,
     decode: decodeOnboardingGuideRow,
     render: (guide, ctx) => (
       <OnboardingGuideCard
@@ -781,7 +790,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
    *  href: an object with `href: undefined` is still truthy and would wrap the
    *  card in a dead <a>. */
   what_i_shipped: cardEntry({
-    skeleton: () => <WhatIShippedCardSkeleton />,
+    skeleton: () => <WhatIShippedCard loading />,
     decode: decodeEmployeeEntryRow,
     render: (entry, ctx) => (
       <WhatIShippedCard
@@ -794,7 +803,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
 
   /** Same shared employee-entry shape + anchor contract as What I Shipped. */
   how_i_work: cardEntry({
-    skeleton: () => <HowIWorkCardSkeleton />,
+    skeleton: () => <HowIWorkCard loading />,
     decode: decodeEmployeeEntryRow,
     render: (entry, ctx) => (
       <HowIWorkCard
@@ -807,7 +816,7 @@ export const RELATED_CARD_REGISTRY: Record<string, RelatedCardRegistryEntry> = {
 
   /** Same shared employee-entry shape + anchor contract as What I Shipped. */
   ai_prompt: cardEntry({
-    skeleton: () => <AiPromptCardSkeleton />,
+    skeleton: () => <AiPromptCard loading />,
     decode: decodeEmployeeEntryRow,
     render: (entry, ctx) => (
       <AiPromptCard

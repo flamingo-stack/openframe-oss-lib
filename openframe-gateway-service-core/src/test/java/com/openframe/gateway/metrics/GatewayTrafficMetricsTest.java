@@ -3,6 +3,8 @@ package com.openframe.gateway.metrics;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GatewayTrafficMetricsTest {
@@ -61,5 +63,100 @@ class GatewayTrafficMetricsTest {
                 .tag("kind", "android")
                 .counter().count();
         assertThat(count).isEqualTo(2.0);
+    }
+
+    @Test
+    void recordClientRequestIncrementsCounterByKindAndVersions() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+
+        double count = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "ios")
+                .tag("shell", "1.0.1")
+                .tag("bundle", "1.0.127")
+                .counter().count();
+        assertThat(count).isEqualTo(2.0);
+    }
+
+    @Test
+    void recordClientRequestCollapsesVersionsBeyondSeriesCap() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry);
+        for (int i = 0; i < GatewayTrafficMetrics.MAX_CLIENT_VERSION_SERIES; i++) {
+            metrics.recordClientRequest("web", "-", "1.0." + i);
+        }
+
+        metrics.recordClientRequest("android", "9.9.9", "9.9.9");
+        metrics.recordClientRequest("web", "-", "1.0.0");
+
+        double overflow = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "android")
+                .tag("shell", GatewayTrafficMetrics.OTHER_VERSION)
+                .tag("bundle", GatewayTrafficMetrics.OTHER_VERSION)
+                .counter().count();
+        double tracked = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "web")
+                .tag("shell", "-")
+                .tag("bundle", "1.0.0")
+                .counter().count();
+        assertThat(overflow).isEqualTo(1.0);
+        assertThat(tracked).isEqualTo(2.0);
+    }
+
+    @Test
+    void recordClientRequestFreesSlotOfSeriesUnusedForTtl() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        FakeTicker ticker = new FakeTicker();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry, ticker::read);
+        for (int i = 0; i < GatewayTrafficMetrics.MAX_CLIENT_VERSION_SERIES; i++) {
+            metrics.recordClientRequest("web", "-", "1.0." + i);
+        }
+
+        ticker.advance(GatewayTrafficMetrics.CLIENT_VERSION_SERIES_TTL.plusSeconds(1));
+        metrics.recordClientRequest("ios", "1.0.2", "1.0.300");
+
+        assertThat(registry.find("openframe.tenant.gateway.client.requests").tag("bundle", "1.0.0").counter()).isNull();
+        double tracked = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "ios")
+                .tag("shell", "1.0.2")
+                .tag("bundle", "1.0.300")
+                .counter().count();
+        assertThat(tracked).isEqualTo(1.0);
+    }
+
+    @Test
+    void recordClientRequestKeepsSeriesUsedWithinTtl() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        FakeTicker ticker = new FakeTicker();
+        GatewayTrafficMetrics metrics = new GatewayTrafficMetrics(registry, ticker::read);
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+
+        ticker.advance(GatewayTrafficMetrics.CLIENT_VERSION_SERIES_TTL.minusHours(1));
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+        ticker.advance(GatewayTrafficMetrics.CLIENT_VERSION_SERIES_TTL.minusHours(1));
+        metrics.recordClientRequest("ios", "1.0.1", "1.0.127");
+
+        double count = registry.get("openframe.tenant.gateway.client.requests")
+                .tag("kind", "ios")
+                .tag("shell", "1.0.1")
+                .tag("bundle", "1.0.127")
+                .counter().count();
+        assertThat(count).isEqualTo(3.0);
+    }
+
+    private static final class FakeTicker {
+
+        private long nanos;
+
+        long read() {
+            return nanos;
+        }
+
+        void advance(Duration duration) {
+            nanos += duration.toNanos();
+        }
     }
 }

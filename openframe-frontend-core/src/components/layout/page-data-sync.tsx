@@ -19,16 +19,41 @@ interface PageDataSyncState {
 
 interface PageDataSyncContextValue {
   state: PageDataSyncState;
-  report: (state: PageDataSyncState) => void;
+  /** The page's records are mirrored, so its list states a sync (`PageDataSyncProvider`'s `stated`). */
+  stated: boolean;
+  report: (state: PageDataSyncState | ((prev: PageDataSyncState) => PageDataSyncState)) => void;
 }
 
 const PageDataSyncContext = createContext<PageDataSyncContextValue | null>(null);
 
 const EMPTY: PageDataSyncState = { sync: null, loading: false };
+/**
+ * Before the list below has reported (its first paint, the server's HTML), the row is loading: a page that has the
+ * row has a list that states its sync, so its line's skeleton holds the row instead of the row appearing later.
+ */
+const NOT_REPORTED: PageDataSyncState = { sync: null, loading: true };
 
-export function PageDataSyncProvider({ children }: { children: ReactNode }) {
-  const [state, report] = useState<PageDataSyncState>(EMPTY);
-  const value = useMemo(() => ({ state, report }), [state]);
+export function PageDataSyncProvider({
+  stated = true,
+  children,
+}: {
+  /**
+   * The page's records are mirrored from another system, so its list states a sync and the row holds its line's
+   * skeleton while it loads. `false`: the host authors the records; nothing is drawn while loading, and a line a host
+   * states anyway is an optional part (`data-loading-optional`). Default `true`.
+   */
+  stated?: boolean;
+  children: ReactNode;
+}) {
+  const [state, report] = useState<PageDataSyncState>(stated ? NOT_REPORTED : EMPTY);
+  // The children's effects run before this one: a list that states its sync has reported by now. When none has, the
+  // page states no sync and the row's skeleton goes (a page whose list never reports must not hold it forever).
+  useEffect(() => {
+    // After the commit (a task, not inside the effect): every list mounted with the page has reported by then.
+    const timer = setTimeout(() => report(prev => (prev === NOT_REPORTED ? EMPTY : prev)), 0);
+    return () => clearTimeout(timer);
+  }, []);
+  const value = useMemo(() => ({ state, report, stated }), [state, stated]);
   return <PageDataSyncContext.Provider value={value}>{children}</PageDataSyncContext.Provider>;
 }
 
@@ -39,7 +64,17 @@ export function PageDataSyncProvider({ children }: { children: ReactNode }) {
 export function PageDataSyncRow({ inline = false }: { inline?: boolean }) {
   const context = useContext(PageDataSyncContext);
   if (!context) return null;
-  return <DataSyncLine sync={context.state.sync} loading={context.state.loading} inline={inline} />;
+  const line = (
+    <DataSyncLine sync={context.state.sync} loading={context.state.loading} stated={context.stated} inline={inline} />
+  );
+  // A host that authors its records states no sync while loading; a line it states anyway is optional.
+  return context.stated ? (
+    line
+  ) : (
+    <div className="contents" data-loading-optional="">
+      {line}
+    </div>
+  );
 }
 
 /**

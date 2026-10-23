@@ -325,3 +325,32 @@ export const AllVariants: Story = {
     </div>
   ),
 };
+
+/**
+ * Items with a description line. The row grows to fit it and long copy
+ * wraps instead of being clipped at the list's edge; the closed trigger
+ * shows the label alone.
+ */
+export const WithDescriptions: Story = {
+  render: () => (
+    <Select defaultValue="notify">
+      <SelectTrigger label="Remote Access Permission">
+        <SelectValue placeholder="Select a permission" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="approval" description="User approves each session before it starts.">
+          Approval Required
+        </SelectItem>
+        <SelectItem
+          value="notify"
+          description="No approval prompt. The user sees the session block, can chat and can end the session."
+        >
+          Notify Only
+        </SelectItem>
+        <SelectItem value="silent" description="No prompt, no indicator, no chat. The user cannot end the session.">
+          Silent Access
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  ),
+};

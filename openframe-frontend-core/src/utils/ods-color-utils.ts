@@ -43,10 +43,6 @@ export function getODSToken(
   return lookupToken(tokenKey);
 }
 
-// The accent colour is owned by the platform-identity leaf (all 12 platforms,
-// derived from the brand record); re-exported here for existing importers.
-export { getPlatformAccentColor } from './platform-identity';
-
 /**
  * Gets the current platform from environment or DOM
  */

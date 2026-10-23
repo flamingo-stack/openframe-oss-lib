@@ -14,6 +14,7 @@ import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge } from '../../ui/status-badge';
 import type { HubspotTicketItem } from '../types/entities/hubspot-ticket';
 import {
@@ -21,11 +22,11 @@ import {
   COMPACT_CARD_META_ROW_BOX,
   COMPACT_CARD_OUTER,
   COMPACT_CARD_OUTER_STATIC,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   safeHref,
 } from '../utils/compact-card-classes';
+import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 export interface HubspotTicketCardAnchorProps {
   href: string;
@@ -65,6 +66,7 @@ function statusScheme(status: string | null | undefined): BadgeScheme {
 }
 
 export function HubspotTicketCard({ item, variant = 'compact', className, anchorProps }: HubspotTicketCardProps) {
+  if (useLoadingScope()) return <HubspotTicketCardSkeleton variant={variant} className={className} />;
   const statusText = item.statusLabel ?? formatToken(item.status);
   const priorityText = formatToken(item.priority);
   const dateText = formatDate(item.dateUpdated, { fallback: '', timezone: 'local' });
@@ -169,7 +171,7 @@ export function HubspotTicketCard({ item, variant = 'compact', className, anchor
   );
 }
 
-export function HubspotTicketCardSkeleton({
+function HubspotTicketCardSkeleton({
   variant = 'compact',
   className,
 }: {
@@ -187,27 +189,13 @@ export function HubspotTicketCardSkeleton({
     );
   }
   return (
-    <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <span className={COMPACT_CARD_TEXT_COL}>
-        <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <UnifiedSkeleton as="span" className="h-3.5 w-2/3 rounded" />
-          <UnifiedSkeleton as="span" className="h-4 w-12 rounded-full" />
-          <UnifiedSkeleton as="span" className="h-4 w-16 rounded-full" />
-        </span>
-        <UnifiedSkeleton as="span" className="h-4 w-1/2 rounded" />
-        <span className="flex min-w-0 flex-col gap-0">
-          <UnifiedSkeleton as="span" className="h-5 w-5/6 rounded" />
-          <UnifiedSkeleton as="span" className="h-5 w-4/6 rounded" />
-          <UnifiedSkeleton as="span" className="h-5 w-3/4 rounded" />
-          <UnifiedSkeleton as="span" className="h-5 w-2/5 rounded" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <UnifiedSkeleton as="span" className="h-3 w-1/3 rounded" />
-        </span>
-      </span>
-      <span className="flex h-5 shrink-0 items-center self-start">
-        <UnifiedSkeleton as="span" className="h-3.5 w-3.5 rounded" />
-      </span>
-    </span>
+    <CompactCardSkeleton
+      slot={false}
+      titleWidth="w-2/3"
+      titleBadges={['w-12', 'w-16']}
+      rows={[{ width: 'w-1/2' }, { width: 'w-5/6', lines: 4 }, { width: 'w-1/3' }]}
+      trailingIcon
+      className={className}
+    />
   );
 }

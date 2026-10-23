@@ -1,6 +1,7 @@
+import { DOT_SIZE } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { ChatTypingIndicator } from '../chat/chat-typing-indicator';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { LIVE_PULSE_CLASS } from './skeleton-surface';
 
 export interface AnalyzingStateProps {
   /** What is being worked on, as a sentence with no closing mark ("Mingo is analyzing your logs"). */
@@ -12,6 +13,9 @@ export interface AnalyzingStateProps {
 const ROW_OPACITY = ['opacity-100', 'opacity-60', 'opacity-30'] as const;
 /** Each row pulses a beat after the one above it, so the eye reads them as a scan. */
 const ROW_STAGGER_MS = 200;
+/** A row's marks: a live dot and two bars of the row's own words, on ODS tokens. Live, not a loading state. */
+const ROW_DOT_CLASS = cn(DOT_SIZE.sm, 'shrink-0 rounded-full bg-ods-flamingo-cyan', LIVE_PULSE_CLASS);
+const ROW_BAR_CLASS = cn('h-2.5 rounded-md bg-ods-border', LIVE_PULSE_CLASS);
 
 /**
  * THE "it is working, nothing to show yet" state of a feed or a window: three
@@ -19,8 +23,9 @@ const ROW_STAGGER_MS = 200;
  * and the chat's own typing dots. It says an agent is at work, where a bare
  * sentence in an empty box reads as idle.
  *
- * Built from the shared pieces only: `UnifiedSkeleton` for the rows and
- * `ChatTypingIndicator` for the dots. Still under reduced motion. It is
+ * It is a live state, never a loading one: the rows pulse on the library's live pulse (`LIVE_PULSE_CLASS`), so no
+ * skeleton surface is left on a loaded page, and the dots are the chat's `ChatTypingIndicator`. Still under
+ * reduced motion. It is
  * announced as a status; the rows and dots are decoration.
  */
 export function AnalyzingState({ label, className }: AnalyzingStateProps) {
@@ -37,9 +42,9 @@ export function AnalyzingState({ label, className }: AnalyzingStateProps) {
                 opacity,
               )}
             >
-              <UnifiedSkeleton className="h-2 w-2 shrink-0 rounded-full bg-ods-flamingo-cyan" style={delay} />
-              <UnifiedSkeleton className="h-2.5 min-w-0 flex-1" style={delay} />
-              <UnifiedSkeleton className="h-2.5 w-12 shrink-0" style={delay} />
+              <span className={ROW_DOT_CLASS} style={delay} />
+              <span className={cn(ROW_BAR_CLASS, 'min-w-0 flex-1')} style={delay} />
+              <span className={cn(ROW_BAR_CLASS, 'w-12 shrink-0')} style={delay} />
             </div>
           );
         })}

@@ -7,7 +7,6 @@ import type { DocContent, DocNode, DocRenderHandlers, DocSourceId } from '../../
 import { findDocNodeByPath } from '../../utils/doc-tree-nav';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
-import { CategorySidebarSkeleton } from '../loading/page-layout-skeleton';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { MultiLevelNavigation, MobileNavigationDropdown } from '../navigation/multi-level-navigation';
 import { StickySectionNav } from '../navigation/sticky-section-nav';
@@ -139,6 +138,10 @@ export interface DocViewerProps {
 export function DocViewer(props: DocViewerProps) {
   return <DocViewerContent {...props} />;
 }
+
+/** The "On this page" column's heading: static copy, drawn for real loaded and loading. */
+const ON_THIS_PAGE_LABEL = 'ON THIS PAGE';
+const ON_THIS_PAGE_HEADING_CLASS = 'mb-4 font-semibold text-ods-text-secondary text-h5';
 
 function DocViewerContent({
   sourceId,
@@ -279,7 +282,10 @@ function DocViewerContent({
       <PageLayout title={title} subtitle={subtitle} titleSize="h1" titleWrap backButton={backCfg ?? undefined}>
         <div className="flex w-full flex-col gap-10">
           {/* Where the document is mirrored from: the first row under the title, as on every synced page. */}
-          {synced && <DataSyncLine sync={content?.sync} loading={isLoadingContent && !content} />}
+          {/* Loading until the document is here: the structure read comes first, so the server's HTML holds the line too. */}
+          {synced && (
+            <DataSyncLine sync={content?.sync} loading={!content && (isLoadingContent || isLoadingStructure)} />
+          )}
           {showAIChat && (
             <DocSearchBar
               placeholder={`Search ${sidebarLabel?.toLowerCase() || 'documents'}...`}
@@ -305,40 +311,36 @@ function DocViewerContent({
             <div className="flex flex-1 flex-col items-start gap-6 content-lg:flex-row content-lg:gap-10">
               <div className="w-full content-lg:w-[320px] content-lg:shrink-0">
                 <div className="content-lg:sticky content-lg:top-20">
-                  {isLoadingStructure ? (
-                    <CategorySidebarSkeleton />
-                  ) : (
-                    <>
-                      <PersistentMobileDropdown isLoading={false}>
-                        <MobileNavigationDropdown
+                  {/* While the tree is read, the dropdown and the sidebar are their own skeletons (`isLoading`), each at
+                      its breakpoint, so the loading state is the loaded tree's frame. */}
+                  <PersistentMobileDropdown isLoading={false}>
+                    <MobileNavigationDropdown
+                      nodes={structure}
+                      selectedPath={selectedPath}
+                      expandedNodes={expandedNodes}
+                      onNodeClick={selectNode}
+                      onToggleExpand={toggleNode}
+                      isLoading={isLoadingStructure}
+                      folderIndexFile={folderIndexFile}
+                    />
+                  </PersistentMobileDropdown>
+
+                  <PersistentSidebar isLoading={false}>
+                    <div className="hidden content-lg:block">
+                      <div className="space-y-4">
+                        <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
+                        <MultiLevelNavigation
                           nodes={structure}
                           selectedPath={selectedPath}
                           expandedNodes={expandedNodes}
                           onNodeClick={selectNode}
                           onToggleExpand={toggleNode}
-                          isLoading={false}
+                          isLoading={isLoadingStructure}
                           folderIndexFile={folderIndexFile}
                         />
-                      </PersistentMobileDropdown>
-
-                      <PersistentSidebar isLoading={false}>
-                        <div className="hidden content-lg:block">
-                          <div className="space-y-4">
-                            <h3 className="font-semibold text-ods-text-secondary text-h5">{sidebarLabel}</h3>
-                            <MultiLevelNavigation
-                              nodes={structure}
-                              selectedPath={selectedPath}
-                              expandedNodes={expandedNodes}
-                              onNodeClick={selectNode}
-                              onToggleExpand={toggleNode}
-                              isLoading={false}
-                              folderIndexFile={folderIndexFile}
-                            />
-                          </div>
-                        </div>
-                      </PersistentSidebar>
-                    </>
-                  )}
+                      </div>
+                    </div>
+                  </PersistentSidebar>
                 </div>
               </div>
 
@@ -378,7 +380,7 @@ function DocViewerContent({
                   {isMarkdownContent && (isLoadingContent || isLoadingStructure) && (
                     <div className="hidden content-lg:block">
                       <div className="sticky top-24">
-                        <UnifiedSkeleton className="mb-5 h-[14px] w-28 rounded" />
+                        <h3 className={ON_THIS_PAGE_HEADING_CLASS}>{ON_THIS_PAGE_LABEL}</h3>
                         <div className="space-y-0">
                           {[130, 170, 190, 220, 110, 200, 80, 100, 120, 140, 90].map((w, i) => (
                             <div
@@ -398,7 +400,7 @@ function DocViewerContent({
                   {showStickyNav && content && stickyNavSections.length > 0 && !isLoadingContent && (
                     <div className="hidden content-lg:block">
                       <div className="sticky top-24">
-                        <h3 className="mb-4 font-semibold text-ods-text-secondary text-h5">ON THIS PAGE</h3>
+                        <h3 className={ON_THIS_PAGE_HEADING_CLASS}>{ON_THIS_PAGE_LABEL}</h3>
                         <StickySectionNav
                           sections={stickyNavSections}
                           activeSection={activeSection}

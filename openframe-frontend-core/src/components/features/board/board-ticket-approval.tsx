@@ -5,6 +5,7 @@ import { cn } from '../../../utils/cn';
 import { ApprovalBatchMessage } from '../../chat/approval-batch-message';
 import { useCollapsible } from '../../chat/hooks/use-collapsible';
 import { Chevron02DownIcon, Chevron02UpIcon, DotsLoaderIcon, ShieldCheckIcon } from '../../icons-v2-generated';
+import { Button } from '../../ui/button';
 import type { BoardTicketPendingApproval } from './types';
 
 export interface BoardTicketApprovalProps {
@@ -27,15 +28,10 @@ export function BoardTicketApproval({ pendingApproval, onApprove, onReject }: Bo
 
   return (
     <div className="pointer-events-auto flex flex-col">
-      <button
-        type="button"
-        onClick={() => setExpanded(v => !v)}
-        aria-expanded={expanded}
-        className="flex w-full cursor-pointer items-center gap-[var(--spacing-system-xxs)] text-h6"
-      >
+      <Button variant="row" type="button" onClick={() => setExpanded(v => !v)} aria-expanded={expanded}>
         <span
           className={cn(
-            'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xxs)]',
+            'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xxs)] text-h6',
             isAdmin ? 'text-ods-open-yellow' : 'text-ods-text-secondary',
           )}
         >
@@ -53,7 +49,7 @@ export function BoardTicketApproval({ pendingApproval, onApprove, onReject }: Bo
         ) : (
           <Chevron02DownIcon className="size-4 shrink-0 text-ods-text-secondary" />
         )}
-      </button>
+      </Button>
 
       <div style={containerStyle}>
         <div ref={innerRef} className="pt-[var(--spacing-system-xs)]">

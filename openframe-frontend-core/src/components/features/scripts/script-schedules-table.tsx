@@ -1,7 +1,10 @@
 'use client';
 
 import { type ReactNode, useCallback, useMemo } from 'react';
-import { type ColumnDef, DataTable, type Row, useDataTable } from '../../ui/data-table';
+import { TextLineSkeleton } from '../../loading/unified-skeleton';
+import { type ColumnDef, DataTable, dataTableLoadingRows, type Row, useDataTable } from '../../ui/data-table';
+import { DATA_TABLE_SKELETON_ROWS } from '../../ui/data-table/utils';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { TruncateText } from '../../ui/truncate-text';
 import { OSTypeBadgeGroup } from '../os-type-badge-group';
 import { ScheduleDateTimeCell, ScriptNameCell } from './script-cells';
@@ -40,6 +43,23 @@ export interface ScriptSchedulesTableProps {
 
 const VALUE_CLASS = 'text-ods-text-primary text-h4';
 
+/** A value of the row (its repeat, its device count); a bar while the row is read (a loading scope). */
+function ScheduleValueCell({ children }: { children: ReactNode }) {
+  if (useLoadingScope()) return <TextLineSkeleton type="h4" className="w-16" />;
+  return <span className={VALUE_CLASS}>{children}</span>;
+}
+
+/** A schedule still being read: a row the table keys, every field a cell shows empty (each draws its loading form). */
+const loadingSchedule = (id: string): ScriptScheduleTableRow => ({
+  id,
+  name: '',
+  supportedPlatforms: [],
+  startsAt: { date: '', time: '' },
+  repeat: '',
+  deviceCount: 0,
+  href: '',
+});
+
 /**
  * The script schedules as a table: what runs, on which operating systems,
  * when, how often and on how many devices.
@@ -53,8 +73,11 @@ export function ScriptSchedulesTable({
   stickyHeader = false,
   stickyHeaderOffset,
   rightSlot,
-  skeletonRows = 10,
+  skeletonRows,
 }: ScriptSchedulesTableProps) {
+  // ONE switch: the host's read (`isLoading`) or a page's loading scope draws the header and the body's skeleton
+  // rows alike.
+  const loading = useLoadingScope() || isLoading;
   const columns = useMemo<ColumnDef<ScriptScheduleTableRow>[]>(() => {
     const cell = (layout: ScriptsTableColumnLayout, render: (row: ScriptScheduleTableRow) => ReactNode) => ({
       id: layout.id,
@@ -76,25 +99,34 @@ export function ScriptSchedulesTable({
           <TruncateText tone="secondary">{row.trigger}</TruncateText>
         ) : null,
       ),
-      cell(SCHEDULE_COLUMNS.repeat, row => (row.repeat ? <span className={VALUE_CLASS}>{row.repeat}</span> : null)),
-      cell(SCHEDULE_COLUMNS.deviceCount, row => <span className={VALUE_CLASS}>{row.deviceCount}</span>),
+      cell(SCHEDULE_COLUMNS.repeat, row =>
+        row.repeat != null ? <ScheduleValueCell>{row.repeat}</ScheduleValueCell> : null,
+      ),
+      cell(SCHEDULE_COLUMNS.deviceCount, row => <ScheduleValueCell>{row.deviceCount}</ScheduleValueCell>),
     ];
     if (renderActions) {
       all.push(cell(SCHEDULE_COLUMNS.actions, row => <RowActionsCell>{renderActions(row)}</RowActionsCell>));
     }
-    all.push(cell(SCHEDULE_COLUMNS.open, row => (row.href ? <OpenInNewTabCell href={row.href} /> : null)));
+    all.push(
+      cell(SCHEDULE_COLUMNS.open, row => (row.href !== undefined ? <OpenInNewTabCell href={row.href} /> : null)),
+    );
     return hideColumns ? all.filter(column => !hideColumns.includes(column.id ?? '')) : all;
   }, [hideColumns, renderActions]);
 
+  // While loading the table holds one page of placeholder rows, drawn with the real cells (`loadingCells`).
+  const loadingRows = useMemo(
+    () => (loading ? dataTableLoadingRows(skeletonRows ?? DATA_TABLE_SKELETON_ROWS, loadingSchedule) : null),
+    [loading, skeletonRows],
+  );
   const table = useDataTable<ScriptScheduleTableRow>({
-    data: rows,
+    data: loadingRows ?? rows,
     columns,
     getRowId: (row: ScriptScheduleTableRow) => row.id,
     enableSorting: false,
   });
 
-  const rowHref = useCallback((row: ScriptScheduleTableRow) => row.href, []);
-  const showHeader = isLoading || rows.length > 0;
+  const rowHref = useCallback((row: ScriptScheduleTableRow) => row.href || undefined, []);
+  const showHeader = loading || rows.length > 0;
 
   return (
     <DataTable table={table}>
@@ -102,7 +134,8 @@ export function ScriptSchedulesTable({
         <DataTable.Header stickyHeader={stickyHeader} stickyHeaderOffset={stickyHeaderOffset} rightSlot={rightSlot} />
       )}
       <DataTable.Body
-        loading={isLoading}
+        loading={loading}
+        loadingCells
         skeletonRows={skeletonRows}
         emptyMessage={emptyMessage}
         rowClassName="mb-1"

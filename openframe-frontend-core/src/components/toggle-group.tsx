@@ -14,6 +14,9 @@ import {
 import { cn } from '../utils/cn';
 import { toggleVariants } from './ui/toggle';
 
+/** The group's row: read by the group and by every skeleton of one. */
+export const TOGGLE_GROUP_CLASS = 'flex items-center justify-center gap-1';
+
 const ToggleGroupContext = createContext<VariantProps<typeof toggleVariants>>({
   size: 'default',
   variant: 'default',
@@ -26,7 +29,7 @@ const ToggleGroup = forwardRef<
     children?: ReactNode;
   } & ComponentPropsWithoutRef<typeof ToggleGroupPrimitive.Root>
 >(({ className, variant, size, children, ...props }, ref) => (
-  <ToggleGroupPrimitive.Root ref={ref} className={cn('flex items-center justify-center gap-1', className)} {...props}>
+  <ToggleGroupPrimitive.Root ref={ref} className={cn(TOGGLE_GROUP_CLASS, className)} {...props}>
     <ToggleGroupContext.Provider value={{ variant, size }}>{children}</ToggleGroupContext.Provider>
   </ToggleGroupPrimitive.Root>
 ));

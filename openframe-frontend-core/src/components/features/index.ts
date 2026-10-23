@@ -110,3 +110,14 @@ export * from './conversation-card';
 
 // The jobs a product does, one at a time with its real screen (marketing pages)
 export * from './capability-explorer';
+export { VIDEO_PLAYBACK_FAILED_EVENT } from './video-shared';
+export type {
+  VideoFailureKind,
+  VideoFailureReason,
+  VideoLayout,
+  VideoMutedFallbackState,
+  VideoPlaybackFailureDetail,
+  VideoPlayerHandle,
+  VideoProps,
+} from './video-shared';
+export { MUX_STREAM_ORIGIN, MUX_IMAGE_ORIGIN } from './mux-origins';

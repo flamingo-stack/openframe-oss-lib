@@ -61,3 +61,18 @@ export const ReleaseBeforeExpiry: Story = {
     />
   ),
 };
+
+/** An "Other" reason typed as one long word wraps inside the modal instead of running past its edge. */
+export const ReleaseLongReason: Story = {
+  render: () => (
+    <ReleaseKeepingModal
+      isOpen
+      onClose={fn()}
+      onConfirm={fn()}
+      keptBy="Dana Whitfield"
+      keptOn="10/19/26"
+      reason={'test'.repeat(20)}
+      expiresOn="01/17/27"
+    />
+  ),
+};

@@ -15,6 +15,16 @@ import { ApprovalRequestMessage } from './approval-request-message';
 import { AskDisplay } from './ask-display';
 import { ChatAppearanceContext, useChatAppearance } from './chat-appearance-context';
 import { ChatContextChipStrip } from './chat-context-picker';
+import {
+  CHAT_MESSAGE_FACE_PX,
+  CHAT_MESSAGE_HEADER_CLASS,
+  CHAT_MESSAGE_ROW_PADDING_CLASS,
+  CHAT_MESSAGE_SEGMENTS_CLASS,
+  CHAT_MESSAGE_STACK_CLASS,
+  CHAT_MESSAGE_TEXT_CLASS,
+  CHAT_MESSAGE_USER_BUBBLE_CLASS,
+  CHAT_MESSAGE_USER_ROW_CLASS,
+} from './chat-message-layout';
 import type { ChatRef } from './chat-ref.types';
 import { ContextCompactionDisplay } from './context-compaction-display';
 import { BlockCard, type BlockCardProps } from './entity-cards/block-card';
@@ -103,6 +113,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
       appearance: appearanceProp,
       authorType: authorTypeProp,
       selfAuthorType,
+      nameEveryTurn = false,
       assistantIcon,
       contextItems,
       resolveContextIcon,
@@ -535,9 +546,15 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // system line and another person answering (a technician in the end
     // user's thread). Mingo sends the admin's own turns as `admin` too; those
     // are the user's words and draw as such. Every face carries its name for
-    // assistive tech and on hover.
-    const showName = isSystem || isOtherPerson || (authorType === 'admin' && !isUser);
+    // assistive tech and on hover. A thread of several parties names every
+    // turn (`nameEveryTurn`: a ticket, where an end user, the agent and any
+    // number of technicians write): the agent's turn as an incoming one, the
+    // viewer's own bubble with the name beside the face, on the bubble's side.
+    const showName =
+      isSystem || isOtherPerson || (authorType === 'admin' && !isUser) || (nameEveryTurn && role === 'assistant');
+    const showSelfName = nameEveryTurn && isUser && !isSystem;
     const displayName = name || (isHuman ? 'User' : assistantType === 'mingo' ? 'Mingo' : 'Fae');
+    const nameLabel = <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>;
     const faceBox = 'h-5 w-5 flex-shrink-0';
     const face: ReactNode =
       !showAvatar || isSystem ? null : !isHuman && !avatar && assistantIcon ? (
@@ -557,7 +574,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             fallback={displayName}
             variant="round"
             size="xs"
-            sizePx={20}
+            sizePx={CHAT_MESSAGE_FACE_PX}
             initialsClassName="text-[9px] text-ods-text-secondary"
           />
         </span>
@@ -567,7 +584,11 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
     // receipt card rather than as an author row with no body.
     if (isV2 && isSystem && name) {
       return (
-        <div ref={ref} className={cn('relative py-[calc(var(--spacing-system-m)/2)]', className)} {...props}>
+        <div
+          ref={ref}
+          className={cn('relative', CHAT_MESSAGE_ROW_PADDING_CLASS[CHAT_APPEARANCE.V2], className)}
+          {...props}
+        >
           <ChatAppearanceContext.Provider value={appearance}>
             <SystemEventMessage text={name} timestamp={timestamp} />
           </ChatAppearanceContext.Provider>
@@ -581,9 +602,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
           ref={ref}
           className={cn(
             'relative',
-            // v2 spaces messages 16px apart (spacing-system-m), split across the
-            // two neighbours' padding so blocks outside a row keep the rhythm.
-            isV2 ? 'py-[calc(var(--spacing-system-m)/2)]' : 'py-[var(--spacing-system-s)]',
+            CHAT_MESSAGE_ROW_PADDING_CLASS[isV2 ? CHAT_APPEARANCE.V2 : CHAT_APPEARANCE.CLASSIC],
             className,
           )}
           {...props}
@@ -602,11 +621,12 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
             layout per drawer-resize frame in Safari / the desktop WKWebView
             vs ~9ms as grid (Chrome: ~2ms either way). Same gap and stretch,
             no margin collapsing — visually identical. */}
-          <div className="grid min-w-0 grid-cols-1 gap-[var(--spacing-system-xxs)]">
-            {(face || showName) && (
-              <div className={cn('flex items-center gap-[var(--spacing-system-xs)]', isUser && 'justify-end')}>
+          <div className={CHAT_MESSAGE_STACK_CLASS}>
+            {(face || showName || showSelfName) && (
+              <div className={cn(CHAT_MESSAGE_HEADER_CLASS, isUser && 'justify-end')}>
+                {showSelfName && nameLabel}
                 {face}
-                {showName && <span className="min-w-0 truncate text-ods-open-yellow text-h6">{displayName}</span>}
+                {showName && nameLabel}
                 {showName && timestamp && (
                   <span className="ml-auto shrink-0 whitespace-nowrap text-ods-text-secondary text-h6">
                     {formatMessageTimestamp(timestamp)}
@@ -617,7 +637,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
 
             {/* Message segments — hidden for system messages without content */}
             {(!isSystem || segments.length > 0) && (
-              <div className="grid grid-cols-1 gap-2">
+              <div className={CHAT_MESSAGE_SEGMENTS_CLASS}>
                 {segments.map((segment, index) => {
                   // The engine's streaming path (atomic-block memoization +
                   // fence tail-completion + aria-live) applies ONLY to the
@@ -633,8 +653,8 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     // speaker's face is the short line above).
                     if (isUser) {
                       return (
-                        <div key={index} className="flex min-w-0 justify-end">
-                          <div className="min-w-0 max-w-[85%] break-words rounded-xl bg-ods-bg-active px-[var(--spacing-system-sf)] py-[var(--spacing-system-xsf)] text-ods-text-primary text-h4">
+                        <div key={index} className={CHAT_MESSAGE_USER_ROW_CLASS}>
+                          <div className={CHAT_MESSAGE_USER_BUBBLE_CLASS}>
                             {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                           </div>
                         </div>
@@ -643,10 +663,7 @@ const ChatMessageEnhanced = forwardRef<HTMLDivElement, ChatMessageEnhancedProps>
                     return (
                       <div
                         key={index}
-                        className={cn(
-                          'w-full min-w-0 break-words text-h4',
-                          isError ? 'text-ods-error' : 'text-ods-text-primary',
-                        )}
+                        className={cn(CHAT_MESSAGE_TEXT_CLASS, isError ? 'text-ods-error' : 'text-ods-text-primary')}
                       >
                         {renderSegmentBody(index, segment.text, segmentIsStreaming)}
                       </div>
@@ -765,6 +782,7 @@ const MemoizedChatMessageEnhanced = memo(ChatMessageEnhanced, (prevProps, nextPr
     prevProps.appearance === nextProps.appearance &&
     prevProps.authorType === nextProps.authorType &&
     prevProps.selfAuthorType === nextProps.selfAuthorType &&
+    prevProps.nameEveryTurn === nextProps.nameEveryTurn &&
     prevProps.assistantIcon === nextProps.assistantIcon &&
     prevProps.className === nextProps.className &&
     // Reference equality — the host re-uses the same array instance per
