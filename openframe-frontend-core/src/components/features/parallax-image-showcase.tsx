@@ -2,7 +2,7 @@
 
 import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion';
 import type React from 'react';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
 
 interface ParallaxImageShowcaseProps {
@@ -42,15 +42,18 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
   const mouseXSpring = useSpring(mouseX, springConfig);
   const mouseYSpring = useSpring(mouseY, springConfig);
 
-  // Track component position for global mouse calculations
-  const [componentRect, setComponentRect] = useState<DOMRect | null>(null);
+  // Track component position for global mouse calculations. The raw rect is
+  // only ever consumed by the mousemove math below, never rendered, so it is
+  // kept in a ref rather than state — updating it on every resize/scroll no
+  // longer triggers a re-render of this component.
+  const componentRectRef = useRef<DOMRect | null>(null);
   const componentRef = useRef<HTMLDivElement>(null);
 
   // Update component position on mount and resize
   useEffect(() => {
     const updateRect = () => {
       if (componentRef.current) {
-        setComponentRect(componentRef.current.getBoundingClientRect());
+        componentRectRef.current = componentRef.current.getBoundingClientRect();
       }
     };
 
@@ -67,6 +70,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
   // Global mouse tracking
   useEffect(() => {
     const handleGlobalMouseMove = (e: MouseEvent) => {
+      const componentRect = componentRectRef.current;
       if (!componentRect) return;
 
       const centerX = componentRect.left + componentRect.width / 2;
@@ -87,7 +91,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
     return () => {
       window.removeEventListener('mousemove', handleGlobalMouseMove);
     };
-  }, [componentRect, mouseX, mouseY]);
+  }, [mouseX, mouseY]);
 
   // SCROLL TRANSFORMS - Values multiplied by intensity
   const scrollX = useTransform(scrollY, [0, 1000], [0, 5 * INTENSITY]);
@@ -307,3 +311,4 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
     </div>
   );
 };
+
