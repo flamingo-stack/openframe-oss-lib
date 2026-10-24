@@ -165,6 +165,7 @@ class ProjectionTaskServiceIT {
 
         // verifications
         assertThat(service.findTask(done.getId()).getStatus()).isEqualTo(EventJobStatus.DONE);
+        assertThat(service.findTask(done.getId()).getFinishedAt()).isEqualTo(NOW);
         assertThat(service.hasTask(PROJECTION, "tenant-a", "widget-doc-1")).isFalse();
         assertThat(service.findTask(closedMeanwhile.getId()).getStatus()).isEqualTo(EventJobStatus.REPLACED);
         assertThat(service.hasTask(PROJECTION, "tenant-a", "widget-doc-2")).isTrue();

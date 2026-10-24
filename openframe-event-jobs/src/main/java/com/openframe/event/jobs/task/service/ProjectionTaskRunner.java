@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// Works one task for a tick: its projection's batches in _id order, each saved, then deletes the task when none is left.
+// Works one task run for a tick: its projection's batches in _id order, each saved, then keeps the run DONE when none is left.
 @Slf4j
 public class ProjectionTaskRunner {
 
