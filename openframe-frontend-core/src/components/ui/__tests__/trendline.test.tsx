@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LoadingScope } from '../loading-scope';
-import { formatTrendChange, TREND_TONES, TrendHistory, Trendline, trendTone, trendToneClass } from '../trendline';
+import { formatTrendChange, TREND_TONES, TrendHistory, Trendline, trendlinePoints, trendTone, trendToneClass } from '../trendline';
 
 describe('Trendline', () => {
   it('names the number, its length and its change since the previous value', () => {
@@ -39,8 +39,36 @@ describe('Trendline', () => {
       </div>,
     );
     expect(details).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('img', { name: 'X: last 2 values, +1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'X: last 2 values, +1' }));
     expect(onRowClick).not.toHaveBeenCalled();
+  });
+
+  it('with a history a keyboard can reach it; without one it is only a picture', () => {
+    const { rerender } = render(<Trendline values={[1, 2]} label="X" details={() => <span>History</span>} />);
+    expect(screen.getByRole('button', { name: 'X: last 2 values, +1' })).toHaveAttribute('tabindex', '0');
+    rerender(<Trendline values={[1, 2]} label="X" />);
+    expect(screen.getByRole('img', { name: 'X: last 2 values, +1' })).not.toHaveAttribute('tabindex');
+  });
+});
+
+describe('trendlinePoints', () => {
+  const inBox = (p: { x: number; y: number }) => p.x >= 0 && p.x <= 56 && p.y >= 0 && p.y <= 16;
+
+  it('keeps negative values inside the box, lowest at the bottom', () => {
+    const points = trendlinePoints([-5, 0, 5]);
+    expect(points.every(inBox)).toBe(true);
+    expect(points[0].y).toBeGreaterThan(points[2].y);
+  });
+
+  it('shows a small move near a large value across the whole height', () => {
+    const [low, high] = trendlinePoints([1000, 1010]);
+    expect(low.y - high.y).toBeGreaterThan(10);
+  });
+
+  it('draws a flat series mid-height and skips unknown values', () => {
+    expect(trendlinePoints([7, 7, 7]).map((p) => p.y)).toEqual([8, 8, 8]);
+    expect(trendlinePoints([1, null, 3])).toHaveLength(2);
+    expect(trendlinePoints([])).toEqual([]);
   });
 });
 

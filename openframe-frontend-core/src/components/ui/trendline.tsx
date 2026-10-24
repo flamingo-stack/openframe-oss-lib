@@ -28,6 +28,8 @@ const SPARK_H = 16;
 const SPARK_CLASS = 'h-4 w-14';
 const CHANGE_CLASS = 'w-8 text-right text-h6 tabular-nums';
 const BOX_CLASS = 'inline-flex shrink-0 items-center gap-[var(--spacing-system-xxs)]';
+/** The focus ring of a trendline a keyboard can open (the lib's focus-visible ring). */
+const FOCUS_CLASS = 'rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-ods-accent';
 
 /** The change written with its sign: "+3", "−2", "0". */
 export function formatTrendChange(change: number): string {
@@ -56,20 +58,32 @@ export function trendToneClass(change: number | null, higherIsBetter = false, to
   return tones[tone] ?? TREND_TONES[tone];
 }
 
-function Spark({ values, toneClass }: { values: ReadonlyArray<number | null>; toneClass: string }) {
+/**
+ * Where each known value sits in the line's 56 × 16 box (oldest left), skipping unknown values. Scaled between the
+ * series' own lowest and highest value, so negative values stay inside the box and a small move near a large value is
+ * still visible; a flat series sits mid-height, a single value in the middle.
+ */
+export function trendlinePoints(values: ReadonlyArray<number | null>): Array<{ x: number; y: number }> {
   const known = values
     .map((v, i) => [i, v] as const)
     .filter((p): p is readonly [number, number] => p[1] !== null);
-  if (known.length === 0) return <svg className={SPARK_CLASS} aria-hidden="true" />;
-  const max = Math.max(...known.map(([, v]) => v), 1);
+  if (known.length === 0) return [];
+  const min = Math.min(...known.map(([, v]) => v));
+  const range = Math.max(...known.map(([, v]) => v)) - min;
   const x = (i: number) => (values.length === 1 ? SPARK_W / 2 : (i / (values.length - 1)) * (SPARK_W - 4) + 2);
-  const y = (v: number) => SPARK_H - 2 - (v / max) * (SPARK_H - 4);
-  const [lastI, lastV] = known[known.length - 1];
+  const y = (v: number) => (range === 0 ? SPARK_H / 2 : SPARK_H - 2 - ((v - min) / range) * (SPARK_H - 4));
+  return known.map(([i, v]) => ({ x: x(i), y: y(v) }));
+}
+
+function Spark({ values, toneClass }: { values: ReadonlyArray<number | null>; toneClass: string }) {
+  const points = trendlinePoints(values);
+  if (points.length === 0) return <svg className={SPARK_CLASS} aria-hidden="true" />;
+  const last = points[points.length - 1];
   return (
     <svg className={`${SPARK_CLASS} ${toneClass}`} viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} aria-hidden="true">
-      {known.length > 1 && (
+      {points.length > 1 && (
         <polyline
-          points={known.map(([i, v]) => `${x(i)},${y(v)}`).join(' ')}
+          points={points.map((p) => `${p.x},${p.y}`).join(' ')}
           fill="none"
           stroke="currentColor"
           strokeWidth={1.5}
@@ -77,7 +91,7 @@ function Spark({ values, toneClass }: { values: ReadonlyArray<number | null>; to
           strokeLinecap="round"
         />
       )}
-      <circle cx={x(lastI)} cy={y(lastV)} r={2} fill="currentColor" />
+      <circle cx={last.x} cy={last.y} r={2} fill="currentColor" />
     </svg>
   );
 }
@@ -122,11 +136,14 @@ export function Trendline({ values, label, change, higherIsBetter = false, tones
   const toneClass = trendToneClass(delta, higherIsBetter, tones);
   const line = (
     <span
-      className={BOX_CLASS}
+      className={details ? `${BOX_CLASS} ${FOCUS_CLASS}` : BOX_CLASS}
       // A trendline sits inside clickable cards and rows: pointing at it must not also click them.
       onClick={(e: MouseEvent) => e.stopPropagation()}
       aria-label={`${label}: last ${values.length} values${delta === null ? '' : `, ${formatTrendChange(delta)}`}`}
-      role="img"
+      // With a history behind it, a keyboard reaches it too: focusing it opens the card (FloatingTooltip opens on focus).
+      role={details ? 'button' : 'img'}
+      tabIndex={details ? 0 : undefined}
+      aria-haspopup={details ? 'dialog' : undefined}
     >
       <Spark values={values} toneClass={toneClass} />
       <span className={`${CHANGE_CLASS} ${toneClass}`}>{delta === null ? '' : formatTrendChange(delta)}</span>
