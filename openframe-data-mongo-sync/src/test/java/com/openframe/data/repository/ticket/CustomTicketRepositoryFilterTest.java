@@ -2,12 +2,15 @@ package com.openframe.data.repository.ticket;
 
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
+import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
+import com.openframe.publishing.api.OutboxPublisher;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.openframe.data.document.ticket.Ticket;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,6 +30,8 @@ class CustomTicketRepositoryFilterTest {
     private static final String HAS_PENDING_APPROVAL = "hasPendingApproval";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
+    @Mock private ObjectProvider<OutboxPublisher> outboxPublisher;
+    @Mock private ObjectProvider<TicketAggregateSpec> ticketSpec;
     @Captor private ArgumentCaptor<Query> queryCaptor;
     @Captor private ArgumentCaptor<Update> updateCaptor;
 
@@ -34,7 +39,7 @@ class CustomTicketRepositoryFilterTest {
 
     @BeforeEach
     void setUp() {
-        repository = new CustomTicketRepositoryImpl(mongoTemplate);
+        repository = new CustomTicketRepositoryImpl(mongoTemplate, outboxPublisher, ticketSpec);
     }
 
     @Test
@@ -110,6 +115,18 @@ class CustomTicketRepositoryFilterTest {
         assertThat(updateCaptor.getValue().getUpdateObject().get("$set", Document.class))
                 .containsEntry(HAS_PENDING_APPROVAL, true)
                 .hasSize(1);
+    }
+
+    // Spring adds $inc version +1 to an update unless the update already names the version.
+    @Test
+    void updatePendingApproval_keepsTheTicketVersion() {
+        // execution
+        repository.updatePendingApproval("t-1", false);
+
+        // verifications
+        verify(mongoTemplate).updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(Ticket.class));
+        assertThat(updateCaptor.getValue().getUpdateObject().get("$inc", Document.class))
+                .containsEntry("version", 0);
     }
 
     @Test

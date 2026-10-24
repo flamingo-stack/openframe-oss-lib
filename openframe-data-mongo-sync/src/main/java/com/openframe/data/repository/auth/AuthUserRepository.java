@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
+public interface AuthUserRepository extends MongoRepository<AuthUser, String>, CustomAuthUserRepository {
 
     /**
      * Find single ACTIVE user by email
@@ -30,7 +30,8 @@ public interface AuthUserRepository extends MongoRepository<AuthUser, String> {
      * Find single user by email within a specific tenant regardless of status
      */
     Optional<AuthUser> findByEmailAndTenantId(String email, String tenantId);
-    void deleteByTenantId(String tenantId);
+
+    List<AuthUser> deleteByTenantId(String tenantId);
 
     /**
      * Find users that still need a CRM sync (never synced or changed since last sync).

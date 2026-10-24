@@ -3,6 +3,7 @@ package com.openframe.data.service.machine;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.device.TelemetryStatus;
 import com.openframe.data.document.packagesearch.PackageManagerState;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.script.OsType;
@@ -19,6 +20,7 @@ public final class MachineFields {
     public static final MachineField<String> DISPLAY_NAME = field("displayName", Machine::setDisplayName);
     public static final MachineField<String> HOSTNAME = field("hostname", Machine::setHostname);
     public static final MachineField<DeviceStatus> STATUS = field("status", Machine::setStatus);
+    public static final MachineField<TelemetryStatus> TELEMETRY_STATUS = field("telemetryStatus", Machine::setTelemetryStatus);
     public static final MachineField<DeviceType> TYPE = field("type", Machine::setType);
     public static final MachineField<Instant> LAST_SEEN = field("lastSeen", Machine::setLastSeen);
     public static final MachineField<String> ORGANIZATION_ID = field("organizationId", Machine::setOrganizationId);
