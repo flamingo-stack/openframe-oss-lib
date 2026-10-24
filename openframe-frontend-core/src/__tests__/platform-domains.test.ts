@@ -18,8 +18,6 @@ import {
   isNonCookieableHost,
   matchCookieDomain,
   keepsSessionHostOnly,
-  isSupabaseSessionCookieName,
-  expireParentDomainSessionCookies,
 } from '@/platform-domains';
 
 /**
@@ -324,8 +322,6 @@ describe('cookie-domain guard + match (shared SSOT primitives)', () => {
 });
 
 describe('host-only sign-in session (a registrable domain shared with customer tenants)', () => {
-  afterEach(() => vi.unstubAllGlobals());
-
   it('keeps the session host-only on every openframe.ai host, and nowhere else', () => {
     for (const h of ['hub.openframe.ai', 'openframe.ai', 'www.openframe.ai', 'forward-tech-it.openframe.ai', 'HUB.OPENFRAME.AI']) {
       expect(keepsSessionHostOnly(h)).toBe(true);
@@ -333,47 +329,5 @@ describe('host-only sign-in session (a registrable domain shared with customer t
     for (const h of ['product-hub.flamingo.so', 'www.openmsp.ai', 'www.flamingo.run', 'notopenframe.ai', 'openframe.ai.evil.com']) {
       expect(keepsSessionHostOnly(h)).toBe(false);
     }
-  });
-
-  it('names exactly the Supabase session cookies', () => {
-    for (const n of ['sb-shdrojejslhgnojzkzak-auth-token', 'sb-shdrojejslhgnojzkzak-auth-token.0', 'sb-shdrojejslhgnojzkzak-auth-token.1', 'sb-shdrojejslhgnojzkzak-auth-token-code-verifier']) {
-      expect(isSupabaseSessionCookieName(n)).toBe(true);
-    }
-    for (const n of ['access_token', 'refresh_token', 'of_ref', 'of_oauth_abc', 'oauth-token', 'sb-x-auth-token-user']) {
-      expect(isSupabaseSessionCookieName(n)).toBe(false);
-    }
-  });
-
-  function stubBrowser(hostname: string, cookie: string) {
-    const writes: string[] = [];
-    vi.stubGlobal('window', { location: { hostname } });
-    vi.stubGlobal('document', {
-      get cookie() { return cookie; },
-      set cookie(v: string) { writes.push(v); },
-    });
-    return writes;
-  }
-
-  it('expires the parent-domain copies of the session on a tenant host, and nothing else', () => {
-    const writes = stubBrowser(
-      'forward-tech-it.openframe.ai',
-      'of_ref=p1; sb-shdrojejslhgnojzkzak-auth-token.0=base64-a; sb-shdrojejslhgnojzkzak-auth-token.1=b; _ga=x',
-    );
-    expect(expireParentDomainSessionCookies()).toEqual([
-      'sb-shdrojejslhgnojzkzak-auth-token.0',
-      'sb-shdrojejslhgnojzkzak-auth-token.1',
-    ]);
-    expect(writes).toEqual([
-      'sb-shdrojejslhgnojzkzak-auth-token.0=; Max-Age=0; Path=/; Domain=.openframe.ai',
-      'sb-shdrojejslhgnojzkzak-auth-token.1=; Max-Age=0; Path=/; Domain=.openframe.ai',
-    ]);
-  });
-
-  it('writes nothing on a domain whose session is shared on purpose, or outside a browser', () => {
-    const writes = stubBrowser('product-hub.flamingo.so', 'sb-shdrojejslhgnojzkzak-auth-token.0=a');
-    expect(expireParentDomainSessionCookies()).toEqual([]);
-    expect(writes).toEqual([]);
-    vi.unstubAllGlobals();
-    expect(expireParentDomainSessionCookies()).toEqual([]);
   });
 });
