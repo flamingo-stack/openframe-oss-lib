@@ -15,8 +15,10 @@ import { LoadingWhen, useLoadingScope } from './loading-scope';
  *   the full history (a fetch on mount) loads it on hover and never for the rows nobody points at.
  * - **Loading.** In a loading scope (the page's, or the host's read through `LoadingWhen`) the trendline draws its own
  *   skeleton at its loaded size; with no values it draws the same box empty. Nothing moves when the data lands.
- * - **Colour is earned** (ODS tokens): a change for the worse is red, for the better green, none grey. Whether a rise
- *   is good is the host's to say (`higherIsBetter`): most numbers a monitor shows count problems.
+ * - **Colour is earned, as a TONE** (`TrendTone`): a change for the better is `positive`, for the worse `negative`, none
+ *   `neutral`. Each tone is an ODS token (`TREND_TONES`: success, error, secondary text) a host may replace for one
+ *   trendline (`tones`). Whether a rise is good is the host's to say (`higherIsBetter`): most numbers a monitor shows
+ *   count problems.
  *
  * `TrendHistory` is the hover card's body: a title and a grid of columns, one height loading and loaded.
  */
@@ -32,10 +34,26 @@ export function formatTrendChange(change: number): string {
   return change === 0 ? '0' : `${change > 0 ? '+' : '−'}${formatNumber(Math.abs(change))}`;
 }
 
-/** The text colour of a change: worse red, better green, none (or unknown) grey. */
-export function trendToneClass(change: number | null, higherIsBetter = false): string {
-  if (change === null || change === 0) return 'text-ods-text-secondary';
-  return change > 0 === higherIsBetter ? 'text-ods-success' : 'text-ods-error';
+/** What a change means: better, worse, or none (or unknown). */
+export type TrendTone = 'positive' | 'negative' | 'neutral';
+
+/** THE colour of each tone: the ODS semantic tokens (never a raw palette var). */
+export const TREND_TONES: Readonly<Record<TrendTone, string>> = {
+  positive: 'text-ods-success',
+  negative: 'text-ods-error',
+  neutral: 'text-ods-text-secondary',
+};
+
+/** The tone of a change: a rise is positive only when `higherIsBetter`; no change (or an unknown one) is neutral. */
+export function trendTone(change: number | null, higherIsBetter = false): TrendTone {
+  if (change === null || change === 0) return 'neutral';
+  return change > 0 === higherIsBetter ? 'positive' : 'negative';
+}
+
+/** The text colour of a change: its tone's class, from `TREND_TONES` or the host's `tones`. */
+export function trendToneClass(change: number | null, higherIsBetter = false, tones: Partial<Record<TrendTone, string>> = {}): string {
+  const tone = trendTone(change, higherIsBetter);
+  return tones[tone] ?? TREND_TONES[tone];
 }
 
 function Spark({ values, toneClass }: { values: ReadonlyArray<number | null>; toneClass: string }) {
@@ -73,12 +91,14 @@ export interface TrendlineProps {
   change?: number | null;
   /** A rise is good (online devices, revenue). Default: a rise is worse (problems, errors). */
   higherIsBetter?: boolean;
+  /** Replace a tone's colour for this trendline (an ODS text class, e.g. `{ positive: 'text-ods-accent' }`). */
+  tones?: Partial<Record<TrendTone, string>>;
   /** The hover card's body, called only while it is open (load the full history here). None: no hover card. */
   details?: () => ReactNode;
   side?: 'top' | 'right' | 'bottom' | 'left';
 }
 
-export function Trendline({ values, label, change, higherIsBetter = false, details, side = 'top' }: TrendlineProps) {
+export function Trendline({ values, label, change, higherIsBetter = false, tones, details, side = 'top' }: TrendlineProps) {
   // The ONE switch: in a loading scope, the skeleton at the loaded size.
   if (useLoadingScope()) {
     return (
@@ -99,7 +119,7 @@ export function Trendline({ values, label, change, higherIsBetter = false, detai
   const last = values[values.length - 1] ?? null;
   const before = values.length > 1 ? (values[values.length - 2] ?? null) : null;
   const delta = change !== undefined ? change : last !== null && before !== null ? last - before : null;
-  const toneClass = trendToneClass(delta, higherIsBetter);
+  const toneClass = trendToneClass(delta, higherIsBetter, tones);
   const line = (
     <span
       className={BOX_CLASS}
