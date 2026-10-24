@@ -1,5 +1,6 @@
 package com.openframe.data.repository.ticket;
 
+import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.Ticket.Fields;
@@ -19,6 +20,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TicketProjectionRepository {
 
+    // From the primary: a lagging secondary could count 0 or miss items, and the event would skip a real update.
+    private static final ReadPreference PRIMARY = ReadPreference.primary();
+
     private final MongoOperations mongoOperations;
 
     public long updateOrganizationName(String tenantId, String organizationId, String organizationName) {
@@ -32,6 +36,7 @@ public class TicketProjectionRepository {
     public long countTicketsToUpdateOrganizationName(String tenantId, String organizationId, String organizationName, int limit) {
         Criteria outdatedNames = matchTicketsToUpdateOrganizationName(tenantId, organizationId, organizationName);
         Query query = new Query(outdatedNames).limit(limit);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.count(query, Ticket.class);
     }
 
@@ -72,6 +77,7 @@ public class TicketProjectionRepository {
     public long countTicketsToUpdateUserName(String tenantId, String userId, String userName, int limit) {
         Criteria outdatedNames = matchTicketsToUpdateUserName(tenantId, userId, userName);
         Query query = new Query(outdatedNames).limit(limit);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.count(query, Ticket.class);
     }
 
@@ -107,6 +113,7 @@ public class TicketProjectionRepository {
     public long countTicketsToUpdateDeviceHostname(String tenantId, String machineId, String hostname, int limit) {
         Criteria ticketsToUpdate = matchTicketsToUpdateDeviceHostname(tenantId, machineId, hostname);
         Query query = new Query(ticketsToUpdate).limit(limit);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.count(query, Ticket.class);
     }
 
@@ -131,6 +138,7 @@ public class TicketProjectionRepository {
                 .and(Fields.id).in(ticketIds);
         Query query = new Query(batchTickets);
         query.fields().include(Fields.id, Fields.tenantId, Fields.title);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.find(query, Ticket.class);
     }
 
@@ -140,6 +148,7 @@ public class TicketProjectionRepository {
         }
         Query query = new Query(criteria).with(Sort.by(Fields.id)).limit(batchSize);
         query.fields().include(Fields.id);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.find(query, Ticket.class).stream()
                 .map(Ticket::getId)
                 .toList();
