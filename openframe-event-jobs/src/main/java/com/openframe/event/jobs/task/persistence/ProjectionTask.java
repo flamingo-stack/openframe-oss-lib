@@ -58,6 +58,8 @@ public class ProjectionTask implements EventJobProgress {
 
     private Instant startedAt;
     private Instant updatedAt;
+    // When the run ended DONE, FAILED or REPLACED.
+    private Instant finishedAt;
 
     public static String buildKey(String projection, String tenantId, String sourceId) {
         return projection + ID_SEPARATOR + tenantId + ID_SEPARATOR + sourceId;
@@ -119,16 +121,20 @@ public class ProjectionTask implements EventJobProgress {
                 .status(finalStatus)
                 .current(stillCurrent)
                 .updatedAt(now)
+                .finishedAt(now)
                 .build();
     }
 
     // For a newer event: a RUNNING run ends REPLACED, a FAILED one keeps its status; neither is current any more.
     public ProjectionTask close(Instant now) {
-        EventJobStatus closedStatus = status == EventJobStatus.RUNNING ? EventJobStatus.REPLACED : status;
+        boolean wasRunning = status == EventJobStatus.RUNNING;
+        EventJobStatus closedStatus = wasRunning ? EventJobStatus.REPLACED : status;
+        Instant closedAt = wasRunning ? now : finishedAt;
         return toBuilder()
                 .status(closedStatus)
                 .current(false)
                 .updatedAt(now)
+                .finishedAt(closedAt)
                 .build();
     }
 }

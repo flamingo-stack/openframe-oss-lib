@@ -26,6 +26,7 @@ class ProjectionTaskTest {
         assertThat(task.getLastId()).isNull();
         assertThat(task.getEventVersion()).isEqualTo(4L);
         assertThat(task.getStartedAt()).isEqualTo(OPENED_AT);
+        assertThat(task.getFinishedAt()).isNull();
         assertThat(task.getRunId()).isEqualTo("event version 4");
     }
 
@@ -39,6 +40,7 @@ class ProjectionTaskTest {
 
         // verifications
         assertThat(closed.getStatus()).isEqualTo(EventJobStatus.REPLACED);
+        assertThat(closed.getFinishedAt()).isEqualTo(LATER);
         assertThat(closed.isCurrent()).isFalse();
         assertThat(closed.getLastId()).isEqualTo("t500");
         assertThat(closed.getUpdatedAt()).isEqualTo(LATER);
@@ -55,6 +57,7 @@ class ProjectionTaskTest {
         // verifications
         assertThat(failed.isCurrent()).isTrue();
         assertThat(closed.getStatus()).isEqualTo(EventJobStatus.FAILED);
+        assertThat(closed.getFinishedAt()).isEqualTo(OPENED_AT);
         assertThat(closed.getLastError()).isEqualTo("boom");
         assertThat(closed.isCurrent()).isFalse();
     }
@@ -66,6 +69,7 @@ class ProjectionTaskTest {
 
         // verifications
         assertThat(done.getStatus()).isEqualTo(EventJobStatus.DONE);
+        assertThat(done.getFinishedAt()).isEqualTo(LATER);
         assertThat(done.isCurrent()).isFalse();
     }
 
