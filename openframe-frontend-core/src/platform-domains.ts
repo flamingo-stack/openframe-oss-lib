@@ -10,9 +10,10 @@
  * EDGE-SAFE + PURE: no React/clsx/tailwind, no `server-only`, no `node:`
  * builtins, no `'use client'`. So it is legal in the Edge middleware
  * (`proxy.ts`), in `'use client'` providers, AND in `server-only` modules
- * (e.g. cookie-domain-server.ts) simultaneously. The ONLY non-pure export is
+ * (e.g. cookie-domain-server.ts) simultaneously. The non-pure exports are
  * `getAllPlatformBaseDomains`, which reads `typeof window`/`process.env` to
- * preserve byte-identical cookie behavior.
+ * preserve byte-identical cookie behavior, and `expireParentDomainSessionCookies`,
+ * which writes `document.cookie` (a no-op outside a browser).
  */
 
 import type { PlatformName } from './types/platform';
@@ -30,6 +31,13 @@ export interface PlatformDomainEntry {
   aliasHostnames?: string[];
   /** Forward-only: no DB row, excluded from the reverse index + cookie set (e.g. the product-CTA dashboard). */
   pseudo?: boolean;
+  /**
+   * The registrable domain also serves hosts that are not this platform's (the product's customer
+   * tenants, `<tenant>.openframe.ai`), so a sign-in session set here stays HOST-ONLY: on the parent
+   * domain it rides along on every tenant request. Other cookies keep the parent domain (the
+   * `of_ref` referral cookie is shared with the tenants' signup app on purpose).
+   */
+  hostOnlySession?: boolean;
 }
 
 export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
@@ -57,6 +65,9 @@ export const PLATFORM_DOMAINS: readonly PlatformDomainEntry[] = [
     defaultUrl: 'https://openframe.ai',
     envVar: 'NEXT_PUBLIC_OPENFRAME_URL',
     aliasHostnames: ['openframe.ai', 'www.openframe.ai', 'hub.openframe.ai'],
+    // The hub's Supabase session on `.openframe.ai` (two ~3 KB chunks) went to every tenant API call,
+    // where the services' 8 KB header limit answered 400 to all of them (CU-17tkuw60ege).
+    hostOnlySession: true,
   },
   {
     key: 'openframe-dashboard',
@@ -383,6 +394,64 @@ export function matchCookieDomain(hostname: string, baseDomains: string[]): stri
     }
   }
   return undefined;
+}
+
+// ── Sign-in session scope (a platform whose registrable domain it shares with hosts that are not its own) ──
+
+/** Registrable domains (dotless) whose platform keeps its sign-in session host-only. Production
+ *  domains only: `defaultUrl` + aliases, never an env override (a preview host is host-only anyway). */
+function hostOnlySessionBases(): string[] {
+  const bases = new Set<string>();
+  for (const entry of PLATFORM_DOMAINS) {
+    if (!entry.hostOnlySession) continue;
+    for (const host of [hostOf(entry.defaultUrl), ...(entry.aliasHostnames ?? [])]) {
+      const base = host ? toRegistrableBaseDomain(host) : undefined;
+      if (base) bases.add(base);
+    }
+  }
+  return Array.from(bases);
+}
+
+function hostOnlySessionBaseOf(hostname: string): string | undefined {
+  const host = hostname.toLowerCase();
+  return hostOnlySessionBases().find(base => host === base || host.endsWith(`.${base}`));
+}
+
+/**
+ * Must a sign-in session set on this host stay host-only (no `Domain=`)? True on every host of a
+ * registrable domain a platform shares with hosts that are not its own (`hostOnlySession`):
+ * `hub.openframe.ai`, `openframe.ai`, and the tenants under them. Other cookies are not affected.
+ */
+export function keepsSessionHostOnly(hostname: string): boolean {
+  return hostOnlySessionBaseOf(hostname) !== undefined;
+}
+
+/** A Supabase session cookie: `sb-<project>-auth-token`, its `.N` chunks and its PKCE verifier. */
+export function isSupabaseSessionCookieName(name: string): boolean {
+  return /^sb-[a-z0-9]+-auth-token(\.\d+|-code-verifier)?$/.test(name);
+}
+
+/**
+ * Expire the Supabase session cookies a browser still holds on the PARENT domain of a
+ * `hostOnlySession` registrable domain (`.openframe.ai`), written before the session became
+ * host-only. Leaves a host-only copy alone (a `Domain=` expiry only matches the domain cookie), so
+ * a current session survives. Run on page load by every app on such a domain; a no-op elsewhere
+ * and outside a browser. Returns the names expired.
+ */
+export function expireParentDomainSessionCookies(): string[] {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return [];
+  const base = hostOnlySessionBaseOf(window.location?.hostname ?? '');
+  if (!base) return [];
+  const names = new Set(
+    document.cookie
+      .split(';')
+      .map(c => c.split('=')[0].trim())
+      .filter(isSupabaseSessionCookieName),
+  );
+  for (const name of names) {
+    document.cookie = `${name}=; Max-Age=0; Path=/; Domain=.${base}`;
+  }
+  return Array.from(names);
 }
 
 // ── Module-load ordering self-check (NON-fatal — this module is imported by cn.ts → ~everything,
