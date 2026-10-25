@@ -162,6 +162,16 @@ export type ButtonSizeKey = keyof typeof BUTTON_SIZE_CLASS;
 const KIND_FOCUS = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus';
 const KIND_FOCUS_INSET =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-focus';
+/**
+ * A TAB's keyboard focus: the tab's own hover look (primary text and the accent fade), never a ring. A tab takes focus
+ * when it is clicked (Radix focuses the trigger it activates), so a ring showed after every click, and a tab strip
+ * that scrolls sideways clipped it to two vertical bars beside the open tab. Every tab, of every strip, reads this.
+ */
+export const TAB_FOCUS_CLASS = [
+  'outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
+  'focus-visible:text-ods-text-primary focus-visible:bg-gradient-to-b focus-visible:from-transparent',
+  'focus-visible:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
+].join(' ');
 
 /**
  * The button KINDS that are not a plain push button: each owns its whole box and look, which no `size` changes, and
@@ -255,7 +265,7 @@ export const BUTTON_KIND_CLASS = {
     'data-[emphasis=fade]:data-[state=active]:bg-gradient-to-b data-[emphasis=fade]:data-[state=active]:from-transparent data-[emphasis=fade]:data-[state=active]:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
     'data-[emphasis=fade]:hover:bg-gradient-to-b data-[emphasis=fade]:hover:from-transparent data-[emphasis=fade]:hover:to-[color-mix(in_srgb,var(--color-accent-primary)_10%,transparent)]',
     'disabled:cursor-not-allowed disabled:text-ods-text-disabled',
-    KIND_FOCUS_INSET,
+    TAB_FOCUS_CLASS,
     '[&_svg]:shrink-0',
   ].join(' '),
   // A segment of a segmented control (`TabSelector`): the label on the strip, a hover fill, and the selected segment
