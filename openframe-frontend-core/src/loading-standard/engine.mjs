@@ -151,9 +151,25 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 
-// The compiler is the HOST's (a dev dependency of every repository that runs the gate), resolved from where this
-// module is installed: the lib does not ship TypeScript to its consumers.
-const ts = createRequire(import.meta.url)('typescript');
+// The compiler is the HOST's (a dev dependency of every repository that runs the gate): resolved from the directory the
+// gate runs in (the host's root), and only then from where this module is installed. The lib does not ship TypeScript,
+// but a host's install can still nest one inside the lib's folder for another package's peer range (a TypeScript 7
+// there has no JavaScript compiler API), which resolving from this module's location would pick first.
+const ts = loadTypeScript();
+
+function loadTypeScript() {
+  const tried = [];
+  for (const from of [join(process.cwd(), 'package.json'), import.meta.url]) {
+    try {
+      const candidate = createRequire(from)('typescript');
+      if (candidate?.SyntaxKind && typeof candidate.createSourceFile === 'function') return candidate;
+      tried.push(`${from}: typescript ${candidate?.version ?? '?'} has no compiler API`);
+    } catch (error) {
+      tried.push(`${from}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  throw new Error(`loading-standard engine: no TypeScript compiler API to read with (${tried.join('; ')})`);
+}
 
 /** Every rule id, with the reason a finding of it prints. */
 export const RULES = {
