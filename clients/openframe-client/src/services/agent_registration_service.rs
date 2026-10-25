@@ -204,3 +204,4 @@ impl AgentRegistrationService {
 #[cfg(test)]
 #[path = "agent_registration_service_tests.rs"]
 mod tests;
+// probe: CU-17tkuw60a9u tests and checks job (do not merge)
