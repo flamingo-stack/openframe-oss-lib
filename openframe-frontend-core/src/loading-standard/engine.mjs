@@ -145,7 +145,8 @@
  *
  * CONFIG: `CONFIGS.lib`, `CONFIGS.frontend` and `CONFIGS.hub` hold each repository's rule set, reported trees, page
  * code, boundaries and exemptions, declared once here. `boundaries` names a host's own boundary components (built on
- * `LoadingSuspense`) and the attribute that makes one render directly, with no boundary (`{ StreamedSection: 'cached' }`).
+ * `LoadingSuspense`) and the attribute that makes one render directly, with no boundary (`{ StreamedSection: 'cached' }`):
+ * bare or with any value but the literal `false`.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -157,15 +158,19 @@ import { dirname, join, relative, resolve } from 'node:path';
 // there has no JavaScript compiler API), which resolving from this module's location would pick first.
 const ts = loadTypeScript();
 
-function loadTypeScript() {
+/**
+ * The first TypeScript with a compiler API, resolved from each place in order (a file or URL to resolve from).
+ * Exported for its test.
+ */
+export function loadTypeScript(from = [join(process.cwd(), 'package.json'), import.meta.url]) {
   const tried = [];
-  for (const from of [join(process.cwd(), 'package.json'), import.meta.url]) {
+  for (const place of from) {
     try {
-      const candidate = createRequire(from)('typescript');
+      const candidate = createRequire(place)('typescript');
       if (candidate?.SyntaxKind && typeof candidate.createSourceFile === 'function') return candidate;
-      tried.push(`${from}: typescript ${candidate?.version ?? '?'} has no compiler API`);
+      tried.push(`${place}: typescript ${candidate?.version ?? '?'} has no compiler API`);
     } catch (error) {
-      tried.push(`${from}: ${error instanceof Error ? error.message : String(error)}`);
+      tried.push(`${place}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   throw new Error(`loading-standard engine: no TypeScript compiler API to read with (${tried.join('; ')})`);
@@ -3130,7 +3135,8 @@ function analyzeFile(project, path, active, rel, page, boundaries = {}) {
     if (direct === undefined) return null;
     const flag = attribute(opening, direct);
     const value = flag && attributeExpression(flag);
-    const off = flag && (!flag.initializer || (value && value.kind === ts.SyntaxKind.TrueKeyword));
+    // Bare (`cached`) or any value but the literal `false` (`cached={isCached}` included) turns the boundary off.
+    const off = flag && (!flag.initializer || !value || value.kind !== ts.SyntaxKind.FalseKeyword);
     return off ? null : { opening, leaf };
   }
 
