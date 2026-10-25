@@ -230,13 +230,7 @@ export const CONFIGS = {
     rules: ['SUSPENSE_FALLBACK', 'HAND_PAIR', 'RAW_SUSPENSE', 'PAGE_BOUNDARY'],
     trees: ['app', 'components', 'lib'],
     boundaries: { StreamedSection: 'cached' },
-    exempt: [
-      {
-        why: 'the boundary itself: StreamedSection is built on Suspense',
-        files: /^components\/shared\/streamed-section\.tsx$/,
-        rules: ['RAW_SUSPENSE'],
-      },
-    ],
+    exempt: [],
   },
   lib: {
     rules: ALL_RULES,
@@ -2281,10 +2275,10 @@ function analyzeFile(project, path, active, rel, page, boundaries = {}) {
     const leaf = tag.split('.').pop();
     skeletonRender(opening, opening.tagName);
     if (LOADERS.has(leaf)) report('LOADER_COMPONENT', opening, RULES.LOADER_COMPONENT);
-    if (leaf === 'StreamedPage') {
+    if (leaf === 'StreamedPage' || leaf === 'StreamedSection') {
       for (const a of opening.attributes.properties) {
         if (ts.isJsxAttribute(a) && /^(?:skeleton|memory|remember)$/.test(a.name.getText()))
-          report('RETIRED_API', a, `StreamedPage \`${a.name.getText()}\` (it takes a placeholder)`);
+          report('RETIRED_API', a, `${leaf} \`${a.name.getText()}\` (it takes a placeholder)`);
       }
     }
     if (leaf === 'Suspense' || leaf === 'LoadingSuspense') checkFallback(opening, leaf);
