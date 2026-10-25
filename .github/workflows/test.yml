@@ -56,7 +56,9 @@ jobs:
       contents: read
       packages: read
       pull-requests: read
-    if: github.event_name == 'pull_request'
+    # Disabled: covered by "Flamingo Code Review / tests and checks" (Trivy, advisory; this scan never blocked: continue-on-error and not in All Checks). Kept here, not deleted. CU-17tkuw60a9u
+    # was: if: github.event_name == 'pull_request'
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -164,20 +166,30 @@ jobs:
         run: npm install
 
       # ~1s; a broken eslint config makes every lint result below meaningless.
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:config-smoke in openframe-frontend-core). Kept here, not deleted. CU-17tkuw60a9u
       - name: Lint Config Smoke
+        if: false
         run: npm run lint:config-smoke
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run type-check in openframe-frontend-core). Kept here, not deleted. CU-17tkuw60a9u
       - name: Type Check
+        if: false
         run: npm run type-check
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint in openframe-frontend-core). Kept here, not deleted. CU-17tkuw60a9u
       - name: Lint
+        if: false
         run: npm run lint
 
       # Needs a TypeScript program and an 8 GB heap; the slowest check, so kept apart.
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:types in openframe-frontend-core). Kept here, not deleted. CU-17tkuw60a9u
       - name: Lint (type-aware)
+        if: false
         run: npm run lint:types
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run format in openframe-frontend-core). Kept here, not deleted. CU-17tkuw60a9u
       - name: Format
+        if: false
         run: npm run format
 
       - name: Test
@@ -215,7 +227,9 @@ jobs:
     name: Test Node Cycles (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
-    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:cycles in openframe-frontend-core). Kept here, not deleted. CU-17tkuw60a9u
+    # was: if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    if: false
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
