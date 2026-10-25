@@ -1,7 +1,15 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LoadingScope } from '../loading-scope';
-import { formatTrendChange, TREND_TONES, TrendHistory, Trendline, trendlinePoints, trendTone, trendToneClass } from '../trendline';
+import {
+  formatTrendChange,
+  TREND_TONES,
+  TrendHistory,
+  Trendline,
+  trendlinePoints,
+  trendTone,
+  trendToneClass,
+} from '../trendline';
 
 describe('Trendline', () => {
   it('names the number, its length and its change since the previous value', () => {
@@ -66,7 +74,7 @@ describe('trendlinePoints', () => {
   });
 
   it('draws a flat series mid-height and skips unknown values', () => {
-    expect(trendlinePoints([7, 7, 7]).map((p) => p.y)).toEqual([8, 8, 8]);
+    expect(trendlinePoints([7, 7, 7]).map(p => p.y)).toEqual([8, 8, 8]);
     expect(trendlinePoints([1, null, 3])).toHaveLength(2);
     expect(trendlinePoints([])).toEqual([]);
   });
@@ -74,11 +82,21 @@ describe('trendlinePoints', () => {
 
 describe('trend tones', () => {
   it('names a change positive, negative or neutral, by whether a rise is good', () => {
-    expect([trendTone(3), trendTone(3, true), trendTone(-1), trendTone(0), trendTone(null)]).toEqual(['negative', 'positive', 'positive', 'neutral', 'neutral']);
+    expect([trendTone(3), trendTone(3, true), trendTone(-1), trendTone(0), trendTone(null)]).toEqual([
+      'negative',
+      'positive',
+      'positive',
+      'neutral',
+      'neutral',
+    ]);
   });
 
   it('colours each tone with its ODS token, and a host may replace one', () => {
-    expect(TREND_TONES).toEqual({ positive: 'text-ods-success', negative: 'text-ods-error', neutral: 'text-ods-text-secondary' });
+    expect(TREND_TONES).toEqual({
+      positive: 'text-ods-success',
+      negative: 'text-ods-error',
+      neutral: 'text-ods-text-secondary',
+    });
     expect(trendToneClass(3)).toBe('text-ods-error');
     expect(trendToneClass(3, true)).toBe('text-ods-success');
     expect(trendToneClass(3, true, { positive: 'text-ods-accent' })).toBe('text-ods-accent');
@@ -94,7 +112,17 @@ describe('TrendHistory', () => {
   const columns = [{ label: 'Day' }, { label: 'Devices', align: 'right' as const }];
 
   it('draws the title, the headers and one row per value', () => {
-    render(<TrendHistory title="Fleet" columns={columns} rows={[['Oct 23', '4'], ['Oct 24', '6']]} loadingRows={2} />);
+    render(
+      <TrendHistory
+        title="Fleet"
+        columns={columns}
+        rows={[
+          ['Oct 23', '4'],
+          ['Oct 24', '6'],
+        ]}
+        loadingRows={2}
+      />,
+    );
     for (const text of ['Fleet', 'Day', 'Devices', 'Oct 23', '6']) expect(screen.getByText(text)).toBeInTheDocument();
   });
 

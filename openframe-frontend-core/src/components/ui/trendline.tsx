@@ -53,7 +53,11 @@ export function trendTone(change: number | null, higherIsBetter = false): TrendT
 }
 
 /** The text colour of a change: its tone's class, from `TREND_TONES` or the host's `tones`. */
-export function trendToneClass(change: number | null, higherIsBetter = false, tones: Partial<Record<TrendTone, string>> = {}): string {
+export function trendToneClass(
+  change: number | null,
+  higherIsBetter = false,
+  tones: Partial<Record<TrendTone, string>> = {},
+): string {
   const tone = trendTone(change, higherIsBetter);
   return tones[tone] ?? TREND_TONES[tone];
 }
@@ -64,9 +68,7 @@ export function trendToneClass(change: number | null, higherIsBetter = false, to
  * still visible; a flat series sits mid-height, a single value in the middle.
  */
 export function trendlinePoints(values: ReadonlyArray<number | null>): Array<{ x: number; y: number }> {
-  const known = values
-    .map((v, i) => [i, v] as const)
-    .filter((p): p is readonly [number, number] => p[1] !== null);
+  const known = values.map((v, i) => [i, v] as const).filter((p): p is readonly [number, number] => p[1] !== null);
   if (known.length === 0) return [];
   const min = Math.min(...known.map(([, v]) => v));
   const range = Math.max(...known.map(([, v]) => v)) - min;
@@ -83,7 +85,7 @@ function Spark({ values, toneClass }: { values: ReadonlyArray<number | null>; to
     <svg className={`${SPARK_CLASS} ${toneClass}`} viewBox={`0 0 ${SPARK_W} ${SPARK_H}`} aria-hidden="true">
       {points.length > 1 && (
         <polyline
-          points={points.map((p) => `${p.x},${p.y}`).join(' ')}
+          points={points.map(p => `${p.x},${p.y}`).join(' ')}
           fill="none"
           stroke="currentColor"
           strokeWidth={1.5}
@@ -112,7 +114,15 @@ export interface TrendlineProps {
   side?: 'top' | 'right' | 'bottom' | 'left';
 }
 
-export function Trendline({ values, label, change, higherIsBetter = false, tones, details, side = 'top' }: TrendlineProps) {
+export function Trendline({
+  values,
+  label,
+  change,
+  higherIsBetter = false,
+  tones,
+  details,
+  side = 'top',
+}: TrendlineProps) {
   // The ONE switch: in a loading scope, the skeleton at the loaded size.
   if (useLoadingScope()) {
     return (
@@ -199,13 +209,15 @@ export function TrendHistory({ title, columns, rows, loadingRows, error, childre
       ) : (
         <LoadingWhen loading={rows === null}>
           <div className="grid gap-x-[var(--spacing-system-mf)] gap-y-[var(--spacing-system-xxs)]" style={grid}>
-            {columns.map((c) => (
+            {columns.map(c => (
               <span key={c.label} className={`${alignClass(c)} text-ods-text-secondary`}>
                 {c.label}
               </span>
             ))}
             {(rows ?? Array.from({ length: loadingRows }, () => null)).map((row, r) =>
-              columns.map((c, i) => <TrendHistoryCell key={`${r}:${c.label}`} column={c} value={row ? row[i] : null} />),
+              columns.map((c, i) => (
+                <TrendHistoryCell key={`${r}:${c.label}`} column={c} value={row ? row[i] : null} />
+              )),
             )}
           </div>
         </LoadingWhen>
@@ -216,6 +228,11 @@ export function TrendHistory({ title, columns, rows, loadingRows, error, childre
 }
 
 function TrendHistoryCell({ column, value }: { column: TrendHistoryColumn; value: ReactNode }) {
-  if (useLoadingScope()) return <TextLineSkeleton type="h6" className={column.align === 'right' ? 'ml-auto w-8' : 'w-12'} />;
-  return <span className={`${column.align === 'right' ? 'text-right tabular-nums' : 'text-left'} text-ods-text-primary`}>{value}</span>;
+  if (useLoadingScope())
+    return <TextLineSkeleton type="h6" className={column.align === 'right' ? 'ml-auto w-8' : 'w-12'} />;
+  return (
+    <span className={`${column.align === 'right' ? 'text-right tabular-nums' : 'text-left'} text-ods-text-primary`}>
+      {value}
+    </span>
+  );
 }
