@@ -235,6 +235,56 @@ export function L({ loading }: { loading: boolean }) { return loading ? <Wait />
     },
   },
   {
+    rule: 'RAW_SUSPENSE',
+    fail: {
+      'components/raw.tsx':
+        'export function Raw() { return <Suspense fallback={<XView x={null} />}><X /></Suspense>; }\n',
+    },
+    pass: {
+      'components/raw.tsx': `export function Raw() {
+  return (
+    <>
+      <LoadingSuspense label="Loading X" fallback={<XView x={null} />}><X /></LoadingSuspense>
+      {/* loading-standard-ok(SUSPENSE_FALLBACK): structured data for crawlers, nothing is drawn */}
+      <Suspense fallback={null}><StructuredData /></Suspense>
+    </>
+  );
+}
+`,
+    },
+  },
+  {
+    rule: 'PAGE_BOUNDARY',
+    fail: {
+      'app/devices/page.tsx': `export default function Page() {
+  return (
+    <LoadingSuspense label="Loading the devices">
+      <DevicesHeading />
+      <DevicesTable />
+    </LoadingSuspense>
+  );
+}
+`,
+      'app/settings/layout.tsx':
+        'export default function Layout({ children }: any) { return <><Suspense fallback={<X />}>{children}</Suspense></>; }\n',
+      'app/pricing/page.tsx':
+        'export default function Page() { return renderPage({ slots: { flamingo: <LoadingSuspense><Pricing /></LoadingSuspense> } }); }\n',
+    },
+    pass: {
+      'app/devices/page.tsx': `export default function Page() {
+  return (
+    <>
+      <DevicesHeading />
+      <LoadingSuspense label="Loading the devices">
+        <DevicesTable />
+      </LoadingSuspense>
+    </>
+  );
+}
+`,
+    },
+  },
+  {
     rule: 'HAND_PAIR',
     fail: {
       'components/pair.tsx': `export function Pair() {
