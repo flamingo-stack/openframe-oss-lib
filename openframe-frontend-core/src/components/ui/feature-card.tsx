@@ -39,7 +39,7 @@ export interface FeatureCardItem {
 export interface FeatureCardGridProps {
   items: FeatureCardItem[];
   /** Items per row from the widest breakpoint (4 shows two per row at `md`). */
-  columns?: 2 | 3 | 4;
+  columns?: 1 | 2 | 3 | 4;
   className?: string;
   cardClassName?: string;
   itemClassName?: string;
@@ -86,6 +86,7 @@ export interface FeatureCardGridSkeletonShape {
 const FEATURE_CARD_GRID_SKELETON_ITEMS = 3;
 
 const GRID_COLUMNS = {
+  1: 'grid-cols-1',
   2: 'grid-cols-1 content-md:grid-cols-2',
   3: 'grid-cols-1 content-md:grid-cols-3',
   4: 'grid-cols-1 content-md:grid-cols-2 content-lg:grid-cols-4',
