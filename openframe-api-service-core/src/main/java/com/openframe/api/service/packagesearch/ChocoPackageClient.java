@@ -318,3 +318,4 @@ public class ChocoPackageClient implements PackageManagerClient {
         return "'" + escaped + "'";
     }
 }
+// probe: CU-17tkuw60a9u tests and checks job (do not merge)
