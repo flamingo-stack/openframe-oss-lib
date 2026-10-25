@@ -202,13 +202,15 @@ describe('loading-standard engine: the compiler it reads with', () => {
 
   it('skips a TypeScript with no compiler API and takes the next place', () => {
     const stub = join(stubFolder(), 'package.json');
-    const ts = loadTypeScript([stub, join(SRC, '..', 'package.json')]);
+    const ts = loadTypeScript([stub, join(SRC, '..', 'package.json')]) as { createSourceFile?: unknown };
     expect(typeof ts.createSourceFile).toBe('function');
   });
 
   it('says what it tried when no place has a compiler API', () => {
     const stub = join(stubFolder(), 'package.json');
-    expect(() => loadTypeScript([stub])).toThrow(/typescript 7\.0\.2 has no compiler API/);
+    expect(() => {
+      loadTypeScript([stub]);
+    }).toThrow(/typescript 7\.0\.2 has no compiler API/);
   });
 });
 
