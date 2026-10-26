@@ -7,7 +7,7 @@ import { TENANT_EMPTY_VALUE, unattributedLabel, usersCountLabel } from './tenant
 import type { TenantCustomer } from './tenant-row';
 
 export interface TenantCustomerCellProps {
-  /** Earliest attached first: the cell names the first and counts the rest. */
+  /** In the host's order: the cell names the first and counts the rest. */
   customers: readonly TenantCustomer[];
   userCount?: number | null;
   /** Users no customer's rule claims: while there are any, the count line says how many, in the warning colour. */
@@ -36,7 +36,12 @@ export function TenantCustomerCell({ customers, userCount, unattributedUserCount
             variant="square"
           />
           <TruncateText>{first.name}</TruncateText>
-          {more > 0 && <span className="shrink-0 text-ods-text-secondary text-h4">+{more}</span>}
+          {more > 0 && (
+            <span className="shrink-0 text-ods-text-secondary text-h4">
+              +{more}
+              <span className="sr-only">{more === 1 ? ' more customer' : ' more customers'}</span>
+            </span>
+          )}
         </div>
       ) : (
         <TruncateText>{TENANT_EMPTY_VALUE}</TruncateText>

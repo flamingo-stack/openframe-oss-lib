@@ -13,7 +13,7 @@ export interface TenantRow {
   /** The directory provider (`MICROSOFT_365`, `GOOGLE_WORKSPACE`); an unknown value keeps its raw name. */
   provider: string;
   domain?: string | null;
-  /** The customers the directory serves, earliest attached first; empty while it serves none. */
+  /** The customers the directory serves, in the order the host shows them; empty while it serves none. */
   customers: readonly TenantCustomer[];
   /** Users read from the directory; absent before the first read. */
   userCount?: number | null;
