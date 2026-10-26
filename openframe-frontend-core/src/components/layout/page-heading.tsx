@@ -1,6 +1,10 @@
 import { Children, Fragment, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { getPlatformBrandClasses } from '../../utils/platform-identity';
-import { TextLineSkeleton } from '../loading/unified-skeleton';
+import {
+  type TextLinesByBreakpoint,
+  TextLineSkeleton,
+  TextLinesByBreakpointSkeleton,
+} from '../loading/unified-skeleton';
 
 /**
  * THE page-title style — the ODS `text-h1` token (`--font-size-h1-title` =
@@ -230,6 +234,17 @@ export interface SectionHeadingProps {
   tone?: HeadingAccentTone;
   /** Extra classes on the outer row. */
   className?: string;
+  /**
+   * The title and intro are read data still being read: the heading draws its own loading form (the eyebrow and the
+   * action for real, a bar at the heading's type step, `intro` lines at the intro's). `true` draws the title alone;
+   * an object also says how many intro lines the loaded heading has and the title bar's width. A title or an intro
+   * that wraps differently with the width gives its typical lines per breakpoint (`titleLines`, `intro` as an
+   * object). The heading renders on the server and cannot read a loading scope: a host passes its own switch
+   * (`useLoadingScope() || loading`).
+   */
+  loading?:
+    | boolean
+    | { intro?: boolean | 1 | 2 | 3 | TextLinesByBreakpoint; titleWidth?: string; titleLines?: TextLinesByBreakpoint };
 }
 
 /**
@@ -272,7 +287,25 @@ export function SectionHeading({
   platform,
   tone = 'accent',
   className,
+  loading,
 }: SectionHeadingProps) {
+  // loading-standard-ok(PROP_ONLY_SWITCH): a server component cannot read the scope; the host passes its own switch
+  if (loading) {
+    const shape = loading === true ? {} : loading;
+    return (
+      <SectionHeadingSkeleton
+        level={level}
+        eyebrow={eyebrow}
+        titleWidth={shape.titleWidth}
+        titleLines={shape.titleLines}
+        intro={shape.intro}
+        action={action}
+        platform={platform}
+        tone={tone}
+        className={className}
+      />
+    );
+  }
   const accentClassName = headingAccentClass(platform, tone);
   const layout = SECTION_HEADING_LAYOUT[level];
   const Tag = presentational ? 'div' : level === 'page' ? 'h1' : 'h2';
@@ -324,14 +357,16 @@ export function SectionHeading({
   );
 }
 
-export interface SectionHeadingSkeletonProps {
+interface SectionHeadingSkeletonProps {
   level?: 'page' | 'section';
   /** The eyebrow: static copy, drawn as it is. */
   eyebrow?: ReactNode;
   /** The title bar's width (a width class). Default `w-2/3`. */
   titleWidth?: string;
-  /** The intro's lines: `true` is two. Omitted: no intro. */
-  intro?: boolean | 1 | 2 | 3;
+  /** The title's lines per breakpoint, for a title that wraps. Omitted: one bar of `titleWidth`. */
+  titleLines?: TextLinesByBreakpoint;
+  /** The intro's lines: `true` is two, or the lines per breakpoint. Omitted: no intro. */
+  intro?: boolean | 1 | 2 | 3 | TextLinesByBreakpoint;
   /** Something at the far end of the row, drawn as given. */
   action?: ReactNode;
   platform?: string | null;
@@ -344,10 +379,11 @@ export interface SectionHeadingSkeletonProps {
  * stack, the eyebrow for real, a one-line bar at the heading's type step and a bar per intro line at the intro's.
  * No heading element is drawn: the loaded heading is the page's one.
  */
-export function SectionHeadingSkeleton({
+function SectionHeadingSkeleton({
   level = 'section',
   eyebrow,
   titleWidth = 'w-2/3',
+  titleLines,
   intro,
   action,
   platform,
@@ -355,17 +391,29 @@ export function SectionHeadingSkeleton({
   className,
 }: SectionHeadingSkeletonProps) {
   const layout = SECTION_HEADING_LAYOUT[level];
-  const introLines = intro === true ? 2 : intro || 0;
+  const introByBreakpoint = typeof intro === 'object' ? intro : null;
+  const introLines = typeof intro === 'number' ? intro : intro === true ? 2 : 0;
+  // The bars have no width of their own: a section's stack fills up to its own cap (640px), the width a real title and
+  // intro take, so an action at the far end wraps under it exactly where it does once loaded.
   const stack = (
-    <div className={layout.stack} aria-hidden>
+    <div className={level === 'section' ? `${layout.stack} w-full` : layout.stack} aria-hidden>
       {eyebrow ? (
         <SectionEyebrow platform={platform} tone={tone}>
           {eyebrow}
         </SectionEyebrow>
       ) : null}
       <div className={layout.heading}>
-        <TextLineSkeleton type="inherit" className={titleWidth} />
+        {titleLines ? (
+          <TextLinesByBreakpointSkeleton lines={titleLines} />
+        ) : (
+          <TextLineSkeleton type="inherit" className={titleWidth} />
+        )}
       </div>
+      {introByBreakpoint ? (
+        <div className={layout.intro}>
+          <TextLinesByBreakpointSkeleton lines={introByBreakpoint} />
+        </div>
+      ) : null}
       {introLines > 0 ? (
         <div className={layout.intro}>
           {Array.from({ length: introLines }, (_, i) => (

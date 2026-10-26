@@ -6,7 +6,9 @@ import { type ComponentPropsWithoutRef, type ComponentRef, type ElementRef, forw
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
+import { FieldValueSkeleton } from './field-value-skeleton';
 import { FieldWrapper } from './field-wrapper';
+import { useLoadingScope } from './loading-scope';
 import { usePortalContainer } from './portal-container';
 
 const Select = SelectPrimitive.Root;
@@ -29,6 +31,9 @@ const SelectTrigger = forwardRef<
   // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
   const errorSlot = 'error' in allProps;
   const isInvalid = invalid || !!error;
+  // ONE switch: in a page's loading state the trigger draws its box, its label and chevron for real, and its value
+  // (or placeholder) as a bar.
+  const inScope = useLoadingScope();
 
   const trigger = (
     <SelectPrimitive.Trigger
@@ -54,7 +59,7 @@ const SelectTrigger = forwardRef<
         'disabled:!cursor-not-allowed disabled:bg-ods-bg',
         'disabled:text-ods-text-disabled disabled:data-[placeholder]:text-ods-border',
         // The chevron sets its own colour — grey it with the value.
-        'disabled:[&_svg]:text-ods-text-disabled',
+        '[&_svg]:disabled:text-ods-text-disabled',
         'cursor-pointer transition-colors duration-200',
         '[&>span]:line-clamp-1',
         isInvalid &&
@@ -63,7 +68,7 @@ const SelectTrigger = forwardRef<
       )}
       {...props}
     >
-      {children}
+      {inScope ? <FieldValueSkeleton /> : children}
       <SelectPrimitive.Icon asChild>
         <Chevron02DownIcon
           className={cn(

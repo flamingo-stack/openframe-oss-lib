@@ -1342,6 +1342,6 @@ export function InlineWalkthroughVideo(props: InlineWalkthroughVideoProps): Reac
  * The inline video's loading state: the shared skeleton in the card's own box. The inline card draws it itself
  * until its player mounts; a host whose video data is still loading draws it in the same slot.
  */
-export function InlineWalkthroughVideoSkeleton({ className }: { className?: string }): React.ReactElement {
+function InlineWalkthroughVideoSkeleton({ className }: { className?: string }): React.ReactElement {
   return <UnifiedSkeleton className={cn(INLINE_CARD_BOX_CLASS, className)} />;
 }

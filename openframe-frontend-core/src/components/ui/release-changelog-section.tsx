@@ -6,10 +6,10 @@ import { useState } from 'react';
 import type { ChangelogEntry } from '../../types/product-release';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
-import { Badge, BadgeSkeleton } from './badge';
+import { Badge } from './badge';
 import { Button } from './button';
 import { FadePreview } from './fade-preview';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { RichMarkdownRenderer } from './markdown';
 
 interface ReleaseChangelogSectionProps {
@@ -77,7 +77,8 @@ const ENTRY_DESCRIPTION_CLASS =
 /** FadePreview's toggle row: a `size="compact"` link Button (h-6, at every width) under a `mf` gap. */
 const COMPACT_BUTTON_HEIGHT_CLASS = 'h-6';
 const PREVIEW_TOGGLE_SKELETON_CLASS = cn('mt-[var(--spacing-system-mf)] w-28', COMPACT_BUTTON_HEIGHT_CLASS);
-/** Entries a skeleton draws when it is not told how many (the first fold of a section). */
+/** Entries a skeleton draws: a section's entries are the data's (no page size), so a typical one, which is also all
+ *  the preview-first mode shows before its fade (the preview is the section's first entry). */
 const CHANGELOG_SKELETON_ENTRIES = 1;
 
 export function ReleaseChangelogSection({
@@ -178,7 +179,7 @@ function ChangelogEntryList({
   return (
     <ul className={ENTRY_LIST_CLASS}>
       {entries.map((entry, index) => (
-        <li key={index} className={ENTRY_CLASS}>
+        <li key={index} className={ENTRY_CLASS} data-loading-item>
           {/* Entry title — run through the SAME markdown renderer as the
               description so inline markdown (links like `[label](url)`,
               emphasis) renders instead of showing as raw text, then pinned
@@ -208,11 +209,9 @@ function ChangelogEntryList({
   );
 }
 
-export interface ReleaseChangelogSectionSkeletonProps {
+interface ReleaseChangelogSectionSkeletonProps {
   /** The section's heading (static copy: drawn for real). */
   title: string;
-  /** Entries drawn when not `previewFirst` (the first fold). Default 1. */
-  count?: number;
   isBreaking?: boolean;
   hideTitle?: boolean;
   collapsible?: boolean;
@@ -227,9 +226,8 @@ export interface ReleaseChangelogSectionSkeletonProps {
  * A changelog section while it is read: the real icon and heading, the count badge as a chip, the first entry (title
  * line and description lines) as bars, clamped to the preview height with FadePreview's toggle row in preview mode.
  */
-export function ReleaseChangelogSectionSkeleton({
+function ReleaseChangelogSectionSkeleton({
   title,
-  count = CHANGELOG_SKELETON_ENTRIES,
   isBreaking = false,
   hideTitle = false,
   collapsible = false,
@@ -243,12 +241,12 @@ export function ReleaseChangelogSectionSkeleton({
       {icon}
       {title}
       {/* The count badge's own frame; its text is one or two digits. */}
-      <BadgeSkeleton className={cn(COUNT_BADGE_CLASS, 'w-[2ch]')} />
+      <Badge loading className={cn(COUNT_BADGE_CLASS, 'w-[2ch]')} />
     </h2>
   );
   const inPreviewMode = previewFirst && !collapsible;
   const showEntries = !collapsible || !defaultCollapsed;
-  const list = <ChangelogEntryListSkeleton count={inPreviewMode ? 1 : count} />;
+  const list = <ChangelogEntryListSkeleton />;
   return (
     <div className={cn(SECTION_CLASS, className)} aria-hidden>
       {!hideTitle &&
@@ -275,21 +273,22 @@ export function ReleaseChangelogSectionSkeleton({
   );
 }
 
-function ChangelogEntryListSkeleton({ count }: { count: number }) {
+function ChangelogEntryListSkeleton() {
   return (
     <ul className={ENTRY_LIST_CLASS}>
-      {Array.from({ length: count }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton entries never reorder
-        <li key={index} className={ENTRY_CLASS}>
-          <div className={ENTRY_TITLE_CLASS}>
-            <TextLineSkeleton type="h3" className="w-2/3" />
-          </div>
-          <div className={ENTRY_DESCRIPTION_CLASS}>
-            {/* Five lines: in preview mode the entry runs past the 120px clamp, as a real first entry does. */}
-            <TextLineSkeleton type="inherit" lines={5} className="w-full" />
-          </div>
-        </li>
-      ))}
+      <LoadingItems count={CHANGELOG_SKELETON_ENTRIES}>
+        {() => (
+          <li className={ENTRY_CLASS} data-loading-item>
+            <div className={ENTRY_TITLE_CLASS}>
+              <TextLineSkeleton type="h3" className="w-2/3" />
+            </div>
+            <div className={ENTRY_DESCRIPTION_CLASS}>
+              {/* Five lines: in preview mode the entry runs past the 120px clamp, as a real first entry does. */}
+              <TextLineSkeleton type="inherit" lines={5} className="w-full" />
+            </div>
+          </li>
+        )}
+      </LoadingItems>
     </ul>
   );
 }

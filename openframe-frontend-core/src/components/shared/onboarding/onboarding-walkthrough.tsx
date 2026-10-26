@@ -6,6 +6,7 @@ import { cn } from '../../../utils/cn';
 import { accentSentenceMarks, SECTION_HEADING_CLASS } from '../../layout/page-heading';
 import { UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button';
+import { useLoadingScope } from '../../ui/loading-scope';
 import { OnboardingStepCard } from './onboarding-step-card';
 
 export interface OnboardingWalkthroughProps {
@@ -42,8 +43,10 @@ export function OnboardingWalkthrough({
   className,
   spacing = 'space-y-4',
   completionStatus,
-  isLoadingCompletion = false,
+  isLoadingCompletion: loadingCompletionGiven = false,
 }: OnboardingWalkthroughProps) {
+  // ONE switch: a page's loading scope (nothing in it reads or writes the completion), or the host's checks.
+  const isLoadingCompletion = useLoadingScope() || loadingCompletionGiven;
   const {
     state,
     markComplete,

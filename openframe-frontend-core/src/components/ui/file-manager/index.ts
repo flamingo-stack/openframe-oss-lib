@@ -1,5 +1,4 @@
 export { FileManager } from './file-manager';
-export { FileManagerSkeleton } from './file-manager-skeleton';
 export { FileManagerBreadcrumb } from './file-manager-breadcrumb';
 export { FileManagerActionBar } from './file-manager-action-bar';
 export { FileManagerTable } from './file-manager-table';

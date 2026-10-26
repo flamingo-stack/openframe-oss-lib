@@ -5,6 +5,7 @@ import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
 import { UserIcon } from '../icons-v2-generated/users/user-icon';
 import { AssigneeDropdown, type TicketAssigneeOption } from './assignee-dropdown';
+import { Button } from './button';
 import { SimpleMarkdownRenderer } from './markdown/simple-markdown-renderer';
 import { SquareAvatar } from './square-avatar';
 import { Tag } from './tag';
@@ -103,14 +104,18 @@ function InfoCell({
             <span className="flex size-4 shrink-0 items-center justify-center text-ods-text-secondary">{icon}</span>
           )}
           {onClick ? (
-            <button
+            <Button
+              variant="link"
+              size="compact"
+              noPaddingX
               type="button"
+              data-tone="primary"
               onClick={onClick}
-              className="cursor-pointer truncate text-left text-ods-text-primary transition-colors text-h4 hover:text-ods-accent"
+              className="min-w-0 max-w-full justify-start"
               title={value}
             >
-              {value}
-            </button>
+              <span className="truncate">{value}</span>
+            </Button>
           ) : (
             <span className="truncate text-ods-text-primary text-h4" title={value}>
               {value}
@@ -205,23 +210,17 @@ export function TicketInfoSection({
             </div>
           )}
           {onExpand && (
-            <button
+            <Button
+              variant="outline"
+              size="icon"
               type="button"
               onClick={onExpand}
-              className={cn(
-                'flex shrink-0 items-center justify-center rounded-[6px] p-3',
-                'border border-ods-border bg-ods-card',
-                'transition-colors duration-150 hover:bg-ods-bg-hover',
-              )}
+              className="shrink-0"
               aria-label={expanded ? 'Collapse' : 'Expand'}
+              aria-expanded={expanded}
             >
-              <Chevron02DownIcon
-                className={cn(
-                  'size-6 text-ods-text-primary transition-transform duration-200',
-                  expanded && 'rotate-180',
-                )}
-              />
-            </button>
+              <Chevron02DownIcon className={cn('transition-transform duration-200', expanded && 'rotate-180')} />
+            </Button>
           )}
         </div>
       </div>

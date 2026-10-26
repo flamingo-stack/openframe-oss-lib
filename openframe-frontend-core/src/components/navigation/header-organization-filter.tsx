@@ -3,6 +3,7 @@
 import { cn } from '../../utils/cn';
 import { Filter02Icon } from '../icons-v2-generated';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui';
+import { Button } from '../ui/button';
 
 export interface HeaderOrganizationFilterOrganization {
   id: string;
@@ -37,16 +38,7 @@ export function HeaderOrganizationFilter({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          className={cn(
-            'flex h-full items-center gap-4 px-4',
-            // Transparent so the cell inherits the bar's background.
-            'border-l border-ods-border bg-transparent',
-            'w-[240px] shrink-0',
-            'transition-colors hover:bg-ods-bg-hover',
-            className,
-          )}
-        >
+        <Button variant="cell" className={cn('w-[240px] justify-start', className)}>
           <Filter02Icon className="h-4 w-4 shrink-0 text-ods-text-secondary" />
           <div className="flex min-w-0 flex-col items-start justify-center">
             <span className="truncate text-ods-text-primary text-h5" title={displayName}>
@@ -56,7 +48,7 @@ export function HeaderOrganizationFilter({
               <span className="truncate text-ods-text-secondary text-h6">{deviceCount.toLocaleString()} Devices</span>
             )}
           </div>
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[240px]">
         <DropdownMenuItem onClick={() => onOrgChange?.('')}>All Organizations</DropdownMenuItem>

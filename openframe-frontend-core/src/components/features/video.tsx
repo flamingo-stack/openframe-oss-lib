@@ -46,6 +46,7 @@ import { useNearViewport } from '../../hooks/use-near-viewport';
 import { cn } from '../../utils/cn';
 import { fetchPriorityProp } from '../../utils/fetch-priority';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { Button } from '../ui/button/button';
 import { useLoadingScope } from '../ui/loading-scope';
 import { VideoPlayBadge } from './video-center-badge';
 import type { FilePlayerProps } from './video-file-player';
@@ -225,7 +226,7 @@ export function Video(props: VideoProps): React.ReactElement | null {
   const layout = props.layout ?? 'native';
   // ONE switch: in a loading scope with no url yet (it is read) the video is its skeleton and no player is mounted;
   // a url it is given there is the page's own and plays as it is.
-  if (loading && !url) return <VideoSkeleton layout={layout} className={props.className} />;
+  if ((loading && !url) || props.loading) return <VideoSkeleton layout={layout} className={props.className} />;
   if (!url) return null;
 
   const effectiveKind = resolveKind(props, url);
@@ -305,7 +306,7 @@ function resolveKind(props: VideoProps, url: string): 'youtube' | 'file' {
  * A video while it is read: the player's box in the player's own layout wrapper (so its size and frame are the
  * player's), drawn as the skeleton's surface. `Video` draws it in a loading scope.
  */
-export function VideoSkeleton({ layout = 'native', className }: { layout?: VideoLayout; className?: string }) {
+function VideoSkeleton({ layout = 'native', className }: { layout?: VideoLayout; className?: string }) {
   return wrapWithLayout(<UnifiedSkeleton variant="rectangular" className={cn('h-full w-full', className)} />, layout);
 }
 
@@ -730,11 +731,12 @@ function YouTubeFacadeInner({
 
   return (
     <div className={wrapperClass} style={wrapperStyle}>
-      <button
+      <Button
+        variant="card"
         type="button"
         aria-label={`Play: ${title}`}
         onClick={() => setActivated(true)}
-        className="group absolute inset-0 m-0 cursor-pointer overflow-hidden rounded-lg border border-ods-border bg-ods-card p-0"
+        className="group absolute inset-0 h-full overflow-hidden"
       >
         <picture>
           <source type="image/webp" srcSet={posterWebp} />
@@ -764,7 +766,7 @@ function YouTubeFacadeInner({
             className="transition-transform duration-200 group-hover:scale-110 group-hover:text-ods-accent"
           />
         </div>
-      </button>
+      </Button>
     </div>
   );
 }

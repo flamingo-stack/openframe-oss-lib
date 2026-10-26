@@ -14,6 +14,7 @@ export * from './date-picker';
 export * from './duration-input';
 export * from './field';
 export * from './field-wrapper';
+export * from './field-value-skeleton';
 export * from './honeypot-field';
 export * from './info-hint';
 export * from './json-detail-list';
@@ -95,6 +96,7 @@ export * from './benefit-card';
 export * from './brand-association-card';
 export * from './brand-association-grid';
 export * from './bullet-list';
+export * from './step-arrow-button';
 export * from './chevron-button';
 export * from './circular-progress';
 export {
@@ -115,6 +117,19 @@ export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';
+export {
+  Trendline,
+  TrendHistory,
+  TREND_TONES,
+  formatTrendChange,
+  trendlinePoints,
+  trendTone,
+  trendToneClass,
+  type TrendTone,
+  type TrendlineProps,
+  type TrendHistoryProps,
+  type TrendHistoryColumn,
+} from './trendline';
 export { SourceTooltip, type SourceTooltipProps, type SourceRef } from './source-tooltip';
 export { TruncateText, type TruncateTextProps } from './truncate-text';
 export * from './highlight-card';
@@ -141,38 +156,11 @@ export * from './touch-friendly-tooltip';
 export * from './error-state';
 export * from './content-loader';
 
-// Table components
-export {
-  Table,
-  TableCardSkeleton,
-  TableCell,
-  TableDescriptionCell,
-  TableEmptyState,
-  TableHeader,
-  TableRow,
-  TableTimestampCell,
-} from './table';
-
-export type {
-  PagePagination,
-  RowAction,
-  TableCardSkeletonProps,
-  TableCellProps,
-  TableColumn,
-  TableDescriptionCellProps,
-  TableEmptyStateProps,
-  TableHeaderProps,
-  TableProps,
-  TableRowProps,
-  TableTimestampCellProps,
-} from './table';
-
 // Query Report Table (dynamic columns for osquery results)
 export {
   QueryReportTable,
   QueryReportTableHeader,
   QueryReportTableRow,
-  QueryReportTableSkeleton,
   deriveColumns,
   exportToCSV,
 } from './query-report-table';
@@ -181,15 +169,14 @@ export type {
   QueryReportTableProps,
   QueryReportTableHeaderProps,
   QueryReportTableRowProps,
-  QueryReportTableSkeletonProps,
   QueryResultRow,
 } from './query-report-table';
 
 // Pagination components
-export { CursorPagination, CursorPaginationSimple, CursorPaginationSkeleton } from './cursor-pagination';
+export { CursorPagination, CursorPaginationSimple } from './cursor-pagination';
 export type { CursorPaginationProps } from './cursor-pagination';
 
-// DataTable (headless, TanStack Table-based) — replacement for legacy `Table`.
+// DataTable (headless, TanStack Table-based): the lib's one table.
 export * from './data-table';
 
 // Password input (show/hide toggle)
@@ -260,7 +247,7 @@ export { IconTile } from './icon-tile';
 export { PolicyLink } from './policy-link';
 export type { DateRange } from 'react-day-picker';
 export { TitleBlock, TITLE_BLOCK_MIN_HEIGHT } from '../layout/title-block';
-export type { TitleBlockProps, TitleSkeletonLines } from '../layout/title-block';
+export type { TitleBlockProps } from '../layout/title-block';
 export type { SortableColumn, SortConfig, SortDirection } from './sort-column-item';
 export {
   ORGANIZATION_CARD_RADIUS_CLASS,
@@ -272,4 +259,4 @@ export {
   ORGANIZATION_CARD_FOOTER_CLASS,
   ORGANIZATION_CARD_STATS_CLASS,
   ORGANIZATION_CARD_STAT_CLASS,
-} from '../loading/organization-card-skeleton';
+} from './organization-card';

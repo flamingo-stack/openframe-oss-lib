@@ -79,7 +79,8 @@ class ScriptDeliveryRetryServiceTest {
     @DisplayName("within budget → re-publishes the stored message via the channel's republisher and increments, not failed")
     void withinBudget_resends() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
         when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(1, DeliveryChannel.SCHEDULE, SCHEDULE_JSON)));
 
         service.retryStuckQueuedDeliveries();
@@ -95,7 +96,8 @@ class ScriptDeliveryRetryServiceTest {
     void exhausted_fails() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
         q.setScheduleId("sch-1");
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
         when(retryStore.get("exec-1", "m-1"))
                 .thenReturn(Optional.of(new RetryState(3, DeliveryChannel.SCHEDULE, SCHEDULE_JSON)));
 
@@ -114,7 +116,8 @@ class ScriptDeliveryRetryServiceTest {
     @DisplayName("no stored payload (retry entry gone / expired) → FAILED + evict")
     void noPayload_fails() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
         when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.empty());
 
         service.retryStuckQueuedDeliveries();
@@ -127,7 +130,7 @@ class ScriptDeliveryRetryServiceTest {
     @Test
     @DisplayName("two leaves on one (executionId, machineId) collapse to a single re-publish")
     void groupsByDelivery() {
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any()))
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
                 .thenReturn(List.of(queued("exec-1", "m-1", "s-a"), queued("exec-1", "m-1", "s-b")));
         when(retryStore.get("exec-1", "m-1")).thenReturn(Optional.of(new RetryState(0, DeliveryChannel.SCHEDULE, SCHEDULE_JSON)));
 
@@ -141,7 +144,8 @@ class ScriptDeliveryRetryServiceTest {
     void offlineDevice_failsWithoutRetry() {
         ScriptExecution q = queued("exec-1", "m-1", "s-a");
         q.setScheduleId("sch-1");
-        when(repository.findByStatusAndDispatchedAtBefore(eq(ExecutionStatus.QUEUED), any())).thenReturn(List.of(q));
+        when(repository.findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(eq(ExecutionStatus.QUEUED), any()))
+                .thenReturn(List.of(q));
         when(machineRepository.findByMachineIdInAndStatus(any(), eq(DeviceStatus.OFFLINE)))
                 .thenReturn(List.of(machine("m-1")));
 

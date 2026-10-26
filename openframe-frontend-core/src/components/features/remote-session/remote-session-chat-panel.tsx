@@ -133,14 +133,16 @@ export function RemoteSessionChatPanel({
           aria-label="Message"
           className="h-12 min-w-0 flex-1 rounded-md border border-ods-border bg-ods-bg px-[var(--spacing-system-s)] text-ods-text-primary outline-none text-h6 placeholder:text-ods-text-secondary"
         />
-        <button
+        <Button
+          variant="transparent"
+          size="icon"
           type="submit"
           aria-label="Send message"
           disabled={!ready}
-          className="flex size-12 shrink-0 items-center justify-center"
+          className="shrink-0"
         >
-          <Send03Icon size={24} color="currentColor" className="text-ods-text-primary" />
-        </button>
+          <Send03Icon size={24} color="currentColor" />
+        </Button>
       </form>
     </div>
   );

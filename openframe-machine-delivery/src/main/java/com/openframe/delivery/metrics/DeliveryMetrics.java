@@ -20,6 +20,8 @@ public class DeliveryMetrics {
 
     private static final String RETRIED_COUNTER = "openframe.delivery.retried";
     private static final String FAILED_COUNTER = "openframe.delivery.failed";
+    private static final String RERUN_COUNTER = "openframe.delivery.rerun";
+    private static final String RERUN_PUBLISHED_COUNTER = "openframe.delivery.rerun.published";
     private static final String PUBLISH_FAILED_COUNTER = "openframe.delivery.publish_failed";
     private static final String ROW_ERROR_COUNTER = "openframe.delivery.sweep.row_errors";
     private static final String RESULT_REJECTED_COUNTER = "openframe.delivery.result.rejected";
@@ -58,6 +60,17 @@ public class DeliveryMetrics {
         String typeTag = tagValue(type.name());
         String reasonTag = tagValue(failure.name());
         meterRegistry.counter(FAILED_COUNTER, TAG_TYPE, typeTag, TAG_REASON, reasonTag).increment();
+    }
+
+    public void recordRerun(DeliveryType type, DeliveryFailure failure) {
+        String typeTag = tagValue(type.name());
+        String reasonTag = tagValue(failure.name());
+        meterRegistry.counter(RERUN_COUNTER, TAG_TYPE, typeTag, TAG_REASON, reasonTag).increment();
+    }
+
+    public void recordRerunPublished(DeliveryType type) {
+        String typeTag = tagValue(type.name());
+        meterRegistry.counter(RERUN_PUBLISHED_COUNTER, TAG_TYPE, typeTag).increment();
     }
 
     public void recordDispatched(DeliveryType type, String sink) {

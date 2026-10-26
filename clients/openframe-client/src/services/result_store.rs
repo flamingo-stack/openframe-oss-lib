@@ -14,6 +14,11 @@ use crate::config::update_config::{
 };
 use crate::models::RmmResult;
 
+mod ledger;
+
+pub use ledger::LedgerState;
+use ledger::{DELIVERY_LEDGER, DELIVERY_SEQUENCE};
+
 const JOURNAL: TableDefinition<&str, &[u8]> = TableDefinition::new("journal");
 const OUTBOX_META: TableDefinition<&str, &[u8]> = TableDefinition::new("outbox_meta");
 const OUTBOX_PAYLOAD: TableDefinition<&str, &[u8]> = TableDefinition::new("outbox_payload");
@@ -105,6 +110,8 @@ impl ResultStore {
             txn.open_table(JOURNAL)?;
             txn.open_table(OUTBOX_META)?;
             txn.open_table(OUTBOX_PAYLOAD)?;
+            txn.open_table(DELIVERY_LEDGER)?;
+            txn.open_table(DELIVERY_SEQUENCE)?;
         }
         txn.commit()?;
         Ok(db)

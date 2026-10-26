@@ -43,9 +43,9 @@ import { CardHoverPlay } from '../../features/video-center-badge';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
-import { useLoadingScope } from '../../ui/loading-scope';
-import { SquareAvatar, SquareAvatarSkeleton } from '../../ui/square-avatar';
-import { Tag, TagSkeleton } from '../../ui/tag';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { SquareAvatar } from '../../ui/square-avatar';
+import { Tag } from '../../ui/tag';
 import type { BaseProgramItem, ProgramConfig, ProgramMedia, ProgramHost } from '../types/entities/program-types';
 import {
   COMPACT_CARD_IMAGE_SLOT,
@@ -59,7 +59,7 @@ import {
 } from '../utils/compact-card-classes';
 import { CompactCardSkeleton } from '../utils/compact-card-skeleton';
 import { CONTENT_CARD_SKELETON_FRAME_CLASS, ContentCardFrame } from './content-card-frame';
-import { EntityPortraitCard, EntityPortraitCardSkeleton } from './entity-portrait-card';
+import { EntityPortraitCard } from './entity-portrait-card';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -105,6 +105,11 @@ const DEFAULT_HOSTS_ROW = 'flex flex-wrap gap-2 md:justify-end';
  * carries (no cap), so there is no limit to draw.
  */
 const DEFAULT_SKELETON_TAGS = 2;
+/** Host avatars a loading card draws for a type whose cards show hosts (`cardShowsHosts`): a typical one. */
+export const PROGRAM_CARD_SKELETON_HOSTS = 1;
+/** Gallery thumbnails a loading card draws for a type whose cards show a gallery (`cardShowsGallery`): the row's
+ *  first fold (the row scrolls past it). */
+export const PROGRAM_CARD_SKELETON_MEDIA = 4;
 /** The person's avatar in the editorial feature card, read by the card and its skeleton. */
 const EDITORIAL_PERSON_AVATAR = { variant: 'round', size: 'sm' } as const;
 
@@ -120,12 +125,12 @@ function ProgramActionButton({ label, href, newTab }: { label: string; href?: st
   );
 }
 
-export function ProgramCardSkeleton({
+function ProgramCardSkeleton({
   size = 'default',
   eyebrow = true,
   media = 0,
   tags = false,
-  hosts = 1,
+  hosts = PROGRAM_CARD_SKELETON_HOSTS,
   typeLabel,
   actionLabel,
   className,
@@ -146,7 +151,8 @@ export function ProgramCardSkeleton({
 }) {
   // The editorial pair: the card's own boxes (EDITORIAL_*), each text row a bar of
   // that row's line height.
-  if (size === 'portrait') return <EntityPortraitCardSkeleton typeLabel={typeLabel} className={className} />;
+  if (size === 'portrait')
+    return <EntityPortraitCard loading href="" imageAlt="" title="" typeLabel={typeLabel} className={className} />;
   if (size === 'row') {
     return (
       <span className={cn(EDITORIAL_FRAME, EDITORIAL_ROW_GRID, className)}>
@@ -173,7 +179,7 @@ export function ProgramCardSkeleton({
           </span>
           <TextLineSkeleton as="span" type="h4" lines={3} className="w-full" />
           <span className={EDITORIAL_PERSON_ROW}>
-            <SquareAvatarSkeleton {...EDITORIAL_PERSON_AVATAR} className="shrink-0" />
+            <SquareAvatar loading {...EDITORIAL_PERSON_AVATAR} className="shrink-0" />
             <TextLineSkeleton as="span" type="h6" className="w-40" />
           </span>
         </span>
@@ -200,25 +206,25 @@ export function ProgramCardSkeleton({
           </div>
           {tags && (
             <div className={DEFAULT_TAG_ROW}>
-              {Array.from({ length: DEFAULT_SKELETON_TAGS }, (_, i) => (
-                <TagSkeleton key={i} />
-              ))}
+              <LoadingItems count={DEFAULT_SKELETON_TAGS}>
+                {() => <Tag loading as="span" label="" variant="outline" data-loading-item />}
+              </LoadingItems>
             </div>
           )}
         </div>
         {hosts > 0 && (
           <div className={DEFAULT_HOSTS_ROW}>
-            {Array.from({ length: hosts }, (_, i) => (
-              <SquareAvatarSkeleton key={i} variant="round" size="sm" />
-            ))}
+            <LoadingItems count={hosts}>
+              {() => <SquareAvatar loading variant="round" size="sm" data-loading-item />}
+            </LoadingItems>
           </div>
         )}
       </div>
       {media > 0 && (
         <div className={DEFAULT_GALLERY_ROW}>
-          {Array.from({ length: media }, (_, i) => (
-            <UnifiedSkeleton key={i} className={DEFAULT_GALLERY_THUMB} />
-          ))}
+          <LoadingItems count={media}>
+            {() => <UnifiedSkeleton className={DEFAULT_GALLERY_THUMB} data-loading-item />}
+          </LoadingItems>
         </div>
       )}
       <div className={DEFAULT_FOOTER}>
@@ -235,7 +241,7 @@ export function ProgramCardSkeleton({
   );
 }
 
-export interface ProgramCardProps<T extends BaseProgramItem> {
+interface LoadedProgramCardProps<T extends BaseProgramItem> {
   config: ProgramConfig<T>;
   item: T;
   media?: ProgramMedia[];
@@ -267,6 +273,34 @@ export interface ProgramCardProps<T extends BaseProgramItem> {
   className?: string;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it does
+ * in a loading scope. What a loading card draws is decided by the type's CONFIG (the hosts and gallery rows its cards
+ * always show); with no config it draws neither.
+ */
+export type ProgramCardProps<T extends BaseProgramItem> =
+  (LoadedProgramCardProps<T> & { loading?: boolean }) | (Partial<LoadedProgramCardProps<T>> & { loading: true });
+
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function ProgramCard<T extends BaseProgramItem>(props: ProgramCardProps<T>) {
+  if (useLoadingScope() || props.loading) {
+    const { config, size = 'default', showTypeBadge = true, eyebrow, className } = props;
+    // A tag row is a record's optional part, not drawn.
+    return (
+      <ProgramCardSkeleton
+        size={size}
+        eyebrow={!!eyebrow}
+        media={config?.cardShowsGallery ? PROGRAM_CARD_SKELETON_MEDIA : 0}
+        hosts={config?.cardShowsHosts ? PROGRAM_CARD_SKELETON_HOSTS : 0}
+        typeLabel={config && size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
+        actionLabel={config ? programActionLabel(config.labels.singular) : undefined}
+        className={className}
+      />
+    );
+  }
+  return <LoadedProgramCard {...props} />;
+}
+
 function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string; avatar: string | null }> {
   if (!hosts) return [];
   try {
@@ -296,7 +330,7 @@ function getHosts(hosts: ProgramHost[] | null | undefined): Array<{ name: string
   return [];
 }
 
-function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string }) {
+function MediaGallery({ images, title, optional }: { images: ProgramMedia[]; title: string; optional?: boolean }) {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const openImageModal = (index: number, event?: React.MouseEvent) => {
@@ -308,15 +342,20 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
     setIsModalOpen(false);
     setSelectedImageIndex(null);
   };
+  // A whole-card link (`wholeCardClickable`) puts the gallery INSIDE its anchor, the gallery's modal too (it renders
+  // in place). `stopPropagation` does not stop an anchor from navigating, so a thumbnail opened the gallery and then
+  // followed the card's link. Every click in the gallery is the gallery's own: cancel the link in the capture phase,
+  // before any of its handlers runs, and let the handlers run.
   return (
-    <>
-      <div className="overflow-x-auto">
+    <div className="contents" onClickCapture={e => e.preventDefault()}>
+      <div className="overflow-x-auto" data-loading-optional={optional || undefined}>
         <div className={DEFAULT_GALLERY_ROW} style={{ width: 'max-content' }}>
           {images.map((mediaItem, index) => (
             <div
               key={mediaItem.id}
               className={cn(DEFAULT_GALLERY_THUMB, 'group/thumb cursor-pointer')}
               onClick={e => openImageModal(index, e)}
+              data-loading-item
             >
               <Image
                 src={mediaItem.media_url}
@@ -337,7 +376,7 @@ function MediaGallery({ images, title }: { images: ProgramMedia[]; title: string
         onClose={closeImageModal}
         initialIndex={selectedImageIndex || 0}
       />
-    </>
+    </div>
   );
 }
 
@@ -449,7 +488,12 @@ function ProgramEditorialCard({
               />
               <span className="truncate text-h6">
                 <span className="text-ods-text-primary">{profile.name}</span>
-                {profile.subtitle && <span className="text-ods-text-secondary"> · {profile.subtitle}</span>}
+                {profile.subtitle && (
+                  <span data-loading-optional className="text-ods-text-secondary">
+                    {' '}
+                    · {profile.subtitle}
+                  </span>
+                )}
               </span>
             </>
           )}
@@ -459,7 +503,7 @@ function ProgramEditorialCard({
   );
 }
 
-export function ProgramCard<T extends BaseProgramItem>({
+function LoadedProgramCard<T extends BaseProgramItem>({
   config,
   item,
   media = [],
@@ -476,7 +520,7 @@ export function ProgramCard<T extends BaseProgramItem>({
   tags = [],
   priority,
   className,
-}: ProgramCardProps<T>) {
+}: LoadedProgramCardProps<T>) {
   const { target, rel } = useEntityCardLink({
     href,
     targetPlatform,
@@ -488,20 +532,6 @@ export function ProgramCard<T extends BaseProgramItem>({
     placeholderUrl: placeholderUrlProp,
     aspect: size === 'sm' || size === 'row' ? 'square' : 'wide',
   });
-  if (useLoadingScope()) {
-    return (
-      <ProgramCardSkeleton
-        size={size}
-        eyebrow={!!eyebrow}
-        media={media.filter(m => isImageMedia(m)).length}
-        tags={tags.length > 0}
-        hosts={getHosts(item.hosts).length}
-        typeLabel={size === 'portrait' && showTypeBadge ? config.labels.singular : undefined}
-        actionLabel={programActionLabel(config.labels.singular)}
-        className={className}
-      />
-    );
-  }
   const coverImage = item.cover_url;
   const images = media.filter(m => isImageMedia(m));
   const hosts = getHosts(item.hosts);
@@ -710,9 +740,10 @@ export function ProgramCard<T extends BaseProgramItem>({
         <p className={DEFAULT_DESCRIPTION}>{item.description}</p>
 
         {tags.length > 0 && (
-          <div className={DEFAULT_TAG_ROW}>
+          // Only some records carry tags: the loading card leaves the row out.
+          <div className={DEFAULT_TAG_ROW} data-loading-optional>
             {tags.map(tag => (
-              <Tag key={tag} as="span" label={tag} variant="outline" />
+              <Tag key={tag} as="span" label={tag} variant="outline" data-loading-item />
             ))}
           </div>
         )}
@@ -730,6 +761,7 @@ export function ProgramCard<T extends BaseProgramItem>({
               alt={host.name}
               fallback={host.name.charAt(0).toUpperCase()}
               size="sm"
+              data-loading-item
             />
           ))}
         </div>
@@ -744,7 +776,7 @@ export function ProgramCard<T extends BaseProgramItem>({
     return (
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cardFrameClass}>
         {cardHeader}
-        {images.length > 0 && <MediaGallery images={images} title={item.title} />}
+        {images.length > 0 && <MediaGallery images={images} title={item.title} optional={!config.cardShowsGallery} />}
         <div className={DEFAULT_FOOTER}>
           <span
             className="inline-flex items-center gap-2 rounded-md border border-ods-border px-4 py-2 text-ods-text-primary text-h4"
@@ -763,7 +795,7 @@ export function ProgramCard<T extends BaseProgramItem>({
       <Link href={href} target={target} rel={rel} className="block">
         {cardHeader}
       </Link>
-      {images.length > 0 && <MediaGallery images={images} title={item.title} />}
+      {images.length > 0 && <MediaGallery images={images} title={item.title} optional={!config.cardShowsGallery} />}
       <div className={DEFAULT_FOOTER}>
         <ProgramActionButton label={actionLabel} href={href} newTab={target === '_blank'} />
       </div>

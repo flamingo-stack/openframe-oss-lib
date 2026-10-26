@@ -2,7 +2,7 @@
 
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { SquareAvatar } from './square-avatar';
 
 /**
@@ -51,6 +51,9 @@ export interface AvatarStackProps {
    *  Default "Assignees". */
   label?: string;
   className?: string;
+  /** The people are still being read: the stack draws its skeleton, `slots ?? max` faces of its size. A loading scope
+   *  does the same. */
+  loading?: boolean;
 }
 
 /** Face diameter and how far each later face tucks under the previous one — the
@@ -72,9 +75,12 @@ const overlapClass = (size: AvatarStackSize) => (size === 'xs' ? '-ml-2' : '-ml-
 const slotsWidthStyle = (size: AvatarStackSize, slots?: number) =>
   slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined;
 
+/** Faces a stack shows when the host states no `max`, and so the faces it draws while its people are read. */
+const AVATAR_STACK_MAX_FACES = 3;
+
 /** A stack while its people are read: `count` overlapped circles of the faces' size. */
-export function AvatarStackSkeleton({
-  count = 3,
+function AvatarStackSkeleton({
+  count = AVATAR_STACK_MAX_FACES,
   size = 'md',
   slots,
   className,
@@ -90,31 +96,33 @@ export function AvatarStackSkeleton({
       className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
       style={slotsWidthStyle(size, slots)}
     >
-      {Array.from({ length: count }, (_, i) => (
-        <UnifiedSkeleton
-          // biome-ignore lint/suspicious/noArrayIndexKey: skeleton faces never reorder
-          key={i}
-          variant="circular"
-          className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
-          width={SIZE_PX[size]}
-          height={SIZE_PX[size]}
-        />
-      ))}
+      <LoadingItems count={count}>
+        {i => (
+          <UnifiedSkeleton
+            data-loading-item
+            variant="circular"
+            className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
+            width={SIZE_PX[size]}
+            height={SIZE_PX[size]}
+          />
+        )}
+      </LoadingItems>
     </div>
   );
 }
 
 export function AvatarStack({
   people,
-  max = 3,
+  max = AVATAR_STACK_MAX_FACES,
   slots,
   total,
   size = 'md',
   ringClassName = 'ring-ods-card',
   label = 'Assignees',
   className,
+  loading: loadingProp,
 }: AvatarStackProps) {
-  const loading = useLoadingScope();
+  const loading = useLoadingScope() || !!loadingProp;
   if (loading) return <AvatarStackSkeleton count={slots ?? max} size={size} slots={slots} className={className} />;
   if (people.length === 0) return null;
   const groupSize = Math.max(total ?? people.length, people.length);
@@ -136,6 +144,7 @@ export function AvatarStack({
       {visible.map((person, i) => (
         <SquareAvatar
           key={person.key ?? `${person.name}-${i}`}
+          data-loading-item
           variant="round"
           size={size}
           src={person.avatarUrl ?? undefined}

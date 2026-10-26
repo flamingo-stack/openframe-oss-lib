@@ -48,6 +48,7 @@ import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-me
 import { useToast } from '../../hooks/use-toast';
 import {
   blocksNativeBooking,
+  bookingContextFields,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
@@ -59,7 +60,7 @@ import { formatDurationCompact, formatDateWithTimezone } from '../../utils/forma
 import { BackButton } from '../layout/back-button';
 import { LoadingRegion } from '../loading/loading-region';
 import { Alert, AlertDescription, Button } from '../ui';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LOADING_NOOP, useLoadingScope } from '../ui/loading-scope';
 import { BookingForm, DEFAULT_SUBMIT_LABEL, type BookingFieldRow, type BookingFormProps } from './booking-form';
 import { Confirmation } from './confirmation';
 import { SchedulerContextPanel } from './context-panel';
@@ -156,10 +157,20 @@ export interface HubSpotMeetingSchedulerProps {
    * so a Server Component can pass it across the RSC boundary where a component
    * cannot. `answers` are what the page took outside the form (a choice made
    * higher up the page), written into questions the visitor has not answered.
+   * `context` is what the page learned outside the link's questions, shown in the
+   * form and sent with the booking (`BookingContext`); `contextSlot` is the space the
+   * form keeps for it from its first paint.
    */
   detailsFormProps?: Pick<
     BookingFormProps,
-    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'answers'
+    | 'fieldRows'
+    | 'optionalFields'
+    | 'consent'
+    | 'fieldCopy'
+    | 'deniedEmailDomains'
+    | 'answers'
+    | 'context'
+    | 'contextSlot'
   >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
@@ -285,7 +296,7 @@ export const MEETING_SCHEDULER_H = 'content-md:h-[34.375rem] content-lg:h-[23.75
  * question the HubSpot link declares is on the page instead of scrolling inside
  * a card cut off mid-consent. What keeps that from jumping is the form's own
  * footprint discipline: the SSR seed renders the real form on first paint, and
- * the cold-start `BookingFormSkeleton` draws the same rows through the same grid.
+ * the cold-start `BookingForm` (its own loading form) draws the same rows through the same grid.
  *
  * Hosts read it through `SCHEDULER_FLOW_PRESETS[flow].height`, never directly.
  */
@@ -426,7 +437,6 @@ function isNativelyBookable(availability: MeetingAvailability): boolean {
 const MODAL_STACK_CLASS = 'flex flex-col gap-[var(--spacing-system-l)]';
 const MODAL_CARD_CLASS = 'flex flex-col overflow-hidden rounded-md border border-ods-border bg-ods-card';
 const MODAL_STEP_CLASS = 'flex flex-col p-[var(--spacing-system-m)]';
-const NOOP = () => undefined;
 const NOOP_SUBMIT = () => Promise.resolve();
 
 /** The modal's form draws the name pair first and the email under it, as its design does. */
@@ -1049,11 +1059,11 @@ export function HubSpotMeetingScheduler({
                   slots={slots}
                   timezone={timezone}
                   monthOffset={monthOffset}
-                  onMonthOffsetChange={NOOP}
+                  onMonthOffsetChange={LOADING_NOOP}
                   selectedSlot={null}
-                  onSelectSlot={NOOP}
+                  onSelectSlot={LOADING_NOOP}
                   selectedDay={null}
-                  onSelectDay={NOOP}
+                  onSelectDay={LOADING_NOOP}
                 />
               </div>
             )
@@ -1175,6 +1185,8 @@ export function HubSpotMeetingScheduler({
                       // copies frozen at that point can be stale.
                       durationMs,
                       timezone,
+                      // Live too: the page's context can change while the visitor is on the calendar.
+                      ...bookingContextFields(detailsFormProps?.context),
                     }).finally(() => {
                       inFlightRef.current = false;
                     });
@@ -1206,7 +1218,6 @@ export function HubSpotMeetingScheduler({
 // package exports `./components/meeting-scheduler`, not the file beneath it).
 export {
   BookingForm,
-  BookingFormSkeleton,
   formFieldOptionLabel,
   type BookingFormProps,
   type BookingFieldRow,
@@ -1215,12 +1226,18 @@ export {
   type BookingFormConsent,
 } from './booking-form';
 
+export { BookingContextSummary } from './booking-context-summary';
+
 export {
   MeetingSchedulerDirectory,
-  MeetingSchedulerDirectoryRowSkeleton,
-  MeetingSchedulerDirectorySkeleton,
   MEETING_DIRECTORY_PAGE_SIZE,
   type MeetingSchedulerDirectoryProps,
 } from './directory';
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };
-export type { SchedulingLink, SchedulingLinksPayload, DeniedEmailDomains } from '../../schemas/meeting-booking-schema';
+export type {
+  SchedulingLink,
+  SchedulingLinksPayload,
+  DeniedEmailDomains,
+  BookingContext,
+  BookingContextSlot,
+} from '../../schemas/meeting-booking-schema';

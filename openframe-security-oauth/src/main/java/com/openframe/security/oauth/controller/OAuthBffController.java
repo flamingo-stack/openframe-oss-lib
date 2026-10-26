@@ -64,6 +64,7 @@ public class OAuthBffController {
                                             ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
         cookieService.addClearSasCookies(headers);
+        cookieService.addClearStaleOAuthStateCookies(headers, request);
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, provider, authMobile && mobileAuthEnabled, request)
                 .map(data -> {
                     String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);
@@ -73,7 +74,7 @@ public class OAuthBffController {
     }
 
     /**
-     * Initializes OAuth authorize redirect (PKCE/state) without clearing any cookies or session.
+     * Initializes OAuth authorize redirect (PKCE/state) without clearing the session or auth cookies (stale state cookies are still dropped).
      * Useful for "continue" flows after SSO finalization where we already have an authenticated principal.
      */
     @GetMapping("/continue")
@@ -82,6 +83,7 @@ public class OAuthBffController {
                                                    @RequestParam(value = "authMobile", required = false, defaultValue = "false") boolean authMobile,
                                                    ServerHttpRequest request) {
         HttpHeaders headers = new HttpHeaders();
+        cookieService.addClearStaleOAuthStateCookies(headers, request);
         return oauthBffService.buildAuthorizeRedirect(tenantId, redirectTo, null, authMobile && mobileAuthEnabled, request)
                 .map(data -> {
                     String token = oauthBffService.buildStateJwt(data, stateCookieTtlSeconds);

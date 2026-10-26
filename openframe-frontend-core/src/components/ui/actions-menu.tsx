@@ -10,6 +10,7 @@ import { Chevron02RightIcon, Ellipsis01Icon } from '../icons-v2-generated';
 import { ActionsMenuHeaderContext } from './actions-menu-header-context';
 import { Button } from './button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from './dropdown-menu';
+import { InertWhileLoading, useLoadingScope } from './loading-scope';
 import { useReportOverlayOpen } from './overlay-open-registry';
 import { COLLISION_PADDING_PX, useCollisionBoundary, usePortalContainer } from './portal-container';
 
@@ -84,9 +85,8 @@ const ROW_CLASSES =
   'flex flex-1 min-w-0 items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] cursor-pointer transition-colors bg-ods-bg outline-none';
 const WRAPPER_CLASSES = 'relative flex items-stretch border-b border-ods-border last:border-b-0';
 
-const SECONDARY_ACTION_CLASSES =
-  'flex p-[var(--spacing-system-s)] shrink-0 items-center justify-center self-stretch border-l border-ods-border transition-colors hover:bg-ods-bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ods-focus [&_svg]:w-4 [&_svg]:h-4 md:[&_svg]:w-6 md:[&_svg]:h-6';
-
+// The row's trailing icon action: a cell of the row (its full height, an icon, secondary until hovered), after a
+// hairline divider. One Button for both forms, a link and an action.
 const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ action }) => {
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -100,40 +100,26 @@ const SecondaryAction: React.FC<{ action: ActionsMenuItemIconAction }> = ({ acti
     [action],
   );
 
-  const classes = cn(
-    SECONDARY_ACTION_CLASSES,
-    action.openInNewTab && 'max-md:hidden',
-    action.disabled && 'pointer-events-none cursor-not-allowed opacity-60',
-  );
-
-  if (action.href) {
-    return (
-      <Link
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={cn('w-px shrink-0 self-stretch bg-ods-border', action.openInNewTab && 'max-md:hidden')}
+      />
+      <Button
+        variant="cell"
+        type="button"
         href={action.href}
-        prefetch={false}
-        target={action.openInNewTab ? '_blank' : undefined}
-        rel={action.openInNewTab ? 'noopener noreferrer' : undefined}
+        prefetch={action.href ? false : undefined}
+        openInNewTab={action.openInNewTab}
         aria-label={action['aria-label']}
-        aria-disabled={action.disabled || undefined}
-        tabIndex={action.disabled ? -1 : undefined}
-        className={classes}
+        disabled={action.disabled}
+        className={cn(action.openInNewTab && 'max-md:hidden')}
         onClick={handleClick}
       >
         {action.icon}
-      </Link>
-    );
-  }
-
-  return (
-    <button
-      type="button"
-      aria-label={action['aria-label']}
-      disabled={action.disabled}
-      className={classes}
-      onClick={handleClick}
-    >
-      {action.icon}
-    </button>
+      </Button>
+    </>
   );
 };
 
@@ -351,6 +337,9 @@ export interface ActionsMenuDropdownProps extends ActionsMenuProps {
   /** Forwarded to the dropdown content — e.g. `e.preventDefault()` to stop
    *  Radix returning focus (and its focus ring) to the trigger on close. */
   onCloseAutoFocus?: (event: Event) => void;
+  /** The menu's subject is still being read: the trigger (default or custom) is drawn for real and inert, and the menu
+   *  cannot open. A loading scope does the same. */
+  loading?: boolean;
 }
 
 export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
@@ -369,7 +358,10 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
   open: openProp,
   onOpenChange,
   onCloseAutoFocus,
+  loading: loadingProp = false,
 }) => {
+  // ONE switch: in a page's loading state (or while the host reads the menu's subject) the menu is its trigger's box.
+  const loading = useLoadingScope() || loadingProp;
   const [open = false, setOpen] = useControllableState({
     prop: openProp,
     defaultProp: false,
@@ -427,21 +419,30 @@ export const ActionsMenuDropdown: React.FC<ActionsMenuDropdownProps> = ({
     [onItemClick, setOpen],
   );
 
+  // The trigger is a static control: drawn for real in both forms, inert while the menu's subject loads.
+  const triggerNode = customTrigger ?? (
+    <Button
+      variant="outline"
+      size="icon"
+      aria-label={triggerAriaLabel}
+      className={
+        triggerClassName ||
+        'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover focus-visible:ring-0'
+      }
+      leftIcon={trigger ?? <Ellipsis01Icon size={24} className="text-ods-text-primary" />}
+    />
+  );
+
+  if (loading) {
+    // A custom trigger is the host's control (it switches itself in the scope, e.g. a field trigger). Either trigger is
+    // drawn as it is, inert: it cannot open while the subject is read.
+    return <InertWhileLoading>{triggerNode}</InertWhileLoading>;
+  }
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild ref={triggerRef}>
-        {customTrigger ?? (
-          <Button
-            variant="outline"
-            size="icon"
-            aria-label={triggerAriaLabel}
-            className={
-              triggerClassName ||
-              'flex items-center justify-center border-ods-border bg-ods-card hover:bg-ods-bg-hover focus-visible:ring-0'
-            }
-            leftIcon={trigger ?? <Ellipsis01Icon size={24} className="text-ods-text-primary" />}
-          />
-        )}
+        {triggerNode}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align={align}

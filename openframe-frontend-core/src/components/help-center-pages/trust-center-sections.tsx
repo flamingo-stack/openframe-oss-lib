@@ -58,8 +58,8 @@ import { ModalV2, ModalV2Content, ModalV2Header, ModalV2Title } from '../ui/moda
 import { ScrollShadow } from '../ui/scroll-fade';
 import { SearchInput } from '../ui/search-input';
 import { StackedRowsPanel, type PanelRow } from '../ui/stacked-rows-panel';
-import { StatusBadge, StatusBadgeSkeleton } from '../ui/status-badge';
-import { TabNavigation, TabNavigationSkeleton, type TabItem } from '../ui/tab-navigation';
+import { StatusBadge } from '../ui/status-badge';
+import { TabNavigation, type TabItem } from '../ui/tab-navigation';
 
 /** Monitoring `icon` vocabulary (owned by `TRUST_FRAMEWORK_MONITORING`) → icon component, ONE lookup. */
 const FRAMEWORK_ICONS: Record<TrustFrameworkMonitoringEntry['icon'], typeof ShieldCheckIcon> = {
@@ -662,22 +662,25 @@ const TRUST_PANEL_SHAPES: Record<
   compliance: { mark: 'logo', action: 'badge', lines: { phone: 4, wide: 1 } },
   documents: { mark: 'glyph', action: 'button', lines: { phone: 1, wide: 1 } },
   subprocessors: { mark: 'glyph', action: 'none', lines: { phone: 1, wide: 1 } },
-  ai: { mark: 'glyph', action: 'none', lines: { phone: 6, wide: 2 } },
+  ai: { mark: 'glyph', action: 'none', lines: { phone: 7, wide: 2 } },
 };
-
-function panelRowCount(rows: TrustPanelRows | undefined): number {
-  if (rows === undefined) return TRUST_PANEL_SKELETON_ROWS;
-  return typeof rows === 'number' ? rows : Math.max(rows.phone, rows.wide);
-}
 
 /**
  * A panel section while it is read: rows of the REAL `StackedRowsPanel` (its own row heights and borders, each row a
  * read list item) whose cells hold bars: the panel's mark, a value over its typical description, and the right-hand
  * badge or button in the page's `ACTION_COLUMN`.
  */
-function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?: TrustPanelRows }) {
+function TrustPanelSkeleton({
+  panel,
+  rows = TRUST_PANEL_SKELETON_ROWS,
+}: {
+  panel: TrustCenterPanelId;
+  rows?: TrustPanelRows;
+}) {
   const shape = TRUST_PANEL_SHAPES[panel];
-  const panelRows: PanelRow[] = Array.from({ length: panelRowCount(rows) }, (_, index) => ({
+  // The rows the host reads, or a typical panel; a count per width draws the larger, so neither width is short.
+  const length = typeof rows === 'number' ? rows : Math.max(rows.phone, rows.wide);
+  const panelRows: PanelRow[] = Array.from({ length }, (_, index) => ({
     id: `skeleton-${index}`,
     columns: [
       {
@@ -716,7 +719,7 @@ function TrustPanelSkeleton({ panel, rows }: { panel: TrustCenterPanelId; rows?:
               align: 'right' as const,
               content:
                 shape.action === 'badge' ? (
-                  <StatusBadgeSkeleton />
+                  <StatusBadge loading text="" />
                 ) : (
                   // The rows' action is a `size="small"` Button: its own size classes.
                   <InteractiveSkeleton.Button size="small" className="w-16" />
@@ -737,7 +740,7 @@ function ControlsSummarySkeleton() {
 function ControlsSectionSkeleton() {
   return (
     <div className={CONTROLS_SECTION_CLASS} style={controlsSectionStyle}>
-      <TabNavigationSkeleton count={CONTROLS_SKELETON_TABS} />
+      <TabNavigation loading tabs={[]} skeletonCount={CONTROLS_SKELETON_TABS} />
       <div className={CONTROLS_TOOLBAR_CLASS}>
         <p className={BODY_TEXT}>
           <ControlsSummarySkeleton />

@@ -10,7 +10,7 @@
  * default branch.
  */
 
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Globe, Lock, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
@@ -23,7 +23,8 @@ import { AvatarStack, type AvatarStackPerson } from '../../ui/avatar-stack';
 import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
-import { StatusBadge, StatusBadgeSkeleton, generationTierFromLabel } from '../../ui/status-badge';
+import { StatusBadge, generationTierFromLabel } from '../../ui/status-badge';
+import { Tag } from '../../ui/tag';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import type { RoadmapItem } from '../types/entities/roadmap-item';
 import { getStatusColorScheme } from '../utils/agent-status-message';
@@ -65,13 +66,28 @@ const ROADMAP_CARD_FOOTER = 'flex w-full items-center justify-between';
 const ROADMAP_CARD_VOTES = 'flex h-[48px] overflow-hidden rounded-[6px]';
 const ROADMAP_CARD_FOOTER_END = 'flex min-w-0 items-center gap-2';
 
+/** What a card says about its visibility when its reader states it (`RoadmapItem.isPublic`). */
+export const ROADMAP_VISIBILITY_LABEL = { public: 'Public', internal: 'Team only' } as const;
+
+/** Public or team only, when the item states it: a team-only plan is never read as announced. */
+function RoadmapVisibilityTag({ isPublic }: { isPublic: boolean }) {
+  return (
+    <Tag
+      data-loading-optional
+      variant="outline"
+      icon={isPublic ? <Globe className="h-4 w-4" aria-hidden /> : <Lock className="h-4 w-4" aria-hidden />}
+      label={isPublic ? ROADMAP_VISIBILITY_LABEL.public : ROADMAP_VISIBILITY_LABEL.internal}
+    />
+  );
+}
+
 /**
  * A roadmap card while it is read. `default`, in the card's own boxes: the 64px icon box, the title as two `text-h3`
  * lines, the quarter and id as a `text-h5` line, the status badge's box (beside the heading from md, its own row
  * below), the description as three `text-h4` lines and the vote buttons' 48px box (with `votes`); the assignees and
  * target version are drawn only when an item has them, so the skeleton leaves them out. `sm`: the compact card's rows.
  */
-export function RoadmapCardSkeleton({
+function RoadmapCardSkeleton({
   size = 'default',
   votes = true,
   className,
@@ -109,11 +125,11 @@ export function RoadmapCardSkeleton({
           </div>
         </div>
         <div className="hidden md:block">
-          <StatusBadgeSkeleton />
+          <StatusBadge loading text="" />
         </div>
       </div>
       <div className="md:hidden">
-        <StatusBadgeSkeleton />
+        <StatusBadge loading text="" />
       </div>
       <div className={ROADMAP_CARD_SUMMARY_ROW}>
         <TextLineSkeleton type="h4" lines={3} className="w-full" />
@@ -126,7 +142,7 @@ export function RoadmapCardSkeleton({
   );
 }
 
-export interface RoadmapCardProps {
+interface LoadedRoadmapCardProps {
   item: RoadmapItem;
   /** Detail URL for the compact branch (`sm`). Used by the parent
    *  wrapper to drive nav. Default-branch cards don't need href —
@@ -153,6 +169,13 @@ export interface RoadmapCardProps {
   isVoting?: boolean;
 }
 
+/**
+ * The record and its link, or `loading` while the host reads it: the card then draws its own loading form, as it
+ * does in a loading scope.
+ */
+export type RoadmapCardProps =
+  (LoadedRoadmapCardProps & { loading?: boolean }) | (Partial<LoadedRoadmapCardProps> & { loading: true });
+
 /** Wire assignees → AvatarStack people (name+avatar only on the wire). */
 function assigneePeople(
   assignees: Array<{ id: number; name: string | null; avatarUrl: string | null }> | undefined,
@@ -164,7 +187,15 @@ function assigneePeople(
   }));
 }
 
-export function RoadmapCard({
+/** ONE switch: in a loading scope (or `loading`) the card is its own loading form. */
+export function RoadmapCard(props: RoadmapCardProps) {
+  if (useLoadingScope() || props.loading) {
+    return <RoadmapCardSkeleton size={props.size} votes={!!props.onVote} className={props.className} />;
+  }
+  return <LoadedRoadmapCard {...props} />;
+}
+
+function LoadedRoadmapCard({
   item,
   href,
 
@@ -178,13 +209,11 @@ export function RoadmapCard({
   userVote,
   onVote,
   isVoting = false,
-}: RoadmapCardProps) {
+}: LoadedRoadmapCardProps) {
   const [showScreenshots, setShowScreenshots] = useState(false);
-  const loading = useLoadingScope();
 
   const logoUrl = item.icon && item.icon.startsWith('http') ? item.icon : null;
   const iconSrc = useProxiedImageUrl(logoUrl) || null;
-  if (loading) return <RoadmapCardSkeleton size={size} votes={!!onVote} className={className} />;
 
   if (size === 'sm') {
     const compactHref = safeHref(href ?? null);
@@ -372,6 +401,7 @@ export function RoadmapCard({
         )}
 
         <div className={ROADMAP_CARD_FOOTER_END}>
+          {typeof item.isPublic === 'boolean' ? <RoadmapVisibilityTag isPublic={item.isPublic} /> : null}
           {item.assignees && item.assignees.length > 0 ? (
             <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
           ) : null}
@@ -396,7 +426,11 @@ export function RoadmapCard({
             ) : null;
           })()}
           {item.targetVersion && (
-            <StatusBadge gen={generationTierFromLabel(item.targetVersion)} text={item.targetVersion} />
+            <StatusBadge
+              data-loading-optional
+              gen={generationTierFromLabel(item.targetVersion)}
+              text={item.targetVersion}
+            />
           )}
         </div>
       </div>

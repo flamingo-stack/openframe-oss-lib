@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { FullscreenSwitchController } from '../../utils/fullscreen-switch';
 import { Button } from '../ui/button/button';
+import { useLoadingScope } from '../ui/loading-scope';
 import { EmbedIframe, EmbedLoadingSkeleton } from './embed-iframe';
 
 /**
@@ -73,7 +74,7 @@ export function EmbedViewerFrame({
   titleVariant = 'h3',
   actions,
   src,
-  isLoading,
+  isLoading: isLoadingGiven,
   emptyIcon,
   emptyMessage = 'Content not available',
   height,
@@ -84,6 +85,8 @@ export function EmbedViewerFrame({
   className,
   fullscreenControl,
 }: EmbedViewerFrameProps) {
+  // ONE switch: a page's loading scope, or the viewer still resolving where its frame points.
+  const isLoading = useLoadingScope() || !!isLoadingGiven;
   const frameRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 

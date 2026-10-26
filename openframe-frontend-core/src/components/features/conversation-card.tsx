@@ -1,18 +1,17 @@
 'use client';
 
-import { type CSSProperties, type ReactNode, useId } from 'react';
+import { type ComponentProps, type CSSProperties, type ReactNode, useId } from 'react';
 import { cn } from '../../utils/cn';
 import { isOwnClick } from '../../utils/own-click';
 import { useAgentTint } from '../agent-identity';
-import { ChatTurn, ChatTurnNameSkeleton, TURN_BODY_CLASS, TURN_ROW_CLASS } from '../chat/chat-turn';
+import { ChatTurn } from '../chat/chat-turn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { CheckIcon } from '../icons-v2-generated/signs-and-symbols/check-icon';
 import { PlusIcon } from '../icons-v2-generated/signs-and-symbols/plus-icon';
 import { LoadingRegion } from '../loading/loading-region';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
-import { BUTTON_ICON_SM_SIZE, Button } from '../ui/button/button';
-import { useLoadingScope } from '../ui/loading-scope';
-import { SquareAvatarSkeleton } from '../ui/square-avatar';
+import { Button } from '../ui/button/button';
+import { InertWhileLoading, useLoadingScope } from '../ui/loading-scope';
 import { Tag } from '../ui/tag';
 
 /**
@@ -49,6 +48,20 @@ const OUTCOME_TEXT_CLASS = cn('m-0 min-w-0 flex-1', OUTCOME_LINES_CLASS);
 /** The outcome's check, centred on its first line (one line high, by style: it is a mark, not a line of text). */
 const OUTCOME_CHECK_CLASS = 'flex shrink-0 items-center';
 const OUTCOME_CHECK_STYLE = { height: '1lh' } as const;
+/** The request's quote: two lines at least, cut at two. Read by the card and its skeleton. */
+const REQUEST_TEXT_CLASS = 'm-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3';
+/**
+ * A pickable card's first row: the asker's turn, then the selection toggle in its own column at the row's end. The
+ * toggle is part of the layout, never drawn over it (the selectable-card practice of Carbon, Salt and PatternFly: the
+ * mark always visible, in a place of its own), so the asker's name and time make room for it instead of running under it.
+ */
+const REQUESTER_ROW_CLASS = 'flex items-start gap-[var(--spacing-system-xsf)]';
+const REQUESTER_TURN_CLASS = 'min-w-0 flex-1';
+const SELECTION_TOGGLE_CLASS = 'shrink-0';
+/** The context's label ("Today"): copy the page states, drawn for real in both forms. */
+const CONTEXT_LABEL_CLASS = 'text-ods-text-secondary text-h6';
+/** The speakers' avatar corner as the skeleton draws it. */
+const SKELETON_AVATAR_SHAPE = 'square';
 
 /** The card's frame, its parts' blocks and its footer row: ONE string each, read by the card and its skeleton. */
 const CARD_FRAME_CLASS =
@@ -107,6 +120,8 @@ export interface ConversationCardProps {
   /** The lines the context and the outcome keep at least (default four on a phone, three wide). */
   lines?: ConversationCardLines;
   className?: string;
+  /** Draw the card's loading form outside a loading scope too (`useLoadingScope() || loading`). */
+  loading?: boolean;
 }
 
 /**
@@ -128,17 +143,23 @@ export function ConversationCard({
   context,
   lines,
   className,
+  loading: loadingProp,
 }: ConversationCardProps) {
   const tint = useAgentTint(agent);
   const requestId = useId();
+  const loading = useLoadingScope() || loadingProp;
   // While the page is read the conversation is not known: the card is its skeleton, with the parts it will have.
-  if (useLoadingScope()) {
+  if (loading) {
     return (
       <ConversationCardSkeleton
         avatarPx={CONVERSATION_CARD_AVATAR_PX}
-        context={!!context}
+        // The context's label is the page's copy: drawn for real.
+        context={context ? context.label || true : false}
         requesterMeta={!!requester.meta}
         responderMeta={!!responder.meta}
+        requesterTime={!!requester.time}
+        responderTime={!!responder.time}
+        selection={selection ? { pressed: selection.pressed } : undefined}
         // The loaded card draws a footer only with a label AND a value; a value left undefined says there is none.
         footer={!!footerLabel && footerValue !== undefined}
         footerLabel={footerLabel}
@@ -167,40 +188,38 @@ export function ConversationCard({
         })
       }
     >
-      {selection && (
-        // The toggle is a regular boxed Button in the card's corner, named by the
-        // request; a click anywhere on the card toggles it too (a pointer
-        // convenience: the Button is the control keyboards and screen readers use).
-        <Button
-          type="button"
-          variant={selection.pressed ? 'accent' : 'outline'}
-          size="icon-sm"
-          aria-pressed={selection.pressed}
-          aria-labelledby={requestId}
-          onClick={event => {
-            event.stopPropagation();
-            selection.onToggle();
-          }}
-          className="absolute right-[var(--spacing-system-mf)] top-[var(--spacing-system-mf)] z-10"
-        >
-          {selection.pressed ? <CheckIcon /> : <PlusIcon />}
-        </Button>
-      )}
       {/* Every part keeps at least its number of lines, so cards in a row or a carousel line up part by part. */}
-      <ChatTurn avatar={requester.avatar} name={requester.name} meta={requester.meta} time={requester.time}>
-        <p
-          id={requestId}
-          className="m-0 line-clamp-2 min-h-[2lh] text-ods-text-primary text-h3"
-          // Clears the corner mark: its width plus a gap.
-          style={selection ? { paddingRight: `calc(${BUTTON_ICON_SM_SIZE} + var(--spacing-system-xsf))` } : undefined}
-          title={request}
+      <RequesterRow
+        selection={
+          // A regular boxed Button, named by the request; a click anywhere on the card toggles it too (a pointer
+          // convenience: the Button is the control keyboards and screen readers use).
+          selection && (
+            <SelectionToggle
+              pressed={selection.pressed}
+              aria-labelledby={requestId}
+              onClick={event => {
+                event.stopPropagation();
+                selection.onToggle();
+              }}
+            />
+          )
+        }
+      >
+        <ChatTurn
+          avatar={requester.avatar}
+          name={requester.name}
+          meta={requester.meta}
+          time={requester.time}
+          className={selection ? REQUESTER_TURN_CLASS : undefined}
         >
-          &ldquo;{request}&rdquo;
-        </p>
-      </ChatTurn>
+          <p id={requestId} className={REQUEST_TEXT_CLASS} title={request}>
+            &ldquo;{request}&rdquo;
+          </p>
+        </ChatTurn>
+      </RequesterRow>
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
-          <span className="text-ods-text-secondary text-h6">{context.label}</span>
+          <span className={CONTEXT_LABEL_CLASS}>{context.label}</span>
           <p className={CONTEXT_TEXT_CLASS} style={partLinesStyle(lines?.context)}>
             {context.text}
           </p>
@@ -234,30 +253,21 @@ export function ConversationCard({
   );
 }
 
-/** A speaker's turn while loading: the avatar box, the turn's name row (its meta and time), then the turn's own lines. */
-function TurnSkeleton({ avatarPx, meta, children }: { avatarPx: number; meta: boolean | string; children: ReactNode }) {
-  return (
-    <div className={TURN_ROW_CLASS}>
-      <SquareAvatarSkeleton sizePx={avatarPx} />
-      <div className={TURN_BODY_CLASS}>
-        <ChatTurnNameSkeleton meta={meta} time />
-        {children}
-      </div>
-    </div>
-  );
-}
-
 /**
- * The card while it loads: the SAME frame, then each part at the number of
- * lines the loaded card keeps for it (the request's two, the context's
- * `lines`, four on a phone and three wide by default), so a loaded card takes the skeleton's place without
- * moving the page. Pass the parts the loaded card will have.
+ * The card while it loads: the SAME frame, each turn drawn by `ChatTurn`'s own loading form (its picture, name row
+ * and the part under it at the line count the loaded card keeps: the request's two, the context's `lines`, four on a
+ * phone and three wide by default), so a loaded card takes the skeleton's place without moving the page. The page's
+ * own copy (the context's label, the footer's question) and the selection toggle are drawn for real, the toggle inert.
+ * Pass the parts the loaded card will have.
  */
-export function ConversationCardSkeleton({
+function ConversationCardSkeleton({
   avatarPx = CONVERSATION_CARD_AVATAR_PX,
   context = false,
   requesterMeta = false,
   responderMeta = false,
+  requesterTime = true,
+  responderTime = true,
+  selection,
   footer = false,
   footerLabel,
   lines,
@@ -273,12 +283,18 @@ export function ConversationCardSkeleton({
   avatarPx?: number;
   /** The footer's question when the page states it ("Your part"): drawn for real. */
   footerLabel?: string;
-  /** The loaded card has a context part ("Today"). */
-  context?: boolean;
+  /** The loaded card has a context part ("Today"); a string is its label, drawn for real. */
+  context?: boolean | string;
   /** The asker's name carries a meta line (their role); a string is static copy, drawn for real. */
   requesterMeta?: boolean | string;
   /** The answerer's name carries a meta line ("What changes"); a string is static copy, drawn for real. */
   responderMeta?: boolean | string;
+  /** The asker's name row carries a time at its far end. */
+  requesterTime?: boolean;
+  /** The answerer's name row carries a time at its far end. */
+  responderTime?: boolean;
+  /** The loaded card is pickable: its toggle is drawn for real (at its state), inert while it loads. */
+  selection?: { pressed: boolean };
   /** The loaded card has a footer. */
   footer?: boolean;
   /** The lines the loaded card keeps for its context and outcome (`ConversationCardProps.lines`). */
@@ -289,32 +305,64 @@ export function ConversationCardSkeleton({
   const outcomeLines = partLines(lines?.outcome);
   return (
     <LoadingRegion label={label} announce={announce} className={cn(CARD_FRAME_CLASS, className)}>
-      <TurnSkeleton avatarPx={avatarPx} meta={requesterMeta}>
-        <TextLineSkeleton lines={2} type="h3" />
-      </TurnSkeleton>
+      <RequesterRow
+        selection={
+          selection && (
+            <InertWhileLoading className="contents">
+              <SelectionToggle pressed={selection.pressed} />
+            </InertWhileLoading>
+          )
+        }
+      >
+        <ChatTurn
+          loading
+          name=""
+          className={selection ? REQUESTER_TURN_CLASS : undefined}
+          skeleton={{
+            avatarPx,
+            avatarShape: SKELETON_AVATAR_SHAPE,
+            meta: requesterMeta,
+            time: requesterTime,
+            body: <TextLineSkeleton lines={2} type="h3" />,
+          }}
+        />
+      </RequesterRow>
       {context && (
         <div className={CONTEXT_BLOCK_CLASS}>
-          <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
+          {typeof context === 'string' ? (
+            <span className={CONTEXT_LABEL_CLASS}>{context}</span>
+          ) : (
+            <TextLineSkeleton lines={1} type="h6" className="w-1/4" />
+          )}
           <p className={CONTEXT_TEXT_CLASS} style={partLinesStyle(contextLines)}>
             <TextLineSkeleton as="span" lines={contextLines.phone} type="h4" className="content-md:hidden" />
             <TextLineSkeleton as="span" lines={contextLines.wide} type="h4" className="hidden content-md:flex" />
           </p>
         </div>
       )}
-      <div className={ANSWER_BLOCK_CLASS}>
-        <TurnSkeleton avatarPx={avatarPx} meta={responderMeta}>
-          {/* The outcome's row: its text at a typical line count, beside the check's place (the row's width). */}
-          <div className={OUTCOME_ROW_CLASS}>
-            <p className={OUTCOME_TEXT_CLASS} style={partLinesStyle(outcomeLines)}>
-              <TextLineSkeleton as="span" lines={outcomeLines.phone} type="h4" className="content-md:hidden" />
-              <TextLineSkeleton as="span" lines={outcomeLines.wide} type="h4" className="hidden content-md:flex" />
-            </p>
-            <span className={cn(OUTCOME_CHECK_CLASS, 'invisible')} style={OUTCOME_CHECK_STYLE}>
-              <CheckCircleIcon size={16} aria-hidden />
-            </span>
-          </div>
-        </TurnSkeleton>
-      </div>
+      <ChatTurn
+        loading
+        name=""
+        className={ANSWER_BLOCK_CLASS}
+        skeleton={{
+          avatarPx,
+          avatarShape: SKELETON_AVATAR_SHAPE,
+          meta: responderMeta,
+          time: responderTime,
+          // The outcome's row: its text at a typical line count, beside the check's place (the row's width).
+          body: (
+            <div className={OUTCOME_ROW_CLASS}>
+              <p className={OUTCOME_TEXT_CLASS} style={partLinesStyle(outcomeLines)}>
+                <TextLineSkeleton as="span" lines={outcomeLines.phone} type="h4" className="content-md:hidden" />
+                <TextLineSkeleton as="span" lines={outcomeLines.wide} type="h4" className="hidden content-md:flex" />
+              </p>
+              <span className={cn(OUTCOME_CHECK_CLASS, 'invisible')} style={OUTCOME_CHECK_STYLE}>
+                <CheckCircleIcon size={16} aria-hidden />
+              </span>
+            </div>
+          ),
+        }}
+      />
       {footer && (
         <div className={cn(FOOTER_ROW_CLASS, 'text-ods-text-secondary text-h6')}>
           {footerLabel ? <span>{footerLabel}</span> : <TextLineSkeleton lines={1} type="h6" className="w-1/4" />}
@@ -322,5 +370,35 @@ export function ConversationCardSkeleton({
         </div>
       )}
     </LoadingRegion>
+  );
+}
+
+/** The asker's turn, and the selection toggle at the row's end when the card is pickable (`REQUESTER_ROW_CLASS`). */
+function RequesterRow({ selection, children }: { selection?: ReactNode; children: ReactNode }) {
+  if (!selection) return <>{children}</>;
+  return (
+    <div className={REQUESTER_ROW_CLASS}>
+      {children}
+      {selection}
+    </div>
+  );
+}
+
+/** The selection toggle: ONE element for the card and its skeleton, a "+" until picked and a check once picked. */
+function SelectionToggle({
+  pressed,
+  ...props
+}: { pressed: boolean } & Pick<ComponentProps<typeof Button>, 'onClick' | 'aria-labelledby'>) {
+  return (
+    <Button
+      type="button"
+      variant={pressed ? 'accent' : 'outline'}
+      size="icon-sm"
+      aria-pressed={pressed}
+      className={SELECTION_TOGGLE_CLASS}
+      {...props}
+    >
+      {pressed ? <CheckIcon /> : <PlusIcon />}
+    </Button>
   );
 }

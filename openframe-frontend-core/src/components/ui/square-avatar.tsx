@@ -7,7 +7,7 @@ import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
-import { useLoadingScope } from './loading-scope';
+import { loadingItemProps, useLoadingScope } from './loading-scope';
 
 interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
@@ -29,6 +29,9 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
    *  defaults (`text-xs font-medium text-ods-text-primary`) via tailwind-merge,
    *  so callers can shrink/recolor the initials for compact avatars. */
   initialsClassName?: string;
+  /** The person is still being read: the avatar draws its skeleton (its own size and corner) and fetches no image.
+   *  A loading scope does the same. */
+  loading?: boolean;
 }
 
 /** The avatar's corner at each variant, read by the avatar and by its skeleton. */
@@ -50,16 +53,27 @@ const SquareAvatar = memo(
         fallback,
         variant = 'square',
         initialsClassName,
+        loading,
         style,
         ...props
       },
       ref,
     ) => {
-      // In a loading scope the avatar is its skeleton, and its image is not fetched.
-      const held = useLoadingScope();
+      // ONE switch: while the host reads the person, or in a loading scope, the avatar is its skeleton, and its image
+      // is not fetched.
+      const inScope = useLoadingScope();
+      const held = inScope || !!loading;
       const authedSrc = useAuthedImageSrc(held ? undefined : src);
       if (held) {
-        return <SquareAvatarSkeleton size={size} sizePx={sizePx} variant={variant} className={className} />;
+        return (
+          <SquareAvatarSkeleton
+            size={size}
+            sizePx={sizePx}
+            variant={variant}
+            className={className}
+            {...loadingItemProps(props)}
+          />
+        );
       }
       const resolvedSrc = authedSrc;
       const sizeClasses = AVATAR_SIZE;
@@ -135,14 +149,19 @@ SquareAvatar.displayName = 'SquareAvatar';
 export { SquareAvatar };
 
 /** A SquareAvatar while its person is read: a box of the avatar's own size and corner. */
-export function SquareAvatarSkeleton({
+function SquareAvatarSkeleton({
   size = 'md',
   sizePx,
   variant = 'square',
   className,
-}: Pick<SquareAvatarProps, 'size' | 'sizePx' | 'variant' | 'className'>) {
+  ...props
+}: Pick<SquareAvatarProps, 'size' | 'sizePx' | 'variant' | 'className'> & {
+  /** The avatar's markers (`data-loading-item`), forwarded like the loaded avatar's. */
+  [marker: `data-${string}`]: unknown;
+}) {
   return (
     <UnifiedSkeleton
+      {...loadingItemProps(props)}
       className={cn(
         'shrink-0',
         sizePx === undefined && AVATAR_SIZE[size],

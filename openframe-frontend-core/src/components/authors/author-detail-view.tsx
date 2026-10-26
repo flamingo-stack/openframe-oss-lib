@@ -32,7 +32,7 @@ import { formatBioText } from '../../utils/format';
 import { useProxiedImageUrl } from '../chat/hooks/use-proxied-image-url';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { SocialIconRow, socialIconRowClass } from '../social-icon-row';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { StatusBadge } from '../ui/status-badge';
 
@@ -111,16 +111,16 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
           )}
           {loading ? (
             <div className={socialIconRowClass(true)}>
-              {Array.from({ length: AUTHOR_SKELETON_SOCIALS }, (_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton icons never reorder
-                <InteractiveSkeleton.Button key={i} size="icon-sm" />
-              ))}
+              <LoadingItems count={AUTHOR_SKELETON_SOCIALS}>
+                {() => <InteractiveSkeleton.Button data-loading-item size="icon-sm" />}
+              </LoadingItems>
             </div>
           ) : (
             author.socialLinks.length > 0 && (
               // Ghost compact row (transparent 32px) — metadata, not CTAs.
               <SocialIconRow
                 compact
+                listItems
                 links={author.socialLinks.map(link => ({
                   platform: link.platform,
                   href: link.url,

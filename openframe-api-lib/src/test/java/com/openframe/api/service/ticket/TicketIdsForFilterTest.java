@@ -9,9 +9,9 @@ import com.openframe.data.repository.notification.NotificationReadStateRepositor
 import com.openframe.data.service.TenantIdProvider;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,7 +34,13 @@ class TicketIdsForFilterTest {
     @Mock private ObjectProvider<TicketUnreadMessagesProvider> unreadMessagesProvider;
     @Mock private TicketUnreadMessagesProvider provider;
 
-    @InjectMocks private TicketIdsForFilter ticketIdsForFilter;
+    private TicketIdsForFilter ticketIdsForFilter;
+
+    @BeforeEach
+    void setUp() {
+        ticketIdsForFilter = new TicketIdsForFilter(ticketTagService, readStateRepository, tenantIdProvider,
+                unreadMessagesProvider);
+    }
 
     @Test
     void resolve_noFilter_noRestriction() {
