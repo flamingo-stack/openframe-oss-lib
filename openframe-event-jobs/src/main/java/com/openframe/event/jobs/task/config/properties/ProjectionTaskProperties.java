@@ -9,7 +9,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
-// enabled is read by ProjectionTaskConfiguration's condition and poll-interval by @Scheduled (default 10s), not here.
+// poll-interval is read by @Scheduled on ProjectionTaskJob.runAll, not here (default 10s).
 @Data
 @Validated
 @ConfigurationProperties(prefix = "openframe.events.jobs.projection-tasks")

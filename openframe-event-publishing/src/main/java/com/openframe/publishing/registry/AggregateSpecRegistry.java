@@ -120,7 +120,7 @@ public class AggregateSpecRegistry {
         Map<String, List<Projection<?, ?>>> byTypeName = new HashMap<>();
         for (AggregateSpec<?, ?> spec : byType.values()) {
             String type = spec.getType();
-            Class<?> eventClass = PublishedDocuments.eventClassOf(spec);
+            Class<?> eventClass = PublishedDocuments.resolveEventClass(spec);
             String typeWithSameEvent = typeByEvent.putIfAbsent(eventClass, type);
             if (typeWithSameEvent != null) {
                 String eventName = eventClass.getName();
