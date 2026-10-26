@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class DefaultPackageUpdateStatusProcessorTest {
+class PackageUpdateStatusProcessorTest {
 
     @Mock private MachineRepository machineRepository;
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
@@ -41,7 +41,7 @@ class DefaultPackageUpdateStatusProcessorTest {
     @Mock private ObjectProvider<PackageUpdateNotifier> notifierProvider;
     @Mock private PackageUpdateNotifier notifier;
 
-    @InjectMocks private DefaultPackageUpdateStatusProcessor processor;
+    @InjectMocks private PackageUpdateStatusProcessor processor;
 
     private static final Instant T = Instant.parse("2026-10-20T14:00:00Z");
 

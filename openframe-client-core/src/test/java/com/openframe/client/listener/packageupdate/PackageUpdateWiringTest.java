@@ -29,7 +29,7 @@ class PackageUpdateWiringTest {
             .withBean(PackageUpdateDeviceStateRepository.class, () -> mock(PackageUpdateDeviceStateRepository.class))
             .withBean(PackageUpdateRequestRepository.class, () -> mock(PackageUpdateRequestRepository.class))
             .withBean(ScriptExecutionRepository.class, () -> mock(ScriptExecutionRepository.class))
-            .withUserConfiguration(PackageUpdateStatusListener.class, DefaultPackageUpdateStatusProcessor.class,
+            .withUserConfiguration(PackageUpdateStatusListener.class, PackageUpdateStatusProcessor.class,
                     PackageUpdateExecutionRecorder.class, PackageUpdateClockService.class,
                     PackageUpdateClockScheduler.class);
 
@@ -38,7 +38,7 @@ class PackageUpdateWiringTest {
         runner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).doesNotHaveBean(PackageUpdateStatusListener.class);
-            assertThat(context).doesNotHaveBean(DefaultPackageUpdateStatusProcessor.class);
+            assertThat(context).doesNotHaveBean(PackageUpdateStatusProcessor.class);
             assertThat(context).doesNotHaveBean(PackageUpdateExecutionRecorder.class);
             assertThat(context).doesNotHaveBean(PackageUpdateClockService.class);
             assertThat(context).doesNotHaveBean(PackageUpdateClockScheduler.class);
@@ -61,7 +61,7 @@ class PackageUpdateWiringTest {
                         "openframe.rmm.software.package-update.retry.backoff-seconds=21600")
                 .run(context -> {
                     assertThat(context).hasSingleBean(PackageUpdateStatusListener.class);
-                    assertThat(context).hasSingleBean(DefaultPackageUpdateStatusProcessor.class);
+                    assertThat(context).hasSingleBean(PackageUpdateStatusProcessor.class);
                     assertThat(context).hasSingleBean(PackageUpdateExecutionRecorder.class);
                     assertThat(context).hasSingleBean(PackageUpdateClockService.class);
                     assertThat(context).hasSingleBean(PackageUpdateClockScheduler.class);
