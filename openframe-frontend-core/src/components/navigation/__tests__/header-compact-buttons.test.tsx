@@ -51,9 +51,9 @@ const hasDot = (button: HTMLElement) => /class="[^"]*\bbg-ods-warning\b/.test(bu
 
 /** The rail's row cell (44px, the rail's width), 32px from 140px of sidebar; never the bar's full-height cell. */
 function expectCompactBox(button: HTMLElement) {
-  expect(button).toHaveClass('h-11', 'w-full', '@[140px]/of-nav-sidebar:size-8', 'rounded-md');
+  expect(button).toHaveClass('h-11', 'min-h-0', 'w-full', '@[140px]/of-nav-sidebar:size-8', 'rounded-md');
   expect(button.className).not.toMatch(/--top-nav-cell/);
-  expect(button.className).not.toMatch(/\bh-full\b/);
+  expect(button.className).not.toMatch(/(^|\s)(min-)?h-full\b/);
 }
 
 describe('HeaderButton size="compact"', () => {
@@ -70,7 +70,11 @@ describe('HeaderButton size="compact"', () => {
 
   it('keeps the bar cell by default', () => {
     render(<HeaderButton aria-label="Cell" icon={<svg />} />);
-    expect(screen.getByRole('button', { name: 'Cell' })).toHaveClass('h-full', 'w-[var(--top-nav-cell,3.5rem)]');
+    expect(screen.getByRole('button', { name: 'Cell' })).toHaveClass(
+      'min-h-full',
+      'self-stretch',
+      'w-[var(--top-nav-cell,3.5rem)]',
+    );
   });
 });
 

@@ -42,7 +42,7 @@ export function MingoInfoCardActionProvider({
 }
 
 /** The trailing cell's footprint (a `cell` Button), shared by the "⋯" trigger and a host's action. */
-const TRAILING_CELL_LAYOUT = 'w-[56px] self-stretch md:w-[68px]';
+const TRAILING_CELL_LAYOUT = 'w-[56px] md:w-[68px]';
 
 /** A coloured status pill rendered to the right of the title/description. */
 export interface MingoInfoCardStatus {

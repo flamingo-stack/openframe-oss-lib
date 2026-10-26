@@ -1,6 +1,6 @@
 package com.openframe.authz.security.flow;
 
-import com.openframe.authz.dto.RegistrationAttribution;
+import com.openframe.authz.dto.Touchpoint;
 import com.openframe.authz.dto.TenantRegistrationRequest;
 import com.openframe.authz.security.SsoCookieCodec;
 import com.openframe.authz.security.SsoTenantRegCookiePayload;
@@ -75,7 +75,7 @@ class TenantRegSsoHandlerTest {
 
     private static SsoTenantRegCookiePayload payload(String formEmail, String name, String domain) {
         return new SsoTenantRegCookiePayload("reg-state", formEmail, name, domain, "google",
-                "/welcome", false, RegistrationAttribution.builder().utmSource("ads").build(), 1L, inTenMinutes());
+                "/welcome", false, Touchpoint.builder().utmSource("ads").build(), 1L, inTenMinutes());
     }
 
     @Test

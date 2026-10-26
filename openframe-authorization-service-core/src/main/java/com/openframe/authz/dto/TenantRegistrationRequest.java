@@ -50,7 +50,7 @@ public class TenantRegistrationRequest extends CoreUserRequest {
     @Positive(message = "prNumber must be a positive number")
     private Integer prNumber;
 
-    private RegistrationAttribution attribution;
+    private Touchpoint attribution;
 
     /**
      * Set by the SSO signup flow when the identity provider has already verified the email

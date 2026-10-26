@@ -7,6 +7,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.repository.delivery.RerunPublication;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.track.DeliveryCloser;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
@@ -27,6 +28,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import static java.util.stream.Collectors.toSet;
 
@@ -127,6 +129,10 @@ public class DeliverySweepService {
     }
 
     private void republish(MachineDelivery delivery, Policy policy, Instant now) {
+        if (isRerunStart(delivery)) {
+            publishRerun(delivery, policy, now);
+            return;
+        }
         DeliveryType type = delivery.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
@@ -153,6 +159,50 @@ public class DeliverySweepService {
         metrics.recordRetried(type);
         log.info("Delivery re-published: type={} targetId={} machineId={} attempt={} dueAt={}",
                 type, delivery.getTargetId(), machineId, attempt, dueAt);
+    }
+
+    // a re-run goes out under a new dispatchId, stored before the publish so the agent's first answer finds its row
+    private void publishRerun(MachineDelivery delivery, Policy policy, Instant now) {
+        DeliveryType type = delivery.getType();
+        DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
+        Class<DeliveryPayload> payloadClass = spec.getPayloadClass();
+        String storedJson = delivery.getPayloadJson();
+        DeliveryPayload payload = payloadJson.read(storedJson, payloadClass);
+        String dispatchId = UUID.randomUUID().toString();
+        payload.getDelivery().setDispatchId(dispatchId);
+        String json = payloadJson.write(payload);
+        long delaySeconds = retryBackoff.delaySeconds(1, policy);
+        Instant dueAt = now.plusSeconds(delaySeconds);
+        String id = delivery.getId();
+        RerunPublication publication = RerunPublication.builder()
+                .id(id)
+                .from(DeliveryStatus.UNACKED)
+                .dispatchedAt(delivery.getDispatchedAt())
+                .dispatchId(dispatchId)
+                .payloadJson(json)
+                .publishedAt(now)
+                .dueAt(dueAt)
+                .build();
+        boolean stored = repository.markRerunPublished(publication);
+        if (!stored) {
+            log.debug("Delivery moved on before its re-run could be published: id={}", id);
+            return;
+        }
+        String machineId = delivery.getMachineId();
+        boolean published = publish(spec, machineId, payload);
+        if (!published) {
+            // the stored dispatch keeps its dueAt: the next pass re-publishes it as its second attempt
+            metrics.recordPublishFailed(type);
+            return;
+        }
+        metrics.recordRerunPublished(type);
+        int run = delivery.getReruns() + 1;
+        log.info("Delivery re-run published: type={} targetId={} machineId={} run={} dispatchId={} dueAt={}",
+                type, delivery.getTargetId(), machineId, run, dispatchId, dueAt);
+    }
+
+    private static boolean isRerunStart(MachineDelivery delivery) {
+        return delivery.getReruns() > 0 && delivery.getAttempts() == 0;
     }
 
     private boolean publish(DeliverySpec<DeliverySeed, DeliveryPayload> spec, String machineId, DeliveryPayload payload) {

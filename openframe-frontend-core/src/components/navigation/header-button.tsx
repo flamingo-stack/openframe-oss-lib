@@ -44,7 +44,8 @@ export function HeaderButton({
         compact
           ? cn(
               // A row's cell of the sidebar rail, a 32px rounded icon button from 140px; its 20px glyph kept.
-              'h-11 w-full rounded-md px-0 @[140px]/of-nav-sidebar:size-8 [&_svg]:h-5 [&_svg]:w-5',
+              // `min-h-0` drops the bar cell's full-height floor, so the rail's height never stretches it.
+              'h-11 min-h-0 w-full rounded-md px-0 @[140px]/of-nav-sidebar:size-8 [&_svg]:h-5 [&_svg]:w-5',
               'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent',
             )
           : // Square cell width follows the TopNavigation size (56px small /

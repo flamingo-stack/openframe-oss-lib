@@ -30,12 +30,12 @@ public class SoftwareInstallUpdatedDataFetcher {
 
     @DgsMutation
     public List<SoftwareDispatchResult> installSoftware(@InputArgument @Valid SoftwareManagementInput input) {
-        return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.MANUAL);
+        return softwareInstallUpdateManagementService.install(input, getCurrentUserId(), ExecutionSource.PACKAGE_INSTALLATION);
     }
 
     @DgsMutation
     public List<SoftwareDispatchResult> updateSoftware(@InputArgument @Valid SoftwareManagementInput input) {
-        return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.MANUAL);
+        return softwareInstallUpdateManagementService.update(input, getCurrentUserId(), ExecutionSource.PACKAGE_UPDATE);
     }
 
     private String getCurrentUserId() {
