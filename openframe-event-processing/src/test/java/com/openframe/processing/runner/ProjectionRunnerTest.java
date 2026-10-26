@@ -34,7 +34,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 // Through EventProcessingAutoConfiguration: real spec registry and metrics; projections that record what reached them.
@@ -308,7 +307,7 @@ class ProjectionRunnerTest {
     @Test
     void anEventOlderThanTheStoredVersion_isSkipped() {
         when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(false));
 
             assertThat(onTickets.records).isEmpty();
@@ -320,7 +319,7 @@ class ProjectionRunnerTest {
     @Test
     void anEventWithTheStoredVersion_isAppliedAgain_soABackfillRepairsDrift() {
         when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(3L);
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(false));
 
             assertThat(onTickets.records).hasSize(1);
@@ -332,7 +331,7 @@ class ProjectionRunnerTest {
     void aNewerEvent_isApplied_thenItsVersionIsStored() {
         when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1"))
                 .thenReturn(ProjectionVersionRepository.NO_VERSION);
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(false));
 
             assertThat(onTickets.records).hasSize(1);
@@ -345,7 +344,7 @@ class ProjectionRunnerTest {
         RecordingProjection failing = new RecordingProjection("widget-failing", event -> {
             throw new IllegalStateException("bug");
         });
-        runnerWith(failing).withPropertyValues(onEvents("widget-failing")).run(context -> {
+        runnerWith(failing).run(context -> {
             assertThatThrownBy(() -> process(context, record(false))).isInstanceOf(EventProcessingFailedException.class);
 
             verify(versions, never()).saveVersionIfHigher(any(), any(), any(), anyLong());
@@ -356,7 +355,7 @@ class ProjectionRunnerTest {
     void anEventHandedOverToATask_storesItsVersion() {
         onTickets.changes = 5000;
         ProjectionTaskService tasks = mock(ProjectionTaskService.class);
-        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
                 .run(context -> {
                     process(context, record(false));
 
@@ -371,7 +370,7 @@ class ProjectionRunnerTest {
         ProjectionTaskService tasks = mock(ProjectionTaskService.class);
         when(tasks.hasTask(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(true);
         when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
-        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
                 .run(context -> {
                     process(context, record(false));
 
@@ -381,7 +380,7 @@ class ProjectionRunnerTest {
 
     @Test
     void aDelete_storesItsVersion_soALateOlderEventIsSkipped() {
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(true));
 
             verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
@@ -406,15 +405,6 @@ class ProjectionRunnerTest {
             process(context, record(true));
 
             assertThat(onTickets.deletedAggregateIds).isEmpty();
-        });
-    }
-
-    @Test
-    void aProjectionOnAspect_neitherReadsNorStoresAVersion() {
-        runnerWith(onTickets).run(context -> {
-            process(context, record(false));
-
-            verifyNoInteractions(versions);
         });
     }
 

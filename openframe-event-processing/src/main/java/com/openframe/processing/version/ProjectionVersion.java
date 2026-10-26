@@ -14,7 +14,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldNameConstants
-@Document(collection = "projection_versions")
+@Document(collection = "event_projection_versions")
 public class ProjectionVersion {
 
     private static final String ID_SEPARATOR = ":";
