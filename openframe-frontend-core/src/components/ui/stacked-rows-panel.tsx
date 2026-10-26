@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { LoadingItems, loadingItemProps, useLoadingScope } from './loading-scope';
 
 /**
  * StackedRowsPanel — a single bordered card that stacks rows inside it.
@@ -30,9 +32,11 @@ export interface PanelColumn {
   key: string;
   /** Custom cell content (tag, avatar + text, button…). Takes precedence over `value`/`label`. */
   content?: ReactNode;
-  /** Primary value rendered in the ODS h4 style when `content` is not set. */
+  /** Primary value rendered in the ODS h4 style when `content` is not set. `null` is a value still being read: in a
+   *  loading scope the cell draws it as an `h4` bar (outside one, nothing). */
   value?: ReactNode;
-  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. */
+  /** Secondary label rendered under the value (ODS h6, secondary colour); a node for inline emphasis. `null` is a label
+   *  still being read: in a loading scope the cell draws it as an `h6` bar (outside one, nothing). */
   label?: ReactNode;
   /** Let the value AND label WRAP instead of truncating to one line (full names, full sentences). */
   wrap?: boolean;
@@ -67,7 +71,25 @@ export interface StackedRowsPanelProps {
   /** Optional uppercase caption rendered above the card. */
   title?: string;
   className?: string;
+  /** The shape drawn while the rows are read (a page's loading state, where `rows` is empty): how many rows (default
+   *  3), how many value/label columns each carries (default 1, a full-width title/caption row), and whether each cell
+   *  carries a label under its value (default `true`). */
+  skeleton?: { rows?: number; columns?: number; labels?: boolean };
+  /**
+   * The rows are a read list (how many there are is the data's; the loading state draws `loadingRows` of them):
+   * every row carries `data-loading-item`, in both forms. Default false (a panel of fixed fields).
+   */
+  listItems?: boolean;
+  /** The rows are still being read (a client read): the panel draws its rows' loading form, `rows` is ignored. A
+   *  loading scope does the same while `rows` is empty. */
+  loading?: boolean;
+  /** How many rows the loading form draws: the list's page size, limit or declared typical constant. Default
+   *  `skeleton.rows`, else 3. */
+  loadingRows?: number;
 }
+
+/** Rows a loading panel draws when its caller names no count. */
+const STACKED_ROWS_SKELETON_COUNT = 3;
 
 const ALIGN_CLASS: Record<PanelColumnAlign, string> = {
   left: 'justify-start items-start',
@@ -93,14 +115,30 @@ const HIDE_CLASS: Record<PanelHideAt, string> = {
 // the joined-row pattern used across the detail layouts (56px mobile, 80px tablet+).
 const ROW_CLASS =
   'flex items-center gap-[var(--spacing-system-m)] px-[var(--spacing-system-m)] min-h-14 content-md:min-h-20 border-b border-ods-border last:border-b-0';
+// A single-column row is a full-width title/subtitle row, padded symmetrically.
+const FULL_WIDTH_ROW_CLASS =
+  'flex items-center gap-[var(--spacing-system-m)] border-b border-ods-border p-[var(--spacing-system-m)] last:border-b-0';
+const CARD_CLASS = 'flex flex-col overflow-clip rounded-md border border-ods-border bg-ods-card';
+const TITLED_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
+const TITLE_CLASS = 'uppercase text-ods-text-secondary text-h5';
+const DEFAULT_WIDTH_CLASS = 'flex-[1_0_0] min-w-0';
+/** A cell's value and label while they are read: one bar each, the same in a loading row and in a loaded row whose
+ *  value or label is still `null`. */
+const CELL_VALUE_BAR_CLASS = 'w-1/2';
+const CELL_LABEL_BAR_CLASS = 'w-3/4';
 
 function CellValue({ column }: { column: PanelColumn }) {
+  // A `null` value or label in a loading scope is read data not here yet: the cell draws its bar in the text's own
+  // box (the value's `h4`, the label's `h6`), so the row keeps its loaded height.
+  const loading = useLoadingScope();
+  const valueBar = loading && column.value === null;
+  const labelBar = loading && column.label === null;
   const valueNode = (
     <div
       className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-primary text-h4')}
       title={typeof column.value === 'string' ? column.value : undefined}
     >
-      {column.value}
+      {valueBar ? <TextLineSkeleton type="inherit" as="span" className={CELL_VALUE_BAR_CLASS} /> : column.value}
     </div>
   );
 
@@ -121,7 +159,11 @@ function CellValue({ column }: { column: PanelColumn }) {
           valueNode
         )}
       </div>
-      {column.label ? (
+      {labelBar ? (
+        <p className="text-h6">
+          <TextLineSkeleton type="inherit" as="span" className={CELL_LABEL_BAR_CLASS} />
+        </p>
+      ) : column.label ? (
         <p className={cn(column.wrap ? 'whitespace-normal' : 'truncate', 'text-ods-text-secondary text-h6')}>
           {column.label}
         </p>
@@ -131,7 +173,7 @@ function CellValue({ column }: { column: PanelColumn }) {
 }
 
 function PanelCell({ column }: { column: PanelColumn }) {
-  const widthClass = column.width ?? 'flex-[1_0_0] min-w-0';
+  const widthClass = column.width ?? DEFAULT_WIDTH_CLASS;
   const hideClass = column.hideAt ? HIDE_CLASS[column.hideAt] : 'flex';
 
   if (column.content !== undefined) {
@@ -158,11 +200,49 @@ function PanelCell({ column }: { column: PanelColumn }) {
   );
 }
 
-function PanelRowView({ row }: { row: PanelRow }) {
+/** The shape a row draws while it is read: how many value/label columns, and whether each cell has a label. */
+interface PanelRowLoadingShape {
+  columns: number;
+  labels: boolean;
+}
+
+/**
+ * One row of the card. ONE structure in both forms: loaded (`row`) its cells; loading (`loading`) the same row frame
+ * with each cell's value a `text-h4` bar over its label's `text-h6` bar. Its `data-*` markers are forwarded in both.
+ */
+function PanelRowView({
+  row,
+  loading,
+  ...props
+}: {
+  row?: PanelRow;
+  loading?: PanelRowLoadingShape;
+  [key: `data-${string}`]: unknown;
+}) {
+  const item = loadingItemProps(props);
+  if (loading) {
+    return (
+      <div className={loading.columns === 1 ? FULL_WIDTH_ROW_CLASS : ROW_CLASS} {...item}>
+        <LoadingItems count={loading.columns}>
+          {() => (
+            <div className={cn('flex flex-col justify-center', DEFAULT_WIDTH_CLASS)}>
+              <TextLineSkeleton type="h4" className={CELL_VALUE_BAR_CLASS} />
+              {loading.labels && <TextLineSkeleton type="h6" className={CELL_LABEL_BAR_CLASS} />}
+            </div>
+          )}
+        </LoadingItems>
+      </div>
+    );
+  }
+  if (!row) return null;
   // Arbitrary content (e.g. a nested table): keep it edge-to-edge unless the caller
   // overrides via `className`. No fixed height — let the content size itself.
   if (row.content !== undefined) {
-    return <div className={cn('border-b border-ods-border last:border-b-0', row.className)}>{row.content}</div>;
+    return (
+      <div className={cn('border-b border-ods-border last:border-b-0', row.className)} {...item}>
+        {row.content}
+      </div>
+    );
   }
 
   const columns = row.columns ?? [];
@@ -170,15 +250,10 @@ function PanelRowView({ row }: { row: PanelRow }) {
 
   // A single-column row is a full-width title/subtitle row: pad symmetrically
   // (ODS `m`) instead of using a fixed column-row height.
-  const rowClass = isFullWidth
-    ? cn(
-        'flex items-center gap-[var(--spacing-system-m)] border-b border-ods-border p-[var(--spacing-system-m)] last:border-b-0',
-        row.className,
-      )
-    : cn(ROW_CLASS, row.className);
+  const rowClass = isFullWidth ? cn(FULL_WIDTH_ROW_CLASS, row.className) : cn(ROW_CLASS, row.className);
 
   return (
-    <div className={rowClass}>
+    <div className={rowClass} {...item}>
       {columns.map(column => (
         <PanelCell key={column.key} column={column} />
       ))}
@@ -186,23 +261,45 @@ function PanelRowView({ row }: { row: PanelRow }) {
   );
 }
 
-export function StackedRowsPanel({ rows, title, className }: StackedRowsPanelProps) {
-  const card = (
-    <div className="flex flex-col overflow-clip rounded-md border border-ods-border bg-ods-card">
-      {rows.map(row => (
-        <PanelRowView key={row.id} row={row} />
-      ))}
-    </div>
-  );
-
-  if (!title) {
-    return <div className={className}>{card}</div>;
-  }
-
+/** The panel's frame, loaded and loading: the optional uppercase title (static copy) over the card. */
+function PanelFrame({ title, className, card }: { title?: string; className?: string; card: ReactNode }) {
+  if (!title) return <div className={className}>{card}</div>;
   return (
-    <div className={cn('flex flex-col gap-[var(--spacing-system-xxs)]', className)}>
-      <p className="uppercase text-ods-text-secondary text-h5">{title}</p>
+    <div className={cn(TITLED_CLASS, className)}>
+      <p className={TITLE_CLASS}>{title}</p>
       {card}
     </div>
   );
+}
+
+export function StackedRowsPanel({
+  rows,
+  title,
+  className,
+  skeleton,
+  listItems = false,
+  loading: loadingProp = false,
+  loadingRows,
+}: StackedRowsPanelProps) {
+  // ONE switch: while the host reads the rows (`loading`), or in a page's loading state with no rows yet, the panel
+  // draws its rows' loading form in the same frame; rows it is given in a scope are the page's own copy and draw as
+  // they are.
+  const inScope = useLoadingScope();
+  const loading = loadingProp || (inScope && rows.length === 0);
+  const marker = { 'data-loading-item': listItems || undefined };
+  const shape: PanelRowLoadingShape = { columns: skeleton?.columns ?? 1, labels: skeleton?.labels ?? true };
+  const card = loading ? (
+    <div className={CARD_CLASS} aria-hidden>
+      <LoadingItems count={loadingRows ?? skeleton?.rows ?? STACKED_ROWS_SKELETON_COUNT}>
+        {() => <PanelRowView loading={shape} {...marker} />}
+      </LoadingItems>
+    </div>
+  ) : (
+    <div className={CARD_CLASS}>
+      {rows.map(row => (
+        <PanelRowView key={row.id} row={row} {...marker} />
+      ))}
+    </div>
+  );
+  return <PanelFrame title={title} className={className} card={card} />;
 }

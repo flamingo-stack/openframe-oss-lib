@@ -22,7 +22,6 @@ openframe-client (service) → openframe-client-core (lib) → openframe-core, o
 ### Controllers
 - **AgentAuthController**: Handles agent authentication
 - **AgentController**: Manages agent operations
-- **ToolAgentFileController**: Serves agent installer files from resources
 
 ### Services
 - **AgentAuthService**: Authentication logic for agents
@@ -99,14 +98,9 @@ mvn clean install
 mvn test
 ```
 
-## Agent Installer Files
+## Tool Agent Binaries
 
-The library includes pre-built agent installers in `src/main/resources/`:
-- **Fleet MDM**: `fleetmdm-agent`, `fleetmdm-agent.exe`, `osqueryd`, `osqueryd.exe`
-- **MeshCentral**: `meshcentral-agent`, `meshcentral-agent.exe`, `meshcentral-core-module`
-- **OpenFrame Chat**: `openframe-chat.exe`
-
-These files are served by `ToolAgentFileController` via `/tool-agent/{assetId}?os={platform}` endpoint.
+No tool agent binaries are bundled. The openframe-client installs each tool from its download configurations: the binary from the GitHub release they name, and generated assets such as the mesh `.msh` from the tool API.
 
 ## Design Patterns
 

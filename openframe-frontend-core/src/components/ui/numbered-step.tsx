@@ -1,4 +1,5 @@
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 
 export interface StepNumberProps {
   /** The step's number, as shown (1-based). */
@@ -29,11 +30,21 @@ export function StepNumber({ number, current = false, accent, className }: StepN
   );
 }
 
+/** The step's row and its text column, read by the step and by its skeleton. */
+const STEP_CLASS = 'flex items-start gap-[var(--spacing-system-xs)]';
+const STEP_TEXT_CLASS = 'flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]';
+
 export interface NumberedStepProps extends StepNumberProps {
   title: string;
   description?: string;
   /** The title's element. Default `h3`. */
   titleAs?: 'h3' | 'h4' | 'p';
+  /**
+   * The step's words are still being read: its number drawn for real, its title a bar and (when the loaded step has
+   * one, `{ description: true }`) its description a bar. The step renders on the server and cannot read a loading
+   * scope: a host passes its own switch (`useLoadingScope() || loading`).
+   */
+  loading?: boolean | { description?: boolean };
 }
 
 /**
@@ -51,11 +62,22 @@ export function NumberedStep({
   accent,
   titleAs: Title = 'h3',
   className,
+  loading,
 }: NumberedStepProps) {
+  // loading-standard-ok(PROP_ONLY_SWITCH): a server component cannot read the scope; the host passes its own switch
+  if (loading) {
+    return (
+      <NumberedStepSkeleton
+        number={number}
+        description={loading === true ? true : loading.description}
+        className={className}
+      />
+    );
+  }
   return (
-    <div className={cn('flex items-start gap-[var(--spacing-system-xs)]', className)}>
+    <div className={cn(STEP_CLASS, className)}>
       <StepNumber number={number} current={current} accent={accent} />
-      <div className="flex min-w-0 flex-col gap-[var(--spacing-system-xxs)]">
+      <div className={STEP_TEXT_CLASS}>
         <Title
           className={cn(
             'm-0 transition-colors duration-200 text-h3 motion-reduce:transition-none',
@@ -75,6 +97,31 @@ export function NumberedStep({
             {description}
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A numbered step while its words are read: its number drawn for real (it is the step's place), its title a
+ * `text-h3` bar and its description, when it carries one, a `text-h4` bar.
+ */
+function NumberedStepSkeleton({
+  number,
+  description = true,
+  className,
+}: {
+  number: number;
+  /** The loaded step carries a description. Default `true`. */
+  description?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn(STEP_CLASS, className)} aria-hidden>
+      <StepNumber number={number} />
+      <div className={cn(STEP_TEXT_CLASS, 'flex-1')}>
+        <TextLineSkeleton type="h3" className="w-1/2" />
+        {description && <TextLineSkeleton type="h4" className="w-3/4" />}
       </div>
     </div>
   );

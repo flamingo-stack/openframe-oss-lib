@@ -9,42 +9,32 @@ import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.api.mapper.GraphQLUserMapper;
-import com.openframe.api.service.InstalledAgentService;
-import com.openframe.api.service.TagService;
-import com.openframe.api.service.ToolConnectionService;
-import com.openframe.api.service.ToolService;
-import com.openframe.api.service.device.DeviceService;
-import com.openframe.api.service.rmm.schedule.ScheduleRunService;
-import com.openframe.api.service.rmm.schedule.ScheduleScriptService;
-import com.openframe.api.service.rmm.script.ScriptExecutionService;
-import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.api.service.user.InvitationService;
 import com.openframe.api.service.user.UserService;
-import com.openframe.data.service.OrganizationService;
+import com.openframe.graphql.node.RelayNodeFinder;
 import com.openframe.graphql.relay.NodeType;
 import com.openframe.graphql.relay.RelayIdCodec;
+import graphql.schema.DataFetchingEnvironment;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
-/** Users and invitations as Relay nodes: node(id:) refetch and opaque edge cursors. */
+/** Users and invitations as Relay nodes: batched nodes(ids:) and opaque edge cursors. */
 @ExtendWith(MockitoExtension.class)
 class UserNodeTest {
 
@@ -52,42 +42,26 @@ class UserNodeTest {
 
     @Mock private UserService userService;
     @Mock private InvitationService invitationService;
+    @Mock private RelayNodeFinder nodeFinder;
 
     @Test
-    @DisplayName("node(User) resolves the user by the raw id inside the global id")
-    void userNodeResolvesByRawId() {
-        UserResponse user = UserResponse.builder().id("u-1").email("jane@acme.io").build();
-        when(userService.findUserById("u-1")).thenReturn(Optional.of(user));
-
-        assertThat(nodeFetcher().node(CODEC.encode(NodeType.USER, "u-1"))).isSameAs(user);
-    }
-
-    @Test
-    @DisplayName("nodes(ids:) loads every user in one query, in input order, null for an unknown one")
+    @DisplayName("nodes(ids:) loads every user in one query, in input order; an id it misses goes through the finder")
     void nodesBatchesUsers() {
         UserResponse jane = UserResponse.builder().id("u-1").email("jane@acme.io").build();
         UserResponse john = UserResponse.builder().id("u-2").email("john@acme.io").build();
         when(userService.getUsersByIds(List.of("u-2", "u-1", "u-gone"))).thenReturn(List.of(jane, john));
+        String gone = CODEC.encode(NodeType.USER, "u-gone");
+        DataFetchingEnvironment environment = mock(DataFetchingEnvironment.class);
 
-        List<Object> nodes = nodeFetcher().nodes(List.of(
+        List<Object> nodes = new NodeDataFetcher(nodeFinder, userService, CODEC).nodes(List.of(
                 CODEC.encode(NodeType.USER, "u-2"),
                 CODEC.encode(NodeType.USER, "u-1"),
-                CODEC.encode(NodeType.USER, "u-gone"),
-                CODEC.encode(NodeType.USER, "u-2")));
+                gone,
+                CODEC.encode(NodeType.USER, "u-2")), null, environment);
 
         assertThat(nodes).containsExactly(john, jane, null, john);
-        verify(userService, never()).findUserById(any());
-    }
-
-    @Test
-    @DisplayName("node(Invitation) resolves only an open invitation")
-    void invitationNodeResolvesOpenInvitationsOnly() {
-        InvitationResponse invitation = InvitationResponse.builder().id("inv-1").build();
-        when(invitationService.findOpenInvitation("inv-1")).thenReturn(Optional.of(invitation));
-        when(invitationService.findOpenInvitation("inv-revoked")).thenReturn(Optional.empty());
-
-        assertThat(nodeFetcher().node(CODEC.encode(NodeType.INVITATION, "inv-1"))).isSameAs(invitation);
-        assertThat(nodeFetcher().node(CODEC.encode(NodeType.INVITATION, "inv-revoked"))).isNull();
+        verify(nodeFinder).findNode(null, gone, null);
+        verifyNoMoreInteractions(nodeFinder);
     }
 
     @Test
@@ -132,16 +106,4 @@ class UserNodeTest {
                 .isEqualTo(createdAt.toEpochMilli() + "_inv-1");
     }
 
-    private NodeDataFetcher nodeFetcher() {
-        return new NodeDataFetcher(mock(DeviceService.class), mock(OrganizationService.class), mock(ToolService.class),
-                mock(TagService.class), mock(ToolConnectionService.class), mock(InstalledAgentService.class),
-                mock(ScriptService.class), mock(ScriptExecutionService.class), mock(ScheduleScriptService.class),
-                mock(ScheduleRunService.class), userService, invitationService,
-                emptyProvider(), emptyProvider(), CODEC);
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> ObjectProvider<T> emptyProvider() {
-        return mock(ObjectProvider.class);
-    }
 }

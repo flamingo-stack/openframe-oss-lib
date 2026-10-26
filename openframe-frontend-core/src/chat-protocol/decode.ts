@@ -54,11 +54,6 @@ export interface SseFrameDecoder {
   end(): ChatStreamEvent[];
 }
 
-// `escapeThinkingTags` moved to `./leading-frames` alongside the frame table,
-// and is re-exported here: consumers have imported it from this module since it
-// was written, and the `chat-protocol` barrel re-exports it from here.
-export { escapeThinkingTags } from './leading-frames';
-
 /** Narrow a parsed leading frame to something the frame table can read. */
 function isFrameObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;

@@ -5,6 +5,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
@@ -13,11 +14,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Set;
 
 import static java.lang.Boolean.FALSE;
 import static java.util.Objects.requireNonNullElse;
+import static java.util.stream.Collectors.toSet;
 
 @Getter
 @Setter
@@ -54,6 +58,18 @@ public class DeliveryProperties {
             return defaults;
         }
         return override.mergeOver(defaults);
+    }
+
+    public Set<DeliveryType> fastTypes() {
+        return Arrays.stream(DeliveryType.values())
+                .filter(this::isEnabled)
+                .filter(this::isOnTheFastPass)
+                .collect(toSet());
+    }
+
+    private boolean isOnTheFastPass(DeliveryType type) {
+        Policy policy = resolve(type);
+        return policy.isFastSweep();
     }
 
     @Getter
@@ -99,6 +115,22 @@ public class DeliveryProperties {
         @NotNull
         @Positive
         private Long ttlSeconds;
+
+        // false unless a type sets it: re-published by the sweep's fast pass (sweep.fast-interval) instead of waiting
+        // for the regular one, for a type a human waits on, whose ack-threshold is seconds
+        private boolean fastSweep;
+
+        // 1 = one run; more = EXHAUSTED, TIMEOUT, ERROR or an agent failure re-runs the row as a new dispatch, OFFLINE never
+        @Min(1)
+        private int maxRuns;
+
+        // the wait between a run's end and the next run's publish
+        @Positive
+        private long rerunAfterSeconds;
+
+        public boolean hasRunsLeft(int reruns) {
+            return reruns + 1 < maxRuns;
+        }
     }
 
     // the wait before a re-publish: ack-threshold × multiplier^attempt, never above max-interval, then spread by
@@ -132,6 +164,9 @@ public class DeliveryProperties {
         private Long reconnectWindowSeconds;
         private Long resultTimeoutSeconds;
         private Long ttlSeconds;
+        private Boolean fastSweep;
+        private Integer maxRuns;
+        private Long rerunAfterSeconds;
 
         Policy mergeOver(Policy base) {
             Policy merged = new Policy();
@@ -142,6 +177,9 @@ public class DeliveryProperties {
             merged.setReconnectWindowSeconds(requireNonNullElse(reconnectWindowSeconds, base.getReconnectWindowSeconds()));
             merged.setResultTimeoutSeconds(requireNonNullElse(resultTimeoutSeconds, base.getResultTimeoutSeconds()));
             merged.setTtlSeconds(requireNonNullElse(ttlSeconds, base.getTtlSeconds()));
+            merged.setFastSweep(requireNonNullElse(fastSweep, base.isFastSweep()));
+            merged.setMaxRuns(requireNonNullElse(maxRuns, base.getMaxRuns()));
+            merged.setRerunAfterSeconds(requireNonNullElse(rerunAfterSeconds, base.getRerunAfterSeconds()));
             return merged;
         }
     }

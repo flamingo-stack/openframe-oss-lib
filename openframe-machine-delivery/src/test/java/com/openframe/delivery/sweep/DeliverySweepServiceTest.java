@@ -9,7 +9,9 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.delivery.MachineDelivery;
 import com.openframe.data.document.device.DeviceStatus;
 import com.openframe.data.repository.delivery.MachineDeliveryRepository;
+import com.openframe.data.repository.delivery.RerunPublication;
 import com.openframe.delivery.config.DeliveryProperties;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import com.openframe.delivery.dispatch.DeliveryPayloadJson;
 import com.openframe.delivery.dispatch.DeliveryPublisher;
 import com.openframe.delivery.track.DeliveryCloser;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,9 +46,11 @@ import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDO
 import static com.openframe.delivery.config.DeliveryTestPolicies.SWEEP_INTERVAL_MILLIS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,6 +66,8 @@ class DeliverySweepServiceTest {
     private static final String TARGET_ID = "fleetmdm-agent";
     private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
     private static final String CORRUPT_JSON = "not-json";
+    private static final String OLD_DISPATCH_ID = "d-0";
+    private static final String RERUN_PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\",\"delivery\":{\"type\":\"TOOL_INSTALLATION\",\"targetId\":\"fleetmdm-agent\",\"dispatchId\":\"d-0\"}}";
     private static final long TWO_DAYS_SECONDS = 172_800L;
     private static final long TEN_SECONDS = 10L;
     private static final long FIRST_RETRY_DELAY = (long) (ACK_THRESHOLD * BACKOFF_MULTIPLIER);
@@ -79,6 +86,7 @@ class DeliverySweepServiceTest {
 
     @Captor private ArgumentCaptor<TestPayload> payloadCaptor;
     @Captor private ArgumentCaptor<Instant> dueAtCaptor;
+    @Captor private ArgumentCaptor<RerunPublication> publicationCaptor;
 
     private DeliverySweepService service;
 
@@ -360,6 +368,122 @@ class DeliverySweepServiceTest {
     }
 
     @Test
+    void retryPendingFast_typeWithFastSweep_itsDueRowsRepublished() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        when(repository.findDue(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(delivery));
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRepublished(eq(delivery.getId()), eq(DeliveryStatus.UNACKED), eq(dispatchedAt), eq(NO_ATTEMPTS), any(Instant.class))).thenReturn(true);
+
+        // execution
+        service.retryPendingFast();
+
+        // verifications
+        verify(publisher).publish(eq(SUBJECT), any(TestPayload.class));
+        verify(repository, never()).findDueExcept(any(DeliveryStatus.class), anySet(), any(Instant.class), any(Integer.class));
+    }
+
+    @Test
+    void retryPending_rerunNotYetPublished_newDispatchStoredThenPublished() {
+        // setup
+        delivery.setReruns(1);
+        delivery.setPayloadJson(RERUN_PAYLOAD_JSON);
+        stubDue(delivery);
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRerunPublished(publicationCaptor.capture())).thenReturn(true);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        InOrder storedFirst = inOrder(repository, publisher);
+        storedFirst.verify(repository).markRerunPublished(any(RerunPublication.class));
+        storedFirst.verify(publisher).publish(eq(SUBJECT), payloadCaptor.capture());
+        String dispatchId = payloadCaptor.getValue().getDelivery().getDispatchId();
+        assertThat(dispatchId).isNotEqualTo(OLD_DISPATCH_ID).isNotBlank();
+        RerunPublication publication = publicationCaptor.getValue();
+        assertThat(publication.getId()).isEqualTo(delivery.getId());
+        assertThat(publication.getFrom()).isEqualTo(DeliveryStatus.UNACKED);
+        assertThat(publication.getDispatchedAt()).isEqualTo(dispatchedAt);
+        assertThat(publication.getDispatchId()).isEqualTo(dispatchId);
+        assertThat(publication.getPayloadJson()).contains(dispatchId);
+        assertThat(publication.getDueAt()).isAfter(publication.getPublishedAt());
+        verify(repository, never()).markRepublished(any(), any(), any(), any(Integer.class), any());
+        verify(metrics).recordRerunPublished(DeliveryType.TOOL_INSTALLATION);
+        verify(metrics, never()).recordRetried(any());
+    }
+
+    @Test
+    void retryPending_rerunRowMovedOnBeforeTheStore_nothingPublished() {
+        // setup
+        delivery.setReruns(1);
+        delivery.setPayloadJson(RERUN_PAYLOAD_JSON);
+        stubDue(delivery);
+        stubMachineOnline();
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        when(spec.getPayloadClass()).thenReturn(TestPayload.class);
+        when(repository.markRerunPublished(any(RerunPublication.class))).thenReturn(false);
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verifyNoInteractions(publisher);
+        verify(metrics, never()).recordRerunPublished(any());
+    }
+
+    @Test
+    void retryPending_rerunPublishFails_storedDispatchKeptForTheNextPass() {
+        // setup
+        delivery.setReruns(1);
+        delivery.setPayloadJson(RERUN_PAYLOAD_JSON);
+        stubDue(delivery);
+        stubMachineOnline();
+        stubSpec();
+        when(repository.markRerunPublished(any(RerunPublication.class))).thenReturn(true);
+        doThrow(new RuntimeException("nats down")).when(publisher).publish(eq(SUBJECT), any(TestPayload.class));
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(metrics).recordPublishFailed(DeliveryType.TOOL_INSTALLATION);
+        verify(metrics, never()).recordRerunPublished(any());
+        verify(repository, never()).postpone(any(), any(), any(Instant.class), any());
+        verifyNoInteractions(closer);
+    }
+
+    @Test
+    void retryPending_typeWithFastSweep_leftToTheFastPass() {
+        // setup
+        PolicyOverride fast = new PolicyOverride();
+        fast.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, fast));
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+        stubDue();
+
+        // execution
+        service.retryPending();
+
+        // verifications
+        verify(repository).findDueExcept(eq(DeliveryStatus.PENDING), eq(Set.of(DeliveryType.TOOL_INSTALLATION)), any(Instant.class), eq(BATCH_SIZE));
+    }
+
+    @Test
+    void retryPendingFast_noTypeWithFastSweep_nothingQueried() {
+        // execution
+        service.retryPendingFast();
+
+        // verifications
+        verifyNoInteractions(repository, machineOnlineStatus, publisher);
+    }
+
+    @Test
     void retryPending_nothingDue_machinesNotLookedUp() {
         // setup
         stubDue();
@@ -387,7 +511,7 @@ class DeliverySweepServiceTest {
     }
 
     private void stubDue(MachineDelivery... rows) {
-        when(repository.findDue(eq(DeliveryStatus.PENDING), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
+        when(repository.findDueExcept(eq(DeliveryStatus.PENDING), anySet(), any(Instant.class), eq(BATCH_SIZE))).thenReturn(List.of(rows));
     }
 
     private void stubMachineOnline() {

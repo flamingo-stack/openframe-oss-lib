@@ -3,7 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AGENT_IDENTITIES_API_PATH, AgentIdentityProvider } from '../agent-identity';
+import { AGENT_IDENTITIES_API_PATH } from '../../hooks/use-agent-identities';
+import { AgentIdentityProvider } from '../agent-identity';
 import { AgentMark } from '../agent-mark';
 import { EntityIcon } from '../icon-display';
 

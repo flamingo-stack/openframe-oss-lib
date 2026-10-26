@@ -12,7 +12,8 @@ public class DeliveryId {
         return type.name() + SEPARATOR + targetId + SEPARATOR + machineId;
     }
 
-    public String of(DeliveryType type, String targetId) {
-        return type.name() + SEPARATOR + targetId;
+    // tenants share one database: a row is unique by its machine, a rollout of a target is unique only with the tenant
+    public String rollout(String tenantId, DeliveryType type, String targetId) {
+        return tenantId + SEPARATOR + type.name() + SEPARATOR + targetId;
     }
 }

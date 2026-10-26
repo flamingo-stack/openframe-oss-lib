@@ -1,10 +1,13 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import Link from '../../embed-shims/next-link';
 import { cn } from '../../utils/cn';
 import { QuestionCircleIcon } from '../icons-v2-generated/signs-and-symbols/question-circle-icon';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { CircularProgress, type CircularProgressOverflow, type CircularProgressVariant } from './circular-progress';
 import { FloatingTooltip } from './floating-tooltip';
+import { useLoadingScope } from './loading-scope';
 import { Tag } from './tag';
 
 /**
@@ -95,7 +98,8 @@ export interface DashboardInfoCardProps {
   /**
    * While `loading`: hold the percentage's box (plain "(NN%)" text, or a `Tag` when
    * `percentageDisplay` / `progressVariant` would draw one), because the loaded card will show
-   * a percentage. Default `false`.
+   * a percentage. Default: `showProgress` or a percentage drawn as a tag (`percentageDisplay="tag"`, or a
+   * `warning`/`error` `progressVariant`), the cards that show one.
    */
   loadingShowsPercentage?: boolean;
   /**
@@ -103,7 +107,20 @@ export interface DashboardInfoCardProps {
    * whose loaded state will carry one. Default `false`.
    */
   loadingShowsSubValue?: boolean;
+  /**
+   * While `loading`: the title is read too, so its line is a bar even when a `title` is passed (an empty `title`
+   * already draws the bar). `titleSlot` and `titleTag` are left as given. Default `false`.
+   */
+  titleLoading?: boolean;
+  /**
+   * While `loading`: the icon is read too (it depends on the figure), so the icon slot is a skeleton of the slot's
+   * own box, whether or not an `icon` is passed. Default `false`.
+   */
+  iconLoading?: boolean;
 }
+
+/** The icon slot's box (Figma "icon" variant): 32px on mobile, 56px from `md` up. Read by the slot and its skeleton. */
+const DASHBOARD_INFO_CARD_ICON_BOX_CLASS = 'size-8 shrink-0 rounded-sm content-md:size-14';
 
 export function DashboardInfoCard({
   title,
@@ -123,25 +140,34 @@ export function DashboardInfoCard({
   valueClassName,
   subValue,
   caption,
-  loading = false,
-  loadingShowsPercentage = false,
+  loading: loadingProp = false,
+  loadingShowsPercentage: loadingShowsPercentageProp,
   loadingShowsSubValue = false,
+  titleLoading = false,
+  iconLoading = false,
 }: DashboardInfoCardProps) {
+  // In a page's loading state the figure is read: the card is its skeleton (`loading`).
+  const inScope = useLoadingScope();
+  const loading = loadingProp || inScope;
+  // A caption still being read is empty while loading: its two lines are kept whenever one is passed.
+  const hasCaption = loading ? caption != null : Boolean(caption);
   const formattedValue = typeof value === 'number' ? value.toLocaleString() : value;
 
   const percentageAsTag =
     percentageDisplay === 'tag' ||
     (percentageDisplay === 'auto' && (progressVariant === 'warning' || progressVariant === 'error'));
+  // A card that draws a progress ring or a percentage tag shows a percentage once loaded: its box is held by default.
+  const loadingShowsPercentage = loadingShowsPercentageProp ?? (showProgress || percentageAsTag);
 
   const renderPercentage = () => {
     if (loading) {
       if (!loadingShowsPercentage) return null;
       // The box the loaded percentage takes: a `Tag` (h-8) or one `text-h4` line.
       return percentageAsTag ? (
-        <UnifiedSkeleton className="h-8 w-12 shrink-0 rounded-md" />
+        <Tag loading label="" className="w-12" />
       ) : (
         <p className="text-h4">
-          <UnifiedSkeleton as="span" className="block h-[1lh] w-12 rounded" />
+          <TextLineSkeleton type="inherit" as="span" className="w-12" />
         </p>
       );
     }
@@ -238,10 +264,19 @@ export function DashboardInfoCard({
     <>
       {/* Icon slot (Figma "icon" variant): 32px box / 16px content on mobile,
           56px box / 24px content from `md` up. */}
-      {icon && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-sm border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary content-md:size-14">
-          <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
-        </div>
+      {loading && iconLoading ? (
+        <UnifiedSkeleton className={DASHBOARD_INFO_CARD_ICON_BOX_CLASS} />
+      ) : (
+        icon && (
+          <div
+            className={cn(
+              DASHBOARD_INFO_CARD_ICON_BOX_CLASS,
+              'flex items-center justify-center border border-ods-border bg-ods-bg p-[var(--spacing-system-xxs)] text-ods-text-primary',
+            )}
+          >
+            <span className="flex size-4 items-center justify-center content-md:size-6 [&>*]:size-full">{icon}</span>
+          </div>
+        )
       )}
 
       {/* Content section */}
@@ -249,12 +284,13 @@ export function DashboardInfoCard({
         {/* Title row: caption and/or tag (Figma "status" variant) */}
         <div className="flex items-center gap-[var(--spacing-system-xxs)]">
           {titleSlot ??
-            (title !== undefined ? (
+            // A title still being read (empty while loading) is a bar of its line, like no title.
+            (title !== undefined && !(loading && (!title || titleLoading)) ? (
               <p className="truncate text-ods-text-secondary text-h5">{title}</p>
             ) : (
               loading && (
                 <p className="text-h5">
-                  <UnifiedSkeleton as="span" className="block h-[1lh] w-20 rounded" />
+                  <TextLineSkeleton type="inherit" as="span" className="w-20" />
                 </p>
               )
             ))}
@@ -264,12 +300,12 @@ export function DashboardInfoCard({
         {/* Value and percentage */}
         <div className="flex items-center gap-[var(--spacing-system-xs)]">
           <p className={cn('truncate text-ods-text-primary text-h3 content-md:text-h2', valueClassName)}>
-            {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-24 rounded" /> : formattedValue}
+            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-24" /> : formattedValue}
           </p>
           {loading
             ? loadingShowsSubValue && (
                 <p className="text-h6">
-                  <UnifiedSkeleton as="span" className="block h-[1lh] w-16 rounded" />
+                  <TextLineSkeleton type="inherit" as="span" className="w-16" />
                 </p>
               )
             : subValue && <p className="text-ods-text-secondary text-h6">{subValue}</p>}
@@ -284,9 +320,9 @@ export function DashboardInfoCard({
         </div>
 
         {/* Two lines kept for the caption, loading or loaded, so a narrow tile is one height. */}
-        {caption && (
+        {hasCaption && (
           <p className="line-clamp-2 min-h-[2lh] text-ods-text-secondary text-h6">
-            {loading ? <UnifiedSkeleton as="span" className="block h-[1lh] w-32 rounded" /> : caption}
+            {loading ? <TextLineSkeleton type="inherit" as="span" className="w-32" /> : caption}
           </p>
         )}
       </div>
@@ -304,9 +340,10 @@ export function DashboardInfoCard({
     'bg-ods-card border border-ods-border rounded-md p-[var(--spacing-system-xsf)] content-md:p-[var(--spacing-system-m)] h-16 content-md:h-[104px] flex gap-[var(--spacing-system-s)] content-md:gap-[var(--spacing-system-m)] items-center transition-all';
 
   // A caption is a third line: the fixed stat-tile height would clip it.
-  const captionClassName = caption ? 'h-auto content-md:h-auto' : undefined;
+  const captionClassName = hasCaption ? 'h-auto content-md:h-auto' : undefined;
 
-  if (href) {
+  // While loading the card is not yet a link: a skeleton is never focusable.
+  if (href && !loading) {
     return (
       <Link
         href={href}

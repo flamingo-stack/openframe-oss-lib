@@ -54,6 +54,8 @@ public class Ticket implements TenantScoped {
     private String assignedTo;
     private String assignedName;
     private Boolean escalatedByUser;
+    // Denormalized from the linked chat's approval requests; null reads as false.
+    private Boolean hasPendingApproval;
     private String order;
     @CreatedDate
     private Instant createdAt;
@@ -66,6 +68,8 @@ public class Ticket implements TenantScoped {
     private String resolvedById;
     private String resolvedByName;
     private Integer reopenCount;
+    @Builder.Default
+    private Long version = 0L;
 
     public Instant effectiveLastActivityAt() {
         return lastActivityAt != null ? lastActivityAt : createdAt;

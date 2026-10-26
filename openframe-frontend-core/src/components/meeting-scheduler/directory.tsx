@@ -30,9 +30,11 @@ import { contentFetch } from '../../utils/embed-content-fetch';
 import { formatDurationCompact, formatDateWithTimezone, VIEWER_TIMEZONE } from '../../utils/format';
 import { pageCount } from '../../utils/search-params';
 import { EmptyState } from '../empty-state';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { PaginationSkeleton } from '../pagination';
 import { PersistentPaginationWrapper } from '../persistent-pagination';
 import { AvatarStack, StatusBadge } from '../ui';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 
 export interface MeetingSchedulerDirectoryProps {
   /** Endpoints prefix, default '' (same-origin `/api/meetings`). */
@@ -65,6 +67,24 @@ function useNextAvailableLabel(ms: number | null): string | null {
   }, [hydrated, ms]);
 }
 
+/** Measured pagination-slot height (PersistentPaginationWrapper = 72px). */
+const PAGINATION_SLOT_H = 'h-[4.5rem]';
+/** Rows per page by default: also the skeleton's row count. */
+export const MEETING_DIRECTORY_PAGE_SIZE = 6;
+/** Reserved rows-area height: pageSize × 80px rows + (pageSize−1) × 16px gaps. */
+const directoryRowsMinHeight = (pageSize: number) => pageSize * 80 + (pageSize - 1) * 16;
+
+/** A row's frame and columns, read by the row and by its skeleton, so the skeleton is the row's size. */
+const ROW_FRAME_CLASS =
+  'flex min-h-20 w-full items-center gap-4 rounded-lg border border-ods-border bg-ods-card px-4 py-3';
+const ROW_TITLE_COLUMN_CLASS = 'flex min-w-0 flex-1 flex-col justify-center text-left';
+const ROW_NEXT_COLUMN_CLASS = 'hidden w-44 shrink-0 flex-col items-end justify-center content-md:flex';
+const ROW_NEXT_LABEL_CLASS = 'text-ods-text-secondary text-h6';
+const ROW_CHEVRON_CLASS =
+  'flex size-12 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-card';
+const ROWS_CLASS = 'flex w-full flex-col gap-4';
+const PAGINATION_SLOT_CLASS = 'mt-8 flex w-full items-center justify-center';
+
 function DirectoryRow({
   link,
   audienceLabel,
@@ -86,13 +106,14 @@ function DirectoryRow({
 
   return (
     <Link
+      data-loading-item
       href={`${bookingBasePath}/${link.slug}`}
       prefetch={false}
       className="block rounded-lg text-inherit no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent"
     >
-      <div className="flex min-h-20 w-full items-center gap-4 rounded-lg border border-ods-border bg-ods-card px-4 py-3 transition-colors duration-150 hover:bg-ods-bg-hover">
+      <div className={cn(ROW_FRAME_CLASS, 'transition-colors duration-150 hover:bg-ods-bg-hover')}>
         {/* Title leads at a fixed X; hosts live in the right meta cluster. */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center text-left">
+        <div className={ROW_TITLE_COLUMN_CLASS}>
           <p className="truncate text-ods-text-primary text-h3">{link.title}</p>
           {subtitle && <p className="truncate text-ods-text-secondary text-h6">{subtitle}</p>}
         </div>
@@ -107,15 +128,15 @@ function DirectoryRow({
             collapse on narrow widths. */}
         <AvatarStack people={link.hosts} max={3} size="md" label="Hosts" className="flex shrink-0" />
 
-        <div className="hidden w-44 shrink-0 flex-col items-end justify-center content-md:flex">
-          <p className="text-ods-text-secondary text-h6">Next available</p>
+        <div className={ROW_NEXT_COLUMN_CLASS}>
+          <p className={ROW_NEXT_LABEL_CLASS}>Next available</p>
           <p className="min-h-5 text-ods-text-primary text-h6">
             {link.nextAvailableMs == null ? 'No times published' : (nextLabel ?? ' ')}
           </p>
         </div>
 
         {/* House boxed chevron (ChatTicketItem). */}
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-md border border-ods-border bg-ods-card">
+        <span className={ROW_CHEVRON_CLASS}>
           <ChevronRight className="size-6 text-ods-text-secondary" />
         </span>
       </div>
@@ -123,33 +144,60 @@ function DirectoryRow({
   );
 }
 
-/** Same-shell loading row (co-located-skeleton convention). */
-export function MeetingSchedulerDirectoryRowSkeleton() {
+const NO_HOSTS: SchedulingLink['hosts'] = [];
+/** Hosts a loading row draws: a typical link's (measured 2026-10: every public link has one host). */
+const TYPICAL_HOSTS = 1;
+
+/**
+ * Same-shell loading row (co-located-skeleton convention): the row's frame, "Next available" and the chevron box
+ * real, the title, subtitle, audience chip, hosts and next time as shapes.
+ */
+function MeetingSchedulerDirectoryRowSkeleton(props: { [marker: `data-${string}`]: unknown } = {}) {
   return (
-    <div className="flex min-h-20 w-full items-center gap-4 rounded-lg border border-ods-border bg-ods-card px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-        <UnifiedSkeleton className="h-5 w-1/2" />
-        <UnifiedSkeleton className="h-4 w-1/3" />
+    <div className={ROW_FRAME_CLASS} aria-hidden {...loadingItemProps(props)}>
+      <div className={ROW_TITLE_COLUMN_CLASS}>
+        <TextLineSkeleton type="h3" className="w-1/2" />
+        <TextLineSkeleton type="h6" className="w-1/3" />
       </div>
       <UnifiedSkeleton className="hidden h-6 w-28 shrink-0 content-sm:block" />
-      <UnifiedSkeleton className="h-10 w-10 shrink-0 rounded-full" />
-      <div className="hidden w-44 shrink-0 flex-col items-end gap-1 content-md:flex">
-        <UnifiedSkeleton className="h-4 w-24" />
-        <UnifiedSkeleton className="h-5 w-32" />
+      {/* The hosts in the stack's own loading form: one face, the typical link's host count. */}
+      <AvatarStack people={NO_HOSTS} loading max={TYPICAL_HOSTS} size="md" label="Hosts" className="flex shrink-0" />
+      <div className={ROW_NEXT_COLUMN_CLASS}>
+        <p className={ROW_NEXT_LABEL_CLASS}>Next available</p>
+        <TextLineSkeleton type="h6" className="w-32" />
       </div>
-      <UnifiedSkeleton className="size-12 shrink-0 rounded-md" />
+      <span className={ROW_CHEVRON_CLASS}>
+        <ChevronRight className="size-6 text-ods-text-secondary" />
+      </span>
     </div>
   );
 }
 
-/** Measured pagination-slot height (PersistentPaginationWrapper = 72px). */
-const PAGINATION_SLOT_H = 'h-[4.5rem]';
+/** The directory while its links are read: `pageSize` row skeletons in the reserved rows area, and the pager. */
+function MeetingSchedulerDirectorySkeleton({
+  pageSize = MEETING_DIRECTORY_PAGE_SIZE,
+  className,
+}: {
+  pageSize?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex flex-col', className)} aria-hidden>
+      <div className={ROWS_CLASS} style={{ minHeight: directoryRowsMinHeight(pageSize) }}>
+        <LoadingItems count={pageSize}>{() => <MeetingSchedulerDirectoryRowSkeleton data-loading-item />}</LoadingItems>
+      </div>
+      <div className={cn(PAGINATION_SLOT_CLASS, PAGINATION_SLOT_H)}>
+        <PaginationSkeleton />
+      </div>
+    </div>
+  );
+}
 
 export function MeetingSchedulerDirectory({
   apiBaseUrl = '',
   initialData = null,
   includeAll = false,
-  pageSize = 6,
+  pageSize = MEETING_DIRECTORY_PAGE_SIZE,
   bookingBasePath = '/schedule-a-call',
   contactHref,
   className,
@@ -158,9 +206,11 @@ export function MeetingSchedulerDirectory({
   const [isLoading, setIsLoading] = useState(initialData === null);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  // In a loading scope nothing is fetched: the directory draws its skeleton.
+  const inScope = useLoadingScope();
 
   useEffect(() => {
-    if (initialData !== null) return undefined; // host-seeded — skip the client fetch
+    if (initialData !== null || inScope) return undefined; // host-seeded — skip the client fetch
     const controller = new AbortController();
     let active = true;
     const load = async () => {
@@ -184,7 +234,7 @@ export function MeetingSchedulerDirectory({
       active = false;
       controller.abort();
     };
-  }, [initialData, includeAll, apiBaseUrl]);
+  }, [initialData, inScope, includeAll, apiBaseUrl]);
 
   const rows = useMemo(() => {
     const purposes = data?.purposes ?? [];
@@ -194,22 +244,10 @@ export function MeetingSchedulerDirectory({
   const totalPages = pageCount(rows.length, pageSize);
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
 
-  // Reserved rows-area height: pageSize × 80px rows + (pageSize−1) × 16px gaps.
-  const rowsMinHeight = pageSize * 80 + (pageSize - 1) * 16;
+  const rowsMinHeight = directoryRowsMinHeight(pageSize);
 
-  if (isLoading && !data) {
-    return (
-      <div className={cn('flex flex-col', className)}>
-        <div className="flex w-full flex-col gap-4" style={{ minHeight: rowsMinHeight }}>
-          {Array.from({ length: pageSize }, (_, i) => (
-            <MeetingSchedulerDirectoryRowSkeleton key={i} />
-          ))}
-        </div>
-        <div className={cn('mt-8 flex w-full items-center justify-center', PAGINATION_SLOT_H)}>
-          <UnifiedSkeleton className="h-10 w-64" />
-        </div>
-      </div>
-    );
+  if (inScope || (isLoading && !data)) {
+    return <MeetingSchedulerDirectorySkeleton pageSize={pageSize} className={className} />;
   }
 
   if (error) {
@@ -240,7 +278,7 @@ export function MeetingSchedulerDirectory({
 
   return (
     <div className={cn('flex flex-col', className)}>
-      <div className="flex w-full flex-col gap-4" style={{ minHeight: rowsMinHeight }}>
+      <div className={ROWS_CLASS} style={{ minHeight: rowsMinHeight }}>
         {pageRows.map(({ link, audienceLabel }) => (
           <DirectoryRow key={link.id} link={link} audienceLabel={audienceLabel} bookingBasePath={bookingBasePath} />
         ))}
@@ -248,7 +286,7 @@ export function MeetingSchedulerDirectory({
       {/* House pagination block — dims in place during refetches; the slot
           holds its measured height even at ≤1 page (where the inner
           UnifiedPagination returns null). */}
-      <div className={cn('mt-8 flex w-full items-center justify-center', PAGINATION_SLOT_H)}>
+      <div className={cn(PAGINATION_SLOT_CLASS, PAGINATION_SLOT_H)}>
         {totalPages > 1 && (
           <PersistentPaginationWrapper
             isLoading={isLoading}

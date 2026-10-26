@@ -1,7 +1,8 @@
 'use client';
 
+import type { JsMsg, Msg } from 'nats.ws';
 import { useRef, useEffect, useState, useCallback } from 'react';
-import type { JsMsg, Msg, NatsSubscribeOptions } from './nats';
+import type { NatsSubscribeOptions } from './nats';
 import { useOptionalNats } from './nats-provider';
 
 export interface UseNatsSubscriptionOptions extends NatsSubscribeOptions {

@@ -232,7 +232,7 @@ export function getSourceLabel(tableId: string): string {
  *
  * Embedders that need a CUSTOM mapping (e.g. polymorphic types whose
  * tableId depends on per-tenant config) still pass their own
- * `tableIdForDocumentType` callback to `useEmbeddedChat`; this default
+ * `tableIdForDocumentType` callback to `useSseChatAdapter`; this default
  * only applies when no callback is supplied.
  *
  * Inverse mapping audited 2026-05-24 against the hub registry — every
@@ -311,7 +311,7 @@ export const DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID: Record<string, string> = {
 };
 
 /**
- * Default `tableIdForDocumentType` resolver used by `useEmbeddedChat` when
+ * Default `tableIdForDocumentType` resolver used by `useSseChatAdapter` when
  * the caller didn't pass an explicit callback. Returns `null` for
  * unrecognized document types so downstream `discussRef` / `displayRef`
  * still short-circuits gracefully on stale or custom types.

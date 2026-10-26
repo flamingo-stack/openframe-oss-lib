@@ -63,7 +63,7 @@ extend type Mutation {
     deleteKnowledgeBaseAttachment(input: MutationDeleteInput!): MutationDeletePayload!
 }
 
-type TempAttachment {
+type TempAttachment @shareable {
     id: ID!
     fileName: String!
     contentType: String

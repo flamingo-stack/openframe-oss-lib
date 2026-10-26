@@ -1,7 +1,10 @@
 'use client';
 
 import type React from 'react';
+import { cn } from '../../utils/cn';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
+import { useLoadingScope } from './loading-scope';
 import { NumberedStep } from './numbered-step';
 
 export interface FeatureListItemData {
@@ -37,7 +40,20 @@ export interface FeatureListProps {
    * (a demo jumps to that step). Omit for a list that is only read.
    */
   onSelect?: (index: number) => void;
+  /** Rows drawn while the items are read (a page's loading state, where `items` is empty). */
+  skeletonCount?: number;
 }
+
+/** Rows a loading list draws when its caller names no count. */
+export const FEATURE_LIST_SKELETON_COUNT = 3;
+
+/** The list's frames, read by the list and by its skeleton. */
+const NUMBERED_LIST_CLASS = 'flex flex-col gap-[var(--spacing-system-lf)]';
+const BOXED_LIST_CLASS = 'flex flex-col overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg';
+const BOXED_ROW_CLASS = 'flex w-full items-start gap-4 bg-ods-card p-4';
+const BOXED_ROW_DIVIDER_CLASS = 'border-b border-ods-border';
+const ICON_BOX_CLASS = 'flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-bg';
+const BOXED_TEXT_CLASS = 'flex min-w-0 flex-1 flex-col gap-1';
 
 export function FeatureList({
   items,
@@ -47,11 +63,19 @@ export function FeatureList({
   activeIndex,
   accent,
   onSelect,
+  skeletonCount = FEATURE_LIST_SKELETON_COUNT,
 }: FeatureListProps) {
+  // Items given in a loading scope are the page's own copy; none means they are read.
+  const inScope = useLoadingScope();
+  if (inScope && items.length === 0) {
+    return (
+      <FeatureListSkeleton count={skeletonCount} variant={variant} iconBoxSize={iconBoxSize} className={className} />
+    );
+  }
   if (variant === 'numbered') {
     const dims = typeof activeIndex === 'number';
     return (
-      <ol className={`flex flex-col gap-[var(--spacing-system-lf)] ${className}`}>
+      <ol className={`${NUMBERED_LIST_CLASS} ${className}`}>
         {items.map((item, index) => {
           const current = dims && index === activeIndex;
           // Every numbered step on a page is the one `NumberedStep`.
@@ -90,23 +114,57 @@ export function FeatureList({
   }
 
   return (
-    <div className={`flex flex-col overflow-hidden rounded-[6px] border border-ods-border bg-ods-bg ${className}`}>
+    <div className={`${BOXED_LIST_CLASS} ${className}`}>
       {items.map((item, index) => (
-        <div
-          key={index}
-          className={`flex w-full items-start gap-4 bg-ods-card p-4 ${
-            index < items.length - 1 ? 'border-b border-ods-border' : ''
-          }`}
-        >
-          <div
-            className="flex shrink-0 items-center justify-center rounded-[6px] border border-ods-border bg-ods-bg"
-            style={{ width: iconBoxSize, height: iconBoxSize }}
-          >
+        <div key={index} className={`${BOXED_ROW_CLASS} ${index < items.length - 1 ? BOXED_ROW_DIVIDER_CLASS : ''}`}>
+          <div className={ICON_BOX_CLASS} style={{ width: iconBoxSize, height: iconBoxSize }}>
             {item.icon}
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className={BOXED_TEXT_CLASS}>
             <p className="text-ods-text-primary text-h3">{item.title}</p>
             <p className="normal-case tracking-normal text-ods-text-secondary text-h6">{item.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A FeatureList while its items are read: the same list, `count` rows. A numbered row keeps its number; a boxed
+ * row's icon is a box of the icon's frame; every title and description is a bar of its own line height.
+ */
+function FeatureListSkeleton({
+  count = FEATURE_LIST_SKELETON_COUNT,
+  variant = 'boxed',
+  iconBoxSize = 72,
+  className = '',
+}: {
+  count?: number;
+  variant?: FeatureListProps['variant'];
+  iconBoxSize?: number;
+  className?: string;
+}) {
+  const rows = Array.from({ length: count }, (_, index) => index);
+  if (variant === 'numbered') {
+    return (
+      <ol className={`${NUMBERED_LIST_CLASS} ${className}`} aria-hidden>
+        {rows.map(index => (
+          <li key={index}>
+            <NumberedStep loading number={index + 1} title="" />
+          </li>
+        ))}
+      </ol>
+    );
+  }
+  return (
+    <div className={`${BOXED_LIST_CLASS} ${className}`} aria-hidden>
+      {rows.map(index => (
+        <div key={index} className={cn(BOXED_ROW_CLASS, index < count - 1 && BOXED_ROW_DIVIDER_CLASS)}>
+          <UnifiedSkeleton className="shrink-0 rounded-[6px]" width={iconBoxSize} height={iconBoxSize} />
+          <div className={BOXED_TEXT_CLASS}>
+            <TextLineSkeleton type="h3" className="w-1/2" />
+            <TextLineSkeleton type="h6" className="w-3/4" />
           </div>
         </div>
       ))}

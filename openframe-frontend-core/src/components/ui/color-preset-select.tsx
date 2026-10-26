@@ -10,6 +10,7 @@ import { ActionsMenuDropdown, type ActionsMenuGroup } from './actions-menu';
 import { ColorSwatch } from './color-swatch';
 import { Input } from './input';
 import { InputTrigger } from './input-trigger';
+import { LoadingWhen, useLoadingScope } from './loading-scope';
 
 export interface ColorPreset {
   key: string;
@@ -246,9 +247,20 @@ export interface ColorPickerInputProps {
   onChange: (color: string) => void;
   disabled?: boolean;
   className?: string;
+  /** The color is still being read: the field draws its box with a bar for the value and cannot open. A loading
+   *  scope does the same. */
+  loading?: boolean;
 }
 
-export function ColorPickerInput({ value, onChange, disabled, className }: ColorPickerInputProps) {
+export function ColorPickerInput({
+  value,
+  onChange,
+  disabled,
+  className,
+  loading: loadingProp,
+}: ColorPickerInputProps) {
+  // ONE switch: in a page's loading state (or while the host reads the color) the field is its loading form.
+  const loading = useLoadingScope() || !!loadingProp;
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<ColorFormat>('HEX');
 
@@ -262,18 +274,29 @@ export function ColorPickerInput({ value, onChange, disabled, className }: Color
     },
   ];
 
+  const trigger = (
+    <InputTrigger
+      disabled={disabled}
+      aria-label="Pick custom color"
+      startIcon={<ColorSwatch color={value} />}
+      selectedLabel={<span className="uppercase">{value}</span>}
+      endIcon={<TriggerChevron />}
+      className={cn('group', className)}
+    />
+  );
+
+  if (loading) {
+    // The field's own box, inert: its swatch and its value draw their loading forms in the scope.
+    return (
+      <span inert aria-hidden className="contents">
+        <LoadingWhen loading>{trigger}</LoadingWhen>
+      </span>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <InputTrigger
-          disabled={disabled}
-          aria-label="Pick custom color"
-          startIcon={<ColorSwatch color={value} />}
-          selectedLabel={<span className="uppercase">{value}</span>}
-          endIcon={<TriggerChevron />}
-          className={cn('group', className)}
-        />
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         align="start"
         sideOffset={4}

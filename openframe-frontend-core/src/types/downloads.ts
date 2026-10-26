@@ -88,6 +88,12 @@ export const DOWNLOAD_ARCHITECTURE_LABELS: Record<string, string> = {
   arm64: 'ARM',
 };
 
+/**
+ * The label of the button that replaces a download once the installer is on its way: it opens the
+ * app the visitor is installing. One wording for every place a host draws it.
+ */
+export const OPEN_APP_LABEL = 'Open the app';
+
 /** What a host learns when a visitor takes an install action on the page. */
 export interface DownloadActionEvent {
   /** `installer`: a download button. `command`: a copied install command. */

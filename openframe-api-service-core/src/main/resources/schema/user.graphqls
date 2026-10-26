@@ -60,7 +60,7 @@ extend type Mutation {
 }
 
 "A person who signs in to the tenant."
-type User implements Node {
+type User implements Node @key(fields: "id") @shareable {
     id: ID!
     firstName: String
     lastName: String
@@ -75,7 +75,7 @@ type User implements Node {
 }
 
 "A user's avatar."
-type UserImage {
+type UserImage @shareable {
     imageUrl: String
     hash: String
 }

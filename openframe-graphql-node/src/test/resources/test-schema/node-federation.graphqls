@@ -1,0 +1,29 @@
+extend schema @link(url: "https://specs.apollo.dev/federation/v2.5", import: ["@key", "@shareable"])
+
+type Query {
+    node(id: ID!): Node
+    nodes(ids: [ID!]!): [Node]!
+}
+
+interface Node {
+    id: ID!
+}
+
+type Ticket implements Node @key(fields: "id") {
+    id: ID!
+    title: String
+}
+
+type GuardrailPolicy implements Node @key(fields: "id") {
+    id: ID!
+    name: String
+}
+
+type Dialog implements Node @key(fields: "id", resolvable: false) {
+    id: ID!
+}
+
+type User implements Node @key(fields: "id", resolvable: false) @shareable {
+    id: ID!
+    firstName: String
+}

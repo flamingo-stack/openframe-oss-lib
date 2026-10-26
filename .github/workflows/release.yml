@@ -89,6 +89,7 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
+          [ "$GITHUB_REF" = refs/heads/main ]  # releases from main only; tick snapshot for a branch
           IFS='.' read -r major minor patch <<< "$OLD_VERSION"
           NEW_VERSION=${NEW_VERSION:-$major.$minor.$((patch + 1))}
           case "$NEW_VERSION" in
@@ -175,6 +176,7 @@ jobs:
             OLD_VERSION=$(git ls-remote --tags --refs origin | cut -d/ -f3 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
             OLD_VERSION=${OLD_VERSION:-0.0.0}
             if [ "$RELEASE" = true ]; then
+              [ "$GITHUB_REF" = refs/heads/main ]  # releases from main only; tick snapshot for a branch
               IFS='.' read -r major minor patch <<< "$OLD_VERSION"
               NEW_VERSION=${VERSION:-$major.$minor.$((patch + 1))}
               case "$NEW_VERSION" in
@@ -249,6 +251,7 @@ jobs:
         env:
           NEW_VERSION: ${{ github.event.inputs.version }}
         run: |
+          [ "$GITHUB_REF" = refs/heads/main ]  # releases from main only; tick snapshot for a branch
           IFS='.' read -r major minor patch <<< "$OLD_VERSION"
           NEW_VERSION=${NEW_VERSION:-$major.$minor.$((patch + 1))}
           case "$NEW_VERSION" in

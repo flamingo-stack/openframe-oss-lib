@@ -1,8 +1,16 @@
 import type React from 'react';
+import { TEXT_LINES_HEIGHT } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
+import { BUTTON_SIZE_CLASS, type ButtonSizeKey } from '../ui/button/button-styles';
+import { INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS } from '../ui/input-styles';
 import { SKELETON_SURFACE_CLASS } from '../ui/skeleton-surface';
 
-interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+interface UnifiedSkeletonProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'children'> {
+  /**
+   * A skeleton is a shape, never a frame: it takes no children, so nothing (another skeleton above all) is ever
+   * drawn inside its pulsing surface.
+   */
+  children?: never;
   className?: string;
   variant?: 'default' | 'text' | 'circular' | 'rectangular';
   width?: string | number;
@@ -31,8 +39,8 @@ interface UnifiedSkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
  * Base skeleton component with consistent styling across the application.
  *
  * Design Specifications:
- * - Color: #2A2A2A base with #3A3A3A pulse highlight
- * - Animation: 1.5s pulse duration, ease-in-out timing
+ * - Surface: `SKELETON_SURFACE_CLASS` (`ui/skeleton-surface.ts`), the ONE skeleton surface: the ODS skeleton token
+ *   and the ONE pulse every loading state shares. Never a second colour, duration or animation.
  * - Responsive: Mobile-first approach with proper scaling
  * - Accessibility: hidden from assistive technology (the `LoadingRegion` around it announces), reduced motion support
  *
@@ -80,9 +88,11 @@ export function UnifiedSkeleton({
       className ?? '',
     );
 
+  // The caller's style is kept (a held image's aspect ratio); the width and height props win where given.
   const style: React.CSSProperties = {
-    width: width,
-    height: height,
+    ...props.style,
+    ...(width !== undefined && { width }),
+    ...(height !== undefined && { height }),
   };
 
   return (
@@ -96,17 +106,125 @@ export function UnifiedSkeleton({
         !width && !style.width && variant !== 'circular' && 'w-full',
         className,
       )}
-      style={style}
       // A bar is decoration: hidden from assistive technology unless the caller names what is loading.
       // The loading CONTAINER says it once (`LoadingRegion`: aria-busy plus one polite status).
       {...(ariaLabel ? { role: 'status', 'aria-label': ariaLabel } : { 'aria-hidden': true })}
       {...props}
+      style={style}
     />
   );
 }
 
 /**
- * Text skeleton variants for consistent typography loading
+ * The ODS type steps a text line can take, as static classes (a class built at runtime emits no CSS). `inherit` sets
+ * no type of its own: the bar takes the line height of the element it sits in (a row sized by its caller).
+ */
+const TEXT_LINE_TYPE = {
+  h1: 'text-h1',
+  h2: 'text-h2',
+  h3: 'text-h3',
+  h4: 'text-h4',
+  h5: 'text-h5',
+  h6: 'text-h6',
+  code: 'text-code',
+  inherit: '',
+} as const;
+
+export type TextLineType = keyof typeof TEXT_LINE_TYPE;
+
+export interface TextLineSkeletonProps {
+  /** The type step of the text the bar stands for (`inherit`: the surrounding element's). */
+  type: TextLineType;
+  /** How many lines the text takes (1 by default). Past 6, the height is set inline in `lh`. */
+  lines?: number;
+  /**
+   * `span` for a bar inside phrasing content (a `<p>`, a heading, a label): a `<div>` there is invalid HTML, and
+   * the browser's parser closes the `<p>` around it, adding empty paragraphs that take a flex gap each.
+   */
+  as?: 'div' | 'span';
+  /**
+   * The bar's width as an inline style, for a width a static class cannot state (a `ch` count per item: `'12ch'`).
+   * A class in `className` is the usual way.
+   */
+  width?: string | number;
+  className?: string;
+}
+
+/**
+ * THE text bar: a run of text lines while it loads. The bar takes the type step the loaded text uses and `lines` of
+ * its line height (`lh`), so the loaded text takes its place at every breakpoint without moving the page. Never
+ * rebuild it as a `UnifiedSkeleton` with `h-[1lh]`.
+ */
+export function TextLineSkeleton({ type, lines = 1, as = 'div', width, className }: TextLineSkeletonProps) {
+  const Tag = as;
+  const heightClass = (TEXT_LINES_HEIGHT as Record<number, string>)[lines];
+  // A run of separate lines, like the text it stands for: each line is one line-height row holding a bar narrower
+  // than the row (the gap between bars is the leading), and a paragraph's last line is shorter. The box is exactly
+  // `lines` line heights, so the loaded text takes its place without moving the page.
+  return (
+    <Tag
+      aria-hidden="true"
+      className={cn('flex flex-col', TEXT_LINE_TYPE[type], heightClass, className)}
+      style={heightClass && width === undefined ? undefined : { height: heightClass ? undefined : `${lines}lh`, width }}
+    >
+      {Array.from({ length: lines }, (_, index) => (
+        <Tag key={index} className="flex h-[1lh] items-center">
+          <UnifiedSkeleton
+            as={as}
+            className={cn('block h-[0.7lh] rounded', lines > 1 && index === lines - 1 ? 'w-3/5' : 'w-full')}
+          />
+        </Tag>
+      ))}
+    </Tag>
+  );
+}
+
+/** The lines a text run takes per breakpoint: on a phone, from `content-md`, and from `content-lg`. */
+export interface TextLinesByBreakpoint {
+  phone: number;
+  md: number;
+  lg: number;
+}
+
+/**
+ * A text run whose line count changes with the width (a heading or a paragraph that wraps): `TextLineSkeleton` at
+ * the typical lines of each step of the content area. Exactly one of the three bars is shown at any width, so the
+ * loaded text takes its place at every breakpoint.
+ */
+export function TextLinesByBreakpointSkeleton({
+  lines,
+  type = 'inherit',
+  as = 'div',
+  className,
+}: {
+  lines: TextLinesByBreakpoint;
+  type?: TextLineType;
+  as?: 'div' | 'span';
+  className?: string;
+}) {
+  return (
+    <>
+      <TextLineSkeleton type={type} as={as} lines={lines.phone} className={cn('w-full content-md:hidden', className)} />
+      <TextLineSkeleton
+        type={type}
+        as={as}
+        lines={lines.md}
+        className={cn('hidden w-full content-md:flex content-lg:hidden', className)}
+      />
+      <TextLineSkeleton
+        type={type}
+        as={as}
+        lines={lines.lg}
+        className={cn('hidden w-full content-lg:flex', className)}
+      />
+    </>
+  );
+}
+
+/**
+ * Text skeleton variants at fixed heights. A skeleton that must take exactly
+ * the space of the text it stands for (a card whose loaded and loading boxes
+ * are one size) is `TextLineSkeleton`, sized by the text's own type step.
  */
 export const TextSkeleton = {
   /**
@@ -141,14 +259,24 @@ export const TextSkeleton = {
 /**
  * Interactive element skeletons
  */
+/** The width a button skeleton stands for its label with (a short label). */
+const BUTTON_SKELETON_LABEL_WIDTH_CLASS = 'w-24';
+
 export const InteractiveSkeleton = {
   /**
-   * Button skeleton with proper touch targets
+   * A button while its label is read (or a whole button row in a skeleton): the box is that Button size's own
+   * classes (`BUTTON_SIZE_CLASS`, the same map `buttonVariants` reads: height and padding per breakpoint; the
+   * `default` size when none is given, as `Button`'s own default) and a width standing for the label (`className`
+   * overrides it); icon sizes carry their own width.
    */
-  Button: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
+  Button: ({
+    className,
+    size = 'default',
+    ...props
+  }: Omit<UnifiedSkeletonProps, 'variant'> & { size?: ButtonSizeKey }) => (
     <UnifiedSkeleton
       variant="default"
-      className={cn('h-10 w-32 content-md:h-12 content-md:w-40', className)}
+      className={cn(BUTTON_SIZE_CLASS[size], !size.startsWith('icon') && BUTTON_SKELETON_LABEL_WIDTH_CLASS, className)}
       {...props}
     />
   ),
@@ -157,7 +285,11 @@ export const InteractiveSkeleton = {
    * Input field skeleton
    */
   Input: ({ className, ...props }: Omit<UnifiedSkeletonProps, 'variant'>) => (
-    <UnifiedSkeleton variant="default" className={cn('h-10 w-full content-md:h-12', className)} {...props} />
+    <UnifiedSkeleton
+      variant="default"
+      className={cn('w-full', INPUT_HEIGHT_CLASS, INPUT_RADIUS_CLASS, className)}
+      {...props}
+    />
   ),
 
   /**

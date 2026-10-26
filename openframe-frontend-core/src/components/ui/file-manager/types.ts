@@ -27,7 +27,12 @@ export interface FileManagerProps {
   deviceName?: string;
   deviceInfo?: string;
   searchQuery?: string;
+  /** The folder is still being read: the file manager draws its loading state (breadcrumb, actions and search real and
+   *  inert, the table's header real, its rows in their loading form). A loading scope does the same. */
   loading?: boolean;
+  /** Whether the loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default
+   *  `true`. */
+  region?: boolean;
   isSearching?: boolean;
   showCheckboxes?: boolean;
   showSearch?: boolean;
@@ -91,7 +96,8 @@ export interface FileManagerTableProps {
 }
 
 export interface FileManagerTableRowProps {
-  file: FileItem;
+  /** The file the row shows. Absent while it is read: the row draws its loading form. */
+  file?: FileItem | null;
   isSelected?: boolean;
   showCheckbox?: boolean;
   showPath?: boolean;
@@ -100,7 +106,12 @@ export interface FileManagerTableRowProps {
   onDoubleClick?: () => void;
   onContextMenu?: (e: MouseEvent) => void;
   onActionClick?: (action: FileAction) => void;
+  /** The folder is still being read: the row draws its loading form (its frame, its read parts as bars). A loading
+   *  scope does the same. */
+  loading?: boolean;
   className?: string;
+  /** Markers for the page's height gate (`data-loading-item`), carried by the row in both forms. */
+  [marker: `data-${string}`]: unknown;
 }
 
 export interface FileManagerContextMenuProps {

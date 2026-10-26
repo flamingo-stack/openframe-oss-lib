@@ -36,6 +36,7 @@ import type { ComponentType, ReactNode } from 'react';
 import { useRouter } from '../../embed-shims/next-navigation';
 import { useCopyToClipboard } from '../../hooks/use-copy-to-clipboard';
 import { useDownloads } from '../../hooks/use-downloads';
+import { TILE_SIZE } from '../../styles/component-sizes';
 import {
   DESKTOP_OS_LABELS,
   DOWNLOAD_ARCHITECTURE_LABELS,
@@ -44,6 +45,7 @@ import {
   DOWNLOADS_MOBILE_TITLE,
   DOWNLOADS_TAGLINE,
   DOWNLOADS_TITLE,
+  OPEN_APP_LABEL,
   type AppDownload,
   type DownloadActionEvent,
   type DownloadsPublic,
@@ -57,14 +59,16 @@ import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
+import { ExternalLinkIcon } from '../icons-v2-generated/interface/external-link-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Button } from '../ui/button/button';
 import { LoadError } from '../ui/error-state';
+import { useLoadingScope } from '../ui/loading-scope';
 import { MobileAppQr } from '../ui/mobile-app-qr';
-import { StoreBadgeLinks } from '../ui/store-badges';
+import { AppStoreBadge, GooglePlayBadge, StoreBadgeLinks } from '../ui/store-badges';
 
 export interface DownloadAppsPageProps {
   /** GET endpoint for the public projection. Default `DOWNLOADS_API_PATH`. */
@@ -86,6 +90,13 @@ export interface DownloadAppsPageProps {
   openStoresInNewTab?: boolean;
   /** Called when a visitor downloads an installer or copies an install command (the host's analytics). */
   onDownloadAction?: (event: DownloadActionEvent) => void;
+  /**
+   * Once an installer is downloaded, the link that opens the app it installs, which then stands in
+   * for that row's download button ("Open the app"); nothing keeps the download. The host decides
+   * both, as it is the one that knows a download happened (the website tags each click with the
+   * id the link carries). Absent: every installer stays a download.
+   */
+  openAppHref?: (download: AppDownload) => string | null | undefined;
   /** The closing card, under the mobile app: using OpenFrame without installing anything. Default: none. */
   web?: DownloadAppsWebOption;
   /**
@@ -112,8 +123,20 @@ const cardsGridClass = (cards: number) => (cards > 1 ? CARDS_GRID_CLASS : 'grid 
 const CARD_CLASS =
   'flex flex-col gap-[var(--spacing-system-lf)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-lf)]';
 const CARD_HEADER_CLASS = 'flex items-center gap-[var(--spacing-system-sf)]';
+/** A card header's logo and name, a card's one line of copy and the scan card's text column: loaded and loading. */
+const CARD_ICON_CLASS = 'h-6 w-6 shrink-0 text-ods-text-secondary';
+const CARD_TITLE_CLASS = 'm-0 text-ods-text-primary text-h3';
+const CARD_LINE_CLASS = 'm-0 text-ods-text-secondary text-h4';
+const SCAN_TEXT_CLASS = 'flex flex-col gap-[var(--spacing-system-sf)]';
 const BUTTONS_CLASS = 'flex flex-wrap gap-[var(--spacing-system-sf)]';
 const COMMANDS_CLASS = 'flex flex-col gap-[var(--spacing-system-mf)]';
+const SCAN_CARD_CLASS = 'content-md:flex-row content-md:items-center content-md:justify-between';
+const QR_CLASS = `${TILE_SIZE.qr} shrink-0`;
+/** `StoreBadgeLinks`' row and badge size, which the loading store card draws with the same artwork. */
+const STORE_BADGES_CLASS = 'flex flex-wrap items-center gap-[var(--spacing-system-lf)]';
+const STORE_BADGE_CLASS = 'h-12 w-auto';
+const MOBILE_STORE_CARD_LINE = 'Get alerts and respond to tickets on the go.';
+const MOBILE_SCAN_TITLE = 'Scan with your phone';
 
 const OS_ICONS: Partial<Record<DesktopOs, ComponentType<{ className?: string }>>> = {
   mac: AppleLogoIcon,
@@ -132,8 +155,8 @@ function CardHeader({
 }) {
   return (
     <div className={CARD_HEADER_CLASS}>
-      {Icon && <Icon className="h-6 w-6 shrink-0 text-ods-text-secondary" />}
-      <h3 className="m-0 text-ods-text-primary text-h3">{title}</h3>
+      {Icon && <Icon className={CARD_ICON_CLASS} />}
+      <h3 className={CARD_TITLE_CLASS}>{title}</h3>
       {detail && <p className="m-0 ml-auto text-right text-ods-text-secondary text-h6">{detail}</p>}
     </div>
   );
@@ -170,9 +193,11 @@ function installerLabel(download: AppDownload, siblings: number): string {
 function SystemCard({
   system,
   onDownloadAction,
+  openAppHref,
 }: {
   system: SystemRows;
   onDownloadAction?: DownloadAppsPageProps['onDownloadAction'];
+  openAppHref?: DownloadAppsPageProps['openAppHref'];
 }) {
   const { copy } = useCopyToClipboard({
     successTitle: 'Copied',
@@ -190,18 +215,30 @@ function SystemCard({
       />
       {system.installers.length > 0 && (
         <div className={BUTTONS_CLASS}>
-          {system.installers.map((download, index) => (
-            <Button
-              key={download.id}
-              variant={index === 0 ? 'accent' : 'outline'}
-              href={download.url ?? undefined}
-              download
-              leftIcon={<Download01Icon className="h-5 w-5" />}
-              onClick={() => report('installer', download)}
-            >
-              {installerLabel(download, system.installers.length)}
-            </Button>
-          ))}
+          {system.installers.map((download, index) => {
+            const openApp = openAppHref?.(download);
+            return openApp ? (
+              <Button
+                key={download.id}
+                variant={index === 0 ? 'accent' : 'outline'}
+                href={openApp}
+                leftIcon={<ExternalLinkIcon className="h-5 w-5" />}
+              >
+                {OPEN_APP_LABEL}
+              </Button>
+            ) : (
+              <Button
+                key={download.id}
+                variant={index === 0 ? 'accent' : 'outline'}
+                href={download.url ?? undefined}
+                download
+                leftIcon={<Download01Icon className="h-5 w-5" />}
+                onClick={() => report('installer', download)}
+              >
+                {installerLabel(download, system.installers.length)}
+              </Button>
+            );
+          })}
         </div>
       )}
       {system.commands.length > 0 && (
@@ -236,28 +273,74 @@ function WebCard({ web }: { web: DownloadAppsWebOption }) {
       className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}
     >
       <div className="flex flex-col gap-[var(--spacing-system-xsf)]">
-        <h2 id="download-web" className="m-0 text-ods-text-primary text-h3">
+        <h2 id="download-web" className={CARD_TITLE_CLASS}>
           {web.title}
         </h2>
-        <p className="m-0 text-ods-text-secondary text-h4">{web.description}</p>
+        <p className={CARD_LINE_CLASS}>{web.description}</p>
       </div>
       <div className="shrink-0">{web.action}</div>
     </section>
   );
 }
 
-/** A section's cards while the server's answer loads: the same grid and card frame, a button's box in each. */
-function CardsSkeleton({ label }: { label: string }) {
+/**
+ * The desktop cards while the server's answer loads: one card per system the page knows (`DESKTOP_OSES`, in the
+ * loaded grid's own rule), each with its real logo and name, the requirement line as a bar, the installer button's
+ * own skeleton and one install command's box (a system the deployment does not offer drops out when it lands).
+ */
+/** A loading command box's copy button: the button is drawn, there is nothing to copy yet. */
+const NO_COMMAND_TO_COPY = () => {};
+
+function SystemCardsSkeleton() {
   return (
-    <LoadingRegion label={label} className={CARDS_GRID_CLASS}>
-      {[0, 1].map(card => (
-        <div key={card} className={CARD_CLASS}>
-          <UnifiedSkeleton className="h-6 w-32 rounded" />
-          <UnifiedSkeleton className="h-12 w-56 rounded-md" />
-          <UnifiedSkeleton className="h-14 w-full rounded-md" />
+    <div className={cardsGridClass(DESKTOP_OSES.length)}>
+      {DESKTOP_OSES.map(os => {
+        const Icon = OS_ICONS[os];
+        return (
+          <div key={os} className={CARD_CLASS}>
+            <div className={CARD_HEADER_CLASS}>
+              {Icon && <Icon className={CARD_ICON_CLASS} />}
+              <h3 className={CARD_TITLE_CLASS}>{DESKTOP_OS_LABELS[os]}</h3>
+              <TextLineSkeleton type="h6" className="ml-auto w-32" />
+            </div>
+            <div className={BUTTONS_CLASS}>
+              <InteractiveSkeleton.Button size="default" className="w-56" />
+            </div>
+            <div className={COMMANDS_CLASS}>
+              <CommandBox loading command="" maxLines={1} onCopy={NO_COMMAND_TO_COPY} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The mobile cards while the server's answer loads: the store card (its line and both store badges, static artwork,
+ * real; the device name as a bar) and the scan card (its heading real, the address line and the code as skeletons).
+ */
+function MobileCardsSkeleton() {
+  return (
+    <div className={cardsGridClass(2)}>
+      <div className={CARD_CLASS}>
+        <div className={CARD_HEADER_CLASS}>
+          <TextLineSkeleton type="h3" className="w-48" />
         </div>
-      ))}
-    </LoadingRegion>
+        <p className={CARD_LINE_CLASS}>{MOBILE_STORE_CARD_LINE}</p>
+        <div className={STORE_BADGES_CLASS} inert aria-hidden>
+          <AppStoreBadge className={STORE_BADGE_CLASS} />
+          <GooglePlayBadge className={STORE_BADGE_CLASS} />
+        </div>
+      </div>
+      <div className={cn(CARD_CLASS, SCAN_CARD_CLASS)}>
+        <div className={SCAN_TEXT_CLASS}>
+          <CardHeader title={MOBILE_SCAN_TITLE} />
+          <TextLineSkeleton type="h4" lines={2} className="w-full" />
+        </div>
+        <UnifiedSkeleton className={QR_CLASS} />
+      </div>
+    </div>
   );
 }
 
@@ -288,10 +371,13 @@ export function DownloadAppsPage({
   showDesktop = true,
   openStoresInNewTab = true,
   onDownloadAction,
+  openAppHref,
   web,
   faq,
 }: DownloadAppsPageProps) {
   const { data, isLoading, error, reload } = useDownloads({ endpoint, initialData });
+  // In a page's loading state the answer is read: the page draws its sections' skeletons, never nothing.
+  const scoped = useLoadingScope();
   // The page adapts to the server's answer: a section exists only for what it names.
   const systems = showDesktop && data ? rowsBySystem(data.desktop) : [];
   const mobile = data?.mobile ?? null;
@@ -300,21 +386,23 @@ export function DownloadAppsPage({
   const offersDesktop = showDesktop && (!data || systems.length > 0);
 
   let body: ReactNode;
-  if (error && !data) {
+  if (error && !data && !scoped) {
     body = <LoadError message="Could not load the downloads" onRetry={reload} />;
-  } else if (!data) {
-    body = isLoading ? (
-      <>
-        {showDesktop && (
-          <Section id="download-desktop" title="Desktop app">
-            <CardsSkeleton label="Loading the installers" />
+  } else if (!data || scoped) {
+    body =
+      isLoading || scoped ? (
+        // ONE region announces the page's loading; the sections inside it are silent.
+        <LoadingRegion label="Loading the downloads" className={SECTIONS_CLASS}>
+          {showDesktop && (
+            <Section id="download-desktop" title="Desktop app">
+              <SystemCardsSkeleton />
+            </Section>
+          )}
+          <Section id="download-mobile" title="Mobile app">
+            <MobileCardsSkeleton />
           </Section>
-        )}
-        <Section id="download-mobile" title="Mobile app">
-          <CardsSkeleton label="Loading the mobile app" />
-        </Section>
-      </>
-    ) : null;
+        </LoadingRegion>
+      ) : null;
   } else {
     body = (
       <>
@@ -322,7 +410,12 @@ export function DownloadAppsPage({
           <Section id="download-desktop" title="Desktop app">
             <div className={cardsGridClass(systems.length)}>
               {systems.map(system => (
-                <SystemCard key={system.os} system={system} onDownloadAction={onDownloadAction} />
+                <SystemCard
+                  key={system.os}
+                  system={system}
+                  onDownloadAction={onDownloadAction}
+                  openAppHref={openAppHref}
+                />
               ))}
             </div>
           </Section>
@@ -333,7 +426,7 @@ export function DownloadAppsPage({
             <div className={cardsGridClass(mobile.install ? 2 : 1)}>
               <div className={CARD_CLASS}>
                 <CardHeader title={storeCardTitle(mobile)} />
-                <p className="m-0 text-ods-text-secondary text-h4">Get alerts and respond to tickets on the go.</p>
+                <p className={CARD_LINE_CLASS}>{MOBILE_STORE_CARD_LINE}</p>
                 <StoreBadgeLinks
                   appStoreUrl={mobile.appStoreUrl}
                   googlePlayUrl={mobile.googlePlayUrl}
@@ -341,16 +434,14 @@ export function DownloadAppsPage({
                 />
               </div>
               {mobile.install && (
-                <div
-                  className={cn(CARD_CLASS, 'content-md:flex-row content-md:items-center content-md:justify-between')}
-                >
-                  <div className="flex flex-col gap-[var(--spacing-system-sf)]">
-                    <CardHeader title="Scan with your phone" />
-                    <p className="m-0 text-ods-text-secondary text-h4">
+                <div className={cn(CARD_CLASS, SCAN_CARD_CLASS)}>
+                  <div className={SCAN_TEXT_CLASS}>
+                    <CardHeader title={MOBILE_SCAN_TITLE} />
+                    <p className={CARD_LINE_CLASS}>
                       Point your camera at the code, or open {formatUrlForDisplay(mobile.install.url)} on your phone.
                     </p>
                   </div>
-                  <MobileAppQr install={mobile.install} className="h-[144px] w-[144px] shrink-0" />
+                  <MobileAppQr install={mobile.install} className={QR_CLASS} />
                 </div>
               )}
             </div>

@@ -16,8 +16,6 @@ import { MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet-id';
 import { NavItemRow } from './nav-item-row';
 import { defaultRenderSiteNavLink, NAV_FOCUS_CLASS, type SiteNavLinkRenderer } from './site-nav-link';
 
-export { MOBILE_NAV_SHEET_ID } from './mobile-nav-sheet-id';
-
 export interface MobileNavSheetProps {
   nav: SiteNav;
   isOpen: boolean;

@@ -13,12 +13,13 @@ import {
   type TrustCenterControlsPage,
   type TrustCenterPublic,
 } from '../../../types/trust-center';
+import { LoadingScope } from '../../ui/loading-scope';
 import {
   TRUST_CENTER_FIXTURE_FAQ,
   TRUST_CENTER_FIXTURE_WINDOW_MS,
   makeTrustCenterData,
 } from '../__fixtures__/trust-center';
-import { TrustCenterPage, TrustCenterPageSkeleton } from '../trust-center-page';
+import { TrustCenterPage } from '../trust-center-page';
 import { TRUST_SECTION_LEADS } from '../trust-center-sections';
 
 // The real ContactForm needs the endpoints + chat runtimes; the page only
@@ -105,6 +106,19 @@ describe('TrustCenterPage', () => {
     expect(html).not.toMatch(/Controls (continuously )?monitored/);
   });
 
+  it('in a loading scope: draws its skeleton (every section heading and lead real, no read words) and fetches nothing', () => {
+    const html = renderToString(
+      <LoadingScope>
+        <TrustCenterPage />
+      </LoadingScope>,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    for (const lead of Object.values(TRUST_SECTION_LEADS)) expect(html).toContain(lead);
+    expect(html).toContain('Security questions');
+    expect(html).not.toContain('Checking monitoring status');
+    expect(html).toMatch(/bg-ods-skeleton/);
+  });
+
   it('does not fetch when initialData is given', () => {
     render(<TrustCenterPage initialData={makeData()} />);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -139,12 +153,19 @@ describe('TrustCenterPage', () => {
     expect(screen.queryByText('Loading the trust center')).toBeNull();
   });
 
-  it('TrustCenterPageSkeleton wears the page chrome it is given: no title and subtitle means no header at all', () => {
-    const { rerender } = render(<TrustCenterPageSkeleton shell={false} title="" subtitle="" />);
-    expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
-    expect(screen.getByRole('status')).toHaveTextContent('Loading the trust center');
-    rerender(<TrustCenterPageSkeleton shell={false} />);
-    expect(screen.getByRole('heading', { level: 1, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
+  it('in a loading scope the page wears the chrome it is given: no title and subtitle means no header at all', () => {
+    const { rerender } = render(
+      <LoadingScope>
+        <TrustCenterPage shell={false} title="" subtitle="" />
+      </LoadingScope>,
+    );
+    expect(screen.queryByRole('heading', { level: 1, hidden: true })).toBeNull();
+    rerender(
+      <LoadingScope>
+        <TrustCenterPage shell={false} />
+      </LoadingScope>,
+    );
+    expect(screen.getByRole('heading', { level: 1, hidden: true, name: TRUST_CENTER_TITLE })).toBeInTheDocument();
   });
 
   it('is ONE page: every section is an anchored h2, in reading order — AI & data use after Subprocessors, Contact before FAQ', () => {
@@ -221,6 +242,12 @@ describe('TrustCenterPage', () => {
     expect(link).toHaveAttribute('target', '_blank');
     // One control only: never also a header action or part of the phone's fixed bottom bar (those are for Request access).
     expect(screen.getAllByText('Download PDF')).toHaveLength(1);
+  });
+
+  it('attribution={false}: the host states the sync line and its download, so the page keeps only the monitoring status', () => {
+    render(<TrustCenterPage initialData={makeData()} attribution={false} />);
+    expect(screen.queryByText(/Data synced from/)).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Download PDF' })).toBeNull();
   });
 
   it('still offers the PDF when monitoring is not connected (no source line to end)', () => {
