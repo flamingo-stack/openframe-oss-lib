@@ -122,14 +122,14 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         String ticketId = ticket.getId();
         TenantOrganization key = new TenantOrganization(tenantId, organizationId);
         if (!organizationNames.containsKey(key)) {
-            return new Mismatch(tenantId, ticketId, "organization " + organizationId + " is gone");
+            return new Mismatch(tenantId, ticketId, null, "organization " + organizationId + " is gone");
         }
         String sourceName = organizationNames.get(key);
         String copiedName = ticket.getOrganizationName();
         if (Objects.equals(sourceName, copiedName)) {
             return null;
         }
-        return new Mismatch(tenantId, ticketId, "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
+        return new Mismatch(tenantId, ticketId, null, "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
     }
 
     // A tenant's organization: an organizationId is unique only inside its tenant.

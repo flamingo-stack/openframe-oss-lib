@@ -1,7 +1,7 @@
 # OpenFrame Event Publishing
 
 Writes an outbox row for every change of a published Mongo document, in the same transaction as the change.
-Debezium will later read the `outbox` collection and send each row to Kafka. Nothing reads the outbox yet.
+Debezium will later read the `event_outbox` collection and send each row to Kafka. Nothing reads the outbox yet.
 
 `openframe-data-mongo-sync` depends on this module, so every service with Mongo has it on the classpath.
 It does nothing until you enable it.
@@ -34,20 +34,23 @@ service ──> OrganizationRepository.save(org)
 ```yaml
 openframe:
   events:
-    publishing:
-      enabled: false      # the whole module (default false); a change needs a pod restart
+    enabled: false        # the whole feature (default false); a change needs a pod restart
     topics:
-      organizations:      # one key per spec's getType(); publish: true for a type no spec has stops the service, any other unknown key logs a WARN
-        publish: false    # per aggregate (default false); a change needs a pod restart
+      organizations:      # one key per spec's getType(); enabled: true for a type no spec has stops the service, any other unknown key logs a WARN
+        enabled: false    # per aggregate (default false); a change needs a pod restart
 ```
 
-| `publishing.enabled` | `publish` | Result |
+The same keys switch every module of the feature: each module exists only in the services that use it. In a tenant
+service, a type switched on is published and the aspect cascades from that type stop; in `openframe-saas-stream`, its
+listener and projections run.
+
+| `events.enabled` | `topics.<type>.enabled` | Result |
 |---|---|---|
-| `false` | any | Nothing of this module exists. Every repository is a plain Spring Data repository, exactly as before. A topic set to `true` gets a WARN at startup. |
+| `false` | any | Nothing of this module exists. Every repository is a plain Spring Data repository, exactly as before, and the aspects keep running. A topic set to `true` gets a WARN at startup. |
 | `true` | `false` | The interceptor and the startup checks run. Writes run without a transaction and without outbox rows. |
 | `true` | `true` | Each write and its outbox rows commit together, or roll back together. |
 
-Also needed: `spring.data.mongodb.enabled: true`. With `publish: true`, Mongo must be a replica set, because
+Also needed: `spring.data.mongodb.enabled: true`. With a type switched on, Mongo must be a replica set, because
 transactions need one.
 
 ## Publish a new aggregate
@@ -98,7 +101,7 @@ Organization is the example; its files are in `openframe-data-mongo-sync`, next 
    document; a second one, or none, stops the service.
 4. Find every other write of that collection (custom repository methods, `MongoTemplate` calls, services) and
    publish each one with `OutboxPublisher`, or the change is silently not published.
-5. Add the config key, with `publish: false`, and enable it per environment.
+5. Add the config key, with `enabled: false`, and switch it on per environment.
 
 ## Projections
 
@@ -109,11 +112,11 @@ it works). The spec lists them in `projections()`, and each one implements
 
 | Method | Who calls it, and when | What it does |
 |---|---|---|
-| `name()` | config, the reconciliation job, metrics | Its own name, for example `organization-on-tickets`: the key of its mode (`openframe.events.processing.projections.<name>.mode`), its reconciliation job id (`reconciliation:<name>`) and the tag of its metrics. Unique. |
-| `apply(record)` | the stream, for every event of the document, when the mode is `both` or `events` | Updates the projection from the event, through its own repository and with the version guard. For example: set `organizationName` on every ticket of that organization. |
+| `name()` | config, the reconciliation job, metrics | Its own name, for example `organization-on-tickets`: its reconciliation job id (`reconciliation:<name>`) and the tag of its metrics. Unique. |
+| `apply(record)` | the stream, for every event of the document, while its type is switched on there | Updates the projection from the event, through its own repository and with the version guard. For example: set `organizationName` on every ticket of that organization. |
 | `projectedClass()` | the nightly reconciliation job | The documents that hold the projection, for example `Ticket.class`. The job reads their collection in `_id` batches, saves its progress and knows when it is done. |
 | `projectedViewClass()` | the nightly reconciliation job | A small class with only the fields `reconcile` needs, for example `TicketOrganizationView` (id, tenant, organization id and name). The job reads only these fields, into this class. Its field names must be property names of `projectedClass()`: an unknown one stays null without an error, so the projection's test checks them. |
-| `reconcile(projectedItems)` | the nightly reconciliation job, once per batch | Gets one batch of projected items (for example tickets' organization fields), reads their source documents (matched by tenant and reference, for example `organizationId`), and returns a [`ReconciliationResult`](src/main/java/com/openframe/publishing/api/model/ReconciliationResult.java#L11) with each projected document that differs from its source or whose source is gone ([`ReconciliationResult.Mismatch`](src/main/java/com/openframe/publishing/api/model/ReconciliationResult.java#L23): tenant, projected item id and a reason for the logs), or `ReconciliationResult.allMatch()`. It writes nothing. |
+| `reconcile(projectedItems)` | the nightly reconciliation job, once per batch | Gets one batch of projected items (for example tickets' organization fields), reads their source documents (matched by tenant and reference, for example `organizationId`), and returns a [`ReconciliationResult`](src/main/java/com/openframe/publishing/api/model/ReconciliationResult.java#L11) with each projected document that differs from its source or whose source is gone ([`ReconciliationResult.Mismatch`](src/main/java/com/openframe/publishing/api/model/ReconciliationResult.java#L23): tenant, projected item id, the source document's `_id` the job publishes again to repair it, null when the source is gone, and a reason for the logs), or `ReconciliationResult.allMatch()`. It writes nothing itself. |
 
 The interface forces all five methods; what they do is the projection's decision. A projection writes and reads
 only through its own repository methods, never a generic one, and has a contract test. In Mongo, "projection" also
@@ -199,12 +202,12 @@ These writes produce no outbox row, and nothing warns about them:
 | A repository method carries `@PublishesChange` / `@PublishesDelete` | These markers are internal to the library's `PublishedRepositoryWrites`; use `OutboxPublisher` instead. |
 | A Spring Data write method is not in `PublishedRepositoryWrites` | A new Spring Data version added a write; add it there with a marker. |
 
-`PublishedAggregateStartupCheck` also stops the service when a topic has `publish: true` but no spec bean exists for
+`PublishedAggregateStartupCheck` also stops the service when a topic has `enabled: true` but no spec bean exists for
 its type.
 
 ## The outbox row
 
-Collection `outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publishing/persistence/OutboxEvent.java):
+Collection `event_outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publishing/persistence/OutboxEvent.java):
 
 | Field | Value |
 |---|---|
@@ -217,7 +220,7 @@ Collection `outbox`, document [`OutboxEvent`](src/main/java/com/openframe/publis
 | `occurredAt` | When the row was written. |
 | `payload` | The `PublishedRecord` envelope as JSON (Jackson names, ISO dates); `null` for the second delete row; the key is always written, because Debezium's router needs it. |
 
-`OutboxIndexInitializer` creates the TTL index `outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
+`OutboxIndexInitializer` creates the TTL index `event_outbox_occurredAt_ttl` at startup: rows expire after 7 days. To
 change the TTL later, write a migration that drops the index first; `createIndex` with other options fails at
 startup with `IndexOptionsConflict`.
 
@@ -260,7 +263,8 @@ What to look for:
 | `… with a null argument goes to Spring Data unpublished` | A base delete got `null`; Spring Data refuses it. |
 
 No `… is a … write` line at all for a repository call means the interceptor is not there: check that
-`openframe.events.publishing.enabled` is `true`, and that the startup log has `<repository> publishes <type>`.
+`openframe.events.enabled` is `true`, and that the startup log has `[<repository>] publish <type>`. The line
+`[<repository>] publish no <type> writes: openframe.events.topics.<type>.enabled is off` means the type is switched off.
 
 ## Tests
 

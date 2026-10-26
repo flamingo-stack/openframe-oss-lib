@@ -14,8 +14,7 @@ import java.time.Duration;
 @RequiredArgsConstructor
 public class OutboxIndexInitializer implements SmartLifecycle {
 
-    static final String TTL_INDEX = "outbox_occurredAt_ttl";
-    static final String OCCURRED_AT = "occurredAt";
+    static final String ROW_EXPIRY = "event_outbox_occurredAt_ttl";
 
     // Debezium reads a row right after its insert; the TTL only has to outlast a Debezium outage.
     static final Duration TIME_TO_LIVE = Duration.ofDays(7);
@@ -31,9 +30,15 @@ public class OutboxIndexInitializer implements SmartLifecycle {
 
     @Override
     public void start() {
-        Index ttlIndex = new Index().on(OCCURRED_AT, Sort.Direction.ASC).expire(TIME_TO_LIVE).named(TTL_INDEX);
-        mongoOperations.indexOps(OutboxEvent.class).createIndex(ttlIndex);
-        log.debug("Ensured TTL index {} on the outbox ({} days)", TTL_INDEX, TIME_TO_LIVE.toDays());
+        Index rowExpiry = new Index()
+            .on(OutboxEvent.Fields.occurredAt, Sort.Direction.ASC)
+            .expire(TIME_TO_LIVE)
+            .named(ROW_EXPIRY);
+
+        mongoOperations.indexOps(OutboxEvent.class)
+            .createIndex(rowExpiry);
+
+        log.debug("Ensured TTL index {} on the outbox ({} days)", ROW_EXPIRY, TIME_TO_LIVE.toDays());
         running = true;
     }
 
