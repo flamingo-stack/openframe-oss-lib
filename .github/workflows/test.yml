@@ -48,45 +48,12 @@ jobs:
             | grep -qE "^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\(.+\))?!?: .+ CU-[0-9a-z]+$" \
             || { echo "::error::Expected 'fix(armor): exclude billing action CU-17tkuw5x3yh' (no-task label drops CU-); fix the title and re-run"; exit 1; }
 
-  scan:
-    name: "Scan Code: ${{ matrix.target.name }}"
-    runs-on: ubuntu-latest
-    needs: [changes]
-    permissions:
-      contents: read
-      packages: read
-      pull-requests: read
-    # Disabled: covered by "Flamingo Code Review / tests and checks" (Trivy, advisory; this scan never blocked: continue-on-error and not in All Checks). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
-    # was: if: github.event_name == 'pull_request'
-    if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
-    strategy:
-      fail-fast: false
-      matrix:
-        target: ${{ fromJson(needs.changes.outputs.node_matrix) }}
-        include:
-          - target: { name: backend, path: ".", paths: "**/{pom.xml,Cargo.toml,Cargo.lock,Dockerfile*}", skip_files: "**/package.json,**/package-lock.json,**/yarn.lock,**/pnpm-lock.yaml" }
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Scan code
-        continue-on-error: true
-        uses: ./.github/steps/trivy
-        with:
-          scan: code
-          path: ${{ matrix.target.path }}
-          paths: ${{ matrix.target.paths || '' }}
-          skip-files: ${{ matrix.target.skip_files || '' }}
-          image-name: ${{ matrix.target.name }}
-
   test-java:
     name: Test Java
     runs-on: ubuntu-latest
     needs: [changes]
-    if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true'
+    # trivy: a change to the Trivy step or its ignores scans again.
+    if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true' || fromJSON(needs.changes.outputs.changes || '{}').trivy == 'true'
     permissions:
       contents: read
       packages: write
@@ -120,6 +87,7 @@ jobs:
           echo "NEW_VERSION=${OLD_VERSION%.*}.$((${OLD_VERSION##*.} + 1))-${{ github.event.pull_request.number }}-SNAPSHOT" >> $GITHUB_ENV
 
       - name: Build and Publish ${{ env.NEW_VERSION }}
+        id: build
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -130,6 +98,17 @@ jobs:
             --batch-mode \
             --no-transfer-progress \
             -Dmaven.source.skip=true
+
+      # The dependencies the build above resolved into ~/.m2, read through the poms, so no go-offline and
+      # no second build. A fixable HIGH/CRITICAL finding fails the job and so All Checks. The merge queue
+      # does not scan again. The client Cargo.lock has its own job.
+      - name: Scan dependencies
+        if: github.event_name == 'pull_request' && !cancelled() && steps.build.outcome == 'success'
+        uses: ./.github/steps/trivy
+        with:
+          scan: code
+          name: java
+          skip-files: "**/Cargo.lock"
 
 
   test-node:
@@ -294,6 +273,27 @@ jobs:
         run: make -C clients/openframe-client test
 
 
+  # The client Cargo.lock, only when it changes. With Cargo.toml trivy drops crates under unversioned git deps.
+  scan_cargo:
+    name: "Scan Cargo.lock"
+    needs: [changes]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && (fromJSON(needs.changes.outputs.changes || '{}').cargo == 'true' || fromJSON(needs.changes.outputs.changes || '{}').trivy == 'true')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Scan Cargo.lock
+        uses: ./.github/steps/trivy
+        with:
+          scan: code
+          name: cargo
+          path: ./clients
+          skip-files: "**/Cargo.toml"
+
+
   cleanup:
     name: Cleanup
     if: github.event_name == 'pull_request' && github.event.pull_request.state != 'open'
@@ -321,7 +321,7 @@ jobs:
 
   all-checks:
     name: "All Checks"
-    needs: [changes, test-java, test-node, test-node-cycles, test-rust, lint]
+    needs: [changes, test-java, test-node, test-node-cycles, test-rust, scan_cargo, lint]
     runs-on: ubuntu-latest
     if: |
       always() &&

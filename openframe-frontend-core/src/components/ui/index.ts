@@ -117,7 +117,19 @@ export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';
-export { Trendline, TrendHistory, TREND_TONES, formatTrendChange, trendlinePoints, trendTone, trendToneClass, type TrendTone, type TrendlineProps, type TrendHistoryProps, type TrendHistoryColumn } from './trendline';
+export {
+  Trendline,
+  TrendHistory,
+  TREND_TONES,
+  formatTrendChange,
+  trendlinePoints,
+  trendTone,
+  trendToneClass,
+  type TrendTone,
+  type TrendlineProps,
+  type TrendHistoryProps,
+  type TrendHistoryColumn,
+} from './trendline';
 export { SourceTooltip, type SourceTooltipProps, type SourceRef } from './source-tooltip';
 export { TruncateText, type TruncateTextProps } from './truncate-text';
 export * from './highlight-card';
