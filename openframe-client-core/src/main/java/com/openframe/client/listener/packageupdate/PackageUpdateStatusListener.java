@@ -6,7 +6,6 @@ import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import io.nats.client.Connection;
 import io.nats.client.Message;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -26,13 +25,13 @@ public class PackageUpdateStatusListener extends AbstractJetStreamPushListener {
 
     private final ObjectMapper objectMapper;
     private final NatsTopicMachineIdExtractor machineIdExtractor;
-    private final ObjectProvider<PackageUpdateStatusProcessor> processor;
+    private final PackageUpdateStatusProcessor processor;
 
     public PackageUpdateStatusListener(
             Connection natsConnection,
             ObjectMapper objectMapper,
             NatsTopicMachineIdExtractor machineIdExtractor,
-            ObjectProvider<PackageUpdateStatusProcessor> processor
+            PackageUpdateStatusProcessor processor
     ) {
         super(natsConnection);
         this.objectMapper = objectMapper;
@@ -78,13 +77,7 @@ public class PackageUpdateStatusListener extends AbstractJetStreamPushListener {
                 message.ack();
                 return;
             }
-            PackageUpdateStatusProcessor bound = processor.getIfAvailable();
-            if (bound != null) {
-                bound.process(machineId, event);
-            } else {
-                log.info("Package-update status observed (no processor bound yet): machineId={} requestId={} state={}",
-                        machineId, event.getRequestId(), event.getState());
-            }
+            processor.process(machineId, event);
             message.ack();
         } catch (JacksonException | IllegalArgumentException permanentlyBad) {
             log.error("Package-update status rejected, malformed: subject={} payload={}", subject, payload, permanentlyBad);
