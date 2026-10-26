@@ -21,14 +21,17 @@ EventBackfillService / ReconciliationService     start a run, continue it, or wa
 EventJobTicker                                   batches until DONE, half of lock-at-most-for, or shutdown
    │  one batch: EventBackfillRunner / ReconciliationRunner
    ▼
-EventJobService ──> event_jobs                  one document per job: run id, status, lastId, counts
+EventJobService ──> event_job_runs              one document per run: run id, status, lastId, counts
 ```
 
 - One pod runs a job at a time: the lock is ShedLock's, with the stream's `LockProvider` (Redis). A dead pod's lock
   expires after `lock-at-most-for`, and the next tick on any pod continues from the saved `lastId`.
 - [`EventJob`](src/main/java/com/openframe/event/jobs/core/persistence/EventJob.java#L21) holds the progress rules; each change returns a copy, and
-  [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. The document has `@Version`, so a pod still busy
-  with an older copy fails its save and stops. `event_jobs` is read from the primary.
+  [`EventJobService`](src/main/java/com/openframe/event/jobs/core/service/EventJobService.java#L13) saves it. Each run is its own document, `_id: "<job>:<run id>"`;
+  the job's current run is its newest by `startedAt`. A new run ends a RUNNING one as REPLACED, and the documents have
+  `@Version`, so a pod still busy with an older copy fails its save and stops. `event_job_runs` is read from the primary.
+- Finished runs stay for good, as the jobs' history; they are small, and reconciliation adds one per projection a night.
+  [`EventJobRunIndexInitializer`](src/main/java/com/openframe/event/jobs/core/persistence/EventJobRunIndexInitializer.java) creates the `{jobId, startedAt}` index that finds the current run.
 - [`EventJobTicker`](src/main/java/com/openframe/event/jobs/core/service/EventJobTicker.java#L17) runs both jobs' batches. It stops after the current batch when
   the service shuts down ([`EventJobShutdown`](src/main/java/com/openframe/event/jobs/core/service/EventJobShutdown.java#L7)): Spring does not interrupt a
   running `@Scheduled` task.
@@ -41,9 +44,9 @@ EventJobService ──> event_jobs                  one document per job: run id
 ```yaml
 openframe:
   events:
+    enabled: false                      # the whole feature (default false); a change needs a pod restart
     jobs:
-      enabled: false                    # the whole module (default false); a change needs a pod restart
-      backfill:                         # only with openframe.events.publishing.enabled: true
+      backfill:
         runs:
           organizations: "2026-10-21"   # a run id per type; a new value starts the type again from its first document
         batch-size: 500
@@ -52,7 +55,6 @@ openframe:
         lock-at-most-for: 2m            # a tick works for half of it
         max-failures: 3                 # errors in a row before the run is FAILED
       reconciliation:
-        enabled: false                  # its own switch (default false); needs the module switch too
         cron: "0 0 3 * * *"             # UTC; when a new run is due. The first run starts at once
         batch-size: 1000
         pause: 200ms
@@ -64,14 +66,14 @@ openframe:
 
 The type keys are the specs' `getType()` names; a key no spec has stops the service.
 
-The service that turns the module on also provides:
+Only `openframe-saas-stream` has this module, so `openframe.events.enabled` runs all three jobs there. It also provides:
 
 - `@EnableScheduling`; the module does not switch scheduling on for every service that adds it;
 - a ShedLock `LockProvider` bean;
-- for the backfill, `openframe.events.publishing.enabled: true` and `openframe.events.topics.<type>.publish: true`.
-  Without publishing the module starts with reconciliation only, and logs a WARN when run ids are set. A type whose
-  publish is off is skipped with a WARN, because the outbox write would do nothing;
-- for the reconciliation, the `AggregateSpec` beans of the published types: every projection they return is reconciled
+- for the backfill, `openframe.events.topics.<type>.enabled: true`. A type switched off is skipped with a WARN,
+  because the outbox write would do nothing;
+- for the reconciliation, the `AggregateSpec` beans of the published types: the projections of each type switched on
+  with `openframe.events.topics.<type>.enabled` are reconciled; a type switched off is not checked
   (see [Projections](../openframe-event-publishing/README.md#projections)).
 
 In `openframe-saas-stream` the scheduling and the lock provider are in `EventJobsConfiguration`, with locks under the
@@ -84,18 +86,18 @@ libraries it scans.
 a date is easy to read. The log shows `Backfill of <type> started, run <id>`, then `done` at the end.
 
 **Repeat** it: set a new run id and restart. The new run starts again from the first document. Leaving the same run id
-changes nothing: a DONE run stays done. A run id once replaced is never started again, so pods that still have the old
-config during a rolling restart leave the new run alone; always use a new value.
+changes nothing: a DONE run stays done. A run id the job already had is never started again, so pods that still have
+the old config during a rolling restart leave the new run alone; always use a new value.
 
 Each batch is written from the documents' current state, then their versions are read again from the primary. A
 document written meanwhile is published once more, so its newest state is the last record on the compacted topic
 ([`republishChanged`](src/main/java/com/openframe/event/jobs/backfill/service/EventBackfillRunner.java#L55)).
 
-**Follow** it in `event_jobs`, `_id: "backfill:<type>"`:
+**Follow** it in `event_job_runs`, newest run first:
 
 ```javascript
-db.event_jobs.findOne({_id: "backfill:organizations"})
-// runId, status (RUNNING, DONE, FAILED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
+db.event_job_runs.find({jobId: "backfill:organizations"}).sort({startedAt: -1})
+// runId, status (RUNNING, DONE, FAILED, REPLACED), lastId, processed, failures, lastError, startedAt, updatedAt, finishedAt
 ```
 
 and with the metric `openframe.events.backfill.documents{type}`.
@@ -113,7 +115,7 @@ and with the metric `openframe.events.backfill.documents{type}`.
 ## Reconciliation
 
 **Read** the result in the gauge `openframe.events.reconciliation.mismatches{projection}`: the projected items that
-differed in the last finished run. Every pod reports it from `event_jobs` on each tick, so the alert
+differed in the last finished run. Every pod reports it from `event_job_runs` on each tick, so the alert
 `event-reconciliation-drift` takes `max by (namespace, projection)`. A run in progress does not change it.
 
 The job reads the collection of the projection's `projectedClass()` in `_id` batches, only the fields of its
@@ -133,8 +135,11 @@ tenant is removed, its items may count as missing sources until its cleanup dele
 Reconciliation of organization-on-tickets in tenant <id>: 3 mismatch(es), for example [<ticket id>: name "Old" differs from organization's "New", ...]
 ```
 
-**Repair**: while the aspects write the projection, a mismatch is a missed aspect write; fix the aspect or the items.
-Once the projection applies events (stage 6), a new backfill run of the source type brings every item up to date.
+**Repair** is automatic: after the second read, the job publishes the current state of each confirmed mismatch's source
+again (`PublishedAggregates.publishCurrent`, each source once per batch), and the projection re-applies it, since the
+version store applies an equal version. The run still counts what it found, so the gauge shows the drift before the
+repair, and the next run should find none. A mismatch whose source is gone (`sourceId` null) has nothing to publish. A
+new backfill run of the type is still the way to repair everything at once.
 
 **Add a projection**: return it from its spec's `projections()` and implement `reconcile`; the job picks it up at the
 next start. Its `name()` is the job id (`reconciliation:<name>`) and the metric tag.

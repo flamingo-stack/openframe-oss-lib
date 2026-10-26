@@ -34,7 +34,7 @@ public class ReconciliationService {
     }
 
     public void reconcile(Projection<?, ?> projection, String jobId) {
-        EventJob job = jobService.jobOf(jobId);
+        EventJob job = jobService.findCurrentRun(jobId);
         Instant now = clock.instant();
         if (job.getStatus() == null) {
             String firstRunId = now.toString();
@@ -57,7 +57,7 @@ public class ReconciliationService {
 
     // Every pod reports the last finished run, so the metric does not depend on which pod ran it.
     public void reportLastResult(Projection<?, ?> projection, String jobId) {
-        EventJob job = jobService.jobOf(jobId);
+        EventJob job = jobService.findCurrentRun(jobId);
         long lastMismatches = job.getLastMismatches();
         metrics.report(projection, lastMismatches);
     }

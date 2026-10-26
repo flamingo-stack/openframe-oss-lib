@@ -110,7 +110,7 @@ class ProjectedItemRepositoryIT {
         ItemView item = repository.findAfter(Item.class, ItemView.class, null, 1).getFirst();
 
         // execution
-        String id = repository.idOf(item);
+        String id = repository.resolveId(item);
 
         // verifications
         assertThat(id).isEqualTo(FIRST);
