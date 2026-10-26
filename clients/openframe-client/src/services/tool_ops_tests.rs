@@ -1,4 +1,6 @@
 use super::ToolOps;
+use crate::config::update_config::CLIENT_UPDATE_POLL_SECS;
+use crate::services::tool_run_manager::ClientUpdatePendingFlag;
 use futures::{poll, FutureExt};
 use std::task::Poll;
 use std::time::Duration;
@@ -159,4 +161,36 @@ fn op_dropped_outside_the_runtime_clears_the_flag() {
         .expect("drop thread");
     assert!(!ops.is_busy(TOOL));
     assert!(ops.try_lock(TOOL).is_ok());
+}
+
+#[tokio::test]
+async fn a_client_update_holds_new_operations_back() {
+    let client_update = ClientUpdatePendingFlag::default();
+    let ops = ToolOps::new(client_update.view());
+
+    client_update.mark();
+    assert!(ops.try_lock(TOOL).is_err());
+
+    client_update.clear();
+    assert!(ops.try_lock(TOOL).is_ok());
+}
+
+#[tokio::test(start_paused = true)]
+async fn lock_waits_out_a_client_update() {
+    let client_update = ClientUpdatePendingFlag::default();
+    let ops = ToolOps::new(client_update.view());
+    client_update.mark();
+
+    let waiting = {
+        let ops = ops.clone();
+        tokio::spawn(async move { drop(ops.lock(TOOL).await) })
+    };
+    tokio::time::sleep(Duration::from_secs(CLIENT_UPDATE_POLL_SECS * 3)).await;
+    assert!(!waiting.is_finished());
+
+    client_update.clear();
+    timeout(WAIT, waiting)
+        .await
+        .expect("the lock was never taken")
+        .unwrap();
 }

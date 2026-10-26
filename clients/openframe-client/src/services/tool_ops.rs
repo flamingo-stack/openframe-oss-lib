@@ -1,33 +1,29 @@
-use crate::platform::write_in_flight_tool_ops;
+use crate::config::update_config::CLIENT_UPDATE_POLL_SECS;
+use crate::services::tool_run_manager::ClientUpdatePending;
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 use tokio::sync::OwnedMutexGuard;
+use tokio::time::{sleep, Duration};
 use tracing::info;
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ToolOps {
     locks: Arc<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>>,
     state: Arc<Mutex<OpState>>,
+    // the swap of a client update would cut a new operation short, so none starts while one holds the client
+    client_update: ClientUpdatePending,
+}
+
+impl Default for ToolOps {
+    fn default() -> Self {
+        Self::new(ClientUpdatePending::never())
+    }
 }
 
 #[derive(Default)]
 struct OpState {
     busy: HashSet<String>,
     released: HashSet<String>,
-    // openframe-client-updater reads the busy set from here before it stops this process
-    marker_dir: Option<PathBuf>,
-}
-
-impl OpState {
-    fn publish_busy(&self) {
-        let Some(dir) = &self.marker_dir else {
-            return;
-        };
-        let mut tool_ids: Vec<String> = self.busy.iter().cloned().collect();
-        tool_ids.sort();
-        write_in_flight_tool_ops(dir, &tool_ids);
-    }
 }
 
 #[derive(Debug)]
@@ -61,23 +57,28 @@ pub struct ToolOpGuard {
 }
 
 impl ToolOps {
-    /// Mirrors the busy set to the in-flight marker in `secured_dir`, cleared here since nothing is busy yet
-    pub fn with_in_flight_marker(secured_dir: &Path) -> Self {
-        let ops = Self::default();
-        {
-            let mut state = ops.state.lock().unwrap_or_else(PoisonError::into_inner);
-            state.marker_dir = Some(secured_dir.to_path_buf());
-            state.publish_busy();
+    pub fn new(client_update: ClientUpdatePending) -> Self {
+        Self {
+            locks: Arc::default(),
+            state: Arc::default(),
+            client_update,
         }
-        ops
     }
 
+    /// Waits out a client update holding the client, then for the tool lock.
     pub async fn lock(&self, tool_agent_id: &str) -> ToolLock {
+        while self.client_update.is_pending() {
+            sleep(Duration::from_secs(CLIENT_UPDATE_POLL_SECS)).await;
+        }
         let lock = self.lock_for(tool_agent_id).lock_owned().await;
         self.tool_lock(tool_agent_id, lock)
     }
 
+    /// Busy while another operation holds the tool or a client update holds the client.
     pub fn try_lock(&self, tool_agent_id: &str) -> Result<ToolLock, Busy> {
+        if self.client_update.is_pending() {
+            return Err(Busy);
+        }
         let lock = self
             .lock_for(tool_agent_id)
             .try_lock_owned()
@@ -137,15 +138,12 @@ impl ToolOps {
 
 impl ToolLock {
     pub fn mark_busy(self) -> ToolOpGuard {
-        {
-            let mut state = self
-                .ops
-                .state
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner);
-            state.busy.insert(self.tool_agent_id.clone());
-            state.publish_busy();
-        }
+        self.ops
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .busy
+            .insert(self.tool_agent_id.clone());
         info!("Tool {} marked as updating", self.tool_agent_id);
         ToolOpGuard {
             ops: self.ops,
@@ -169,7 +167,6 @@ impl Drop for ToolOpGuard {
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         state.busy.remove(&self.tool_agent_id);
-        state.publish_busy();
         // A run loop parked on a restart delay relaunches now instead of waiting it out.
         state.released.insert(self.tool_agent_id.clone());
         drop(state);

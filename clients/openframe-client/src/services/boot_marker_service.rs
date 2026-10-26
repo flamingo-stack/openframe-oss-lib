@@ -4,11 +4,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
 
+const CLIENT_UPDATE_DELEGATED_FILE_NAME: &str = "client_update_delegated";
+
 /// Writes `{secured}/boot.marker` with the running version on every boot: openframe-client-updater
 /// verifies a swapped binary by it, as did the update scripts of earlier clients.
 #[derive(Clone)]
 pub struct BootMarkerService {
     boot_marker_path: PathBuf,
+    delegation_marker_path: PathBuf,
     legacy_artifacts: Vec<PathBuf>,
 }
 
@@ -23,6 +26,9 @@ impl BootMarkerService {
 
         Ok(Self {
             boot_marker_path: directory_manager.secured_dir().join("boot.marker"),
+            delegation_marker_path: directory_manager
+                .secured_dir()
+                .join(CLIENT_UPDATE_DELEGATED_FILE_NAME),
             legacy_artifacts: legacy_last_known_good_artifacts(
                 directory_manager.secured_dir(),
                 &current_exe,
@@ -30,16 +36,12 @@ impl BootMarkerService {
         })
     }
 
+    /// Hands this client's updates to openframe-client-updater, then writes the boot marker. The
+    /// updater acts only while both carry the same version, so it leaves an older client that still
+    /// updates itself alone, including one that a downgrade brought back.
     pub async fn write_boot_marker(&self) -> Result<()> {
-        let temp_path = self.boot_marker_path.with_extension("marker.tmp");
-        fs::write(&temp_path, env!("OPENFRAME_VERSION"))
-            .with_context(|| format!("Failed to write temp boot marker: {:?}", temp_path))?;
-        fs::rename(&temp_path, &self.boot_marker_path).with_context(|| {
-            format!(
-                "Failed to move boot marker into place: {:?}",
-                self.boot_marker_path
-            )
-        })?;
+        write_version(&self.delegation_marker_path)?;
+        write_version(&self.boot_marker_path)?;
         debug!("Boot marker written: {}", self.boot_marker_path.display());
         Ok(())
     }
@@ -60,6 +62,16 @@ impl BootMarkerService {
             }
         }
     }
+}
+
+fn write_version(path: &Path) -> Result<()> {
+    let mut temp_path = path.as_os_str().to_owned();
+    temp_path.push(".tmp");
+    let temp_path = PathBuf::from(temp_path);
+    fs::write(&temp_path, env!("OPENFRAME_VERSION"))
+        .with_context(|| format!("Failed to write temp marker: {:?}", temp_path))?;
+    fs::rename(&temp_path, path)
+        .with_context(|| format!("Failed to move marker into place: {:?}", path))
 }
 
 fn legacy_last_known_good_artifacts(secured_dir: &Path, current_exe: &Path) -> Vec<PathBuf> {

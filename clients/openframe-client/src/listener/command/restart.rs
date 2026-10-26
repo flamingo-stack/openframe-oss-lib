@@ -13,6 +13,8 @@ use crate::services::tool_run_manager::ClientUpdatePending;
 #[derive(Clone)]
 pub struct RestartGate {
     closing: Arc<AtomicBool>,
+    // set while openframe-client-updater waits to stop this process for a swap; released if it never does
+    held_for_update: Arc<AtomicBool>,
     work: Arc<RwLock<()>>,
     requested: Arc<Notify>,
     busy_tools: BusyTools,
@@ -28,6 +30,7 @@ impl RestartGate {
     ) -> Self {
         Self {
             closing: Arc::new(AtomicBool::new(false)),
+            held_for_update: Arc::new(AtomicBool::new(false)),
             work: Arc::new(RwLock::new(())),
             requested: Arc::new(Notify::new()),
             busy_tools,
@@ -38,10 +41,43 @@ impl RestartGate {
 
     pub(super) fn admit(&self) -> Option<OwnedRwLockReadGuard<()>> {
         let admitted = self.work.clone().try_read_owned().ok()?;
-        if self.closing.load(Ordering::Acquire) {
+        if self.closing.load(Ordering::Acquire) || self.held_for_update.load(Ordering::Acquire) {
             return None;
         }
         Some(admitted)
+    }
+
+    /// A client update is a restart onto a new binary: no new commands are taken and running
+    /// work gets the same time a restart gives it, then the updater may stop this process.
+    pub(super) async fn drain_for_update(&self) {
+        self.held_for_update.store(true, Ordering::Release);
+        let deadline = Instant::now() + Duration::from_secs(SELF_RESTART_IDLE_WAIT_SECS);
+        info!(
+            "Client update pending: no new commands are taken, waiting for running ones to finish"
+        );
+
+        if timeout_at(deadline, self.work.write()).await.is_err() {
+            warn!(
+                "Commands still running after {}s, letting the update go ahead",
+                SELF_RESTART_IDLE_WAIT_SECS
+            );
+        }
+        while self.work_running() && Instant::now() < deadline {
+            sleep(Duration::from_secs(SELF_RESTART_IDLE_POLL_SECS)).await;
+        }
+        if self.work_running() {
+            warn!(
+                "Tool operation or script still running after {}s, letting the update go ahead",
+                SELF_RESTART_IDLE_WAIT_SECS
+            );
+        }
+    }
+
+    /// The update ended without stopping this process: commands are taken again.
+    pub(super) fn release_after_update(&self) {
+        if self.held_for_update.swap(false, Ordering::AcqRel) {
+            info!("Client update no longer pending, taking commands again");
+        }
     }
 
     pub(super) async fn drain_and_request(&self) {
@@ -64,9 +100,9 @@ impl RestartGate {
                 SELF_RESTART_IDLE_WAIT_SECS
             );
         }
-        // A running client update restarts the client itself; stopping the service under it could
-        // interrupt the binary swap. With a tool still busy the update is only deferred and keeps
-        // re-marking the flag on redelivery, so it is not worth waiting for.
+        // A client update in flight stops and swaps this client itself; restarting under it could
+        // interrupt the swap. With a tool still busy the updater is still waiting for the drain, and
+        // the restarted client drains for it again, so the restart goes ahead.
         while self.client_update.is_pending() && !self.busy_tools.any() {
             sleep(Duration::from_secs(SELF_RESTART_IDLE_POLL_SECS)).await;
         }
@@ -74,7 +110,11 @@ impl RestartGate {
     }
 
     fn busy(&self) -> bool {
-        self.busy_tools.any() || self.running_scripts.any() || self.client_update.is_pending()
+        self.work_running() || self.client_update.is_pending()
+    }
+
+    fn work_running(&self) -> bool {
+        self.busy_tools.any() || self.running_scripts.any()
     }
 
     pub async fn requested(&self) {

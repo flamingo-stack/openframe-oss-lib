@@ -45,3 +45,24 @@ fn clear_boot_marker_removes_and_tolerates_absence() {
     s.svc.clear_boot_marker().unwrap();
     assert!(s.svc.boot_marker_version().is_none());
 }
+
+#[test]
+fn updates_are_delegated_only_by_the_client_that_booted() {
+    let s = setup();
+    assert!(!s.svc.client_delegates_updates(), "no markers at all");
+
+    fs::write(s.secured.join("boot.marker"), b"1.4.0").unwrap();
+    assert!(
+        !s.svc.client_delegates_updates(),
+        "an older client writes no delegation marker"
+    );
+
+    fs::write(s.secured.join("client_update_delegated"), b"1.5.0\n").unwrap();
+    assert!(
+        !s.svc.client_delegates_updates(),
+        "a downgrade back to 1.4.0 leaves the newer client's marker behind"
+    );
+
+    fs::write(s.secured.join("boot.marker"), b"1.5.0").unwrap();
+    assert!(s.svc.client_delegates_updates());
+}

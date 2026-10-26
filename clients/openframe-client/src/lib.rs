@@ -46,8 +46,8 @@ use crate::config::update_config::{
 };
 use crate::listener::client_uninstall_message_listener::ClientUninstallMessageListener;
 use crate::listener::command::{
-    ClientUninstallHandler, CommandContext, CommandListener, FeatureFlagsHandler, RestartGate,
-    ToolInstallationHandler, ToolUpdateHandler,
+    follow_updater_drains, ClientUninstallHandler, CommandContext, CommandListener,
+    FeatureFlagsHandler, RestartGate, ToolInstallationHandler, ToolUpdateHandler,
 };
 use crate::listener::execution_listener::ExecutionListener;
 use crate::listener::remote_access_message_listener::RemoteAccessMessageListener;
@@ -95,6 +95,7 @@ use crate::services::tool_connection_message_publisher::ToolConnectionMessagePub
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_installation_service::ToolInstallationService;
 use crate::services::tool_restart_service::ToolRestartService;
+use crate::services::tool_run_manager::ClientUpdatePending;
 use crate::services::tool_uninstall_service::ToolUninstallService;
 use crate::services::InstalledToolsService;
 use crate::services::MachineIdService;
@@ -380,7 +381,7 @@ impl Client {
         // Initialize tool kill service
         let tool_kill_service = ToolKillService::new();
 
-        let tool_ops = ToolOps::with_in_flight_marker(directory_manager.secured_dir());
+        let tool_ops = ToolOps::new(ClientUpdatePending::default());
 
         let feature_flags_service = Arc::new(FeatureFlagsService::load(
             directory_manager.secured_dir().join("feature_flags.json"),
@@ -738,6 +739,8 @@ impl Client {
         self.nats_connection_manager.start_connection_watchdog();
 
         self.feature_flags_listener.start().await?;
+        // A client update stops this process as well: drain for it the way a restart does
+        tokio::spawn(follow_updater_drains(self.restart_gate.clone()));
         let restart_gate = self.restart_gate.clone();
         tokio::spawn(async move {
             restart_gate.requested().await;

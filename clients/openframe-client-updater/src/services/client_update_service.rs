@@ -6,14 +6,13 @@ use tracing::{error, info, warn};
 
 use crate::config::updater_config::{
     ALLOW_DOWNGRADE, BOOT_MARKER_POLL_INTERVAL_SECS, BOOT_MARKER_WAIT_SECS,
-    CLIENT_SERVICE_FULL_NAME, MIN_BINARY_SIZE_BYTES, SERVICE_START_SETTLE_SECS,
-    TOOL_OP_QUIESCE_WAIT_SECS,
+    CLIENT_SERVICE_FULL_NAME, DRAIN_WAIT_SECS, MIN_BINARY_SIZE_BYTES, SERVICE_START_SETTLE_SECS,
 };
 use crate::models::{ClientUpdateMessage, UpdaterPhase, UpdaterState};
 use crate::platform::atomic_replace;
 use crate::services::boot_marker_service::BootMarkerService;
 use crate::services::client_binary::{self, Restore};
-use crate::services::client_tool_op_probe::ClientToolOpProbe;
+use crate::services::client_drain::ClientDrain;
 use crate::services::service_manager_service::ServiceManagerService;
 use crate::services::{GithubDownloadService, UpdateProgressPublisher, UpdaterStateService};
 use crate::utils::blocking::run_blocking;
@@ -38,7 +37,7 @@ pub struct ClientUpdateService {
     state_service: UpdaterStateService,
     progress_publisher: UpdateProgressPublisher,
     boot_marker: BootMarkerService,
-    tool_op_probe: ClientToolOpProbe,
+    client_drain: ClientDrain,
     in_progress: Arc<Mutex<()>>,
 }
 
@@ -48,16 +47,22 @@ impl ClientUpdateService {
         state_service: UpdaterStateService,
         progress_publisher: UpdateProgressPublisher,
         boot_marker: BootMarkerService,
-        tool_op_probe: ClientToolOpProbe,
+        client_drain: ClientDrain,
     ) -> Self {
         Self {
             download_service,
             state_service,
             progress_publisher,
             boot_marker,
-            tool_op_probe,
+            client_drain,
             in_progress: Arc::new(Mutex::new(())),
         }
+    }
+
+    /// False while the running client still updates itself (it predates the
+    /// updater, or a downgrade brought such a client back): requests are its own.
+    pub fn client_delegates_updates(&self) -> bool {
+        self.boot_marker.client_delegates_updates()
     }
 
     /// The update slot, or `None` while another update runs.
@@ -201,29 +206,27 @@ impl ClientUpdateService {
         Ok(temp_path)
     }
 
-    /// Waits for the client's tool operations, then stops it. On failure the
+    /// Lets the client finish its running work, then stops it. On failure the
     /// staged binary goes and the client keeps running.
     async fn stop_client_for_swap(
         &self,
         state: &mut UpdaterState,
         temp_path: &Path,
     ) -> Result<(), UpdateOutcome> {
-        // The client parks new tool operations while this state file shows an
-        // in-flight phase; operations that started earlier must finish before the
-        // client is stopped, or their tool record and directory are left half-done.
-        if let Err(busy) = self.tool_op_probe.wait_for_quiescence().await {
-            let reason = format!(
-                "Client tool operations still in flight after {}s ({}) — deferring update to v{} to redelivery",
-                TOOL_OP_QUIESCE_WAIT_SECS,
-                busy.join(", "),
-                state.target_version
-            );
-            warn!("{}", reason);
+        // Only this update's confirmation may release the wait, never one an
+        // earlier update left behind.
+        self.client_drain.clear();
+        if let Err(outcome) = self.enter(state, UpdaterPhase::Draining).await {
             client_binary::remove_quietly(temp_path, "temp binary");
-            if let Err(e) = self.state_service.clear() {
-                warn!("Failed to clear updater state after deferral: {:#}", e);
-            }
-            return Err(UpdateOutcome::Failed(reason));
+            return Err(outcome);
+        }
+        if ServiceManagerService::query_running(CLIENT_SERVICE_FULL_NAME).await == Some(false) {
+            info!("Client is not running, nothing to drain");
+        } else if !self.client_drain.wait(&state.started_at).await {
+            warn!(
+                "Client did not confirm the drain within {}s, stopping it anyway",
+                DRAIN_WAIT_SECS
+            );
         }
 
         if let Err(outcome) = self.enter(state, UpdaterPhase::StoppingService).await {

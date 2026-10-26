@@ -2,6 +2,7 @@ mod core_nats;
 mod delivery;
 mod handlers;
 mod restart;
+mod update_drain;
 
 use std::future::Future;
 use std::sync::Arc;
@@ -25,6 +26,7 @@ pub use handlers::{
     ClientUninstallHandler, FeatureFlagsHandler, ToolInstallationHandler, ToolUpdateHandler,
 };
 pub use restart::RestartGate;
+pub use update_drain::follow_updater_drains;
 
 pub trait CommandHandler: Clone + Send + Sync + 'static {
     type Command: DeserializeOwned + Send + 'static;

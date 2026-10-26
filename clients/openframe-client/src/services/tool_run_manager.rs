@@ -61,6 +61,11 @@ impl ClientUpdatePending {
     pub fn is_pending(&self) -> bool {
         (self.0)()
     }
+
+    /// Never pending, for tool operations that are not this client's to hold back.
+    pub fn never() -> Self {
+        Self(Arc::new(|| false))
+    }
 }
 
 /// Stands in for the updater's state file in tests

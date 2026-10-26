@@ -1,13 +1,14 @@
 use anyhow::Result;
-use async_nats::jetstream::{self, consumer::push, consumer::DeliverPolicy, Message};
+use async_nats::jetstream::{self, consumer::push, consumer::DeliverPolicy, AckKind, Message};
 use futures::StreamExt;
+use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{error, info, warn};
 
 use crate::config::updater_config::{
     CLIENT_UPDATE_ACK_WAIT_SECS, CLIENT_UPDATE_MAX_DELIVER, CLIENT_UPDATE_STREAM,
     CONSUMER_CYCLE_PAUSE_MS, CONSUMER_INITIAL_RETRY_DELAY_MS, CONSUMER_MAX_RETRY_DELAY_MS,
-    CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, RECONNECTION_DELAY_MS,
+    CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, PROGRESS_ACK_INTERVAL_SECS, RECONNECTION_DELAY_MS,
 };
 use crate::models::ClientUpdateMessage;
 use crate::services::client_update_service::UpdateOutcome;
@@ -125,6 +126,20 @@ impl ClientUpdateListener {
             }
         };
 
+        // An older client consumes the same stream through its own consumer and
+        // updates itself; the ack only keeps this consumer from redelivering it.
+        if !self.update_service.client_delegates_updates() {
+            info!(
+                "The running client updates itself, leaving v{} to it",
+                update_msg.version
+            );
+            message
+                .ack()
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to ACK message: {}", e))?;
+            return Ok(());
+        }
+
         let Some(slot) = self.update_service.try_reserve() else {
             // An ACK would silently consume a genuinely new update.
             warn!(
@@ -135,7 +150,12 @@ impl ClientUpdateListener {
         };
 
         let version = update_msg.version.clone();
-        match self.update_service.apply(&update_msg, slot).await {
+        let message = Arc::new(message);
+        let keep_alive = Self::keep_alive(message.clone());
+        let outcome = self.update_service.apply(&update_msg, slot).await;
+        keep_alive.abort();
+
+        match outcome {
             UpdateOutcome::Applied | UpdateOutcome::Rejected(_) => {
                 info!("ACKing update message for v{}", version);
                 message
@@ -152,6 +172,23 @@ impl ClientUpdateListener {
         }
 
         Ok(())
+    }
+
+    /// Progress acks keep the message from redelivering however long the
+    /// download or the client's drain takes; if the updater dies it comes back
+    /// after CLIENT_UPDATE_ACK_WAIT_SECS.
+    fn keep_alive(message: Arc<Message>) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(PROGRESS_ACK_INTERVAL_SECS)).await;
+                if let Err(e) = message.ack_with(AckKind::Progress).await {
+                    warn!(
+                        "Failed to send a progress ack for the running update: {}",
+                        e
+                    );
+                }
+            }
+        })
     }
 
     async fn acquire_consumer(

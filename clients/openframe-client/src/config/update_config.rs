@@ -46,5 +46,6 @@ pub const ALLOW_DOWNGRADE: bool = false;
 pub const CONSUMER_ACK_WAIT_SECS: u64 = 120;
 pub const CONSUMER_MAX_DELIVER: i64 = 10; // Maximum delivery attempts
 pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60; // parked-message heartbeat, well inside ack_wait (120s)
+pub const CLIENT_UPDATE_POLL_SECS: u64 = 5; // how often a tool operation held by a client update looks again
 pub const UNINSTALL_CONSUMER_MAX_DELIVER: i64 = 20; // Larger budget: uninstall may defer behind a long install holding the tool lock
 pub const RESTART_CONSUMER_MAX_DELIVER: i64 = 20; // Larger budget: restart may defer behind a long install holding the tool lock

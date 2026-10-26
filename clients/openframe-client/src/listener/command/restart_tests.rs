@@ -152,3 +152,48 @@ async fn a_client_update_deferred_by_a_busy_tool_does_not_hold_the_restart() {
     assert!(work.client_update.view().is_pending());
     draining.await.unwrap();
 }
+
+#[tokio::test]
+async fn a_hold_for_update_refuses_commands_until_released() {
+    let gate = Work::default().gate();
+    gate.drain_for_update().await;
+    assert!(gate.admit().is_none());
+
+    gate.release_after_update();
+    assert!(gate.admit().is_some());
+}
+
+#[tokio::test(start_paused = true)]
+async fn drain_for_update_waits_for_a_busy_tool() {
+    let work = Work::default();
+    let gate = work.gate();
+    let op = work
+        .tool_ops
+        .try_lock("fleetmdm-agent")
+        .unwrap()
+        .mark_busy();
+
+    let draining = {
+        let gate = gate.clone();
+        tokio::spawn(async move { gate.drain_for_update().await })
+    };
+    until_closed(&gate).await;
+    assert!(!draining.is_finished());
+
+    drop(op);
+    timeout(BOUND, draining)
+        .await
+        .expect("the drain never finished")
+        .unwrap();
+}
+
+#[tokio::test]
+async fn releasing_an_update_hold_keeps_a_restart_closed() {
+    let gate = Work::default().gate();
+    gate.drain_for_update().await;
+    start_drain(&gate);
+    until_requested(&gate).await;
+
+    gate.release_after_update();
+    assert!(gate.admit().is_none());
+}

@@ -13,9 +13,10 @@ use crate::models::UpdaterPhase;
 use crate::platform::DirectoryManager;
 use crate::services::boot_marker_service::BootMarkerService;
 use crate::services::client_binary::{self, Restore};
+use crate::services::client_drain::ClientDrain;
 use crate::services::token_provider::TokenProvider;
 use crate::services::{
-    AgentConfigurationService, ClientToolOpProbe, ClientUpdateService, GithubDownloadService,
+    AgentConfigurationService, ClientUpdateService, GithubDownloadService,
     InitialConfigurationService, LocalTlsConfigProvider, NatsConnectionManager,
     NatsMessagePublisher, ServiceManagerService, UpdateProgressPublisher, UpdaterStateService,
 };
@@ -168,7 +169,7 @@ impl UpdaterOrchestrator {
             state_service,
             progress_publisher,
             boot_marker,
-            ClientToolOpProbe::new(&self.dir_manager),
+            ClientDrain::new(&self.dir_manager),
         );
 
         let listener =
@@ -213,7 +214,10 @@ impl UpdaterOrchestrator {
         let target = ServiceManagerService::client_binary_path();
 
         let report = match state.phase {
-            UpdaterPhase::Downloading | UpdaterPhase::Verifying | UpdaterPhase::Idle => {
+            UpdaterPhase::Idle
+            | UpdaterPhase::Downloading
+            | UpdaterPhase::Verifying
+            | UpdaterPhase::Draining => {
                 if let Some(path) = &state.downloaded_binary_path {
                     client_binary::remove_quietly(path, "temp binary");
                 }

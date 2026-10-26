@@ -4,7 +4,6 @@ pub const MAX_DOWNLOAD_RETRIES: u32 = 3;
 /// is spent so retries can never push the update past its ACK window.
 pub const DOWNLOAD_TIMEOUT_SECS: u64 = 180;
 /// Whole download phase (all attempts, backoff and CDN fallback included).
-/// Must stay below CLIENT_UPDATE_ACK_WAIT_SECS minus the post-download work.
 pub const DOWNLOAD_TOTAL_BUDGET_SECS: u64 = 360;
 /// The download service's own HTTP client budget — must not be lower than
 /// DOWNLOAD_TIMEOUT_SECS or the reqwest timeout fires first and shrinks the
@@ -14,11 +13,11 @@ pub const MIN_BINARY_SIZE_BYTES: u64 = 100 * 1024; // 100 KB
 
 // NATS consumer settings
 pub const CLIENT_UPDATE_STREAM: &str = "CLIENT_UPDATE";
-/// Must comfortably exceed a normal update's time-to-ACK, i.e. DOWNLOAD_TOTAL_BUDGET_SECS
-/// plus tool-op quiesce wait, service stop, swap, start settle and boot-marker wait
-/// (roughly 360 + 60 + 30 + 10 + 3 + 90 = 553s). At 120s the same message was
-/// redelivered mid-update.
+/// How long JetStream waits before redelivering a CLIENT_UPDATE the updater went
+/// quiet on. While an update runs, progress acks every PROGRESS_ACK_INTERVAL_SECS
+/// keep extending it, so a long download or drain never redelivers mid-update.
 pub const CLIENT_UPDATE_ACK_WAIT_SECS: u64 = 600;
+pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60;
 pub const CLIENT_UPDATE_MAX_DELIVER: i64 = 10;
 pub const RECONNECTION_DELAY_MS: u64 = 5000;
 
@@ -38,16 +37,19 @@ pub const SERVICE_START_VERIFY_WAIT_SECS: u64 = 5;
 pub const SERVICE_STATE_QUERY_ATTEMPTS: u32 = 3;
 pub const SERVICE_STATE_QUERY_RETRY_DELAY_SECS: u64 = 2;
 
-// Client tool-op quiescence: openframe-client mirrors its in-flight tool
-// operations (install/update/uninstall/restart) to {secured}/tool_ops_in_flight.json.
-// Stopping the client mid-install would strand the tool record in Installing
-// and orphan its children, so the swap waits for the file to empty.
-pub const TOOL_OPS_IN_FLIGHT_FILE_NAME: &str = "tool_ops_in_flight.json";
-/// How long to wait for the client's tool operations to drain before stopping it.
-pub const TOOL_OP_QUIESCE_WAIT_SECS: u64 = 60;
-pub const TOOL_OP_QUIESCE_POLL_INTERVAL_SECS: u64 = 2;
-/// A marker untouched for longer than this is ignored (client died mid-op).
-pub const TOOL_OPS_IN_FLIGHT_STALE_SECS: u64 = 30 * 60;
+// Drain: while the state file shows `draining`, openframe-client takes no new work
+// and waits for running tool operations and scripts, as before its own restart,
+// then writes {secured}/client_drained with the update's started_at.
+pub const CLIENT_DRAINED_FILE_NAME: &str = "client_drained";
+/// The client gives running work 600 s (its SELF_RESTART_IDLE_WAIT_SECS) and then
+/// confirms anyway; the updater waits a little longer before stopping it regardless.
+pub const DRAIN_WAIT_SECS: u64 = 660;
+pub const DRAIN_POLL_INTERVAL_SECS: u64 = 2;
+
+/// openframe-client writes its version here on every boot, just before boot.marker,
+/// to hand its updates to the updater. An older client that still updates itself
+/// writes none, so the updater stays out of its way.
+pub const CLIENT_UPDATE_DELEGATED_FILE_NAME: &str = "client_update_delegated";
 
 // Boot verification: openframe-client writes {secured}/boot.marker with its
 // version on every boot; a swap counts only once the new binary has written it.
