@@ -6,6 +6,8 @@ export {
   UnifiedSkeleton,
   TextSkeleton,
   TextLineSkeleton,
+  TextLinesByBreakpointSkeleton,
+  type TextLinesByBreakpoint,
   MediaSkeleton,
   InteractiveSkeleton,
 } from './unified-skeleton';

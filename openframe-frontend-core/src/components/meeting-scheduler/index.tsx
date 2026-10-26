@@ -48,6 +48,7 @@ import { BOOKING_IN_FLIGHT_MESSAGE, useMeetingBooking } from '../../hooks/use-me
 import { useToast } from '../../hooks/use-toast';
 import {
   blocksNativeBooking,
+  bookingContextFields,
   type BookingConfirmation,
   type MeetingAvailability,
   type MeetingBookingErrorCode,
@@ -156,10 +157,20 @@ export interface HubSpotMeetingSchedulerProps {
    * so a Server Component can pass it across the RSC boundary where a component
    * cannot. `answers` are what the page took outside the form (a choice made
    * higher up the page), written into questions the visitor has not answered.
+   * `context` is what the page learned outside the link's questions, shown in the
+   * form and sent with the booking (`BookingContext`); `contextSlot` is the space the
+   * form keeps for it from its first paint.
    */
   detailsFormProps?: Pick<
     BookingFormProps,
-    'fieldRows' | 'optionalFields' | 'consent' | 'fieldCopy' | 'deniedEmailDomains' | 'answers'
+    | 'fieldRows'
+    | 'optionalFields'
+    | 'consent'
+    | 'fieldCopy'
+    | 'deniedEmailDomains'
+    | 'answers'
+    | 'context'
+    | 'contextSlot'
   >;
   /** Form rescue for the details form (`RESCUE_FORMS.meetingBooking`). OPT-IN:
    *  omitted or `null` saves nothing. */
@@ -1174,6 +1185,8 @@ export function HubSpotMeetingScheduler({
                       // copies frozen at that point can be stale.
                       durationMs,
                       timezone,
+                      // Live too: the page's context can change while the visitor is on the calendar.
+                      ...bookingContextFields(detailsFormProps?.context),
                     }).finally(() => {
                       inFlightRef.current = false;
                     });
@@ -1213,10 +1226,18 @@ export {
   type BookingFormConsent,
 } from './booking-form';
 
+export { BookingContextSummary } from './booking-context-summary';
+
 export {
   MeetingSchedulerDirectory,
   MEETING_DIRECTORY_PAGE_SIZE,
   type MeetingSchedulerDirectoryProps,
 } from './directory';
 export type { MeetingAvailability, BookingConfirmation, MeetingBookingErrorCode, MeetingHost };
-export type { SchedulingLink, SchedulingLinksPayload, DeniedEmailDomains } from '../../schemas/meeting-booking-schema';
+export type {
+  SchedulingLink,
+  SchedulingLinksPayload,
+  DeniedEmailDomains,
+  BookingContext,
+  BookingContextSlot,
+} from '../../schemas/meeting-booking-schema';
