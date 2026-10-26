@@ -34,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // The real OrganizationRepository, its custom implementation and OrganizationAggregateSpec, with the outbox wired as in a service.
 @SpringBootTest(classes = OrganizationPublishingIT.TestApplication.class,
-        properties = {"openframe.events.topics.organizations.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true"})
+        properties = {"openframe.events.topics.organizations.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

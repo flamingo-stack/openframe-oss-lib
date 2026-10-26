@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Import;
 
 // Apart from OutboxAutoConfiguration, so a context without a Mongo server can load the rest.
 @AutoConfiguration
-@ConditionalOnBooleanProperty(name = {"spring.data.mongodb.enabled", "openframe.events.publishing.enabled"})
+@ConditionalOnBooleanProperty(name = {"spring.data.mongodb.enabled", "openframe.events.enabled"})
 @Import(OutboxIndexInitializer.class)
 public class OutboxIndexAutoConfiguration {
 }

@@ -36,8 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // Tenant plane: TenantAwareMongoTemplate is the main template, so publishing reads and writes inside the pod's tenant.
 @SpringBootTest(classes = OrganizationPublishingTenantModeIT.TestApplication.class,
-        properties = {"openframe.events.topics.organizations.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true"})
+        properties = {"openframe.events.topics.organizations.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

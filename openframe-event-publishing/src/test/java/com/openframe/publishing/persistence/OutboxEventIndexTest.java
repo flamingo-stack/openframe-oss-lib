@@ -31,7 +31,7 @@ class OutboxEventIndexTest {
         long sevenDays = Duration.ofDays(7).toSeconds();
         assertThat(index.getValue().getIndexKeys()).isEqualTo(new Document("occurredAt", 1));
         assertThat(index.getValue().getIndexOptions())
-                .containsEntry("name", "outbox_occurredAt_ttl")
+                .containsEntry("name", "event_outbox_occurredAt_ttl")
                 .containsEntry("expireAfterSeconds", sevenDays);
         assertThat(initializer.isRunning()).isTrue();
     }
