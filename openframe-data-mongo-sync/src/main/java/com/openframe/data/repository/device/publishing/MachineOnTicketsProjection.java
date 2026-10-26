@@ -115,8 +115,9 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
         String machineId = ticket.getDeviceId();
         TenantScopedId key = new TenantScopedId(tenantId, machineId);
         Machine machine = machines.get(key);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
         if (machine == null) {
-            return new Mismatch(tenantId, ticketId, null, "machine " + machineId + " is gone");
+            return null;
         }
         String sourceHostname = machine.getHostname();
         String copiedHostname = ticket.getDeviceHostname();

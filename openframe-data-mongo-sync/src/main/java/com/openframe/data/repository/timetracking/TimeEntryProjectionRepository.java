@@ -1,5 +1,6 @@
 package com.openframe.data.repository.timetracking;
 
+import com.mongodb.ReadPreference;
 import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.timetracking.TimeEntry;
 import com.openframe.data.document.timetracking.TimeEntry.Fields;
@@ -18,6 +19,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TimeEntryProjectionRepository {
 
+    // From the primary: a lagging secondary could count 0 or miss items, and the event would skip a real update.
+    private static final ReadPreference PRIMARY = ReadPreference.primary();
+
     private final MongoOperations mongoOperations;
 
     public long updateTicketTitle(String tenantId, String ticketId, String ticketTitle) {
@@ -31,6 +35,7 @@ public class TimeEntryProjectionRepository {
     public long countTimeEntriesToUpdateTicketTitle(String tenantId, String ticketId, String ticketTitle, int limit) {
         Criteria timeEntriesToUpdate = matchTimeEntriesToUpdateTicketTitle(tenantId, ticketId, ticketTitle);
         Query query = new Query(timeEntriesToUpdate).limit(limit);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.count(query, TimeEntry.class);
     }
 
@@ -55,6 +60,7 @@ public class TimeEntryProjectionRepository {
         }
         Query query = new Query(criteria).with(Sort.by(Fields.id)).limit(batchSize);
         query.fields().include(Fields.id);
+        query.withReadPreference(PRIMARY);
         return mongoOperations.find(query, TimeEntry.class).stream()
                 .map(TimeEntry::getId)
                 .toList();

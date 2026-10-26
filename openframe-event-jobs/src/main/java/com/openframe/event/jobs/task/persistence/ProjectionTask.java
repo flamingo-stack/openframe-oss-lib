@@ -14,8 +14,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.Instant;
 import java.util.Map;
 
-// One run of a large update of a projection, for one source document; kept when it ends, as the tasks' history. Every
-// tenant's, so not TenantScoped.
+// One run of a large projection update for one source document, kept when it ends; every tenant's, so not TenantScoped.
 @Data
 @Builder(toBuilder = true)
 @NoArgsConstructor
@@ -47,8 +46,7 @@ public class ProjectionTask implements EventJobProgress {
     private long eventVersion;
 
     private EventJobStatus status;
-    // The source's current run, RUNNING or FAILED: every event of the source goes to the tasks until a newer event
-    // closes it.
+    // RUNNING or FAILED: the source's events go to the tasks until a newer event closes this run.
     private boolean current;
     // The last _id done; saved only after its batch is written, so a crash repeats at most one batch.
     private String lastId;

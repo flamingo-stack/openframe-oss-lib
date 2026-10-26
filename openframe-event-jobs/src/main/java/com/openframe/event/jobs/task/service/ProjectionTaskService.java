@@ -17,8 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-// Saves the copies ProjectionTask makes, one document per run; a save throws OptimisticLockingFailureException when
-// another copy is newer.
+// Saves the copies ProjectionTask makes, one per run; saving an older copy throws OptimisticLockingFailureException.
 @Slf4j
 @RequiredArgsConstructor
 public class ProjectionTaskService implements EventJobProgressStore<ProjectionTask> {
@@ -29,15 +28,13 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
     private final ProjectionTaskEnvelopes envelopes;
     private final Clock clock;
 
-    // A current run, RUNNING or FAILED: every event of its source goes to the tasks, so an older value never lands after a
-    // newer one.
+    // While a source has a current run, its events go to the tasks, so an older value never lands after a newer one.
     public boolean hasTask(String projection, String tenantId, String sourceId) {
         String key = ProjectionTask.buildKey(projection, tenantId, sourceId);
         return taskRepository.existsByKeyAndCurrentTrue(key);
     }
 
-    // Closes the source's current run, if any, and opens a new one with this event; a worker's save in between conflicts, so
-    // it tries again.
+    // Closes the source's current run and opens a new one; a worker's save in between conflicts, so it tries again.
     public void submit(String projection, String type, String sourceId, PublishedRecord<?> record) {
         String tenantId = record.getTenantId();
         long eventVersion = record.getVersion();
@@ -93,7 +90,7 @@ public class ProjectionTaskService implements EventJobProgressStore<ProjectionTa
         return taskRepository.save(failed);
     }
 
-    // A FAILED run stays current, for the alert and for the next event of the source, which closes it and opens a new run.
+    // A FAILED run stays current, for the alert, until the next event of its source closes it.
     @Override
     public ProjectionTask finishRun(ProjectionTask task, EventJobStatus status) {
         Instant now = clock.instant();

@@ -55,7 +55,7 @@ class MachineOnTicketsProjectionTest {
     }
 
     @Test
-    void anOldHostname_andAGoneMachine_areMismatches_eachInItsOwnTenant() {
+    void anOldHostname_isAMismatch_inItsOwnTenant_butAGoneMachineKeepsItsCopy() {
         // setup
         when(machineRepository.findByTenantIdInAndMachineIdIn(Set.of("tenant-a", "tenant-b"), Set.of("machine-1", "machine-gone")))
                 .thenReturn(List.of(buildMachine("tenant-a", "machine-1", "host-a"), buildMachine("tenant-b", "machine-1", "host-b")));
@@ -67,8 +67,8 @@ class MachineOnTicketsProjectionTest {
                 new TicketDeviceView("t3", "tenant-a", "machine-gone", "host-x")));
 
         // verifications
-        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2", "t3");
-        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-tenant-b", null);
+        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-tenant-b");
     }
 
     @Test

@@ -8,8 +8,7 @@ import lombok.RequiredArgsConstructor;
 import java.time.Clock;
 import java.time.Instant;
 
-// Saves the copies EventJob makes, one document per run; a save throws OptimisticLockingFailureException when another pod
-// saved a newer copy of the run.
+// Saves the copies EventJob makes, one document per run; saving an older copy throws OptimisticLockingFailureException.
 @RequiredArgsConstructor
 public class EventJobService implements EventJobProgressStore<EventJob> {
 
@@ -25,8 +24,7 @@ public class EventJobService implements EventJobProgressStore<EventJob> {
         return jobRepository.existsByJobIdAndRunId(jobId, runId);
     }
 
-    // The newest run, while still RUNNING, ends REPLACED (a FAILED one has already ended); the new run is inserted, so a
-    // second pod starting it fails with DuplicateKeyException.
+    // A RUNNING newest run ends REPLACED; a second pod inserting the same run gets DuplicateKeyException.
     public EventJob startRun(EventJob newest, String runId) {
         Instant now = clock.instant();
         if (newest.isRunning()) {
