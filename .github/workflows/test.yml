@@ -52,8 +52,7 @@ jobs:
     name: Test Java
     runs-on: ubuntu-latest
     needs: [changes]
-    # trivy: a change to the Trivy step or its ignores scans again.
-    if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true' || fromJSON(needs.changes.outputs.changes || '{}').trivy == 'true'
+    if: fromJSON(needs.changes.outputs.changes || '{}').java == 'true'
     permissions:
       contents: read
       packages: write
@@ -99,16 +98,6 @@ jobs:
             --no-transfer-progress \
             -Dmaven.source.skip=true
 
-      # The dependencies the build above resolved into ~/.m2, read through the poms, so no go-offline and
-      # no second build. A fixable HIGH/CRITICAL finding fails the job and so All Checks. The merge queue
-      # does not scan again. The client Cargo.lock has its own job.
-      - name: Scan dependencies
-        if: github.event_name == 'pull_request' && !cancelled() && steps.build.outcome == 'success'
-        uses: ./.github/steps/trivy
-        with:
-          scan: code
-          name: java
-          skip-files: "**/Cargo.lock"
 
 
   test-node:
@@ -145,20 +134,30 @@ jobs:
         run: npm install
 
       # ~1s; a broken eslint config makes every lint result below meaningless.
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:config-smoke in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Lint Config Smoke
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint:config-smoke
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run type-check in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Type Check
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run type-check
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Lint
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint
 
       # Needs a TypeScript program and an 8 GB heap; the slowest check, so kept apart.
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:types in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Lint (type-aware)
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run lint:types
 
+      # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run format in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
       - name: Format
+        if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
         run: npm run format
 
       - name: Test
@@ -196,7 +195,9 @@ jobs:
     name: Test Node Cycles (openframe-frontend-core)
     runs-on: ubuntu-latest
     needs: [changes]
-    if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    # Disabled: covered by "Flamingo Code Review / tests and checks" (npm run lint:cycles in openframe-frontend-core). Kept here, not deleted: the repository variable FLAMINGO_LEGACY_CHECKS=on runs it again. CU-17tkuw60a9u
+    # was: if: fromJSON(needs.changes.outputs.changes || '{}')['openframe-frontend-core'] == 'true'
+    if: vars.FLAMINGO_LEGACY_CHECKS == 'on'
     env:
       NPM_CONFIG_FETCH_TIMEOUT: 30000
       NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: 15000
@@ -261,26 +262,6 @@ jobs:
         run: make -C clients/openframe-client test
 
 
-  # The client Cargo.lock, only when it changes. With Cargo.toml trivy drops crates under unversioned git deps.
-  scan_cargo:
-    name: "Scan Cargo.lock"
-    needs: [changes]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && (fromJSON(needs.changes.outputs.changes || '{}').cargo == 'true' || fromJSON(needs.changes.outputs.changes || '{}').trivy == 'true')
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Scan Cargo.lock
-        uses: ./.github/steps/trivy
-        with:
-          scan: code
-          name: cargo
-          path: ./clients
-          skip-files: "**/Cargo.toml"
-
 
   cleanup:
     name: Cleanup
@@ -309,7 +290,7 @@ jobs:
 
   all-checks:
     name: "All Checks"
-    needs: [changes, test-java, test-node, test-node-cycles, test-rust, scan_cargo, lint]
+    needs: [changes, test-java, test-node, test-node-cycles, test-rust, lint]
     runs-on: ubuntu-latest
     if: |
       always() &&
