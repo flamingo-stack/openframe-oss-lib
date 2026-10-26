@@ -16,7 +16,7 @@ events.organizations ──> PublishedTypeListener             one per spec type
                            │  (a tombstone, the second record of a delete, is skipped here)
                            ▼
                          ProjectionRunner                  a delete envelope is skipped: no projection handles deletes yet
-                           │  for each projection of the type's spec, unless its mode is aspect
+                           │  for each projection of the type's spec
                            ▼
                          projection.apply(record)          writes its projected items through its own repository
                            │
@@ -26,13 +26,13 @@ events.organizations ──> PublishedTypeListener             one per spec type
 
 - A record's Kafka key is the aggregate's Mongo `_id` (the outbox `aggregateId`), not a business id such as
   `organizationId`. The listener passes it to the runner for the logs.
-- [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L16)
+- [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L15)
   registers one listener per spec type at startup, so a new published type needs no listener class.
 - The value is the `PublishedRecord` envelope: `tenantId`, `version`, `deleted`, `schemaVersion` and `event`. It is
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
-- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L27) runs each projection on its own, in name order: a
+- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L28) runs each projection on its own, in name order: a
   failed projection does not stop the others.
 - Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
   writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
@@ -45,9 +45,6 @@ events.organizations ──> PublishedTypeListener             one per spec type
 openframe:
   events:
     enabled: false                      # the whole feature (default false); a change needs a pod restart
-    topics:
-      organizations:
-        enabled: false                  # per type: its topics, listener and projections in this service
     processing:
       kafka:                            # Spring's KafkaProperties keys, for the processing cluster only
         bootstrap-servers: ${spring.saas.kafka.bootstrap-servers}               # required, no localhost default
@@ -63,8 +60,7 @@ openframe:
           initial-interval: 1s
           multiplier: 2
           max-interval: 30s
-        topics:                         # needs enabled: true too; see Topics
-          create: false                 # default; creates every published type's topic and DLT at startup
+        topics:                         # see Topics
           events:                       # used only when a topic is created
             partitions: 1
             replication-factor: 2
@@ -90,9 +86,9 @@ openframe:
 With `openframe.events.enabled: true`,
 [`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L31) creates
 `<topic-prefix><type>` and `<topic-prefix><type>-dlt` for every spec at startup, before the listeners start, so a new
-published type needs no topic config. With processing off, nothing is created: off means no infrastructure. So the
-rollout enables processing (every processor on `aspect`) before the outbox connector is registered, and the topics
-exist before the connector writes.
+published type needs no topic config. With the feature off, nothing is created: off means no infrastructure. So the
+rollout turns the feature on in the stream before the tenant services publish, and the topics exist before the
+connector writes.
 
 - It creates only what is missing and never changes an existing topic, not even its partitions. Another pod creating
   the same topic at the same moment is fine.
@@ -104,11 +100,11 @@ exist before the connector writes.
 
 ## Switching a type
 
-A type moves with all its projections. Switch it on in the stream's config first, then in the tenant services'
-configs, each a config change plus a pod restart; roll back in the reverse order. While only the stream has it on, the
-aspects still write and the stream gets no events of that type; once the tenant services have it on, they publish it
-and their aspect cascades from it stop. A type on in the tenant services but off in the stream leaves the copies
-stale: reconciliation and the consumer lag alert show it.
+A type moves with all its projections. With the feature on, the stream listens to every spec's topic, so the switch
+that matters is `openframe.events.topics.<type>.enabled` in the tenant services: a config change plus a pod restart.
+Turn the feature on in the stream first; roll back in the reverse order. Once the tenant services have the type on,
+they publish it and their aspect cascades from it stop. A type on in the tenant services while the stream has the
+feature off leaves the copies stale: reconciliation and the consumer lag alert show it.
 
 ## Add a projection
 
@@ -130,7 +126,7 @@ stale: reconciliation and the consumer lag alert show it.
    - The guard makes duplicates, replays and out-of-order events harmless.
    - It retries its own write conflicts (`@RetryOnOptimisticLockingFailure`). A conflict that reaches the runner
      sends the record to the DLT.
-2. It runs as soon as its type is switched on in the stream (see [Switching a type](#switching-a-type)). The aspect
+2. It runs on every event of its type once the feature is on in the stream (see [Switching a type](#switching-a-type)). The aspect
    that writes the same copy skips its cascade while `PublishedAggregateTopics.isPublishing(<type>)` is true.
 
 A new published type needs only its spec: the listener of its topic is registered from the spec at startup.
@@ -139,7 +135,7 @@ A new published type needs only its spec: the listener of its topic is registere
 
 | What fails | What happens |
 |---|---|
-| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L24), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
+| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L15), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
 | A projection: any other exception, a write conflict too, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The other projections still run. The record then goes to `<topic>-dlt` once. |
 | An unreadable value, or a `schemaVersion` newer than this build | The record goes to `<topic>-dlt` without reaching a projection. |
 
@@ -198,7 +194,6 @@ logging:
 | `Projection X applied <id> version V of tenant T` | Applied. |
 | `Projection X failed for <id> version V of tenant T` (WARN, with the stack trace) | That projection failed; the record goes to the DLT after the others ran. |
 | `Record <id> of <topic>-<partition> at offset O goes to <topic>-dlt` (ERROR) | Sent to the DLT. |
-| `openframe.events.processing.projections names [...], but no projection has that name` (ERROR, at startup) | A typo, or a config newer than this image. |
 | `Delete of ... skipped` / `Tombstone of ... skipped` | A delete; no projection handles deletes yet. |
 | `Created the event topic <name>` (INFO, at startup) | The topic did not exist; it now has the configured settings. |
 | `Event topic <name> exists with cleanup.policy=delete, not compact` (WARN, at startup) | Fix the topic by hand. |
@@ -209,6 +204,6 @@ logging:
 mvn test -pl openframe-event-processing -am -Dintegration.tests=true
 ```
 
-[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L76) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
+[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L73) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
 its topics, and checks the whole listener path, the retry and the DLT.
 [`EventTopicCreatorIT`](src/test/java/com/openframe/processing/topic/EventTopicCreatorIT.java#L41) checks the created topics' settings and that an existing topic is left alone.
