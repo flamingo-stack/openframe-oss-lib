@@ -5,6 +5,8 @@ import com.openframe.event.jobs.backfill.scheduler.EventBackfillJob;
 import com.openframe.event.jobs.core.lock.EventJobLock;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobTicker;
+import com.openframe.publishing.config.EventsProperties;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import com.openframe.publishing.registry.PublishedAggregates;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -19,32 +21,30 @@ import static org.mockito.Mockito.mock;
 class BackfillConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(BackfillConfiguration.class, BackfillWithoutPublishingWarning.class,
-                    BackfillPropertiesConfiguration.class)
+            .withUserConfiguration(BackfillConfiguration.class, BackfillPropertiesConfiguration.class)
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
             .withBean(EventJobService.class, () -> mock(EventJobService.class))
             .withBean(EventJobTicker.class, () -> mock(EventJobTicker.class))
             .withBean(EventJobLock.class, () -> mock(EventJobLock.class));
 
     @Test
-    void withoutPublishing_theJobsStartWithoutTheBackfill() {
+    void withoutMongo_theJobsStartWithoutTheBackfill() {
         runner.withPropertyValues("openframe.events.jobs.backfill.runs.organizations=run-1")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).doesNotHaveBean(EventBackfillJob.class);
-                    assertThat(context).hasSingleBean(BackfillWithoutPublishingWarning.class);
                 });
     }
 
     @Test
-    void withPublishing_theBackfillIsCreated() {
-        runner.withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.publishing.enabled=true")
+    void withMongo_theBackfillIsCreated() {
+        runner.withPropertyValues("spring.data.mongodb.enabled=true")
                 .withBean(PublishedAggregates.class, () -> mock(PublishedAggregates.class))
                 .withBean(AggregateSpecRegistry.class, () -> mock(AggregateSpecRegistry.class))
+                .withBean(PublishedAggregateTopics.class, () -> new PublishedAggregateTopics(new EventsProperties()))
                 .run(context -> {
                     assertThat(context).hasSingleBean(EventBackfillJob.class);
                     assertThat(context).hasSingleBean(BackfillRunsStartupCheck.class);
-                    assertThat(context).doesNotHaveBean(BackfillWithoutPublishingWarning.class);
                 });
     }
 

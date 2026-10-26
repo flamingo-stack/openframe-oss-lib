@@ -1,10 +1,10 @@
 package com.openframe.event.jobs;
 
 import com.openframe.event.jobs.backfill.config.BackfillConfiguration;
-import com.openframe.event.jobs.backfill.config.BackfillWithoutPublishingWarning;
 import com.openframe.event.jobs.backfill.config.properties.EventBackfillProperties;
 import com.openframe.event.jobs.core.lock.EventJobLock;
 import com.openframe.event.jobs.core.persistence.EventJob;
+import com.openframe.event.jobs.core.persistence.EventJobRunIndexInitializer;
 import com.openframe.event.jobs.core.repository.EventJobRepository;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobShutdown;
@@ -26,12 +26,12 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
 
 import java.time.Clock;
 
-// Off by default; the service that turns it on (openframe-saas-stream) adds @EnableScheduling and a LockProvider.
+// Only openframe-saas-stream has this module; it adds @EnableScheduling and a LockProvider.
 @AutoConfiguration(after = {AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class})
-@ConditionalOnBooleanProperty(name = "openframe.events.jobs.enabled")
+@ConditionalOnBooleanProperty(name = "openframe.events.enabled")
 @EnableMongoRepositories(basePackageClasses = {EventJobRepository.class, ProjectionTaskRepository.class})
 @EnableConfigurationProperties({EventBackfillProperties.class, ReconciliationProperties.class, ProjectionTaskProperties.class})
-@Import({BackfillConfiguration.class, BackfillWithoutPublishingWarning.class, ReconciliationConfiguration.class,
+@Import({EventJobRunIndexInitializer.class, BackfillConfiguration.class, ReconciliationConfiguration.class,
         ProjectionTaskConfiguration.class})
 public class EventJobsAutoConfiguration {
 
