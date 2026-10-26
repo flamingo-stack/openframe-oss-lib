@@ -41,7 +41,7 @@ public class PublishedEventListeners implements KafkaListenerConfigurer {
         String groupPrefix = EventTopicNames.requireGroupPrefix(kafka);
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String type = spec.getType();
-            Class<?> eventClass = eventClassOf(spec);
+            Class<?> eventClass = resolveEventClass(spec);
             PublishedTypeListener listener = new PublishedTypeListener(type, eventClass, envelopeMapper, runner);
             String topic = EventTopicNames.topicOf(topicPrefix, type);
             PublishedTypeEndpoint endpoint = new PublishedTypeEndpoint(LISTENER_ID_PREFIX + type, groupPrefix + type, topic,
@@ -50,7 +50,7 @@ public class PublishedEventListeners implements KafkaListenerConfigurer {
         }
     }
 
-    private static Class<?> eventClassOf(AggregateSpec<?, ?> spec) {
+    private static Class<?> resolveEventClass(AggregateSpec<?, ?> spec) {
         Class<?> specClass = ClassUtils.getUserClass(spec);
         ResolvableType specType = ResolvableType.forClass(specClass).as(AggregateSpec.class);
         return specType.getGeneric(EVENT_TYPE_ARGUMENT).resolve();
