@@ -378,6 +378,7 @@ export function MarkdownEditor({
 
       {/* `next/dynamic` draws the loader's `loading`; a host on `React.lazy` reaches this boundary. Both are the skeleton. */}
       <MarkdownEditorHeightContext.Provider value={height}>
+        {/* loading-standard-ok(RAW_SUSPENSE): waits on the editor's CODE (React.lazy), like next/dynamic's loading: */}
         <Suspense fallback={<MarkdownEditorFieldSkeleton height={height} />}>
           <MDEditor
             value={value}

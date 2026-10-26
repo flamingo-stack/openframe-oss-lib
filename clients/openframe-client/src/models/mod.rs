@@ -40,7 +40,7 @@ pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
 pub use delivery::{
     delivery_result_subject, DeliveryRef, DeliveryResult, DeliveryResultMessage,
-    DELIVERY_RESULT_KIND,
+    CLIENT_UPDATE_DELIVERY_TYPE, DELIVERY_RESULT_KIND,
 };
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
@@ -51,7 +51,7 @@ pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{
-    FirstRunState, Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,
+    Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,
 };
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;

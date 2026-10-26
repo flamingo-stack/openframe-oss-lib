@@ -29,11 +29,69 @@ import { contentFetch } from '../../../utils/embed-content-fetch';
 import { RoadmapCard } from '../../chat/entity-cards/roadmap-card';
 import type { RoadmapItem } from '../../chat/types/entities/roadmap-item';
 import { EmptyState } from '../../empty-state';
+import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
-import { useLoadingScope } from '../../ui/loading-scope';
-import { RoadmapGridSkeleton, roadmapGridClass } from './roadmap-grid-skeleton';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
+
+/**
+ * The grid's loading form: each placeholder is `RoadmapCard`'s own loading form.
+ */
+
+/**
+ * The grid's box, read by `RoadmapGrid` and by its skeleton: one column, two from `content-md` when `columns` is 2,
+ * and the desktop left margin that aligns it with the page hero's title. LITERAL class strings: an interpolated
+ * `content-md:grid-cols-${n}` is invisible to Tailwind's scanner and is never generated.
+ */
+function roadmapGridClass(columns: 1 | 2, showLeftMargin: boolean): string {
+  return `grid grid-cols-1 gap-6 ${columns === 2 ? 'content-md:grid-cols-2' : ''} ${
+    showLeftMargin ? 'content-md:ml-[120px]' : ''
+  }`;
+}
+
+/**
+ * Cards the grid's skeleton draws when its host states no count: a typical count. The roadmap lists every item it
+ * holds (no page, no limit); a host that reads a known number of items passes it as `count`.
+ */
+const ROADMAP_GRID_SKELETON_CARDS = 4;
+
+interface RoadmapGridSkeletonProps {
+  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
+  region?: boolean;
+  /** Skeleton cards: the number of items the host reads. Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count. */
+  count?: number;
+  /** Show the desktop left margin (~120px) that aligns the grid with
+   *  the page hero's title block. Default `true`. Related-content rails
+   *  inside narrower surfaces (e.g. the release detail page) pass `false`. */
+  showLeftMargin?: boolean;
+  /** The grid's columns from `content-md` (`RoadmapGrid`'s `columns`). Default `2`. */
+  columns?: 1 | 2;
+  /** The cards draw their vote row (`RoadmapGrid`'s `votes`). Default `true`. */
+  votes?: boolean;
+}
+
+/** The loading cards' vote handler: they draw the vote row and take no vote. */
+const NO_VOTE = () => {};
+
+function RoadmapGridSkeleton({
+  region = true,
+  count = ROADMAP_GRID_SKELETON_CARDS,
+  showLeftMargin = true,
+  columns = 2,
+  votes = true,
+}: RoadmapGridSkeletonProps) {
+  return (
+    <LoadingRegion label="Loading the roadmap" announce={region} className={roadmapGridClass(columns, showLeftMargin)}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="min-w-0" data-loading-item>
+          {/* With its vote row when the loaded grid's cards have one (`votes`). */}
+          <RoadmapCard loading onVote={votes ? NO_VOTE : undefined} />
+        </div>
+      ))}
+    </LoadingRegion>
+  );
+}
 
 const DEFAULT_BUILD_REFRESH_URL = (taskId: string) => `/api/roadmap/${taskId}`;
 const BACKLOG = 'Backlog';
@@ -113,6 +171,11 @@ export interface RoadmapGridProps {
   buildRefreshUrl?: (taskId: string) => string;
   /** Voting hook options (vote endpoint + storage key). */
   votingOptions?: UseRoadmapVotingOptions;
+  /**
+   * The cards draw their vote buttons. Default `true` (the public roadmap). `false` for a surface that shows the
+   * roadmap to the team and must not cast public votes (an internal hub, which may not serve the vote route at all).
+   */
+  votes?: boolean;
   /** Group items into collapsible per-quarter accordions. Default `false`
    *  (flat grid) so EXISTING callers — the hub's per-quarter RoadmapGrid calls
    *  and related-content rails — stay unchanged. `RoadmapView` / full-page
@@ -131,7 +194,7 @@ export interface RoadmapGridProps {
    * Default `ROADMAP_GRID_SKELETON_CARDS`, a typical count for a roadmap that lists everything it holds.
    */
   skeletonCount?: number;
-  /** @deprecated Use `skeletonCount`. */
+  /** @deprecated Ignored: the skeleton draws `skeletonCount` (a list draws its full count, never a fold). */
   fold?: number;
 }
 
@@ -149,7 +212,8 @@ function RoadmapGridSingle({
   showLeftMargin: boolean;
   columns?: 1 | 2;
   getVote: (taskId: string) => 'up' | 'down' | null;
-  onVote: (taskId: string, voteType: 'up' | 'down') => void;
+  /** Absent: the cards draw no vote row (`RoadmapGrid`'s `votes={false}`). */
+  onVote?: (taskId: string, voteType: 'up' | 'down') => void;
   votingTasks: Set<string>;
 }) {
   return (
@@ -166,7 +230,7 @@ function RoadmapGridSingle({
             item={item}
             id={devSectionAnchorId('roadmap', item.id)}
             userVote={getVote(item.id)}
-            onVote={voteType => onVote(item.id, voteType)}
+            onVote={onVote ? voteType => onVote(item.id, voteType) : undefined}
             isVoting={votingTasks.has(item.id)}
           />
         </div>
@@ -183,30 +247,60 @@ const QUARTER_CONTENT_CLASS = 'pt-4';
 const QUARTER_CONTENT_INNER_CLASS = 'pb-4';
 
 /**
- * The quarter-grouped grid while its items are read: one quarter, its heading and item count as bars, then the
- * grid's card skeletons.
+ * Collapsed past quarters the grouped grid draws while its items are read, before the open one: a TYPICAL count
+ * (measured on the live roadmap, 2026-10: four past quarters older than the ones kept open). The loaded grid shows
+ * every quarter older than `quartersToKeepClosed` collapsed (`computeDefaultExpandedQuarters`), so its first quarters
+ * are heads only.
  */
-export function RoadmapGridQuarterSkeleton({
+const ROADMAP_SKELETON_CLOSED_QUARTERS = 4;
+
+/** A collapsed quarter while it is read: its heading and item count as bars, nothing under them. */
+function RoadmapQuarterHeadSkeleton() {
+  return (
+    <div className={QUARTER_HEAD_CLASS}>
+      <TextLineSkeleton type="h2" className="w-40" />
+      <TextLineSkeleton type="h6" className="w-16" />
+    </div>
+  );
+}
+
+/**
+ * The quarter-grouped grid while its items are read, in the loaded grid's shape: the collapsed past quarters (heads
+ * only), then one open quarter, its head and the grid's card skeletons.
+ */
+function RoadmapGridQuarterSkeleton({
   showLeftMargin = true,
   columns = 2,
   count,
+  votes = true,
 }: {
   showLeftMargin?: boolean;
   columns?: 1 | 2;
   /** The quarter's skeleton cards. Default the grid skeleton's own. */
   count?: number;
+  votes?: boolean;
 }) {
   return (
     <div className={QUARTER_LIST_CLASS} aria-hidden>
+      <LoadingItems count={ROADMAP_SKELETON_CLOSED_QUARTERS}>
+        {() => (
+          <div data-loading-item>
+            <RoadmapQuarterHeadSkeleton />
+          </div>
+        )}
+      </LoadingItems>
       <div className="flex flex-col" data-loading-item>
-        <div className={QUARTER_HEAD_CLASS}>
-          <TextLineSkeleton type="h2" className="w-40" />
-          <TextLineSkeleton type="h6" className="w-16" />
-        </div>
+        <RoadmapQuarterHeadSkeleton />
         {/* The quarter's content box: the `AccordionContent` padding (`pt-4` here, the content's own `pb-4` inside). */}
         <div className={QUARTER_CONTENT_CLASS}>
           <div className={QUARTER_CONTENT_INNER_CLASS}>
-            <RoadmapGridSkeleton region={false} count={count} showLeftMargin={showLeftMargin} columns={columns} />
+            <RoadmapGridSkeleton
+              region={false}
+              count={count}
+              showLeftMargin={showLeftMargin}
+              columns={columns}
+              votes={votes}
+            />
           </div>
         </div>
       </div>
@@ -221,14 +315,13 @@ export function RoadmapGrid({
   columns = 2,
   buildRefreshUrl = DEFAULT_BUILD_REFRESH_URL,
   votingOptions,
+  votes = true,
   groupByQuarter = false,
   hasActiveFilters = false,
   quartersToKeepClosed = 2,
   isLoading = false,
   skeletonCount,
-  fold,
 }: RoadmapGridProps) {
-  const skeletonCards = skeletonCount ?? fold;
   // ── Voting (shared across all quarters) ──
   const { getVote, toggleVote } = useRoadmapVoting(votingOptions);
   const inScope = useLoadingScope();
@@ -323,9 +416,20 @@ export function RoadmapGrid({
   // empty state. The page's loading region announces a scope's; a host's own read announces itself.
   if (inScope || isLoading) {
     return groupByQuarter ? (
-      <RoadmapGridQuarterSkeleton showLeftMargin={showLeftMargin} columns={columns} count={skeletonCards} />
+      <RoadmapGridQuarterSkeleton
+        showLeftMargin={showLeftMargin}
+        columns={columns}
+        count={skeletonCount}
+        votes={votes}
+      />
     ) : (
-      <RoadmapGridSkeleton region={!inScope} count={skeletonCards} showLeftMargin={showLeftMargin} columns={columns} />
+      <RoadmapGridSkeleton
+        region={!inScope}
+        count={skeletonCount}
+        showLeftMargin={showLeftMargin}
+        columns={columns}
+        votes={votes}
+      />
     );
   }
 
@@ -347,7 +451,7 @@ export function RoadmapGrid({
         showLeftMargin={showLeftMargin}
         columns={columns}
         getVote={getVote}
-        onVote={handleVote}
+        onVote={votes ? handleVote : undefined}
         votingTasks={votingTasks}
       />
     );
@@ -400,7 +504,7 @@ export function RoadmapGrid({
                 showLeftMargin={showLeftMargin}
                 columns={columns}
                 getVote={getVote}
-                onVote={handleVote}
+                onVote={votes ? handleVote : undefined}
                 votingTasks={votingTasks}
               />
             </AccordionContent>

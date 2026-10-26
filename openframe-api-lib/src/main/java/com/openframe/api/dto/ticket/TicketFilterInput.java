@@ -30,6 +30,10 @@ public class TicketFilterInput {
     private Boolean hasUnreadNotifications;
     @Size(max = 3)
     private List<TicketActivityFilter> activity;
+    /** true keeps only tickets the client escalated; false the others (a null document value counts as false). */
+    private Boolean escalatedByUser;
+    /** true keeps only tickets whose chat waits on an approval request; false keeps the others; null does not filter. */
+    private Boolean hasPendingApproval;
     //TODO Backward compatibility alias. Remove after FE alignment
     @Deprecated
     private List<String> labelIds;

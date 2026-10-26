@@ -3,7 +3,7 @@ package com.openframe.data.cassandra.config;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.core.cql.Statement;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.cassandra.core.convert.MappingCassandraConverter;
@@ -25,7 +25,7 @@ class CassandraSchemaInitializerTest {
         CqlSession session = mock(CqlSession.class);
         when(session.execute(any(Statement.class))).thenReturn(mock(ResultSet.class));
         CassandraMappingContext mappingContext = new CassandraMappingContext();
-        mappingContext.setInitialEntitySet(Set.of(UnifiedLogEvent.class));
+        mappingContext.setInitialEntitySet(Set.of(CassandraLogEvent.class));
         mappingContext.afterPropertiesSet();
         MappingCassandraConverter converter = new MappingCassandraConverter(mappingContext);
         converter.afterPropertiesSet();

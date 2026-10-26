@@ -25,14 +25,14 @@
 
 import type React from 'react';
 import Image from '../../embed-shims/next-image';
-import { AVATAR_SIZE } from '../../styles/component-sizes';
+import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
 import type { AuthorProfile } from '../../types/entity-author';
 import { cn } from '../../utils/cn';
 import { formatBioText } from '../../utils/format';
 import { useProxiedImageUrl } from '../chat/hooks/use-proxied-image-url';
 import { InteractiveSkeleton, TextLineSkeleton } from '../loading/unified-skeleton';
 import { SocialIconRow, socialIconRowClass } from '../social-icon-row';
-import { useLoadingScope } from '../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { SquareAvatar } from '../ui/square-avatar';
 import { StatusBadge } from '../ui/status-badge';
 
@@ -77,7 +77,15 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
           ) : (
             <div className="relative h-full w-full overflow-hidden rounded-full border border-ods-border bg-ods-bg-surface">
               {proxiedAvatar ? (
-                <Image src={proxiedAvatar} alt={author.fullName} fill className="object-cover" unoptimized />
+                <Image
+                  src={proxiedAvatar}
+                  alt={author.fullName}
+                  fill
+                  // The frame's size, so a host that resizes serves a 96 px picture, not the 2500 px original.
+                  sizes={`${AVATAR_SIZE_PX.profile}px`}
+                  className="object-cover"
+                  unoptimized
+                />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-ods-text-secondary text-h2">
                   {author.fullName.charAt(0).toUpperCase()}
@@ -103,16 +111,16 @@ export function AuthorDetailView({ author, proxyImageUrl, children, className }:
           )}
           {loading ? (
             <div className={socialIconRowClass(true)}>
-              {Array.from({ length: AUTHOR_SKELETON_SOCIALS }, (_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: skeleton icons never reorder
-                <InteractiveSkeleton.Button key={i} size="icon-sm" />
-              ))}
+              <LoadingItems count={AUTHOR_SKELETON_SOCIALS}>
+                {() => <InteractiveSkeleton.Button data-loading-item size="icon-sm" />}
+              </LoadingItems>
             </div>
           ) : (
             author.socialLinks.length > 0 && (
               // Ghost compact row (transparent 32px) — metadata, not CTAs.
               <SocialIconRow
                 compact
+                listItems
                 links={author.socialLinks.map(link => ({
                   platform: link.platform,
                   href: link.url,

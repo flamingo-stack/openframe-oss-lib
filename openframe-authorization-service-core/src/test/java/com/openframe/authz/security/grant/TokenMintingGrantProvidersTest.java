@@ -2,7 +2,7 @@ package com.openframe.authz.security.grant;
 
 import com.openframe.authz.config.tenant.TenantContext;
 import com.openframe.authz.service.sso.SignupTicketService;
-import com.openframe.authz.service.sso.SignupTicketService.SignupTicketPayload;
+import com.openframe.authz.service.sso.SignupTicketService.PendingSignup;
 import com.openframe.authz.service.sso.SsoIdentityService;
 import com.openframe.authz.service.sso.SsoOidcUserService;
 import com.openframe.authz.service.sso.apple.AppleAuthorizationCodeClient;
@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -38,6 +39,7 @@ import org.springframework.security.oauth2.server.authorization.settings.Authori
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 
+import java.security.Principal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -126,8 +128,8 @@ class TokenMintingGrantProvidersTest {
         return new OAuth2ClientAuthenticationToken(builder.build(), ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
     }
 
-    private static SignupTicketPayload ticket(String userId, String tenantId) {
-        return new SignupTicketPayload("ada@acme.com", "Ada", "L", "google", true, "g-1", userId, tenantId);
+    private static PendingSignup ticket(String userId, String tenantId) {
+        return new PendingSignup("ada@acme.com", "Ada", "L", "google", true, "g-1", userId, tenantId, null);
     }
 
     private static void assertOAuthError(Runnable call, String code) {
@@ -216,6 +218,33 @@ class TokenMintingGrantProvidersTest {
 
         assertOAuthError(() -> signupProvider.authenticate(new SignupTicketGrantAuthenticationToken(
                 client(SignupTicketGrantAuthenticationToken.GRANT_TYPE), "t-1")), "invalid_grant");
+    }
+
+    @Test
+    void authenticate_boundTicket_mintsPrincipalWithUserRoles() {
+        when(signupTicketService.consume("t-1")).thenReturn(Optional.of(ticket("user-1", TENANT)));
+        when(userService.findActiveById("user-1")).thenReturn(Optional.of(user));
+
+        signupProvider.authenticate(signupRequest());
+
+        ArgumentCaptor<OAuth2Authorization> saved = ArgumentCaptor.forClass(OAuth2Authorization.class);
+        verify(authorizationService).save(saved.capture());
+        Authentication principal = saved.getValue().getAttribute(Principal.class.getName());
+        assertThat(principal.getAuthorities()).extracting(GrantedAuthority::getAuthority).containsExactly("ROLE_ADMIN");
+    }
+
+    @Test
+    void authenticate_ticketNotYetBound_rejectsAsRegistrationIncomplete() {
+        when(signupTicketService.consume("t-1")).thenReturn(Optional.of(ticket(null, null)));
+
+        assertThatThrownBy(() -> signupProvider.authenticate(signupRequest()))
+                .isInstanceOfSatisfying(OAuth2AuthenticationException.class,
+                        e -> assertThat(e.getError().getErrorCode()).isEqualTo("invalid_grant"))
+                .hasMessage("Signup ticket has not completed registration.");
+    }
+
+    private static SignupTicketGrantAuthenticationToken signupRequest() {
+        return new SignupTicketGrantAuthenticationToken(client(SignupTicketGrantAuthenticationToken.GRANT_TYPE), "t-1");
     }
 
     // --- apple-native grant ---

@@ -5,6 +5,7 @@ import { type ComponentPropsWithoutRef, type ElementRef, forwardRef } from 'reac
 
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { TAB_FOCUS_CLASS } from './button/button-styles';
 import { useLoadingScope } from './loading-scope';
 
 /**
@@ -36,10 +37,10 @@ const tabsListVariantClasses: Record<TabsVariant, string> = {
 };
 
 const TABS_TRIGGER_BASE =
-  'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-h6 ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm';
+  'inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-h6 transition-all disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm';
 
 const tabsTriggerVariantClasses: Record<TabsVariant, string> = {
-  default: TABS_TRIGGER_BASE,
+  default: cn(TABS_TRIGGER_BASE, TAB_FOCUS_CLASS),
   'admin-rail': cn(
     TABS_TRIGGER_BASE,
     'rounded-none border-b-2 border-transparent',
@@ -49,6 +50,8 @@ const tabsTriggerVariantClasses: Record<TabsVariant, string> = {
     'transition-colors hover:text-ods-text-primary',
     // Disabled tabs stay visible but inert.
     'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
+    // Focus is the tab's hover look, never the base's ring (see TAB_FOCUS_CLASS).
+    TAB_FOCUS_CLASS,
   ),
 };
 
@@ -118,35 +121,6 @@ function TabsTriggerSkeleton({
   );
 }
 
-/**
- * A tab list whose tabs are not known until a read: the list's own frame (the bordered rail for `admin-rail`) and
- * `count` trigger skeletons.
- */
-function TabsListSkeleton({
-  variant = 'default',
-  count,
-  labels,
-  className,
-}: {
-  variant?: TabsVariant;
-  /** How many tabs, when their names are read. */
-  count?: number;
-  /** The tabs' names, when the page states them (drawn as they are). */
-  labels?: string[];
-  className?: string;
-}) {
-  const tabs: Array<string | undefined> = labels ?? Array.from({ length: count ?? 0 }, () => undefined);
-  const list = (
-    <div aria-hidden className={cn(tabsListVariantClasses[variant], className)}>
-      {tabs.map((label, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton tabs never reorder
-        <TabsTriggerSkeleton key={i} variant={variant} label={label} />
-      ))}
-    </div>
-  );
-  return variant === 'admin-rail' ? <div className={ADMIN_RAIL_WRAPPER_CLASS}>{list}</div> : list;
-}
-
 /** @deprecated Use `TabNavigation` from `components/ui/tab-navigation`. See {@link Tabs}. */
 const TabsContent = forwardRef<
   ElementRef<typeof TabsPrimitive.Content>,
@@ -163,4 +137,4 @@ const TabsContent = forwardRef<
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, TabsTriggerSkeleton, TabsListSkeleton };
+export { Tabs, TabsList, TabsTrigger, TabsContent };

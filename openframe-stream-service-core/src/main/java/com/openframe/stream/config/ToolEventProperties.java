@@ -19,6 +19,7 @@ public class ToolEventProperties {
 
     public enum Store {
         LOKI,
-        CASSANDRA
+        CASSANDRA,
+        BOTH
     }
 }

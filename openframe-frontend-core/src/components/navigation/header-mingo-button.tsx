@@ -4,6 +4,7 @@ import type React from 'react';
 import { cn } from '../../utils/cn';
 import { AgentMark } from '../agent-mark';
 import { XmarkIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 
 export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Active/pressed state — set to `true` while the Mingo drawer is open. */
@@ -37,22 +38,17 @@ export function HeaderMingoButton({
 }: HeaderMingoButtonProps) {
   const showClose = isActive && (iconOnly || closeWhenActive);
   return (
-    <button
+    <Button
+      variant="cell"
       type="button"
       aria-label={showClose ? 'Close Mingo AI' : 'Mingo AI'}
       aria-pressed={isActive}
       className={cn(
-        'flex h-full shrink-0 items-center gap-2 px-4',
         // Fixed 140px cell from md, so the header's right-hand cluster has a
         // known width and a loading placeholder can reserve it exactly
         // (`AppHeaderProps.loadingActionCells` → `'wide'`). Content-width below
         // md, and in `iconOnly` mode, where the control is a square affordance.
-        !iconOnly && 'md:w-[140px] md:justify-center',
-        'transition-colors duration-200',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-        // Transparent at rest so the cell inherits the bar's background
-        // (TopNavigation `backgroundClassName` can differ per platform).
-        'bg-transparent text-ods-text-primary hover:bg-ods-bg-hover',
+        !iconOnly && 'md:w-[140px]',
         className,
       )}
       {...props}
@@ -68,7 +64,7 @@ export function HeaderMingoButton({
         <AgentMark agent="mingo" className="h-6 w-6 shrink-0" />
       )}
       {!iconOnly && <span className="whitespace-nowrap font-bold tracking-[-0.36px] text-h3">Mingo AI</span>}
-    </button>
+    </Button>
   );
 }
 

@@ -168,7 +168,7 @@ export function ArticleAuthorByline({
  * The byline while its author is read: the card frame, the avatar circle at its size, and bars for the name (h5),
  * the job title and three bio lines, each inside the loaded text's own element so it takes that line's height.
  */
-export function ArticleAuthorBylineSkeleton({ size = 'md', className }: { size?: 'md' | 'lg'; className?: string }) {
+function ArticleAuthorBylineSkeleton({ size = 'md', className }: { size?: 'md' | 'lg'; className?: string }) {
   return (
     <div className={cn(BYLINE_FRAME_CLASS, className)} aria-hidden>
       <div className="flex-shrink-0">

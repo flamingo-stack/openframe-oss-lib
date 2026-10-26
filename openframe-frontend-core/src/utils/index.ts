@@ -71,6 +71,7 @@ export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description';
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
 export * from './brand-marks';
 export * from './design-doc-readiness';
+export * from './clickup-drop-down';
 export * from './platform-config';
 export * from './os-platforms';
 export * from './access-code-client';
@@ -383,6 +384,7 @@ export type { FaqHashTarget } from './faq-anchor';
 // pure + server-safe; the hub re-exports these from its config/util shims.
 export {
   CONTENT_REF_GROUPS,
+  GROUP_PAGE_SIZE,
   getContentRefLabel,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,

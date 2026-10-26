@@ -153,7 +153,7 @@ export function SlackMessageCard({ item, variant = 'compact', className, anchorP
   );
 }
 
-export function SlackMessageCardSkeleton({
+function SlackMessageCardSkeleton({
   variant = 'compact',
   className,
 }: {

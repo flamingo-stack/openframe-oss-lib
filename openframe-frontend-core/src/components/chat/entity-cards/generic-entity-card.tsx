@@ -124,7 +124,7 @@ export function GenericEntityCard({ item, className, anchorProps }: GenericEntit
   );
 }
 
-export function GenericEntityCardSkeleton({ className }: { className?: string }) {
+function GenericEntityCardSkeleton({ className }: { className?: string }) {
   return (
     <CompactCardSkeleton
       slot={false}

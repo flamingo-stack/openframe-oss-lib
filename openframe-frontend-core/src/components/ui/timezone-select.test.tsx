@@ -22,7 +22,7 @@ describe('BackButton', () => {
     const link = renderToStaticMarkup(<BackButton label="Back to list" href="/list" />);
     expect(link).toMatch(/^<a [^>]*href="\/list"/);
     expect(link).toContain('Back to list');
-    expect(renderToStaticMarkup(<BackButton label="Back" />)).toMatch(/^<button type="button"/);
+    expect(renderToStaticMarkup(<BackButton label="Back" />)).toMatch(/^<button [^>]*type="button"/);
   });
 
   it('a link keeps the attributes a caller passes, minus the button-only ones', () => {
@@ -42,7 +42,8 @@ describe('BackButton', () => {
     expect(link).toContain('title="Go back"');
     expect(link).toContain('data-testid="back"');
     expect(link).toContain('aria-label="Back to list"');
-    expect(link).not.toContain('disabled');
+    // The attribute, not the `disabled:` state classes the link's button styling carries.
+    expect(link).not.toMatch(/\sdisabled(=|[\s>])/);
     expect(link).not.toContain('name=');
   });
 });
