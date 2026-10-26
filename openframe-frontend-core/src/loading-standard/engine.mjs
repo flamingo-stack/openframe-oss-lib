@@ -69,6 +69,14 @@
  *                       by one, share one boundary; the page's static frame (heading, copy, back link, cached content)
  *                       renders at once, outside every boundary. A component that reads in the browser keeps its own
  *                       loading state (`LoadingWhen`, `useLoadingScope`) and needs no boundary.
+ * BOUNDARY_OWNER        A `LoadingSuspense` placed AROUND a component instead of BY it. The boundary is the whole output
+ *                       of the component that waits (the root element it returns), wrapping exactly one component
+ *                       declared in the same file (its reader), with no `fallback`: the reader draws its own loading form
+ *                       in the scope the boundary opens (`useLoadingScope()`, the skeletons inside the component). A
+ *                       parent renders the component and never wraps it; a fallback built beside the reader, a boundary
+ *                       around an imported component, around markup or an expression, or in the middle of a layout,
+ *                       each puts a component's loading state outside the component. A host's own boundary built on it
+ *                       (`config.boundaries`) opts out where it is defined.
  * WHOLE_VIEW_SKELETON   A component declared or rendered as `*PageSkeleton`, `*ScreenSkeleton`, `*DetailSkeleton`,
  *                       `*ArticleSkeleton`, `*ViewSkeleton`, `*HomeSkeleton`, `*DeckSkeleton`, `*EditorSkeleton`,
  *                       `*CenterSkeleton`, `*CatalogSkeleton`, `*FormSkeleton`, `*LayoutSkeleton`,
@@ -192,6 +200,8 @@ export const RULES = {
   RAW_SUSPENSE: 'a raw Suspense (use LoadingSuspense: its fallback is the component it waits on, in a loading scope)',
   PAGE_BOUNDARY:
     'a boundary around a whole page (wrap only the component that waits on a read; the static frame renders at once)',
+  BOUNDARY_OWNER:
+    'a boundary placed around a component (the component that waits returns <LoadingSuspense><Reader /></LoadingSuspense>, the reader draws its own loading form)',
   WHOLE_VIEW_SKELETON: 'a whole-view skeleton (the view itself in a loading scope is its loading state)',
   FOLD_PROP: 'a `fold` prop (a skeleton draws its full count: skeletonCount)',
   DEPRECATED_SKELETON: 'deprecated in the lib (render the component in a loading scope)',
@@ -248,7 +258,7 @@ export const CONFIGS = {
    * a loading scope until it answers), which renders directly when told `cached`.
    */
   hub: {
-    rules: ['SUSPENSE_FALLBACK', 'HAND_PAIR', 'RAW_SUSPENSE', 'PAGE_BOUNDARY'],
+    rules: ['SUSPENSE_FALLBACK', 'HAND_PAIR', 'RAW_SUSPENSE', 'PAGE_BOUNDARY', 'BOUNDARY_OWNER'],
     trees: ['app', 'components', 'lib'],
     boundaries: { StreamedSection: 'cached' },
     exempt: [],
@@ -260,7 +270,14 @@ export const CONFIGS = {
         why: "the lib's own loading primitives: the one pulse, the scope, the fallback and the Suspense wrapper are built here",
         files:
           /(?:^|\/)components\/(?:loading\/(?:loading-fallback|loading-region|unified-skeleton)|ui\/(?:loading-scope|skeleton[\w-]*|text-line-skeleton))\.tsx?$/,
-        rules: ['OWN_PULSE', 'HAND_PAIR', 'SUSPENSE_FALLBACK', 'RAW_SUSPENSE', 'NOTHING_WHILE_LOADING'],
+        rules: [
+          'OWN_PULSE',
+          'HAND_PAIR',
+          'SUSPENSE_FALLBACK',
+          'RAW_SUSPENSE',
+          'NOTHING_WHILE_LOADING',
+          'BOUNDARY_OWNER',
+        ],
       },
       {
         why: "the loaders themselves (declared, never a screen state in the lib), the Button's own action progress, and the chat registry's card loader (a card read by id, drawn by the card's own skeleton)",
@@ -2303,6 +2320,7 @@ function analyzeFile(project, path, active, rel, page, boundaries = {}) {
       }
     }
     if (leaf === 'Suspense' || leaf === 'LoadingSuspense') checkFallback(opening, leaf);
+    if (leaf === 'LoadingSuspense') checkBoundaryOwner(opening);
     if (leaf === 'LoadingFallback' && ts.isJsxOpeningElement(opening)) {
       const children = opening.parent.children.filter(c => !(ts.isJsxText(c) && !c.text.trim()));
       if (children.every(c => (ts.isJsxExpression(c) ? !c.expression || isBlank(c.expression) : isBlank(c))))
@@ -2347,6 +2365,35 @@ function analyzeFile(project, path, active, rel, page, boundaries = {}) {
         );
       else if (pagedSkeletonCount(value, a)) reportPagedSkeletonCount(a, value);
     }
+  }
+
+  /**
+   * BOUNDARY_OWNER: the boundary is the root element its component returns, around one component declared in this file,
+   * with no fallback of its own.
+   */
+  function checkBoundaryOwner(opening) {
+    const problems = [];
+    if (attribute(opening, 'fallback'))
+      problems.push('it takes a fallback (the component it wraps draws its own loading form in the scope)');
+    const el = ts.isJsxOpeningElement(opening) ? opening.parent : opening;
+    const kids = ts.isJsxElement(el) ? el.children.filter(c => !(ts.isJsxText(c) && !c.text.trim())) : [];
+    const only = kids.length === 1 && !ts.isJsxExpression(kids[0]) ? openingOf(kids[0]) : null;
+    const name = only ? dottedName(only.tagName) : '';
+    const decl = name && isComponentName(name) && !name.includes('.') ? model.lookup(name, el) : null;
+    if (!decl || decl.kind === 'import' || decl.kind === 'namespace' || decl.kind === 'param')
+      problems.push(
+        name && isComponentName(name)
+          ? `it wraps ${name}, which is not declared in this file (move the boundary into ${name})`
+          : 'it does not wrap exactly one component declared in this file',
+      );
+    let at = el.parent;
+    while (at && ts.isParenthesizedExpression(at)) at = at.parent;
+    const fn = nearestFunction(el);
+    const isRoot = !!fn && (ts.isReturnStatement(at) ? nearestFunction(at) === fn : at === fn && fn.body === el);
+    if (!isRoot || !isComponentName(functionName(fn)))
+      problems.push("it is not the whole output of the component it is written in (make it that component's root)");
+    if (problems.length)
+      report('BOUNDARY_OWNER', opening, `a boundary placed around a component, not by it: ${problems.join('; ')}`);
   }
 
   /** A `Suspense` / `LoadingSuspense` fallback that draws nothing (LoadingSuspense's own default is its children). */
