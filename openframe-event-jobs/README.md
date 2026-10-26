@@ -150,7 +150,7 @@ The job reads the collection of the projection's `projectedClass()` in `_id` bat
 decides what a mismatch is, for example [`OrganizationOnTicketsProjection`](../openframe-data-mongo-sync/src/main/java/com/openframe/data/repository/organization/publishing/OrganizationOnTicketsProjection.java#L54)
 (a ticket whose organization name differs, or whose organization is gone). The items it returns are read again from the
 primary and reconciled again before they count
-([`confirm`](src/main/java/com/openframe/event/jobs/reconciliation/service/ReconciliationRunner.java#L61)), so an item updated
+([`confirm`](src/main/java/com/openframe/event/jobs/reconciliation/service/ReconciliationRunner.java#L78)), so an item updated
 meanwhile is not drift.
 
 A run that checked no items logs a WARN, or an ERROR when the collection of `projectedClass()` does not exist. When a
@@ -163,10 +163,10 @@ Reconciliation of organization-on-tickets in tenant <id>: 3 mismatch(es), for ex
 ```
 
 **Repair** is automatic: after the second read, the job publishes the current state of each confirmed mismatch's source
-again (`PublishedAggregates.publishCurrent`, each source once per batch), and the projection re-applies it, since the
-version store applies an equal version. The run still counts what it found, so the gauge shows the drift before the
-repair, and the next run should find none. A mismatch whose source is gone (`sourceId` null) has nothing to publish. A
-new backfill run of the type is still the way to repair everything at once.
+again (`PublishedAggregates.publishCurrent`, each source at most once per run), for the projection to apply. The run
+still counts what it found, so the gauge shows the drift before the repair, and the next run should find none. A
+mismatch whose source is gone is not published again. A new backfill run of the type is still the way to repair
+everything at once.
 
 **Add a projection**: return it from its spec's `projections()` and implement `reconcile`; the job picks it up at the
 next start. Its `name()` is the job id (`reconciliation:<name>`) and the metric tag.
