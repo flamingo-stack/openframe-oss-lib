@@ -22,13 +22,13 @@ fn save_then_load_round_trips() {
 
     let mut state = UpdaterState::new("1.2.3".to_string());
     state.phase = UpdaterPhase::ReplacingBinary;
-    state.backup_path = Some("/tmp/backup".to_string());
+    state.backup_path = Some("/tmp/backup".into());
     svc.save(&state).unwrap();
 
     let loaded = svc.load().unwrap().unwrap();
     assert_eq!(loaded.target_version, "1.2.3");
     assert_eq!(loaded.phase, UpdaterPhase::ReplacingBinary);
-    assert_eq!(loaded.backup_path.as_deref(), Some("/tmp/backup"));
+    assert_eq!(loaded.backup_path, Some("/tmp/backup".into()));
 }
 
 // Crash-safety: the state is written to a temp file and renamed into place,

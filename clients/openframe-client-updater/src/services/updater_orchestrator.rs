@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::clients::AuthClient;
 use crate::config::updater_config::{
@@ -10,15 +10,15 @@ use crate::config::updater_config::{
 };
 use crate::listener::ClientUpdateListener;
 use crate::models::UpdaterPhase;
-use crate::platform::{atomic_replace, DirectoryManager};
+use crate::platform::DirectoryManager;
 use crate::services::boot_marker_service::BootMarkerService;
+use crate::services::client_binary::{self, Restore};
 use crate::services::token_provider::TokenProvider;
 use crate::services::{
     AgentConfigurationService, ClientToolOpProbe, ClientUpdateService, GithubDownloadService,
     InitialConfigurationService, LocalTlsConfigProvider, NatsConnectionManager,
     NatsMessagePublisher, ServiceManagerService, UpdateProgressPublisher, UpdaterStateService,
 };
-use crate::utils::blocking::run_blocking;
 
 /// Outcome of crash recovery — recovery itself is purely local; the report is
 /// published once NATS is up.
@@ -27,7 +27,6 @@ enum RecoveryReport {
         version: String,
     },
     Failure {
-        phase: UpdaterPhase,
         version: String,
         reason: String,
         rolled_back: bool,
@@ -59,6 +58,11 @@ impl UpdaterOrchestrator {
         let recovery_report = self
             .recover_from_crash(&state_service, &boot_marker)
             .await?;
+        if !state_service.state_file_path().exists() {
+            // Nothing in flight any more: staged binaries and backups next to the
+            // client are what interrupted updates left behind.
+            client_binary::sweep_leftovers(&ServiceManagerService::client_binary_path());
+        }
 
         let server_host = initial_config_service
             .get_server_url()
@@ -144,13 +148,12 @@ impl UpdaterOrchestrator {
                 progress_publisher.publish_success(&version).await;
             }
             Some(RecoveryReport::Failure {
-                phase,
                 version,
                 reason,
                 rolled_back,
             }) => {
                 progress_publisher
-                    .publish_failure(&phase, &version, &reason, rolled_back)
+                    .publish_failure(&UpdaterPhase::Failed, &version, &reason, rolled_back)
                     .await;
             }
             None => {}
@@ -212,15 +215,9 @@ impl UpdaterOrchestrator {
         let report = match state.phase {
             UpdaterPhase::Downloading | UpdaterPhase::Verifying | UpdaterPhase::Idle => {
                 if let Some(path) = &state.downloaded_binary_path {
-                    let p = PathBuf::from(path);
-                    if p.exists() {
-                        if let Err(e) = std::fs::remove_file(&p) {
-                            warn!("Failed to remove temp binary during recovery: {}", e);
-                        }
-                    }
+                    client_binary::remove_quietly(path, "temp binary");
                 }
                 let report = RecoveryReport::Failure {
-                    phase: UpdaterPhase::Failed,
                     version: version.clone(),
                     reason: "Updater crashed before stopping service — no changes made".to_string(),
                     rolled_back: false,
@@ -231,7 +228,7 @@ impl UpdaterOrchestrator {
 
             UpdaterPhase::StoppingService | UpdaterPhase::ReplacingBinary => {
                 let report = self
-                    .restore_and_start(&state.backup_path, &target, version)
+                    .restore_and_start(&state.backup_path, &target, version, boot_marker)
                     .await;
                 state_service.clear()?;
                 Some(report)
@@ -288,7 +285,7 @@ impl UpdaterOrchestrator {
                         "Crash recovery: not healthy (marker verified: {}, running: {:?}) — restoring the previous binary",
                         verified, running
                     );
-                    self.restore_and_start(&state.backup_path, &target, version)
+                    self.restore_and_start(&state.backup_path, &target, version, boot_marker)
                         .await
                 };
                 state_service.clear()?;
@@ -307,67 +304,47 @@ impl UpdaterOrchestrator {
 
     async fn restore_and_start(
         &self,
-        backup_path: &Option<String>,
+        backup_path: &Option<PathBuf>,
         target: &Path,
         version: &str,
+        boot_marker: &BootMarkerService,
     ) -> RecoveryReport {
-        let Some(backup) = backup_path
-            .as_ref()
-            .map(PathBuf::from)
-            .filter(|p| p.exists())
-        else {
+        let failure = |reason: &str, rolled_back: bool| RecoveryReport::Failure {
+            version: version.to_string(),
+            reason: reason.to_string(),
+            rolled_back,
+        };
+
+        let Some(backup) = backup_path.as_ref().filter(|p| p.exists()) else {
             if target.exists() {
                 info!("Crash recovery: no backup left to restore — starting the client binary in place");
                 if let Err(e) = ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await {
-                    error!("Crash recovery: failed to start service: {}", e);
+                    warn!("Crash recovery: failed to start service: {:#}", e);
                 }
-                return RecoveryReport::Failure {
-                    phase: UpdaterPhase::Failed,
-                    version: version.to_string(),
-                    reason: "Updater crashed mid-update; client binary left in place".to_string(),
-                    rolled_back: false,
-                };
+                return failure(
+                    "Updater crashed mid-update; client binary left in place",
+                    false,
+                );
             }
-            return RecoveryReport::Failure {
-                phase: UpdaterPhase::Failed,
-                version: version.to_string(),
-                reason: "Updater crashed mid-update, no client binary and no backup available"
-                    .to_string(),
-                rolled_back: false,
-            };
-        };
-
-        let restored = {
-            let (backup, target) = (backup.clone(), target.to_path_buf());
-            run_blocking(move || atomic_replace::restore(&backup, &target)).await
-        };
-        if let Err(e) = restored {
-            error!(
-                "Crash recovery: restore from {} failed: {:#}",
-                backup.display(),
-                e
+            return failure(
+                "Updater crashed mid-update, no client binary and no backup available",
+                false,
             );
-            return RecoveryReport::Failure {
-                phase: UpdaterPhase::Failed,
-                version: version.to_string(),
-                reason: "Updater crashed mid-update and restoring the previous binary failed"
-                    .to_string(),
-                rolled_back: false,
-            };
-        }
-        info!(
-            "Crash recovery: restored client binary from {}",
-            backup.display()
-        );
+        };
 
-        if let Err(e) = ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await {
-            error!("Crash recovery: failed to start restored service: {}", e);
-        }
-        RecoveryReport::Failure {
-            phase: UpdaterPhase::Failed,
-            version: version.to_string(),
-            reason: "Updater crashed mid-update, previous binary restored".to_string(),
-            rolled_back: true,
+        match client_binary::restore_previous_binary(backup, target, boot_marker).await {
+            Restore::Restored => failure("Updater crashed mid-update, previous binary restored", true),
+            Restore::RestoredNotStarted(e) => failure(
+                &format!(
+                    "Updater crashed mid-update, previous binary restored but its service did not start: {}",
+                    e
+                ),
+                true,
+            ),
+            Restore::Failed => failure(
+                "Updater crashed mid-update and restoring the previous binary failed",
+                false,
+            ),
         }
     }
 }

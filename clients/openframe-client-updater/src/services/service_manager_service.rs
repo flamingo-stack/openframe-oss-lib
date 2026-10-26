@@ -12,7 +12,7 @@ pub struct ServiceManagerService;
 
 impl ServiceManagerService {
     /// Stops the given service and waits until it reaches the Stopped state.
-    pub fn stop(service_name: &str) -> Result<()> {
+    fn stop(service_name: &str) -> Result<()> {
         info!("Stopping service: {}", service_name);
         Self::stop_impl(service_name)?;
         info!("Service stopped: {}", service_name);
@@ -20,16 +20,11 @@ impl ServiceManagerService {
     }
 
     /// Starts the given service.
-    pub fn start(service_name: &str) -> Result<()> {
+    fn start(service_name: &str) -> Result<()> {
         info!("Starting service: {}", service_name);
         Self::start_impl(service_name)?;
         info!("Service started: {}", service_name);
         Ok(())
-    }
-
-    /// Returns true if the service is currently in the Running state.
-    pub fn is_running(service_name: &str) -> Result<bool> {
-        Self::is_running_impl(service_name)
     }
 
     /// Async wrappers: the sync implementations block (SCM polling up to
@@ -47,18 +42,16 @@ impl ServiceManagerService {
             .context("Service start task failed to join")?
     }
 
-    pub async fn is_running_async(service_name: &'static str) -> Result<bool> {
-        tokio::task::spawn_blocking(move || Self::is_running(service_name))
-            .await
-            .context("Service status task failed to join")?
-    }
-
     /// Service state with transient query failures retried; `None` means the
     /// state could not be determined (SCM/launchctl kept failing) — callers
-    /// must not treat that as "stopped".
+    /// must not treat that as "stopped". The only way to ask whether a service runs.
     pub async fn query_running(service_name: &'static str) -> Option<bool> {
         for attempt in 1..=SERVICE_STATE_QUERY_ATTEMPTS {
-            match Self::is_running_async(service_name).await {
+            let queried = tokio::task::spawn_blocking(move || Self::is_running_impl(service_name))
+                .await
+                .context("Service status task failed to join")
+                .and_then(|state| state);
+            match queried {
                 Ok(running) => return Some(running),
                 Err(e) => {
                     warn!(

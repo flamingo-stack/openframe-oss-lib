@@ -4,6 +4,9 @@ use tracing::{info, warn};
 
 use crate::config::updater_config::{REPLACE_MAX_RETRIES, REPLACE_RETRY_DELAY_MS};
 
+/// Name prefix of the staged binary `write_temp` leaves next to the target.
+pub const TEMP_PREFIX: &str = ".openframe-client-update-";
+
 /// Renames `target` to `backup_path`, then renames `new_binary` to `target`.
 /// The caller persists `backup_path` before calling, so crash recovery can
 /// find the backup even if this never returns.
@@ -53,10 +56,7 @@ pub fn write_temp(bytes: &[u8], target: &Path) -> Result<PathBuf> {
         .parent()
         .ok_or_else(|| anyhow!("Target path has no parent directory: {}", target.display()))?;
 
-    let temp_path = dir.join(format!(
-        ".openframe-client-update-{}.tmp",
-        uuid::Uuid::new_v4()
-    ));
+    let temp_path = dir.join(format!("{}{}.tmp", TEMP_PREFIX, uuid::Uuid::new_v4()));
 
     {
         use std::io::Write;

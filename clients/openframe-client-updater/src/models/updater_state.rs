@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -35,8 +36,8 @@ impl std::fmt::Display for UpdaterPhase {
 pub struct UpdaterState {
     pub target_version: String,
     pub phase: UpdaterPhase,
-    pub backup_path: Option<String>,
-    pub downloaded_binary_path: Option<String>,
+    pub backup_path: Option<PathBuf>,
+    pub downloaded_binary_path: Option<PathBuf>,
     pub started_at: String,
     pub failure_reason: Option<String>,
 }

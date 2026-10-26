@@ -1,5 +1,6 @@
 pub mod agent_configuration_service;
 pub mod boot_marker_service;
+pub mod client_binary;
 pub mod client_tool_op_probe;
 pub mod client_update_service;
 pub mod encryption_service;

@@ -10,6 +10,7 @@ use crate::config::updater_config::{
     CONSUMER_RETRY_ATTEMPTS_PER_CYCLE, RECONNECTION_DELAY_MS,
 };
 use crate::models::ClientUpdateMessage;
+use crate::services::client_update_service::UpdateOutcome;
 use crate::services::{AgentConfigurationService, ClientUpdateService, NatsConnectionManager};
 
 #[derive(Clone)]
@@ -124,20 +125,28 @@ impl ClientUpdateListener {
             }
         };
 
-        let version = update_msg.version.clone();
+        let Some(slot) = self.update_service.try_reserve() else {
+            // An ACK would silently consume a genuinely new update.
+            warn!(
+                "Update already in progress — leaving message for v{} unacked for redelivery",
+                update_msg.version
+            );
+            return Ok(());
+        };
 
-        match self.update_service.process_update(update_msg).await {
-            Ok(_) => {
-                info!("ACKing successful update message for v{}", version);
+        let version = update_msg.version.clone();
+        match self.update_service.apply(&update_msg, slot).await {
+            UpdateOutcome::Applied | UpdateOutcome::Rejected(_) => {
+                info!("ACKing update message for v{}", version);
                 message
                     .ack()
                     .await
                     .map_err(|e| anyhow::anyhow!("Failed to ACK message: {}", e))?;
             }
-            Err(e) => {
+            UpdateOutcome::Failed(reason) => {
                 error!(
-                    "Update failed for v{}: {:#} — leaving unacked for redelivery",
-                    version, e
+                    "Update to v{} failed: {} — leaving unacked for redelivery",
+                    version, reason
                 );
             }
         }

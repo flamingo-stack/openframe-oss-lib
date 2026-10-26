@@ -63,8 +63,8 @@ fn new_state_starts_idle_and_empty() {
 fn state_round_trips_through_json() {
     let mut state = UpdaterState::new("2.0.0".to_string());
     state.phase = UpdaterPhase::ReplacingBinary;
-    state.backup_path = Some("/tmp/openframe-client.backup".to_string());
-    state.downloaded_binary_path = Some("/tmp/new-binary".to_string());
+    state.backup_path = Some("/tmp/openframe-client.backup".into());
+    state.downloaded_binary_path = Some("/tmp/new-binary".into());
     state.failure_reason = Some("boom".to_string());
 
     let json = serde_json::to_string(&state).unwrap();
