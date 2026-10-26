@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // The publishing switch is off while the topic is on: the service runs exactly as before the outbox existed.
 @SpringBootTest(classes = OrganizationPublishingSwitchedOffIT.TestApplication.class,
-        properties = {"openframe.events.topics.organizations.publish=true", "spring.data.mongodb.enabled=true"})
+        properties = {"openframe.events.topics.organizations.enabled=true", "spring.data.mongodb.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

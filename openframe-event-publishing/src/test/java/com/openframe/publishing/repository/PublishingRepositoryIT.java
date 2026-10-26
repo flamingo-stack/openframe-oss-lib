@@ -45,8 +45,8 @@ import static org.mockito.Mockito.doReturn;
 
 // Real repository proxies with the publishing interceptor, in real Mongo transactions: each write commits or rolls back with its rows.
 @SpringBootTest(classes = PublishingRepositoryIT.TestApplication.class,
-        properties = {"openframe.events.topics.organizations.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true"})
+        properties = {"openframe.events.topics.organizations.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")
@@ -95,7 +95,7 @@ class PublishingRepositoryIT {
         List<IndexInfo> indexes = mongoTemplate.indexOps(OutboxEvent.class).getIndexInfo();
 
         assertThat(indexes).anySatisfy(index -> {
-            assertThat(index.getName()).isEqualTo("outbox_occurredAt_ttl");
+            assertThat(index.getName()).isEqualTo("event_outbox_occurredAt_ttl");
             assertThat(index.getExpireAfter()).contains(Duration.ofDays(7));
         });
     }
@@ -253,7 +253,7 @@ class PublishingRepositoryIT {
 
         widgetRepository.delete(saved);
 
-        List<org.bson.Document> rawRows = mongoTemplate.getCollection("outbox").find().into(new ArrayList<>());
+        List<org.bson.Document> rawRows = mongoTemplate.getCollection("event_outbox").find().into(new ArrayList<>());
         List<org.bson.Document> rawTombstones = rawRows.stream().filter(row -> row.get("payload") == null).toList();
         assertThat(rawTombstones).singleElement().satisfies(row -> assertThat(row).containsKey("payload"));
     }

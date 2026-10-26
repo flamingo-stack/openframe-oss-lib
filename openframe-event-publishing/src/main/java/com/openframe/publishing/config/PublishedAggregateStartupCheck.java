@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-// publish on for a type no spec covers would silently write nothing; refuse to start. Any other unknown key is only a WARN.
+// A type switched on that no spec covers would silently write nothing; refuse to start. Any other unknown key is only a WARN.
 @Slf4j
 @RequiredArgsConstructor
 public class PublishedAggregateStartupCheck implements SmartInitializingSingleton {
@@ -21,14 +21,14 @@ public class PublishedAggregateStartupCheck implements SmartInitializingSingleto
     public void afterSingletonsInstantiated() {
         Map<String, EventsProperties.Topic> topics = properties.getTopics();
         Set<String> types = registry.types();
-        List<String> publishedWithoutSpec = topics.entrySet().stream()
-                .filter(entry -> entry.getValue().isPublish())
+        List<String> enabledWithoutSpec = topics.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
                 .map(Map.Entry::getKey)
                 .filter(type -> !types.contains(type))
                 .sorted()
                 .toList();
-        if (!publishedWithoutSpec.isEmpty()) {
-            throw new IllegalStateException("publish is on for " + publishedWithoutSpec + " but no AggregateSpec has that type;"
+        if (!enabledWithoutSpec.isEmpty()) {
+            throw new IllegalStateException("enabled is on for " + enabledWithoutSpec + " but no AggregateSpec has that type;"
                     + " the types are " + types);
         }
         List<String> unknown = topics.keySet().stream()
