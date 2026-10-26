@@ -47,7 +47,7 @@ public class EventProcessingKafkaProperties {
         }
     }
 
-    // Every published type's topic and DLT, created at startup when create is on; the same settings for every type.
+    // Every published type's topic and DLT, created at startup; the same settings for every type.
     @Getter
     @Setter
     public static class Topics {
@@ -55,8 +55,6 @@ public class EventProcessingKafkaProperties {
         private static final long SEVEN_DAYS_MS = Duration.ofDays(7).toMillis();
         private static final long THIRTY_DAYS_MS = Duration.ofDays(30).toMillis();
 
-        // Its own switch: the topics must exist before the connector writes, which can be before processing is on.
-        private boolean create;
         // Compacted, so a new group reads the latest event of every aggregate; a delete stays readable for 7 days.
         private final TopicSettings events = new TopicSettings(Map.of(
                 "cleanup.policy", "compact",
