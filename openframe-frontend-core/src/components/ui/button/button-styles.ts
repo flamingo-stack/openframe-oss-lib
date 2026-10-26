@@ -288,16 +288,30 @@ export const BUTTON_KIND_CLASS = {
   // A whole card or tile that is one click target (a card's hit area, a media tile, a summary that expands): the
   // content is the look; the button gives it the click, the keyboard and the focus ring.
   card: ['relative block w-full rounded-md text-left text-ods-text-primary', KIND_FOCUS].join(' '),
-  // A cell of a bar (a header's or a chat's top bar): the bar's full height, an icon or a short label, secondary
-  // until hovered. The current cell (`data-state="active"`: the header's open section) takes the pressed surface and
-  // the primary text.
+  // A cell of a bar (a header's or a chat's top bar) or of a card row: the row's full height, an icon or a short
+  // label, secondary until hovered. The current cell (`data-state="active"`: the header's open section) takes the
+  // pressed surface and the primary text. Full height is `self-stretch` + `min-h-full`, never `h-full`: a set
+  // `height: 100%` turns off `align-self: stretch`, so in a row with no fixed height (a chat entity card) the cell
+  // fell to the row's top with a divider only as tall as its icon. `min-h-full` keeps a bar's height in a parent
+  // that is not a flex row.
   cell: [
-    'flex h-full shrink-0 items-center justify-center gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
+    'flex min-h-full shrink-0 items-center justify-center self-stretch gap-[var(--spacing-system-xsf)] px-[var(--spacing-system-m)]',
     'bg-transparent text-ods-text-secondary text-h4 transition-colors duration-200',
     'hover:bg-ods-bg-hover hover:text-ods-text-primary aria-expanded:text-ods-text-primary',
     'data-[state=active]:bg-ods-bg-active data-[state=active]:text-ods-text-primary',
     KIND_FOCUS_INSET,
     '[&_svg]:h-6 [&_svg]:w-6 [&_svg]:shrink-0',
+  ].join(' '),
+  // A round step control: the previous / next arrow of a carousel's controls row and of a presentation's navbar (the
+  // company-hub deck's prev / next, pause and fullscreen). 36px, the card surface with a border, the accent border and
+  // glyph on hover, faded when disabled (a carousel at either end of its track). Arrows go through `StepArrowButton`.
+  stepper: [
+    'grid h-9 w-9 shrink-0 place-items-center rounded-full border-[length:1.5px] border-ods-border',
+    'bg-ods-card text-ods-text-primary transition-colors duration-150',
+    'hover:border-ods-accent hover:text-ods-accent',
+    'disabled:cursor-default disabled:text-ods-text-secondary disabled:opacity-50 disabled:hover:border-ods-border disabled:hover:text-ods-text-secondary',
+    KIND_FOCUS,
+    '[&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0',
   ].join(' '),
 } as const;
 

@@ -32,7 +32,7 @@ import { EmptyState } from '../../empty-state';
 import { LoadingRegion } from '../../loading/loading-region';
 import { TextLineSkeleton } from '../../loading/unified-skeleton';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../../ui';
-import { useLoadingScope } from '../../ui/loading-scope';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
 import { useRoadmapVoting, type UseRoadmapVotingOptions } from './use-roadmap-voting';
 
 /**
@@ -69,6 +69,9 @@ interface RoadmapGridSkeletonProps {
   columns?: 1 | 2;
 }
 
+/** The loading cards' vote handler: they draw the vote row and take no vote. */
+const NO_VOTE = () => {};
+
 function RoadmapGridSkeleton({
   region = true,
   count = ROADMAP_GRID_SKELETON_CARDS,
@@ -79,7 +82,8 @@ function RoadmapGridSkeleton({
     <LoadingRegion label="Loading the roadmap" announce={region} className={roadmapGridClass(columns, showLeftMargin)}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="min-w-0" data-loading-item>
-          <RoadmapCard loading />
+          {/* With its vote row, as every card of the loaded grid has (the grid always passes `onVote`). */}
+          <RoadmapCard loading onVote={NO_VOTE} />
         </div>
       ))}
     </LoadingRegion>
@@ -234,8 +238,26 @@ const QUARTER_CONTENT_CLASS = 'pt-4';
 const QUARTER_CONTENT_INNER_CLASS = 'pb-4';
 
 /**
- * The quarter-grouped grid while its items are read: one quarter, its heading and item count as bars, then the
- * grid's card skeletons.
+ * Collapsed past quarters the grouped grid draws while its items are read, before the open one: a TYPICAL count
+ * (measured on the live roadmap, 2026-10: four past quarters older than the ones kept open). The loaded grid shows
+ * every quarter older than `quartersToKeepClosed` collapsed (`computeDefaultExpandedQuarters`), so its first quarters
+ * are heads only.
+ */
+const ROADMAP_SKELETON_CLOSED_QUARTERS = 4;
+
+/** A collapsed quarter while it is read: its heading and item count as bars, nothing under them. */
+function RoadmapQuarterHeadSkeleton() {
+  return (
+    <div className={QUARTER_HEAD_CLASS}>
+      <TextLineSkeleton type="h2" className="w-40" />
+      <TextLineSkeleton type="h6" className="w-16" />
+    </div>
+  );
+}
+
+/**
+ * The quarter-grouped grid while its items are read, in the loaded grid's shape: the collapsed past quarters (heads
+ * only), then one open quarter, its head and the grid's card skeletons.
  */
 function RoadmapGridQuarterSkeleton({
   showLeftMargin = true,
@@ -249,11 +271,15 @@ function RoadmapGridQuarterSkeleton({
 }) {
   return (
     <div className={QUARTER_LIST_CLASS} aria-hidden>
+      <LoadingItems count={ROADMAP_SKELETON_CLOSED_QUARTERS}>
+        {() => (
+          <div data-loading-item>
+            <RoadmapQuarterHeadSkeleton />
+          </div>
+        )}
+      </LoadingItems>
       <div className="flex flex-col" data-loading-item>
-        <div className={QUARTER_HEAD_CLASS}>
-          <TextLineSkeleton type="h2" className="w-40" />
-          <TextLineSkeleton type="h6" className="w-16" />
-        </div>
+        <RoadmapQuarterHeadSkeleton />
         {/* The quarter's content box: the `AccordionContent` padding (`pt-4` here, the content's own `pb-4` inside). */}
         <div className={QUARTER_CONTENT_CLASS}>
           <div className={QUARTER_CONTENT_INNER_CLASS}>
