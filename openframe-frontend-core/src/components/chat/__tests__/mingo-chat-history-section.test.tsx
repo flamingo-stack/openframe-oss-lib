@@ -162,6 +162,27 @@ describe('MingoChatRail variant="section"', () => {
     expect(onWhatToAsk).toHaveBeenCalledTimes(1);
   });
 
+  it("ends the ⋯ menu with the host's own items", () => {
+    const onReset = vi.fn();
+    render(
+      <MingoChatRail
+        variant="section"
+        dialogs={DIALOGS}
+        onOpenArchive={vi.fn()}
+        onWhatToAsk={vi.fn()}
+        moreMenuItems={[{ id: 'reset', label: 'Reset Onboarding', onClick: onReset }]}
+      />,
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More' }), { button: 0, pointerType: 'mouse' });
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
+      'Chat archive',
+      'What to ask Mingo?',
+      'Reset Onboarding',
+    ]);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reset Onboarding' }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+
   it('asks the host to open the search when controlled, and leaves the modal to it', () => {
     const onSearchOpenChange = vi.fn();
     const props = { variant: 'section' as const, dialogs: DIALOGS, onSearchOpenChange, onSearchChange: vi.fn() };

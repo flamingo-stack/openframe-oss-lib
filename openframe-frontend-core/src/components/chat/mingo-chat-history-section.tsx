@@ -191,7 +191,7 @@ function HistoryList({
  * The chat history block of a host's main navigation sidebar (`MingoChatRail`
  * `variant="section"`): a "Chat history" caption with three icon buttons —
  * Search (a modal over the page, ⌘K), the My chats / All chats filter (lit while
- * all chats show) and ⋯ (Chat archive) — then the chats grouped by day. It is
+ * all chats show) and ⋯ (Chat archive, the host's own items) — then the chats grouped by day. It is
  * drawn at its full height and does not scroll: the sidebar body scrolls it with
  * the tree above it. The sidebar owns the width, the background and the borders;
  * the colours are the tenant's accent, as everywhere in the sidebar.
@@ -203,6 +203,7 @@ export function MingoChatHistorySection({
   draftTitle,
   onOpenArchive,
   onWhatToAsk,
+  moreMenuItems = [],
   statusOf,
   onRequestRename,
   onRequestArchive,
@@ -270,6 +271,7 @@ export function MingoChatHistorySection({
           },
         ]
       : []),
+    ...moreMenuItems,
   ];
 
   // The scope as a filter, not a control of its own: a choice of two (radio

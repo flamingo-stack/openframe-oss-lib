@@ -3,6 +3,7 @@
 import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
 import { cn } from '../../utils/cn';
 import { AlertCircleIcon, MessageIndicatorIcon, Refresh01RightIcon, ShieldCheckIcon } from '../icons-v2-generated';
+import type { ActionsMenuItem } from '../ui/actions-menu';
 import { Button } from '../ui/button';
 import type { DialogItem } from './types/component.types';
 
@@ -62,6 +63,11 @@ export interface MingoChatListProps {
    * action under the logo, the section as an item of its ⋯ menu.
    */
   onWhatToAsk?: () => void;
+  /**
+   * The host's own actions at the end of the section's ⋯ menu, after "Chat archive" and
+   * "What to ask Mingo?" (e.g. "Reset Onboarding"). The section only: the rail has no ⋯ of its own.
+   */
+  moreMenuItems?: ActionsMenuItem[];
   /** A row's status glyph. Unread replies are shown without it. */
   statusOf?: (dialog: DialogItem) => MingoDialogStatus | undefined;
   /** Row ⋯ menu actions — each item appears only when its handler is set. */
