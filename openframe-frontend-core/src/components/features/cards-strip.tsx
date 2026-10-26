@@ -726,8 +726,12 @@ export function CardsStrip<T = unknown>(props: CardsStripProps<T>): React.ReactE
         // moves right) is a step BACK along the engine's axis.
         glideBy((reverse ? -dir : dir) * step);
       } else {
-        // No clones/seam without the marquee — native smooth scroll is safe.
-        scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
+        // No clones/seam without the marquee — native smooth scroll is safe. The arrows loop like the marquee does:
+        // next at the track's end goes back to its start, previous at the start goes to its end.
+        const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+        if (dir === 1 && scroller.scrollLeft >= maxScroll - 1) scroller.scrollTo({ left: 0, behavior: 'smooth' });
+        else if (dir === -1 && scroller.scrollLeft <= 1) scroller.scrollTo({ left: maxScroll, behavior: 'smooth' });
+        else scroller.scrollBy({ left: dir * step, behavior: 'smooth' });
       }
     },
     [glideBy, reverse],

@@ -43,6 +43,26 @@ export const DEMO_DEVICES = {
 } as const;
 
 /**
+ * The fleet the Devices screen lists, in its order: each device with its kind, its status and how long ago it was
+ * seen. The fixture builds its rows from it, and the screen's loading state counts its rows from it, so the two
+ * always draw the same number of rows.
+ */
+export const DEMO_FLEET = [
+  { device: DEMO_DEVICES.frontDesk, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 2 },
+  { device: DEMO_DEVICES.reception, type: 'desktop', status: 'OFFLINE', lastSeenMinutesAgo: 190 },
+  { device: DEMO_DEVICES.mayaAir, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 1 },
+  { device: DEMO_DEVICES.buildServer, type: 'server', status: 'ONLINE', lastSeenMinutesAgo: 1 },
+  { device: DEMO_DEVICES.leoThinkPad, type: 'laptop', status: 'OFFLINE', lastSeenMinutesAgo: 64 },
+  { device: DEMO_DEVICES.samT14, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 3 },
+  { device: DEMO_DEVICES.jenSurface, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 6 },
+  { device: DEMO_DEVICES.priyaXps, type: 'laptop', status: 'ONLINE', lastSeenMinutesAgo: 2 },
+] as const;
+
+/** The OS the Devices screen's search answers, and how many fleet devices run it (the rows the search shows). */
+export const DEMO_FLEET_SEARCH_OS = 'WINDOWS';
+export const DEMO_FLEET_SEARCH_ROWS = DEMO_FLEET.filter(entry => entry.device.os === DEMO_FLEET_SEARCH_OS).length;
+
+/**
  * A fixed "now" for relative times, so a screen reads the same on every render
  * and never drifts between the server and the browser.
  */
