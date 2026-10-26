@@ -41,8 +41,8 @@ events.organizations ──> PublishedTypeListener             one per spec type
   backfill race, a connector re-snapshot, a DLT replay and a group reset harmless.
 - Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
   writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
-  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. With projection
-  tasks off, a large event is still applied inline, with a WARN.
+  `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. Without that
+  module's beans, a large event is still applied inline, with a WARN.
 
 ## Configuration
 
@@ -80,9 +80,6 @@ openframe:
             config: {cleanup.policy: delete, retention.ms: 2592000000}
       large-updates:
         inline-limit: 5000              # default; an event that changes this many items or more goes to a projection task
-      projections:
-        organization-on-tickets:        # one key per projection name(); an unknown name logs an ERROR
-          mode: aspect                  # aspect (default), both or events; a change needs a pod restart
 ```
 
 - `kafka` is separate from `spring.kafka` and from the stream's `spring.saas.kafka`. The module adds its own Kafka

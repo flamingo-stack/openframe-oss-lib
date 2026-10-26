@@ -222,7 +222,7 @@ class ProjectionRunnerTest {
     void anEventBelowTheInlineLimit_isAppliedInline() {
         onTickets.changes = 4999;
         ProjectionTaskService tasks = mock(ProjectionTaskService.class);
-        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
                 .run(context -> {
                     process(context, record(false));
 
@@ -236,7 +236,7 @@ class ProjectionRunnerTest {
     void anEventAtTheInlineLimit_goesToAProjectionTask_insteadOfInline() {
         onTickets.changes = 5000;
         ProjectionTaskService tasks = mock(ProjectionTaskService.class);
-        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
                     process(context, record);
@@ -251,7 +251,7 @@ class ProjectionRunnerTest {
     void whileItsSourceHasATask_evenASmallEventGoesToTheTask() {
         ProjectionTaskService tasks = mock(ProjectionTaskService.class);
         when(tasks.hasTask(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(true);
-        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks).withPropertyValues(onEvents(ON_TICKETS))
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
                 .run(context -> {
                     process(context, record(false));
 
@@ -263,7 +263,7 @@ class ProjectionRunnerTest {
     @Test
     void withProjectionTasksOff_aLargeEventIsStillAppliedInline() {
         onTickets.changes = 10000;
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(false));
 
             assertThat(onTickets.records).hasSize(1);
@@ -276,7 +276,7 @@ class ProjectionRunnerTest {
         onTickets.changes = 5;
         ProjectionTaskService tasks = mock(ProjectionTaskService.class);
         runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
-                .withPropertyValues(onEvents(ON_TICKETS), "openframe.events.processing.large-updates.inline-limit=5")
+                .withPropertyValues("openframe.events.processing.large-updates.inline-limit=5")
                 .run(context -> {
                     process(context, record(false));
 

@@ -8,7 +8,7 @@ import org.springframework.data.mongodb.repository.ReadPreference;
 import java.util.List;
 import java.util.Optional;
 
-// From the primary, as event_jobs: an older copy from a secondary would fail every save.
+// From the primary, as event_job_runs: an older copy from a secondary would fail every save.
 @ReadPreference("primary")
 public interface ProjectionTaskRepository extends MongoRepository<ProjectionTask, String> {
 
@@ -18,5 +18,7 @@ public interface ProjectionTaskRepository extends MongoRepository<ProjectionTask
 
     Optional<ProjectionTask> findFirstByProjectionAndStatusOrderByStartedAtAsc(String projection, EventJobStatus status);
 
-    long deleteByIdAndVersion(String id, Long version);
+    Optional<ProjectionTask> findByKeyAndCurrentTrue(String key);
+
+    boolean existsByKeyAndCurrentTrue(String key);
 }

@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// Works one task for a tick: its projection's batches in _id order, each saved, then deletes the task when none is left.
+// Works one task run for a tick: its projection's batches in _id order, each saved, then keeps the run DONE when none is left.
 @Slf4j
 public class ProjectionTaskRunner {
 
@@ -42,7 +42,7 @@ public class ProjectionTaskRunner {
 
     // Read again under the lock: the listed copy may be older than the restart a newer event made.
     public void applyBatches(String taskId) {
-        ProjectionTask task = taskService.taskOf(taskId);
+        ProjectionTask task = taskService.findTask(taskId);
         if (task.getStatus() != EventJobStatus.RUNNING) {
             log.debug("Projection task {} is {}: nothing to do", taskId, task.getStatus());
             return;
@@ -67,7 +67,7 @@ public class ProjectionTaskRunner {
 
     // Read in every batch, so a broken envelope counts as a failure and ends FAILED like any other.
     private ProjectionTask applyBatch(Projection<?, ?> projection, ProjectionTask task) {
-        PublishedRecord<?> record = envelopes.recordOf(task);
+        PublishedRecord<?> record = envelopes.toRecord(task);
         String lastId = task.getLastId();
         int batchSize = properties.getBatchSize();
         String batchLastId = applyTyped(projection, record, lastId, batchSize);
