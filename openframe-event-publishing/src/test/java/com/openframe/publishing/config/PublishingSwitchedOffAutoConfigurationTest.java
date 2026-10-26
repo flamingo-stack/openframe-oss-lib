@@ -17,14 +17,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ExtendWith(OutputCaptureExtension.class)
 class PublishingSwitchedOffAutoConfigurationTest {
 
-    private static final String WARNING = "openframe.events.topics.organizations.publish is true, but openframe.events.publishing.enabled is off";
+    private static final String WARNING = "openframe.events.topics.organizations.enabled is true, but openframe.events.enabled is off";
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PublishingSwitchedOffAutoConfiguration.class));
 
     @Test
     void aTopicOn_withTheModuleOff_logsAWarning(CapturedOutput output) {
-        runner.withPropertyValues("openframe.events.topics.organizations.publish=true")
+        runner.withPropertyValues("openframe.events.topics.organizations.enabled=true")
                 .run(context -> assertThat(context).hasNotFailed());
 
         assertThat(output).contains(WARNING);
@@ -48,7 +48,7 @@ class PublishingSwitchedOffAutoConfigurationTest {
 
     @Test
     void theModuleOn_leavesNoWarningBean() {
-        runner.withPropertyValues("openframe.events.publishing.enabled=true", "openframe.events.topics.organizations.publish=true")
+        runner.withPropertyValues("openframe.events.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .run(context -> assertThat(context).doesNotHaveBean(PublishingSwitchedOffAutoConfiguration.class));
     }
 
