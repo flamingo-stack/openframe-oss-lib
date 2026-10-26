@@ -28,16 +28,16 @@ public class EventBackfillService {
 
     public void backfill(String type, String runId, String jobId) {
         if (!publishedAggregates.isPublishing(type)) {
-            log.warn("Backfill of {} skipped: the type has no spec or its publish is off in this service, run {}", type, runId);
+            log.debug("Backfill of {} skipped: the type is switched off in this service, run {}", type, runId);
             return;
         }
-        EventJob job = jobService.jobOf(jobId);
-        if (job.wasReplaced(runId)) {
+        EventJob job = jobService.findCurrentRun(jobId);
+        if (!job.hasRunId(runId) && jobService.hasRun(jobId, runId)) {
             log.warn("Backfill of {} skipped: run {} was replaced by run {}; this pod has the old config", type, runId,
                     job.getRunId());
             return;
         }
-        if (!job.isRunOf(runId)) {
+        if (!job.hasRunId(runId)) {
             EventJob started = jobService.startRun(job, runId);
             log.info("Backfill of {} started, run {}", type, runId);
             runner.writeBatches(type, started);
@@ -46,7 +46,7 @@ public class EventBackfillService {
         switch (job.getStatus()) {
             case RUNNING -> runner.writeBatches(type, job);
             case FAILED -> resumeFailed(type, job);
-            case DONE -> log.debug("Backfill of {} is done, run {}", type, runId);
+            case DONE, REPLACED -> log.debug("Backfill of {} is done, run {}", type, runId);
         }
     }
 

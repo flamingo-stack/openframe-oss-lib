@@ -42,6 +42,7 @@ class ReconciliationServiceTest {
     @BeforeEach
     void setUp() {
         when(jobRepository.save(any(EventJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jobRepository.insert(any(EventJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         EventJobService jobService = new EventJobService(jobRepository, clock);
         ReconciliationMetrics metrics = new ReconciliationMetrics(meterRegistry, List.of(TICKETS));
@@ -51,7 +52,7 @@ class ReconciliationServiceTest {
     @Test
     void theFirstRun_startsAtOnce_forTheBaseline() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.empty());
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.empty());
 
         // execution
         service.reconcile(TICKETS, JOB);
@@ -65,7 +66,7 @@ class ReconciliationServiceTest {
     @Test
     void aRunningRun_continuesAfterItsLastId() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored(EventJobStatus.RUNNING, "2026-10-21T03:00:00Z")));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored(EventJobStatus.RUNNING, "2026-10-21T03:00:00Z")));
 
         // execution
         service.reconcile(TICKETS, JOB);
@@ -78,7 +79,7 @@ class ReconciliationServiceTest {
     @Test
     void aFinishedRun_waitsForTheNextCronFire() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored(EventJobStatus.DONE, "2026-10-21T03:00:00Z")));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored(EventJobStatus.DONE, "2026-10-21T03:00:00Z")));
 
         // execution
         service.reconcile(TICKETS, JOB);
@@ -91,7 +92,7 @@ class ReconciliationServiceTest {
     @Test
     void afterTheCronFired_aNewRunStarts_namedAfterTheFireTime() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored(EventJobStatus.DONE, "2026-10-20T03:00:00Z")));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored(EventJobStatus.DONE, "2026-10-20T03:00:00Z")));
 
         // execution
         service.reconcile(TICKETS, JOB);
@@ -106,7 +107,7 @@ class ReconciliationServiceTest {
     @Test
     void aFailedRun_startsAgainAtTheNextCronFire() {
         // setup
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(stored(EventJobStatus.FAILED, "2026-10-20T03:00:00Z")));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored(EventJobStatus.FAILED, "2026-10-20T03:00:00Z")));
 
         // execution
         service.reconcile(TICKETS, JOB);
@@ -116,11 +117,24 @@ class ReconciliationServiceTest {
     }
 
     @Test
+    void aNewRun_leavesTheFailedRunBeforeItAsItEnded() {
+        // setup
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(stored(EventJobStatus.FAILED, "2026-10-20T03:00:00Z")));
+
+        // execution
+        service.reconcile(TICKETS, JOB);
+
+        // verifications
+        assertThat(checkedJob().getRunId()).isEqualTo("2026-10-21T03:00:00Z");
+        verify(jobRepository, never()).save(any());
+    }
+
+    @Test
     void reportLastResult_setsTheGaugeToTheLastFinishedRun() {
         // setup
         EventJob job = stored(EventJobStatus.RUNNING, "2026-10-21T03:00:00Z");
         job.setLastMismatches(7);
-        when(jobRepository.findById(JOB)).thenReturn(Optional.of(job));
+        when(jobRepository.findFirstByJobIdOrderByStartedAtDesc(JOB)).thenReturn(Optional.of(job));
 
         // execution
         service.reportLastResult(TICKETS, JOB);
@@ -137,7 +151,7 @@ class ReconciliationServiceTest {
     }
 
     private static EventJob stored(EventJobStatus status, String startedAt) {
-        return EventJob.builder().id(JOB).version(1L).runId("run-1").status(status).lastId("t9")
+        return EventJob.builder().id(JOB + ":run-1").jobId(JOB).version(1L).runId("run-1").status(status).lastId("t9")
                 .startedAt(Instant.parse(startedAt)).build();
     }
 }
