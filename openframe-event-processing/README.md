@@ -35,7 +35,7 @@ events.organizations ──> PublishedTypeListener             one per spec type
 - [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L27) runs each projection on its own, in name order: a
   failed projection does not stop the others.
 - Versions: before a projection runs, the runner reads the version it last stored for that projection, tenant and
-  aggregate in `projection_versions`. An older event is skipped; an equal or newer one is applied (so a backfill, which
+  aggregate in `event_projection_versions`. An older event is skipped; an equal or newer one is applied (so a backfill, which
   sends the current version, still repairs drift), then its version is stored with a `$max` upsert. A delete stores
   its version too, and an event handed over to a projection task is stored when the task is saved. This makes the
   backfill race, a connector re-snapshot, a DLT replay and a group reset harmless.
