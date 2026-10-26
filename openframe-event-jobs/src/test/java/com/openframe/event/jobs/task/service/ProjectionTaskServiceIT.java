@@ -4,6 +4,7 @@ import com.openframe.event.jobs.core.persistence.EventJobStatus;
 import com.openframe.event.jobs.task.fixture.Widgets;
 import com.openframe.event.jobs.task.fixture.Widgets.WidgetEvent;
 import com.openframe.event.jobs.task.persistence.ProjectionTask;
+import com.openframe.event.jobs.task.persistence.ProjectionTaskIndexInitializer;
 import com.openframe.event.jobs.task.repository.ProjectionTaskRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.spec.Projection;
@@ -16,7 +17,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -29,6 +32,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.Map;
 
 import static com.openframe.event.jobs.task.fixture.Widgets.record;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -51,12 +55,15 @@ class ProjectionTaskServiceIT {
     }
 
     private static final String PROJECTION = "widget-copies";
-    private static final String TASK_ID = "widget-copies:tenant-a:widget-doc-1";
+    private static final String KEY = "widget-copies:tenant-a:widget-doc-1";
     private static final Instant NOW = Instant.parse("2026-10-22T10:00:00Z");
     private static final Instant RENAMED_AT = Instant.parse("2026-10-22T09:59:00Z");
 
     @Autowired
     private ProjectionTaskRepository repository;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     private ProjectionTaskEnvelopes envelopes;
     private ProjectionTaskService service;
@@ -65,6 +72,7 @@ class ProjectionTaskServiceIT {
     @SuppressWarnings("unchecked")
     void setUp() {
         repository.deleteAll();
+        new ProjectionTaskIndexInitializer(mongoTemplate).start();
         Projection<WidgetEvent, Object> projection = mock(Projection.class);
         AggregateSpecRegistry specRegistry = Widgets.registryWith(projection);
         envelopes = new ProjectionTaskEnvelopes(specRegistry);
@@ -72,16 +80,16 @@ class ProjectionTaskServiceIT {
     }
 
     @Test
-    void aSubmittedEvent_opensATask_whoseEnvelopeReadsBackIntoTheSpecsEventClass() {
+    void aSubmittedEvent_opensARun_whoseEnvelopeReadsBackIntoTheSpecsEventClass() {
         // execution
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "New name", RENAMED_AT));
 
         // verifications
-        ProjectionTask stored = service.taskOf(TASK_ID);
+        ProjectionTask stored = currentRun(KEY);
         assertThat(stored.getStatus()).isEqualTo(EventJobStatus.RUNNING);
         assertThat(stored.getTenantId()).isEqualTo("tenant-a");
         assertThat(stored.getSourceId()).isEqualTo("widget-doc-1");
-        PublishedRecord<?> read = envelopes.recordOf(stored);
+        PublishedRecord<?> read = envelopes.toRecord(stored);
         assertThat(read.getTenantId()).isEqualTo("tenant-a");
         assertThat(read.getVersion()).isEqualTo(4L);
         assertThat(read.getEvent()).isInstanceOf(WidgetEvent.class);
@@ -91,31 +99,34 @@ class ProjectionTaskServiceIT {
     }
 
     @Test
-    void aNewerEvent_startsTheTaskAgainFromTheFirstItem_withItsEnvelope() {
+    void aNewerEvent_endsTheRunReplaced_andOpensANewRunFromTheFirstItem() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask opened = service.taskOf("widget-copies:tenant-a:widget-doc-1");
-        service.saveBatch(opened, "w500");
+        ProjectionTask firstRun = currentRun(KEY);
+        service.saveBatch(firstRun, "w500");
 
         // execution
         serviceAt(NOW.plusSeconds(60)).submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // verifications
-        ProjectionTask stored = service.taskOf(TASK_ID);
-        assertThat(stored.getLastId()).isNull();
-        assertThat(stored.getEventVersion()).isEqualTo(5L);
-        assertThat(stored.getCreatedAt()).isEqualTo(NOW);
-        assertThat(stored.getStartedAt()).isEqualTo(NOW.plusSeconds(60));
-        WidgetEvent event = (WidgetEvent) envelopes.recordOf(stored).getEvent();
+        ProjectionTask secondRun = currentRun(KEY);
+        assertThat(secondRun.getLastId()).isNull();
+        assertThat(secondRun.getEventVersion()).isEqualTo(5L);
+        assertThat(secondRun.getStartedAt()).isEqualTo(NOW.plusSeconds(60));
+        WidgetEvent event = (WidgetEvent) envelopes.toRecord(secondRun).getEvent();
         assertThat(event.getName()).isEqualTo("Newer");
-        assertThat(repository.count()).isEqualTo(1);
+        ProjectionTask replaced = service.findTask(firstRun.getId());
+        assertThat(replaced.getStatus()).isEqualTo(EventJobStatus.REPLACED);
+        assertThat(replaced.isCurrent()).isFalse();
+        assertThat(replaced.getLastId()).isEqualTo("w500");
+        assertThat(repository.count()).isEqualTo(2);
     }
 
     @Test
-    void afterANewerEvent_aWorkersOlderCopyFailsToSave() {
+    void afterANewerEvent_aWorkersCopyOfTheOldRunFailsToSave() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask workerCopy = service.taskOf("widget-copies:tenant-a:widget-doc-1");
+        ProjectionTask workerCopy = currentRun(KEY);
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // execution
@@ -123,51 +134,65 @@ class ProjectionTaskServiceIT {
 
         // verifications
         assertThat(failure).isInstanceOf(OptimisticLockingFailureException.class);
-        assertThat(service.taskOf(TASK_ID).getLastId()).isNull();
+        assertThat(currentRun(KEY).getLastId()).isNull();
     }
 
     @Test
-    void aFinishedTask_isDeleted_unlessANewerEventStartedItAgain() {
+    void aSecondCurrentRunOfTheSameSource_isRefusedByTheIndex() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask done = service.taskOf("widget-copies:tenant-a:widget-doc-1");
-        service.submit(PROJECTION, Widgets.TYPE, "widget-doc-2",
-                record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask finishedMeanwhile = service.taskOf("widget-copies:tenant-a:widget-doc-2");
+        ProjectionTask secondCurrent = ProjectionTask.open(PROJECTION, Widgets.TYPE, "tenant-a", "widget-doc-1", Map.of(), 5, NOW);
+
+        // execution
+        Throwable failure = catchThrowable(() -> repository.insert(secondCurrent));
+
+        // verifications
+        assertThat(failure).isInstanceOf(DuplicateKeyException.class);
+    }
+
+    @Test
+    void aFinishedRun_isKeptDone_unlessANewerEventClosedItMeanwhile() {
+        // setup
+        service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
+        ProjectionTask done = currentRun(KEY);
+        service.submit(PROJECTION, Widgets.TYPE, "widget-doc-2", record("tenant-a", 4, "Old", RENAMED_AT));
+        ProjectionTask closedMeanwhile = currentRun("widget-copies:tenant-a:widget-doc-2");
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-2", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // execution
-        ProjectionTask finished = service.finish(done);
-        ProjectionTask restarted = service.finish(finishedMeanwhile);
+        service.finish(done);
+        service.finish(closedMeanwhile);
 
         // verifications
-        assertThat(finished.getStatus()).isEqualTo(EventJobStatus.DONE);
-        assertThat(restarted.getStatus()).isEqualTo(EventJobStatus.DONE);
+        assertThat(service.findTask(done.getId()).getStatus()).isEqualTo(EventJobStatus.DONE);
+        assertThat(service.findTask(done.getId()).getFinishedAt()).isEqualTo(NOW);
         assertThat(service.hasTask(PROJECTION, "tenant-a", "widget-doc-1")).isFalse();
+        assertThat(service.findTask(closedMeanwhile.getId()).getStatus()).isEqualTo(EventJobStatus.REPLACED);
         assertThat(service.hasTask(PROJECTION, "tenant-a", "widget-doc-2")).isTrue();
-        assertThat(service.taskOf("widget-copies:tenant-a:widget-doc-2").getStatus()).isEqualTo(EventJobStatus.RUNNING);
+        assertThat(currentRun("widget-copies:tenant-a:widget-doc-2").getStatus()).isEqualTo(EventJobStatus.RUNNING);
     }
 
     @Test
-    void aFailedTask_stillTakesTheEventsOfItsSource_andTheNextOneRunsItAgain() {
+    void aFailedRun_stillTakesTheEventsOfItsSource_andTheNextOneOpensANewRun() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
-        ProjectionTask opened = service.taskOf("widget-copies:tenant-a:widget-doc-1");
+        ProjectionTask opened = currentRun(KEY);
         service.finishRun(opened, EventJobStatus.FAILED);
 
         // execution
         boolean hasTaskWhileFailed = service.hasTask(PROJECTION, "tenant-a", "widget-doc-1");
         boolean runningWhileFailed = !service.runningTasks().isEmpty();
-        service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Newer", RENAMED_AT));
+        serviceAt(NOW.plusSeconds(60)).submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 5, "Newer", RENAMED_AT));
 
         // verifications
         assertThat(hasTaskWhileFailed).isTrue();
         assertThat(runningWhileFailed).isFalse();
-        assertThat(service.runningTasks()).extracting(ProjectionTask::getId).containsExactly(TASK_ID);
+        assertThat(service.findTask(opened.getId()).getStatus()).isEqualTo(EventJobStatus.FAILED);
+        assertThat(service.runningTasks()).extracting(ProjectionTask::getEventVersion).containsExactly(5L);
     }
 
     @Test
-    void theOpenTasksAndTheOldestOnesAge_areCountedPerProjection() {
+    void theRunningRunsAndTheOldestOnesAge_areCountedPerProjection() {
         // setup
         service.submit(PROJECTION, Widgets.TYPE, "widget-doc-1", record("tenant-a", 4, "Old", RENAMED_AT));
         serviceAt(NOW.plusSeconds(30)).submit(PROJECTION, Widgets.TYPE, "widget-doc-2", record("tenant-b", 4, "Old", RENAMED_AT));
@@ -182,6 +207,10 @@ class ProjectionTaskServiceIT {
         assertThat(oldestAge).isEqualTo(Duration.ofSeconds(90));
         assertThat(ninetySecondsLater.countRunning("other-projection")).isZero();
         assertThat(ninetySecondsLater.oldestRunningAge("other-projection")).isZero();
+    }
+
+    private ProjectionTask currentRun(String key) {
+        return repository.findByKeyAndCurrentTrue(key).orElseThrow();
     }
 
     private ProjectionTaskService serviceAt(Instant now) {

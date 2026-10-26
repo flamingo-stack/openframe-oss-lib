@@ -39,11 +39,11 @@ public class ProjectionTaskEnvelopes {
         this.recordTypesByType = Map.copyOf(recordTypes);
     }
 
-    public Map<String, Object> envelopeOf(PublishedRecord<?> record) {
+    public Map<String, Object> toEnvelope(PublishedRecord<?> record) {
         return ENVELOPE_MAPPER.convertValue(record, ENVELOPE_TYPE);
     }
 
-    public PublishedRecord<?> recordOf(ProjectionTask task) {
+    public PublishedRecord<?> toRecord(ProjectionTask task) {
         String type = task.getType();
         JavaType recordType = recordTypesByType.get(type);
         if (recordType == null) {

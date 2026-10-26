@@ -14,16 +14,14 @@ import com.openframe.event.jobs.task.service.ProjectionTaskService;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.time.Clock;
 import java.util.List;
 
-// Its own switch inside the module; it works the large updates of every projection of the service's aggregate specs.
+// It works the large updates of every projection of the service's aggregate specs.
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBooleanProperty(name = "openframe.events.jobs.projection-tasks.enabled")
 public class ProjectionTaskConfiguration {
 
     @Bean

@@ -29,7 +29,7 @@ public class ProjectionRunner {
 
     private final Map<String, List<Projection<?, ?>>> projectionsByType;
     private final EventProcessingMetrics metrics;
-    // A provider: the projection tasks are openframe-event-jobs' beans, with their own switch.
+    // A provider: openframe-event-jobs' beans, which a context without that module's auto-configuration does not have.
     private final ObjectProvider<ProjectionTaskService> projectionTasks;
     private final int inlineLimit;
 
@@ -128,7 +128,7 @@ public class ProjectionRunner {
         }
         if (tasks == null) {
             log.warn("Projection {} applies {} version {} of tenant {} inline although it changes {} or more items: "
-                + "projection tasks are off", name, aggregateId, record.getVersion(), tenantId, inlineLimit);
+                + "projection tasks are not configured", name, aggregateId, record.getVersion(), tenantId, inlineLimit);
             projection.apply(record);
             return false;
         }

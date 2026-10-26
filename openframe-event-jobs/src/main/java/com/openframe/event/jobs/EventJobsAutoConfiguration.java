@@ -13,6 +13,7 @@ import com.openframe.event.jobs.reconciliation.config.ReconciliationConfiguratio
 import com.openframe.event.jobs.reconciliation.config.properties.ReconciliationProperties;
 import com.openframe.event.jobs.task.config.ProjectionTaskConfiguration;
 import com.openframe.event.jobs.task.config.properties.ProjectionTaskProperties;
+import com.openframe.event.jobs.task.persistence.ProjectionTaskIndexInitializer;
 import com.openframe.event.jobs.task.repository.ProjectionTaskRepository;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
