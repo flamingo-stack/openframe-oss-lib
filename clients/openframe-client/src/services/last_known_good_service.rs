@@ -1,4 +1,5 @@
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json_or_quarantine};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -46,25 +47,20 @@ impl LastKnownGoodService {
     }
 
     pub async fn load(&self) -> Result<Option<String>> {
-        if !self.anchor_file_path.exists() {
+        let anchor: Option<LastKnownGood> = read_json_or_quarantine(&self.anchor_file_path)
+            .with_context(|| {
+                format!(
+                    "Failed to read last-known-good file: {:?}",
+                    self.anchor_file_path
+                )
+            })?;
+        if anchor.is_none() {
             debug!(
                 "No last-known-good file found at: {}",
                 self.anchor_file_path.display()
             );
-            return Ok(None);
         }
-
-        let json_content = fs::read_to_string(&self.anchor_file_path).with_context(|| {
-            format!(
-                "Failed to read last-known-good file: {:?}",
-                self.anchor_file_path
-            )
-        })?;
-
-        let anchor: LastKnownGood = serde_json::from_str(&json_content)
-            .context("Failed to deserialize last-known-good from JSON")?;
-
-        Ok(Some(anchor.version))
+        Ok(anchor.map(|anchor| anchor.version))
     }
 
     fn copy_running_to_reserve(&self) -> Result<()> {
@@ -92,16 +88,9 @@ impl LastKnownGoodService {
             version: version.to_string(),
         })
         .context("Failed to serialize last-known-good to JSON")?;
-        let temp_anchor = self.anchor_file_path.with_extension("json.tmp");
-        fs::write(&temp_anchor, json_content).with_context(|| {
+        atomic_write(&self.anchor_file_path, json_content).with_context(|| {
             format!(
-                "Failed to write temp last-known-good file: {:?}",
-                temp_anchor
-            )
-        })?;
-        fs::rename(&temp_anchor, &self.anchor_file_path).with_context(|| {
-            format!(
-                "Failed to move last-known-good file into place: {:?}",
+                "Failed to write last-known-good file: {:?}",
                 self.anchor_file_path
             )
         })?;
@@ -220,3 +209,7 @@ impl LastKnownGoodService {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "last_known_good_service_tests.rs"]
+mod tests;

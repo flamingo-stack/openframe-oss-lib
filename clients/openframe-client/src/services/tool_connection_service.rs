@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use crate::models::tool_connection::ToolConnection;
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json_or_quarantine};
 
 #[derive(Clone)]
 pub struct ToolConnectionService {
@@ -46,15 +46,10 @@ impl ToolConnectionService {
     }
 
     pub async fn get_all(&self) -> Result<Vec<ToolConnection>> {
-        if !self.file_path.exists() {
-            return Ok(Vec::new());
-        }
-        let json = fs::read_to_string(&self.file_path).with_context(|| {
+        let list = read_json_or_quarantine(&self.file_path).with_context(|| {
             format!("Failed to read tool connections file: {:?}", self.file_path)
         })?;
-        let list: Vec<ToolConnection> = serde_json::from_str(&json)
-            .context("Failed to deserialize tool connections from JSON")?;
-        Ok(list)
+        Ok(list.unwrap_or_default())
     }
 
     /// Delete a tool connection by its tool_agent_id
@@ -75,7 +70,7 @@ impl ToolConnectionService {
     async fn persist(&self, list: &[ToolConnection]) -> Result<()> {
         let json = serde_json::to_string_pretty(list)
             .context("Failed to serialize tool connections to JSON")?;
-        fs::write(&self.file_path, json).with_context(|| {
+        atomic_write(&self.file_path, json).with_context(|| {
             format!(
                 "Failed to write tool connections file: {:?}",
                 self.file_path
@@ -84,3 +79,7 @@ impl ToolConnectionService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tool_connection_service_tests.rs"]
+mod tests;

@@ -1,7 +1,7 @@
 use crate::models::openframe_client_info::OpenFrameClientInfo;
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json_or_quarantine};
 use anyhow::{Context, Result};
-use std::fs;
 use std::path::PathBuf;
 use tracing::{debug, info};
 
@@ -24,26 +24,20 @@ impl OpenFrameClientInfoService {
     }
 
     pub async fn get(&self) -> Result<OpenFrameClientInfo> {
-        if !self.info_file_path.exists() {
-            debug!("OpenFrame client info file doesn't exist, returning default");
-            return Ok(OpenFrameClientInfo::default());
-        }
-
-        let json_content = fs::read_to_string(&self.info_file_path).with_context(|| {
+        let info = read_json_or_quarantine(&self.info_file_path).with_context(|| {
             format!("Failed to read client info file: {:?}", self.info_file_path)
         })?;
-
-        let info: OpenFrameClientInfo = serde_json::from_str(&json_content)
-            .context("Failed to deserialize OpenFrame client info from JSON")?;
-
-        Ok(info)
+        if info.is_none() {
+            debug!("OpenFrame client info file doesn't exist, returning default");
+        }
+        Ok(info.unwrap_or_default())
     }
 
     pub async fn save(&self, info: &OpenFrameClientInfo) -> Result<()> {
         let json_content = serde_json::to_string_pretty(info)
             .context("Failed to serialize OpenFrame client info to JSON")?;
 
-        fs::write(&self.info_file_path, json_content).with_context(|| {
+        atomic_write(&self.info_file_path, json_content).with_context(|| {
             format!(
                 "Failed to write client info file: {:?}",
                 self.info_file_path
@@ -103,3 +97,7 @@ impl OpenFrameClientInfoService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "openframe_client_info_service_tests.rs"]
+mod tests;

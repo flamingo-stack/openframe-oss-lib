@@ -1,5 +1,6 @@
 use crate::models::update_state::UpdateState;
 use crate::platform::directories::DirectoryManager;
+use crate::utils::fs::{atomic_write, read_json_text_or_quarantine};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
@@ -27,25 +28,22 @@ impl UpdateStateService {
             self.state_file_path.display()
         );
 
-        if !self.state_file_path.exists() {
+        let state: Option<(UpdateState, String)> =
+            read_json_text_or_quarantine(&self.state_file_path).with_context(|| {
+                format!(
+                    "Failed to read update state file: {:?}",
+                    self.state_file_path
+                )
+            })?;
+        let Some((state, json_content)) = state else {
             info!(
                 "No update state file found at: {}",
                 self.state_file_path.display()
             );
             return Ok(None);
-        }
-
-        let json_content = fs::read_to_string(&self.state_file_path).with_context(|| {
-            format!(
-                "Failed to read update state file: {:?}",
-                self.state_file_path
-            )
-        })?;
+        };
 
         info!("Read update state file content: {}", json_content);
-
-        let state: UpdateState = serde_json::from_str(&json_content)
-            .context("Failed to deserialize update state from JSON")?;
 
         info!(
             "Loaded update state for version: {}, phase: {:?}",
@@ -58,12 +56,9 @@ impl UpdateStateService {
         let json_content = serde_json::to_string_pretty(state)
             .context("Failed to serialize update state to JSON")?;
 
-        let temp_path = self.state_file_path.with_extension("json.tmp");
-        fs::write(&temp_path, json_content)
-            .with_context(|| format!("Failed to write temp update state file: {:?}", temp_path))?;
-        fs::rename(&temp_path, &self.state_file_path).with_context(|| {
+        atomic_write(&self.state_file_path, json_content).with_context(|| {
             format!(
-                "Failed to move update state file into place: {:?}",
+                "Failed to write update state file: {:?}",
                 self.state_file_path
             )
         })?;
@@ -100,3 +95,7 @@ impl UpdateStateService {
         self.state_file_path.to_string_lossy().to_string()
     }
 }
+
+#[cfg(test)]
+#[path = "update_state_service_tests.rs"]
+mod tests;
