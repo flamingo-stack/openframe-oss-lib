@@ -49,14 +49,15 @@ pub const TOOL_OP_QUIESCE_POLL_INTERVAL_SECS: u64 = 2;
 /// A marker untouched for longer than this is ignored (client died mid-op).
 pub const TOOL_OPS_IN_FLIGHT_STALE_SECS: u64 = 30 * 60;
 
-// Last-known-good update ratchet — parity with the in-client updater (Hotfix #2169).
+// Boot verification: openframe-client writes {secured}/boot.marker with its
+// version on every boot; a swap counts only once the new binary has written it.
 /// How long to wait for the new client binary to write its boot marker.
 pub const BOOT_MARKER_WAIT_SECS: u64 = 90;
 /// Poll interval while waiting for the boot marker.
 pub const BOOT_MARKER_POLL_INTERVAL_SECS: u64 = 2;
 /// Settle time between service start and the first Running-state check.
 pub const SERVICE_START_SETTLE_SECS: u64 = 3;
-/// Refuse update messages below the LKG anchor (flip to force a downgrade).
+/// Refuse update messages below the version the client booted with (flip to allow downgrades).
 pub const ALLOW_DOWNGRADE: bool = false;
 /// Attempts to put the pre-swap backup back after a failed swap (file may be briefly locked).
 pub const BACKUP_RESTORE_ATTEMPTS: u32 = 3;

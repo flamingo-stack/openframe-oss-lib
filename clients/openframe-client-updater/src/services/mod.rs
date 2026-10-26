@@ -1,10 +1,10 @@
 pub mod agent_configuration_service;
+pub mod boot_marker_service;
 pub mod client_tool_op_probe;
 pub mod client_update_service;
 pub mod encryption_service;
 pub mod github_download_service;
 pub mod initial_configuration_service;
-pub mod last_known_good_service;
 pub mod local_tls_config_provider;
 pub mod nats_connection_manager;
 pub mod nats_message_publisher;

@@ -11,7 +11,7 @@ use crate::config::updater_config::{
 use crate::listener::ClientUpdateListener;
 use crate::models::UpdaterPhase;
 use crate::platform::{atomic_replace, DirectoryManager};
-use crate::services::last_known_good_service::LastKnownGoodService;
+use crate::services::boot_marker_service::BootMarkerService;
 use crate::services::token_provider::TokenProvider;
 use crate::services::{
     AgentConfigurationService, ClientToolOpProbe, ClientUpdateService, GithubDownloadService,
@@ -54,13 +54,10 @@ impl UpdaterOrchestrator {
         // mid-swap while offline must get its client binary back without the
         // network.
         let state_service = UpdaterStateService::new(&self.dir_manager);
-        let lkg_service = LastKnownGoodService::new(
-            &self.dir_manager,
-            ServiceManagerService::client_binary_path(),
-        );
+        let boot_marker = BootMarkerService::new(&self.dir_manager);
         state_service.cleanup_legacy_state();
         let recovery_report = self
-            .recover_from_crash(&state_service, &lkg_service)
+            .recover_from_crash(&state_service, &boot_marker)
             .await?;
 
         let server_host = initial_config_service
@@ -167,7 +164,7 @@ impl UpdaterOrchestrator {
             download_service,
             state_service,
             progress_publisher,
-            lkg_service,
+            boot_marker,
             ClientToolOpProbe::new(&self.dir_manager),
         );
 
@@ -184,7 +181,7 @@ impl UpdaterOrchestrator {
     async fn recover_from_crash(
         &self,
         state_service: &UpdaterStateService,
-        lkg_service: &LastKnownGoodService,
+        boot_marker: &BootMarkerService,
     ) -> Result<Option<RecoveryReport>> {
         let state = match state_service.load() {
             Ok(None) => return Ok(None),
@@ -243,9 +240,9 @@ impl UpdaterOrchestrator {
             // The boot marker was cleared before StartingService, so in these
             // phases the marker is the source of truth: only a marker carrying
             // the target version proves the new binary booted. The marker alone
-            // proves a *past* boot though — promotion additionally requires the
+            // proves a *past* boot though — success additionally requires the
             // service to be running now (started here if needed). A state query
-            // that keeps failing is "unknown", never grounds for a rollback.
+            // that keeps failing is "unknown", never grounds for a restore.
             UpdaterPhase::StartingService | UpdaterPhase::VerifyingBoot => {
                 if ServiceManagerService::query_running(CLIENT_SERVICE_FULL_NAME).await
                     != Some(true)
@@ -260,13 +257,13 @@ impl UpdaterOrchestrator {
                 }
 
                 let mut verified =
-                    lkg_service.boot_marker_version().as_deref() == Some(version.as_str());
+                    boot_marker.boot_marker_version().as_deref() == Some(version.as_str());
                 if !verified {
                     // Give the (possibly just-started) binary one marker window
                     // before restoring the backup.
                     let mut elapsed = 0u64;
                     while elapsed < BOOT_MARKER_WAIT_SECS {
-                        if lkg_service.boot_marker_version().as_deref() == Some(version.as_str()) {
+                        if boot_marker.boot_marker_version().as_deref() == Some(version.as_str()) {
                             verified = true;
                             break;
                         }
@@ -283,16 +280,6 @@ impl UpdaterOrchestrator {
 
                 let report = if verified && running != Some(false) {
                     info!("Crash recovery: boot marker matches target and service is running — marking success");
-                    let promoted = {
-                        let (lkg, version) = (lkg_service.clone(), version.clone());
-                        run_blocking(move || lkg.promote(&version)).await
-                    };
-                    if let Err(e) = promoted {
-                        warn!(
-                            "Crash recovery: failed to raise last-known-good anchor to {}: {:#}",
-                            version, e
-                        );
-                    }
                     RecoveryReport::Success {
                         version: version.clone(),
                     }

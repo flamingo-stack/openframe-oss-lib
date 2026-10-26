@@ -11,8 +11,8 @@ use crate::config::updater_config::{
 };
 use crate::models::{ClientUpdateMessage, UpdaterPhase, UpdaterState};
 use crate::platform::atomic_replace;
+use crate::services::boot_marker_service::BootMarkerService;
 use crate::services::client_tool_op_probe::ClientToolOpProbe;
-use crate::services::last_known_good_service::LastKnownGoodService;
 use crate::services::service_manager_service::ServiceManagerService;
 use crate::services::{GithubDownloadService, UpdateProgressPublisher, UpdaterStateService};
 use crate::utils::blocking::run_blocking;
@@ -22,7 +22,7 @@ pub struct ClientUpdateService {
     download_service: GithubDownloadService,
     state_service: UpdaterStateService,
     progress_publisher: UpdateProgressPublisher,
-    lkg_service: LastKnownGoodService,
+    boot_marker: BootMarkerService,
     tool_op_probe: ClientToolOpProbe,
     /// The update slot: held as an owned guard for the whole of run_update, so
     /// it is released on every exit path, panics included.
@@ -34,14 +34,14 @@ impl ClientUpdateService {
         download_service: GithubDownloadService,
         state_service: UpdaterStateService,
         progress_publisher: UpdateProgressPublisher,
-        lkg_service: LastKnownGoodService,
+        boot_marker: BootMarkerService,
         tool_op_probe: ClientToolOpProbe,
     ) -> Self {
         Self {
             download_service,
             state_service,
             progress_publisher,
-            lkg_service,
+            boot_marker,
             tool_op_probe,
             in_progress: Arc::new(Mutex::new(())),
         }
@@ -85,10 +85,10 @@ impl ClientUpdateService {
 
         // The boot marker holds the version the client last booted with — the
         // updater's only view of the running client version.
-        if self
-            .lkg_service
-            .boot_marker_version()
-            .map(|m| Self::versions_match(&m, version))
+        let booted = self.boot_marker.boot_marker_version();
+        if booted
+            .as_deref()
+            .map(|m| Self::versions_match(m, version))
             .unwrap_or(false)
         {
             info!(
@@ -98,31 +98,25 @@ impl ClientUpdateService {
             return Ok(());
         }
 
-        if !ALLOW_DOWNGRADE {
-            match self.lkg_service.load_anchor() {
-                Ok(Some(anchor)) => match semver::Version::parse(anchor.trim_start_matches('v')) {
-                    Ok(anchor_semver) if requested_semver < anchor_semver => {
-                        let reason = format!(
-                            "Refusing downgrade to {} — last-known-good anchored at {}",
-                            version, anchor
-                        );
-                        warn!("{}", reason);
-                        self.progress_publisher
-                            .publish_failure(&UpdaterPhase::Failed, version, &reason, false)
-                            .await;
-                        // Ok → ACK: redelivering a refused downgrade changes nothing.
-                        return Ok(());
-                    }
-                    Ok(_) => {}
-                    Err(e) => warn!(
-                        "Failed to parse last-known-good anchor '{}': {:#}",
-                        anchor, e
-                    ),
-                },
-                Ok(None) => {}
+        // A message redelivered after a newer update landed must not take the client back.
+        if let (false, Some(booted)) = (ALLOW_DOWNGRADE, booted.as_deref()) {
+            match semver::Version::parse(booted.trim_start_matches('v')) {
+                Ok(booted_semver) if requested_semver < booted_semver => {
+                    let reason = format!(
+                        "Refusing downgrade to {} — client booted with {}",
+                        version, booted
+                    );
+                    warn!("{}", reason);
+                    self.progress_publisher
+                        .publish_failure(&UpdaterPhase::Failed, version, &reason, false)
+                        .await;
+                    // Ok → ACK: redelivering a refused downgrade changes nothing.
+                    return Ok(());
+                }
+                Ok(_) => {}
                 Err(e) => warn!(
-                    "Failed to load last-known-good anchor, skipping downgrade guard: {:#}",
-                    e
+                    "Failed to parse booted version '{}', skipping downgrade guard: {:#}",
+                    booted, e
                 ),
             }
         }
@@ -259,7 +253,7 @@ impl ClientUpdateService {
 
         // Stale markers must go before the new binary starts: the verification
         // below treats any marker that doesn't match the target as a failure.
-        if let Err(e) = self.lkg_service.clear_boot_marker() {
+        if let Err(e) = self.boot_marker.clear_boot_marker() {
             let reason = format!("Failed to clear boot marker before start: {:#}", e);
             error!("{}", reason);
             return self
@@ -313,16 +307,6 @@ impl ClientUpdateService {
         }
 
         // Boot verified: the swap is final. The NATS message ACKs when this returns.
-        let promoted = {
-            let (lkg, version) = (self.lkg_service.clone(), version.clone());
-            run_blocking(move || lkg.promote(&version)).await
-        };
-        if let Err(e) = promoted {
-            warn!(
-                "Failed to raise last-known-good anchor to {} (keeping previous anchor): {:#}",
-                version, e
-            );
-        }
         Self::remove_backup(&backup_path);
         if let Err(e) = self.state_service.clear() {
             warn!("Failed to clear updater state after update: {:#}", e);
@@ -344,7 +328,7 @@ impl ClientUpdateService {
 
         let mut elapsed = 0u64;
         while elapsed < BOOT_MARKER_WAIT_SECS {
-            match self.lkg_service.boot_marker_version() {
+            match self.boot_marker.boot_marker_version() {
                 Some(marker) if Self::versions_match(&marker, version) => {
                     info!("Boot marker matched target version {}", version);
                     return Ok(());
@@ -399,7 +383,7 @@ impl ClientUpdateService {
 
         // The failed binary may have left a marker with the target version; crash
         // recovery must not read it as the update having booted.
-        if let Err(e) = self.lkg_service.clear_boot_marker() {
+        if let Err(e) = self.boot_marker.clear_boot_marker() {
             warn!(
                 "Failed to clear boot marker before restarting the previous binary: {:#}",
                 e

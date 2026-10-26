@@ -103,7 +103,7 @@ use crate::services::{
     ToolCommandParamsResolver, ToolConnectionProcessingManager, ToolKillService, ToolOps,
     ToolRunManager, ToolUrlParamsResolver,
 };
-use crate::services::{LastKnownGoodService, LogKeyService};
+use crate::services::{BootMarkerService, LogKeyService};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
@@ -199,7 +199,7 @@ pub struct Client {
     result_outbox_run_manager: ResultOutboxRunManager<NatsMessagePublisher>,
     result_store: Arc<ResultStore>,
     openframe_client_info_service: OpenFrameClientInfoService,
-    last_known_good_service: LastKnownGoodService,
+    boot_marker_service: BootMarkerService,
     // Services needed for log streaming initialization
     initial_configuration_service: InitialConfigurationService,
     agent_configuration_service: AgentConfigurationService,
@@ -439,8 +439,8 @@ impl Client {
         let github_download_service =
             GithubDownloadService::new(download_client.clone(), DmgExtractor::new());
 
-        let last_known_good_service = LastKnownGoodService::new(directory_manager.clone())
-            .context("Failed to initialize last-known-good service")?;
+        let boot_marker_service = BootMarkerService::new(directory_manager.clone())
+            .context("Failed to initialize boot marker service")?;
 
         let result_store = Arc::new(ResultStore::open_or_degrade(
             directory_manager
@@ -679,7 +679,7 @@ impl Client {
             result_outbox_run_manager,
             result_store: result_store_for_recovery,
             openframe_client_info_service,
-            last_known_good_service,
+            boot_marker_service,
             initial_configuration_service,
             agent_configuration_service: config_service,
             installed_tools_service,
@@ -706,13 +706,11 @@ impl Client {
             error!("Failed to reconcile client version at startup: {:#}", e);
         }
 
-        if let Err(e) = self.last_known_good_service.write_boot_marker().await {
+        if let Err(e) = self.boot_marker_service.write_boot_marker().await {
             error!("Failed to write boot marker: {:#}", e);
         }
 
-        if let Err(e) = self.last_known_good_service.seed_if_missing().await {
-            error!("Failed to seed last-known-good anchor: {:#}", e);
-        }
+        self.boot_marker_service.remove_legacy_artifacts();
 
         LogStreamingRunManager::new(
             &self.initial_configuration_service,
