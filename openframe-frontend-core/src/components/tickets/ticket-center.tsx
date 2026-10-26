@@ -13,26 +13,36 @@
  * sign-in EmptyState — no form, no list, no fetch. This keeps the
  * Network tab clean for anon visitors and prevents the form from
  * accepting input that would 401 on submit.
+ *
+ * LOADING: while the identity or the tickets are read (or in a host's loading scope) the center renders its SAME view
+ * with no tickets inside a `LoadingScope` (`TicketCenterPending`): the open-ticket form is drawn for real (inert), the
+ * list's header is real with its sync line's skeleton, and the list draws its own skeleton.
  */
 
 import { useQueryClient } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useState } from 'react';
 import { toast as defaultToast } from '../../hooks/use-toast';
-import { formatRelativeTime } from '../../utils/date-utils';
+import type { DataSync } from '../../types/data-sync';
 import { devSectionAnchorId } from '../../utils/dev-sections/dev-section-param-keys';
 import { useChatIdentity } from '../chat/hooks/use-chat-identity';
 import { EmptyState } from '../empty-state';
-import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { usePageDataSync } from '../layout/page-data-sync';
+import { LoadingFallback } from '../loading/loading-fallback';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
+import { DataSyncLine } from '../ui/data-attribution';
+import { LoadingItems, useLoadingScope } from '../ui/loading-scope';
 import { useTicketActions } from './hooks/use-ticket-actions';
-import { useTicketsList } from './hooks/use-tickets-list';
-import { TicketOpenForm } from './ticket-open-form';
+import { TICKETS_PAGE_SIZE, useTicketsList } from './hooks/use-tickets-list';
+import { TicketOpenForm, type TicketOpenFormProps } from './ticket-open-form';
 import { TicketRow } from './ticket-row';
 import type { AnyTicket, OptimisticTicket, TicketData } from './types';
 import { isOptimistic } from './types';
+
+/** The center's layout. */
+const TICKET_CENTER_CLASS = 'flex flex-col gap-6';
+const TICKET_LIST_BLOCK_CLASS = 'flex flex-col gap-2';
 
 export interface TicketCenterProps {
   /** Optional toast override (test-friendly). Defaults to the lib's
@@ -41,12 +51,18 @@ export interface TicketCenterProps {
 }
 
 export function TicketCenter({ toast = defaultToast }: TicketCenterProps = {}) {
+  // In a page's loading state nothing is read: no identity, no ticket list (the gate below owns those reads).
+  if (useLoadingScope()) return <TicketCenterPending region={false} />;
+  return <TicketCenterGate toast={toast} />;
+}
+
+function TicketCenterGate({ toast }: { toast: typeof defaultToast }) {
   const identity = useChatIdentity();
   // Loading window — wait for the capability bag to resolve before
   // deciding what to render. `identity.isLoading` is the first-mount
   // window; once resolved we know authTier definitively.
   if (identity.isLoading) {
-    return <TicketCenterSkeleton />;
+    return <TicketCenterPending />;
   }
   if (identity.authTier === 'anon' || !identity.user?.email) {
     return (
@@ -71,7 +87,7 @@ function TicketCenterAuthed({
   sessionEmail: string;
 }) {
   const queryClient = useQueryClient();
-  const { tickets, isLoading, isFetching, refetch, lastUpdatedAt } = useTicketsList({
+  const { tickets, isLoading, isFetching, refetch, sync } = useTicketsList({
     customerEmail: sessionEmail,
   });
   const [optimisticTickets, setOptimisticTickets] = useState<OptimisticTicket[]>([]);
@@ -117,99 +133,181 @@ function TicketCenterAuthed({
     setExpandedTicketId(prev => (prev === id ? null : id));
   }, []);
 
+  // The page states the sync under its title; the ticket list shown without that page draws it in its own header.
+  const syncInPage = usePageDataSync(sync, isLoading);
+
   const merged: AnyTicket[] = [...optimisticTickets, ...tickets];
 
   return (
-    <div className="flex flex-col gap-6">
-      <TicketOpenForm
-        onSubmit={input => actions.submitTicket(input)}
-        isSubmitting={actions.isSubmittingForm}
-        supportSystemDown={supportSystemDown}
-      />
-
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-ods-text-secondary text-h5">Your Current Tickets</p>
-          <div className="flex items-center gap-3 text-ods-text-secondary text-h6">
-            {lastUpdatedAt && <span>Updated {formatRelativeTime(new Date(lastUpdatedAt))}</span>}
-            <Button
-              type="button"
-              variant="transparent"
-              size="small"
-              onClick={refetch}
-              disabled={isFetching}
-              aria-label="Refresh ticket list"
-              leftIcon={<RefreshCw className="h-4 w-4" />}
-            />
-          </div>
-        </div>
-
-        {isLoading ? (
-          <TicketListSkeleton />
-        ) : merged.length === 0 ? (
-          <Card className="p-6">
-            <EmptyState
-              type="generic"
-              title="No tickets yet"
-              description="Open one above to start the conversation."
-              showCTA={false}
-            />
-          </Card>
-        ) : (
-          <Card className="overflow-hidden">
-            {merged.map(ticket => (
-              <TicketRow
-                key={ticket.id}
-                id={devSectionAnchorId('ticket', ticket.external_id)}
-                ticket={ticket}
-                expanded={expandedTicketId === ticket.id}
-                onToggle={toggleRow}
-                busy={isOptimistic(ticket) ? false : actions.isRowBusy(ticket.id)}
-                supportSystemDown={supportSystemDown}
-                onSendMessage={actions.sendMessage}
-                onClose={actions.closeTicket}
-                onReopen={actions.reopenTicket}
-                onActionCollapsed={() => setExpandedTicketId(null)}
-              />
-            ))}
-          </Card>
-        )}
-      </div>
-    </div>
+    <TicketCenterView
+      tickets={merged}
+      loading={isLoading}
+      sync={syncInPage ? undefined : sync}
+      onRefresh={refetch}
+      refreshing={isFetching}
+      onSubmit={input => actions.submitTicket(input)}
+      isSubmitting={actions.isSubmittingForm}
+      supportSystemDown={supportSystemDown}
+      renderRow={ticket => (
+        <TicketRow
+          key={ticket.id}
+          data-loading-item
+          id={devSectionAnchorId('ticket', ticket.external_id)}
+          ticket={ticket}
+          expanded={expandedTicketId === ticket.id}
+          onToggle={toggleRow}
+          busy={isOptimistic(ticket) ? false : actions.isRowBusy(ticket.id)}
+          supportSystemDown={supportSystemDown}
+          onSendMessage={actions.sendMessage}
+          onClose={actions.closeTicket}
+          onReopen={actions.reopenTicket}
+          onActionCollapsed={() => setExpandedTicketId(null)}
+        />
+      )}
+    />
   );
 }
 
-function TicketCenterSkeleton({
+/**
+ * The center while its identity is read (or in a host's loading scope): the SAME view, with no tickets and nothing
+ * usable, inside a `LoadingScope` where every part draws its own loading state. Announced once (`region`).
+ */
+function TicketCenterPending({
   region = true,
 }: {
   /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
   region?: boolean;
 } = {}) {
+  // The page states the sync under its title: the list's header then draws no line, loading or loaded.
+  const syncInPage = usePageDataSync(null, true);
   return (
-    <LoadingRegion label="Loading tickets" announce={region} className="flex flex-col gap-6">
-      <Card className="p-6">
-        <UnifiedSkeleton className="mb-4 h-7 w-48" />
-        <UnifiedSkeleton className="mb-3 h-10 w-full" />
-        <UnifiedSkeleton className="h-24 w-full" />
-      </Card>
-      <TicketListSkeleton />
-    </LoadingRegion>
+    <LoadingFallback label="Loading tickets" status={region}>
+      <TicketCenterView
+        tickets={[]}
+        loading
+        formInert
+        sync={syncInPage ? undefined : null}
+        onSubmit={() => Promise.resolve(false)}
+        isSubmitting={false}
+        supportSystemDown={false}
+        renderRow={() => null}
+      />
+    </LoadingFallback>
   );
 }
 
+/** The center's ONE view, loaded and loading: the open-ticket form, then the list under its header. */
+function TicketCenterView({
+  tickets,
+  loading,
+  formInert = false,
+  sync,
+  onRefresh,
+  refreshing,
+  onSubmit,
+  isSubmitting,
+  supportSystemDown,
+  renderRow,
+}: {
+  tickets: AnyTicket[];
+  /** The tickets are being read: the list draws its skeleton. */
+  loading: boolean;
+  /** The identity is not read yet: the form is drawn for real but cannot be focused, typed into or submitted. */
+  formInert?: boolean;
+  /** `undefined`: the page states the sync, the header draws no line. */
+  sync: DataSync | null | undefined;
+  /** Absent while loading, where the button is drawn but cannot be used. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  onSubmit: TicketOpenFormProps['onSubmit'];
+  isSubmitting: boolean;
+  supportSystemDown: boolean;
+  renderRow: (ticket: AnyTicket) => ReactNode;
+}) {
+  return (
+    <div className={TICKET_CENTER_CLASS}>
+      {/* `contents`: the wrapper adds no box, the form stays the view's own child. */}
+      <div inert={formInert || undefined} className="contents">
+        <TicketOpenForm onSubmit={onSubmit} isSubmitting={isSubmitting} supportSystemDown={supportSystemDown} />
+      </div>
+
+      <div className={TICKET_LIST_BLOCK_CLASS}>
+        <TicketListHeader sync={sync} syncLoading={loading} onRefresh={onRefresh} refreshing={refreshing} />
+        <TicketList tickets={tickets} loading={loading} renderRow={renderRow} />
+      </div>
+    </div>
+  );
+}
+
+/** The ticket list: its own skeleton while the tickets are read (`useLoadingScope() || loading`), else rows or empty. */
+function TicketList({
+  tickets,
+  loading,
+  renderRow,
+}: {
+  tickets: AnyTicket[];
+  loading: boolean;
+  renderRow: (ticket: AnyTicket) => ReactNode;
+}) {
+  if (useLoadingScope() || loading) return <TicketListSkeleton />;
+  if (tickets.length === 0) {
+    return (
+      <Card className="p-6">
+        <EmptyState
+          type="generic"
+          title="No tickets yet"
+          description="Open one above to start the conversation."
+          showCTA={false}
+        />
+      </Card>
+    );
+  }
+  return <Card className="overflow-hidden">{tickets.map(renderRow)}</Card>;
+}
+
+/**
+ * The list's header, loaded and loading: "Your Current Tickets" (static), the sync line (when the page does not
+ * state it above) and the refresh button.
+ */
+function TicketListHeader({
+  sync,
+  syncLoading,
+  onRefresh,
+  refreshing = false,
+}: {
+  /** `undefined`: the page states the sync, the header draws no line. */
+  sync: DataSync | null | undefined;
+  syncLoading: boolean;
+  /** Absent in the skeleton, where the button is drawn but cannot be used. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-ods-text-secondary text-h5">Your Current Tickets</p>
+      <div className="flex items-center gap-3 text-ods-text-secondary text-h6">
+        {sync !== undefined && <DataSyncLine sync={sync} loading={syncLoading} inline />}
+        <span inert={!onRefresh || undefined} aria-hidden={!onRefresh || undefined}>
+          <Button
+            type="button"
+            variant="transparent"
+            size="small"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh ticket list"
+            leftIcon={<RefreshCw className="h-4 w-4" />}
+          />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** The ticket list while it is read: ONE FULL PAGE of rows (the list reads `TICKETS_PAGE_SIZE` tickets), at every width. */
 function TicketListSkeleton() {
   return (
     <Card className="overflow-hidden">
-      {[0, 1, 2].map(i => (
-        <div key={i} className="flex h-20 items-center gap-4 border-b border-ods-border px-4 last:border-b-0">
-          <div className="flex flex-1 flex-col gap-2">
-            <UnifiedSkeleton className="h-4 w-2/3" />
-            <UnifiedSkeleton className="h-3 w-full" />
-          </div>
-          <UnifiedSkeleton className="h-8 w-20" />
-          <UnifiedSkeleton className="h-8 w-16" />
-        </div>
-      ))}
+      <LoadingItems count={TICKETS_PAGE_SIZE}>{() => <TicketRow loading data-loading-item />}</LoadingItems>
     </Card>
   );
 }

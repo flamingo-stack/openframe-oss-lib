@@ -27,15 +27,14 @@
 
 import { useState, type ChangeEvent } from 'react';
 import { ContactForm } from '../contact';
-import { LoadingRegion } from '../loading/loading-region';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { Input, Label } from '../ui';
+import { AnnouncedLoadingScope, useLoadingScope } from '../ui/loading-scope';
 import { RequiredMark } from '../ui/required-mark';
 import type { UseTicketActionsReturn } from './hooks/use-ticket-actions';
 
 const SUBJECT_MAX_CHARS = 200;
 
-export interface HelpCenterCreateFormProps {
+interface HelpCenterCreateFormLoadedProps {
   /** The full actions bag from `useTicketActions` — we read
    *  `submitTicket` from it. Passing the whole bag (rather than just
    *  the one method) keeps the wiring shape consistent with other
@@ -58,126 +57,43 @@ export interface HelpCenterCreateFormProps {
    *  is down. Wired from the parent's
    *  `useTicketActions.onSupportSystemDown` flag. */
   supportSystemDown?: boolean;
+  /** Not loading: the form. */
+  loading?: false;
 }
 
 /**
- * Loading placeholder that mirrors `<HelpCenterCreateForm>`'s outer
- * dimensions PIXEL-FOR-PIXEL so the page chrome doesn't shift when
- * identity resolves and the real form mounts.
- *
- * Verified against live DOM bounding-rect measurements at the lg
- * breakpoint — every section's top + height matches the real form to
- * the pixel (skeleton wrapper 556px == real wrapper 556px). Each
- * section uses the SAME flex / spacing / padding classes the real
- * form uses, so the gaps propagate identically; only the inner
- * content swaps an `<Input>` / `<Textarea>` / `<Button>` for a
- * same-sized animated `bg-ods-border` bar.
- *
- *   wrapper          → `p-6 content-md:p-8 content-lg:p-10` + border + rounded-3xl
- *   heading area     → 56px (`mb-6 content-md:mb-8` container, h-10 inner bar
- *                       + `mb-3 content-md:mb-4` = 40 + 16)
- *   subject section  → 79px (`h-[27px]` label + `mb-1` (4px) + h-12
- *                       input = 27 + 4 + 48)
- *   message section  → 127px (`h-[27px]` label + `mb-1` + h-24
- *                       textarea = 27 + 4 + 96)
- *   attachments row  → 28px (h-7 add button + helper label)
- *   footer           → 56px (h-12 button + `pt-2 mt-auto`)
- *   between sections → `space-y-4 content-md:space-y-6` (16/24px)
- *
- * One non-obvious detail: the real `<ContactForm>` renders 4
- * `<input type="hidden">` registrations BEFORE the visible Subject
- * section (for the hidden name/email/helpCategory/message fields).
- * Tailwind's `space-y-*` rule (`:not([hidden]) ~ :not([hidden])`)
- * counts `type="hidden"` inputs as siblings, so Subject gets a 24px
- * top margin. The skeleton mirrors those 4 hidden inputs exactly so
- * the spacing rule fires identically — without them the whole stack
- * shifts up 24px on every page load.
+ * The form's props. `loading: true` (the session identity is still being read): the form draws its own loading state
+ * (as in a page's loading scope), at the loaded form's size, and the other props may be left out.
  */
-export function HelpCenterCreateFormSkeleton({
-  region = true,
-}: {
-  /** The loading state announces itself (`LoadingRegion`). `false` inside another loading region. Default `true`. */
-  region?: boolean;
-} = {}) {
-  return (
-    <LoadingRegion
-      label="Loading the form"
-      announce={region}
-      className="flex h-full flex-col rounded-2xl border border-ods-border p-6 content-md:rounded-3xl content-md:p-8 content-lg:p-10"
-    >
-      {/* Heading container — mirrors `mb-6 content-md:mb-8` + h2 with its own
-          `mb-3 content-md:mb-4` and `text-h2` height (32px font, line-height
-          ~1.25 → 40px). h-10 bar matches the rendered h2 height. */}
-      <div className="mb-6 content-md:mb-8">
-        <UnifiedSkeleton className="mb-3 h-10 w-72 rounded content-md:mb-4" />
-      </div>
+export type HelpCenterCreateFormProps =
+  HelpCenterCreateFormLoadedProps | ({ loading: true } & Partial<Omit<HelpCenterCreateFormLoadedProps, 'loading'>>);
 
-      {/* Form body — same `space-y-4 content-md:space-y-6` gap stack.
-          IMPORTANT: the real `<ContactForm>` prepends 4
-          `<input type="hidden">` registrations for the hidden
-          name/email/helpCategory/message fields (see contact-form.tsx).
-          `space-y-*` uses `:not([hidden]) ~ :not([hidden])` — `type="hidden"`
-          inputs aren't excluded — so those hidden inputs ARE counted as
-          siblings, and the visible Subject section gets a 24px top
-          margin. The skeleton mirrors that exact structure with the
-          same 4 hidden inputs so the Subject placeholder lands at the
-          same Y as the real Subject input. Removing them would shift
-          the whole stack up by 24px on every page load. */}
-      <div className="flex flex-grow flex-col space-y-4 content-md:space-y-6">
-        <input type="hidden" aria-hidden />
-        <input type="hidden" aria-hidden />
-        <input type="hidden" aria-hidden />
-        <input type="hidden" aria-hidden />
-        {/* Subject section — `flex flex-col` matches real form. Label
-            bar uses arbitrary `h-[27px]` to match the live Label
-            component (18px font * 1.5 line-height = 27px) and `mb-1`
-            (4px) which is Tailwind's default `mb-1`. Total section
-            height: 27 + 4 + 48 (h-12 input) = 79px, identical to
-            real form. */}
-        <div className="flex flex-col">
-          <UnifiedSkeleton className="mb-1 h-[27px] w-20 rounded" />
-          <UnifiedSkeleton className="h-12 w-full rounded" />
-        </div>
-
-        {/* Message section — `flex flex-col flex-grow` matches real
-            form (textarea fills remaining vertical space inside the
-            wrapper). h-24 bar (96px) = textarea's natural rendered
-            height when the wrapper has the standard list + footer
-            below it. Same `h-[27px]` + `mb-1` Label pattern as Subject:
-            27 + 4 + 96 = 127px, identical to real form. */}
-        <div className="flex flex-grow flex-col">
-          <UnifiedSkeleton className="mb-1 h-[27px] w-32 rounded" />
-          <UnifiedSkeleton className="h-24 w-full flex-grow rounded" />
-        </div>
-
-        {/* Attachments row — mirrors the real `flex flex-col gap-2`
-            container with chip strip (empty when no files staged) +
-            the h-7 add button + helper text. */}
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <UnifiedSkeleton className="h-7 w-7 shrink-0 rounded" />
-            <UnifiedSkeleton className="h-4 w-40 rounded" />
-          </div>
-        </div>
-
-        {/* Footer — same `pt-2 mt-auto` so it sticks to the bottom.
-            Button bar is h-12 to match the real `<Button>` height
-            (48px). */}
-        <div className="mt-auto flex w-full flex-col items-center justify-end gap-4 pt-2 content-md:flex-row content-md:gap-6">
-          <UnifiedSkeleton className="h-4 w-72 rounded" />
-          <UnifiedSkeleton className="h-12 w-32 rounded" />
-        </div>
-      </div>
-    </LoadingRegion>
-  );
+/**
+ * The ticket form. ONE structure: while the session identity is read (`loading`) it is the SAME form in a loading
+ * scope (its title, labels and footer copy real, each field and control its own loading form), announced once (an
+ * outer scope has already said it); in a page's loading scope it draws the same way.
+ */
+export function HelpCenterCreateForm(props: HelpCenterCreateFormProps) {
+  const scoped = useLoadingScope();
+  if (props.loading || scoped) {
+    return (
+      <AnnouncedLoadingScope label="Loading the form" active className="contents">
+        <HelpCenterCreateFormBody sessionName="" sessionEmail="" />
+      </AnnouncedLoadingScope>
+    );
+  }
+  return <HelpCenterCreateFormBody {...props} />;
 }
 
-export function HelpCenterCreateForm({
+function HelpCenterCreateFormBody({
   actions,
   sessionName,
   sessionEmail,
   supportSystemDown = false,
-}: HelpCenterCreateFormProps) {
+}: Omit<HelpCenterCreateFormLoadedProps, 'actions' | 'loading'> & {
+  /** Absent in the loading form, where nothing submits. */
+  actions?: UseTicketActionsReturn;
+}) {
   const [subject, setSubject] = useState('');
   const [subjectError, setSubjectError] = useState<string | null>(null);
 
@@ -238,6 +154,7 @@ export function HelpCenterCreateForm({
           throw new Error('SUBJECT_REQUIRED');
         }
         setSubjectError(null);
+        if (!actions) throw new Error('TICKET_FORM_LOADING');
         const ok = await actions.submitTicket({
           subject: trimmedSubject,
           content: data.message,

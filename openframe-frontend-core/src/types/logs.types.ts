@@ -21,15 +21,17 @@ export interface LogsListProps {
   showConnector?: boolean;
   onLogClick?: (log: LogEntry) => void;
   loading?: boolean;
+  /** Rows the loading state draws: the logs the host reads (its page size or limit). Default a typical count. */
+  skeletonRows?: number;
   emptyMessage?: string;
   className?: string;
 }
 
-export interface LogSeverityDotProps {
-  severity: LogSeverity;
+/** The log's severity, or `loading` while the log is read: the dot then draws its own loading form. */
+export type LogSeverityDotProps = {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
-}
+} & ({ severity: LogSeverity; loading?: boolean } | { severity?: undefined; loading: true });
 
 export const LOG_SEVERITY_COLORS: Record<LogSeverity, string> = {
   DEBUG: '#888888',

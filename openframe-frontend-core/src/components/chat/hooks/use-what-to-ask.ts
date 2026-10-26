@@ -165,8 +165,8 @@ function exchangeMessages(
 
 /**
  * Whether the thread waits on the user before it can go on: an approval or an
- * escalation offer nobody has answered. "What to ask?" opens a new chat then,
- * rather than adding prompts to a conversation that cannot take them.
+ * escalation offer nobody has answered. A "What to ask?" chip does not send
+ * then: the conversation cannot take a message.
  */
 export function awaitsDecision(messages: readonly Message[]): boolean {
   return messages.some(

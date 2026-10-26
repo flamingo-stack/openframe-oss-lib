@@ -79,15 +79,26 @@
  * a `div` inside a `p` is auto-closed by the HTML parser, which would split the
  * subtitle paragraph and desync hydration. The `titleWrap` branch is untouched
  * (wrapped text never clips, so it never needs a tooltip).
+ *
+ * SANCTIONED EXCEPTION (2026-10, explicit human sign-off): loading scopes. In a
+ * `LoadingScope` a title or subtitle that is READ arrives as '' (an absent one
+ * is undefined) and is drawn exactly as `loading` draws it: its bar inside the
+ * real `h1`/`p`. A given title or subtitle is the page's own words, drawn as
+ * is. Outside a scope every caller is byte-identical.
  * ========================================================================== */
 
 import type React from 'react';
 import { useIsTruncated } from '../../hooks/ui/use-is-truncated';
 import { cn } from '../../utils/cn';
-import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import {
+  type TextLinesByBreakpoint,
+  TextLinesByBreakpointSkeleton,
+  UnifiedSkeleton,
+} from '../loading/unified-skeleton';
 import type { ActionsMenuGroup } from '../ui/actions-menu';
 import { EntityImage } from '../ui/entity-image';
 import { FloatingTooltip } from '../ui/floating-tooltip';
+import { useLoadingScope } from '../ui/loading-scope';
 import { PageActions, type PageActionButton } from '../ui/page-actions';
 import { BackButton } from './back-button';
 import { PageTitle } from './page-picture';
@@ -157,6 +168,11 @@ export interface TitleBlockProps {
    *  ellipsis clamp. For content detail pages whose h1 is CMS data of arbitrary length.
    *  Additive + default-preserving: omit it and every existing caller is byte-identical. */
   titleWrap?: boolean;
+  /**
+   * With `titleWrap`: the lines a typical title of the page takes per breakpoint, drawn by the loading title (a
+   * record's title is read; a long one growing past them is a settle). Absent: one bar.
+   */
+  titleSkeletonLines?: TextLinesByBreakpoint;
 }
 
 /**
@@ -202,8 +218,17 @@ export function TitleBlock({
   loadingActions,
   subtitleRow = 'when-set',
   titleWrap = false,
+  titleSkeletonLines,
 }: TitleBlockProps) {
-  const hasSubtitleRow = !!subtitle || subtitleRow === 'always' || (subtitleRow === 'while-loading' && !!loading);
+  // In a loading scope a read title / subtitle ('' there) is drawn as `loading` draws it.
+  const scoped = useLoadingScope();
+  const titleLoading = !!loading || (scoped && title === '');
+  const subtitleLoading = !!loading || (scoped && subtitle === '');
+  const hasSubtitleRow =
+    !!subtitle ||
+    subtitleRow === 'always' ||
+    (subtitleRow === 'while-loading' && !!loading) ||
+    (scoped && subtitle === '');
   const hasActions = actions && actions.length > 0;
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
   const titleClass = titleSize === 'h1' ? 'text-h1' : 'text-h2';
@@ -215,19 +240,24 @@ export function TitleBlock({
   // Exactly one title element renders per pass, so one ref covers every branch.
   // The tooltip arms itself only on real clipping — repeating a fully visible
   // title back to the user is noise, and `titleWrap`/loading never clip at all.
-  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(loading ? null : title);
+  const { ref: titleRef, isTruncated: titleTruncated } = useIsTruncated<HTMLHeadingElement>(
+    titleLoading ? null : title,
+  );
   const { ref: subtitleRef, isTruncated: subtitleTruncated } = useIsTruncated<HTMLParagraphElement>(
-    loading ? null : subtitle,
+    subtitleLoading ? null : subtitle,
   );
-  const titleNode = loading ? (
-    <UnifiedSkeleton
-      as="span"
-      aria-hidden
-      className={cn(TITLE_TEXT_SKELETON_CLASS, skeletonSize.width, skeletonSize.height)}
-    />
-  ) : (
-    title
-  );
+  const titleNode =
+    titleLoading && titleWrap && titleSkeletonLines ? (
+      <TextLinesByBreakpointSkeleton as="span" lines={titleSkeletonLines} />
+    ) : titleLoading ? (
+      <UnifiedSkeleton
+        as="span"
+        aria-hidden
+        className={cn(TITLE_TEXT_SKELETON_CLASS, skeletonSize.width, skeletonSize.height)}
+      />
+    ) : (
+      title
+    );
 
   return (
     <div
@@ -256,16 +286,19 @@ export function TitleBlock({
         className={cn(
           'flex min-w-0 flex-1 flex-col justify-center gap-[var(--spacing-system-xs)] content-md:max-w-full content-md:flex-none',
           TITLE_BLOCK_MIN_HEIGHT,
+          // A wrapping title's loading lines stand for a title that fills the row (its typical lines are full ones), so the
+          // column takes the row's width: sized to content it would shrink to the bars' minimum.
+          titleLoading && titleWrap && titleSkeletonLines && 'content-md:w-full',
         )}
       >
         {backButton && (
           <BackButton onClick={backButton.onClick} label={backButton.label} className="hidden content-md:inline-flex" />
         )}
-        {image || hasSubtitleRow || loading ? (
+        {image || hasSubtitleRow || titleLoading ? (
           <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
             {image && <EntityImage src={image.src} alt={image.alt} fallbackText={image.alt || title} />}
             <div className="flex min-w-0 flex-1 flex-col justify-center">
-              {(loading || title) &&
+              {(titleLoading || title) &&
                 (titleAdornment ? (
                   <div className="flex w-full min-w-0 items-center gap-[var(--spacing-system-m)]">
                     {/* `min-w-0` moves onto the tooltip's wrapper: the wrapper is
@@ -302,9 +335,9 @@ export function TitleBlock({
                   <p
                     ref={subtitleRef}
                     className="truncate text-ods-text-secondary text-h6"
-                    aria-hidden={!loading && !subtitle ? true : undefined}
+                    aria-hidden={!subtitleLoading && !subtitle ? true : undefined}
                   >
-                    {loading ? (
+                    {subtitleLoading ? (
                       <UnifiedSkeleton
                         as="span"
                         aria-hidden

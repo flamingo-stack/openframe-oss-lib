@@ -30,10 +30,10 @@ describe('SearchableSelect without onSearchChange', () => {
     expect(optionLabels()).toEqual(['Bob']);
   });
 
-  it('shows the loading line in place of the rows while loading', () => {
+  it('shows the loading rows in place of the options while loading', () => {
     render(<SearchableSelect options={PEOPLE} isLoading onValueChange={() => {}} />);
     openPicker('Select...');
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading options');
     expect(optionLabels()).toEqual([]);
   });
 });
@@ -60,7 +60,7 @@ describe('SearchableSelect with onSearchChange', () => {
     // no "no results" flash.
     rerender(<SearchableSelect {...props} options={[]} isLoading />);
     expect(optionLabels()).toEqual(['Alice', 'Bob', 'Carol']);
-    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByText('No results found')).not.toBeInTheDocument();
 
     // The answer settled empty: that IS the empty state.
@@ -69,10 +69,10 @@ describe('SearchableSelect with onSearchChange', () => {
     expect(screen.getByText('No results found')).toBeInTheDocument();
   });
 
-  it('shows the loading line only while there is nothing to list yet', () => {
+  it('shows the loading rows only while there is nothing to list yet', () => {
     render(<SearchableSelect options={[]} isLoading onValueChange={() => {}} onSearchChange={() => {}} />);
     openPicker('Select...');
-    expect(screen.getByText('Loading…')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading options');
   });
 
   it('reports an empty query when the dropdown closes on a query, and only then', () => {

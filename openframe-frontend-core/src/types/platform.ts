@@ -10,6 +10,7 @@ export type PlatformName =
   | 'product-hub'
   | 'revenue-hub'
   | 'people-hub'
+  | 'coding-hub'
   | 'openframe'
   | 'company-hub'
   | 'mlg';

@@ -167,6 +167,7 @@ Platforms set **brand accent + link colors only** (and a couple of intentional b
 | `product-hub`     | Green `--ods-attention-green-success` |                             |
 | `revenue-hub`     | Yellow-warning `--ods-attention-yellow-warning` |                   |
 | `people-hub`      | Cyan `--ods-flamingo-cyan-base`     |                               |
+| `coding-hub`      | White `--ods-system-greys-white`    | Black secondary; mark is white on black |
 | `company-hub`     | Red `--ods-attention-red-error`     |                               |
 
 Adding a new platform = add one `[data-app-type="…"]` block in `ods-colors.css`. Because the block references `--ods-*` primitives (not raw hex), the new platform inherits dark/light flipping for free.

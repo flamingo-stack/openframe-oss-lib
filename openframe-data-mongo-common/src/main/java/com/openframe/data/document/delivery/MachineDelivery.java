@@ -18,6 +18,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @Document(collection = "machine_delivery")
 @CompoundIndex(name = "machine_delivery_due", def = "{'tenantId': 1, 'status': 1, 'dueAt': 1}")
+@CompoundIndex(name = "machine_delivery_type_due", def = "{'tenantId': 1, 'status': 1, 'type': 1, 'dueAt': 1}")
 public class MachineDelivery implements TenantScoped {
 
     @Id
@@ -31,6 +32,8 @@ public class MachineDelivery implements TenantScoped {
     private DeliveryStatus status;
     private int attempts;
     private int errors;
+    // runs the row went through after its first: the policy's max-runs bounds reruns + 1
+    private int reruns;
     private String dispatchId;
     private int sequence;
     private String payloadJson;

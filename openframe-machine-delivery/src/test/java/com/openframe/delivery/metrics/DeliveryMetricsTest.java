@@ -3,10 +3,13 @@ package com.openframe.delivery.metrics;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryType;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,6 +26,78 @@ class DeliveryMetricsTest {
     void setUp() {
         registry = new SimpleMeterRegistry();
         metrics = new DeliveryMetrics(registry);
+    }
+
+    @Test
+    void recordDispatchHeld_machineNotOnline_countedByType() {
+        // execution
+        metrics.recordDispatchHeld(DeliveryType.TOOL_INSTALLATION);
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.dispatch.held").tags("type", "tool_installation").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void recordRerunPublished_type_countedApartFromRetries() {
+        // execution
+        metrics.recordRerunPublished(DeliveryType.CLIENT_UPDATE);
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.rerun.published").tags("type", "client_update").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+        assertThat(registry.find("openframe.delivery.retried").counter()).isNull();
+    }
+
+    @Test
+    void recordRolloutStarted_type_countedByType() {
+        // execution
+        metrics.recordRolloutStarted(DeliveryType.CLIENT_UPDATE);
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.rollout.started").tags("type", "client_update").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void recordRolloutMachines_batchOfMachines_counterGrowsByTheBatch() {
+        // execution
+        metrics.recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 500);
+        metrics.recordRolloutMachines(DeliveryType.CLIENT_UPDATE, 12);
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.rollout.machines").tags("type", "client_update").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(512.0);
+    }
+
+    @Test
+    void recordRolloutFinished_type_countedAndTimed() {
+        // execution
+        metrics.recordRolloutFinished(DeliveryType.CLIENT_UPDATE, Duration.ofSeconds(42));
+
+        // verifications
+        Counter counter = registry.find("openframe.delivery.rollout.finished").tags("type", "client_update").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+        Timer timer = registry.find("openframe.delivery.rollout.duration").tags("type", "client_update").timer();
+        assertThat(timer).isNotNull();
+        assertThat(timer.count()).isEqualTo(1L);
+    }
+
+    @Test
+    void recordRolloutsRunning_setTwice_gaugeReadsTheLastValue() {
+        // execution
+        metrics.recordRolloutsRunning(DeliveryType.CLIENT_UPDATE, 2);
+        metrics.recordRolloutsRunning(DeliveryType.CLIENT_UPDATE, 0);
+
+        // verifications
+        Gauge gauge = registry.find("openframe.delivery.rollout.running").tags("type", "client_update").gauge();
+        assertThat(gauge).isNotNull();
+        assertThat(gauge.value()).isEqualTo(0.0);
     }
 
     @Test

@@ -27,28 +27,12 @@ export const platformIcons: Record<PlatformName, React.ReactNode> = {
   'product-hub': renderPlatformIcon('product-hub', 'h-5 w-5'),
   'revenue-hub': renderPlatformIcon('revenue-hub', 'h-5 w-5'),
   'people-hub': renderPlatformIcon('people-hub', 'h-5 w-5'),
+  'coding-hub': renderPlatformIcon('coding-hub', 'h-5 w-5'),
   'company-hub': renderPlatformIcon('company-hub', 'h-5 w-5'),
   tmcg: renderPlatformIcon('tmcg', 'h-5 w-5'),
   mlg: renderPlatformIcon('mlg', 'h-5 w-5'),
   universal: renderPlatformIcon('universal', 'h-5 w-5'),
 };
-
-// Identity + brand strings/colours live in ONE place; re-exported here so every
-// existing importer of `platform-config` keeps working unchanged.
-export {
-  platformDisplayNames,
-  platformShortNames,
-  platformDescriptions,
-  platformSlogans,
-  platformHexColors,
-  platformColors,
-  getPlatformDisplayName,
-  getPlatformShortName,
-  getPlatformDescription,
-  getPlatformSlogan,
-  getPlatformColor,
-  getDefaultColorForPlatform,
-} from './platform-identity';
 
 export function transformPlatformConfigsToOptions(platformConfigs: PlatformConfig[]): SelectableOption[] {
   return platformConfigs.map((platform: PlatformConfig) => ({

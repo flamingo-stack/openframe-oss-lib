@@ -20,8 +20,11 @@
  */
 
 export { OnboardingGuidesCatalogView, type OnboardingGuidesCatalogViewProps } from './onboarding-guides-catalog-view';
-export { OnboardingGuideDetailView, type OnboardingGuideDetailViewProps } from './onboarding-guide-detail-view';
-export { OnboardingGuidesCatalogSkeleton } from './onboarding-guides-catalog-skeleton';
+export {
+  OnboardingGuideDetailView,
+  ONBOARDING_GUIDE_RELATED_SKELETON_COUNT,
+  type OnboardingGuideDetailViewProps,
+} from './onboarding-guide-detail-view';
 
 export {
   useOnboardingGuides,

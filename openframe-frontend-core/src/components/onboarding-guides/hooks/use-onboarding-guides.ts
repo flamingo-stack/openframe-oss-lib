@@ -21,6 +21,7 @@ import type {
   OnboardingGuideListResponse,
   OnboardingGuideSectionSummary,
 } from '../../chat/types/entities/onboarding-guide';
+import { useLoadingScope } from '../../ui/loading-scope';
 
 /**
  * Cache key builder for the `['onboarding-guides']` namespace.
@@ -47,7 +48,10 @@ export const onboardingGuideKeys = {
 };
 
 export function useOnboardingGuides(filters?: OnboardingGuideFilters) {
+  // In a loading scope nothing is fetched (the view draws its loading state).
+  const held = useLoadingScope();
   return useQuery({
+    enabled: !held,
     queryKey: onboardingGuideKeys.list(filters || {}),
     queryFn: async (): Promise<OnboardingGuideListResponse> => {
       const params = new URLSearchParams();
@@ -68,6 +72,7 @@ export function useOnboardingGuides(filters?: OnboardingGuideFilters) {
 }
 
 export function useOnboardingGuide(slug: string | undefined) {
+  const held = useLoadingScope();
   return useQuery({
     queryKey: onboardingGuideKeys.detail(slug || ''),
     queryFn: async (): Promise<OnboardingGuide> => {
@@ -75,12 +80,14 @@ export function useOnboardingGuide(slug: string | undefined) {
       if (!res.ok) throw new Error('Failed to fetch onboarding guide');
       return (await res.json()) as OnboardingGuide;
     },
-    enabled: !!slug,
+    enabled: !!slug && !held,
   });
 }
 
 export function useOnboardingGuideSections() {
+  const held = useLoadingScope();
   return useQuery({
+    enabled: !held,
     queryKey: onboardingGuideKeys.sections(),
     queryFn: async (): Promise<OnboardingGuideSectionSummary[]> => {
       const res = await fetch('/api/onboarding-guides/sections');

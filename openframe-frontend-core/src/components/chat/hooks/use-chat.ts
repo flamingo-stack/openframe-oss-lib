@@ -12,9 +12,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ApprovalRequestSegment, Message, MessageSegment, ToolExecutionData } from '../types/message.types';
 import { useSSE, type StreamFn, type StreamFnExtraOptions } from './use-sse';
 
-export type { Message } from '../types/message.types';
-export type { StreamFnExtraOptions } from './use-sse';
-
 interface UseChatOptions {
   useMock?: boolean;
   debugMode?: boolean;

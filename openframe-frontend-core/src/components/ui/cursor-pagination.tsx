@@ -2,7 +2,9 @@
 
 import { ChevronLeft, ChevronRight, RotateCcw, Home } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { Button } from './button';
+import { useLoadingScope } from './loading-scope';
 
 export interface CursorPaginationProps {
   hasNextPage: boolean;
@@ -15,6 +17,10 @@ export interface CursorPaginationProps {
   totalCount?: number | null;
   itemName?: string;
 
+  /**
+   * The pager's page is being read: every button is disabled. Before the first count is known (no `currentCount`), and
+   * inside a loading scope, the pager draws its skeleton: the count line a bar, its own buttons real and inert.
+   */
   loading?: boolean;
 
   onNext?: (cursor: string) => void;
@@ -37,7 +43,7 @@ export function CursorPagination({
   currentCount,
   totalCount,
   itemName = 'items',
-  loading = false,
+  loading: loadingProp = false,
   onNext,
   onPrevious,
   onReset,
@@ -47,6 +53,10 @@ export function CursorPagination({
   resetButtonLabel = 'First',
   resetButtonIcon = 'home',
 }: CursorPaginationProps) {
+  const loading = useLoadingScope() || loadingProp;
+  // Its data is the count: until the first one is known, the pager draws its skeleton (a page read with a count shown
+  // keeps the count and only disables the buttons).
+  const skeleton = loading && !currentCount;
   const handleNext = () => {
     if (hasNextPage && endCursor && onNext) {
       onNext(endCursor);
@@ -84,10 +94,18 @@ export function CursorPagination({
   return (
     <div className={cn('flex items-center justify-between gap-4', compact ? 'py-2' : 'py-3', className)}>
       {/* Info text */}
-      {showInfo && <div className="text-ods-text-secondary text-h6">{displayText || <span>&nbsp;</span>}</div>}
+      {showInfo && (
+        <div className="text-ods-text-secondary text-h6">
+          {skeleton ? (
+            <TextLineSkeleton type="inherit" as="span" className="w-40" />
+          ) : (
+            displayText || <span>&nbsp;</span>
+          )}
+        </div>
+      )}
 
-      {/* Navigation buttons */}
-      <div className="flex items-center gap-2">
+      {/* Navigation buttons (in the skeleton: the real buttons, their labels the pager's own words, inert) */}
+      <div className="flex items-center gap-2" inert={skeleton || undefined} aria-hidden={skeleton || undefined}>
         {onReset ? (
           <Button
             variant="outline"

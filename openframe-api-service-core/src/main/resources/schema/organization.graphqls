@@ -17,9 +17,9 @@ extend type Query {
     organizationByOrganizationId(organizationId: String!): Organization
 }
 
-type Organization implements Node {
-    id: ID!
-    name: String!
+type Organization implements Node @key(fields: "organizationId") {
+    id: ID! @shareable
+    name: String! @shareable
     organizationId: String!  # Generated as UUID on creation
     category: String
     numberOfEmployees: Int

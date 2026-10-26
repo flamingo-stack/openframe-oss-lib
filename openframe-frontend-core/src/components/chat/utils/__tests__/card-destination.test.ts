@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { makeComposeContentUrl } from '../../../../utils/content-href';
 import { buildListUrl } from '../../../../utils/list-url';
+import { DOC_TABLE_TYPES } from '../../../../utils/source-grouping';
 import type { ChatRef } from '../../chat-ref.types';
 import { CHAT_CARD_REGISTRY } from '../../entity-cards/dispatch';
 import { resolveCardDestination } from '../card-destination';
-import { DOC_TABLE_TYPES, resolveSourceRowCTA, type SourceRowContext } from '../source-row-cta';
+import { resolveSourceRowCTA, type SourceRowContext } from '../source-row-cta';
 
 const HUB = 'https://www.flamingo.run';
 const compose = makeComposeContentUrl({ hostedTypes: new Set<string>(), contentOrigin: HUB });

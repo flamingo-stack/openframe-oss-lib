@@ -9,6 +9,7 @@ mod uninstall;
 use crate::doctor::healing::{HealOutcome, HealResult};
 use crate::doctor::{CheckResult, Remediation};
 use crate::installation_initial_config_service::InstallConfigParams;
+use crate::models::RemoteAccessMode;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use std::process;
@@ -32,6 +33,10 @@ struct InstallArgs {
     #[arg(long = "initialKey")]
     initial_key: Option<String>,
 
+    /// Key for the logs stream; fetched after registration when absent
+    #[arg(long = "logKey")]
+    log_key: Option<String>,
+
     #[arg(long = "localMode", default_value_t = false)]
     local_mode: bool,
 
@@ -43,6 +48,10 @@ struct InstallArgs {
 
     #[arg(long = "tag")]
     tags: Vec<String>,
+
+    /// Remote access mode to set on this device once it registers (default: the customer's)
+    #[arg(long = "remote-access-mode", value_enum)]
+    remote_access_mode: Option<RemoteAccessMode>,
 }
 
 impl InstallArgs {
@@ -50,10 +59,12 @@ impl InstallArgs {
         InstallConfigParams {
             server_url: self.server_url.clone(),
             initial_key: self.initial_key.clone(),
+            log_key: self.log_key.clone(),
             org_id: self.org_id.clone(),
             user_id: self.user_id.clone(),
             local_mode: self.local_mode,
             tags: self.tags.clone(),
+            remote_access_mode: self.remote_access_mode,
         }
     }
 }
@@ -142,3 +153,7 @@ fn print_heal_outcomes(heals: &[HealResult]) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "cli_tests.rs"]
+mod tests;

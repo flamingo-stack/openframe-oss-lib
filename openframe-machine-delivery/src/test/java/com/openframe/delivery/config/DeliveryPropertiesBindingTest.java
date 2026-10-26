@@ -43,10 +43,37 @@ class DeliveryPropertiesBindingTest {
     }
 
     @Test
+    void bind_perTypeFastSweep_thatTypeOnTheFastPass() {
+        // setup
+        Map<String, String> config = fullDefaults();
+        config.put(PREFIX + ".enabled.REMOTE_ACCESS_REQUEST", "true");
+        config.put(PREFIX + ".enabled.CLIENT_UNINSTALL", "true");
+        config.put(PREFIX + ".types.REMOTE_ACCESS_REQUEST.fast-sweep", "true");
+
+        // execution
+        DeliveryProperties properties = bind(config);
+
+        // verifications
+        Policy uninstall = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+        assertThat(properties.fastTypes()).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
+        assertThat(uninstall.isFastSweep()).isFalse();
+    }
+
+    @Test
     void bind_defaultsMissingAField_rejected() {
         // setup
         Map<String, String> config = fullDefaults();
         config.remove(PREFIX + ".defaults.result-timeout-seconds");
+
+        // execution + verifications
+        assertThatThrownBy(() -> bind(config)).hasRootCauseInstanceOf(BindValidationException.class);
+    }
+
+    @Test
+    void bind_defaultsWithoutMaxRuns_rejected() {
+        // setup
+        Map<String, String> config = fullDefaults();
+        config.remove(PREFIX + ".defaults.max-runs");
 
         // execution + verifications
         assertThatThrownBy(() -> bind(config)).hasRootCauseInstanceOf(BindValidationException.class);
@@ -72,6 +99,8 @@ class DeliveryPropertiesBindingTest {
         config.put(PREFIX + ".defaults.reconnect-window-seconds", "86400");
         config.put(PREFIX + ".defaults.result-timeout-seconds", "600");
         config.put(PREFIX + ".defaults.ttl-seconds", "604800");
+        config.put(PREFIX + ".defaults.max-runs", "1");
+        config.put(PREFIX + ".defaults.rerun-after-seconds", "10800");
         return config;
     }
 }

@@ -15,6 +15,7 @@ pub mod machine_heartbeat_message;
 pub mod machine_timezone_message;
 pub mod openframe_client_info;
 pub mod openframe_client_update_message;
+pub mod remote_access_mode;
 pub mod tool_agent_update_message;
 pub mod tool_connection;
 pub mod tool_connection_message;
@@ -39,7 +40,7 @@ pub use agent_registration_response::AgentRegistrationResponse;
 pub use agent_token_response::AgentTokenResponse;
 pub use delivery::{
     delivery_result_subject, DeliveryRef, DeliveryResult, DeliveryResultMessage,
-    DELIVERY_RESULT_KIND,
+    CLIENT_UPDATE_DELIVERY_TYPE, DELIVERY_RESULT_KIND,
 };
 pub use device_tag::DeviceTag;
 pub use download_configuration::{DownloadConfiguration, InstallationType};
@@ -50,12 +51,13 @@ pub use hostname_report_message::HostnameReportMessage;
 pub use initial_configuration::InitialConfiguration;
 pub use installed_agent_message::InstalledAgentMessage;
 pub use installed_tool::{
-    FirstRunState, Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,
+    Installation, InstalledAsset, InstalledTool, ToolRecordState, CHAT_TOOL_AGENT_ID,
 };
 pub use machine_heartbeat_message::MachineHeartbeatMessage;
 pub use machine_timezone_message::MachineTimezoneMessage;
 pub use openframe_client_info::OpenFrameClientInfo;
 pub use openframe_client_update_message::OpenFrameClientUpdateMessage;
+pub use remote_access_mode::RemoteAccessMode;
 pub use tool_agent_update_message::{AssetUpdate, ToolAgentUpdateMessage};
 pub use tool_connection::ToolConnection;
 pub use tool_connection_message::ToolConnectionMessage;

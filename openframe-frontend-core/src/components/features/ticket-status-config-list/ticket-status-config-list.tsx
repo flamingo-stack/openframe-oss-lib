@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../../../utils/cn';
+import { LoadingItems, useLoadingScope } from '../../ui/loading-scope';
+import { TicketStatusConfigRow } from '../../ui/ticket-status-config-row';
 import { SortableList } from '../sortable-list/sortable-list';
 import { SortableMoveButtons } from '../sortable-list/sortable-move-buttons';
 import { type SortableDragHandleProps, useSortableItem } from '../sortable-list/use-sortable-item';
@@ -24,8 +26,22 @@ export interface TicketStatusConfigListProps<T extends { id: string }> {
   renderRow: (item: T, args: SortableRowRenderArgs) => ReactNode;
   /** Names a row for the live region and the move buttons, e.g. its status name. */
   getItemLabel?: (index: number) => string | undefined;
+  /**
+   * The rows are being read. With no rows yet the list draws `skeletonRows` row skeletons (a loading scope does the
+   * same); rows it already has draw themselves.
+   */
+  loading?: boolean;
+  /** Row skeletons while loading with no rows. Default `TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS`. */
+  skeletonRows?: number;
   className?: string;
 }
+
+/** Row skeletons a status list draws while it has none: a typical list (the list is not paged). */
+export const TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS = 4;
+
+const noop = () => {};
+
+const LIST_CLASS = 'flex w-full flex-col gap-[var(--spacing-system-xs)]';
 
 /**
  * A reorderable list of config rows (ticket statuses, AI quick actions), built
@@ -40,14 +56,43 @@ export function TicketStatusConfigList<T extends { id: string }>({
   onReorder,
   renderRow,
   getItemLabel,
+  loading: loadingProp,
+  skeletonRows = TICKET_STATUS_CONFIG_LIST_SKELETON_ROWS,
   className,
 }: TicketStatusConfigListProps<T>) {
+  // ONE switch: in a page's loading state (or while the host reads the rows) an empty list is its skeleton.
+  const loading = useLoadingScope() || !!loadingProp;
+  if (loading && items.length === 0) {
+    return (
+      // The SAME sortable list and rows, inert: the reorder controls a row has (the grip, or the touch move pair) are
+      // drawn for real, and nothing in it can be dragged or pressed while it loads.
+      <div inert aria-hidden className="contents">
+        <SortableList onReorder={noop} className={cn(LIST_CLASS, className)}>
+          <LoadingItems count={skeletonRows}>
+            {index => (
+              <SortableRow index={index} count={skeletonRows}>
+                {args => (
+                  // The row's own loading form. A list that knows nothing yet draws `custom` rows (the kind a host can
+                  // recolor, so the Color column is drawn).
+                  <TicketStatusConfigRow
+                    variant="custom"
+                    statusKey=""
+                    name=""
+                    onColorChange={noop}
+                    dragHandleProps={args.dragHandleProps}
+                    moveButtons={args.moveButtons}
+                    loading
+                  />
+                )}
+              </SortableRow>
+            )}
+          </LoadingItems>
+        </SortableList>
+      </div>
+    );
+  }
   return (
-    <SortableList
-      onReorder={onReorder}
-      getItemLabel={getItemLabel}
-      className={cn('flex w-full flex-col gap-[var(--spacing-system-xs)]', className)}
-    >
+    <SortableList onReorder={onReorder} getItemLabel={getItemLabel} className={cn(LIST_CLASS, className)}>
       {items.map((item, index) => (
         <SortableRow key={item.id} index={index} count={items.length} label={getItemLabel?.(index)}>
           {args => renderRow(item, args)}
@@ -77,6 +122,8 @@ function SortableRow({
       // stacking follows DOM order, so a row dragged DOWN slides UNDER the rows
       // below it while a row dragged up correctly renders on top.
       className={isDragging ? 'relative z-10' : undefined}
+      // One row of a read list: how many there are is the record's (the height gate counts them).
+      data-loading-item
     >
       {children({
         dragHandleProps,

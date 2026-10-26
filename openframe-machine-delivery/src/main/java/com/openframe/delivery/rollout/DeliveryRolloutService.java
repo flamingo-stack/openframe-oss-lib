@@ -25,9 +25,15 @@ import org.springframework.dao.TransientDataAccessException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
+import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
 
 @Slf4j
 @Service
@@ -45,7 +51,16 @@ public class DeliveryRolloutService {
 
     public void advance() {
         List<MachineDeliveryRollout> running = repository.findByStatus(DeliveryRolloutStatus.RUNNING);
+        countRunning(running);
         running.forEach(this::advanceOne);
+    }
+
+    private void countRunning(List<MachineDeliveryRollout> running) {
+        Map<DeliveryType, Long> byType = running.stream().collect(groupingBy(MachineDeliveryRollout::getType, counting()));
+        for (DeliveryType type : DeliveryType.values()) {
+            int count = byType.getOrDefault(type, 0L).intValue();
+            metrics.recordRolloutsRunning(type, count);
+        }
     }
 
     // a batch that fails midway is repeated next tick from the same cursor: the machines already handed out have a
@@ -70,9 +85,12 @@ public class DeliveryRolloutService {
         String id = rollout.getId();
         int sequence = rollout.getSequence();
         int dispatched = machines.size();
+        metrics.recordRolloutMachines(type, dispatched);
         if (isLastBatch(machines, batchSize)) {
             repository.finish(id, sequence, dispatched);
-            log.info("Delivery rollout finished: id={} sequence={}", id, sequence);
+            Duration took = Duration.between(rollout.getStartedAt(), Instant.now());
+            metrics.recordRolloutFinished(type, took);
+            log.info("Delivery rollout finished: id={} sequence={} took={}", id, sequence, took);
             return;
         }
         Machine last = machines.get(dispatched - 1);

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Set;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
 import static com.openframe.delivery.config.DeliveryTestPolicies.JITTER;
@@ -61,6 +62,7 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(RECONNECT_WINDOW);
         assertThat(resolved.getResultTimeoutSeconds()).isEqualTo(RESULT_TIMEOUT);
         assertThat(resolved.getTtlSeconds()).isEqualTo(TTL);
+        assertThat(resolved.isFastSweep()).isFalse();
     }
 
     @Test
@@ -94,6 +96,84 @@ class DeliveryPropertiesTest {
         // verifications
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
     }
+    @Test
+    void resolve_typeOverridesMaxRuns_rerunsBoundedByItAndTheDefaultIsOneRun() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setMaxRuns(3);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.hasRunsLeft(0)).isTrue();
+        assertThat(resolved.hasRunsLeft(1)).isTrue();
+        assertThat(resolved.hasRunsLeft(2)).isFalse();
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(10_800L);
+        assertThat(other.getMaxRuns()).isEqualTo(1);
+        assertThat(other.hasRunsLeft(0)).isFalse();
+    }
+
+    @Test
+    void resolve_typeOverridesRerunAfterSeconds_overrideWinsAndTheRestStaysDefault() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setRerunAfterSeconds(120L);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(120L);
+        assertThat(resolved.getMaxRuns()).isEqualTo(DeliveryTestPolicies.SINGLE_RUN);
+        assertThat(other.getRerunAfterSeconds()).isEqualTo(DeliveryTestPolicies.RERUN_AFTER);
+    }
+
+    @Test
+    void fastTypes_noTypeAskingForTheFastPass_empty() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).isEmpty();
+    }
+
+    @Test
+    void fastTypes_enabledTypeWithFastSweep_thatTypeOnly() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+        properties.setEnabled(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, true, DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
+    }
+
+    @Test
+    void fastTypes_fastTypeSwitchedOff_empty() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).isEmpty();
+    }
+
     @Test
     void isEnabled_typeNotListed_false() {
         // setup

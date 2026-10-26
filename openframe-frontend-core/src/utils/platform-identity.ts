@@ -31,6 +31,7 @@ export const platformDisplayNames = {
   'product-hub': 'Flamingo Product Hub',
   'revenue-hub': 'Flamingo Revenue Hub',
   'people-hub': 'Flamingo People Hub',
+  'coding-hub': 'Flamingo Coding Hub',
   'company-hub': 'Flamingo Company Hub',
   tmcg: 'TMCG',
   mlg: 'Major League GitHub',
@@ -85,11 +86,18 @@ export function getPlatformSlogan(platformName: string): string {
 // ── Colour stems ────────────────────────────────────────────────────────────
 
 /**
- * The six brand/attention colours (plus the neutral) a platform may adopt, named
+ * The six brand/attention colours (plus the two neutrals) a platform may adopt, named
  * by STEM rather than by token so the token spelling has exactly one home below.
  */
 export type OdsColorStem =
-  'flamingo-pink' | 'flamingo-cyan' | 'open-yellow' | 'success' | 'warning' | 'error' | 'text-secondary';
+  | 'flamingo-pink'
+  | 'flamingo-cyan'
+  | 'open-yellow'
+  | 'success'
+  | 'warning'
+  | 'error'
+  | 'text-primary'
+  | 'text-secondary';
 
 /** Stem → ODS token name (without the `--ods-` prefix). THE token spelling. */
 export const ODS_STEM_TOKENS: Record<OdsColorStem, string> = {
@@ -99,6 +107,7 @@ export const ODS_STEM_TOKENS: Record<OdsColorStem, string> = {
   success: 'attention-green-success',
   warning: 'attention-yellow-warning',
   error: 'attention-red-error',
+  'text-primary': 'system-greys-white',
   'text-secondary': 'system-greys-grey',
 };
 
@@ -144,6 +153,12 @@ export const ODS_STEM_CLASSES: Record<OdsColorStem, { text: string; bg: string; 
       bg: 'bg-ods-error',
       bgSoft: 'bg-ods-error/10',
       borderSoft: 'border-ods-error/30',
+    },
+    'text-primary': {
+      text: 'text-ods-text-primary',
+      bg: 'bg-ods-text-primary',
+      bgSoft: 'bg-ods-text-primary/10',
+      borderSoft: 'border-ods-text-primary/30',
     },
     'text-secondary': {
       text: 'text-ods-text-secondary',
@@ -194,6 +209,7 @@ export const PLATFORM_BRAND: Record<PlatformName, PlatformBrand> = {
   'product-hub': { accentStem: 'success', secondaryStem: 'success' },
   'revenue-hub': { accentStem: 'warning', secondaryStem: 'warning' },
   'people-hub': { accentStem: 'flamingo-cyan', secondaryStem: 'flamingo-cyan' },
+  'coding-hub': { accentStem: 'text-primary', secondaryStem: 'text-primary' },
   'company-hub': { accentStem: 'error', secondaryStem: 'error' },
   mlg: { accentStem: 'flamingo-pink', secondaryStem: 'flamingo-cyan' },
   universal: { accentStem: 'text-secondary', secondaryStem: 'text-secondary' },
@@ -276,6 +292,7 @@ export const platformHexColors: Record<PlatformName, string> = {
   'product-hub': '#5ea62e',
   'revenue-hub': '#e1b32f',
   'people-hub': '#5efaf0',
+  'coding-hub': '#fafafa',
   'company-hub': '#f36666',
   tmcg: '#f357bb',
   mlg: '#f357bb',

@@ -140,18 +140,6 @@ public class ScheduleScriptDeviceService {
         log.info("Removed {} device(s) from script schedule id={} tenantId={}", removed, scheduleId, tenantId);
     }
 
-    public void removeDeviceFromAllSchedules(String tenantId, String machineId) {
-        if (tenantId == null || machineId == null) {
-            return;
-        }
-        long removed = assignedRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
-        onlineDeviceDispatchRepository.deleteByTenantIdAndMachineId(tenantId, machineId);
-        if (removed > 0) {
-            log.info("Removed deleted device {} from {} schedule assignment(s) tenantId={}",
-                    machineId, removed, tenantId);
-        }
-    }
-
     private void armDeviceOnline(String tenantId, ScheduleScript schedule, Collection<String> machineIds) {
         if (schedule.getTrigger() != ScheduleScriptTrigger.DEVICE_ONLINE || machineIds.isEmpty()) {
             return;

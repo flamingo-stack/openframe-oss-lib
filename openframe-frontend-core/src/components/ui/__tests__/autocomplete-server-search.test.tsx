@@ -72,7 +72,7 @@ describe('Autocomplete with onSearchChange', () => {
 
     rerender(<Autocomplete {...props} options={[]} loading />);
     expect(optionLabels()).toEqual(['Alice', 'Bob', 'Carol']);
-    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(screen.queryByText('No users')).not.toBeInTheDocument();
 
     rerender(<Autocomplete {...props} options={[]} />);
