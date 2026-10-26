@@ -4,6 +4,7 @@ import com.mongodb.MongoException;
 import com.mongodb.MongoNodeIsRecoveringException;
 import com.mongodb.MongoNotPrimaryException;
 import com.mongodb.MongoSocketException;
+import com.mongodb.MongoSocketReadTimeoutException;
 import com.mongodb.MongoTimeoutException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -20,18 +21,17 @@ public final class MongoUnavailability {
     private MongoUnavailability() {
     }
 
-    // Network errors, no server to select, a primary stepping down or recovering, and errors Mongo labels as transient.
+    // The whole cause chain, because Spring wraps the driver's exception in a DataAccessResourceFailureException.
     public static boolean isMongoUnavailable(Throwable failure) {
+        boolean unavailable = false;
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            // A write conflict is the caller's own failure, even when Mongo labels it transient.
-            if (cause instanceof OptimisticLockingFailureException) {
+            // A write conflict is the caller's own failure; a read timeout is a slow query, retried forever.
+            if (cause instanceof OptimisticLockingFailureException || cause instanceof MongoSocketReadTimeoutException) {
                 return false;
             }
-            if (isUnavailability(cause)) {
-                return true;
-            }
+            unavailable = unavailable || isUnavailability(cause);
         }
-        return false;
+        return unavailable;
     }
 
     private static boolean isUnavailability(Throwable cause) {

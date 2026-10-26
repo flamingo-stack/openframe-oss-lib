@@ -2,7 +2,6 @@ package com.openframe.processing.runner;
 
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
-import com.openframe.processing.mode.ProcessingModes;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
@@ -26,11 +25,10 @@ import java.util.stream.Collectors;
 public class ProjectionRunner {
 
     private final Map<String, List<Projection<?, ?>>> projectionsByType;
-    private final ProcessingModes modes;
     private final EventProcessingMetrics metrics;
 
     // Sorted by name: the projections run, and the first failure is chosen, in the same order on every pod.
-    public ProjectionRunner(AggregateSpecRegistry specRegistry, ProcessingModes modes, EventProcessingMetrics metrics) {
+    public ProjectionRunner(AggregateSpecRegistry specRegistry, EventProcessingMetrics metrics) {
         Comparator<Projection<?, ?>> byName = Comparator.comparing(Projection::name);
         Map<String, List<Projection<?, ?>>> byType = new HashMap<>();
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
@@ -42,7 +40,6 @@ public class ProjectionRunner {
             byType.put(type, sorted);
         }
         this.projectionsByType = Map.copyOf(byType);
-        this.modes = modes;
         this.metrics = metrics;
     }
 
@@ -61,7 +58,6 @@ public class ProjectionRunner {
 
         List<Projection<?, ?>> projections = projectionsByType.getOrDefault(type, List.of());
         Map<String, Throwable> failures = projections.stream()
-            .filter(this::shouldRun)
             .flatMap(projection -> applyProjection(projection, aggregateId, record).stream())
             .collect(Collectors.toMap(
                 ProjectionFailure::getProjectionName,
@@ -71,15 +67,6 @@ public class ProjectionRunner {
         if (!failures.isEmpty()) {
             throw new EventProcessingFailedException(failures);
         }
-    }
-
-    private boolean shouldRun(Projection<?, ?> projection) {
-        String name = projection.name();
-        boolean runs = modes.runsProjection(name);
-        if (!runs) {
-            log.debug("Projection {} skipped: mode aspect", name);
-        }
-        return runs;
     }
 
     // Empty on success; Mongo down stops the stream; any Error but a broken JVM (StackOverflowError too) is the projection's.
