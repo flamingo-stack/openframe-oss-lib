@@ -6,6 +6,7 @@ import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
 import com.openframe.data.repository.ticket.publishing.TicketOnTimeEntriesProjection;
 import com.openframe.data.repository.timetracking.TimeEntryProjectionRepository;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.persistence.OutboxEvent;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,7 +117,7 @@ class TicketPublishingIT {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class,
+    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class,
             OutboxAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = TicketRepository.class)
     @Import({TicketAggregateSpec.class, TicketOnTimeEntriesProjection.class, TimeEntryProjectionRepository.class,

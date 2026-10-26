@@ -15,8 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PublishedAggregateConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-            .withUserConfiguration(EventsConfiguration.class, AggregateSpecRegistry.class,
-                    PublishedAggregateStartupCheck.class, PublishedAggregateTopics.class)
+            .withUserConfiguration(EventsAutoConfiguration.class, AggregateSpecRegistry.class,
+                    PublishedAggregateStartupCheck.class)
             .withPropertyValues("openframe.events.enabled=true");
 
     @Test

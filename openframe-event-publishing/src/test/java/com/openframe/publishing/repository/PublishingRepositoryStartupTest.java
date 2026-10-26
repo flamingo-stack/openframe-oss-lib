@@ -2,10 +2,10 @@ package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.OutboxPublisher;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.EventsConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.config.OutboxIndexAutoConfiguration;
-import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.fixture.Widgets.UnversionedWidget;
 import com.openframe.publishing.fixture.Widgets.UnversionedWidgetSpec;
 import com.openframe.publishing.fixture.Widgets.Widget;
@@ -40,7 +40,7 @@ class PublishingRepositoryStartupTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(MongoAutoConfiguration.class, DataMongoAutoConfiguration.class,
-                    AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class))
+                    AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class, OutboxAutoConfiguration.class))
             .withPropertyValues("spring.mongodb.uri=mongodb://localhost:1/startup-test", "spring.data.mongodb.enabled=true",
                     "openframe.events.enabled=true");
 
@@ -82,7 +82,7 @@ class PublishingRepositoryStartupTest {
     void publishingSwitchedOff_leavesAPlainRepository_andNoPublishingBeans() {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(MongoAutoConfiguration.class, DataMongoAutoConfiguration.class,
-                        AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class,
+                        AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class, OutboxAutoConfiguration.class,
                         OutboxIndexAutoConfiguration.class))
                 .withPropertyValues("spring.mongodb.uri=mongodb://localhost:1/startup-test", "spring.data.mongodb.enabled=true")
                 .withUserConfiguration(UnversionedWidgetRepositories.class)
@@ -188,7 +188,7 @@ class PublishingRepositoryStartupTest {
 
     // Everything of OutboxAutoConfiguration except PublishingRepositoryPostProcessor.
     @Configuration
-    @Import({EventsConfiguration.class, PublishedAggregateTopics.class, OutboxPublisher.class,
+    @Import({EventsAutoConfiguration.class, EventsConfiguration.class, OutboxPublisher.class,
             AggregateSpecRegistry.class, PublishingRepositoryStartupCheck.class})
     static class WithoutPostProcessor {
     }
