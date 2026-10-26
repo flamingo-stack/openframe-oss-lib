@@ -5,7 +5,7 @@ import { DEMO_NOW, demoMinutesAgo } from './shared';
 function tenant(
   organization: DemoOrganization,
   provider: TenantRow['provider'],
-  rest: Pick<TenantRow, 'accessState' | 'userCount' | 'lastReadAt'>,
+  rest: Pick<TenantRow, 'accessState' | 'userCount' | 'unattributedUserCount' | 'lastReadAt'>,
   /** Other customers the same directory serves. */
   sharedWith: readonly DemoOrganization[] = [],
 ): TenantRow {
@@ -27,7 +27,8 @@ export interface CloudTenantsFixture {
 
 /**
  * The three customers' directories, a Microsoft 365 and a Google Workspace tenant each: all connected with write
- * access but one that lost its connection. Acme's Microsoft 365 directory also serves Harbor.
+ * access but one that lost its connection. Acme's Microsoft 365 directory also serves Harbor, and its rules leave a
+ * few accounts to no customer.
  */
 export function buildCloudTenantsFixture(cast: DemoCast): CloudTenantsFixture {
   return {
@@ -38,6 +39,7 @@ export function buildCloudTenantsFixture(cast: DemoCast): CloudTenantsFixture {
         {
           accessState: 'WRITE_ENABLED',
           userCount: 212,
+          unattributedUserCount: 14,
           lastReadAt: demoMinutesAgo(9),
         },
         [cast.organization('harbor')],

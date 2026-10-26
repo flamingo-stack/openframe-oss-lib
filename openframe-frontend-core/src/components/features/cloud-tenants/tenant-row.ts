@@ -17,6 +17,8 @@ export interface TenantRow {
   customers: readonly TenantCustomer[];
   /** Users read from the directory; absent before the first read. */
   userCount?: number | null;
+  /** Of those, the users no customer's rule claims; absent before the first read. */
+  unattributedUserCount?: number | null;
   /** What the last access probe found (`WRITE_ENABLED`, `DISCONNECTED`, ...). */
   accessState: string;
   /** When the directory was last read; absent when it never was. */

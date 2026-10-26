@@ -3,21 +3,27 @@
 import { useLoadingScope } from '../../ui/loading-scope';
 import { SquareAvatar } from '../../ui/square-avatar';
 import { TruncateText } from '../../ui/truncate-text';
-import { TENANT_EMPTY_VALUE, usersCountLabel } from './tenant-presentation';
+import { TENANT_EMPTY_VALUE, unattributedLabel, usersCountLabel } from './tenant-presentation';
 import type { TenantCustomer } from './tenant-row';
 
 export interface TenantCustomerCellProps {
   /** Earliest attached first: the cell names the first and counts the rest. */
   customers: readonly TenantCustomer[];
   userCount?: number | null;
+  /** Users no customer's rule claims: while there are any, the count line says how many, in the warning colour. */
+  unattributedUserCount?: number | null;
 }
 
-/** CUSTOMERS column: the first customer's logo + name and "+N" for the rest, over the synced user count. */
-export function TenantCustomerCell({ customers, userCount }: TenantCustomerCellProps) {
+/**
+ * CUSTOMERS column: the first customer's logo + name and "+N" for the rest, over the synced user count — or
+ * "30 of 412 unattributed" while some users belong to no customer.
+ */
+export function TenantCustomerCell({ customers, userCount, unattributedUserCount }: TenantCustomerCellProps) {
   // While the tenant is read (a loading scope) the user count is a bar too (its label is never empty).
   const loading = useLoadingScope();
   const [first] = customers;
   const more = customers.length - 1;
+  const unattributed = unattributedLabel(unattributedUserCount, userCount);
   return (
     <div className="flex min-w-0 flex-col justify-center">
       {first ? (
@@ -35,8 +41,13 @@ export function TenantCustomerCell({ customers, userCount }: TenantCustomerCellP
       ) : (
         <TruncateText>{TENANT_EMPTY_VALUE}</TruncateText>
       )}
-      <TruncateText variant="h6" tone="secondary" loading={loading}>
-        {usersCountLabel(userCount)}
+      <TruncateText
+        variant="h6"
+        tone="secondary"
+        loading={loading}
+        className={unattributed ? 'text-ods-warning' : undefined}
+      >
+        {unattributed ?? usersCountLabel(userCount)}
       </TruncateText>
     </div>
   );

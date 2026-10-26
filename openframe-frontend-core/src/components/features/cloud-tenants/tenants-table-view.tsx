@@ -100,7 +100,11 @@ export function TenantsTableView({
         id: TENANT_COLUMNS.customer.id,
         header: TENANT_COLUMNS.customer.header,
         cell: ({ row }: { row: Row<TenantRow> }) => (
-          <TenantCustomerCell customers={row.original.customers} userCount={row.original.userCount} />
+          <TenantCustomerCell
+            customers={row.original.customers}
+            userCount={row.original.userCount}
+            unattributedUserCount={row.original.unattributedUserCount}
+          />
         ),
         enableSorting: false,
         meta: columnMeta(TENANT_COLUMNS.customer),

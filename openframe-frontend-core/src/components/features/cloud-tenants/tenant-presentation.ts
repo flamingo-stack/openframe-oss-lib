@@ -109,3 +109,15 @@ export function usersCountLabel(count: number | null | undefined): string {
   if (count == null) return TENANT_EMPTY_VALUE;
   return `${count} ${count === 1 ? 'User' : 'Users'}`;
 }
+
+/**
+ * "30 of 412 unattributed" while some synced users belong to no customer (no customer's rule claims them), or `null`
+ * while every user is attributed or nothing has been read.
+ */
+export function unattributedLabel(
+  unattributed: number | null | undefined,
+  users: number | null | undefined,
+): string | null {
+  if (unattributed == null || unattributed <= 0) return null;
+  return users == null ? `${unattributed} unattributed` : `${unattributed} of ${users} unattributed`;
+}

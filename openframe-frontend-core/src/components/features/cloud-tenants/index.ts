@@ -17,6 +17,7 @@ export {
   lastReadAt,
   providerMark,
   TENANT_EMPTY_VALUE,
+  unattributedLabel,
   usersCountLabel,
 } from './tenant-presentation';
 export type {
