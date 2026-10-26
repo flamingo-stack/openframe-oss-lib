@@ -46,7 +46,7 @@ public class PublishedEventListeners implements KafkaListenerConfigurer {
             if (!publishedTopics.isPublishing(type)) {
                 continue;
             }
-            Class<?> eventClass = PublishedDocuments.eventClassOf(spec);
+            Class<?> eventClass = PublishedDocuments.resolveEventClass(spec);
             PublishedTypeListener listener = new PublishedTypeListener(type, eventClass, envelopeMapper, runner);
             String topic = EventTopicNames.topicOf(topicPrefix, type);
             PublishedTypeEndpoint endpoint = new PublishedTypeEndpoint(LISTENER_ID_PREFIX + type, groupPrefix + type, topic,

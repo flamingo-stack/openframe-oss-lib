@@ -38,7 +38,7 @@ public class PublishedDocuments {
     }
 
     // The event class a spec names, the class its records are read into.
-    public static Class<?> eventClassOf(AggregateSpec<?, ?> spec) {
+    public static Class<?> resolveEventClass(AggregateSpec<?, ?> spec) {
         Class<?> specClass = ClassUtils.getUserClass(spec);
         ResolvableType specType = ResolvableType.forClass(specClass).as(AggregateSpec.class);
         return specType.getGeneric(EVENT_TYPE_ARGUMENT).resolve();
