@@ -12,7 +12,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-// Without a broker: the two switches, and the settings a creator cannot start without.
+// Without a broker: the switch, and the settings a creator cannot start without.
 class EventTopicsAutoConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
@@ -23,36 +23,22 @@ class EventTopicsAutoConfigurationTest {
 
     @Test
     void topicCreation_isOffByDefault() {
-        runner.run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(EventTopicCreator.class));
-    }
-
-    @Test
-    void processingOff_createsNoTopics_evenWithTopicCreationOn() {
-        runner.withPropertyValues("openframe.events.processing.kafka.topics.create=true",
-                        "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
+        runner.withPropertyValues("openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                         "openframe.events.processing.kafka.topic-prefix=events.")
-                .run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(EventTopicCreator.class));
-    }
-
-    @Test
-    void processingOn_withTopicCreationOff_createsNoTopics() {
-        runner.withPropertyValues("openframe.events.processing.enabled=true")
                 .run(context -> assertThat(context).hasNotFailed().doesNotHaveBean(EventTopicCreator.class));
     }
 
     @Test
     void aMissingBootstrapServers_stopsTheService() {
-        runner.withPropertyValues("openframe.events.processing.enabled=true",
-                        "openframe.events.processing.kafka.topics.create=true",
+        runner.withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.topic-prefix=events.")
                 .run(context -> assertThat(context).hasFailed().getFailure()
-                        .hasStackTraceContaining("bootstrap-servers is required when topic creation is on"));
+                        .hasStackTraceContaining("bootstrap-servers is required when openframe.events.enabled is on"));
     }
 
     @Test
     void aMissingTopicPrefix_stopsTheService() {
-        runner.withPropertyValues("openframe.events.processing.enabled=true",
-                        "openframe.events.processing.kafka.topics.create=true",
+        runner.withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092")
                 .run(context -> assertThat(context).hasFailed().getFailure()
                         .hasStackTraceContaining("openframe.events.processing.kafka.topic-prefix is required"));

@@ -42,7 +42,7 @@ class EventProcessingKafkaAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
             .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
             .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
-            .withPropertyValues("openframe.events.processing.enabled=true",
+            .withPropertyValues("openframe.events.enabled=true",
                     "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                     "openframe.events.processing.kafka.topic-prefix=events.",
                     "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
@@ -110,7 +110,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
                 .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
-                .withPropertyValues("openframe.events.processing.enabled=true",
+                .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                         "openframe.events.processing.kafka.topic-prefix=events.")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
@@ -148,7 +148,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
                 .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
-                .withPropertyValues("openframe.events.processing.enabled=true",
+                .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.topic-prefix=events.",
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
@@ -170,7 +170,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
                 .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
-                .withPropertyValues("openframe.events.processing.enabled=true",
+                .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
                     "openframe.events.processing.kafka.topic-prefix=events.",
                         "openframe.events.processing.kafka.group-prefix=openframe-saas-stream.processing-",
