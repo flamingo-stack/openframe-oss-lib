@@ -18,7 +18,7 @@ class EventTopicsAutoConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(EventTopicsAutoConfiguration.class))
             .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
-            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
+            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
             .withBean(WidgetSpec.class, () -> new WidgetSpec(List.of(new RecordingProjection("widget-on-organizations"))));
 
     @Test

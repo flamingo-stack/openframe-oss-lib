@@ -32,8 +32,8 @@ import java.time.Clock;
 @ConditionalOnBooleanProperty(name = "openframe.events.enabled")
 @EnableMongoRepositories(basePackageClasses = {EventJobRepository.class, ProjectionTaskRepository.class})
 @EnableConfigurationProperties({EventBackfillProperties.class, ReconciliationProperties.class, ProjectionTaskProperties.class})
-@Import({EventJobRunIndexInitializer.class, BackfillConfiguration.class, ReconciliationConfiguration.class,
-        ProjectionTaskConfiguration.class})
+@Import({EventJobRunIndexInitializer.class, ProjectionTaskIndexInitializer.class, BackfillConfiguration.class,
+        ReconciliationConfiguration.class, ProjectionTaskConfiguration.class})
 public class EventJobsAutoConfiguration {
 
     // Ours, not a LockingTaskExecutor bean, so a service's own ShedLock setup stays as it is.

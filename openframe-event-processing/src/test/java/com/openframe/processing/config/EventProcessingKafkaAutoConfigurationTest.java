@@ -40,7 +40,7 @@ class EventProcessingKafkaAutoConfigurationTest {
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                     EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
             .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
-            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
+            .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
             .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
             .withPropertyValues("openframe.events.enabled=true",
                     "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
@@ -85,7 +85,7 @@ class EventProcessingKafkaAutoConfigurationTest {
     // The stream reads the same publish switch as the publishing services: a type nobody publishes has no topic to read.
     @Test
     void aTypeWhosePublishIsOff_getsNoListener() {
-        runner.withPropertyValues("openframe.events.topics.organizations.publish=false").run(context -> {
+        runner.withPropertyValues("openframe.events.topics.organizations.enabled=false").run(context -> {
             KafkaListenerEndpointRegistry registry = context.getBean(KafkaListenerEndpointRegistry.class);
             assertThat(registry.getListenerContainers()).isEmpty();
         });
@@ -108,7 +108,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
                 .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
-                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",
@@ -146,7 +146,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
                 .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
-                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.topic-prefix=events.",
@@ -168,7 +168,7 @@ class EventProcessingKafkaAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
                 .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
-                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.publish=true")
+                .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
                         "openframe.events.processing.kafka.bootstrap-servers=localhost:9092",

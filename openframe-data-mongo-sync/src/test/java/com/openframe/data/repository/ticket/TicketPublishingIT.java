@@ -39,8 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // Tenant plane, where TicketRepository exists: a save and the custom updateTitle both publish.
 @SpringBootTest(classes = TicketPublishingIT.TestApplication.class,
-        properties = {"openframe.events.topics.tickets.publish=true", "spring.data.mongodb.enabled=true",
-                "openframe.events.publishing.enabled=true", "openframe.tenant-isolation.enabled=true"})
+        properties = {"openframe.events.topics.tickets.enabled=true", "spring.data.mongodb.enabled=true",
+                "openframe.events.enabled=true", "openframe.tenant-isolation.enabled=true"})
 @Testcontainers
 @Tag("integration")
 @EnabledIfSystemProperty(named = "integration.tests", matches = "true")

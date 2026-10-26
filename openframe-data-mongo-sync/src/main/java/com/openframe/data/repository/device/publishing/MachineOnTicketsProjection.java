@@ -87,43 +87,45 @@ public class MachineOnTicketsProjection implements Projection<MachineEvent, Tick
 
         Set<String> tenantIds = withDevice.stream().map(TicketDeviceView::getTenantId).collect(toSet());
         Set<String> machineIds = withDevice.stream().map(TicketDeviceView::getDeviceId).collect(toSet());
-        Map<TenantScopedId, String> hostnames = findHostnames(tenantIds, machineIds);
+        Map<TenantScopedId, Machine> machines = findMachines(tenantIds, machineIds);
 
         List<Mismatch> mismatches = withDevice.stream()
-            .map(ticket -> toMismatch(ticket, hostnames))
+            .map(ticket -> toMismatch(ticket, machines))
             .filter(Objects::nonNull)
             .toList();
         return new ReconciliationResult(mismatches);
     }
 
-    // The current hostname of every machine of the batch, in one query.
-    private Map<TenantScopedId, String> findHostnames(Set<String> tenantIds, Set<String> machineIds) {
-        Map<TenantScopedId, String> hostnames = new HashMap<>();
+    // Every machine of the batch, in one query: its hostname to compare, its _id to publish again.
+    private Map<TenantScopedId, Machine> findMachines(Set<String> tenantIds, Set<String> machineIds) {
+        Map<TenantScopedId, Machine> machines = new HashMap<>();
         for (Machine machine : machineRepository.findByTenantIdInAndMachineIdIn(tenantIds, machineIds)) {
             String tenantId = machine.getTenantId();
             String machineId = machine.getMachineId();
             TenantScopedId key = new TenantScopedId(tenantId, machineId);
-            String hostname = machine.getHostname();
-            hostnames.put(key, hostname);
+            machines.put(key, machine);
         }
-        return hostnames;
+        return machines;
     }
 
     // Null when the copy matches its machine.
-    private static Mismatch toMismatch(TicketDeviceView ticket, Map<TenantScopedId, String> hostnames) {
+    private static Mismatch toMismatch(TicketDeviceView ticket, Map<TenantScopedId, Machine> machines) {
         String tenantId = ticket.getTenantId();
         String ticketId = ticket.getId();
         String machineId = ticket.getDeviceId();
         TenantScopedId key = new TenantScopedId(tenantId, machineId);
-        if (!hostnames.containsKey(key)) {
-            return new Mismatch(tenantId, ticketId, "machine " + machineId + " is gone");
+        Machine machine = machines.get(key);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
+        if (machine == null) {
+            return null;
         }
-        String sourceHostname = hostnames.get(key);
+        String sourceHostname = machine.getHostname();
         String copiedHostname = ticket.getDeviceHostname();
         if (Objects.equals(sourceHostname, copiedHostname)) {
             return null;
         }
-        return new Mismatch(tenantId, ticketId,
+        String sourceId = machine.getId();
+        return new Mismatch(tenantId, ticketId, sourceId,
             "hostname \"" + copiedHostname + "\" differs from machine's \"" + sourceHostname + "\"");
     }
 }

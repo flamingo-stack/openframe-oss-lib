@@ -221,7 +221,7 @@ class ProjectionRunnerTest {
     @Test
     void anEventThatChangesNothing_isNotApplied_butItsVersionIsStored() {
         onTickets.changes = 0;
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(false));
 
             assertThat(onTickets.records).isEmpty();
@@ -390,7 +390,7 @@ class ProjectionRunnerTest {
 
     @Test
     void aDelete_reachesTheProjection_andNeverApply() {
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(true));
 
             assertThat(onTickets.deletedAggregateIds).containsExactly("organization-document-1");
@@ -401,7 +401,7 @@ class ProjectionRunnerTest {
     @Test
     void anOlderDelete_isSkipped() {
         when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             process(context, record(true));
 
             assertThat(onTickets.deletedAggregateIds).isEmpty();

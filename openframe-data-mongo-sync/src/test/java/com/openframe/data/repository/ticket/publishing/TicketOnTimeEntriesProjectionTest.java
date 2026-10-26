@@ -55,7 +55,7 @@ class TicketOnTimeEntriesProjectionTest {
     }
 
     @Test
-    void anOldTitle_andAGoneTicket_areMismatches_eachInItsOwnTenant() {
+    void anOldTitle_isAMismatch_inItsOwnTenant_butAGoneTicketKeepsItsCopy() {
         // setup
         when(ticketProjectionRepository.findTitles(Set.of("tenant-a", "tenant-b"), Set.of("ticket-1", "ticket-gone")))
                 .thenReturn(List.of(buildTicket("tenant-a", "ticket-1", "Printer jam"), buildTicket("tenant-b", "ticket-1", "Other")));
@@ -67,7 +67,8 @@ class TicketOnTimeEntriesProjectionTest {
                 new TimeEntryTicketView("e3", "tenant-a", "ticket-gone", "Gone")));
 
         // verifications
-        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("e2", "e3");
+        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("e2");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("ticket-1");
     }
 
     @Test

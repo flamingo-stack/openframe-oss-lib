@@ -54,7 +54,7 @@ class UserOnTicketsProjectionTest {
     }
 
     @Test
-    void anOldAssigneeName_anOldResolverName_andAGoneUser_areMismatches() {
+    void anOldAssigneeName_andAnOldResolverName_areMismatches_butAGoneUserKeepsItsCopy() {
         // setup
         when(userRepository.findByTenantIdInAndIdIn(Set.of("tenant-a"), Set.of("user-1", "user-gone")))
                 .thenReturn(List.of(buildUser("tenant-a", "user-1", "Ada", "Lovelace")));
@@ -67,8 +67,8 @@ class UserOnTicketsProjectionTest {
                 buildTicket("t4", "tenant-a", "user-gone", "Gone", null, null)));
 
         // verifications
-        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2", "t3", "t4");
-        assertThat(result.getMismatches().get(2).getReason()).contains("user-gone").contains("gone");
+        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t2", "t3");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("user-1", "user-1");
     }
 
     @Test

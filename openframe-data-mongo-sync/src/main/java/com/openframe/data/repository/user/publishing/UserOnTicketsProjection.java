@@ -137,13 +137,14 @@ public class UserOnTicketsProjection implements Projection<UserEvent, TicketUser
     private static Mismatch toMismatch(String tenantId, String ticketId, String userId, String copiedName,
                                        Map<TenantScopedId, String> names) {
         TenantScopedId key = new TenantScopedId(tenantId, userId);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
         if (!names.containsKey(key)) {
-            return new Mismatch(tenantId, ticketId, "user " + userId + " is gone");
+            return null;
         }
         String sourceName = names.get(key);
         if (sourceName.isEmpty() || Objects.equals(sourceName, copiedName)) {
             return null;
         }
-        return new Mismatch(tenantId, ticketId, "name \"" + copiedName + "\" differs from user's \"" + sourceName + "\"");
+        return new Mismatch(tenantId, ticketId, userId, "name \"" + copiedName + "\" differs from user's \"" + sourceName + "\"");
     }
 }

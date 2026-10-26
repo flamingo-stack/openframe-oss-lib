@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-// Creates the missing topic and DLT of each type whose publish switch is on, before the listeners; never changes one.
+// Creates the missing topic and DLT of each type that is switched on, before the listeners; never changes one.
 // A plain AdminClient, not NewTopic beans: every KafkaAdmin in the context (Spring Boot's, the stream's saasKafkaAdmin) would create those too.
 @Slf4j
 @RequiredArgsConstructor
@@ -66,7 +66,7 @@ public class EventTopicCreator implements SmartInitializingSingleton {
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String typeName = spec.getType();
             if (!publishedTopics.isPublishing(typeName)) {
-                log.info("No event topic for {}: openframe.events.topics.{}.publish is off", typeName, typeName);
+                log.info("No event topic for {}: openframe.events.topics.{}.enabled is off", typeName, typeName);
                 continue;
             }
             String topic = EventTopicNames.topicOf(topicPrefix, typeName);

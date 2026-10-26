@@ -115,14 +115,16 @@ public class TicketOnTimeEntriesProjection implements Projection<TicketEvent, Ti
         String timeEntryId = timeEntry.getId();
         String ticketId = timeEntry.getTicketId();
         TenantScopedId key = new TenantScopedId(tenantId, ticketId);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
         if (!titles.containsKey(key)) {
-            return new Mismatch(tenantId, timeEntryId, "ticket " + ticketId + " is gone");
+            return null;
         }
         String sourceTitle = titles.get(key);
         String copiedTitle = timeEntry.getTicketTitle();
         if (Objects.equals(sourceTitle, copiedTitle)) {
             return null;
         }
-        return new Mismatch(tenantId, timeEntryId, "title \"" + copiedTitle + "\" differs from ticket's \"" + sourceTitle + "\"");
+        return new Mismatch(tenantId, timeEntryId, ticketId,
+            "title \"" + copiedTitle + "\" differs from ticket's \"" + sourceTitle + "\"");
     }
 }

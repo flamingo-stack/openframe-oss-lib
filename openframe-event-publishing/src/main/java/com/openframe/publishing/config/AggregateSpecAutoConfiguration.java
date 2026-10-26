@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Import;
 
-// Without the publish switch: the stream reads the specs and the per-type publish switches with publishing off too.
+// Without openframe.events.enabled: the aspects read the per-type switches with the feature off too.
 @AutoConfiguration
 @ConditionalOnBooleanProperty(name = "spring.data.mongodb.enabled")
 @EnableConfigurationProperties(EventsProperties.class)
