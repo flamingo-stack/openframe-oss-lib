@@ -152,7 +152,7 @@ impl ClientUpdateListener {
         let version = update_msg.version.clone();
         let message = Arc::new(message);
         let keep_alive = Self::keep_alive(message.clone());
-        let outcome = self.update_service.apply(&update_msg, slot).await;
+        let outcome = self.update_service.apply(&update_msg, None, slot).await;
         keep_alive.abort();
 
         match outcome {

@@ -8,12 +8,14 @@ use crate::config::updater_config::{
     BOOT_MARKER_POLL_INTERVAL_SECS, BOOT_MARKER_WAIT_SECS, CLIENT_SERVICE_FULL_NAME,
     DOWNLOAD_CLIENT_TIMEOUT_SECS, SERVICE_START_VERIFY_WAIT_SECS,
 };
-use crate::listener::ClientUpdateListener;
-use crate::models::UpdaterPhase;
+use crate::listener::{ClientUpdateDeliveryListener, ClientUpdateListener};
+use crate::models::{DeliveryRef, DeliveryResultMessage, UpdaterPhase};
 use crate::platform::DirectoryManager;
 use crate::services::boot_marker_service::BootMarkerService;
 use crate::services::client_binary::{self, Restore};
 use crate::services::client_drain::ClientDrain;
+use crate::services::delivery_ledger::DeliveryLedger;
+use crate::services::delivery_reporter::DeliveryReporter;
 use crate::services::token_provider::TokenProvider;
 use crate::services::{
     AgentConfigurationService, ClientUpdateService, GithubDownloadService,
@@ -23,15 +25,15 @@ use crate::services::{
 
 /// Outcome of crash recovery — recovery itself is purely local; the report is
 /// published once NATS is up.
-enum RecoveryReport {
-    Success {
-        version: String,
-    },
-    Failure {
-        version: String,
-        reason: String,
-        rolled_back: bool,
-    },
+struct RecoveryReport {
+    version: String,
+    delivery: Option<DeliveryRef>,
+    outcome: RecoveryOutcome,
+}
+
+enum RecoveryOutcome {
+    Success,
+    Failure { reason: String, rolled_back: bool },
 }
 
 pub struct UpdaterOrchestrator {
@@ -142,22 +144,13 @@ impl UpdaterOrchestrator {
             .await
             .context("Failed to read machine_id")?;
 
-        let progress_publisher = UpdateProgressPublisher::new(nats_publisher, machine_id.clone());
+        let progress_publisher =
+            UpdateProgressPublisher::new(nats_publisher.clone(), machine_id.clone());
+        let ledger = DeliveryLedger::new(&self.dir_manager);
+        let reporter = DeliveryReporter::new(nats_publisher, ledger.clone(), &machine_id);
 
-        match recovery_report {
-            Some(RecoveryReport::Success { version }) => {
-                progress_publisher.publish_success(&version).await;
-            }
-            Some(RecoveryReport::Failure {
-                version,
-                reason,
-                rolled_back,
-            }) => {
-                progress_publisher
-                    .publish_failure(&UpdaterPhase::Failed, &version, &reason, rolled_back)
-                    .await;
-            }
-            None => {}
+        if let Some(report) = recovery_report {
+            Self::publish_recovery(report, &progress_publisher, &reporter, &ledger).await;
         }
 
         progress_publisher.publish_updater_version().await;
@@ -172,14 +165,69 @@ impl UpdaterOrchestrator {
             ClientDrain::new(&self.dir_manager),
         );
 
-        let listener =
-            ClientUpdateListener::new(nats_manager, update_service, agent_config_service);
+        reporter.start_resend_loop();
+        let stream_listener = ClientUpdateListener::new(
+            nats_manager.clone(),
+            update_service.clone(),
+            agent_config_service.clone(),
+        )
+        .start()
+        .await;
+        let delivery_listener = ClientUpdateDeliveryListener::new(
+            nats_manager,
+            update_service,
+            agent_config_service,
+            reporter,
+            ledger,
+        )
+        .start()
+        .await;
 
         info!("Updater ready — listening for update commands");
-        let handle = listener.start().await;
-        handle.await.ok();
+        let _ = tokio::join!(stream_listener, delivery_listener);
 
         Ok(())
+    }
+
+    async fn publish_recovery(
+        report: RecoveryReport,
+        progress_publisher: &UpdateProgressPublisher,
+        reporter: &DeliveryReporter,
+        ledger: &DeliveryLedger,
+    ) {
+        match &report.outcome {
+            RecoveryOutcome::Success => progress_publisher.publish_success(&report.version).await,
+            RecoveryOutcome::Failure {
+                reason,
+                rolled_back,
+            } => {
+                progress_publisher
+                    .publish_failure(&UpdaterPhase::Failed, &report.version, reason, *rolled_back)
+                    .await
+            }
+        }
+
+        // A delivery-engine update the crash interrupted is answered now.
+        let Some(delivery) = report.delivery else {
+            return;
+        };
+        let result = match report.outcome {
+            RecoveryOutcome::Success => {
+                if let Some(sequence) = delivery.sequence {
+                    if let Err(e) = ledger.record_applied(sequence) {
+                        warn!(
+                            "Crash recovery: failed to record the applied sequence: {:#}",
+                            e
+                        );
+                    }
+                }
+                DeliveryResultMessage::done(delivery)
+            }
+            RecoveryOutcome::Failure { reason, .. } => {
+                DeliveryResultMessage::failed(delivery, reason)
+            }
+        };
+        reporter.settle(result).await;
     }
 
     async fn recover_from_crash(
@@ -213,7 +261,7 @@ impl UpdaterOrchestrator {
         let version = &state.target_version;
         let target = ServiceManagerService::client_binary_path();
 
-        let report = match state.phase {
+        let outcome = match state.phase {
             UpdaterPhase::Idle
             | UpdaterPhase::Downloading
             | UpdaterPhase::Verifying
@@ -221,21 +269,20 @@ impl UpdaterOrchestrator {
                 if let Some(path) = &state.downloaded_binary_path {
                     client_binary::remove_quietly(path, "temp binary");
                 }
-                let report = RecoveryReport::Failure {
-                    version: version.clone(),
+                let outcome = RecoveryOutcome::Failure {
                     reason: "Updater crashed before stopping service — no changes made".to_string(),
                     rolled_back: false,
                 };
                 state_service.clear()?;
-                Some(report)
+                Some(outcome)
             }
 
             UpdaterPhase::StoppingService | UpdaterPhase::ReplacingBinary => {
-                let report = self
-                    .restore_and_start(&state.backup_path, &target, version, boot_marker)
+                let outcome = self
+                    .restore_and_start(&state.backup_path, &target, boot_marker)
                     .await;
                 state_service.clear()?;
-                Some(report)
+                Some(outcome)
             }
 
             // The boot marker was cleared before StartingService, so in these
@@ -279,21 +326,19 @@ impl UpdaterOrchestrator {
                     warn!("Crash recovery: service state unknown after retries — trusting the boot marker");
                 }
 
-                let report = if verified && running != Some(false) {
+                let outcome = if verified && running != Some(false) {
                     info!("Crash recovery: boot marker matches target and service is running — marking success");
-                    RecoveryReport::Success {
-                        version: version.clone(),
-                    }
+                    RecoveryOutcome::Success
                 } else {
                     warn!(
                         "Crash recovery: not healthy (marker verified: {}, running: {:?}) — restoring the previous binary",
                         verified, running
                     );
-                    self.restore_and_start(&state.backup_path, &target, version, boot_marker)
+                    self.restore_and_start(&state.backup_path, &target, boot_marker)
                         .await
                 };
                 state_service.clear()?;
-                Some(report)
+                Some(outcome)
             }
 
             UpdaterPhase::Completed | UpdaterPhase::Failed => {
@@ -303,18 +348,20 @@ impl UpdaterOrchestrator {
             }
         };
 
-        Ok(report)
+        Ok(outcome.map(|outcome| RecoveryReport {
+            version: state.target_version.clone(),
+            delivery: state.delivery.clone(),
+            outcome,
+        }))
     }
 
     async fn restore_and_start(
         &self,
         backup_path: &Option<PathBuf>,
         target: &Path,
-        version: &str,
         boot_marker: &BootMarkerService,
-    ) -> RecoveryReport {
-        let failure = |reason: &str, rolled_back: bool| RecoveryReport::Failure {
-            version: version.to_string(),
+    ) -> RecoveryOutcome {
+        let failure = |reason: &str, rolled_back: bool| RecoveryOutcome::Failure {
             reason: reason.to_string(),
             rolled_back,
         };

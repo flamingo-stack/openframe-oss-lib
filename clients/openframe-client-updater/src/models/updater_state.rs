@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use super::DeliveryRef;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdaterPhase {
@@ -42,6 +44,9 @@ pub struct UpdaterState {
     pub downloaded_binary_path: Option<PathBuf>,
     pub started_at: String,
     pub failure_reason: Option<String>,
+    /// The delivery-engine command being applied, so crash recovery can still answer it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery: Option<DeliveryRef>,
 }
 
 impl UpdaterState {
@@ -53,6 +58,7 @@ impl UpdaterState {
             downloaded_binary_path: None,
             started_at: chrono::Utc::now().to_rfc3339(),
             failure_reason: None,
+            delivery: None,
         }
     }
 

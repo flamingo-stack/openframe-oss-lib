@@ -3,6 +3,8 @@ pub mod boot_marker_service;
 pub mod client_binary;
 pub mod client_drain;
 pub mod client_update_service;
+pub mod delivery_ledger;
+pub mod delivery_reporter;
 pub mod encryption_service;
 pub mod github_download_service;
 pub mod initial_configuration_service;

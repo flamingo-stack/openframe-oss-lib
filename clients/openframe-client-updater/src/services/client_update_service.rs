@@ -8,7 +8,7 @@ use crate::config::updater_config::{
     ALLOW_DOWNGRADE, BOOT_MARKER_POLL_INTERVAL_SECS, BOOT_MARKER_WAIT_SECS,
     CLIENT_SERVICE_FULL_NAME, DRAIN_WAIT_SECS, MIN_BINARY_SIZE_BYTES, SERVICE_START_SETTLE_SECS,
 };
-use crate::models::{ClientUpdateMessage, UpdaterPhase, UpdaterState};
+use crate::models::{ClientUpdateMessage, DeliveryRef, UpdaterPhase, UpdaterState};
 use crate::platform::atomic_replace;
 use crate::services::boot_marker_service::BootMarkerService;
 use crate::services::client_binary::{self, Restore};
@@ -70,7 +70,14 @@ impl ClientUpdateService {
         self.in_progress.clone().try_lock_owned().ok()
     }
 
-    pub async fn apply(&self, msg: &ClientUpdateMessage, _slot: UpdateSlot) -> UpdateOutcome {
+    /// Runs one update under its slot; `delivery` is kept in the state file so crash
+    /// recovery can still answer it.
+    pub async fn apply(
+        &self,
+        msg: &ClientUpdateMessage,
+        delivery: Option<&DeliveryRef>,
+        _slot: UpdateSlot,
+    ) -> UpdateOutcome {
         let version = match self.check_request(msg).await {
             Ok(Some(version)) => version,
             Ok(None) => return UpdateOutcome::Applied,
@@ -78,6 +85,7 @@ impl ClientUpdateService {
         };
         info!("Starting update to v{}", version);
         let mut state = UpdaterState::new(version);
+        state.delivery = delivery.cloned();
 
         let temp_path = match self.acquire_binary(msg, &mut state).await {
             Ok(path) => path,

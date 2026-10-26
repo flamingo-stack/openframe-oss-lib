@@ -21,6 +21,16 @@ pub const PROGRESS_ACK_INTERVAL_SECS: u64 = 60;
 pub const CLIENT_UPDATE_MAX_DELIVER: i64 = 10;
 pub const RECONNECTION_DELAY_MS: u64 = 5000;
 
+// Delivery engine: CLIENT_UPDATE deliveries on machine.{id}.client-update.v2,
+// answered on machine.{id}.delivery.result.
+pub const DELIVERY_LEDGER_FILE_NAME: &str = "updater_deliveries.json";
+/// Outlives the backend's longest delivery ttl, so a repeated dispatch is still recognised.
+pub const DELIVERY_LEDGER_TTL_SECS: i64 = 31 * 24 * 60 * 60;
+pub const DELIVERY_LEDGER_MAX_SETTLED: usize = 100;
+pub const RESULT_PUBLISH_TIMEOUT_SECS: u64 = 30;
+/// How often results that did not reach the stream yet are published again.
+pub const RESULT_RESEND_INTERVAL_SECS: u64 = 30;
+
 // Consumer creation retry settings
 pub const CONSUMER_RETRY_ATTEMPTS_PER_CYCLE: u32 = 5;
 pub const CONSUMER_INITIAL_RETRY_DELAY_MS: u64 = 1000;
