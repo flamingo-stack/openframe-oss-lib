@@ -1,17 +1,20 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openframe.data.cassandra.model.UnifiedLogEvent;
+import tools.jackson.databind.json.JsonMapper;
+import com.openframe.data.cassandra.model.CassandraLogEvent;
 import com.openframe.data.cassandra.model.enums.UnifiedEventType;
-import com.openframe.data.cassandra.repository.UnifiedLogEventRepository;
+import com.openframe.data.cassandra.repository.CassandraLogEventRepository;
 import com.openframe.data.model.enums.IntegratedToolType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.model.debezium.DebeziumMessage;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import com.openframe.stream.config.ToolEventProperties;
+import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,7 +35,7 @@ class LogEventNicknamePropagationTest {
     private static final String NICKNAME = "Reception iMac";
 
     private static DeserializedDebeziumMessage message() {
-        DebeziumMessage.Payload<com.fasterxml.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
+        DebeziumMessage.Payload<tools.jackson.databind.JsonNode> payload = new DebeziumMessage.Payload<>();
         payload.setOperation("c");
         return DeserializedDebeziumMessage.builder()
                 .payload(payload)
@@ -58,15 +61,16 @@ class LogEventNicknamePropagationTest {
     @Test
     @DisplayName("Cassandra sink: hostname and nickname are both written to unified_logs")
     void cassandraHandlerWritesBothNameFields() {
-        UnifiedLogEventRepository repository = mock(UnifiedLogEventRepository.class);
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+        CassandraLogEventRepository repository = mock(CassandraLogEventRepository.class);
+        CassandraLogEventHandler handler = new CassandraLogEventHandler(
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
+                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
 
         handler.handle(message(), enriched(NICKNAME));
 
-        ArgumentCaptor<UnifiedLogEvent> captor = ArgumentCaptor.forClass(UnifiedLogEvent.class);
+        ArgumentCaptor<CassandraLogEvent> captor = ArgumentCaptor.forClass(CassandraLogEvent.class);
         verify(repository).save(captor.capture());
-        UnifiedLogEvent saved = captor.getValue();
+        CassandraLogEvent saved = captor.getValue();
         assertThat(saved.getHostname()).isEqualTo(HOSTNAME);
         assertThat(saved.getNickname()).isEqualTo(NICKNAME);
     }
@@ -74,15 +78,16 @@ class LogEventNicknamePropagationTest {
     @Test
     @DisplayName("Cassandra sink: a machine with no nickname writes a null nickname, not the hostname")
     void cassandraHandlerWritesNullNicknameWhenAbsent() {
-        UnifiedLogEventRepository repository = mock(UnifiedLogEventRepository.class);
-        DebeziumCassandraMessageHandler handler = new DebeziumCassandraMessageHandler(
-                repository, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+        CassandraLogEventRepository repository = mock(CassandraLogEventRepository.class);
+        CassandraLogEventHandler handler = new CassandraLogEventHandler(
+                repository, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(),
+                ToolEventStores.of(ToolEventProperties.Store.CASSANDRA), Mappers.getMapper(LogEventMapper.class));
 
         handler.handle(message(), enriched(null));
 
-        ArgumentCaptor<UnifiedLogEvent> captor = ArgumentCaptor.forClass(UnifiedLogEvent.class);
+        ArgumentCaptor<CassandraLogEvent> captor = ArgumentCaptor.forClass(CassandraLogEvent.class);
         verify(repository).save(captor.capture());
-        UnifiedLogEvent saved = captor.getValue();
+        CassandraLogEvent saved = captor.getValue();
         assertThat(saved.getHostname()).isEqualTo(HOSTNAME);
         assertThat(saved.getNickname()).isNull();
     }
@@ -92,7 +97,7 @@ class LogEventNicknamePropagationTest {
     void kafkaHandlerPublishesBothNameFields() {
         OssTenantRetryingKafkaProducer producer = mock(OssTenantRetryingKafkaProducer.class);
         TenantDebeziumKafkaMessageHandler handler = new TenantDebeziumKafkaMessageHandler(
-                producer, new ObjectMapper(), new TenantIdRequiredDebeziumEventValidator());
+                producer, new JsonMapper(), new TenantIdRequiredDebeziumEventValidator(), Mappers.getMapper(LogEventMapper.class));
 
         handler.handle(message(), enriched(NICKNAME));
 

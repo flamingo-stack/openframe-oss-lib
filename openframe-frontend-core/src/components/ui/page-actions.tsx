@@ -3,10 +3,11 @@
 import React from 'react';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated';
+import { InteractiveSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from './actions-menu';
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
-import { Skeleton } from './skeleton';
+import { InertWhileLoading, useLoadingScope } from './loading-scope';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
@@ -17,8 +18,24 @@ export type PageActionButton = {
   /** Click handler. Optional when `href` or `submenu` is provided. */
   onClick?: () => void;
   icon?: React.ReactNode;
-  /** `overlay` and `glyph` are media chrome and `link` an inline text action; none is a page action, and SplitButton has no divider colour for them. */
-  variant?: Exclude<ButtonProps['variant'], 'overlay' | 'glyph' | 'link'>;
+  /** `overlay` and `glyph` are media chrome, `link` an inline text action and `bare` a glyph control; none is a page action, and SplitButton has no divider colour for them. */
+  variant?: Exclude<
+    ButtonProps['variant'],
+    | 'overlay'
+    | 'glyph'
+    | 'link'
+    | 'bare'
+    | 'inverted'
+    | 'field'
+    | 'row'
+    | 'rail'
+    | 'tab'
+    | 'segment'
+    | 'chip'
+    | 'card'
+    | 'cell'
+    | 'stepper'
+  >;
   disabled?: boolean;
   /**
    * For SplitButton actions (when `iconAction` is set): disables only the main
@@ -32,7 +49,8 @@ export type PageActionButton = {
   /**
    * Render the desktop button as icon-only (label hidden, icon centered). The full
    * label still appears in the mobile "..." dropdown. The desktop icon is forced to
-   * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color.
+   * `text-ods-text-primary`; the mobile row keeps the caller-provided icon color
+   * (re-tinted only when it was picked for a filled variant, see `menuRowIcon`).
    */
   iconOnlyOnDesktop?: boolean;
   /** Render as a link (next/link). Mutually exclusive with `submenu`. */
@@ -61,6 +79,29 @@ function actionKey(action: PageActionButton, idx: number) {
   return `${action.label ?? action.ariaLabel ?? 'action'}-${idx}`;
 }
 
+/** Variants that paint the button: the caller tints its icon for that fill (`text-ods-text-on-accent`). */
+const FILLED_VARIANTS: ReadonlySet<NonNullable<PageActionButton['variant']>> = new Set([
+  'accent',
+  'destructive',
+  'warning',
+]);
+
+/**
+ * The action's icon as a "..." menu row shows it. An icon tinted for a filled
+ * button (an empty list's accent "Add ...") is dark on the menu's dark row, so it
+ * is re-tinted to the row's secondary icon color. Outline and transparent buttons
+ * sit on the page background like the row does, so their icon is kept as is. No
+ * variant renders as accent, the Button default.
+ *
+ * `&&` doubles the class (specificity 0,2,1): a caller that tints the fill with its
+ * own `[&_svg]:!text-...` wrapper ties with a single class, and the tie would go to
+ * whichever rule the consumer's stylesheet happens to emit last.
+ */
+function menuRowIcon(action: PageActionButton): React.ReactNode {
+  if (!action.icon || !FILLED_VARIANTS.has(action.variant ?? 'accent')) return action.icon;
+  return <span className="inline-flex [&&_svg]:!text-ods-text-secondary">{action.icon}</span>;
+}
+
 function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuItem[] {
   if (action.submenu && action.submenu.length > 0) {
     // When a split-button action collapses into the merged mobile "..." menu,
@@ -78,7 +119,7 @@ function actionToMenuItems(action: PageActionButton, idx: number): ActionsMenuIt
     {
       id: `action-${idx}`,
       label: action.label,
-      icon: action.icon,
+      icon: menuRowIcon(action),
       onClick: action.onClick,
       disabled: action.disabled,
       href: action.href,
@@ -101,9 +142,18 @@ interface RenderOptions {
   iconOnly?: boolean;
   /** Stretch the button to fill flex parent (used in mobile bottom bar). */
   fullWidth?: boolean;
+  /** The page's action set is still being read: the button is drawn for real (the caller's copy is static) and inert. */
+  inert?: boolean;
 }
 
 function renderActionButton(action: PageActionButton, opts: RenderOptions = {}): React.ReactNode {
+  if (opts.inert) {
+    return (
+      <InertWhileLoading className={cn('inline-flex', opts.fullWidth && 'flex-1')}>
+        {renderRawActionButton(action, opts)}
+      </InertWhileLoading>
+    );
+  }
   const button = renderRawActionButton(action, opts);
   if (!action.tooltip) return button;
   return (
@@ -214,84 +264,28 @@ export interface PageActionsProps {
   selector?: React.ReactNode;
   className?: string;
   /**
-   * Render placeholders instead of the actions — for pages whose action SET
-   * depends on data still in flight. Opt-in: a page whose actions are already
-   * final while its title loads keeps rendering them.
+   * The action SET depends on data still in flight: the actions are drawn for real and inert (an empty list is one
+   * placeholder: the set is unknown). Opt-in: a page whose actions are already final while its title loads keeps
+   * rendering them live.
    */
   loading?: boolean;
 }
 
 const ACTIONS_GAP = 'gap-[var(--spacing-system-xs)]';
 
-/** Matches `Button` size="icon" / size="default" exactly, so a placeholder and the
- *  button that replaces it occupy the same box at both breakpoints. `rounded-md`
- *  is the same token `Button` itself uses — a raw `6px` would agree today and
- *  drift the moment a platform overrides `--radius`. */
-const SKELETON_HEIGHT = 'h-11 md:h-12';
-const SKELETON_ICON_WIDTH = 'w-11 md:w-12';
-const SKELETON_LABEL_WIDTH = 'w-[120px] md:w-[140px]';
-const SKELETON_RADIUS = 'rounded-md';
-
 /**
- * Placeholders for actions whose SHAPE isn't known yet — the page is still
- * loading the record that decides which actions exist (e.g. an archived entity
- * offers "Unarchive" where an active one offers "Edit").
+ * While the page reads the record that decides which actions exist (`loading`), the actions the caller passed are
+ * drawn for real and inert: a labelled or icon button is static copy, so its box and its label are the loaded ones,
+ * and an inert control promises nothing and cannot act on a wrong assumption before the data lands. The "…" trigger
+ * is drawn the same way (`ActionsMenuDropdown loading`).
  *
- * Why not render the actions anyway: a button is a promise. Painting the
- * optimistic set means a flash of the wrong header AND a live click target that
- * can act on the wrong assumption before the data lands. A grey box promises
- * nothing and can't be clicked.
- *
- * The placeholders are derived from the actions the caller passed — one per
- * action, each sized like the button that action WILL render — so the common
- * case (the data confirms that set) settles with no layout shift at all. Sizing
- * per action matters: `renderRawActionButton` collapses a label-less action (or
- * one flagged `iconOnlyOnDesktop`) to a square `size="icon"` button, and a
- * 140px-wide placeholder snapping to 48px is exactly the shift this is meant to
- * avoid.
- *
- * An empty list still yields one placeholder: `loading` means the action set is
- * unknown, not known-empty. Its shape comes from `emptyFallback`, because what
- * an empty header settles into differs per variant — `icon-buttons` and
- * `menu-primary` fall back to the square "…" overflow trigger, `primary-buttons`
- * has no overflow trigger at all and settles into a labelled button.
+ * An empty list is the one placeholder: `loading` means the action set is unknown, not known-empty, so nothing real can
+ * be drawn. Its shape is what an empty header settles into for the variant: `icon-buttons` and `menu-primary` the
+ * square "…" trigger (`icon`), `primary-buttons` a labelled button (`label`).
  */
-function ActionSkeletons({
-  actions,
-  fullWidth,
-  emptyFallback = 'icon',
-}: {
-  actions: PageActionButton[];
-  fullWidth?: boolean;
-  emptyFallback?: 'icon' | 'label';
-}) {
-  const items = actions.length > 0 ? actions : [null];
-  return (
-    <>
-      {items.map((action, idx) => {
-        // Mirrors `renderRawActionButton`'s `isIconOnly`. The mobile bottom bar
-        // stretches only labelled buttons (`fullWidth: !!action.label`), so an
-        // icon action keeps its square box there too.
-        const isIconOnly = action ? !action.label || !!action.iconOnlyOnDesktop : emptyFallback === 'icon';
-        return (
-          <Skeleton
-            // Static placeholder list — index IS the identity here.
-            key={`action-skeleton-${idx}`}
-            className={cn(
-              SKELETON_HEIGHT,
-              SKELETON_RADIUS,
-              isIconOnly ? SKELETON_ICON_WIDTH : fullWidth ? 'flex-1' : SKELETON_LABEL_WIDTH,
-            )}
-          />
-        );
-      })}
-    </>
-  );
-}
-
-/** Mobile placeholder for the variants that collapse to ONE trigger (icon button or "…"). */
-function MobileTriggerSkeleton() {
-  return <Skeleton className={cn(SKELETON_HEIGHT, SKELETON_ICON_WIDTH, SKELETON_RADIUS)} />;
+function UnknownActionSkeleton({ shape, fullWidth }: { shape: 'icon' | 'label'; fullWidth?: boolean }) {
+  if (shape === 'icon') return <InteractiveSkeleton.Button size="icon" />;
+  return <InteractiveSkeleton.Button size="default" className={fullWidth ? 'flex-1' : undefined} />;
 }
 
 export function PageActions({
@@ -300,8 +294,9 @@ export function PageActions({
   menuActions,
   selector,
   className,
-  loading,
+  loading: loadingProp,
 }: PageActionsProps) {
+  const loading = useLoadingScope() || loadingProp;
   if (variant === 'icon-buttons') {
     return (
       <IconButtonsVariant
@@ -334,7 +329,7 @@ function IconButtonsVariant({
   menuActions,
   selector,
   className,
-  loading,
+  loading: loadingProp,
 }: {
   actions: PageActionButton[];
   menuActions?: ActionsMenuGroup[];
@@ -342,6 +337,7 @@ function IconButtonsVariant({
   className?: string;
   loading?: boolean;
 }) {
+  const loading = useLoadingScope() || loadingProp;
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = !!menuActions && menuActions.some(g => g.items.length > 0);
 
@@ -355,28 +351,24 @@ function IconButtonsVariant({
   return (
     <>
       {/* Desktop: every action as an icon button + optional overflow menu */}
-      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center content-md:flex', ACTIONS_GAP, className)}>
         {selector}
-        {loading ? (
-          <ActionSkeletons actions={desktopActions} />
-        ) : (
-          <>
-            {desktopActions.map((action, idx) => (
-              <React.Fragment key={actionKey(action, idx)}>{renderActionButton(action)}</React.Fragment>
-            ))}
-            {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
-          </>
-        )}
+        {desktopActions.map((action, idx) => (
+          <React.Fragment key={actionKey(action, idx)}>{renderActionButton(action, { inert: loading })}</React.Fragment>
+        ))}
+        {/* An unknown set with no menu: the trigger's square. With a menu, the trigger already is it. */}
+        {loading && desktopActions.length === 0 && !hasMenuActions && <UnknownActionSkeleton shape="icon" />}
+        {hasMenuActions && <ActionsMenuDropdown groups={menuActions} loading={loading} />}
       </div>
 
       {/* Mobile: single icon button OR all actions merged into one "..." menu */}
-      <div className={cn('flex md:hidden', className)}>
-        {loading ? (
-          <MobileTriggerSkeleton />
-        ) : useSingleActionMobile && singleAction ? (
-          renderActionButton(singleAction, { iconOnly: true })
+      <div className={cn('flex content-md:hidden', className)}>
+        {useSingleActionMobile && singleAction ? (
+          renderActionButton(singleAction, { iconOnly: true, inert: loading })
         ) : hasMobileMenuItems ? (
-          <ActionsMenuDropdown groups={mobileMenuGroups} />
+          <ActionsMenuDropdown groups={mobileMenuGroups} loading={loading} />
+        ) : loading ? (
+          <UnknownActionSkeleton shape="icon" />
         ) : null}
       </div>
     </>
@@ -386,16 +378,23 @@ function IconButtonsVariant({
 /**
  * Primary buttons variant — primary + outline buttons on desktop,
  * fixed bottom bar on mobile.
+ *
+ * The bottom bar spans the WINDOW, so it stays on the viewport `md` step. A
+ * content area narrowed by a docked side panel is a third case: the window is
+ * wide (no bar) but the title row has no room for every labelled button, so the
+ * actions compact into the row instead. `md:content-max-md:` is exactly that case
+ * and never matches outside a content area.
  */
 function PrimaryButtonsVariant({
   actions,
   className,
-  loading,
+  loading: loadingProp,
 }: {
   actions: PageActionButton[];
   className?: string;
   loading?: boolean;
 }) {
+  const loading = useLoadingScope() || loadingProp;
   // Sort: outline first, accent last (rightmost on desktop).
   const sortedActions = [...actions].sort((a, b) => {
     if (a.variant === 'accent' && b.variant !== 'accent') return 1;
@@ -407,16 +406,19 @@ function PrimaryButtonsVariant({
 
   return (
     <>
-      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
-        {loading ? (
-          // No overflow trigger in this variant — an unknown action set settles
-          // into a labelled button, not a square one.
-          <ActionSkeletons actions={desktopActions} emptyFallback="label" />
-        ) : (
-          desktopActions.map((action, idx) => (
-            <React.Fragment key={`desktop-${actionKey(action, idx)}`}>{renderActionButton(action)}</React.Fragment>
-          ))
-        )}
+      <div className={cn('hidden items-center md:content-md:flex', ACTIONS_GAP, className)}>
+        {desktopActions.map((action, idx) => (
+          <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
+            {renderActionButton(action, { inert: loading })}
+          </React.Fragment>
+        ))}
+        {/* No overflow trigger in this variant: an unknown action set settles into a labelled button. */}
+        {loading && desktopActions.length === 0 && <UnknownActionSkeleton shape="label" />}
+      </div>
+
+      <div className={cn('hidden items-center md:content-max-md:flex', ACTIONS_GAP, className)}>
+        <CompactPrimaryActions actions={desktopActions} loading={loading} />
+        {loading && desktopActions.length === 0 && <UnknownActionSkeleton shape="icon" />}
       </div>
 
       <MobileBottomActions actions={sortedActions} loading={loading} />
@@ -433,7 +435,7 @@ function MenuPrimaryVariant({
   menuActions,
   selector,
   className,
-  loading,
+  loading: loadingProp,
 }: {
   actions: PageActionButton[];
   menuActions: ActionsMenuGroup[];
@@ -441,6 +443,7 @@ function MenuPrimaryVariant({
   className?: string;
   loading?: boolean;
 }) {
+  const loading = useLoadingScope() || loadingProp;
   const desktopActions = actions.filter(a => !a.showOnlyMobile);
   const hasMenuActions = menuActions.some(g => g.items.length > 0);
 
@@ -449,37 +452,56 @@ function MenuPrimaryVariant({
 
   return (
     <>
-      <div className={cn('hidden items-center md:flex', ACTIONS_GAP, className)}>
+      <div className={cn('hidden items-center content-md:flex', ACTIONS_GAP, className)}>
         {selector}
-        {loading ? (
-          <ActionSkeletons actions={desktopActions} />
-        ) : (
-          <>
-            {hasMenuActions && <ActionsMenuDropdown groups={menuActions} />}
-            {desktopActions.map((action, idx) => (
-              <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
-                {renderActionButton({ ...action, variant: action.variant || 'accent' })}
-              </React.Fragment>
-            ))}
-          </>
-        )}
+        {hasMenuActions && <ActionsMenuDropdown groups={menuActions} loading={loading} />}
+        {desktopActions.map((action, idx) => (
+          <React.Fragment key={`desktop-${actionKey(action, idx)}`}>
+            {renderActionButton({ ...action, variant: action.variant || 'accent' }, { inert: loading })}
+          </React.Fragment>
+        ))}
+        {/* An unknown set with no menu: the trigger's square. With a menu, the trigger already is it. */}
+        {loading && desktopActions.length === 0 && !hasMenuActions && <UnknownActionSkeleton shape="icon" />}
       </div>
 
-      <div className={cn('flex md:hidden', className)}>
-        {loading ? (
-          <MobileTriggerSkeleton />
-        ) : hasMobileMenuItems || selector ? (
+      <div className={cn('flex content-md:hidden', className)}>
+        {hasMobileMenuItems || selector ? (
           // The selector rides into the menu as its header row: on mobile the
           // title row has no room for it, and hiding it entirely (what
           // `icon-buttons` does) would leave no way to switch views at all.
-          <ActionsMenuDropdown groups={mobileMenuGroups} header={selector} />
+          <ActionsMenuDropdown groups={mobileMenuGroups} header={selector} loading={loading} />
+        ) : loading ? (
+          <UnknownActionSkeleton shape="icon" />
         ) : null}
       </div>
     </>
   );
 }
 
-function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]; loading?: boolean }) {
+/**
+ * `primary-buttons` in a narrow content area of a wide window: the accent (and
+ * icon-only) actions stay buttons, the other labelled ones fold into one "..."
+ * menu — unless that menu would hold a single action, which stays a button.
+ */
+function CompactPrimaryActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
+  const foldable = actions.filter(action => action.variant !== 'accent' && !!action.label);
+  const fold = foldable.length > 1;
+  const inline = fold ? actions.filter(action => !foldable.includes(action)) : actions;
+  return (
+    <>
+      {fold && <ActionsMenuDropdown groups={[{ items: foldable.flatMap(actionToMenuItems) }]} loading={loading} />}
+      {inline.map((action, idx) => (
+        <React.Fragment key={`compact-${actionKey(action, idx)}`}>
+          {renderActionButton(action, { inert: loading })}
+        </React.Fragment>
+      ))}
+    </>
+  );
+}
+
+function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageActionButton[]; loading?: boolean }) {
+  const loading = useLoadingScope() || loadingProp;
   return (
     <div
       className={cn(
@@ -492,15 +514,12 @@ function MobileBottomActions({ actions, loading }: { actions: PageActionButton[]
         ACTIONS_GAP,
       )}
     >
-      {loading ? (
-        <ActionSkeletons actions={actions} fullWidth emptyFallback="label" />
-      ) : (
-        actions.map((action, idx) => (
-          <React.Fragment key={`mobile-${actionKey(action, idx)}`}>
-            {renderActionButton(action, { fullWidth: !!action.label })}
-          </React.Fragment>
-        ))
-      )}
+      {actions.map((action, idx) => (
+        <React.Fragment key={`mobile-${actionKey(action, idx)}`}>
+          {renderActionButton(action, { fullWidth: !!action.label, inert: loading })}
+        </React.Fragment>
+      ))}
+      {loading && actions.length === 0 && <UnknownActionSkeleton shape="label" fullWidth />}
     </div>
   );
 }

@@ -43,6 +43,7 @@ export { DatabaseIcon } from './database-icon';
 export { DatabaseLockIcon } from './database-lock-icon';
 export { PackageAltIcon } from './package-alt-icon';
 export { PackageCheckIcon } from './package-check-icon';
+export { PackageClassicIcon } from './package-classic-icon';
 export { PackageIcon } from './package-icon';
 export { PackageLockIcon } from './package-lock-icon';
 export { PackageMinusIcon } from './package-minus-icon';

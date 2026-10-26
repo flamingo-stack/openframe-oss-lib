@@ -18,19 +18,22 @@ import { MarkdownImage } from '../../../embeds/markdown-image';
 import { OGLinkPreview, OGLinkErrorBoundary } from '../../../embeds/og-link-preview';
 import { RedditEmbedClient } from '../../../embeds/reddit-embed-client';
 import { TwitterEmbedClient } from '../../../embeds/twitter-embed-client';
-import { Video } from '../../../features/video';
+import { extractYouTubeId, Video } from '../../../features/video';
 import { buildStandardLeafRenderers, hasRenderableSrc, type MdRenderProps } from '../base-components';
 import type { TextSizeElement } from '../text-size';
 
-/** Depth-first search of a hast node for the first `<a href>` matching `hostRe`. */
-function findFirstHref(node: ElementContent | undefined, hostRe: RegExp): string | null {
+/** Depth-first search of a hast node for the first `<a href>` matching `hostRe`, with the `rel` written on it. */
+function findFirstLink(node: ElementContent | undefined, hostRe: RegExp): { href: string; rel?: string } | null {
   if (!node || node.type !== 'element') return null;
   if (node.tagName === 'a') {
-    const href = node.properties.href;
-    if (typeof href === 'string' && hostRe.test(href)) return href;
+    const { href, rel } = node.properties;
+    if (typeof href === 'string' && hostRe.test(href)) {
+      const relText = Array.isArray(rel) ? rel.join(' ') : typeof rel === 'string' ? rel : undefined;
+      return { href, rel: relText };
+    }
   }
   for (const child of node.children) {
-    const found = findFirstHref(child, hostRe);
+    const found = findFirstLink(child, hostRe);
     if (found) return found;
   }
   return null;
@@ -202,12 +205,12 @@ export function buildRichEmbedOverrides({
       const { node, className } = bqProps;
       const classNames: string = Array.isArray(className) ? className.join(' ') : (className ?? '');
       if (classNames.includes('reddit-embed-bq')) {
-        const postUrl = findFirstHref(node, /reddit\.com/);
-        if (postUrl) return <RedditEmbedClient url={postUrl} />;
+        const post = findFirstLink(node, /reddit\.com/);
+        if (post) return <RedditEmbedClient url={post.href} rel={post.rel} />;
       }
       if (classNames.includes('twitter-tweet')) {
-        const tweetUrl = findFirstHref(node, /(?:twitter\.com|x\.com)\/[^/]+\/status\//);
-        if (tweetUrl) return <TwitterEmbedClient url={tweetUrl} />;
+        const tweet = findFirstLink(node, /(?:twitter\.com|x\.com)\/[^/]+\/status\//);
+        if (tweet) return <TwitterEmbedClient url={tweet.href} rel={tweet.rel} />;
       }
       return standard.blockquote(bqProps);
     },
@@ -219,6 +222,16 @@ export function buildRichEmbedOverrides({
       // Empty-`![]()` guard shared with the base `img` renderer.
       if (!hasRenderableSrc(src)) return null;
       return <MarkdownImage src={src.trim()} alt={alt} />;
+    },
+
+    // Raw <iframe> tags in stored content (a pasted YouTube embed). A YouTube one becomes the same click-to-play
+    // facade as the `youtube-embed` fence: the raw iframe loaded YouTube's whole player (about 470 KB of script) with
+    // the page, on every post that carried one (CU-17tkuw5xp4q). Any other iframe loads when it nears the screen.
+    iframe: ({ node: _node, src, ...rest }: MdRenderProps<'iframe'>) => {
+      if (!hasRenderableSrc(src)) return null;
+      const url = src.trim();
+      if (extractYouTubeId(url)) return <Video kind="youtube" url={url} />;
+      return <iframe {...rest} src={url} loading="lazy" />;
     },
 
     // Raw <video> tags in stored content (blog publisher injection) route

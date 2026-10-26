@@ -2,14 +2,17 @@ package com.openframe.delivery.config;
 
 import com.openframe.data.document.delivery.DeliveryOfflineBehavior;
 import com.openframe.data.document.delivery.DeliveryType;
+import com.openframe.delivery.config.DeliveryProperties.BackoffOverride;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
+import com.openframe.delivery.config.DeliveryProperties.PolicyOverride;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.Set;
 
 import static com.openframe.delivery.config.DeliveryTestPolicies.ACK_THRESHOLD;
-import static com.openframe.delivery.config.DeliveryTestPolicies.BACKOFF_MULTIPLIER;
+import static com.openframe.delivery.config.DeliveryTestPolicies.JITTER;
 import static com.openframe.delivery.config.DeliveryTestPolicies.MAX_RETRY_INTERVAL;
 import static com.openframe.delivery.config.DeliveryTestPolicies.RECONNECT_WINDOW;
 import static com.openframe.delivery.config.DeliveryTestPolicies.RESULT_TIMEOUT;
@@ -19,6 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class DeliveryPropertiesTest {
 
     private static final int UNINSTALL_MAX_ATTEMPTS = 5;
+
+    private static final double UNINSTALL_BACKOFF_MULTIPLIER = 2.0;
 
     private DeliveryProperties properties;
 
@@ -42,7 +47,7 @@ class DeliveryPropertiesTest {
     @Test
     void resolve_typeOverridesOneField_otherFieldsFromDefaults() {
         // setup
-        Policy uninstall = new Policy();
+        PolicyOverride uninstall = new PolicyOverride();
         uninstall.setMaxAttempts(UNINSTALL_MAX_ATTEMPTS);
         properties.setTypes(Map.of(DeliveryType.CLIENT_UNINSTALL, uninstall));
 
@@ -52,18 +57,36 @@ class DeliveryPropertiesTest {
         // verifications
         assertThat(resolved.getMaxAttempts()).isEqualTo(UNINSTALL_MAX_ATTEMPTS);
         assertThat(resolved.getAckThresholdSeconds()).isEqualTo(ACK_THRESHOLD);
-        assertThat(resolved.getBackoffMultiplier()).isEqualTo(BACKOFF_MULTIPLIER);
-        assertThat(resolved.getMaxRetryIntervalSeconds()).isEqualTo(MAX_RETRY_INTERVAL);
+        assertThat(resolved.getBackoff()).isSameAs(properties.getDefaults().getBackoff());
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.RETRY_ON_RECONNECT);
         assertThat(resolved.getReconnectWindowSeconds()).isEqualTo(RECONNECT_WINDOW);
         assertThat(resolved.getResultTimeoutSeconds()).isEqualTo(RESULT_TIMEOUT);
         assertThat(resolved.getTtlSeconds()).isEqualTo(TTL);
+        assertThat(resolved.isFastSweep()).isFalse();
+    }
+
+    @Test
+    void resolve_typeOverridesBackoffMultiplierOnly_capAndJitterFromDefaults() {
+        // setup
+        BackoffOverride growing = new BackoffOverride();
+        growing.setMultiplier(UNINSTALL_BACKOFF_MULTIPLIER);
+        PolicyOverride uninstall = new PolicyOverride();
+        uninstall.setBackoff(growing);
+        properties.setTypes(Map.of(DeliveryType.CLIENT_UNINSTALL, uninstall));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.getBackoff().getMultiplier()).isEqualTo(UNINSTALL_BACKOFF_MULTIPLIER);
+        assertThat(resolved.getBackoff().getMaxIntervalSeconds()).isEqualTo(MAX_RETRY_INTERVAL);
+        assertThat(resolved.getBackoff().getJitter()).isEqualTo(JITTER);
     }
 
     @Test
     void resolve_typeOverridesOfflineBehavior_overrideWins() {
         // setup
-        Policy scripts = new Policy();
+        PolicyOverride scripts = new PolicyOverride();
         scripts.setOfflineBehavior(DeliveryOfflineBehavior.SKIP);
         properties.setTypes(Map.of(DeliveryType.SCRIPT_SCHEDULE, scripts));
 
@@ -73,6 +96,84 @@ class DeliveryPropertiesTest {
         // verifications
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
     }
+    @Test
+    void resolve_typeOverridesMaxRuns_rerunsBoundedByItAndTheDefaultIsOneRun() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setMaxRuns(3);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.hasRunsLeft(0)).isTrue();
+        assertThat(resolved.hasRunsLeft(1)).isTrue();
+        assertThat(resolved.hasRunsLeft(2)).isFalse();
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(10_800L);
+        assertThat(other.getMaxRuns()).isEqualTo(1);
+        assertThat(other.hasRunsLeft(0)).isFalse();
+    }
+
+    @Test
+    void resolve_typeOverridesRerunAfterSeconds_overrideWinsAndTheRestStaysDefault() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setRerunAfterSeconds(120L);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(120L);
+        assertThat(resolved.getMaxRuns()).isEqualTo(DeliveryTestPolicies.SINGLE_RUN);
+        assertThat(other.getRerunAfterSeconds()).isEqualTo(DeliveryTestPolicies.RERUN_AFTER);
+    }
+
+    @Test
+    void fastTypes_noTypeAskingForTheFastPass_empty() {
+        // setup
+        properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).isEmpty();
+    }
+
+    @Test
+    void fastTypes_enabledTypeWithFastSweep_thatTypeOnly() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+        properties.setEnabled(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, true, DeliveryType.TOOL_INSTALLATION, true));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).containsExactly(DeliveryType.REMOTE_ACCESS_REQUEST);
+    }
+
+    @Test
+    void fastTypes_fastTypeSwitchedOff_empty() {
+        // setup
+        PolicyOverride approval = new PolicyOverride();
+        approval.setFastSweep(true);
+        properties.setTypes(Map.of(DeliveryType.REMOTE_ACCESS_REQUEST, approval));
+
+        // execution
+        Set<DeliveryType> fast = properties.fastTypes();
+
+        // verifications
+        assertThat(fast).isEmpty();
+    }
+
     @Test
     void isEnabled_typeNotListed_false() {
         // setup

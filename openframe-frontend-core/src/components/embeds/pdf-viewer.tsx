@@ -31,7 +31,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
       icon={<AdobePdfIcon className="h-5 w-5 shrink-0" />}
       title={displayName}
       actions={
-        <div className="flex w-full items-center gap-2 sm:w-auto">
+        <div className="flex w-full items-center gap-2 content-sm:w-auto">
           <Button
             variant="outline"
             size="small-legacy"
@@ -39,7 +39,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
             openInNewTab={!onPreview}
             onClick={onPreview}
             leftIcon={<Eye className="h-4 w-4" />}
-            className="flex-1 sm:flex-initial"
+            className="flex-1 content-sm:flex-initial"
           >
             Preview
           </Button>
@@ -50,7 +50,7 @@ export function PdfViewer({ src, fileName, onPreview, onDownload, height }: PdfV
             openInNewTab={!onDownload}
             onClick={onDownload}
             leftIcon={<Download className="h-4 w-4" />}
-            className="flex-1 sm:flex-initial"
+            className="flex-1 content-sm:flex-initial"
           >
             Download
           </Button>

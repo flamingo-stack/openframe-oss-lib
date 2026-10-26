@@ -1,7 +1,8 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.kafka.producer.retry.OssTenantRetryingKafkaProducer;
+import com.openframe.stream.mapping.LogEventMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -17,8 +18,9 @@ public class TenantDebeziumKafkaMessageHandler extends DebeziumKafkaMessageHandl
 
     public TenantDebeziumKafkaMessageHandler(OssTenantRetryingKafkaProducer kafkaProducer,
                                              ObjectMapper objectMapper,
-                                             DebeziumEventValidator validator) {
-        super(kafkaProducer, objectMapper, validator);
+                                             DebeziumEventValidator validator,
+                                             LogEventMapper logEventMapper) {
+        super(kafkaProducer, objectMapper, validator, logEventMapper);
     }
 
     @Override

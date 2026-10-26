@@ -1,16 +1,14 @@
 'use client';
 
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { breakpoints } from '../../hooks/ui/use-media-query';
 import { cn } from '../../utils/cn';
 
 /**
- * Mirrors `screens.md` in tailwind.config.ts (800px), which is also where the
- * ODS responsive tokens step up (ods-responsive-tokens.css). ONE breakpoint
- * for the whole bar: the `md:` variants below and the `onContentClick` guard
- * must never disagree (they did before — the guard read a stale 768px while
- * the CSS switched at 800px).
+ * The bar's height (the 44px one-line strip, see the design note on `AnnouncementBarView`): read by the bar and by
+ * every shape that stands for it (a preview's loading state).
  */
-const MD_QUERY = '(min-width: 800px)';
+export const ANNOUNCEMENT_BAR_HEIGHT_CLASS = 'min-h-11';
 
 export interface AnnouncementBarViewProps {
   /**
@@ -92,12 +90,12 @@ export function AnnouncementBarView({
 }: AnnouncementBarViewProps) {
   const handleContentClick = onContentClick
     ? () => {
-        if (!window.matchMedia(MD_QUERY).matches) onContentClick();
+        if (!window.matchMedia(breakpoints.md).matches) onContentClick();
       }
     : undefined;
 
   return (
-    <div className={cn('flex min-h-11 w-full max-w-full items-center', className)} style={style}>
+    <div className={cn('flex w-full max-w-full items-center', ANNOUNCEMENT_BAR_HEIGHT_CLASS, className)} style={style}>
       {/* Content row — the tap target below `md`, where the CTA is hidden.
           Its vertical padding never drives the height; the 44px strip does. */}
       <div

@@ -16,11 +16,24 @@ export {
 // Number / currency / byte / date formatters live in `./format` (single
 // source of truth). Re-exported here so existing callers that pull from
 // the barrel keep working without changing imports.
-export { formatDate, formatNumber, formatPrice, formatBytes } from './format';
+export { formatDate, formatNumber, formatPrice, formatBytes, formatUrlForDisplay } from './format';
+export * from './ai-providers';
+export * from './model-token-rates';
+export { TRIAL_TERMS, trialLabels, trialLengthLabel } from './trial';
+export {
+  VENDOR_CLASSIFICATION_COPY,
+  vendorClassificationCopy,
+  vendorClassificationGroup,
+  compareVendorClassifications,
+  isOpenFrameClassification,
+  type VendorClassificationValue,
+  type VendorClassificationGroup,
+  type VendorClassificationCopy,
+  type VendorClassificationIconConfig,
+} from './vendor-classification';
 // SVG path constants — re-exported here (server-safe) because icons-v2 has "use client"
 export { PLAY_ICON_PATH } from '../components/icons-v2-generated/media-playback/play-icon';
 export {
-  getPlatformAccentColor,
   getCurrentPlatform,
   getPlatformConfig,
   usePlatformColors,
@@ -28,14 +41,13 @@ export {
   getSemanticColor,
   type ColorCategory,
   HEX_PATTERN,
-  // Custom-color helpers so consumers (e.g. the chat client's accent theming)
-  // reuse the design-system math instead of re-implementing darken/hex utils.
   getReadableTextColor,
   hexToRgb,
   rgbToHex,
   deriveHoverColor,
   deriveActiveColor,
 } from './ods-color-utils';
+export { getPlatformAccentColor } from './platform-identity';
 export {
   errorMessage,
   delay,
@@ -49,6 +61,7 @@ export {
   NO_CLIENT_CACHE,
 } from './common';
 export { escapeRegExp } from './escape-regexp';
+export { isOwnClick } from './own-click';
 // SEO title length budget — server-safe constant (SSOT). Consumed by the hub
 // (prompt guidance + DB check value) and by SEOEditorPreview (input maxLength).
 export { SEO_TITLE_MAX_LENGTH } from './seo-title';
@@ -58,6 +71,7 @@ export { SEO_DESCRIPTION_MAX_LENGTH } from './seo-description';
 // consumers (e.g. company-hub deck) don't ship their own copies of the marks.
 export * from './brand-marks';
 export * from './design-doc-readiness';
+export * from './clickup-drop-down';
 export * from './platform-config';
 export * from './os-platforms';
 export * from './access-code-client';
@@ -107,6 +121,9 @@ export * from './shell-utils';
 export * from './video-bite-id';
 // OS type utilities
 export * from './os-utils';
+export * from './visitor-os';
+// Also exported via the granular subpath `./utils/mobile-app` (server and Edge consumers).
+export * from './mobile-app';
 // Phone utilities
 export * from './country-phone-utils';
 export * from './compliance-standards';
@@ -118,8 +135,11 @@ export * from './color-analysis';
 
 // Announcement dismissal store (cookie SSOT; server-safe name/match helpers)
 export * from './announcement-storage';
+// Which surfaces (browser, desktop app, phone app) an announcement is shown on
+export * from './announcement-surface';
 // cookie id-match dismissal store (walkthrough video widget)
 export * from './dismiss-cookie';
+export * from './after-page-load';
 export * from './dismissal-storage';
 // walkthrough deep-link query param (widget default + host URL minters)
 export * from './walkthrough-deep-link';
@@ -131,6 +151,7 @@ export {
   urlPathLooksLikeSvg,
   shouldProxyImage,
   generateImageSizes,
+  skipsImageOptimizer,
 } from './image-proxy';
 
 // Number / byte / duration / time / UTC date / initials / metric /
@@ -151,8 +172,10 @@ export {
   formatDateWithTimezone,
   formatDateTimeYmd,
   VIEWER_TIMEZONE,
+  viewerLocale,
   formatWebinarTimeMeta,
   formatProgramDate,
+  formatProgramDateRange,
   formatProgramTimeRange,
   type ZonedDateStyle,
   formatDurationFromRange,
@@ -235,6 +258,8 @@ export {
 } from './sse-subscription';
 export {
   type EmbedProxyAuth,
+  type EmbedProxyOptionalField,
+  EMBED_PROXY_OPTIONAL_HEADERS,
   getEmbedProxyAuth,
   setEmbedProxyAuth,
   clearEmbedProxyAuth,
@@ -270,12 +295,8 @@ export {
   type BuildAutoContinuationOptions,
 } from '../components/chat/utils/auto-continuation-directive';
 export { flattenAssistantContent } from '../components/chat/utils/flatten-assistant-content';
-export {
-  SCROLL_ANCHOR,
-  type ScrollAnchor,
-  SCROLL_ANCHOR_WIRE_KEY,
-  parseScrollAnchor,
-} from '../components/chat/utils/scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from '../components/chat/utils/scroll-anchor';
+export { SCROLL_ANCHOR, type ScrollAnchor } from '../components/chat/types/message.types';
 export {
   type WireCommandOverride,
   parseWireCommandOverride,
@@ -317,6 +338,7 @@ export * from './dev-sections';
 // pre-computed pixel value avoids the mid-animation jitter that
 // `element.scrollIntoView()` produces when layout shifts during the
 // scroll).
+export { openInNewTab } from './open-in-new-tab';
 export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scroll-into-view';
 
 // Same-page hash navigation — owns pushState + synthetic hashchange +
@@ -324,8 +346,12 @@ export { type ScrollElementIntoViewOptions, scrollElementIntoView } from './scro
 // hub's `useUnifiedNav` + chat-runtime `navigate`, AND by every
 // embeddable surface that drives state off the URL hash.
 export {
+  ACTIVE_ANCHOR_ATTRIBUTE,
+  isScrollSyncedHash,
+  LOCATION_HASH_SYNC_EVENT,
   navigateSamePageHash,
   normalizeHashFragment,
+  replaceLocationHash,
   STICKY_HEADER_OFFSET_PX,
   HUB_HEADER_OFFSET_PX,
   type NavigateSamePageHashOptions,
@@ -358,6 +384,7 @@ export type { FaqHashTarget } from './faq-anchor';
 // pure + server-safe; the hub re-exports these from its config/util shims.
 export {
   CONTENT_REF_GROUPS,
+  GROUP_PAGE_SIZE,
   getContentRefLabel,
   getContentRefLabelOrTitleCase,
   orderContentRefTypes,
@@ -391,6 +418,7 @@ export * from './humanity-signals';
 // so the host's draft endpoint re-applies the same filter the browser hook runs.
 // Also exported via the granular subpath `./utils/form-rescue`.
 export * from './form-rescue';
+export * from './legal-documents';
 
 // Doc-source viewer utilities (path parsing, tree building, section extraction,
 // embed-URL conversion) — single home for all doc-viewer pure helpers across
@@ -399,6 +427,7 @@ export * from './doc-path-utils';
 export * from './doc-tree-nav';
 export * from './tree-builder';
 export * from './markdown-heading-id';
+export * from './markdown-link';
 export * from './markdown-section-extractor';
 export * from './markdown-to-plain';
 export * from './embed-url-converters';
@@ -436,6 +465,7 @@ export {
   programDateInstant,
   programMetaFormatters,
   programMetaLine,
+  eventAudience,
   programStr,
   webinarTiming,
 } from './program-instant';
@@ -443,3 +473,12 @@ export {
 // line from one set rather than mirroring the triple.
 export { PROGRAM_META_RENDERERS } from './program-meta-renderers';
 export type { ProgramDateFields, ProgramInstant, ProgramMetaRenderers } from './program-instant';
+
+// Footer copyright line (one owner; never a double period after "Inc.").
+export { copyrightLine } from './copyright-line';
+export * from './path-pattern';
+export * from './random-id';
+export * from './demo-clock';
+export * from './identity-tint';
+export { createFenceTracker, isBlankLine } from './markdown-fences';
+export type { FenceTracker, FenceLineRole } from './markdown-fences';

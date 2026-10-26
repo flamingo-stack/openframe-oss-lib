@@ -7,6 +7,7 @@ import com.openframe.test.api.AttachmentApi;
 import com.openframe.test.api.UserApi;
 import com.openframe.test.data.dto.knowledgebase.TempAttachment;
 import com.openframe.test.data.dto.shared.MutationDeletePayload;
+import com.openframe.test.helpers.RelayIds;
 import com.openframe.test.helpers.ai.RunId;
 import com.openframe.test.data.dto.device.Machine;
 import com.openframe.test.data.dto.shared.GraphqlError;
@@ -28,6 +29,7 @@ import static com.openframe.test.data.generator.DeviceGenerator.onlineDevicesFil
 import static com.openframe.test.data.generator.KnowledgeBaseGenerator.attachmentFile;
 import static com.openframe.test.data.generator.TicketGenerator.allTickets;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 @Tag("saas")
 @DisplayName("Tickets")
@@ -43,20 +45,15 @@ public class TicketsTest extends BaseTest {
         TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
         assertThat(connection).as("Tickets connection should not be null").isNotNull();
         assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        // No withFailMessage() here on purpose. It overrides the per-field .as() descriptions below,
-        // which is what this assertion is worth: the tenant is shared, tickets arrive from the AI cases,
-        // the External API suite and every pipeline run, and ticketNumber/title/status are all nullable
-        // in the schema (only id is ID!). So a legitimate null is possible, and the failure has to name
-        // which field on which ticket -- "Expected tickets to have mandatory fields" alone is not
-        // diagnosable from a nightly log, because response bodies are not logged.
-        assertThat(connection.getEdges())
-                .allSatisfy(edge -> {
-                    Ticket ticket = edge.getNode();
-                    assertThat(ticket.getId()).as("No Id").isNotNull();
-                    assertThat(ticket.getTicketNumber()).as("No ticketNumber for " + ticket.getId()).isNotNull();
-                    assertThat(ticket.getTitle()).as("No title for " + ticket.getId()).isNotEmpty();
-                    assertThat(ticket.getStatus()).as("No status for " + ticket.getId()).isNotEmpty();
-                });
+        // The tenant is shared, so the failure has to name which field on which ticket. Collected rather
+        // than allSatisfy(): its message prints every edge before the reason, and the runner's log cuts
+        // the stack at ~2000 characters, which lost the offender on stage (KI-29).
+        List<String> missing = connection.getEdges().stream()
+                .map(TicketEdge::getNode)
+                .map(TicketsTest::missingFields)
+                .filter(problem -> problem != null)
+                .toList();
+        assertThat(missing).as("Tickets missing a mandatory field").isEmpty();
     }
 
     @Tag("feature")
@@ -188,13 +185,9 @@ public class TicketsTest extends BaseTest {
     @DisplayName("Resolve ticket")
     @Order(4)
     public void testResolveTicket() {
-        // Without the old lifecycle filter a bare listing can hand back a ticket that is already RESOLVED
-        // or ARCHIVED, and resolving one of those is not a valid transition. Select on the kind instead,
-        // the same way the archive case below does.
-        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        Ticket resolvable = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
-        assertThat(resolvable).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        // Its own ticket, not one borrowed from the shared listing: teardown archives every chat ticket
+        // the suite opens (#2376), so the top of that listing can be all ARCHIVED.
+        Ticket resolvable = newOwnTicket(me());
         String ticketId = resolvable.getId();
 
         String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
@@ -214,14 +207,13 @@ public class TicketsTest extends BaseTest {
     @Test
     @DisplayName("Archive non-resolved ticket is rejected")
     public void testArchiveActiveTicketRejected() {
-        // Only RESOLVED → ARCHIVED is a valid transition, and an unfiltered listing carries tickets in
-        // every column, so pick one whose lifecycle status kind is neither RESOLVED nor ARCHIVED.
-        TicketConnection connection = TicketApi.getTickets(allTickets(), limit(20));
-        assertThat(connection.getEdges()).as("Expected at least one ticket").isNotEmpty();
-        Ticket ticket = TicketGenerator.firstTicketWithStatusKindNotIn(connection, "RESOLVED", "ARCHIVED");
-        assertThat(ticket).as("No ticket found with a status kind outside [RESOLVED, ARCHIVED]").isNotNull();
+        // Only RESOLVED → ARCHIVED is a valid transition, so this needs a fresh ticket in neither kind —
+        // its own, for the reason given in testResolveTicket.
+        Ticket ticket = newOwnTicket(me());
         String ticketId = ticket.getId();
+        assertThat(ticket.getStatusDefinition()).as("A new ticket has a statusDefinition").isNotNull();
         String kindBefore = ticket.getStatusDefinition().getKind();
+        assertThat(kindBefore).as("A new ticket starts outside RESOLVED/ARCHIVED").isNotIn("RESOLVED", "ARCHIVED");
 
         String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
         assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
@@ -377,6 +369,25 @@ public class TicketsTest extends BaseTest {
         return UserApi.me().getUser().getId();
     }
 
+    /** "id #number: missing a, b", or null when the ticket has every field "List tickets" requires. */
+    private static String missingFields(Ticket ticket) {
+        List<String> fields = new ArrayList<>();
+        if (ticket.getId() == null) {
+            fields.add("id");
+        }
+        if (ticket.getTicketNumber() == null) {
+            fields.add("ticketNumber");
+        }
+        if (ticket.getTitle() == null || ticket.getTitle().isEmpty()) {
+            fields.add("title");
+        }
+        if (ticket.getStatus() == null || ticket.getStatus().isEmpty()) {
+            fields.add("status");
+        }
+        return fields.isEmpty() ? null
+                : ticket.getId() + " #" + ticket.getTicketNumber() + ": missing " + String.join(", ", fields);
+    }
+
     @Tag("feature")
     @Test
     @DisplayName("Take over a ticket in one operation")
@@ -420,7 +431,8 @@ public class TicketsTest extends BaseTest {
 
         TicketNote note = TicketApi.addNote(ticket.getId(), text);
         assertThat(note.getId()).as("A note has an id").isNotBlank();
-        assertThat(note.getTicketId()).as("The note belongs to the ticket").isEqualTo(ticket.getId());
+        // ticketId is a raw id on every API version; the ticket's GraphQL id is a global id after the Relay migration.
+        assertThat(note.getTicketId()).as("The note belongs to the ticket").isEqualTo(RelayIds.raw(ticket.getId()));
         assertThat(note.getContent()).as("The note content is stored").isEqualTo(text);
         assertThat(note.getAuthorId()).as("The note records its author").isNotBlank();
         assertThat(TicketApi.getTicketDetails(ticket.getId()).getNotes()).extracting(TicketNote::getId)
@@ -433,7 +445,7 @@ public class TicketsTest extends BaseTest {
 
         MutationDeletePayload deletedNote = TicketApi.deleteNote(note.getId());
         assertThat(deletedNote.getUserErrors()).as("Deleting a note reports no userErrors").isNullOrEmpty();
-        assertThat(deletedNote.getDeletedId()).as("The deleted note id is echoed").isEqualTo(note.getId());
+        assertThat(RelayIds.raw(deletedNote.getDeletedId())).as("The deleted note id is echoed").isEqualTo(RelayIds.raw(note.getId()));
         assertThat(TicketApi.getTicketDetails(ticket.getId()).getNotes()).extracting(TicketNote::getId)
                 .as("The note left the ticket").doesNotContain(note.getId());
 
@@ -461,7 +473,7 @@ public class TicketsTest extends BaseTest {
 
         MutationDeletePayload deletedAttachment = TicketApi.deleteTicketAttachment(attachment.getId());
         assertThat(deletedAttachment.getUserErrors()).as("Deleting an attachment reports no userErrors").isNullOrEmpty();
-        assertThat(deletedAttachment.getDeletedId()).as("The deleted attachment id is echoed").isEqualTo(attachment.getId());
+        assertThat(RelayIds.raw(deletedAttachment.getDeletedId())).as("The deleted attachment id is echoed").isEqualTo(RelayIds.raw(attachment.getId()));
         assertThat(TicketApi.getTicketDetails(ticket.getId()).getAttachments()).extracting(TicketAttachment::getId)
                 .as("The attachment left the ticket").doesNotContain(attachment.getId());
 
@@ -470,6 +482,32 @@ public class TicketsTest extends BaseTest {
         MutationDeletePayload deletedTemp = TicketApi.deleteTempAttachment(discarded.getId());
         assertThat(deletedTemp.getUserErrors()).as("Discarding a staged file reports no userErrors").isNullOrEmpty();
         assertThat(deletedTemp.getDeletedId()).as("The discarded staged file id is echoed").isEqualTo(discarded.getId());
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Filter tickets by device")
+    @Order(8)
+    public void testFilterTicketsByDevice() {
+        Ticket ticket = newOwnTicket(me());
+        String deviceId = ticket.getDeviceId();
+        assertThat(deviceId).as("The ticket starts linked to a device").isNotBlank();
+        assertThat(ticket.getStatusDefinition()).as("The ticket opens in a lifecycle column").isNotNull();
+        TicketFilterInput ofDevice = TicketGenerator.ticketsOfDeviceInStatus(deviceId, ticket.getStatusDefinition().getId());
+
+        TicketConnection linked = TicketApi.getTickets(ofDevice, limit(20));
+        assertThat(linked.getEdges()).extracting(edge -> edge.getNode().getId())
+                .as("The device filter returns the ticket linked to that device")
+                .contains(ticket.getId());
+        assertThat(linked.getEdges()).extracting(edge -> edge.getNode().getDeviceId())
+                .as("The device filter returns nothing linked to another device")
+                .containsOnly(deviceId);
+
+        TicketApi.unlinkDeviceFromTicket(ticket.getId());
+        TicketConnection afterUnlink = TicketApi.getTickets(ofDevice, limit(20));
+        assertThat(afterUnlink.getEdges()).extracting(edge -> edge.getNode().getId())
+                .as("An unlinked ticket drops out of its former device's list")
+                .doesNotContain(ticket.getId());
     }
 
     @Tag("feature")
@@ -558,35 +596,86 @@ public class TicketsTest extends BaseTest {
         assertThat(sum).as("Per-status counts never exceed the total").isLessThanOrEqualTo(stats.getTotalCount());
     }
 
+    @Tag("feature")
+    @Test
+    @DisplayName("Resolve two tickets of this run's own for the bulk archive: one assigned to the caller, one unassigned")
+    @Order(10)
+    public void testResolveTicketsForBulkArchive() {
+        String me = me();
+        String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+        assertThat(resolvedStatusId).as("No system status definition found for kind RESOLVED").isNotNull();
+        Ticket mine = newOwnTicket(me);
+        Ticket unassigned = newOwnTicket(null);
+        assertThat(mine.getAssignedTo()).as("The first ticket is assigned to the caller").isEqualTo(me);
+        assertThat(unassigned.getAssignedTo()).as("The second ticket has no assignee").isNull();
+        assertThat(unassigned.getOrganizationId()).as("Both tickets sit in the same organization").isEqualTo(mine.getOrganizationId());
+
+        assertThat(TicketApi.transitionTicket(mine.getId(), resolvedStatusId).getStatusDefinition().getKind())
+                .as("The caller's ticket is RESOLVED").isEqualTo("RESOLVED");
+        assertThat(TicketApi.transitionTicket(unassigned.getId(), resolvedStatusId).getStatusDefinition().getKind())
+                .as("The unassigned ticket is RESOLVED").isEqualTo("RESOLVED");
+        Ticket rereadUnassigned = TicketApi.getTicket(unassigned.getId());
+        assertThat(rereadUnassigned.getAssignedTo()).as("Resolving does not assign the unassigned ticket").isNull();
+
+        bulkArchiveAssigneeId = me;
+        bulkArchiveOrganizationId = mine.getOrganizationId();
+        bulkArchiveMineId = mine.getId();
+        bulkArchiveUnassignedId = unassigned.getId();
+    }
+
+    @Tag("feature")
+    @Test
+    @DisplayName("Archive resolved tickets in bulk, narrowed to one organization and the caller as assignee")
+    @Order(11)
+    public void testArchiveResolvedTickets() {
+        requireResolvedForBulkArchive();
+        String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+        assertThat(archivedStatusId).as("No system status definition found for kind ARCHIVED").isNotNull();
+
+        // The owner allowed this tenant-wide write on test-env; the filter keeps it to the caller's tickets in one organization.
+        BulkOperationPayload payload = TicketApi.archiveResolvedTickets(
+                TicketGenerator.ticketsOfOrganizationAssignedTo(bulkArchiveOrganizationId, bulkArchiveAssigneeId));
+        assertThat(payload).as("archiveResolvedTickets returns a payload").isNotNull();
+        assertThat(payload.getUserErrors()).as("The bulk archive reports no userErrors").isNullOrEmpty();
+        assertThat(payload.getCount()).as("At least this run's resolved ticket was archived").isGreaterThanOrEqualTo(1);
+
+        Ticket mine = TicketApi.getTicket(bulkArchiveMineId);
+        assertThat(mine.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(mine.getStatusDefinition().getId()).as("The caller's resolved ticket moved to the ARCHIVED status definition").isEqualTo(archivedStatusId);
+        assertThat(mine.getStatusDefinition().getKind()).as("The caller's resolved ticket is ARCHIVED").isEqualTo("ARCHIVED");
+
+        Ticket unassigned = TicketApi.getTicket(bulkArchiveUnassignedId);
+        assertThat(unassigned.getStatusDefinition()).as("statusDefinition should be present").isNotNull();
+        assertThat(unassigned.getStatusDefinition().getKind()).as("A resolved ticket outside the assignee filter stays RESOLVED").isEqualTo("RESOLVED");
+    }
+
+    private static String bulkArchiveAssigneeId;
+    private static String bulkArchiveOrganizationId;
+    private static String bulkArchiveMineId;
+    private static String bulkArchiveUnassignedId;
+
+    private static void requireResolvedForBulkArchive() {
+        assumeTrue(bulkArchiveMineId != null,
+                "No resolved tickets were prepared in \"Resolve two tickets of this run's own for the bulk archive\"; see that failure");
+    }
+
+    // Undoes only what a failed run left behind: staged files, own tickets not yet ARCHIVED, custom statuses; raw calls never throw.
     @AfterAll
     public static void cleanupOwnTicketsAndStatuses() {
-        for (String id : stagedAttachmentIds) {
-            try {
-                TicketApi.deleteTempAttachment(id);
-            } catch (RuntimeException | AssertionError ignored) {
-                // best effort: already discarded by the case, or gone with its ticket
-            }
-        }
-        for (Ticket ticket : createdTickets) {
-            try {
-                Ticket current = TicketApi.getTicket(ticket.getId());
-                String kind = current.getStatusDefinition() == null ? null : current.getStatusDefinition().getKind();
+        stagedAttachmentIds.forEach(TicketApi::deleteTempAttachmentRaw);
+        if (!createdTickets.isEmpty()) {
+            String resolvedStatusId = TicketApi.resolveSystemStatusId("RESOLVED");
+            String archivedStatusId = TicketApi.resolveSystemStatusId("ARCHIVED");
+            for (Ticket ticket : createdTickets) {
+                String kind = TicketApi.ticketKindRaw(ticket.getId());
                 if (!"RESOLVED".equals(kind) && !"ARCHIVED".equals(kind)) {
-                    TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("RESOLVED"));
+                    TicketApi.transitionTicketRaw(ticket.getId(), resolvedStatusId);
                 }
                 if (!"ARCHIVED".equals(kind)) {
-                    TicketApi.transitionTicket(ticket.getId(), TicketApi.resolveSystemStatusId("ARCHIVED"));
+                    TicketApi.transitionTicketRaw(ticket.getId(), archivedStatusId);
                 }
-            } catch (RuntimeException | AssertionError ignored) {
-                // best effort: a failed cleanup must not mask the case that failed
             }
         }
-        for (String id : createdStatusIds) {
-            try {
-                TicketApi.deleteTicketStatus(id);
-            } catch (RuntimeException | AssertionError ignored) {
-                // best effort
-            }
-        }
+        createdStatusIds.forEach(TicketApi::deleteTicketStatusRaw);
     }
 }

@@ -2,10 +2,10 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { MingoAiButton } from '../components/navigation/mingo-ai-button';
 
 /**
- * Marketing-header Mingo AI launcher. Full-height and flush inside the 72px
- * unified header: the decorator reproduces that context so the left border
- * divider and traveling accent edge light render as they do in `Header` (`config.mingo`).
- * The "Mingo AI" label hides below `md` (icon-only, see IconOnly).
+ * The Mingo AI launcher: a 40px rounded button in `SiteHeader`'s right cluster
+ * with a 1px travelling accent edge light. The decorator reproduces the 72px
+ * bar. The name and the shortcut key cap hide below `lg` (icon-only, see
+ * IconOnly); `variant="field"` is the mobile menu's plain row.
  */
 const meta = {
   title: 'Navigation/MingoAiButton',
@@ -35,7 +35,7 @@ export const Default: Story = {
   },
 };
 
-/** Below `md` the wordmark is hidden and only the Mingo icon shows. */
+/** Below `lg` the name is hidden and only the Mingo icon shows. */
 export const IconOnly: Story = {
   args: {
     source: 'flamingo',

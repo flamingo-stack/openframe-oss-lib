@@ -199,6 +199,17 @@ public class KnowledgeBaseApi {
                 .extract().jsonPath().getBoolean("data.deleteFolder");
     }
 
+    // A folder delete for teardown, where the folder may already be gone: returns the HTTP status instead of asserting.
+    public static int deleteFolderRaw(DeleteFolderInput input) {
+        Map<String, Object> body = Map.of(
+                "query", DELETE_FOLDER,
+                "variables", Map.of("input", input)
+        );
+        return given(getAuthorizedSpec())
+                .body(body).post(GRAPHQL)
+                .then().extract().statusCode();
+    }
+
     public static KnowledgeBaseItem archiveArticle(String articleId) {
         Map<String, Object> body = Map.of(
                 "query", ARCHIVE_ARTICLE,

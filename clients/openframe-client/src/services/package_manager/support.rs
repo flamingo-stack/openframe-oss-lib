@@ -1,6 +1,15 @@
 use super::ManagerId;
+use std::collections::BTreeMap;
 use std::sync::{Once, OnceLock};
-use tracing::{info, warn};
+use tracing::info;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum Os {
+    Mac,
+    Windows,
+    Other,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Arch {
@@ -19,6 +28,7 @@ enum ProductType {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct OsSpec {
+    os: Os,
     arch: Arch,
     product_type: ProductType,
     edition_id: Option<String>,
@@ -51,11 +61,15 @@ fn support_of(id: ManagerId, spec: &OsSpec) -> Support {
     match id {
         ManagerId::Brew => brew(spec),
         ManagerId::Winget => winget(spec),
-        ManagerId::Choco => Support::Supported,
+        ManagerId::Choco => Support::Unsupported("Chocolatey is not enabled"),
     }
 }
 
 fn brew(spec: &OsSpec) -> Support {
+    if spec.os != Os::Mac {
+        return Support::Unsupported("Homebrew is macOS only");
+    }
+
     match spec.arch {
         Arch::X86_64 => Support::Unsupported("Homebrew is Apple Silicon only"),
         Arch::Arm64 | Arch::Unknown => Support::Supported,
@@ -63,6 +77,10 @@ fn brew(spec: &OsSpec) -> Support {
 }
 
 fn winget(spec: &OsSpec) -> Support {
+    if spec.os != Os::Windows {
+        return Support::Unsupported("winget is Windows only");
+    }
+
     let edition = spec.edition_id.as_deref();
 
     if spec.build.is_some_and(|build| build < MIN_WINGET_BUILD) {
@@ -96,41 +114,31 @@ fn current() -> &'static OsSpec {
     static LOGGED: Once = Once::new();
 
     let spec = SPEC.get_or_init(detect);
-    LOGGED.call_once(|| {
-        log_spec(spec);
-        log_gated_managers(spec);
-    });
+    LOGGED.call_once(|| log_spec(spec));
     spec
 }
 
 fn log_spec(spec: &OsSpec) {
+    let verdicts: BTreeMap<ManagerId, Support> = ManagerId::ALL
+        .iter()
+        .map(|id| (*id, support_of(*id, spec)))
+        .collect();
+
     info!(
+        os = ?spec.os,
         arch = ?spec.arch,
         product_type = ?spec.product_type,
         edition_id = ?spec.edition_id,
         build = ?spec.build,
-        "Detected machine spec for package manager support"
+        verdicts = ?verdicts,
+        "Resolved package manager support"
     );
-}
-
-fn log_gated_managers(spec: &OsSpec) {
-    for id in ManagerId::for_current_platform() {
-        if let Support::Unsupported(reason) = support_of(*id, spec) {
-            warn!(
-                manager = ?id,
-                reason,
-                product_type = ?spec.product_type,
-                edition_id = ?spec.edition_id,
-                build = ?spec.build,
-                "Package manager gated as unsupported on this machine"
-            );
-        }
-    }
 }
 
 #[cfg(target_os = "macos")]
 fn detect() -> OsSpec {
     OsSpec {
+        os: Os::Mac,
         arch: macos_arch(),
         product_type: ProductType::Unknown,
         edition_id: None,
@@ -207,6 +215,7 @@ fn detect() -> OsSpec {
         .and_then(|value| value.trim().parse().ok());
 
     OsSpec {
+        os: Os::Windows,
         arch,
         product_type,
         edition_id,
@@ -217,6 +226,7 @@ fn detect() -> OsSpec {
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn detect() -> OsSpec {
     OsSpec {
+        os: Os::Other,
         arch: Arch::Unknown,
         product_type: ProductType::Unknown,
         edition_id: None,

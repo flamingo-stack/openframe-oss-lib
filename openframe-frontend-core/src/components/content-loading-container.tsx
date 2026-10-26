@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '../utils/cn';
+import { LoadingRegion } from './loading/loading-region';
 
 interface ContentLoadingContainerProps {
   /**
@@ -50,7 +51,7 @@ interface ContentLoadingContainerProps {
  * ```tsx
  * <ContentLoadingContainer
  *   isLoading={isLoadingVendors}
- *   skeletonComponent={<CardSkeletonGrid variant="vendor" count={12} />}
+ *   skeletonComponent={<CardSkeletonGrid variant="vendor" count={12} region={false} />}
  *   minHeight="min-h-[800px]"
  * >
  *   <VendorGrid vendors={vendors} />
@@ -62,7 +63,7 @@ export function ContentLoadingContainer({
   children,
   skeletonComponent,
   className,
-  minHeight = 'min-h-[300px] md:min-h-[800px]',
+  minHeight = 'min-h-[300px] content-md:min-h-[800px]',
   loadingOpacity = 1,
   transitionDuration = 300,
 }: ContentLoadingContainerProps) {
@@ -72,23 +73,21 @@ export function ContentLoadingContainer({
       style={{
         transitionDuration: `${transitionDuration}ms`,
       }}
-      role="region"
-      aria-label={isLoading ? 'Loading content' : 'Content loaded'}
-      aria-live="polite"
     >
       {/* Loading Skeleton Overlay */}
       {isLoading && (
-        <div
+        // The one announcement for this content: a `skeletonComponent` that has a region of its own
+        // takes `region={false}`.
+        <LoadingRegion
+          label="Loading content"
           className="absolute inset-0 z-10 bg-ods-bg"
           style={{
             opacity: loadingOpacity,
             transition: `opacity ${transitionDuration}ms ease-in-out`,
           }}
-          role="status"
-          aria-label="Loading content"
         >
           {skeletonComponent}
-        </div>
+        </LoadingRegion>
       )}
 
       {/* Actual Content */}
@@ -120,7 +119,9 @@ export function useContentLoading(isLoading: boolean) {
 
   const getMinHeight = (contentType: 'vendor' | 'blog') => {
     // Vendor cards are typically taller, need more space
-    return contentType === 'vendor' ? 'min-h-[400px] md:min-h-[900px]' : 'min-h-[300px] md:min-h-[800px]';
+    return contentType === 'vendor'
+      ? 'min-h-[400px] content-md:min-h-[900px]'
+      : 'min-h-[300px] content-md:min-h-[800px]';
   };
 
   return {

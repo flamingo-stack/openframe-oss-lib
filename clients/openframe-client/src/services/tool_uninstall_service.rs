@@ -4,10 +4,14 @@ use crate::platform::file_lock::log_file_lock_info;
 #[cfg(target_os = "macos")]
 use crate::platform::remove_app_bundle;
 use crate::platform::DirectoryManager;
+use crate::services::tool_ops::ToolOps;
+use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::InstalledToolsService;
 use crate::services::ToolCommandParamsResolver;
 use crate::services::ToolKillService;
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
+use futures::FutureExt;
+use std::panic::AssertUnwindSafe;
 use std::process::Stdio;
 use std::time::Instant;
 use tokio::io::AsyncReadExt;
@@ -86,6 +90,7 @@ fn emit_command_line(line: &mut Vec<u8>, tool_agent_id: &str, stream: &'static s
 pub enum UninstallOutcome {
     Removed,
     NotInstalled,
+    Busy,
 }
 
 #[derive(Clone)]
@@ -111,10 +116,25 @@ impl ToolUninstallService {
         }
     }
 
-    pub async fn uninstall_by_tool_agent_id(
+    pub async fn uninstall_guarded(
         &self,
         tool_agent_id: &str,
+        tool_ops: &ToolOps,
+        tool_run_manager: &ToolRunManager,
     ) -> Result<UninstallOutcome> {
+        let _op = match tool_ops.try_lock(tool_agent_id) {
+            Ok(lock) => lock.mark_busy(),
+            Err(_) => return Ok(UninstallOutcome::Busy),
+        };
+        let outcome = AssertUnwindSafe(self.uninstall_by_tool_agent_id(tool_agent_id))
+            .catch_unwind()
+            .await
+            .map_err(|_| anyhow!("Uninstall panicked for tool {}", tool_agent_id))??;
+        tool_run_manager.clear_running_tool(tool_agent_id).await;
+        Ok(outcome)
+    }
+
+    async fn uninstall_by_tool_agent_id(&self, tool_agent_id: &str) -> Result<UninstallOutcome> {
         match self
             .installed_tools_service
             .get_by_tool_agent_id(tool_agent_id)
@@ -415,3 +435,7 @@ impl ToolUninstallService {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tool_uninstall_service_tests.rs"]
+mod tests;

@@ -298,6 +298,16 @@ fn read_capped_file(path: &Path) -> String {
     }
 }
 
+pub(crate) async fn console_user_present() -> bool {
+    match InteractiveToken::token_for_active_session() {
+        Some(token) => {
+            close(token);
+            true
+        }
+        None => false,
+    }
+}
+
 struct InteractiveToken(HANDLE);
 
 impl InteractiveToken {

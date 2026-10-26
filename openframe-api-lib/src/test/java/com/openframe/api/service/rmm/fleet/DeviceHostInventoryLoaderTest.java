@@ -15,6 +15,7 @@ import com.openframe.sdk.fleetmdm.model.Host;
 import com.openframe.sdk.fleetmdm.model.HostSearchRequest;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareResponse;
 import com.openframe.sdk.fleetmdm.model.HostSoftwareTitle;
+import com.openframe.sdk.fleetmdm.model.HostVulnerabilityInventory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,7 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -230,6 +232,40 @@ class DeviceHostInventoryLoaderTest {
         assertThat(inventory.getTitles())
                 .extracting(HostSoftwareTitle::getName)
                 .containsExactly("Google Chrome", "node");
+    }
+
+    @Test
+    void load_fleetPaging_softwareDetailsFromThatHostOnly() {
+        // setup
+        ReflectionTestUtils.setField(loader, "fleetPaging", true);
+        stubCorrelatedHost();
+        stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0", CVE_A));
+        when(fleet.getHostVulnerabilityInventoryById(HOST_ID)).thenReturn(new HostVulnerabilityInventory(HOST_ID, "host-1",
+                null, List.of(hostSoftware("Google Chrome", "120.0", vulnerability(CVE_A, 9.8, null)))));
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        CveHit hit = inventory.hits().findFirst().orElseThrow();
+        assertThat(inventory.detail(hit)).map(FleetVulnerability::getCvssScore).contains(9.8);
+        verifyNoInteractions(hostSoftwareCache);
+    }
+
+    @Test
+    void load_fleetPaging_hostGoneFromFleet_titlesKeptWithoutCveDetails() {
+        // setup
+        ReflectionTestUtils.setField(loader, "fleetPaging", true);
+        stubCorrelatedHost();
+        stubHostSoftwarePage(0, false, title(10L, "Google Chrome", "apps", "120.0", CVE_A));
+        when(fleet.getHostVulnerabilityInventoryById(HOST_ID)).thenReturn(null);
+
+        // execution
+        HostInventory inventory = loader.load(fleet, MACHINE_ID);
+
+        // verifications
+        assertThat(inventory.getTitles()).extracting(HostSoftwareTitle::getName).containsExactly("Google Chrome");
+        assertThat(inventory.detail(inventory.hits().findFirst().orElseThrow())).isEmpty();
     }
 
     private void stubMachineLookup() {

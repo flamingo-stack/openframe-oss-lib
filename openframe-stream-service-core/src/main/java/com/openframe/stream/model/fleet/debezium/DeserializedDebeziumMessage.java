@@ -19,6 +19,7 @@ public class DeserializedDebeziumMessage extends CommonDebeziumMessage {
     private String ingestDay;
     private String toolEventId;
     private String agentId;
+    private String machineId;
     private String sourceEventType;
     private String message;
     private IntegratedToolType integratedToolType;

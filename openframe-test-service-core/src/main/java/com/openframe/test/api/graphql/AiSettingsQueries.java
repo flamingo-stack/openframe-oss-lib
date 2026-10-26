@@ -88,4 +88,86 @@ public class AiSettingsQueries {
                 }
             }
             """ + CLIENT_VIEW_FIELDS;
+
+    private static final String ORGANIZATION_AI_CONFIG_FIELDS = """
+            fragment organizationAiConfigFields on OrganizationClientAiConfig {
+                organizationId
+                inheritDefault
+                llmProvider
+                providerModel
+                answerStyle
+                customPrompt
+                quickActions { id name instructions }
+                quickActionsIsDefault
+                updatedAt
+            }
+            """;
+
+    private static final String ORGANIZATION_GUARDRAILS_FIELDS = """
+            fragment organizationGuardrailsFields on OrganizationGuardrails {
+                organizationId
+                inheritDefault
+                sourceTemplate
+                active
+                rules { tool function policyGroup category operation commandPattern approvalLevel naturalKey }
+                overrides { naturalKey approvalLevel }
+            }
+            """;
+
+    public static final String ORGANIZATION_CLIENT_AI_CONFIG = """
+            query OrganizationClientAiConfig($organizationId: ID!) {
+                organizationClientAiConfig(organizationId: $organizationId) { ...organizationAiConfigFields }
+            }
+            """ + ORGANIZATION_AI_CONFIG_FIELDS;
+
+    public static final String UPDATE_ORGANIZATION_CLIENT_AI_CONFIG = """
+            mutation UpdateOrganizationClientAiConfig($organizationId: ID!, $input: AgentAiConfigInput!) {
+                updateOrganizationClientAiConfig(organizationId: $organizationId, input: $input) {
+                    config { ...organizationAiConfigFields }
+                    userErrors { field message }
+                }
+            }
+            """ + ORGANIZATION_AI_CONFIG_FIELDS;
+
+    public static final String RESET_ORGANIZATION_CLIENT_AI_CONFIG = """
+            mutation ResetOrganizationClientAiConfig($organizationId: ID!) {
+                resetOrganizationClientAiConfig(organizationId: $organizationId) {
+                    config { ...organizationAiConfigFields }
+                    userErrors { field message }
+                }
+            }
+            """ + ORGANIZATION_AI_CONFIG_FIELDS;
+
+    public static final String RESET_ORGANIZATION_CLIENT_AI_QUICK_ACTIONS = """
+            mutation ResetOrganizationClientAiQuickActions($organizationId: ID!) {
+                resetOrganizationClientAiQuickActions(organizationId: $organizationId) {
+                    config { ...organizationAiConfigFields }
+                    userErrors { field message }
+                }
+            }
+            """ + ORGANIZATION_AI_CONFIG_FIELDS;
+
+    public static final String ORGANIZATION_GUARDRAILS = """
+            query OrganizationGuardrails($organizationId: ID!) {
+                organizationGuardrails(organizationId: $organizationId) { ...organizationGuardrailsFields }
+            }
+            """ + ORGANIZATION_GUARDRAILS_FIELDS;
+
+    public static final String UPDATE_ORGANIZATION_GUARDRAILS = """
+            mutation UpdateOrganizationGuardrails($organizationId: ID!, $input: OrganizationGuardrailsInput!) {
+                updateOrganizationGuardrails(organizationId: $organizationId, input: $input) {
+                    guardrails { ...organizationGuardrailsFields }
+                    userErrors { field message }
+                }
+            }
+            """ + ORGANIZATION_GUARDRAILS_FIELDS;
+
+    public static final String RESET_ORGANIZATION_GUARDRAILS = """
+            mutation ResetOrganizationGuardrails($organizationId: ID!) {
+                resetOrganizationGuardrails(organizationId: $organizationId) {
+                    guardrails { ...organizationGuardrailsFields }
+                    userErrors { field message }
+                }
+            }
+            """ + ORGANIZATION_GUARDRAILS_FIELDS;
 }

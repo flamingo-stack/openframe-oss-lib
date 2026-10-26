@@ -3,6 +3,7 @@ package com.openframe.api.service.ticket;
 import com.openframe.api.dto.ticket.ReorderTicketInput;
 import com.openframe.api.service.AssignmentService;
 import com.openframe.api.service.ticket.spi.TicketEventListener;
+import com.openframe.core.exception.ForbiddenException;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.document.ticket.TicketStatusKind;
 import com.openframe.data.repository.device.MachineRepository;
@@ -88,7 +89,7 @@ class TicketServiceReorderTest {
         AuthPrincipal agent = principal(ActorType.AGENT);
 
         assertThatThrownBy(() -> service.reorderTicket(agent, input(COLUMN_ID)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ForbiddenException.class);
 
         verify(ticketLifecycleService, never()).reorderTicket(any(), any());
     }

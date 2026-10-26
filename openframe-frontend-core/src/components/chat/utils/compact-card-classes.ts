@@ -1,3 +1,4 @@
+import { MEDIA_ASPECT, TILE_SIZE } from '../../../styles/component-sizes';
 import { UNSAFE_URL_CHARS, isSameOriginPath } from '../../../utils/url-safety';
 
 /**
@@ -26,17 +27,16 @@ export const COMPACT_CARD_OUTER =
 export const COMPACT_CARD_OUTER_STATIC =
   'my-1.5 flex items-start gap-3 w-full p-2 rounded-lg border border-ods-border bg-ods-card no-underline cursor-default';
 
-/** Skeleton outer frame — same dimensions as loaded, plus `animate-pulse`. */
+/** Skeleton outer frame: same dimensions as loaded. Static; its placeholders are `UnifiedSkeleton`s. */
 export const COMPACT_CARD_SKELETON_OUTER =
-  'my-1.5 flex w-full animate-pulse items-start gap-3 rounded-lg border border-ods-border bg-ods-card p-2';
+  'my-1.5 flex w-full items-start gap-3 rounded-lg border border-ods-border bg-ods-card p-2';
 
 /** 56×56 image slot — for cards with a cover image. */
 export const COMPACT_CARD_IMAGE_SLOT =
   'relative block shrink-0 self-start w-14 h-14 aspect-square overflow-hidden rounded-md bg-ods-bg';
 
-/** 56×56 placeholder slot for skeletons. */
-export const COMPACT_CARD_SKELETON_IMAGE_SLOT =
-  'block h-14 w-14 aspect-square shrink-0 self-start rounded-md bg-ods-bg';
+/** 56×56 placeholder slot for skeletons: the box of a `UnifiedSkeleton as="span"`, which draws the surface. */
+export const COMPACT_CARD_SKELETON_IMAGE_SLOT = `block ${TILE_SIZE.thumb} ${MEDIA_ASPECT.square} shrink-0 self-start rounded-md`;
 
 /** 56×56 icon slot — for cards without a cover image. */
 export const COMPACT_CARD_ICON_SLOT =
@@ -51,8 +51,20 @@ export const COMPACT_CARD_TITLE_ROW = 'flex items-center min-w-0 h-5';
 /** Subtitle / summary row container — fixed 16px (h-4). */
 export const COMPACT_CARD_META_ROW_BOX = 'flex items-center min-w-0 h-4';
 
+/** The title's type: bold 14px on a 20px line (the skeleton's title bar takes the same line). */
+export const COMPACT_CARD_TITLE_TYPE = 'text-sm font-semibold leading-5';
+
 /** Title text — bold 14px on a 20px line. */
-export const COMPACT_CARD_TITLE = 'truncate text-sm font-semibold leading-5 text-ods-text-primary';
+export const COMPACT_CARD_TITLE = `truncate ${COMPACT_CARD_TITLE_TYPE} text-ods-text-primary`;
+
+/** Title row that wraps (the title followed by its badges), for cards with no fixed title row. */
+export const COMPACT_CARD_TITLE_WRAP_ROW = 'flex min-w-0 flex-wrap items-center gap-1.5';
+
+/** Two-line preview under the title (data-room docs, generic entities, tickets). */
+export const COMPACT_CARD_PREVIEW = 'line-clamp-2 whitespace-pre-wrap break-words text-ods-text-secondary text-h6';
+
+/** The trailing external-link icon's slot, top-aligned with the title. */
+export const COMPACT_CARD_TRAILING_ICON = 'flex h-5 shrink-0 items-center self-start text-ods-text-secondary';
 
 /** Subtitle text — 11px on a 16px line. */
 export const COMPACT_CARD_SUBTITLE = 'truncate text-h6 text-ods-text-secondary';

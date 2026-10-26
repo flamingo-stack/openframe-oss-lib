@@ -58,6 +58,11 @@ enum AssignmentTargetType {
     KNOWLEDGE_ARTICLE
 }
 
+input AssignmentTargetInput {
+    targetType: AssignmentTargetType!
+    targetId: ID!
+}
+
 # Extend existing types to implement AssignableTarget
 extend type Organization implements AssignableTarget
 extend type Machine implements AssignableTarget
@@ -67,13 +72,18 @@ extend type Machine implements AssignableTarget
 # Fields requiring DataLoaders (assignee User, attachments, notes, dialog, labels) are
 # only on the ai-agent side; query ticket(id) there for full detail.
 # TODO: Remove after Apollo Federation migration — single shared Ticket type.
-type Ticket implements AssignableTarget & Node {
+type Ticket implements AssignableTarget & Node @key(fields: "id", resolvable: false) @shareable {
     id: ID!
     ticketNumber: Int
     title: String
     description: String
-    status: String
-    creationSource: String
+    status: TicketStatus
+    # The lifecycle status: the kind drives the canonical chip styling, the definition carries the
+    # name and colour a custom column is drawn from. `status` above is the legacy status and reports
+    # every custom column as TECH_REQUIRED — it stays only for clients that have not migrated.
+    statusKind: TicketStatusKind
+    statusDefinition: TicketStatusDefinition
+    creationSource: TicketCreationSource
 
     deviceId: String
     deviceHostname: String
@@ -90,4 +100,38 @@ type Ticket implements AssignableTarget & Node {
     createdAt: Instant
     updatedAt: Instant
     resolvedAt: Instant
+}
+
+# Mirrors the lifecycle status types in ai-agent's ticket.graphqls so a client can reuse the same
+# mapping for an assigned ticket as for the board.
+# TODO: Remove after Apollo Federation migration — single shared Ticket type.
+enum TicketStatusKind {
+    AI_ASSISTANCE
+    TECH_REQUIRED
+    RESOLVED
+    ARCHIVED
+    CUSTOM
+}
+
+type TicketStatusDefinition @key(fields: "id", resolvable: false) @shareable {
+    id: ID!
+    name: String!
+    color: String!
+    kind: TicketStatusKind!
+}
+
+# Same values as ai-agent's ticket.graphqls and the TicketStatus / TicketCreationSource Java enums; the
+# federated Ticket field must have one type in both subgraphs.
+enum TicketStatus {
+    ACTIVE
+    TECH_REQUIRED
+    ON_HOLD
+    RESOLVED
+    ARCHIVED
+}
+
+enum TicketCreationSource {
+    FAE_FORM
+    FAE_DIALOG
+    ADMIN_DASHBOARD
 }

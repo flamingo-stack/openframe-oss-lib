@@ -10,6 +10,7 @@ import com.openframe.authz.util.AppleUserParam;
 import com.openframe.authz.util.SsoAuthentication;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.web.Redirects;
+import com.openframe.core.exception.AuthFlowException;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -18,6 +19,8 @@ import java.util.Optional;
 import static com.openframe.authz.util.OidcUserUtils.resolveEmail;
 import static com.openframe.authz.web.AuthStateUtils.clearCookie;
 import static com.openframe.authz.web.Redirects.foundAtRoot;
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_PROVIDED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static org.springframework.util.StringUtils.hasText;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ROOT;
@@ -36,7 +39,7 @@ public interface SsoFlowHandler {
 
     default Cookie requireCookie(HttpServletRequest request) {
         Cookie c = resolveCookie(request);
-        if (c == null) throw new IllegalStateException("SSO session expired. Please try again.");
+        if (c == null) throw new AuthFlowException(SSO_SESSION_EXPIRED, "SSO session expired. Please try again.");
         return c;
     }
 
@@ -69,7 +72,7 @@ public interface SsoFlowHandler {
 
     default String requireEmail(OidcUser u) {
         String email = resolveEmail(u);
-        if (email == null || email.isBlank()) throw new IllegalStateException("Email not provided by SSO provider. Please use an account with a verified email.");
+        if (email == null || email.isBlank()) throw new AuthFlowException(EMAIL_NOT_PROVIDED, "Email not provided by SSO provider. Please use an account with a verified email.");
         return email.toLowerCase(ROOT);
     }
 

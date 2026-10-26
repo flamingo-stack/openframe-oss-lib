@@ -1,6 +1,8 @@
 'use client';
 
 import { cn } from '../../utils/cn';
+import { UnifiedSkeleton } from '../loading/unified-skeleton';
+import { LoadingItems, useLoadingScope } from './loading-scope';
 import { SquareAvatar } from './square-avatar';
 
 /**
@@ -33,6 +35,10 @@ export interface AvatarStackProps {
    * so the text beside every stack starts at the same x.
    */
   slots?: number;
+  /** How many people the group has when `people` is only a sample of it (a
+   *  server that returns the first few faces plus a count). The "+N" circle
+   *  then counts everyone not shown. Defaults to `people.length`. */
+  total?: number;
   /** Size bucket (also sizes the "+N" circle). `xs` (24px) is for
    *  dense card meta rows (chat compact cards, delivery rows). */
   size?: AvatarStackSize;
@@ -45,6 +51,9 @@ export interface AvatarStackProps {
    *  Default "Assignees". */
   label?: string;
   className?: string;
+  /** The people are still being read: the stack draws its skeleton, `slots ?? max` faces of its size. A loading scope
+   *  does the same. */
+  loading?: boolean;
 }
 
 /** Face diameter and how far each later face tucks under the previous one — the
@@ -59,45 +68,98 @@ const OVERFLOW_CIRCLE_SIZE: Record<AvatarStackSize, string> = {
   lg: 'h-12 min-w-12',
 };
 
+const STACK_ROW_CLASS = 'flex items-center';
+/** How far each later face tucks under the previous one, as the class both the stack and its skeleton use. */
+const overlapClass = (size: AvatarStackSize) => (size === 'xs' ? '-ml-2' : '-ml-3');
+/** A fixed-width stack's width (`slots`). */
+const slotsWidthStyle = (size: AvatarStackSize, slots?: number) =>
+  slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined;
+
+/** Faces a stack shows when the host states no `max`, and so the faces it draws while its people are read. */
+const AVATAR_STACK_MAX_FACES = 3;
+
+/** A stack while its people are read: `count` overlapped circles of the faces' size. */
+function AvatarStackSkeleton({
+  count = AVATAR_STACK_MAX_FACES,
+  size = 'md',
+  slots,
+  className,
+}: {
+  count?: number;
+  size?: AvatarStackSize;
+  slots?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
+      style={slotsWidthStyle(size, slots)}
+    >
+      <LoadingItems count={count}>
+        {i => (
+          <UnifiedSkeleton
+            data-loading-item
+            variant="circular"
+            className={cn('relative shrink-0 ring-2 ring-ods-card', i > 0 && overlapClass(size))}
+            width={SIZE_PX[size]}
+            height={SIZE_PX[size]}
+          />
+        )}
+      </LoadingItems>
+    </div>
+  );
+}
+
 export function AvatarStack({
   people,
-  max = 3,
+  max = AVATAR_STACK_MAX_FACES,
   slots,
+  total,
   size = 'md',
   ringClassName = 'ring-ods-card',
   label = 'Assignees',
   className,
+  loading: loadingProp,
 }: AvatarStackProps) {
+  const loading = useLoadingScope() || !!loadingProp;
+  if (loading) return <AvatarStackSkeleton count={slots ?? max} size={size} slots={slots} className={className} />;
   if (people.length === 0) return null;
-  const faces = slots ? (people.length > slots ? slots - 1 : slots) : max;
+  const groupSize = Math.max(total ?? people.length, people.length);
+  const faces = slots ? (groupSize > slots ? slots - 1 : slots) : max;
   const visible = people.slice(0, faces);
   const overflow = people.slice(faces);
+  const overflowCount = groupSize - visible.length;
+  const names = people.map(p => p.name).join(', ');
+  // Names beyond the sample are unknown here; say how many there are instead.
+  const unnamed = groupSize - people.length;
   const compact = size === 'xs';
   return (
     <div
-      className={cn('flex items-center', slots && 'shrink-0', className)}
-      style={slots ? { width: SIZE_PX[size] + (slots - 1) * (SIZE_PX[size] - OVERLAP_PX[size]) } : undefined}
+      className={cn(STACK_ROW_CLASS, slots && 'shrink-0', className)}
+      style={slotsWidthStyle(size, slots)}
       role="group"
-      aria-label={`${label}: ${people.map(p => p.name).join(', ')}`}
+      aria-label={`${label}: ${names}${unnamed > 0 ? ` and ${unnamed} more` : ''}`}
     >
       {visible.map((person, i) => (
         <SquareAvatar
           key={person.key ?? `${person.name}-${i}`}
+          data-loading-item
           variant="round"
           size={size}
           src={person.avatarUrl ?? undefined}
           alt={person.name}
           fallback={person.name}
           title={person.name}
-          className={cn('relative ring-2', ringClassName, i > 0 && (compact ? '-ml-2' : '-ml-3'))}
+          className={cn('relative ring-2', ringClassName, i > 0 && overlapClass(size))}
           // Leftmost (primary assignee) on TOP — later avatars tuck
           // BEHIND, so the first face is always fully visible.
           style={{ zIndex: visible.length - i }}
         />
       ))}
-      {overflow.length > 0 && (
+      {overflowCount > 0 && (
         <span
-          title={overflow.map(p => p.name).join(', ')}
+          title={overflow.length > 0 ? overflow.map(p => p.name).join(', ') : `${overflowCount} more`}
           className={cn(
             'relative z-0 flex shrink-0 items-center justify-center rounded-full bg-ods-bg text-ods-text-secondary ring-2',
             ringClassName,
@@ -109,7 +171,7 @@ export function AvatarStack({
             OVERFLOW_CIRCLE_SIZE[size],
           )}
         >
-          +{overflow.length}
+          +{overflowCount}
         </span>
       )}
     </div>

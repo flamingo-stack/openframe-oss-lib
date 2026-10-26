@@ -5,6 +5,7 @@ import com.mongodb.client.result.UpdateResult;
 import com.openframe.data.document.delivery.DeliveryFailure;
 import com.openframe.data.document.delivery.DeliveryStatus;
 import com.openframe.data.document.delivery.MachineDelivery;
+import com.openframe.data.repository.delivery.RerunPublication;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.mongodb.core.convert.MongoConverter;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -21,6 +23,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -35,6 +38,7 @@ class CustomMachineDeliveryRepositoryImplTest {
     private static final int ATTEMPTS = 1;
     private static final String DISPATCH_ID = "d-1";
     private static final String ERROR = "download failed";
+    private static final String PAYLOAD_JSON = "{\"value\":\"fleetmdm-agent\"}";
 
     @Mock private TenantAwareMongoTemplate mongoTemplate;
     @Mock private MongoConverter converter;
@@ -80,10 +84,46 @@ class CustomMachineDeliveryRepositoryImplTest {
 
         // verifications
         verify(mongoTemplate).upsert(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class));
-        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID);
+        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains(ID).contains("$or").contains("sequence");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("$set")
                 .contains("tenantId=" + TENANT_ID);
+    }
+
+    @Test
+    void upsertPending_rowHeldByANewerDispatch_duplicateKeyThenNoRowMatchesFalse() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).sequence(42).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+        when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenThrow(new DuplicateKeyException("E11000"));
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenReturn(UpdateResult.acknowledged(0, 0L, null));
+
+        // execution
+        boolean taken = repository.upsertPending(delivery);
+
+        // verifications
+        assertThat(taken).isFalse();
+    }
+
+    @Test
+    void upsertPending_olderRowInsertedByAnotherPodMeanwhile_duplicateKeyThenUpdateMatchesTrue() {
+        // setup
+        MachineDelivery delivery = MachineDelivery.builder().id(ID).machineId(MACHINE_ID).sequence(42).build();
+        when(mongoTemplate.getConverter()).thenReturn(converter);
+        when(mongoTemplate.tenantId()).thenReturn(TENANT_ID);
+        when(mongoTemplate.upsert(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenThrow(new DuplicateKeyException("E11000"));
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(MachineDelivery.class)))
+                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+
+        // execution
+        boolean taken = repository.upsertPending(delivery);
+
+        // verifications
+        assertThat(taken).isTrue();
     }
 
     @Test
@@ -216,11 +256,103 @@ class CustomMachineDeliveryRepositoryImplTest {
                 .contains(ID)
                 .contains("dispatchId=" + DISPATCH_ID)
                 .contains("PENDING")
-                .contains("ACKED");
+                .contains("ACKED")
+                .contains("$or")
+                .contains("attempts");
         assertThat(updateCaptor.getValue().getUpdateObject().toString())
                 .contains("FAILED")
                 .contains("AGENT_ERROR")
                 .contains("error=" + ERROR)
                 .contains("$unset");
+    }
+
+    @Test
+    void scheduleRerun_firstRunSameDispatch_rowBackToPendingWithTheRunCounted() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+
+        // execution
+        boolean scheduled = repository.scheduleRerun(ID, DeliveryStatus.UNACKED, now, 0, now);
+
+        // verifications
+        assertThat(scheduled).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("dispatchedAt")
+                .contains("reruns")
+                .contains("$not");
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("PENDING")
+                .contains("attempts=0")
+                .contains("$inc")
+                .contains("reruns=1")
+                .contains("$unset")
+                .contains("failure");
+    }
+
+    @Test
+    void scheduleRerun_laterRun_matchesOnlyTheRunTheCallerRead() {
+        // setup
+        UpdateResult noRow = UpdateResult.acknowledged(0, 0L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(noRow);
+
+        // execution
+        boolean scheduled = repository.scheduleRerun(ID, DeliveryStatus.UNACKED, now, 2, now);
+
+        // verifications
+        assertThat(scheduled).isFalse();
+        assertThat(queryCaptor.getValue().getQueryObject().toString()).contains("reruns=2");
+    }
+
+    @Test
+    void scheduleRerun_byDispatch_onlyADispatchTheAgentHad() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+
+        // execution
+        boolean scheduled = repository.scheduleRerun(ID, DISPATCH_ID, DeliveryStatus.OPEN, 1, now);
+
+        // verifications
+        assertThat(scheduled).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains("dispatchId=" + DISPATCH_ID)
+                .contains("$or")
+                .contains("attempts")
+                .contains("reruns=1");
+        assertThat(updateCaptor.getValue().getUpdateObject().toString()).contains("PENDING");
+    }
+
+    @Test
+    void markRerunPublished_scheduledRunNotYetPublished_newDispatchWrittenAsFirstAttempt() {
+        // setup
+        UpdateResult oneRow = UpdateResult.acknowledged(1, 1L, null);
+        when(mongoTemplate.updateFirst(queryCaptor.capture(), updateCaptor.capture(), eq(MachineDelivery.class))).thenReturn(oneRow);
+        RerunPublication publication = RerunPublication.builder()
+                .id(ID)
+                .from(DeliveryStatus.UNACKED)
+                .dispatchedAt(now)
+                .dispatchId(DISPATCH_ID)
+                .payloadJson(PAYLOAD_JSON)
+                .publishedAt(now)
+                .dueAt(now)
+                .build();
+
+        // execution
+        boolean published = repository.markRerunPublished(publication);
+
+        // verifications
+        assertThat(published).isTrue();
+        assertThat(queryCaptor.getValue().getQueryObject().toString())
+                .contains(ID)
+                .contains("PENDING")
+                .contains("dispatchedAt")
+                .contains("attempts=0");
+        assertThat(updateCaptor.getValue().getUpdateObject().toString())
+                .contains("dispatchId=" + DISPATCH_ID)
+                .contains("attempts=1")
+                .contains("payloadJson")
+                .contains("dueAt");
     }
 }

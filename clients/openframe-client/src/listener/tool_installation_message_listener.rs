@@ -138,8 +138,6 @@ impl ToolInstallationMessageListener {
 
     async fn handle_message(&self, message: Message) -> Result<()> {
         let payload = String::from_utf8_lossy(&message.payload);
-        info!("Received tool installation message: {:?}", payload);
-
         let tool_installation_message: ToolInstallationMessage =
             match serde_json::from_str(&payload) {
                 Ok(msg) => msg,
@@ -153,11 +151,16 @@ impl ToolInstallationMessageListener {
                 }
             };
 
-        let listener = self.clone();
-        let label = format!(
-            "tool-installation:{}",
-            tool_installation_message.tool_agent_id
+        let tool_agent_id = tool_installation_message.tool_agent_id.clone();
+        info!(
+            tool_id = %tool_agent_id,
+            version = %tool_installation_message.version,
+            reinstall = tool_installation_message.reinstall,
+            "Received tool installation message"
         );
+
+        let listener = self.clone();
+        let label = format!("tool-installation:{}", tool_agent_id);
         park_or_dispatch(message, label, move |msg| async move {
             listener.dispatch(msg, tool_installation_message).await;
         })

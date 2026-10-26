@@ -1,6 +1,7 @@
 pub mod binary_writer;
 pub mod client_update_probe;
 pub mod console;
+pub mod detached_process;
 pub mod directories;
 pub mod dmg_extractor;
 pub mod file_acl;
@@ -17,6 +18,8 @@ pub mod tool_updater;
 pub mod uninstall;
 pub mod user_session;
 
+#[cfg(target_os = "windows")]
+pub mod apps_entry;
 #[cfg(target_os = "windows")]
 pub mod powershell;
 #[cfg(target_os = "macos")]

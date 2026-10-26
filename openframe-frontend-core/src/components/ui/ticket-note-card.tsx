@@ -3,6 +3,7 @@
 import { type KeyboardEvent, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { CheckIcon, PenEditIcon, TrashIcon, XmarkIcon } from '../icons-v2-generated';
+import { Button } from './button';
 import { Input } from './input';
 import { SquareAvatar } from './square-avatar';
 
@@ -64,23 +65,28 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
             <div className="flex-1">
               <Input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={handleKeyDown} autoFocus />
             </div>
-            <button
+            <Button
+              variant="bare"
+              data-tone="success"
+              size="icon-sm"
               type="button"
               onClick={handleSave}
               disabled={!editText.trim()}
-              className="shrink-0 text-ods-success transition-colors hover:text-ods-success/80 disabled:opacity-50"
+              className="shrink-0"
               aria-label="Save note"
             >
-              <CheckIcon className="size-5" />
-            </button>
-            <button
+              <CheckIcon className="text-ods-success" />
+            </Button>
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               onClick={handleCancel}
-              className="shrink-0 text-ods-text-secondary transition-colors hover:text-ods-text-primary"
+              className="shrink-0"
               aria-label="Cancel editing"
             >
-              <XmarkIcon className="size-5" />
-            </button>
+              <XmarkIcon />
+            </Button>
           </div>
         ) : (
           <>
@@ -94,24 +100,27 @@ export function TicketNoteCard({ note, onEdit, onDelete, className }: TicketNote
       {note.isOwn && !isEditing && (
         <div className="flex shrink-0 items-center gap-4">
           {onDelete && (
-            <button
+            <Button
+              variant="bare"
+              data-tone="danger"
+              size="icon-sm"
               type="button"
               onClick={() => onDelete(note.id)}
-              className="text-ods-text-secondary transition-colors hover:text-ods-error"
               aria-label="Delete note"
             >
-              <TrashIcon className="size-6" />
-            </button>
+              <TrashIcon />
+            </Button>
           )}
           {onEdit && (
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               onClick={() => setIsEditing(true)}
-              className="text-ods-text-secondary transition-colors hover:text-ods-text-primary"
               aria-label="Edit note"
             >
-              <PenEditIcon className="size-6" />
-            </button>
+              <PenEditIcon />
+            </Button>
           )}
         </div>
       )}

@@ -3,7 +3,7 @@
 import { Upload, X, Video as VideoIcon } from 'lucide-react';
 import type React from 'react';
 import { useState, useCallback } from 'react';
-import { YouTubeIcon } from '../icons/youtube-icon';
+import { YoutubeClassicIcon } from '../icons-v2-generated/brand-logos/youtube-classic-icon';
 import { AIGeneratedBadge } from '../ui/ai-generated-badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -169,7 +169,7 @@ export function VideoSourceSelector({
           type="button"
           variant={videoSourceType === 'youtube' ? 'accent' : 'outline'}
           onClick={() => onVideoSourceTypeChange('youtube')}
-          leftIcon={<YouTubeIcon className="h-4 w-4" color="currentColor" />}
+          leftIcon={<YoutubeClassicIcon className="h-4 w-4" color="currentColor" />}
           disabled={disabled}
         >
           YouTube URL
@@ -286,15 +286,17 @@ function DefaultVideoPreview({ videoUrl, onDelete, disabled }: DefaultVideoPrevi
       <div className="aspect-video max-h-[300px] w-full">
         <Video kind="file" url={videoUrl} />
       </div>
-      <button
+      <Button
+        variant="overlay"
+        size="icon-sm"
         type="button"
         onClick={onDelete}
         aria-label="Delete video"
-        className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 transition-colors hover:bg-black/80"
+        className="absolute right-2 top-2"
         disabled={disabled}
       >
-        <X className="h-4 w-4 text-ods-text-on-dark" />
-      </button>
+        <X />
+      </Button>
     </div>
   );
 }

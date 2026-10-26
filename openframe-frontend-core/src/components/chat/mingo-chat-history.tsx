@@ -3,13 +3,35 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { Ellipsis01Icon, SearchXmarkIcon } from '../icons-v2-generated';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
 import { ActionsMenuDropdown } from '../ui/actions-menu';
 import { Button } from '../ui/button';
+import { LoadingItems, loadingItemProps, useLoadingScope } from '../ui/loading-scope';
 import { ScrollFadeOverlay, useScrollFade } from '../ui/scroll-fade';
 import { SquareAvatar } from '../ui/square-avatar';
 import { chatDialogMenuItems } from './chat-dialog-menu-items';
 import { ChatListEmptyState } from './chat-list-empty-state';
+import { SKELETON_TITLE_WIDTHS } from './chat-nav-sidebar';
 import type { DialogItem } from './types/component.types';
+
+/**
+ * The lib's own conversation page: what its dialog readers request (the NATS adapter's `dialogsPageSize` default and
+ * the archive's fetch), and so what a history list's loading state draws when its host names no page size. A host
+ * that pages its list differently passes its page size (`pageSize`, `EmbeddableChat`'s `historyPageSize`), so the
+ * loading state draws exactly one page.
+ */
+export const CHAT_HISTORY_PAGE_SIZE = 20;
+
+/** The list's layout, read by the loaded groups and by the loading state, so both are one size. */
+const HISTORY_GROUP_CLASS = 'flex flex-col gap-[var(--spacing-system-xxs)]';
+const HISTORY_GROUP_LABEL_CLASS = 'text-ods-text-secondary text-h5';
+const HISTORY_GROUP_BOX_CLASS = 'overflow-hidden rounded-md border border-ods-border';
+const HISTORY_ROW_CLASS = 'flex h-12 items-center border-b border-ods-border last:border-b-0';
+const HISTORY_ROW_CONTENT_CLASS = 'p-[var(--spacing-system-s)]';
+
+/** Date groups the loading state draws: the typical history, recent chats over older ones. */
+const HISTORY_SKELETON_GROUPS = 2;
 
 // =============================================================================
 // Types
@@ -44,6 +66,11 @@ export interface MingoChatHistoryProps {
   isLoadingMore?: boolean;
   /** Fetch the next page — fired when the bottom sentinel scrolls into view. */
   onLoadMore?: () => void;
+  /** The first page is still loading: the list draws its own loading state (one page of rows). Inside a
+   *  `LoadingScope` it does so whatever this says. */
+  loading?: boolean;
+  /** The host's page size: how many rows the loading state draws. Default {@link CHAT_HISTORY_PAGE_SIZE}. */
+  pageSize?: number;
   /** Appended to the root element. */
   className?: string;
 }
@@ -91,8 +118,14 @@ function groupDialogs(dialogs: ReadonlyArray<DialogItem>): DialogGroup[] {
 // =============================================================================
 
 interface RowProps {
-  dialog: DialogItem;
-  isActive: boolean;
+  /** Absent while `loading`: the loading row needs no data. */
+  dialog?: DialogItem;
+  isActive?: boolean;
+  /** The dialog is still being read: the SAME row, its title slot a bar (no unread badge, no trailing cell: both are
+   *  read data most rows do not have). */
+  loading?: boolean;
+  /** The loading row's place in the list: picks its title bar's width. */
+  skeletonIndex?: number;
   onSelect?: (id: string) => void;
   onRequestRename?: (dialog: DialogItem) => void;
   onRequestCopyLink?: (dialog: DialogItem) => void;
@@ -102,28 +135,36 @@ interface RowProps {
 
 function MingoChatHistoryRow({
   dialog,
-  isActive,
+  isActive = false,
+  loading: loadingProp = false,
+  skeletonIndex = 0,
   onSelect,
   onRequestCopyLink,
   onRequestRename,
   onRequestCompact,
   onRequestArchive,
-}: RowProps) {
-  const title = dialog.title || 'Untitled Chat';
-  const unread = dialog.unreadMessagesCount ?? 0;
-  const hasMenu = !!onRequestRename || !!onRequestArchive || !!onRequestCopyLink || !!onRequestCompact;
-  const owner = dialog.owner;
-  const hasAvatar = !!(owner?.name || owner?.avatarUrl);
+  ...props
+}: RowProps & { [key: `data-${string}`]: unknown }) {
+  // ONE switch: a row with no dialog yet is a loading row.
+  const loading = useLoadingScope() || loadingProp || !dialog;
+  const title = dialog?.title || 'Untitled Chat';
+  const unread = dialog?.unreadMessagesCount ?? 0;
+  const hasMenu = !loading && (!!onRequestRename || !!onRequestArchive || !!onRequestCopyLink || !!onRequestCompact);
+  const owner = dialog?.owner;
+  const hasAvatar = !loading && !!(owner?.name || owner?.avatarUrl);
   // Keep the `⋯` visible while its menu is open — once Radix moves focus into
   // the portalled content the row loses hover/focus-within.
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const menuItems = chatDialogMenuItems({
-    onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
-    onRename: onRequestRename && (() => onRequestRename(dialog)),
-    onCompact: onRequestCompact && (() => onRequestCompact(dialog)),
-    onArchive: onRequestArchive && (() => onRequestArchive(dialog)),
-  });
+  const menuItems = dialog
+    ? chatDialogMenuItems({
+        onCopyLink: onRequestCopyLink && (() => onRequestCopyLink(dialog)),
+        onRename: onRequestRename && (() => onRequestRename(dialog)),
+        onCompact: onRequestCompact && (() => onRequestCompact(dialog)),
+        onArchive: onRequestArchive && (() => onRequestArchive(dialog)),
+      })
+    : [];
+  const select = () => dialog && onSelect?.(dialog.id);
 
   // The item is the full-width row (inside the group's bordered box). Padding
   // lives on the inner content button (badge + title) only — the `⋯` is a
@@ -131,40 +172,57 @@ function MingoChatHistoryRow({
   // the item but outside its padded content area.
   return (
     <div
+      {...loadingItemProps(props)}
+      aria-hidden={loading || undefined}
       className={cn(
-        'group/row relative flex h-12 items-center border-b border-ods-border transition-colors last:border-b-0',
+        HISTORY_ROW_CLASS,
+        'group/row relative transition-colors',
         // Active (selected) dialog — Figma 259:91610: an accent-secondary
         // fill, a 4px accent bar down the leading edge, and accent-colored
         // title text. Inactive rows keep the dark surface with a hover tint.
-        isActive ? 'bg-ods-accent-secondary' : 'bg-ods-bg hover:bg-ods-bg-hover',
+        isActive ? 'bg-ods-accent-secondary' : cn('bg-ods-bg', !loading && 'hover:bg-ods-bg-hover'),
       )}
     >
       {isActive ? (
         <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-ods-accent" />
       ) : null}
       <div
-        role="button"
-        tabIndex={0}
-        onClick={() => onSelect?.(dialog.id)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onSelect?.(dialog.id);
-          }
-        }}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-[var(--spacing-system-xsf)] p-[var(--spacing-system-s)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent"
+        role={loading ? undefined : 'button'}
+        tabIndex={loading ? undefined : 0}
+        onClick={loading ? undefined : select}
+        onKeyDown={
+          loading
+            ? undefined
+            : e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  select();
+                }
+              }
+        }
+        className={cn(
+          HISTORY_ROW_CONTENT_CLASS,
+          'flex min-w-0 flex-1 items-center gap-[var(--spacing-system-xsf)]',
+          !loading &&
+            'cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ods-accent',
+        )}
       >
-        {unread > 0 ? (
+        {loading ? (
+          <TextLineSkeleton type="h4" className={SKELETON_TITLE_WIDTHS[skeletonIndex % SKELETON_TITLE_WIDTHS.length]} />
+        ) : null}
+        {!loading && unread > 0 ? (
           <span className="flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md bg-ods-accent px-[var(--spacing-system-xsf)] text-ods-text-on-accent text-h5">
             {unread > 99 ? '99+' : unread}
           </span>
         ) : null}
-        <span
-          className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-accent' : 'text-ods-text-primary')}
-          title={title}
-        >
-          {title}
-        </span>
+        {loading ? null : (
+          <span
+            className={cn('min-w-0 flex-1 truncate text-h4', isActive ? 'text-ods-accent' : 'text-ods-text-primary')}
+            title={title}
+          >
+            {title}
+          </span>
+        )}
       </div>
       {hasMenu || hasAvatar ? (
         // Trailing 48px cell (Figma 113:63224): the owner avatar sits centred
@@ -215,7 +273,7 @@ function MingoChatHistoryRow({
             // the cell whenever the menu trigger is faded out). On desktop it
             // fades for the menu swap; on mobile it's always shown.
             <span
-              onClick={() => onSelect?.(dialog.id)}
+              onClick={select}
               title={owner?.name || undefined}
               className={cn(
                 'absolute inset-0 flex cursor-pointer items-center justify-center transition-opacity',
@@ -246,47 +304,34 @@ function MingoChatHistoryRow({
 // =============================================================================
 
 /**
- * Loading placeholder for the dialog history, shaped like the grouped row list
- * above. Shown while the FIRST page of dialogs is in flight so the Mingo empty
- * state doesn't flash the new-user greeting+grid before the list arrives (the
- * two layouts are mutually exclusive — swapping between them mid-load reads as
- * a flicker). Pure ODS tokens, `animate-pulse`.
+ * The history's loading state, shaped like the loaded list: the typical two date groups, each a group label over a
+ * bordered box of rows, one page of rows across them (`rows`, the host's page size), each the row itself in its loading
+ * form (`MingoChatHistoryRow loading`). Drawn by `MingoChatHistory` itself (`loading`, or inside a `LoadingScope`).
  */
-export function MingoChatHistorySkeleton({ className }: { className?: string }) {
-  // Mirror the real grouped list exactly: a small group label, then a bordered
-  // rounded container of `h-12` rows, each with a single title bar of varying
-  // width (no unread-badge squares — the real rows currently never show one, so
-  // a badge placeholder would mis-promise the layout). `bg-ods-border` matches
-  // the kit's canonical `Skeleton` placeholder colour; `bg-ods-bg` rows read a
-  // touch darker than the `bg-ods-card` panel so the bars stay legible.
-  const groups: ReadonlyArray<ReadonlyArray<string>> = [
-    ['w-3/5', 'w-4/5', 'w-2/5', 'w-3/4'],
-    ['w-1/2', 'w-2/3'],
-  ];
+function MingoChatHistorySkeleton({ rows, className }: { rows: number; className?: string }) {
+  const perGroup = Math.ceil(rows / HISTORY_SKELETON_GROUPS);
+  const groups = Array.from({ length: HISTORY_SKELETON_GROUPS }, (_, group) =>
+    Math.max(0, Math.min(perGroup, rows - group * perGroup)),
+  ).filter(count => count > 0);
   return (
-    <div
-      aria-hidden
-      // `overflow-hidden` clips the placeholder rows to the flex-1 box (the real
-      // list scrolls; the skeleton just needs to stay within bounds).
+    <LoadingRegion
+      label="Loading conversations"
+      // `overflow-hidden` clips the page of rows to the flex-1 box (the loaded list scrolls; the loading state stays
+      // within bounds).
       className={cn('flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)] overflow-hidden', className)}
     >
-      {groups.map((widths, g) => (
-        <div key={g} className="flex shrink-0 flex-col gap-[var(--spacing-system-xxs)]">
-          {/* Group label (Today / Older). */}
-          <div className="h-3 w-16 animate-pulse rounded bg-ods-border" />
-          <div className="overflow-hidden rounded-md border border-ods-border">
-            {widths.map((w, i) => (
-              <div
-                key={i}
-                className="flex h-12 items-center border-b border-ods-border bg-ods-bg px-[var(--spacing-system-s)] last:border-b-0"
-              >
-                <div className={cn('h-4 animate-pulse rounded bg-ods-border', w)} />
-              </div>
-            ))}
+      {groups.map((count, group) => (
+        <div key={group} className={cn(HISTORY_GROUP_CLASS, 'shrink-0')}>
+          {/* Group label (Today / Yesterday / Older): read from the dialogs' dates. */}
+          <TextLineSkeleton type="h5" className="w-16" />
+          <div className={HISTORY_GROUP_BOX_CLASS}>
+            <LoadingItems count={count}>
+              {i => <MingoChatHistoryRow loading data-loading-item skeletonIndex={group * perGroup + i} />}
+            </LoadingItems>
           </div>
         </div>
       ))}
-    </div>
+    </LoadingRegion>
   );
 }
 
@@ -303,7 +348,8 @@ export function MingoChatHistorySkeleton({ className }: { className?: string }) 
  * menu (Rename / Archive — each gated on the matching handler and surfaced as
  * a request the host fulfils via a modal). Owns its own scroll + bottom/top
  * fade and an infinite-scroll
- * sentinel that fires `onLoadMore`.
+ * sentinel that fires `onLoadMore`. While its first page loads (`loading`, or
+ * inside a `LoadingScope`) it draws its own skeleton: one page of rows.
  */
 export function MingoChatHistory({
   dialogs,
@@ -317,8 +363,12 @@ export function MingoChatHistory({
   hasMore = false,
   isLoadingMore = false,
   onLoadMore,
+  loading = false,
+  pageSize = CHAT_HISTORY_PAGE_SIZE,
   className,
 }: MingoChatHistoryProps) {
+  // ONE switch: the first page loading (or the page's loading state) draws one page of skeleton rows.
+  const isLoading = useLoadingScope() || loading;
   const groups = useMemo(() => groupDialogs(dialogs), [dialogs]);
   const noSearchResults = groups.length === 0 && !!searchQuery?.trim();
 
@@ -364,6 +414,8 @@ export function MingoChatHistory({
     // grew by a single page per drawer open.
   }, [hasMore, isLoadingMore, dialogCount, scrollRef]);
 
+  if (isLoading) return <MingoChatHistorySkeleton rows={pageSize} className={className} />;
+
   return (
     <div className={cn('relative flex min-h-0 flex-1 flex-col gap-[var(--spacing-system-m)]', className)}>
       {/* Scroll region — the search INPUT now lives in the panel header
@@ -384,12 +436,13 @@ export function MingoChatHistory({
             />
           ) : (
             groups.map(group => (
-              <div key={group.key} className="flex flex-col gap-[var(--spacing-system-xxs)]">
-                <p className="text-ods-text-secondary text-h5">{group.label}</p>
-                <div className="overflow-hidden rounded-md border border-ods-border">
+              <div key={group.key} className={HISTORY_GROUP_CLASS}>
+                <p className={HISTORY_GROUP_LABEL_CLASS}>{group.label}</p>
+                <div className={HISTORY_GROUP_BOX_CLASS}>
                   {group.items.map(dialog => (
                     <MingoChatHistoryRow
                       key={dialog.id}
+                      data-loading-item
                       dialog={dialog}
                       isActive={dialog.id === activeDialogId}
                       onSelect={onSelectDialog}

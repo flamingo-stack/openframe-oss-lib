@@ -12,8 +12,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-import static com.openframe.data.document.device.DeviceStatus.DELETED;
-import static com.openframe.data.document.device.DeviceStatus.PENDING_DELETION;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @Service
@@ -43,7 +41,7 @@ public class MachineTimezoneService {
 
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        if (status == PENDING_DELETION || status == DELETED) {
+        if (DeviceStatus.DELETING_OR_DELETED.contains(status)) {
             log.debug("Ignoring timezone update for machineId={} in status {}", machineId, status);
             return;
         }

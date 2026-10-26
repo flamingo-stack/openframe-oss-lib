@@ -5,7 +5,11 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import React from 'react';
 import Link from '../../../embed-shims/next-link';
 import { cn } from '../../../utils/cn';
+import { loadingItemProps } from '../loading-scope';
 import {
+  BUTTON_KIND_CLASS,
+  BUTTON_SIZE_CLASS,
+  type ButtonKind,
   buttonSurfaceClasses,
   outlineBorderClasses,
   splitDividerColorClasses,
@@ -13,6 +17,9 @@ import {
 } from './button-styles';
 
 // Default layout: centered single content area, padding/gap on the button itself.
+/** The `icon-sm` button's size (its `h-8 w-8`), for a layout that must leave room for one. */
+export const BUTTON_ICON_SM_SIZE = '2rem';
+
 const buttonVariants = cva(
   [
     'relative inline-flex items-center justify-center gap-[var(--spacing-system-xsf)]',
@@ -30,49 +37,24 @@ const buttonVariants = cva(
         transparent: buttonSurfaceClasses.transparent,
         destructive: buttonSurfaceClasses.destructive,
         warning: buttonSurfaceClasses.warning,
+        inverted: buttonSurfaceClasses.inverted,
         glyph: buttonSurfaceClasses.glyph,
         overlay: buttonSurfaceClasses.overlay,
         link: buttonSurfaceClasses.link,
+        bare: buttonSurfaceClasses.bare,
+        // The kinds that are not a plain push button own their whole box (`BUTTON_KIND_CLASS`); resolved
+        // before this map is read, so `size` never reaches them. The entries only type the prop.
+        field: '',
+        row: '',
+        rail: '',
+        tab: '',
+        segment: '',
+        chip: '',
+        card: '',
+        cell: '',
+        stepper: '',
       },
-      size: {
-        default: 'h-11 px-[var(--spacing-system-m)] py-[var(--spacing-system-sf)] text-h3 md:h-12',
-        small: 'h-6 p-[var(--spacing-system-xs)] text-h5 md:h-8',
-        // The CHILD is the affordance (a badge, a chip, a thumbnail): the button
-        // contributes the hit target, the focus ring and the keyboard/ARIA
-        // semantics, and NO box of its own. Without this, call sites reached for
-        // a `className="h-auto p-0"` override to cancel the default box.
-        wrap: 'h-auto p-0',
-        'small-legacy': 'h-10 px-[var(--spacing-system-m)] py-[var(--spacing-system-xs)] text-[14px] font-bold', // Temporary alias for "small" — deprecated; grep size="small-legacy" (lib + hub) and migrate the remaining consumers before removal
-        // 24px pill for slim strips (announcement/promo bars, inline banner
-        // actions — Primer banner / Polaris banner / Vercel-bar convention).
-        // The label matches the strip's MESSAGE type ramp exactly (DM Sans
-        // regular, 13px -> md:14px, snug leading — the announcement bar's
-        // subtitle styling): in-strip CTAs must never read louder than the
-        // message beside them, so this deliberately uses neither the
-        // mono-uppercase control style of "small" nor a heavier weight.
-        // Pinned h-6 across breakpoints (24px = the WCAG 2.5.8 target-size
-        // floor) with horizontal-dominant padding and a 14px glyph.
-        compact: 'h-6 px-[var(--spacing-system-sf)] py-0 font-normal text-h6 [&_svg]:h-3.5 [&_svg]:w-3.5',
-        icon: 'h-11 w-11 p-[var(--spacing-system-sf)] md:h-12 md:w-12 [&_svg]:h-4 [&_svg]:w-4 md:[&_svg]:h-6 md:[&_svg]:w-6',
-        // Quiet 32px icon target with a 16px glyph, fixed across breakpoints
-        // (Carbon ghost sm / Primer medium / shadcn icon-sm all pin 32px;
-        // ≥ the 24px WCAG 2.5.8 target floor). For icon actions that read as
-        // metadata rather than CTAs — author-page social rows, share rows.
-        // Pair with variant="transparent" for the ghost treatment.
-        'icon-sm': 'h-8 w-8 p-[var(--spacing-system-xxs)] [&_svg]:h-4 [&_svg]:w-4',
-        // 20px inline glyph for affordances that sit INSIDE a line of text —
-        // an info hint beside a badge, a copy glyph after an id. `icon-sm`'s
-        // 32px target is correct for a metadata row but visually swamps a
-        // 10px badge or a 14px label, so hosts were reaching for className
-        // overrides to shrink it. Below the WCAG 2.5.8 target floor on purpose:
-        // this is only for glyphs whose information is ALSO available another
-        // way (tooltip content mirrored into an aria-describedby node), never
-        // for a sole means of performing an action.
-        'icon-inline': 'h-5 min-h-0 w-5 min-w-0 shrink-0 p-0 [&_svg]:h-3.5 [&_svg]:w-3.5',
-        // Bare 56px media glyph (play / unmute over video). A size variant so
-        // hosts stop re-implementing a <button> to escape the 20px svg cap.
-        'icon-glyph': 'h-14 w-14 p-0 [&_svg]:h-14 [&_svg]:w-14',
-      },
+      size: BUTTON_SIZE_CLASS,
       // Label typography axis (Figma 133-740). `bold` is the classic h3-bold
       // label; `regular` swaps the DEFAULT size's label to the h4 step
       // (DM Sans 500, neutral tracking) — added for navigation buttons.
@@ -89,8 +71,36 @@ const buttonVariants = cva(
         true: 'px-0',
         false: '',
       },
+      // Two buttons drawn as ONE surface with a seam between them (a main action
+      // and a chevron that opens its alternatives: `DropdownButton` with an
+      // `action`). `start` is the leading half, `end` the trailing one: each
+      // gives up the corners and the border on its inner edge.
+      attach: {
+        none: '',
+        start: 'rounded-r-none',
+        end: 'rounded-l-none border-l-0',
+      },
     },
     compoundVariants: [
+      // The trailing half as an icon button is the design's 40px chevron cell, at every breakpoint.
+      { attach: 'end', size: 'icon', class: 'w-10 px-0 md:w-10' },
+      { attach: 'end', size: 'small', class: 'w-6 px-0 md:w-8' },
+      // The seam between two attached halves of a filled button: a 1px darker edge on the trailing half.
+      {
+        attach: 'end',
+        variant: 'accent',
+        class: cn('border-l', splitDividerColorClasses.accent, 'disabled:border-ods-disabled'),
+      },
+      {
+        attach: 'end',
+        variant: 'destructive',
+        class: cn('border-l', splitDividerColorClasses.destructive, 'disabled:border-ods-disabled'),
+      },
+      {
+        attach: 'end',
+        variant: 'warning',
+        class: cn('border-l', splitDividerColorClasses.warning, 'disabled:border-ods-disabled'),
+      },
       { size: 'small', class: '[&_svg]:h-4 [&_svg]:w-4' },
       // Comes after the size classes, so cn()'s tailwind-merge resolves the
       // ods-typography group in favour of text-h4.
@@ -102,6 +112,7 @@ const buttonVariants = cva(
       font: 'bold',
       fullWidth: false,
       noPaddingX: false,
+      attach: 'none',
     },
   },
 );
@@ -266,6 +277,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     font,
     fullWidth,
     noPaddingX,
+    attach,
     asChild,
     href,
     openInNewTab,
@@ -284,10 +296,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
   ref,
 ) {
   const isDisabled = disabled || loading;
+  const kind = variant && variant in BUTTON_KIND_CLASS ? (variant as ButtonKind) : null;
 
   // splitIcon is only supported for default/small sizes. With other sizes
   // (icon, small-legacy) we silently fall back to the normal layout.
-  const useSplitLayout = !!splitIcon && (size === 'default' || size === 'small' || size === undefined);
+  const useSplitLayout = !kind && !!splitIcon && (size === 'default' || size === 'small' || size === undefined);
 
   if (useSplitLayout) {
     const safeSize = size ?? 'default';
@@ -338,7 +351,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           download={download}
           prefetch={false}
           className={cn(shellClasses, isDisabled && 'pointer-events-none')}
+          // The click still reaches the caller (a download is what analytics counts).
+          onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
           aria-label={props['aria-label']}
+          {...loadingItemProps(props)}
         >
           {splitContent}
         </Link>
@@ -373,6 +389,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
           tabIndex={isDisabled ? -1 : undefined}
           className={cn(shellClasses, isDisabled && 'pointer-events-none')}
           onClick={splitAnchor.onClick}
+          // A list's markers (`data-loading-item`) survive on an anchor too.
+          {...loadingItemProps(props)}
         >
           {splitContent}
         </Link>
@@ -386,7 +404,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
     );
   }
 
-  const classes = cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX }), className);
+  const classes = kind
+    ? cn(BUTTON_KIND_CLASS[kind], loading && 'relative', fullWidth && 'w-full', className)
+    : cn(buttonVariants({ variant, size, font, fullWidth, noPaddingX, attach }), className);
 
   // asChild: consumer fully controls the rendered element; we just stamp our classes.
   if (asChild) {
@@ -422,6 +442,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function ButtonI
         download={download}
         prefetch={false}
         className={cn(classes, isDisabled && 'pointer-events-none')}
+        onClick={onClick as unknown as React.MouseEventHandler<HTMLAnchorElement> | undefined}
         aria-label={props['aria-label']}
       >
         {content}

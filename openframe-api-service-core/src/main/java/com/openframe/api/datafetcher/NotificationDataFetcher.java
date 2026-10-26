@@ -1,9 +1,10 @@
 package com.openframe.api.datafetcher;
 
 import com.netflix.graphql.dgs.*;
-import com.openframe.api.dto.GenericConnection;
+import graphql.schema.DataFetchingFieldSelectionSet;
+import com.openframe.api.dto.CountedGenericConnection;
+import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
-import com.openframe.api.dto.GenericQueryResult;
 import com.openframe.api.dto.notification.NotificationFilter;
 import com.openframe.api.dto.notification.NotificationFilterInput;
 import com.openframe.api.dto.notification.NotificationView;
@@ -12,6 +13,7 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLNotificationMapper;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.NotificationService;
 import com.openframe.core.exception.UnauthorizedException;
 import com.openframe.data.document.notification.NotificationCategory;
@@ -20,7 +22,6 @@ import com.openframe.data.document.notification.RecipientType;
 import com.openframe.notification.readstate.NotificationReadStateService;
 import com.openframe.security.authentication.ActorType;
 import com.openframe.security.authentication.AuthPrincipal;
-import graphql.relay.Relay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +32,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import java.util.List;
 import java.util.Map;
 
+import static com.openframe.graphql.relay.NodeType.NOTIFICATION;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 @DgsComponent
@@ -38,28 +40,24 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 @Slf4j
 public class NotificationDataFetcher {
 
-    private static final Relay RELAY = new Relay();
+    private static final String FILTERED_COUNT_FIELD = "filteredCount";
 
     private final NotificationService notificationService;
     private final NotificationReadStateService readStateService;
     private final GraphQLNotificationMapper notificationMapper;
-
-    @DgsData(parentType = "Notification", field = "id")
-    public String notificationNodeId(DgsDataFetchingEnvironment dfe) {
-        NotificationView view = dfe.getSource();
-        return RELAY.toGlobalId("Notification", view.id());
-    }
+    private final RelayIdCodec relayIdCodec;
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
     @DgsQuery
-    public GenericConnection<GenericEdge<NotificationView>> notifications(
+    public CountedGenericConnection<GenericEdge<NotificationView>> notifications(
             @InputArgument NotificationFilterInput filter,
             @InputArgument String search,
             @InputArgument Integer first,
             @InputArgument String after,
             @InputArgument Integer last,
             @InputArgument String before,
-            @InputArgument SortInput sort) {
+            @InputArgument SortInput sort,
+            DgsDataFetchingEnvironment dfe) {
 
         Recipient r = currentRecipient();
         log.debug("Listing notifications for {} {} (filter={}, search={}, sort={})",
@@ -69,12 +67,20 @@ public class NotificationDataFetcher {
                 .first(first).after(after).last(last).before(before)
                 .build();
         CursorPaginationCriteria pagination = notificationMapper.toCursorPaginationCriteria(args);
-        NotificationFilter serviceFilter = new NotificationFilter(
-                filter == null ? null : filter.getRead(), search);
+        NotificationFilter serviceFilter = filter == null
+                ? new NotificationFilter(null, null, null, null, search)
+                : new NotificationFilter(filter.getRead(), filter.getCategories(), filter.getTypes(),
+                        filter.getSeverities(), search);
 
-        GenericQueryResult<NotificationView> result = notificationService.list(
-                r.id(), r.type(), serviceFilter, pagination, sort);
+        boolean countRequested = wantsFilteredCount(dfe);
+        CountedGenericQueryResult<NotificationView> result = notificationService.list(
+                r.id(), r.type(), serviceFilter, pagination, sort, countRequested);
         return notificationMapper.toConnection(result);
+    }
+
+    private static boolean wantsFilteredCount(DgsDataFetchingEnvironment dfe) {
+        DataFetchingFieldSelectionSet selectionSet = dfe != null ? dfe.getSelectionSet() : null;
+        return selectionSet == null || selectionSet.contains(FILTERED_COUNT_FIELD);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
@@ -106,7 +112,10 @@ public class NotificationDataFetcher {
     @DgsMutation
     public boolean markNotificationAsRead(@InputArgument String notificationId) {
         Recipient r = currentRecipient();
-        return readStateService.markRead(r.id(), r.type(), decodeNotificationId(notificationId));
+        String recipientId = r.id();
+        RecipientType recipientType = r.type();
+        String rawNotificationId = decodeNotificationId(notificationId);
+        return readStateService.markRead(recipientId, recipientType, rawNotificationId);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
@@ -120,7 +129,10 @@ public class NotificationDataFetcher {
     @DgsMutation
     public boolean deleteNotification(@InputArgument String notificationId) {
         Recipient r = currentRecipient();
-        return readStateService.deleteNotification(r.id(), r.type(), decodeNotificationId(notificationId));
+        String recipientId = r.id();
+        RecipientType recipientType = r.type();
+        String rawNotificationId = decodeNotificationId(notificationId);
+        return readStateService.deleteNotification(recipientId, recipientType, rawNotificationId);
     }
 
     @PreAuthorize("hasAnyAuthority('ADMIN', 'AGENT')")
@@ -152,17 +164,7 @@ public class NotificationDataFetcher {
         if (isBlank(input)) {
             throw new IllegalArgumentException("notificationId must not be blank");
         }
-        Relay.ResolvedGlobalId resolved;
-        try {
-            resolved = RELAY.fromGlobalId(input);
-        } catch (IllegalArgumentException ex) {
-            throw new IllegalArgumentException("Invalid notificationId: " + input, ex);
-        }
-        if (!"Notification".equals(resolved.getType())) {
-            throw new IllegalArgumentException(
-                    "notificationId references the wrong type: " + resolved.getType());
-        }
-        return resolved.getId();
+        return relayIdCodec.decode(input, NOTIFICATION);
     }
 
     private AuthPrincipal currentPrincipal() {

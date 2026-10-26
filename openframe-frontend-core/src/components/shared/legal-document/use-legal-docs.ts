@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { contentFetch } from '../../../utils/embed-content-fetch';
+import { useLoadingScope } from '../../ui/loading-scope';
 
 export interface LegalDocument {
   title: string;
@@ -24,6 +25,10 @@ export interface LegalDocument {
   githubSha: string | null;
   sections: Array<{ id: string; title: string; level: number }>;
   docType: string;
+  /** The version the document states for itself ("1.0"); null when it states none. */
+  version: string | null;
+  /** The day that version takes effect, as the document words it; null when it states none. */
+  effectiveDate: string | null;
   meta: {
     sectionsCount: number;
     contentLength: number;
@@ -111,6 +116,8 @@ function toLegalDocument(payload: unknown, docType: string): LegalDocument | nul
     githubSha: typeof githubSha === 'string' ? githubSha : null,
     sections,
     docType: readString(payload, 'docType') ?? docType,
+    version: readString(payload, 'version') ?? null,
+    effectiveDate: readString(payload, 'effectiveDate') ?? null,
     meta: {
       sectionsCount: typeof sectionsCount === 'number' ? sectionsCount : sections.length,
       contentLength: typeof contentLength === 'number' ? contentLength : content.length,
@@ -122,9 +129,9 @@ function toLegalDocument(payload: unknown, docType: string): LegalDocument | nul
 /**
  * Hook to fetch a legal document.
  * @param docType — short identifier for the document (drives the
- *   default endpoint path AND the error-log prefix). Common values:
- *   `'privacy'` (SECURITY.md), `'terms'` (LICENSE). Embedders may use
- *   any string — the hook treats it as opaque.
+ *   default endpoint path AND the error-log prefix). The valid values are
+ *   the ones the host's list endpoint answers (`useLegalDocuments`); the
+ *   hook treats it as opaque.
  */
 export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {}): UseLegalDocsReturn {
   const { initialData = null, apiEndpoint } = options;
@@ -173,7 +180,10 @@ export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {})
 
   // Fetch on mount (only if we don't already have server-provided initialData),
   // and on every explicit `refetch()`.
+  // In a loading scope nothing is fetched: the page draws what it was given.
+  const held = useLoadingScope();
   useEffect(() => {
+    if (held) return;
     if (initialData && reloadCount === 0) return;
 
     const requestId = ++requestIdRef.current;
@@ -182,6 +192,15 @@ export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {})
     const fetchDocument = async () => {
       try {
         const response = await contentFetch(effectiveEndpoint);
+
+        // 404: the hub has no published text for this document yet (a legal
+        // file is published only once it states its version and effective
+        // date). That is "not available", not a failure: no data, no error.
+        if (response.status === 404) {
+          if (!isCurrent()) return;
+          setData(null);
+          return;
+        }
 
         if (!response.ok) {
           throw new Error(`Failed to fetch ${docType} document: ${response.status} ${response.statusText}`);
@@ -213,7 +232,7 @@ export function useLegalDocs(docType: string, options: UseLegalDocsOptions = {})
 
     // Never rejects — settles every failure into `error` state.
     void fetchDocument();
-  }, [docType, effectiveEndpoint, initialData, reloadCount]);
+  }, [docType, effectiveEndpoint, initialData, reloadCount, held]);
 
   const refetch = () => {
     // An explicit retry starts from a settled (usually errored) state, so it

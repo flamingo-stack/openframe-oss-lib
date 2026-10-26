@@ -93,6 +93,15 @@ public class DeviceQueries {
             }
             """;
 
+    // What the agent last reported per package manager (PRESENT, MISSING, UNSUPPORTED, UNKNOWN); software submit refuses MISSING and UNKNOWN.
+    public static final String DEVICE_PACKAGE_MANAGERS = """
+            query($machineId: String!) {
+                device(machineId: $machineId) {
+                    packageManagers { brew winget choco }
+                }
+            }
+            """;
+
     public static final String DEVICES_WITH_FILTER = """
             query($filter: DeviceFilterInput) {
                 devices(filter: $filter) {
@@ -195,6 +204,19 @@ public class DeviceQueries {
                     machineId
                     hostname
                     nickname
+                }
+            }
+            """;
+
+    // Machine.remoteAccess is a SaaS extension of the Machine type, so it has a query of its own rather than joining FULL_DEVICE.
+    public static final String DEVICE_REMOTE_ACCESS = """
+            query DeviceRemoteAccess($machineId: String!) {
+                device(machineId: $machineId) {
+                    id
+                    machineId
+                    hostname
+                    organizationId
+                    remoteAccess { mode effectiveMode effectiveScope updatedBy updatedAt }
                 }
             }
             """;

@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { randomId } from '../../../utils/random-id';
 import type { AddNotificationInput, Notification, RenderNotificationTile } from './types';
 
 interface NotificationsContextValue {
@@ -147,13 +148,6 @@ function reducer(state: Notification[], action: Action): Notification[] {
   }
 }
 
-function generateId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `n_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
 export function NotificationsProvider({
   children,
   initialNotifications = [],
@@ -183,7 +177,7 @@ export function NotificationsProvider({
 
   const addNotification = useCallback(
     (input: AddNotificationInput) => {
-      const id = input.id ?? generateId();
+      const id = input.id ?? randomId();
       const notification: Notification = {
         ...input,
         id,

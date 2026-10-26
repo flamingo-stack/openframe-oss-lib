@@ -49,6 +49,7 @@ export { ReflectVrIcon } from './reflect-vr-icon';
 export { ScalingUpIcon } from './scaling-up-icon';
 export { ScissorsIcon } from './scissors-icon';
 export { ScribbleIcon } from './scribble-icon';
+export { ShapeCircleDashClassicIcon } from './shape-circle-dash-classic-icon';
 export { ShapeCircleDashIcon } from './shape-circle-dash-icon';
 export { ShapeSquareDashIcon } from './shape-square-dash-icon';
 export { StampIcon } from './stamp-icon';

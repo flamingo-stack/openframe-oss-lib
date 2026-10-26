@@ -33,10 +33,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import { embedAuthedFetch } from '../../../utils/embed-authed-fetch';
+import { randomId } from '../../../utils/random-id';
 import type { ChatAttachment } from '../../chat/utils/chat-attachment-markdown';
 import { useOptionalTicketLive } from '../ticket-live-provider';
 import {
-  type AnyTicket,
   type MappedTicketActionError,
   type OptimisticTicket,
   type TicketActionErrorCode,
@@ -360,7 +360,7 @@ export function useTicketActions(options: UseTicketActionsOptions): UseTicketAct
       const submitToken: object = {};
       formInFlightRef.current = submitToken;
       setIsSubmittingForm(true);
-      const placeholderId = `temp-${cryptoRandomId()}`;
+      const placeholderId = `temp-${randomId()}`;
       const placeholder: OptimisticTicket = {
         id: placeholderId,
         external_id: 'Pending sync…',
@@ -713,15 +713,6 @@ export function mapTicketActionError(err: unknown): MappedTicketActionError {
   };
 }
 
-/** Small id generator that doesn't require pulling in nanoid as a new
- *  dep. Sufficient for client-only optimistic ids. */
-function cryptoRandomId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 /** True iff any ['tickets', …] cache slot contains a ticket whose
  *  HubSpot id (external_id) matches the target. Used by the mirror-sync
  *  watcher to detect "the real row just arrived" and drop the placeholder
@@ -753,6 +744,3 @@ function resolveErrorCode(bodyCode: string | undefined, status: number): TicketA
   if (status === 412) return 'HUBSPOT_DISCONNECTED';
   return 'UNKNOWN';
 }
-
-// Re-export so callers can narrow the type when needed.
-export type { AnyTicket, OptimisticTicket };

@@ -3,6 +3,7 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
@@ -22,11 +23,18 @@ public class ScheduleCriteriaDeviceResolver {
     private final MachineRepository machineRepository;
 
     public List<String> resolveMachineIds(String tenantId, ScheduleDeviceCriteria criteria, Collection<OsType> supportedPlatforms) {
+        return resolveMachineIds(tenantId, criteria, supportedPlatforms, null);
+    }
+
+    public List<String> resolveMachineIds(String tenantId, ScheduleDeviceCriteria criteria, Collection<OsType> supportedPlatforms,
+                                          Collection<PackageManagerType> manageableByPackageManagers) {
         List<OsType> scope = platformScope(criteria, supportedPlatforms);
         if (scope != null && scope.isEmpty()) {
             return List.of();
         }
-        return machineRepository.findMachineIdsByCriteria(tenantId, buildFilter(criteria), scope);
+        MachineQueryFilter filter = buildFilter(criteria);
+        filter.setManageableByPackageManagers(manageableByPackageManagers);
+        return machineRepository.findMachineIdsByCriteria(tenantId, filter, scope);
     }
 
     public long count(String tenantId, ScheduleDeviceCriteria criteria, Collection<OsType> supportedPlatforms) {

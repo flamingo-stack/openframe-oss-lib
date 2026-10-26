@@ -1,4 +1,6 @@
 import { render, act } from '@testing-library/react';
+import React from 'react';
+import { describe, it, expect, vi } from 'vitest';
 /**
  * Phase-0 GOLDEN CHARACTERIZATION TESTS for the markdown renderer unification.
  *
@@ -18,8 +20,6 @@ import { render, act } from '@testing-library/react';
  * sanitization), not the leaves. The same mocks apply pre- and
  * post-refactor, so snapshots stay comparable.
  */
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
 // Leaf mocks (stable across the refactor)
@@ -38,18 +38,24 @@ interface MockUrlProps {
   url?: string;
 }
 
-vi.mock('@/components/features/video', () => ({
+vi.mock('@/components/features/video', async importOriginal => ({
+  // The real URL helpers (the markdown iframe override asks `extractYouTubeId`); only the player is mocked.
+  ...(await importOriginal<Record<string, unknown>>()),
   Video: ({ kind, url, poster }: { kind?: string; url?: string; poster?: string | null }) => (
     <div data-mock="video" data-kind={kind} data-url={url} data-poster={poster ?? ''} />
   ),
 }));
 
 vi.mock('@/components/embeds/reddit-embed-client', () => ({
-  RedditEmbedClient: ({ url }: MockUrlProps) => <div data-mock="reddit" data-url={url} />,
+  RedditEmbedClient: ({ url, rel }: MockUrlProps & { rel?: string }) => (
+    <div data-mock="reddit" data-url={url} data-rel={rel} />
+  ),
 }));
 
 vi.mock('@/components/embeds/twitter-embed-client', () => ({
-  TwitterEmbedClient: ({ url }: MockUrlProps) => <div data-mock="twitter" data-url={url} />,
+  TwitterEmbedClient: ({ url, rel }: MockUrlProps & { rel?: string }) => (
+    <div data-mock="twitter" data-url={url} data-rel={rel} />
+  ),
 }));
 
 vi.mock('@/components/embeds/linkedin-embed-client', () => ({
@@ -709,6 +715,13 @@ const RICH_ONLY_FIXTURES: Record<string, string> = {
   // (script stripped by sanitize; blockquote rehydrated to RedditEmbedClient).
   'audit-reddit-embed-bq':
     '<blockquote class="reddit-embed-bq" data-embed-height="500"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/">view</a></blockquote>\n<script async src="https://embed.reddit.com/widgets.js" charset="UTF-8"></script>',
+  // An editor's Nofollow choice (the editors write it as an HTML anchor): the SEO tokens are kept,
+  // any other authored token is dropped, and new-tab links still get noopener noreferrer.
+  'link-authored-rel':
+    '<a href="https://example.com/sponsor" rel="nofollow">nofollow</a>, <a href="/pricing" rel="nofollow ugc">internal</a>, <a href="https://example.com/me" rel="me">me</a>, <a href="https://example.com/ad" rel="sponsored">ad</a> and [followed](https://example.com/page).',
+  // A Reddit post the author marked nofollow keeps it on the card's links to the post.
+  'reddit-embed-bq-nofollow':
+    '<blockquote class="reddit-embed-bq"><p>Post title</p><a href="https://www.reddit.com/r/msp/comments/abc/post/" rel="nofollow">view</a></blockquote>',
 };
 
 const CHAT_FIXTURES: Record<string, string> = {

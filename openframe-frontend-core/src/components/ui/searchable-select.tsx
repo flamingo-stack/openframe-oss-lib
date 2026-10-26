@@ -1,19 +1,44 @@
 'use client';
 
 import * as PopoverPrimitive from '@radix-ui/react-popover';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useId, useMemo, useState } from 'react';
 import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
 import { cn } from '../../utils/cn';
 import { CheckIcon, SearchIcon } from '../icons-v2-generated';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
+import { LoadingRegion } from '../loading/loading-region';
+import { TextLineSkeleton } from '../loading/unified-skeleton';
+import { BUTTON_KIND_CLASS, Button } from './button';
+import { FieldWrapper } from './field-wrapper';
 import { Input } from './input';
+import { LoadingItems } from './loading-scope';
+import { usePortalContainer } from './portal-container';
+
+/** An option's frame (a list row, or a tile in the grid): the `row` button kind, read by the options and by their
+ *  loading state so both draw one box. A tile is the row laid out as a column. */
+const SELECT_TILE_LAYOUT = 'min-w-0 flex-col justify-center';
+const SELECT_ROW_CLASS = BUTTON_KIND_CLASS.row;
+const SELECT_TILE_CLASS = cn(BUTTON_KIND_CLASS.row, SELECT_TILE_LAYOUT);
+/**
+ * Options the loading state draws (rows, or tiles in the grid layout) when its host states no `loadingRows`: a
+ * typical count. A host that reads its options with a limit passes that limit.
+ */
+const SELECT_SKELETON_ROWS = 8;
+const SELECT_SKELETON_TILES = 12;
 
 export interface SearchableSelectOption {
   value: string;
   label: string;
-  /** Optional leading visual for the option row (avatar, icon, badge). */
+  /** Optional leading visual for the option row (avatar, icon, badge). The
+   *  default trigger leads with the selected option's icon too. */
   icon?: ReactNode;
+  /** Extra terms the search matches besides `label` — e.g. the stored key of a
+   *  glyph (`chart-pie`) whose label reads "Pie chart". */
+  keywords?: string[];
 }
+
+/** How the dropdown lays its options out — see `SearchableSelectProps.layout`. */
+export type SearchableSelectLayout = 'list' | 'grid';
 
 export interface SearchableSelectProps {
   options: SearchableSelectOption[];
@@ -27,6 +52,8 @@ export interface SearchableSelectProps {
   emptyText?: string;
   loadingText?: string;
   isLoading?: boolean;
+  /** Options drawn while `isLoading`: the options the host reads (its limit). Default a typical count. */
+  loadingRows?: number;
   disabled?: boolean;
   /**
    * Custom trigger node (rendered via Popover.Trigger asChild). When omitted,
@@ -34,7 +61,27 @@ export interface SearchableSelectProps {
    * is rendered.
    */
   trigger?: ReactNode;
-  /** Custom option-row renderer; default is icon + label + selected check. */
+  /** `id` of the default trigger button, which `label` names through `htmlFor`; generated when omitted. */
+  id?: string;
+  /**
+   * Label above the default trigger — the same `FieldWrapper` treatment
+   * `SelectTrigger` gives its `label`, so a searchable field lines up with the
+   * plain selects beside it. A custom `trigger` owns its own label.
+   */
+  label?: string;
+  /** Label scale forwarded to FieldWrapper ('large' = text-h4 for designs with body-scale field titles). */
+  labelVariant?: 'default' | 'large';
+  /** Validation message under the default trigger; also paints its border red. */
+  error?: string;
+  /**
+   * `'list'` (default) stacks full-width rows. `'grid'` tiles the options —
+   * icon above a centered caption, `minmax(7rem, 1fr)` columns — the
+   * icon-picker pattern. The grid fills the popover, so size it through
+   * `contentClassName` (360px fits three tiles).
+   */
+  layout?: SearchableSelectLayout;
+  /** Custom option-row renderer; default is icon + label + selected check
+   *  (icon above the caption in the grid layout). */
   renderOption?: (option: SearchableSelectOption, isSelected: boolean) => ReactNode;
   align?: 'start' | 'center' | 'end';
   /** Classes for the default trigger button. */
@@ -50,25 +97,42 @@ export interface SearchableSelectProps {
  * custom `trigger` for icon-button use cases; the default trigger looks and
  * behaves like `SelectTrigger`.
  */
-export function SearchableSelect({
-  options,
-  value = null,
-  onValueChange,
-  placeholder = 'Select...',
-  searchPlaceholder = 'Search...',
-  emptyText = 'No results found',
-  loadingText = 'Loading…',
-  isLoading = false,
-  disabled = false,
-  trigger,
-  renderOption,
-  align = 'start',
-  className,
-  contentClassName,
-}: SearchableSelectProps) {
+export function SearchableSelect(allProps: SearchableSelectProps) {
+  const {
+    options,
+    value = null,
+    onValueChange,
+    placeholder = 'Select...',
+    searchPlaceholder = 'Search...',
+    emptyText = 'No results found',
+    loadingText = 'Loading options',
+    isLoading = false,
+    loadingRows,
+    disabled = false,
+    trigger,
+    id,
+    label,
+    labelVariant,
+    error,
+    layout = 'list',
+    renderOption,
+    align = 'start',
+    className,
+    contentClassName,
+  } = allProps;
+  // Wired for a message even while `error` is undefined — see `FieldWrapper.errorSlot`.
+  const errorSlot = 'error' in allProps;
+  const isInvalid = !!error;
+  const isGrid = layout === 'grid';
+  // The label names the trigger through `htmlFor`: clicking it focuses the
+  // button and assistive tech reads the field by it. A caller's `id` wins.
+  const generatedId = useId();
+  const triggerId = id ?? generatedId;
+
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const keyboardPadding = useKeyboardCollisionPadding();
+  const portalContainer = usePortalContainer();
 
   // Clear the query on close, while rendering rather than from an effect: the
   // popover closes and reopens without unmounting, so an effect left the
@@ -79,7 +143,9 @@ export function SearchableSelect({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return options;
-    return options.filter(o => o.label.toLowerCase().includes(q));
+    return options.filter(
+      o => o.label.toLowerCase().includes(q) || (o.keywords ?? []).some(k => k.toLowerCase().includes(q)),
+    );
   }, [options, search]);
 
   const selectedOption = useMemo(
@@ -93,33 +159,55 @@ export function SearchableSelect({
   };
 
   const defaultTrigger = (
-    <button
+    <Button
+      variant="field"
+      id={triggerId}
       type="button"
       disabled={disabled}
-      className={cn(
-        // Mirrors SelectTrigger so the closed state is indistinguishable from
-        // the regular Select.
-        'flex h-11 w-full items-center justify-between gap-2 rounded-md border px-3 text-left outline-none md:h-12',
-        'border-ods-border bg-ods-card text-h4',
-        selectedOption ? 'text-ods-text-primary' : 'text-ods-text-secondary',
-        'enabled:hover:border-ods-border-hover enabled:hover:bg-ods-bg-hover enabled:active:border-ods-border-active enabled:active:bg-ods-bg-active',
-        'data-[state=open]:border-ods-accent data-[state=open]:hover:border-ods-accent',
-        'group cursor-pointer transition-colors duration-200 disabled:!cursor-not-allowed disabled:bg-ods-bg',
-        className,
-      )}
+      data-invalid={isInvalid || undefined}
+      className={className}
     >
-      <span className="line-clamp-1">{selectedOption ? selectedOption.label : placeholder}</span>
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        {selectedOption?.icon}
+        <span
+          className={cn(
+            'truncate',
+            disabled ? 'text-ods-text-disabled' : selectedOption ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+          )}
+        >
+          {selectedOption ? selectedOption.label : placeholder}
+        </span>
+      </span>
       <Chevron02DownIcon
-        className="shrink-0 text-ods-text-secondary transition-all duration-200 group-data-[state=open]:rotate-180 group-data-[state=open]:text-ods-accent"
+        className={cn(
+          'shrink-0 transition-all duration-200',
+          isOpen && 'rotate-180',
+          isInvalid ? 'text-ods-error' : isOpen ? 'text-ods-accent' : 'text-ods-text-secondary',
+        )}
         size={24}
       />
-    </button>
+    </Button>
+  );
+
+  const triggerElement = <PopoverPrimitive.Trigger asChild>{trigger ?? defaultTrigger}</PopoverPrimitive.Trigger>;
+
+  // A `role="listbox"` child that is a status line, not an option: in the grid
+  // it has to span the row or it would sit in one tile-sized cell.
+  const statusClass = cn(
+    'px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h5',
+    isGrid && 'col-span-full',
   );
 
   return (
     <PopoverPrimitive.Root open={isOpen} onOpenChange={disabled ? undefined : setIsOpen} modal={false}>
-      <PopoverPrimitive.Trigger asChild>{trigger ?? defaultTrigger}</PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Portal>
+      {!trigger && (label !== undefined || errorSlot) ? (
+        <FieldWrapper label={label} htmlFor={triggerId} labelVariant={labelVariant} error={error} errorSlot={errorSlot}>
+          {triggerElement}
+        </FieldWrapper>
+      ) : (
+        triggerElement
+      )}
+      <PopoverPrimitive.Portal container={portalContainer ?? undefined}>
         <PopoverPrimitive.Content
           align={align}
           sideOffset={6}
@@ -139,6 +227,7 @@ export function SearchableSelect({
         >
           <div className="shrink-0 border-b border-ods-border">
             <Input
+              userValue
               autoFocus
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -147,33 +236,64 @@ export function SearchableSelect({
               className="rounded-none border-0"
             />
           </div>
-          <div className="max-h-80 min-h-0 overflow-y-auto py-[var(--spacing-system-xs)]" role="listbox">
+          <div
+            className={cn(
+              'max-h-80 min-h-0 overflow-y-auto',
+              // Tiles grow from 7rem: the popover's own border and a classic
+              // always-on scrollbar both eat into the track, so 7.5rem (the
+              // Figma cell) dropped a 360px popover to two columns. The column
+              // count follows the popover width. Each tile draws its own
+              // bottom/right rule, so the grid needs no gap.
+              isGrid ? 'grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))]' : 'py-[var(--spacing-system-xs)]',
+            )}
+            // A listbox owns options only: while they are read the box holds the loading region (a status and
+            // hidden rows), with no listbox role around it.
+            role={isLoading ? undefined : 'listbox'}
+          >
             {isLoading ? (
-              <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h5">
-                {loadingText}
-              </div>
+              // The options while they are read: the list's own rows (or tiles), a label bar each; `loadingText` is
+              // what a screen reader hears.
+              <LoadingRegion label={loadingText} className="contents">
+                <LoadingItems count={loadingRows ?? (isGrid ? SELECT_SKELETON_TILES : SELECT_SKELETON_ROWS)}>
+                  {() => (
+                    <div data-loading-item className={isGrid ? SELECT_TILE_CLASS : SELECT_ROW_CLASS} aria-hidden>
+                      <TextLineSkeleton type={isGrid ? 'h6' : 'h4'} className={isGrid ? 'w-full' : 'w-2/3'} />
+                    </div>
+                  )}
+                </LoadingItems>
+              </LoadingRegion>
             ) : filtered.length === 0 ? (
-              <div className="px-[var(--spacing-system-sf)] py-[var(--spacing-system-s)] text-ods-text-secondary text-h5">
-                {emptyText}
-              </div>
+              <div className={statusClass}>{emptyText}</div>
             ) : (
               filtered.map(opt => {
                 const isSelected = value === opt.value;
                 return (
-                  <button
+                  <Button
+                    variant="row"
                     key={opt.value}
+                    data-loading-item
                     type="button"
                     role="option"
                     aria-selected={isSelected}
+                    data-state={isSelected ? 'active' : undefined}
                     onClick={() => handleSelect(opt.value)}
-                    className={cn(
-                      'flex w-full items-center gap-[var(--spacing-system-xs)] px-[var(--spacing-system-sf)] py-[var(--spacing-system-xs)] text-left',
-                      'transition-colors hover:bg-ods-bg-hover',
-                      isSelected && 'bg-ods-bg-hover',
-                    )}
+                    className={isGrid ? SELECT_TILE_LAYOUT : undefined}
                   >
                     {renderOption ? (
                       renderOption(opt, isSelected)
+                    ) : isGrid ? (
+                      <>
+                        {opt.icon}
+                        <span
+                          className={cn(
+                            'w-full truncate text-center text-h6',
+                            isSelected ? 'text-ods-text-primary' : 'text-ods-text-secondary',
+                          )}
+                          title={opt.label}
+                        >
+                          {opt.label}
+                        </span>
+                      </>
                     ) : (
                       <>
                         {opt.icon}
@@ -183,7 +303,7 @@ export function SearchableSelect({
                         {isSelected && <CheckIcon className="size-4 shrink-0 text-ods-accent" />}
                       </>
                     )}
-                  </button>
+                  </Button>
                 );
               })
             )}

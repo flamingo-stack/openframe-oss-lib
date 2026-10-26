@@ -6,11 +6,13 @@ import { useDebounce } from '../../hooks/ui/use-debounce';
 import { cn } from '../../utils/cn';
 import { Filter02Icon, SearchIcon } from '../icons-v2-generated';
 import { Button } from '../ui/button';
+import type { DataTableFilters } from '../ui/data-table/types';
 import { PageError } from '../ui/error-state';
-import { FilterModal, type FilterGroup, type SortConfig, type SortDirection } from '../ui/filter-modal';
+import { FilterModal, type FilterGroup } from '../ui/filter-modal';
 import { Input } from '../ui/input';
-import type { TableFilters } from '../ui/table/types';
-import { ListPageContainer, type PageActionButton } from './page-container';
+import type { PageActionButton } from '../ui/page-actions';
+import type { SortConfig, SortDirection } from '../ui/sort-column-item';
+import { ListPageContainer } from './page-container';
 
 export interface ListPageLayoutProps {
   title: string;
@@ -25,8 +27,8 @@ export interface ListPageLayoutProps {
   padding?: 'none' | 'sm' | 'md' | 'lg';
   background?: 'default' | 'card' | 'transparent';
   mobileFilterGroups?: FilterGroup[];
-  onMobileFilterChange?: (filters: TableFilters) => void;
-  currentMobileFilters?: TableFilters;
+  onMobileFilterChange?: (filters: DataTableFilters) => void;
+  currentMobileFilters?: DataTableFilters;
   mobileSortConfig?: SortConfig;
   onMobileSort?: (column: string, direction: SortDirection) => void;
   mobileFilterTitle?: string;
@@ -161,11 +163,12 @@ export function ListPageLayout({
           )}
         >
           <Input
+            userValue
             placeholder={searchPlaceholder}
             onChange={e => setLocalSearchValue(e.target.value)}
             value={localSearchValue}
             className="flex-1"
-            startAdornment={<SearchIcon className="h-4 w-4 md:h-6 md:w-6" />}
+            startAdornment={<SearchIcon className="h-4 w-4 content-md:h-6 content-md:w-6" />}
           />
 
           {/* Mobile Filter Button - only visible on mobile when filter is enabled */}
@@ -173,7 +176,7 @@ export function ListPageLayout({
             <Button
               variant="outline"
               size="icon"
-              className="md:hidden"
+              className="content-md:hidden"
               onClick={() => setMobileFilterOpen(true)}
               aria-label="Open filters"
             >
@@ -202,9 +205,6 @@ export function ListPageLayout({
     </ListPageContainer>
   );
 }
-
-// Re-export PageActionButton type for convenience
-export type { PageActionButton } from './page-container';
 
 /** @deprecated Use `PageLayout` from `'../layout/page-layout'` instead. */
 export default ListPageLayout;

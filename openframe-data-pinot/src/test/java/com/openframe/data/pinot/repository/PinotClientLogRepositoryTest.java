@@ -334,6 +334,50 @@ class PinotClientLogRepositoryTest {
         }
     }
 
+    @Nested
+    @DisplayName("filter options carry an explicit LIMIT")
+    class FacetLimits {
+
+        /**
+         * Pinot defaults to LIMIT 10 on any query that sets none, so a facet without one returns the first ten
+         * values in ORDER BY order and silently drops the rest - the eleventh organization by name is simply
+         * missing from the Source filter until another filter narrows the set enough for it to fit.
+         */
+        @Test
+        @DisplayName("every facet query, not just the ones that visibly overflow today")
+        void everyFacetQuerySetsALimit() {
+            assertLimited(() -> repository.getEventTypeOptions(TENANT_ID, START, END, List.of(), List.of(), List.of(), List.of()));
+            assertLimited(() -> repository.getSeverityOptions(TENANT_ID, START, END, List.of(), List.of(), List.of(), List.of()));
+            assertLimited(() -> repository.getToolTypeOptions(TENANT_ID, START, END, List.of(), List.of(), List.of(), List.of()));
+            assertLimited(() -> repository.getAvailableDateRanges(TENANT_ID, List.of(), List.of(), List.of(), List.of()));
+            assertLimited(() -> repository.getOrganizationOptions(TENANT_ID, START, END, List.of(), List.of(), List.of()));
+        }
+
+        @Test
+        @DisplayName("the ORDER BY stays: the frontend renders the list in the order it receives")
+        void keepsTheOrderingAlongsideTheLimit() {
+            whenQueryReturnsEmptyRows();
+
+            repository.getOrganizationOptions(TENANT_ID, START, END, List.of(), List.of(), List.of());
+
+            String query = captureExecutedQuery();
+            assertTrue(query.indexOf("ORDER BY") < query.indexOf("LIMIT"),
+                    () -> "ORDER BY must precede LIMIT, otherwise the limit cuts an unordered set: " + query);
+            assertTrue(query.contains("ORDER BY organizationName"), () -> query);
+        }
+
+        private void assertLimited(Runnable facetQuery) {
+            org.mockito.Mockito.reset(pinotConnection, resultSetGroup, resultSet);
+            whenQueryReturnsEmptyRows();
+
+            facetQuery.run();
+
+            String query = captureExecutedQuery();
+            assertTrue(query.contains("LIMIT 10000"),
+                    () -> "facet query would be truncated to Pinot's default of 10 rows: " + query);
+        }
+    }
+
     // ----- helpers -----
 
     private void whenQueryReturnsEmptyRows() {

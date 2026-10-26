@@ -174,7 +174,3 @@ export function getRequiredParams(schema: Record<string, FlattenedParam>): strin
     .filter(([_, param]) => param.required)
     .map(([key]) => key);
 }
-
-// THE omission rule lives in the search-params leaf (the server serializer and
-// this flattened-schema path must agree); re-exported for existing importers.
-export { shouldIncludeInUrl } from '../../utils/search-params';

@@ -13,7 +13,8 @@ use crate::config::update_config::{
     FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS, RECONNECTION_DELAY_MS,
 };
 use crate::models::{
-    is_ack_subject, ExecutionAck, ExecutionMessage, ExecutionRequest, RmmResult, EXECUTION_ACK_KIND,
+    requires_stream_ack, ExecutionAck, ExecutionMessage, ExecutionRequest, RmmResult,
+    EXECUTION_ACK_KIND,
 };
 use crate::services::execution_service::ExecutionService;
 use crate::services::nats_connection_manager::NatsConnectionManager;
@@ -30,6 +31,7 @@ pub struct ExecutionListener<M> {
     config_service: AgentConfigurationService,
     result_store: Arc<ResultStore>,
     flush_notify: Arc<Notify>,
+    message_handled: Option<Arc<Notify>>,
     _marker: PhantomData<fn() -> M>,
 }
 
@@ -42,6 +44,7 @@ impl<M> Clone for ExecutionListener<M> {
             config_service: self.config_service.clone(),
             result_store: self.result_store.clone(),
             flush_notify: self.flush_notify.clone(),
+            message_handled: self.message_handled.clone(),
             _marker: PhantomData,
         }
     }
@@ -68,8 +71,14 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             config_service,
             result_store,
             flush_notify,
+            message_handled: None,
             _marker: PhantomData,
         }
+    }
+
+    pub fn on_message_handled(mut self, notify: Arc<Notify>) -> Self {
+        self.message_handled = Some(notify);
+        self
     }
 
     pub async fn start(&self) -> Result<tokio::task::JoinHandle<()>> {
@@ -182,6 +191,10 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
             }
         }
 
+        if let Some(notify) = &self.message_handled {
+            notify.notify_one();
+        }
+
         Ok(())
     }
 
@@ -242,7 +255,7 @@ impl<M: ExecutionMessage + 'static> ExecutionListener<M> {
 
     fn spawn_fallback_publish(&self, subject: String, bytes: Vec<u8>) {
         let publisher = self.nats_message_publisher.clone();
-        let acked = is_ack_subject(&subject);
+        let acked = requires_stream_ack(&subject);
         tokio::spawn(async move {
             let max_backoff = Duration::from_millis(FALLBACK_PUBLISH_MAX_RETRY_DELAY_MS);
             let mut backoff = Duration::from_millis(FALLBACK_PUBLISH_INITIAL_RETRY_DELAY_MS);

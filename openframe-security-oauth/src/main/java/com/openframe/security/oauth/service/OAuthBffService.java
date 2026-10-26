@@ -1,7 +1,9 @@
 package com.openframe.security.oauth.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.nimbusds.jwt.JWTParser;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.repository.oauth.MongoOAuth2AuthorizationRepository;
 import com.openframe.security.jwt.JwtService;
 import com.openframe.security.oauth.dto.OAuthCallbackResult;
@@ -36,6 +38,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 import static com.openframe.core.constants.HttpHeaders.ACCEPT;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_EXPIRED;
 import static com.openframe.security.pkce.PKCEUtils.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.Instant.now;
@@ -58,7 +61,7 @@ public class OAuthBffService {
 
     private static final String INVALID_GRANT = "invalid_grant";
     private static final Pattern OAUTH_ERROR_CODE = Pattern.compile("[a-z0-9_]{1,40}");
-    private static final ObjectMapper ERROR_BODY_MAPPER = new ObjectMapper();
+    private static final ObjectMapper ERROR_BODY_MAPPER = new JsonMapper();
 
     @Value("${openframe.auth.server.url}")
     private String authServerUrl;
@@ -96,7 +99,7 @@ public class OAuthBffService {
                                                     ServerHttpRequest request) {
         OAuthSessionData sessionData = validateAndExtractCookieData(state, request)
                 .orElse(null);
-        if (sessionData == null) return Mono.error(new IllegalStateException("Authentication session expired. Please try again."));
+        if (sessionData == null) return Mono.error(new AuthFlowException(SSO_SESSION_EXPIRED, "Authentication session expired. Please try again."));
         return exchangeCodeForTokens(sessionData, code, request)
                 .flatMap(tokens -> redirectTargetResolver
                         .resolve(sessionData.tenantId(), extractUserId(tokens), sessionData.redirectTo(), request)
@@ -279,7 +282,7 @@ public class OAuthBffService {
         try {
             var node = ERROR_BODY_MAPPER.readTree(body);
             for (String field : new String[]{"message", "error", "detail"}) {
-                if (node.hasNonNull(field)) return node.get(field).asText();
+                if (node.hasNonNull(field)) return node.get(field).asString();
             }
         } catch (Exception ignored) {
         }
@@ -424,7 +427,7 @@ public class OAuthBffService {
 
     private String extractOAuthErrorCode(String body) {
         try {
-            String error = ERROR_BODY_MAPPER.readTree(body).path("error").asText(null);
+            String error = ERROR_BODY_MAPPER.readTree(body).path("error").asString(null);
             return error != null && OAUTH_ERROR_CODE.matcher(error).matches() ? error : null;
         } catch (Exception e) {
             return null;

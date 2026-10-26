@@ -19,11 +19,13 @@ import com.openframe.api.dto.shared.ConnectionArgs;
 import com.openframe.api.dto.shared.CursorPaginationCriteria;
 import com.openframe.api.dto.shared.SortInput;
 import com.openframe.api.mapper.GraphQLDeviceMapper;
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.service.device.DeviceService;
 import com.openframe.api.service.rmm.software.SoftwareBundleService;
 import com.openframe.data.document.device.Machine;
+import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import com.openframe.security.authentication.AuthPrincipal;
-import graphql.relay.Relay;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +39,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static com.openframe.graphql.relay.NodeType.MACHINE;
+import static com.openframe.graphql.relay.NodeType.SOFTWARE_BUNDLE;
+
 @DgsComponent
 @ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
 @RequiredArgsConstructor
@@ -44,15 +49,16 @@ import java.util.Set;
 @Validated
 public class SoftwareBundleDataFetcher {
 
-    private static final Relay RELAY = new Relay();
-
     private final SoftwareBundleService softwareBundleService;
     private final DeviceService deviceService;
     private final GraphQLDeviceMapper deviceMapper;
+    private final PackageManagerAvailability packageManagerAvailability;
+    private final RelayIdCodec relayIdCodec;
 
     @DgsQuery
     public SoftwareBundleResponse softwareBundle(@InputArgument String id) {
-        return softwareBundleService.findById(decodeId(id)).orElse(null);
+        String bundleId = relayIdCodec.decode(id, SOFTWARE_BUNDLE);
+        return softwareBundleService.findById(bundleId).orElse(null);
     }
 
     @DgsMutation
@@ -63,46 +69,58 @@ public class SoftwareBundleDataFetcher {
     @DgsMutation
     public SoftwareBundleResponse addDevicesToSoftwareBundle(@InputArgument String bundleId,
                                                              @InputArgument List<String> machineIds) {
-        return softwareBundleService.addDevices(decodeId(bundleId), decodeMachineIds(machineIds), getCurrentUserId());
+        String rawBundleId = relayIdCodec.decode(bundleId, SOFTWARE_BUNDLE);
+        List<String> rawMachineIds = decodeMachineIds(machineIds);
+        String userId = getCurrentUserId();
+        return softwareBundleService.addDevices(rawBundleId, rawMachineIds, userId);
     }
 
     @DgsMutation
     public SoftwareBundleResponse removeDevicesFromSoftwareBundle(@InputArgument String bundleId,
                                                                   @InputArgument List<String> machineIds) {
-        return softwareBundleService.removeDevices(decodeId(bundleId), decodeMachineIds(machineIds), getCurrentUserId());
+        String rawBundleId = relayIdCodec.decode(bundleId, SOFTWARE_BUNDLE);
+        List<String> rawMachineIds = decodeMachineIds(machineIds);
+        String userId = getCurrentUserId();
+        return softwareBundleService.removeDevices(rawBundleId, rawMachineIds, userId);
     }
 
     @DgsMutation
     public SoftwareBundleResponse addAllDevicesToSoftwareBundle(@InputArgument String bundleId,
                                                                 @InputArgument @Valid DeviceFilterInput filter,
                                                                 @InputArgument String search) {
-        List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
-        return softwareBundleService.addDevices(decodeId(bundleId), machineIds, getCurrentUserId());
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
+        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search);
+        String rawBundleId = relayIdCodec.decode(bundleId, SOFTWARE_BUNDLE);
+        String userId = getCurrentUserId();
+        return softwareBundleService.addDevices(rawBundleId, machineIds, userId);
     }
 
     @DgsMutation
     public SoftwareBundleResponse removeAllDevicesFromSoftwareBundle(@InputArgument String bundleId,
                                                                      @InputArgument @Valid DeviceFilterInput filter,
                                                                      @InputArgument String search) {
-        List<String> machineIds = deviceService.findAllDeviceIds(deviceMapper.toDeviceFilterCriteria(filter), search);
-        return softwareBundleService.removeDevices(decodeId(bundleId), machineIds, getCurrentUserId());
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<String> machineIds = deviceService.findAllDeviceIds(filterOptions, search);
+        String rawBundleId = relayIdCodec.decode(bundleId, SOFTWARE_BUNDLE);
+        String userId = getCurrentUserId();
+        return softwareBundleService.removeDevices(rawBundleId, machineIds, userId);
     }
 
     @DgsMutation
     public SoftwareBundleResponse submitSoftwareBundle(@InputArgument @Valid SubmitSoftwareBundleInput input) {
-        input.setId(decodeId(input.getId()));
-        return softwareBundleService.submit(input, getCurrentUserId());
+        String bundleGlobalId = input.getId();
+        String bundleId = relayIdCodec.decode(bundleGlobalId, SOFTWARE_BUNDLE);
+        input.setId(bundleId);
+        String userId = getCurrentUserId();
+        return softwareBundleService.submit(input, userId);
     }
 
     @DgsMutation
     public boolean deleteSoftwareBundle(@InputArgument String id) {
-        return softwareBundleService.delete(decodeId(id), getCurrentUserId());
-    }
-
-    @DgsData(parentType = "SoftwareBundle", field = "id")
-    public String softwareBundleNodeId(DgsDataFetchingEnvironment dfe) {
-        SoftwareBundleResponse bundle = dfe.getSource();
-        return RELAY.toGlobalId("SoftwareBundle", bundle.getId());
+        String bundleId = relayIdCodec.decode(id, SOFTWARE_BUNDLE);
+        String userId = getCurrentUserId();
+        return softwareBundleService.delete(bundleId, userId);
     }
 
     @DgsData(parentType = "SoftwareBundle", field = "deviceCount")
@@ -142,7 +160,8 @@ public class SoftwareBundleDataFetcher {
             @InputArgument String search,
             @InputArgument @Valid SortInput sort) {
         SoftwareBundleResponse bundle = dfe.getSource();
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         CursorPaginationCriteria pagination = deviceMapper.toCursorPaginationCriteria(
                 ConnectionArgs.builder().first(first).after(after).last(last).before(before).build());
         Set<String> assignedMachineIds = new HashSet<>(bundle.getMachineIds() == null ? List.of() : bundle.getMachineIds());
@@ -168,23 +187,16 @@ public class SoftwareBundleDataFetcher {
             DgsDataFetchingEnvironment dfe,
             @InputArgument @Valid DeviceFilterInput filter,
             @InputArgument String search) {
-        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter);
+        List<PackageManagerType> enabledManagers = packageManagerAvailability.enabledManagers();
+        DeviceFilterCriteria filterOptions = deviceMapper.toDeviceFilterCriteria(filter, enabledManagers);
         return deviceService.getAvailableDeviceFilters(null, filterOptions, search);
     }
 
-    private static List<String> decodeMachineIds(List<String> machineIds) {
+    private List<String> decodeMachineIds(List<String> machineIds) {
         if (machineIds == null) {
             return List.of();
         }
-        return machineIds.stream().map(SoftwareBundleDataFetcher::decodeId).toList();
-    }
-
-    private static String decodeId(String id) {
-        try {
-            return RELAY.fromGlobalId(id).getId();
-        } catch (Exception e) {
-            return id;
-        }
+        return relayIdCodec.decodeAll(machineIds, MACHINE);
     }
 
     private String getCurrentUserId() {

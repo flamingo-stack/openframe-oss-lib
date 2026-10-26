@@ -29,7 +29,8 @@
  *     fetch-mode entries.
  */
 
-import React, { type ReactNode } from 'react';
+import type React from 'react';
+import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
@@ -55,33 +56,20 @@ import { faqItemAnchor } from '../../../utils/faq-anchor';
 import { formatDateUTC as formatDate } from '../../../utils/format';
 import { programMetaFormatters, programMetaLine } from '../../../utils/program-instant';
 import { PROGRAM_META_RENDERERS } from '../../../utils/program-meta-renderers';
-import { MingoIcon } from '../../icons';
+import { defaultTableIdForDocumentType, getSourceLabel, SOURCE_ICON_NAMES } from '../../../utils/source-icons';
+import { AgentMark } from '../../agent-mark';
+import { EntityIcon } from '../../icon-display';
 import { ArrowRightUpIcon } from '../../icons-v2-generated/arrows/arrow-right-up-icon';
 import { ClickupLogoIcon } from '../../icons-v2-generated/brand-logos/clickup-logo-icon';
 import { SlackLogoGreyIcon } from '../../icons-v2-generated/brand-logos/slack-logo-grey-icon';
-import { ChartBar01VerIcon } from '../../icons-v2-generated/charts/chart-bar-01-ver-icon';
-import { ChartPieIcon } from '../../icons-v2-generated/charts/chart-pie-icon';
 import { PresentationBarIcon } from '../../icons-v2-generated/charts/presentation-bar-icon';
 import { PresentationLineIcon } from '../../icons-v2-generated/charts/presentation-line-icon';
-import { BracketCurlyCheckIcon } from '../../icons-v2-generated/coding/bracket-curly-check-icon';
 import { CodeIcon } from '../../icons-v2-generated/coding/code-icon';
-import { CodeSquareIcon } from '../../icons-v2-generated/coding/code-square-icon';
-import { CodingBranchIcon } from '../../icons-v2-generated/coding/coding-branch-icon';
 import { CodingCommitIcon } from '../../icons-v2-generated/coding/coding-commit-icon';
-import { CodingMergeIcon } from '../../icons-v2-generated/coding/coding-merge-icon';
 import { CodingPullRequestIcon } from '../../icons-v2-generated/coding/coding-pull-request-icon';
-import { PackageIcon } from '../../icons-v2-generated/coding/package-icon';
-import { CallIcon } from '../../icons-v2-generated/communication/call-icon';
-import { ChatQuoteIcon } from '../../icons-v2-generated/communication/chat-quote-icon';
 import { CalendarIcon } from '../../icons-v2-generated/date-and-time/calendar-icon';
-import { ClipboardListIcon } from '../../icons-v2-generated/documents/clipboard-list-icon';
-import { Copy01Icon } from '../../icons-v2-generated/documents/copy-01-icon';
-import { FileCodeIcon } from '../../icons-v2-generated/documents/file-code-icon';
 import { FileContentIcon } from '../../icons-v2-generated/documents/file-content-icon';
 import { NewspaperIcon } from '../../icons-v2-generated/documents/newspaper-icon';
-import { BankIcon } from '../../icons-v2-generated/finance/bank-icon';
-import { CoinsExchangeCurrencyIcon } from '../../icons-v2-generated/finance/coins-exchange-currency-icon';
-import { MoneyBillDollarIcon } from '../../icons-v2-generated/finance/money-bill-dollar-icon';
 import { MicrophoneIcon } from '../../icons-v2-generated/household/microphone-icon';
 import { AlertTriangleIcon } from '../../icons-v2-generated/interface/alert-triangle-icon';
 import { EyeIcon } from '../../icons-v2-generated/interface/eye-icon';
@@ -95,32 +83,31 @@ import { QuestionCircleIcon } from '../../icons-v2-generated/signs-and-symbols/q
 import { TrophyIcon } from '../../icons-v2-generated/sport/trophy-icon';
 import { Rocket02Icon } from '../../icons-v2-generated/vehicles-and-delivery/rocket-02-icon';
 import { TruckFastIcon } from '../../icons-v2-generated/vehicles-and-delivery/truck-fast-icon';
+import type { LoadedProductReleaseCardProps } from '../../shared/product-release/product-release-card';
+import { ProductReleaseCard } from '../../shared/product-release/product-release-card';
 import type { ActionsMenuGroup } from '../../ui/actions-menu';
+import { VendorIcon } from '../../vendor-icon';
 import { useChatPanel } from '../chat-panel-context';
 import type { ChatRef } from '../chat-ref.types';
 import { useChatCardItem } from '../hooks/use-chat-card-item';
-import { MingoInfoCard, MingoInfoCardSkeleton, type MingoInfoCardStatus } from '../mingo-info-card';
-import { NavLinkAnchorViaRuntime } from '../nav-link-anchor-via-runtime';
+import { MingoInfoCard, type MingoInfoCardStatus } from '../mingo-info-card';
 import { SourceActionButton } from '../source-action-button';
 import type { PrReviewState, GitHubActivityKind } from '../types/entities/github-activity';
 import { formatInvestorUpdatePeriod } from '../types/entities/investor-update';
 import type { BaseProgramItem, ProgramConfig } from '../types/entities/program-types';
 import { getStatusColorScheme } from '../utils/agent-status-message';
+import { resolveCardDestination } from '../utils/card-destination';
 import { resolveHrefForRuntime } from '../utils/chat-nav-resolution';
-import { safeHref } from '../utils/compact-card-classes';
 import { executeNavigation } from '../utils/execute-navigation';
 import { clickupTaskUrl } from '../utils/external-app-urls';
-import { resolveIcon } from '../utils/icon-library';
 import { computeIsNewTab, buildAnchorProps } from '../utils/nav-anchor-props';
-import { resolveFetchedCardHref, pickFetchedCardHref, readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
-import { getSourceLabel } from '../utils/source-icons';
-import { resolveSourceRowCTA, resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
+import { readFetchedCardTitle } from '../utils/resolve-fetched-card-href';
+import { resolveSourceIcon, sourceRowCtxFromRuntime } from '../utils/source-row-cta';
 import { BlockCard } from './block-card';
-import { BlogCardSkeleton } from './blog-card';
-import { CampaignCardAdminSkeleton } from './campaign-card-admin';
-import { CaseStudyCardSkeleton } from './case-study-card';
+import { BlogCard } from './blog-card';
+import { CaseStudyCard } from './case-study-card';
 import { ChatVideoEntityCard } from './chat-video-entity-card';
-import { CustomerInterviewCardSkeleton } from './customer-interview-card';
+import { CustomerInterviewCard } from './customer-interview-card';
 import { DeletedDataCard } from './deleted-data-card';
 import { designDocMetaLine } from './design-doc-card';
 import {
@@ -129,12 +116,11 @@ import {
   kindLabel as githubKindLabel,
   reviewStateLabel,
 } from './github-activity-card';
-import { InvestorUpdateCardSkeleton } from './investor-update-card';
-import { OnboardingGuideCardSkeleton } from './onboarding-guide-card';
-import { ProductReleaseCardSkeleton, type ProductReleaseCardProps } from './product-release-card';
+import { InvestorUpdateCard } from './investor-update-card';
+import { OnboardingGuideCard } from './onboarding-guide-card';
 import { defaultBuildProductReleaseCardProps } from './product-release-card-defaults';
-import { ProgramCardSkeleton } from './program-card';
-import { RoadmapCardSkeleton } from './roadmap-card';
+import { ProgramCard } from './program-card';
+import { RoadmapCard } from './roadmap-card';
 import { TaskTypeIcon } from './task-type-icon';
 
 // =============================================================================
@@ -231,7 +217,7 @@ export interface ChatCardDispatchExtras {
    *  `lib/utils/product-release-card-props.ts`. */
   buildProductReleaseCardProps?: (
     release: unknown,
-  ) => Omit<ProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>;
+  ) => Omit<LoadedProductReleaseCardProps, 'size' | 'title' | 'summary' | 'version' | 'anchorProps'>;
   /** Build a branded OG placeholder URL from an entity title. Compact chat-
    *  inline cards (`size='sm'` for blog/case-study/customer-interview/
    *  investor-update/onboarding-guide) pass the result as `placeholderUrl`
@@ -1385,23 +1371,21 @@ function refHydratedEntry(
     contentRefType: docType,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => renderRef(fetchedItemDisplayRef(item, chatRef), opts),
   };
 }
 
+/** The leading glyph carries the type signal (the badge pill is dropped); it is the SOURCE's icon (`sourceGlyph`). */
 interface FinancialCardConfig {
   label: string;
-  /** Per-type leading glyph — carries the type signal now that the
-   *  badge pill is dropped. */
-  icon: () => React.ReactNode;
 }
 const FINANCIAL_CARD_CONFIGS: Record<string, FinancialCardConfig> = {
-  financial_kpi: { label: 'Financial KPI', icon: () => <ChartBar01VerIcon size={24} /> },
-  cap_table: { label: 'Cap table entry', icon: () => <ChartPieIcon size={24} /> },
-  profit_loss: { label: 'P&L period', icon: () => <MoneyBillDollarIcon size={24} /> },
-  balance_sheet: { label: 'Balance sheet', icon: () => <BankIcon size={24} /> },
-  cash_flow: { label: 'Cash flow', icon: () => <CoinsExchangeCurrencyIcon size={24} /> },
+  financial_kpi: { label: 'Financial KPI' },
+  cap_table: { label: 'Cap table entry' },
+  profit_loss: { label: 'P&L period' },
+  balance_sheet: { label: 'Balance sheet' },
+  cash_flow: { label: 'Cash flow' },
 };
 /** Expand a per-family config map into registry entries — ONE loop shell
  *  for every card family (financial, github, program, roadmap); adding a
@@ -1420,12 +1404,29 @@ function financialRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     refHydratedEntry(docType, cfg.label, (displayRef, opts) => (
       <GenericFinancialChatCard
         chatRef={displayRef}
-        icon={cfg.icon()}
+        icon={sourceGlyph(docType)}
         isNewTab={opts.isNewTab}
         discuss={opts.discuss}
       />
     )),
   );
+}
+
+/** A string field the card route attached to a hydrated ref beside the `ChatRef` ones (`logo_url`, `icon_name`). */
+function refText(ref: ChatRef | undefined, key: string): string | null {
+  const value = (ref as Record<string, unknown> | undefined)?.[key];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/** A vendor's own logo, through the shared `VendorIcon` (its logo rule and proxying); the directory's source icon without one. */
+function VendorGlyph({ title, logoUrl }: { title: string; logoUrl: string | null }) {
+  if (!logoUrl) return <EntityIcon icon={{ name: SOURCE_ICON_NAMES.vendors }} size={24} />;
+  return <VendorIcon vendor={{ title, logo_url: logoUrl }} size="xs" showBackground={false} />;
+}
+
+/** A website page's menu icon (the one its navigation entry draws), through `EntityIcon`; the site's own mark for a page without one. */
+function SitePageGlyph({ iconName }: { iconName: string | null }) {
+  return <EntityIcon icon={{ name: iconName ?? SOURCE_ICON_NAMES['website-pages'] }} size={24} />;
 }
 
 interface GitHubCardConfig {
@@ -1442,7 +1443,14 @@ const GITHUB_CARD_CONFIGS: Record<string, GitHubCardConfig> = {
 };
 interface GlyphCardConfig {
   label: string;
-  icon: () => React.ReactNode;
+  /**
+   * ONLY for a type whose records carry their own mark (a vendor's logo, a
+   * page's menu icon): it is handed the hydrated ref and draws that mark.
+   * Every other type leaves it out and gets its SOURCE's icon
+   * (`sourceGlyph`): the one `SOURCE_ICON_NAMES` entry its chip draws too, so
+   * a card and its chip can never show different icons.
+   */
+  icon?: (ref?: ChatRef) => React.ReactNode;
   /**
    * Video-bearing ref types: render the media card (cover from the ref's
    * `metadata.videoPoster`, else the host's OG placeholder; the type label as the
@@ -1456,33 +1464,51 @@ interface GlyphCardConfig {
  *  (`/api/design-docs`, `/api/openframe-tenants`, `/api/prospect-calls` — ChatRef-shaped items,
  *  same preset as github / slack). Adding one = one line here + the
  *  `list-url.ts` builder + the `source-icons.ts` label / icon / type entries. */
-/** The OpenFrame logo every OpenFrame surface uses (the `openframe` icon name). */
-const OpenFrameGlyph = resolveIcon('openframe');
 const REF_GLYPH_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  openframe_tenant: { label: 'OpenFrame tenant', icon: () => <OpenFrameGlyph size={24} /> },
-  prospect_call: { label: 'Prospect call', icon: () => <CallIcon size={24} />, media: true },
+  openframe_tenant: { label: 'OpenFrame tenant' },
+  prospect_call: { label: 'Prospect call', media: true },
   // Code intelligence (product-hub internal): the review rules a repository is
   // held to, the repositories themselves, and one row per deployment
   // environment. Glyph cards like their siblings — none of the three has a
   // cover image, and a rule is read in the admin screen it links to.
-  code_rule: { label: 'Code rule', icon: () => <BracketCurlyCheckIcon size={24} /> },
-  code_repo: { label: 'Repository', icon: () => <CodingBranchIcon size={24} /> },
-  code_deployment: { label: 'Deployment', icon: () => <PackageIcon size={24} /> },
+  code_rule: { label: 'Code rule' },
+  code_repo: { label: 'Repository' },
+  code_deployment: { label: 'Deployment' },
   // The graph's own objects: one source file's public surface, one public
   // symbol, a near-duplicate cluster, and a pull request's blast radius.
   // Glyph cards for the same reason as their three siblings — none carries a
   // cover image, and each links to the admin screen that renders it in full.
-  code_file: { label: 'Code file', icon: () => <FileCodeIcon size={24} /> },
-  code_symbol: { label: 'Code symbol', icon: () => <CodeSquareIcon size={24} /> },
-  code_duplicate: { label: 'Duplicate code', icon: () => <Copy01Icon size={24} /> },
-  code_impact: { label: 'Change impact', icon: () => <CodingPullRequestIcon size={24} /> },
+  code_file: { label: 'Code file' },
+  code_symbol: { label: 'Code symbol' },
+  code_duplicate: { label: 'Duplicate code' },
+  code_impact: { label: 'Change impact' },
   // A change set: pull requests across repositories declared as one change, with the ClickUp tasks and design
   // docs its pull requests are attached to. ONE card for it wherever a set is shown (chat, a design doc's page).
-  change_set: { label: 'Change set', icon: () => <CodingMergeIcon size={24} /> },
+  change_set: { label: 'Change set' },
+  // A page of the public website (pricing, product, legal, and every page the navigation lists), read live
+  // from the data the page shows. A glyph card: a page has no cover of its own, and the card opens the page.
+  site_page: { label: 'Website page', icon: ref => <SitePageGlyph iconName={refText(ref, 'icon_name')} /> },
+  // What OpenFrame charges, read live from its billing: the plan in force, or one AI model's token exchange
+  // rate. A glyph card; it opens the pricing page.
+  openframe_price: { label: 'OpenFrame price' },
+  // A vendor (product) of the OpenMSP directory. A glyph card; it opens the vendor's page there.
+  vendor: { label: 'Vendor', icon: ref => <VendorGlyph title={ref?.title ?? ''} logoUrl={refText(ref, 'logo_url')} /> },
 };
+/**
+ * A card type's icon: its SOURCE's, resolved exactly as the source's chip
+ * resolves it (`resolveSourceIcon` over `SOURCE_ICON_NAMES`). One name per
+ * source, one resolver, so a card and its chip always match.
+ */
+function sourceGlyph(docType: string): React.ReactNode {
+  const { Icon } = resolveSourceIcon({ sourceRepo: defaultTableIdForDocumentType(docType), documentType: docType });
+  return <Icon className="size-6" />;
+}
+
 function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
-  return registryEntries(REF_GLYPH_CARD_CONFIGS, (cfg, docType) =>
-    refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
+  return registryEntries(REF_GLYPH_CARD_CONFIGS, (config, docType) => {
+    const glyph = config.icon ?? (() => sourceGlyph(docType));
+    const cfg = config;
+    return refHydratedEntry(docType, cfg.label, (displayRef, opts) =>
       cfg.media ? (
         <EntityMingoCard
           title={displayRef.title}
@@ -1491,7 +1517,7 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
             displayRef.metadata?.videoPoster,
             opts.extras?.buildOgPlaceholderUrl?.(displayRef.title ?? '') ?? null,
           )}
-          fallbackIcon={cfg.icon()}
+          fallbackIcon={glyph(displayRef)}
           status={{ label: cfg.label, variant: 'grey' }}
           chatRef={displayRef}
           isNewTab={opts.isNewTab}
@@ -1499,10 +1525,10 @@ function refGlyphRegistryEntries(): Record<string, ChatCardRegistryEntry> {
           menuAriaLabel={`${cfg.label} actions`}
         />
       ) : (
-        <GlyphChatCard chatRef={displayRef} icon={cfg.icon()} isNewTab={opts.isNewTab} discuss={opts.discuss} />
+        <GlyphChatCard chatRef={displayRef} icon={glyph(displayRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
       ),
-    ),
-  );
+    );
+  });
 }
 
 /** People-hub employee feeds hydrate from their EXISTING list APIs
@@ -1520,20 +1546,20 @@ function fetchedEmployeeEntryDisplayRef(item: unknown, chatRef: ChatRef): ChatRe
   return { ...chatRef, title, preview: preview.length > 0 ? preview : chatRef.preview };
 }
 const EMPLOYEE_ENTRY_CARD_CONFIGS: Record<string, GlyphCardConfig> = {
-  what_i_shipped: { label: 'What I Shipped', icon: () => <Rocket02Icon size={24} /> },
-  how_i_work: { label: 'How I Work', icon: () => <ClipboardListIcon size={24} /> },
-  ai_prompt: { label: 'Squawkbox', icon: () => <ChatQuoteIcon size={24} /> },
+  what_i_shipped: { label: 'What I Shipped' },
+  how_i_work: { label: 'How I Work' },
+  ai_prompt: { label: 'Squawkbox' },
 };
 function employeeEntryRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   return registryEntries(EMPLOYEE_ENTRY_CARD_CONFIGS, (cfg, docType) => ({
     label: cfg.label,
     bareInline: true,
     contentRefType: docType,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <GlyphChatCard
         chatRef={fetchedEmployeeEntryDisplayRef(item, chatRef)}
-        icon={cfg.icon()}
+        icon={sourceGlyph(docType)}
         isNewTab={opts.isNewTab}
         discuss={opts.discuss}
       />
@@ -1565,7 +1591,7 @@ function programRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     label: cfg.label,
     contentRefType: cfg.contentRefType,
     bareInline: true,
-    skeleton: () => <ProgramCardSkeleton size="sm" />,
+    skeleton: () => <ProgramCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <ProgramChatCard
         item={item}
@@ -1616,7 +1642,7 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
     bareInline: true,
     ...(cfg.noComposedHref ? { noComposedHref: true } : {}),
     ...(cfg.fallbackHref ? { fallbackHref: cfg.fallbackHref } : {}),
-    skeleton: () => <RoadmapCardSkeleton size="sm" />,
+    skeleton: () => <RoadmapCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <RoadmapChatCard
         item={item}
@@ -1629,7 +1655,8 @@ function roadmapRegistryEntries(): Record<string, ChatCardRegistryEntry> {
   }));
 }
 
-const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
+/** Exported for the destination test, which walks every registered type. */
+export const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
   // ───────── ref-shaped types: hydrated via /api/chat/entity-refs ─────────
   ...githubRegistryEntries(),
   // Generic TOMBSTONE for entities a chat action deleted (ClickUp task
@@ -1668,7 +1695,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: 'faq',
     noComposedHref: true,
     fallbackHref: (item: ChatCardItem) => (item?.id != null ? `/faqs#${faqItemAnchor(item.id)}` : null),
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <FaqChatCard chatRef={fetchedFaqDisplayRef(item, chatRef)} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1683,7 +1710,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     contentRefType: TRUST_CENTER_DOCUMENT_TYPE,
     noComposedHref: true,
     fallbackHref: () => TRUST_CENTER_PAGE_PATH,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <TrustCenterChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1721,7 +1748,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Blog post',
     contentRefType: 'blog_post_existing',
     bareInline: true,
-    skeleton: () => <BlogCardSkeleton size="sm" />,
+    skeleton: () => <BlogCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <BlogChatCard
         item={item}
@@ -1737,7 +1764,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Case study',
     contentRefType: 'case_study',
     bareInline: true,
-    skeleton: () => <CaseStudyCardSkeleton size="sm" />,
+    skeleton: () => <CaseStudyCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <CaseStudyChatCard
         item={item}
@@ -1754,7 +1781,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     bareInline: true,
     noComposedHref: true,
     fallbackHref: (item: { url?: string | null }) => item?.url ?? null,
-    skeleton: () => <MingoInfoCardSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     render: (item, chatRef, opts) => (
       <DesignDocChatCard item={item} chatRef={chatRef} isNewTab={opts.isNewTab} discuss={opts.discuss} />
     ),
@@ -1763,7 +1790,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Customer interview',
     contentRefType: 'customer_interview',
     bareInline: true,
-    skeleton: () => <CustomerInterviewCardSkeleton size="sm" />,
+    skeleton: () => <CustomerInterviewCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <CustomerInterviewChatCard
         item={item}
@@ -1778,7 +1805,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Product release',
     contentRefType: 'product_release',
     bareInline: true,
-    skeleton: () => <ProductReleaseCardSkeleton size="sm" />,
+    skeleton: () => <ProductReleaseCard loading size="sm" />,
     render: (item, chatRef, opts) => {
       // Embedder-provided builder wins; lib default fills in otherwise
       // (covers `coverImage`, `hasVideoCover`, `formattedDate` — the
@@ -1803,7 +1830,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Investor update',
     contentRefType: 'investor_update',
     bareInline: true,
-    skeleton: () => <InvestorUpdateCardSkeleton size="sm" />,
+    skeleton: () => <InvestorUpdateCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <InvestorUpdateChatCard
         item={item}
@@ -1820,7 +1847,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     bareInline: true,
     // "Display" affordance (verbatim guide body) instead of "Ask".
     displayAction: true,
-    skeleton: () => <OnboardingGuideCardSkeleton size="sm" />,
+    skeleton: () => <OnboardingGuideCard loading size="sm" />,
     render: (item, chatRef, opts) => (
       <OnboardingGuideChatCard
         item={item}
@@ -1835,7 +1862,7 @@ const CHAT_CARD_REGISTRY: Record<string, ChatCardRegistryEntry> = {
     label: 'Marketing campaign',
     contentRefType: 'marketing_campaign',
     bareInline: true,
-    skeleton: () => <CampaignCardAdminSkeleton />,
+    skeleton: () => <MingoInfoCard loading title="" />,
     // No public viewer — synthesize the hub-internal admin URL post-fetch
     // so the wrapper + isNewTab computation see the actual destination.
     fallbackHref: (item: ChatCardItem) => (item?.id ? `/admin/campaigns/${encodeURIComponent(String(item.id))}` : null),
@@ -2002,28 +2029,7 @@ export function ChatCardLoader({
   extras,
 }: ChatCardLoaderProps) {
   const runtime = useRequiredChatRuntime();
-  const resolvedChatRef = React.useMemo<ChatRef>(() => {
-    const cta = resolveSourceRowCTA(
-      {
-        sourceRepo: chatRef.sourceRepo,
-        documentType: chatRef.type,
-        id: chatRef.id,
-        title: chatRef.title,
-        externalUrl: chatRef.url,
-        targetPlatform: chatRef.targetPlatform,
-        path: typeof chatRef.metadata?.path === 'string' ? chatRef.metadata.path : null,
-      },
-      sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
-    );
-    const finalHref = cta.href ? resolveHrefForRuntime(cta.href, runtime) : null;
-    return {
-      ...chatRef,
-      url: finalHref ?? chatRef.url,
-      targetPlatform: cta.targetPlatform ?? chatRef.targetPlatform ?? null,
-    };
-  }, [chatRef, runtime, baseRoute, chipBasePlatform]);
-
-  const entry = CHAT_CARD_REGISTRY[resolvedChatRef.type];
+  const entry = CHAT_CARD_REGISTRY[chatRef.type];
   // Hook order MUST be stable across renders — call the data hook
   // unconditionally regardless of entry mode. For non-fetch types the
   // `contentRefType` is empty so the hook returns `isLoading=false` and
@@ -2031,55 +2037,30 @@ export function ChatCardLoader({
   const fetchEntry = entry && entry.contentRefType ? entry : null;
   const { item, isLoading, isError, isFetched } = useChatCardItem<ChatCardItem>(
     fetchEntry?.contentRefType ?? '',
-    fetchEntry ? resolvedChatRef.id : '',
+    fetchEntry ? chatRef.id : '',
   );
   if (!entry) return null;
 
-  // Apply the post-fetch URL fallback (the ref carried no `externalUrl`).
-  // We mutate `resolvedChatRef.url` BEFORE computing isNewTab so the
-  // wrapper's interceptor sees the destination the user will actually
-  // visit. `safeHref` blocks `javascript:` / `data:` payloads even
-  // though the registry callers compose hub-internal strings today.
-  //
-  // Two producers, ranked by `pickFetchedCardHref` (which owns the
-  // precedence and its rationale):
-  //   1. the registry's per-type `fallbackHref` — an explicit non-content
-  //      destination (marketing campaign → `/admin/...`, or a ref-hydrated
-  //      row's own `item.url`);
-  //   2. the host's `composeContentUrl` seam via `resolveFetchedCardHref` —
-  //      the SAME resolver page cards go through. This is what makes cards
-  //      clickable on every transport: the wire ships bare
-  //      `[card://type:id]` markers with no metadata, so the ref reaches
-  //      us with `url: null` and `resolveSourceRowCTA` has nothing to route.
-  // …except an EXPLICIT host override outranks both: the seam is asked
-  // even for `fallbackHref` / `noComposedHref` types now, and its answer is
-  // taken only when the host actually re-homed the type (never when the
-  // composer merely synthesized one) — the case those two flags guard against.
-  const composedHref =
-    fetchEntry?.contentRefType && !resolvedChatRef.url && item
-      ? resolveFetchedCardHref({
-          contentRefType: fetchEntry.contentRefType,
-          id: resolvedChatRef.id,
-          item,
-          composeContentUrl: runtime.composeContentUrl,
-        })
-      : null;
-  const hrefChoice =
-    fetchEntry && !resolvedChatRef.url && item
-      ? pickFetchedCardHref({
-          composed: composedHref,
-          itemHref: fetchEntry.fallbackHref?.(item) ?? null,
-          allowComposed: !fetchEntry.noComposedHref,
-        })
-      : null;
-  const hrefResolvedChatRef: ChatRef = hrefChoice
-    ? {
-        ...resolvedChatRef,
-        url: safeHref(hrefChoice.href),
-        // The `item` branch carries no platform of its own — keep the ref's.
-        targetPlatform: hrefChoice.targetPlatform ?? resolvedChatRef.targetPlatform ?? null,
-      }
-    : resolvedChatRef;
+  // THE card's destination, decided in one place (`resolveCardDestination`):
+  // the source chip's resolver with the row as far as it is known (the ref's
+  // fields, plus the fetched row's doc path when a bare `[card://type:id]`
+  // marker carried none), else the fetched row's own destination. Computed
+  // BEFORE `isNewTab` so the click wrapper sees the page the user will visit.
+  const destination = resolveCardDestination({
+    chatRef,
+    item: fetchEntry ? item : undefined,
+    entry: fetchEntry,
+    ctx: sourceRowCtxFromRuntime(runtime, { baseRoute, chipBasePlatform }),
+    composeContentUrl: runtime.composeContentUrl,
+    resolveHref: href => resolveHrefForRuntime(href, runtime),
+  });
+  const hrefResolvedChatRef: ChatRef = {
+    ...chatRef,
+    url: destination.url,
+    targetPlatform: destination.targetPlatform,
+    // The nav wrapper reads the path off the ref for in-app doc navigation.
+    ...(destination.path ? { metadata: { ...(chatRef.metadata ?? {}), path: destination.path } } : {}),
+  };
 
   // Title enrichment, same synthetic-ref gap as the href above: a Mingo
   // `[card://type:id]` marker produces `title: <id>` because the transport
@@ -2107,16 +2088,7 @@ export function ChatCardLoader({
   const discuss: CardDiscussAction | undefined = discussFn
     ? {
         label: useDisplay ? 'Display' : 'Ask Mingo',
-        icon: useDisplay ? (
-          <FileContentIcon size={20} />
-        ) : (
-          <MingoIcon
-            className="size-5"
-            color="white"
-            eyesColor="var(--ods-flamingo-cyan-base)"
-            cornerColor="var(--ods-flamingo-cyan-base)"
-          />
-        ),
+        icon: useDisplay ? <FileContentIcon size={20} /> : <AgentMark agent="mingo" className="size-5" />,
         run: () => discussFn(finalChatRef),
       }
     : undefined;
@@ -2280,11 +2252,3 @@ export function renderChatInlineEntityCard(
 
   return loader;
 }
-
-// =============================================================================
-// NavLink wiring for callers that need to compose anchors (Task 2 + Task 3)
-// =============================================================================
-
-/** Re-export so call sites can wrap any subtree with chat-runtime
- *  routing in a single import. */
-export { NavLinkAnchorViaRuntime };

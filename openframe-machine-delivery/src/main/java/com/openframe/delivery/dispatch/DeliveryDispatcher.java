@@ -20,24 +20,25 @@ import java.util.UUID;
 public class DeliveryDispatcher {
 
     private final DeliverySpecRegistry registry;
-    private final DeliveryRecorder recorder;
-    // ObjectProvider: the dispatcher boots in services without NATS, where no publisher bean exists
-    private final ObjectProvider<DeliveryPublisher> publisher;
+    // ObjectProvider: the dispatcher boots in services with neither NATS nor Kafka, where no sink bean exists
+    private final ObjectProvider<DeliverySink> sink;
 
     public void dispatch(DeliverySeed seed) {
-        DeliveryType type = seed.type();
+        DeliveryType type = seed.getType();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
         DeliveryRequest<DeliveryPayload> request = spec.request(seed);
+        if (isWildcardOnASingleMachineType(request, spec)) {
+            throw new IllegalArgumentException("Delivery type delivers to one machine at a time: " + type);
+        }
         DeliveryPayload payload = request.getPayload();
         String dispatchId = UUID.randomUUID().toString();
         String targetId = request.getTargetId();
         DeliveryRef delivery = new DeliveryRef(type, targetId, dispatchId);
         payload.setDelivery(delivery);
-        recorder.record(request);
-        String machineId = request.getMachineId();
-        String subject = spec.subject(machineId);
-        publisher.getObject().publish(subject, payload);
-        log.info("Delivery dispatched: type={} targetId={} machineId={} dispatchId={}",
-                type, request.getTargetId(), machineId, dispatchId);
+        sink.getObject().accept(request);
+    }
+
+    private static boolean isWildcardOnASingleMachineType(DeliveryRequest<?> request, DeliverySpec<?, ?> spec) {
+        return request.isForEveryMachine() && !spec.canDeliverToEveryMachine();
     }
 }

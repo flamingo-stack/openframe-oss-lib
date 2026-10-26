@@ -2,6 +2,8 @@ package com.openframe.api.service;
 
 import com.openframe.api.dto.device.DeviceFilterOption;
 import com.openframe.core.exception.ConflictException;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
 import com.openframe.data.document.tag.Tag;
 import com.openframe.data.document.tag.TagAssignment;
 import com.openframe.data.document.tag.TagEntityType;
@@ -234,7 +236,7 @@ public class TagService {
         log.info("Updating tag: {}", tagId);
 
         Tag tag = tagRepository.findById(tagId)
-                .orElseThrow(() -> new IllegalArgumentException("Tag not found: " + tagId));
+                .orElseThrow(() -> new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId));
 
         if (key != null) {
             TagEntityType entityType = tag.getEntityType();
@@ -259,7 +261,7 @@ public class TagService {
         log.info("Deleting tag: {}", tagId);
 
         if (!tagRepository.existsById(tagId)) {
-            throw new IllegalArgumentException("Tag not found: " + tagId);
+            throw new NotFoundException(ErrorCode.TAG_NOT_FOUND, "Tag not found: " + tagId);
         }
 
         tagAssignmentRepository.deleteByTagId(tagId);

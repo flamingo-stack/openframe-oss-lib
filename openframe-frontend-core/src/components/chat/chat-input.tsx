@@ -16,10 +16,13 @@ import {
 import { renderToStaticMarkup } from 'react-dom/server';
 import { cn } from '../../utils/cn';
 import { Send01Icon, StopCircleIcon } from '../icons-v2-generated';
+import { AvatarStack } from '../ui/avatar-stack';
+import { Button } from '../ui/button';
 import { Tag } from '../ui/tag';
 import { ChatTypingIndicator } from './chat-typing-indicator';
 import { SlashCommandSuggestions } from './slash-command-suggestions';
 import type { ChatInputProps, ChatInputRef, MentionMeta, SlashCommandSummary } from './types';
+import { CHAT_APPEARANCE } from './types/chat.types';
 
 /** SHARED with `lib/config/slash-commands-config.ts` AND the chat-route slash
  *  dispatch parser. Keep all three in sync. */
@@ -164,6 +167,9 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
     onStop,
     sending = false,
     awaitingResponse = false,
+    awaitingTeam,
+    awaitingTeamCount,
+    appearance = CHAT_APPEARANCE.CLASSIC,
     placeholder = 'Enter your Request...',
     reserveAvatarOffset: _reserveAvatarOffset,
     disabled = false,
@@ -560,10 +566,30 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
         className,
       )}
     >
-      {awaitingResponse ? (
+      {awaitingResponse && appearance === CHAT_APPEARANCE.CLASSIC ? (
         <div className="relative flex items-center justify-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-card px-[var(--spacing-system-s)] py-[var(--spacing-system-s)] transition-colors">
           <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-primary" />
           <p className="text-ods-text-secondary text-h4">Waiting for Technician Response</p>
+        </div>
+      ) : awaitingResponse ? (
+        // Hand-off bar (fae chat v2): who has the conversation now, and that a
+        // reply is on its way. Same 48px height as the editor row it replaces,
+        // so the thread above does not jump when the chat is handed off.
+        <div
+          role="status"
+          className="flex min-h-11 w-full items-center justify-center gap-[var(--spacing-system-xs)] rounded-md border border-ods-border bg-ods-bg p-[var(--spacing-system-sf)] md:min-h-12"
+        >
+          {awaitingTeam && awaitingTeam.length > 0 && (
+            <AvatarStack
+              people={awaitingTeam}
+              total={awaitingTeamCount}
+              size="xs"
+              ringClassName="ring-ods-bg"
+              label="Technicians"
+            />
+          )}
+          <p className="min-w-0 truncate text-ods-text-primary text-h4">Handed off to your technical support team</p>
+          <ChatTypingIndicator size="sm" dotClassName="bg-ods-text-secondary" />
         </div>
       ) : (
         <div className="relative">
@@ -606,9 +632,12 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
             <div className="relative min-w-0 flex-1">
               {/* No chip-line override on the placeholder: it only renders while
                   the draft is EMPTY, so the editor is always on its plain line
-                  box here. */}
+                  box here. `data-editor-ghost` (here and on the preview) pins
+                  both overlays to 16px on phones alongside `data-editor` — the
+                  iOS focus-zoom rule in app-globals.css. */}
               {isEmpty && !showPreview && (
                 <span
+                  data-editor-ghost
                   className={cn(
                     // One line, clipped with an ellipsis (Figma 954:28455): the
                     // disabled copy is a sentence, and the panel's narrowest
@@ -634,6 +663,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
                   editor. */}
               {showPreview && (
                 <p
+                  data-editor-ghost
                   className={cn(
                     'pointer-events-none absolute inset-x-0 top-0 m-0 select-none truncate text-ods-text-secondary text-h4',
                     hasChips && '!leading-9',
@@ -715,26 +745,19 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>((allProps, ref) => {
               />
             </div>
 
-            <button
+            <Button
+              variant="bare"
+              size="icon-sm"
               type="button"
               aria-label={isStopMode ? 'Stop generation' : 'Send message'}
+              // Send is armed (the accent) while the editor has focus. Stop stays neutral wherever focus sits.
+              data-state={focused && !isStopMode ? 'active' : undefined}
               onClick={isStopMode ? handleStop : handleSubmit}
               disabled={isStopMode ? isStopping : sendDisabled}
-              className={cn(
-                'flex h-6 shrink-0 items-center text-ods-text-secondary transition-colors duration-200',
-                // Focus accent applies to the SEND icon only. Stop stays neutral
-                // regardless of where focus sits — otherwise it reads yellow after
-                // an Enter-send (editor keeps focus) but gray after an approve
-                // click (focus moved to the card button).
-                focused && !isStopMode && 'text-ods-accent',
-                '[&_svg]:size-4 md:[&_svg]:size-6',
-                'cursor-pointer hover:text-ods-text-primary',
-                'focus-visible:text-ods-accent focus-visible:outline-none',
-                'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ods-text-secondary',
-              )}
+              className="shrink-0"
             >
               {isStopMode ? <StopCircleIcon size={20} /> : <Send01Icon size={20} />}
-            </button>
+            </Button>
           </div>
         </div>
       )}

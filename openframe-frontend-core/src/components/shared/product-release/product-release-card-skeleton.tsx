@@ -1,6 +1,30 @@
 'use client';
 
 import { cn } from '../../../utils/cn';
+import { CONTENT_CARD_SKELETON_FRAME_CLASS } from '../../chat/entity-cards/content-card-frame';
+import { EntityMetadataAuthorCell } from '../../chat/entity-cards/entity-author-card';
+import { TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { StatusBadge } from '../../ui/status-badge';
+import {
+  RELEASE_CARD_CELL_CLASS,
+  RELEASE_CARD_CELL_DIVIDER_CLASS,
+  RELEASE_CARD_CELL_LABEL_CLASS,
+  RELEASE_CARD_CELL_LABELS,
+  RELEASE_CARD_CELL_STACK_CLASS,
+  RELEASE_CARD_CHANGELOG_CLASS,
+  RELEASE_CARD_COVER_BOX_CLASS,
+  RELEASE_CARD_COVER_COLUMN_CLASS,
+  RELEASE_CARD_GRID_CLASS,
+  RELEASE_CARD_HERO_CLASS,
+  RELEASE_CARD_LG_FRAME_CLASS,
+  RELEASE_CARD_SUMMARY_BOX_CLASS,
+  RELEASE_CARD_SUMMARY_CLASS,
+  RELEASE_CARD_TEXT_COLUMN_CLASS,
+  RELEASE_CARD_TITLE_BOX_CLASS,
+  RELEASE_CARD_TITLE_CLASS,
+  RELEASE_CARD_VERSION_CLASS,
+  RELEASE_CARD_VERSION_ROW_CLASS,
+} from './product-release-card-classes';
 
 export interface ProductReleaseCardSkeletonProps {
   /** Additional CSS classes */
@@ -21,91 +45,55 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
   // grid (with em-dash placeholders for missing values), so this
   // skeleton's shape matches exactly with zero load-to-resolve reflow.
   if (size === 'lg') {
+    // The card's own classes (`product-release-card-classes`): each read text is a bar of its own line box inside
+    // the loaded element, the grid's labels are real, the author cell is the shared metadata author skeleton.
     return (
-      <div
-        className={cn(
-          'overflow-hidden rounded-lg border border-ods-border bg-ods-card',
-          'flex flex-col gap-4 p-6',
-          'animate-pulse',
-          className,
-        )}
-      >
-        {/* HERO — placeholders use `bg-ods-border` (#3a3a3a) so they
-            contrast against the card's `bg-ods-card`
-            (#212121) container. The metadata grid cells below use
-            `bg-ods-card` containers so `bg-ods-bg` placeholders work
-            there, but in the hero the card IS `bg-ods-card`-equivalent —
-            `bg-ods-bg` (#161616) is only 6 hex points darker than the
-            card and renders nearly invisible.
-
-            CRITICAL: title + summary use the SAME min-h containers as
-            the loaded card so total card height is byte-identical
-            between skeleton state and loaded state. Without this,
-            individual placeholder heights underrun the loaded card's
-            min-h reservations and the page jumps on resolve. */}
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
-          <div className="aspect-[1200/630] w-full flex-shrink-0 rounded-lg bg-ods-border md:w-[256px]" />
-          <div className="flex min-w-0 flex-1 flex-col">
-            {/* Version pill — mirrors `flex items-center gap-3 mb-3` in
-                the loaded card. The loaded `<span text-lg>` renders at
-                line-height 28 px (Tailwind text-lg = 18 px / 28 px LH);
-                placeholder uses `h-7` (28 px) to match exactly. */}
-            <div className="mb-3 flex items-center gap-3">
-              <div className="h-7 w-20 rounded bg-ods-border" />
+      <div className={cn(CONTENT_CARD_SKELETON_FRAME_CLASS, RELEASE_CARD_LG_FRAME_CLASS, className)} aria-hidden>
+        <div className={RELEASE_CARD_HERO_CLASS}>
+          <div className={RELEASE_CARD_COVER_COLUMN_CLASS}>
+            <UnifiedSkeleton className={RELEASE_CARD_COVER_BOX_CLASS} />
+          </div>
+          <div className={RELEASE_CARD_TEXT_COLUMN_CLASS}>
+            <div className={RELEASE_CARD_VERSION_ROW_CLASS}>
+              <span className={RELEASE_CARD_VERSION_CLASS}>
+                <TextLineSkeleton type="inherit" as="span" className="w-16" />
+              </span>
             </div>
-            {/* Title container — SAME min-h as the loaded card so the
-                card height contributed by this region matches exactly. */}
-            <div className="mb-3 flex min-h-[60px] flex-col justify-start gap-1.5 md:min-h-[72px]">
-              <div className="h-[25px] w-3/4 rounded bg-ods-border md:h-[30px]" />
-              <div className="h-[25px] w-1/2 rounded bg-ods-border md:h-[30px]" />
+            <div className={RELEASE_CARD_TITLE_BOX_CLASS}>
+              <h3 className={cn(RELEASE_CARD_TITLE_CLASS, 'w-full')}>
+                <TextLineSkeleton type="inherit" as="span" lines={2} className="w-3/4" />
+              </h3>
             </div>
-            {/* Summary container — SAME min-h as the loaded card. The
-                3 placeholder lines mirror the rendered 3-line clamp;
-                `bg-ods-border/70` keeps summary placeholders slightly
-                dimmer than title placeholders (primary vs secondary
-                text hierarchy). */}
-            <div className="flex min-h-[68px] flex-col justify-start gap-2 md:min-h-[78px]">
-              <div className="h-3 w-full rounded bg-ods-border/70" />
-              <div className="h-3 w-11/12 rounded bg-ods-border/70" />
-              <div className="h-3 w-5/6 rounded bg-ods-border/70" />
+            <div className={RELEASE_CARD_SUMMARY_BOX_CLASS}>
+              <p className={RELEASE_CARD_SUMMARY_CLASS}>
+                <TextLineSkeleton type="inherit" as="span" lines={3} className="w-full" />
+              </p>
             </div>
           </div>
         </div>
-
-        {/* CHANGELOG strip placeholder — always rendered. Inner
-            placeholder `h-5` mirrors the loaded strip's `text-sm`
-            line-height (20 px) so total height is consistent with the
-            loaded `border-t pt-3 + text content` (~32-33 px). */}
-        <div className="border-t border-ods-border pt-3">
-          <div className="h-5 w-2/3 rounded bg-ods-border/70" />
+        {/* The changelog's counts are read list items (which ones show is read data): one row's first item. */}
+        <div className={RELEASE_CARD_CHANGELOG_CLASS}>
+          <span data-loading-item className="inline-flex">
+            <TextLineSkeleton type="inherit" as="span" className="w-24" />
+          </span>
         </div>
-
-        {/* METADATA GRID — 4-cell placeholder. The grid cells use
-            `bg-ods-card` containers and `bg-ods-bg` placeholders, which
-            DO contrast correctly because the cells are brighter than
-            the placeholders. Inner content heights mirror the loaded
-            cells (`text-h4` ≈ 28 px + `DM_Sans 14px leading-20`) so
-            total grid height matches the loaded ~86 px. */}
-        <div className="grid w-full grid-cols-1 overflow-hidden rounded-md border border-ods-border md:grid-cols-4">
-          {[0, 1, 2].map(i => (
-            <div
-              key={`cell-${i}`}
-              className="flex flex-col gap-3 border-b border-ods-border bg-ods-card p-4 md:border-b-0 md:border-r"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="h-7 w-24 rounded bg-ods-bg" />
-                <div className="h-4 w-16 rounded bg-ods-bg/60" />
+        <div className={RELEASE_CARD_GRID_CLASS}>
+          {RELEASE_CARD_CELL_LABELS.map((label, i) => (
+            <div key={label} className={cn(RELEASE_CARD_CELL_CLASS, RELEASE_CARD_CELL_DIVIDER_CLASS)}>
+              <div className={RELEASE_CARD_CELL_STACK_CLASS}>
+                {/* The Type value is a card StatusBadge loaded; the others are a text-h4 line. */}
+                {i === 0 ? (
+                  <StatusBadge loading text="" variant="card" className="justify-self-start" />
+                ) : (
+                  <p className="text-h4">
+                    <TextLineSkeleton type="inherit" as="span" className="w-24" />
+                  </p>
+                )}
+                <p className={RELEASE_CARD_CELL_LABEL_CLASS}>{label}</p>
               </div>
             </div>
           ))}
-          {/* Author cell */}
-          <div className="flex items-center gap-3 bg-ods-card p-4">
-            <div className="h-10 w-10 shrink-0 rounded-full bg-ods-bg" />
-            <div className="flex min-w-0 flex-1 flex-col gap-2">
-              <div className="h-5 w-3/4 rounded bg-ods-bg" />
-              <div className="h-4 w-1/2 rounded bg-ods-bg/60" />
-            </div>
-          </div>
+          <EntityMetadataAuthorCell loading />
         </div>
       </div>
     );
@@ -123,12 +111,12 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
     return (
       <span
         className={cn(
-          'my-1.5 flex w-full animate-pulse items-start gap-3',
+          'my-1.5 flex w-full items-start gap-3',
           'rounded-lg border border-ods-border bg-ods-card p-2',
           className,
         )}
       >
-        <span className="block aspect-square h-14 w-14 shrink-0 self-start rounded-md bg-ods-bg" />
+        <UnifiedSkeleton as="span" className="block aspect-square h-14 w-14 shrink-0 self-start rounded-md" />
         {/* Text column: 3 rows with FIXED heights matching the loaded
             card (h-5 title, h-4 + h-4 meta + summary). Skeleton bars
             sit centered inside each row container so a placeholder
@@ -136,14 +124,14 @@ export function ProductReleaseCardSkeleton({ className, size = 'lg' }: ProductRe
             on resolve. */}
         <span className="flex min-h-14 min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex h-5 min-w-0 items-center gap-2">
-            <span className="h-3.5 w-3/5 rounded bg-ods-bg" />
-            <span className="h-4 w-12 shrink-0 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3.5 w-3/5 rounded" />
+            <UnifiedSkeleton as="span" className="h-4 w-12 shrink-0 rounded" />
           </span>
           <span className="flex h-4 min-w-0 items-center">
-            <span className="h-3 w-1/3 rounded bg-ods-bg/70" />
+            <UnifiedSkeleton as="span" className="h-3 w-1/3 rounded" />
           </span>
           <span className="flex h-4 min-w-0 items-center">
-            <span className="h-3 w-11/12 rounded bg-ods-bg/40" />
+            <UnifiedSkeleton as="span" className="h-3 w-11/12 rounded" />
           </span>
         </span>
       </span>

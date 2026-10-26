@@ -1,11 +1,13 @@
 package com.openframe.api.datafetcher;
 
+import com.openframe.graphql.relay.RelayIdCodec;
 import com.openframe.api.datafetcher.rmm.ScriptDataFetcher;
 import com.openframe.api.dto.CountedGenericConnection;
 import com.openframe.api.dto.CountedGenericQueryResult;
 import com.openframe.api.dto.GenericEdge;
 import com.openframe.api.dto.rmm.DispatchResponse;
 import com.openframe.api.dto.rmm.script.BatchRunScriptInput;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.api.dto.rmm.script.CreateScriptInput;
 import com.openframe.api.dto.rmm.script.RunScriptInput;
 import com.openframe.api.dto.rmm.script.ScriptFilterInput;
@@ -21,7 +23,6 @@ import com.openframe.api.service.rmm.script.ScriptDispatchService;
 import com.openframe.api.service.rmm.script.ScriptFilterService;
 import com.openframe.api.service.rmm.script.ScriptService;
 import com.openframe.data.document.rmm.script.ExecutionSource;
-import com.netflix.graphql.dgs.DgsDataFetchingEnvironment;
 import graphql.relay.Relay;
 
 import java.util.List;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -37,8 +39,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -58,20 +58,13 @@ class ScriptDataFetcherTest {
     private ScriptFilterService scriptFilterService;
     @Mock
     private GraphQLScriptMapper scriptMapper;
+    @Spy
+    private RelayIdCodec relayIdCodec = new RelayIdCodec();
 
     @InjectMocks
     private ScriptDataFetcher dataFetcher;
 
     private static final Relay RELAY = new Relay();
-
-    @Test
-    @DisplayName("Script.id resolver returns the Relay global id (Base64 \"Script:<rawId>\")")
-    void scriptNodeId_returnsGlobalId() {
-        DgsDataFetchingEnvironment dfe = mock(DgsDataFetchingEnvironment.class);
-        doReturn(ScriptResponse.builder().id("id-1").build()).when(dfe).getSource();
-
-        assertThat(dataFetcher.scriptNodeId(dfe)).isEqualTo(RELAY.toGlobalId("Script", "id-1"));
-    }
 
     @Test
     @DisplayName("runScript stamps the authenticated user's id (sub claim) and forwards to the dispatch service — same getCurrentUserId() pattern as createScript")
@@ -188,10 +181,10 @@ class ScriptDataFetcherTest {
         try {
             CreateScriptInput input = new CreateScriptInput();
             ScriptResponse resp = ScriptResponse.builder().id("id-1").build();
-            when(scriptService.create(input, "user-1")).thenReturn(resp);
+            when(scriptService.create(input, "user-1", ScriptCreationSource.MANUAL)).thenReturn(resp);
 
             assertThat(dataFetcher.createScript(input)).isSameAs(resp);
-            verify(scriptService).create(input, "user-1");
+            verify(scriptService).create(input, "user-1", ScriptCreationSource.MANUAL);
         } finally {
             SecurityContextHolder.clearContext();
         }

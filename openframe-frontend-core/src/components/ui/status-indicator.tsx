@@ -1,5 +1,14 @@
 'use client';
 
+import Link from '../../embed-shims/next-link';
+import { DOT_SIZE } from '../../styles/component-sizes';
+import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
+import { useLoadingScope } from './loading-scope';
+
+/** The indicator's row and dot, read by the indicator and by its skeleton. */
+const ROW_CLASS = 'flex items-center gap-1.5';
+const DOT_CLASS = `${DOT_SIZE.md} rounded-full`;
+
 interface StatusIndicatorProps {
   status: 'success' | 'pending' | 'error' | 'missing';
   label: string;
@@ -7,6 +16,8 @@ interface StatusIndicatorProps {
 }
 
 export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
+  // In a page's loading state the status is read: the indicator is its skeleton.
+  if (useLoadingScope()) return <StatusIndicatorSkeleton />;
   const getStatusColor = (kind: string) => {
     switch (kind) {
       case 'success':
@@ -26,19 +37,29 @@ export function StatusIndicator({ status, label, href }: StatusIndicatorProps) {
   const [dotColor, textColor] = colorClasses.split(' ');
 
   const content = (
-    <div className="flex items-center gap-1.5">
-      <div className={`h-3 w-3 rounded-full ${dotColor}`} />
+    <div className={ROW_CLASS}>
+      <div className={`${DOT_CLASS} ${dotColor}`} />
       <span className={`text-h6 ${textColor}`}>{label}</span>
     </div>
   );
 
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:underline">
+      <Link href={href} target="_blank" rel="noopener noreferrer" className="cursor-pointer hover:underline">
         {content}
-      </a>
+      </Link>
     );
   }
 
   return content;
+}
+
+/** A StatusIndicator while its status is read: the dot a circle of its size, the label a `text-h6` bar. */
+function StatusIndicatorSkeleton({ className }: { className?: string }) {
+  return (
+    <div className={`${ROW_CLASS} ${className ?? ''}`} aria-hidden>
+      <UnifiedSkeleton variant="circular" className={DOT_CLASS} />
+      <TextLineSkeleton type="h6" className="w-24" />
+    </div>
+  );
 }

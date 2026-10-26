@@ -1,7 +1,7 @@
 flowchart TD
-    NodeQuery["node(id)"] --> Decode["Relay.fromGlobalId"]
-    Decode --> Switch["NodeType Switch"]
-    Switch --> Device["DeviceService"]
-    Switch --> Org["OrganizationService"]
-    Switch --> Event["EventService"]
-    Switch --> Script["ScriptService"]
+    NodeQuery["node(id)"] --> Finder["RelayNodeFinder"]
+    Finder --> Registry["NodeLoaderRegistry"]
+    Registry --> Device["Machine loader (DeviceService)"]
+    Registry --> Org["Organization loader (OrganizationService)"]
+    Registry --> Script["Script loader (ScriptService)"]
+    Registry --> Other["Other ApiNodeLoaderConfiguration loaders"]

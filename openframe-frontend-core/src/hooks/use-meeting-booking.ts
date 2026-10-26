@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useLoadingScope } from '../components/ui/loading-scope';
 import {
   MEETING_BOOKING_ERROR_CODES,
   type BookingConfirmation,
@@ -93,6 +94,8 @@ export function useMeetingBooking(options: {
   }, [meetingId]);
 
   // The SSR seed covers exactly one (link, month) cell of the cache.
+  // In a loading scope nothing is fetched: the scheduler's components draw their skeletons there.
+  const inScope = useLoadingScope();
   const seed =
     initialAvailability?.meetingId === meetingId && initialAvailability.monthOffset === monthOffset
       ? initialAvailability
@@ -107,6 +110,7 @@ export function useMeetingBooking(options: {
       return (await res.json()) as MeetingAvailability;
     },
     staleTime: AVAILABILITY_STALE_MS,
+    enabled: !inScope,
     initialData: seed,
     // Stamped as infinitely old on purpose: the seed is first-paint
     // scaffolding for a 60-second-volatile resource, not truth, so it paints

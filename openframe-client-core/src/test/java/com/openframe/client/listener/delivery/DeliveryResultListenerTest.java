@@ -1,9 +1,11 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.delivery.metrics.DeliveryMetrics;
+import com.openframe.delivery.spec.DeliveryRef;
 import com.openframe.delivery.track.DeliveryTracker;
 import io.nats.client.Connection;
 import io.nats.client.Message;
@@ -27,6 +29,7 @@ class DeliveryResultListenerTest {
     private static final String SUBJECT = "machine.mach-42.delivery.result";
     private static final String TOOL_AGENT_ID = "fleetmdm-agent";
     private static final String DISPATCH_ID = "d-1";
+    private static final DeliveryRef REF = new DeliveryRef(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, DISPATCH_ID);
     private static final String ERROR = "download failed";
     private static final String ACKED =
             "{\"delivery\":{\"type\":\"TOOL_INSTALLATION\",\"targetId\":\"fleetmdm-agent\",\"dispatchId\":\"d-1\"},\"result\":\"ACKED\"}";
@@ -52,7 +55,7 @@ class DeliveryResultListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new DeliveryResultListener(natsConnection, new ObjectMapper(), new NatsTopicMachineIdExtractor(), deliveryTracker, metrics);
+        listener = new DeliveryResultListener(natsConnection, new JsonMapper(), new NatsTopicMachineIdExtractor(), deliveryTracker, metrics);
     }
 
     @Test
@@ -64,7 +67,7 @@ class DeliveryResultListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(deliveryTracker).acknowledge(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID, DISPATCH_ID);
+        verify(deliveryTracker).acknowledge(REF, MACHINE_ID);
         verify(message).ack();
     }
 
@@ -77,7 +80,7 @@ class DeliveryResultListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(deliveryTracker).complete(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID, DISPATCH_ID);
+        verify(deliveryTracker).done(REF, MACHINE_ID);
         verify(message).ack();
     }
 
@@ -90,7 +93,7 @@ class DeliveryResultListenerTest {
         listener.handleMessage(message);
 
         // verifications
-        verify(deliveryTracker).fail(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID, DISPATCH_ID, ERROR);
+        verify(deliveryTracker).fail(REF, MACHINE_ID, ERROR);
         verify(message).ack();
     }
 
@@ -168,7 +171,7 @@ class DeliveryResultListenerTest {
     void handleMessage_trackerThrows_leftUnackedForRedelivery() {
         // setup
         stubMessage(ACKED);
-        doThrow(new IllegalStateException("mongo down")).when(deliveryTracker).acknowledge(DeliveryType.TOOL_INSTALLATION, TOOL_AGENT_ID, MACHINE_ID, DISPATCH_ID);
+        doThrow(new IllegalStateException("mongo down")).when(deliveryTracker).acknowledge(REF, MACHINE_ID);
 
         // execution
         listener.handleMessage(message);

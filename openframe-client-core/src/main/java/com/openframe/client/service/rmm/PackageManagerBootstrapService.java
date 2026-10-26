@@ -25,7 +25,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@ConditionalOnProperty(name = "openframe.rmm.software.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "openframe.rmm.package-manager-bootstrap.enabled", havingValue = "true")
 @RequiredArgsConstructor
 @Slf4j
 public class PackageManagerBootstrapService {
@@ -46,7 +46,7 @@ public class PackageManagerBootstrapService {
         }
         Machine machine = foundMachine.get();
         DeviceStatus status = machine.getStatus();
-        if (!DeviceStatus.DISPATCH_ELIGIBLE.contains(status)) {
+        if (!DeviceStatus.CONNECTED.contains(status)) {
             log.debug("Ignoring package-manager report for machineId={} in status {}", machineId, status);
             return;
         }

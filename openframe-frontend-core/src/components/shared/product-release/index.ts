@@ -1,7 +1,6 @@
 'use client';
 
 export { ProductReleaseCard, type ProductReleaseCardProps } from './product-release-card';
-export { ProductReleaseCardSkeleton, type ProductReleaseCardSkeletonProps } from './product-release-card-skeleton';
 export {
   ProductReleasesView,
   type ProductReleasesViewProps,
@@ -12,8 +11,8 @@ export {
   type ReleaseDetailPageProps,
   type VideoDisplaySectionProps,
   type MarkdownRendererProps,
-  type RoadmapItem,
 } from './release-detail-page';
+export { type RoadmapItem } from '../../chat/types/entities/roadmap-item';
 // NOTE: `RoadmapSectionProps` / `DeliverySectionProps` (the injectable-
 // component slot types for ReleaseDetailPage) are intentionally NOT
 // re-exported from this barrel — they collide with the prop types of
@@ -28,4 +27,3 @@ export {
 // keeps resolving (hub's components/releases/release-detail-page.tsx
 // imports it through this barrel).
 export type { DeliveryResponse } from '../../../types/delivery';
-export { ReleaseDetailSkeleton } from './release-detail-skeleton';

@@ -39,21 +39,6 @@
   ],
   "assets": [
     {
-      "id": "meshcentral-core-module",
-      "localFilenameConfiguration": [
-        {
-          "filename": "CoreModule.js",
-          "os": "windows"
-        },
-        {
-          "filename": "CoreModule.js",
-          "os": "macos"
-        }
-      ],
-      "source": "ARTIFACTORY",
-      "executable": false
-    },
-    {
       "id": "msh-configuration",
       "localFilenameConfiguration": [
         {

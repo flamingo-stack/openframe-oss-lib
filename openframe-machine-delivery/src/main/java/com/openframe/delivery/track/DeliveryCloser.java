@@ -8,10 +8,6 @@ import com.openframe.data.repository.delivery.MachineDeliveryRepository;
 import com.openframe.delivery.config.DeliveryProperties;
 import com.openframe.delivery.config.DeliveryProperties.Policy;
 import com.openframe.delivery.metrics.DeliveryMetrics;
-import com.openframe.delivery.spec.DeliveryPayload;
-import com.openframe.delivery.spec.DeliverySeed;
-import com.openframe.delivery.spec.DeliverySpec;
-import com.openframe.delivery.spec.DeliverySpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,15 +22,26 @@ import java.util.Set;
 public class DeliveryCloser {
 
     private final MachineDeliveryRepository repository;
-    private final DeliverySpecRegistry registry;
     private final DeliveryProperties properties;
     private final DeliveryMetrics metrics;
 
     public void fail(MachineDelivery delivery, DeliveryFailure failure, Set<DeliveryStatus> from, Instant now) {
         DeliveryType type = delivery.getType();
-        Instant expiresAt = expiresAt(type, now);
+        Policy policy = properties.resolve(type);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
+        int reruns = delivery.getReruns();
+        if (isRerunDue(failure, policy, reruns)) {
+            Instant dueAt = rerunAt(policy, now);
+            boolean scheduled = repository.scheduleRerun(id, from, dispatchedAt, reruns, dueAt);
+            if (scheduled) {
+                rerunScheduled(delivery, failure, dueAt);
+            } else {
+                log.debug("Delivery moved on before its re-run could be scheduled: id={}", id);
+            }
+            return;
+        }
+        Instant expiresAt = expiresAt(type, now);
 
         boolean stillIn = repository.markFailed(id, from, dispatchedAt, failure, now, expiresAt);
         if (!stillIn) {
@@ -47,13 +54,18 @@ public class DeliveryCloser {
         delivery.setExpiresAt(expiresAt);
 
         metrics.recordFailed(type, failure);
-        notifySpec(delivery, failure);
         log.warn("Delivery FAILED: type={} targetId={} machineId={} attempts={} reason={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), delivery.getAttempts(), failure);
     }
 
     public void failReported(DeliveryType type, String targetId, String machineId, String dispatchId, String error, Instant now) {
         String id = DeliveryId.of(type, targetId, machineId);
+        Policy policy = properties.resolve(type);
+        Optional<MachineDelivery> rerunnable = findRerunnable(id, policy);
+        rerunnable.ifPresent(delivery -> scheduleAgentRerun(delivery, policy, dispatchId, error, now));
+        if (rerunnable.isPresent()) {
+            return;
+        }
         Instant expiresAt = expiresAt(type, now);
         boolean stillOpen = repository.markFailed(id, dispatchId, DeliveryStatus.OPEN, DeliveryFailure.AGENT_ERROR, error, now, expiresAt);
         if (!stillOpen) {
@@ -61,7 +73,6 @@ public class DeliveryCloser {
             return;
         }
         metrics.recordFailed(type, DeliveryFailure.AGENT_ERROR);
-        repository.findById(id).ifPresent(this::notifyAgentError);
         log.warn("Delivery FAILED by agent: type={} targetId={} machineId={} dispatchId={} error={}",
                 type, targetId, machineId, dispatchId, error);
     }
@@ -73,21 +84,61 @@ public class DeliveryCloser {
         String id = delivery.getId();
         boolean cancelled = repository.markCancelled(id, from, dispatchedAt, now, expiresAt);
         if (cancelled) {
-            log.info("Delivery CANCELLED by sweep: type={} targetId={} machineId={} reason={}",
+            log.info("Delivery CANCELLED: type={} targetId={} machineId={} reason={}",
                     type, delivery.getTargetId(), delivery.getMachineId(), reason);
         }
     }
 
-    private void notifyAgentError(MachineDelivery delivery) {
-        notifySpec(delivery, DeliveryFailure.AGENT_ERROR);
+    // the primary is read only when the policy allows a second run at all
+    private Optional<MachineDelivery> findRerunnable(String id, Policy policy) {
+        if (isSingleRun(policy)) {
+            return Optional.empty();
+        }
+        return repository.findByIdOnPrimary(id).filter(delivery -> policy.hasRunsLeft(delivery.getReruns()));
     }
 
-    private void notifySpec(MachineDelivery delivery, DeliveryFailure failure) {
+    private void scheduleAgentRerun(MachineDelivery delivery, Policy policy, String dispatchId, String error, Instant now) {
+        String id = delivery.getId();
+        int reruns = delivery.getReruns();
+        Instant dueAt = rerunAt(policy, now);
+        boolean scheduled = repository.scheduleRerun(id, dispatchId, DeliveryStatus.OPEN, reruns, dueAt);
+        if (!scheduled) {
+            log.debug("Delivery failure from agent ignored, no published row of this dispatch: id={} dispatchId={}", id, dispatchId);
+            return;
+        }
+        delivery.setError(error);
+        rerunScheduled(delivery, DeliveryFailure.AGENT_ERROR, dueAt);
+    }
+
+    private void rerunScheduled(MachineDelivery delivery, DeliveryFailure failure, Instant dueAt) {
         DeliveryType type = delivery.getType();
-        Optional<DeliverySpec<DeliverySeed, DeliveryPayload>> spec = registry.find(type);
-        spec.ifPresentOrElse(
-                registered -> registered.onFailed(delivery, failure),
-                () -> log.warn("No spec registered for delivery type {}, onFailed skipped", type));
+        int reruns = delivery.getReruns() + 1;
+        int run = reruns + 1;
+        delivery.setStatus(DeliveryStatus.PENDING);
+        delivery.setAttempts(0);
+        delivery.setReruns(reruns);
+        delivery.setDueAt(dueAt);
+        metrics.recordRerun(type, failure);
+        log.warn("Delivery re-run scheduled: type={} targetId={} machineId={} reason={} error={} run={} dueAt={}",
+                type, delivery.getTargetId(), delivery.getMachineId(), failure, delivery.getError(), run, dueAt);
+    }
+
+    private static boolean isRerunDue(DeliveryFailure failure, Policy policy, int reruns) {
+        return canRerun(failure) && policy.hasRunsLeft(reruns);
+    }
+
+    private static boolean isSingleRun(Policy policy) {
+        return policy.getMaxRuns() <= 1;
+    }
+
+    // an offline machine never had the run: the reconnect window, counted from the kept dispatchedAt, is the decision
+    private static boolean canRerun(DeliveryFailure failure) {
+        return failure != DeliveryFailure.OFFLINE;
+    }
+
+    private static Instant rerunAt(Policy policy, Instant now) {
+        long rerunAfterSeconds = policy.getRerunAfterSeconds();
+        return now.plusSeconds(rerunAfterSeconds);
     }
 
     private Instant expiresAt(DeliveryType type, Instant now) {

@@ -159,32 +159,31 @@ export function EmptyState({
   // page with a link CTA must never enter that branch. Existing callers
   // without ctaHref keep today's smart-default behavior unchanged.
   const smartCTA = ctaHref ? null : getSmartCTA();
-  const ctaClassName =
-    ctaVariant === 'primary'
-      ? 'w-full bg-ods-accent text-ods-text-on-accent hover:bg-ods-accent-hover transition-all duration-150 font-body font-medium'
-      : 'w-full bg-transparent border border-ods-border text-ods-text-primary hover:border-ods-accent hover:text-ods-accent transition-all duration-150 font-body font-medium';
+  // The CTA is the house Button in its own variant: painting colours over the
+  // default accent Button with classes lost to its hover (green text on green).
+  const ctaButtonVariant = ctaVariant === 'primary' ? 'accent' : 'outline';
 
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-6 text-center md:py-16">
+    <div className="flex flex-col items-center justify-center px-6 py-6 text-center content-md:py-16">
       {/* Icon */}
-      <div className="mb-3 flex items-center justify-center md:mb-6">
-        <div className="rounded-full border border-ods-border bg-ods-card p-3 md:p-6">
-          <div className="flex h-8 w-8 items-center justify-center text-ods-text-secondary md:h-16 md:w-16">
+      <div className="mb-3 flex items-center justify-center content-md:mb-6">
+        <div className="rounded-full border border-ods-border bg-ods-card p-3 content-md:p-6">
+          <div className="flex h-8 w-8 items-center justify-center text-ods-text-secondary content-md:h-16 content-md:w-16">
             {defaultContent.icon}
           </div>
         </div>
       </div>
 
       {/* Title */}
-      <h2 className="mb-2 text-ods-text-primary text-h3 md:mb-3">{displayTitle}</h2>
+      <h2 className="mb-2 text-ods-text-primary text-h3 content-md:mb-3">{displayTitle}</h2>
 
       {/* Description */}
-      <p className="mb-4 max-w-md text-ods-text-secondary text-h6 md:mb-8">{displayDescription}</p>
+      <p className="mb-4 max-w-md text-ods-text-secondary text-h6 content-md:mb-8">{displayDescription}</p>
 
       {/* Link CTA (ctaHref) — SSR-safe, no path sniffing */}
       {showCTA && ctaHref && (
         <div className="mb-3 w-full max-w-xs">
-          <Button href={ctaHref} className={ctaClassName}>
+          <Button href={ctaHref} variant={ctaButtonVariant} className="w-full">
             {ctaText || 'Contact us'}
           </Button>
         </div>
@@ -193,7 +192,7 @@ export function EmptyState({
       {/* Smart CTA Button */}
       {showCTA && !ctaHref && smartCTA && (
         <div className="mb-3 w-full max-w-xs">
-          <Button onClick={smartCTA.action} className={ctaClassName}>
+          <Button onClick={smartCTA.action} variant={ctaButtonVariant} className="w-full">
             {smartCTA.text}
           </Button>
         </div>

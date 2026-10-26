@@ -1,5 +1,6 @@
 package com.openframe.authz.service.validation;
 
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthInvitation;
 import com.openframe.data.repository.auth.AuthInvitationRepository;
 import lombok.RequiredArgsConstructor;
@@ -7,6 +8,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 
+import static com.openframe.core.exception.AuthErrorCode.INVITATION_EXPIRED;
+import static com.openframe.core.exception.AuthErrorCode.INVITATION_USED;
 import static com.openframe.data.document.user.InvitationStatus.PENDING;
 
 @Service
@@ -24,10 +27,10 @@ public class InvitationValidator {
 
     public void ensureAcceptable(AuthInvitation inv) {
         if (inv.getStatus() != PENDING) {
-            throw new IllegalStateException("Invitation already used or revoked");
+            throw new AuthFlowException(INVITATION_USED, "Invitation already used or revoked");
         }
         if (inv.getExpiresAt() != null && inv.getExpiresAt().isBefore(Instant.now())) {
-            throw new IllegalStateException("Invitation expired");
+            throw new AuthFlowException(INVITATION_EXPIRED, "Invitation expired");
         }
     }
 }

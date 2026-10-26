@@ -3,6 +3,7 @@ package com.openframe.data.service.rmm;
 import com.openframe.data.document.device.DeviceType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.device.filter.MachineQueryFilter;
+import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.schedule.ScheduleDeviceCriteria;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -22,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +34,7 @@ class ScheduleCriteriaDeviceResolverTest {
     private static final String TENANT = "tenant-1";
 
     @Mock private MachineRepository machineRepository;
+    @Captor private ArgumentCaptor<MachineQueryFilter> filterCaptor;
     @InjectMocks private ScheduleCriteriaDeviceResolver resolver;
 
     @Test
@@ -69,6 +73,21 @@ class ScheduleCriteriaDeviceResolverTest {
         when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), eq(null))).thenReturn(List.of("m-9"));
 
         assertThat(resolver.resolveMachineIds(TENANT, criteria, null)).containsExactly("m-9");
+    }
+
+    @Test
+    @DisplayName("resolveMachineIds: the software overload lands manageableByPackageManagers on the filter; the script overload leaves it null")
+    void resolve_manageableBy_landsOnFilter() {
+        ScheduleDeviceCriteria criteria = ScheduleDeviceCriteria.builder().organizationIds(List.of("org-1")).build();
+        when(machineRepository.findMachineIdsByCriteria(eq(TENANT), any(), eq(null))).thenReturn(List.of("m-1"));
+
+        resolver.resolveMachineIds(TENANT, criteria, null, List.of(PackageManagerType.BREW));
+        resolver.resolveMachineIds(TENANT, criteria, null);
+
+        verify(machineRepository, times(2)).findMachineIdsByCriteria(eq(TENANT), filterCaptor.capture(), eq(null));
+        assertThat(filterCaptor.getAllValues())
+                .extracting(MachineQueryFilter::getManageableByPackageManagers)
+                .containsExactly(List.of(PackageManagerType.BREW), null);
     }
 
     @Test

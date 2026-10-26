@@ -49,7 +49,9 @@
 
 export interface ScrollElementIntoViewOptions {
   /** Pixels to subtract from the target element's `top` so it lands BELOW
-   *  sticky chrome. Defaults to 0. Pass `96` for the standard hub header. */
+   *  sticky chrome. Defaults to 0. Pass `96` for the standard hub header.
+   *  A target that declares a larger `scroll-margin-top` in CSS wins: see
+   *  {@link declaredScrollMarginTop}. */
   headerOffset?: number;
   /** `'smooth'` (default) runs the self-driven tween; `'instant'` / `'auto'`
    *  jump in one synchronous write (deep-link land, programmatic focus moves). */
@@ -105,6 +107,21 @@ export function getScrollableAncestor(el: HTMLElement): HTMLElement | null {
 }
 
 /**
+ * The offset the target ITSELF declares in CSS (`scroll-margin-top`), in px.
+ *
+ * A page with more sticky chrome than the standard header (a second bar under
+ * it) says so on its anchors with `scroll-margin-top`, which is what a native
+ * anchor jump (a URL that loads with the hash, the router's own hash scroll)
+ * honours. The tween honours the same declaration, so a link clicked on the
+ * page and a link that loads the page land on the same pixel: the caller's
+ * `headerOffset` is the floor, the anchor's own margin wins when it is larger.
+ */
+export function declaredScrollMarginTop(target: HTMLElement): number {
+  const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop);
+  return Number.isFinite(margin) ? margin : 0;
+}
+
+/**
  * Scroll the page so `target` lands at the top of the viewport (below sticky
  * chrome via `headerOffset`). SSR-safe; `null`/`undefined` target is a no-op so
  * callers can pass refs without defensive branching.
@@ -130,11 +147,10 @@ export function scrollElementIntoView(
   // the page reflows (a sibling drawer collapsing) and the reachable max grows
   // as the just-opened drawer expands. Clamp to the LIVE max each frame.
   const computeTarget = (): number => {
+    const offset = Math.max(headerOffset, declaredScrollMarginTop(target));
     const raw = container
-      ? container.scrollTop +
-        (target.getBoundingClientRect().top - container.getBoundingClientRect().top) -
-        headerOffset
-      : target.getBoundingClientRect().top + window.scrollY - headerOffset;
+      ? container.scrollTop + (target.getBoundingClientRect().top - container.getBoundingClientRect().top) - offset
+      : target.getBoundingClientRect().top + window.scrollY - offset;
     const adjusted = adjustTargetY ? adjustTargetY(raw) : raw;
     const maxScroll = container
       ? Math.max(0, container.scrollHeight - container.clientHeight)

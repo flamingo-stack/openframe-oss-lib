@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PackageSearchResult {
 
-    private List<PackageSearchItem> items;
+    private List<PackageSearchHit> hits;
     private Integer total;
     private boolean hasMore;
 }

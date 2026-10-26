@@ -13,6 +13,8 @@ import com.openframe.authz.service.tenant.TenantService;
 import com.openframe.authz.service.user.UserService;
 import com.openframe.authz.util.OidcUserUtils;
 import com.openframe.authz.util.SsoAuthentication;
+import com.openframe.authz.web.SignupSourceCookie;
+import com.openframe.core.exception.AuthFlowException;
 import com.openframe.data.document.auth.AuthUser;
 import com.openframe.data.document.tenant.Tenant;
 import jakarta.servlet.http.Cookie;
@@ -29,6 +31,11 @@ import java.io.IOException;
 import java.util.Optional;
 
 import static com.openframe.authz.web.Redirects.foundAtRoot;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_INACTIVE;
+import static com.openframe.core.exception.AuthErrorCode.ACCOUNT_NOT_FOUND;
+import static com.openframe.core.exception.AuthErrorCode.EMAIL_NOT_VERIFIED;
+import static com.openframe.core.exception.AuthErrorCode.ORGANIZATION_SSO_REQUIRED;
+import static com.openframe.core.exception.AuthErrorCode.SSO_SESSION_INVALID;
 import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.springframework.util.StringUtils.hasText;
@@ -89,7 +96,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         String email = requireEmail(user);
 
         SsoLoginCookiePayload payload = ssoCookieCodec.decodeLogin(cookie.getValue())
-                .orElseThrow(() -> new IllegalStateException("SSO session is invalid. Please try again."));
+                .orElseThrow(() -> new AuthFlowException(SSO_SESSION_INVALID, "SSO session is invalid. Please try again."));
 
         String provider = registrationId(authentication, payload);
 
@@ -128,7 +135,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
 
         tenantService.findById(tenantId)
                 .filter(Tenant::isActive)
-                .orElseThrow(() -> new IllegalStateException("Your account is not active. Please contact your administrator."));
+                .orElseThrow(() -> new AuthFlowException(ACCOUNT_INACTIVE, "Your account is not active. Please contact your administrator."));
 
         // Only now — the login is fully allowed (trusted routing, provider permitted, tenant
         // active). A link written before these checks would outlive a REJECTED login and later
@@ -155,7 +162,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
         if (!emailTrustPolicy.emailTrustedForRouting(provider, user.getClaims())) {
             log.warn("event=sso-login-unverified-email provider={} sub={} {}",
                     provider, user.getSubject(), OidcUserUtils.describeEmailTrustSignals(user.getClaims()));
-            throw new IllegalStateException(
+            throw new AuthFlowException(EMAIL_NOT_VERIFIED,
                     "This account's email is not verified by the provider. Please try a different sign-in method, or contact your administrator.");
         }
     }
@@ -169,7 +176,7 @@ public class LoginSsoHandler implements SsoFlowHandler {
     private void ensureGenericProviderAllowed(String tenantId, String provider) {
         if (ssoConfigService.getSSOConfig(tenantId, provider).isPresent()) {
             log.warn("event=sso-login-forbidden-provider tenant={} provider={}", tenantId, provider);
-            throw new IllegalStateException(
+            throw new AuthFlowException(ORGANIZATION_SSO_REQUIRED,
                     "Your organization uses its own sign-in for this provider. Enter your email on the login page to be redirected to it.");
         }
     }
@@ -189,14 +196,15 @@ public class LoginSsoHandler implements SsoFlowHandler {
             String[] names = resolveNames(request, authentication, user);
             String ticket = signupTicketService.create(email, names[0], names[1], provider,
                     OidcUserUtils.emailVerifiedClaimAllows(user),
-                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null));
+                    ssoIdentityService.subjectOf(provider, user.getClaims()).orElse(null),
+                    SignupSourceCookie.read(request));
             log.info("event=sso-login-continue-registration-mobile provider={}", provider);
             foundAtRoot(response, "/oauth/signup-continue?signupTicket=" + urlEncode(ticket)
                     + "&redirectTo=" + urlEncode(payload.redirectTo()));
             return;
         }
         if (!hasText(signupContinueUrl)) {
-            throw new IllegalStateException(
+            throw AuthFlowException.withDetail(ACCOUNT_NOT_FOUND,
                     "No account found for " + email + ". Please sign up first.");
         }
         log.info("event=sso-login-continue-registration email={}", email);

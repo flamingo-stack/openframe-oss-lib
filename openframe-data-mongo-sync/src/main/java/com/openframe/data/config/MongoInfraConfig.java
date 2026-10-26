@@ -2,7 +2,7 @@ package com.openframe.data.config;
 
 import org.springframework.boot.autoconfigure.AutoConfigureBefore;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration;
+import org.springframework.boot.data.mongodb.autoconfigure.DataMongoAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -16,7 +16,7 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 
 @Configuration
 @ConditionalOnProperty(name = "spring.data.mongodb.enabled", havingValue = "true", matchIfMissing = false)
-@AutoConfigureBefore(MongoDataAutoConfiguration.class)
+@AutoConfigureBefore(DataMongoAutoConfiguration.class)
 @EnableMongoAuditing
 @Import(MongoCustomConversionsConfig.class)
 public class MongoInfraConfig {

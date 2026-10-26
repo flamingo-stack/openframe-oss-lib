@@ -6,7 +6,7 @@ import {
   type SchedulerStage,
 } from '../components/meeting-scheduler';
 import type { MeetingAvailability } from '../schemas/meeting-booking-schema';
-import { availabilityWith, fillIdentity } from './fixtures/meeting-booking';
+import { availabilityWith, fillIdentity, typeInto } from './fixtures/meeting-booking';
 
 /** A slot two hours from now, on the hour — inside the month the calendar opens on. */
 const SLOT_MS = Math.ceil((Date.now() + 2 * 3_600_000) / 3_600_000) * 3_600_000;
@@ -163,5 +163,46 @@ describe('HubSpotMeetingScheduler — which links fall back to HubSpot', () => {
     expect(await screen.findByLabelText(/^Email/)).toBeInTheDocument();
     expect(screen.queryByText(BOOKED_ON_HUBSPOT)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Upload/)).not.toBeInTheDocument();
+  });
+  it('fieldCopy replaces a field label and placeholder, and derives the one it is not given', async () => {
+    availability.formFields = [];
+    render(
+      scheduler({
+        detailsFormProps: {
+          fieldCopy: {
+            email: { label: 'Business Email', placeholder: 'username@company.com' },
+            firstName: { label: 'Given Name' },
+          },
+        },
+      }),
+    );
+    const email = await screen.findByLabelText(/^Business Email/);
+    expect(email).toHaveAttribute('placeholder', 'username@company.com');
+    // A label alone still moves the placeholder the TYPE derives from it.
+    expect(screen.getByLabelText(/^Given Name/)).toHaveAttribute('placeholder', 'Enter Given Name');
+    // The overridden field keeps everything else: its own label is gone, and the
+    // untouched one is drawn exactly as the widget declares it.
+    expect(screen.queryByLabelText(/^Email/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Last Name/)).toHaveAttribute('placeholder', 'Enter Last Name');
+  });
+  it('a denied email domain keeps the visitor on the form and says why', async () => {
+    availability.formFields = [];
+    const message = 'Looks like a personal email. Drop your work email instead.';
+    render(scheduler({ detailsFormProps: { deniedEmailDomains: { domains: ['gmail.com'], message } } }));
+    await screen.findByLabelText(/^Email/);
+    fillIdentity();
+    typeInto(screen.getByLabelText(/^Email/), 'ada@gmail.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    // The message lands under the email control, and the form does not advance
+    // (Back exists on the calendar step only).
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
+    // …and once at the button, where a visitor whose address LOOKS answered is
+    // looking when nothing happens.
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ description: message, variant: 'error' }));
+    // A work address passes the same form.
+    typeInto(screen.getByLabelText(/^Email/), 'ada@acmecorp.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('button', { name: 'Back' })).toBeInTheDocument();
   });
 });

@@ -28,10 +28,6 @@ export interface DocsHubPageProps extends Omit<DocViewerProps, 'renderContent' |
    *  "Unsupported document type" message. */
   fallbackRenderer?: DocRenderer;
 
-  /** Loading skeleton picker. Defaults: `markdown` / `undefined` →
-   *  `<MarkdownSkeleton>`, everything else → `<EmbedSkeleton>`. */
-  renderSkeleton?: (documentType: DocumentType | undefined) => React.ReactNode;
-
   /** Defaults to `true` (the embeddable wrapper favors the chat-enabled
    *  experience). Only mounts the in-source RAG search bar
    *  (`<DocSearchBar>`) — does NOT require `ChatRuntimeContext`. */
@@ -82,7 +78,8 @@ const defaultFileRenderer: DocRenderer = content => (
   />
 );
 
-const defaultRenderSkeleton = (documentType: DocumentType | undefined) =>
+/** The page's own loading form per document type: the markdown article's, else the embed viewer's. */
+const documentLoadingForm = (documentType: DocumentType | undefined) =>
   !documentType || documentType === 'markdown' ? (
     <MarkdownSkeleton />
   ) : (
@@ -108,7 +105,6 @@ export function DocsHubPage({
   title = DEFAULT_TITLE,
   documentTypeRenderers,
   fallbackRenderer = defaultFallbackRenderer,
-  renderSkeleton = defaultRenderSkeleton,
   showAIChat = true,
   className = 'min-h-screen',
   sidebarLabel = 'DOCUMENTATION',
@@ -136,7 +132,7 @@ export function DocsHubPage({
       className={className}
       sidebarLabel={sidebarLabel}
       renderContent={renderContent}
-      renderSkeleton={renderSkeleton}
+      renderSkeleton={documentLoadingForm}
     />
   );
 }

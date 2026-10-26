@@ -6,8 +6,6 @@ export type { DocViewerProps } from './doc-viewer';
 export { DocsHubPage } from './docs-hub-page';
 export type { DocsHubPageProps, DocumentTypeRenderers } from './docs-hub-page';
 
-export { MarkdownSkeleton, EmbedSkeleton } from './skeletons';
-
 export { useDocumentTree } from './use-document-tree';
 export type { UseDocumentTreeConfig } from './use-document-tree';
 

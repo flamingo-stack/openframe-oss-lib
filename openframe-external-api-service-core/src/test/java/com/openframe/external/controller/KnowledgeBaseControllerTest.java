@@ -12,6 +12,9 @@ import com.openframe.api.dto.shared.PageInfo;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseAttachmentService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseService;
 import com.openframe.api.service.knowledgebase.KnowledgeBaseTagService;
+import com.openframe.core.exception.ErrorCode;
+import com.openframe.core.exception.NotFoundException;
+import com.openframe.core.exception.ValidationException;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseArticleStatus;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItem;
 import com.openframe.data.document.knowledgebase.KnowledgeBaseItemAttachment;
@@ -390,11 +393,11 @@ class KnowledgeBaseControllerTest {
     @Test
     void moveRejectedByTheDomainIs400WithItsMessage() throws Exception {
         when(knowledgeBaseService.moveToFolder("folder-1", "folder-1"))
-                .thenThrow(new IllegalArgumentException("Cannot move item to itself."));
+                .thenThrow(new ValidationException("Cannot move item to itself."));
 
         mockMvc.perform(json(post(BASE + "/items/folder-1/move"), Map.of("parentId", "folder-1")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("Cannot move item to itself."));
     }
 
@@ -575,13 +578,13 @@ class KnowledgeBaseControllerTest {
     }
 
     @Test
-    void createFolderUnderUnknownParentIs400FromTheDomain() throws Exception {
+    void createFolderUnderUnknownParentIs404FromTheDomain() throws Exception {
         when(knowledgeBaseService.createFolder("Networking", "missing"))
-                .thenThrow(new IllegalArgumentException("Parent folder not found: missing"));
+                .thenThrow(new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Parent folder not found: missing"));
 
         mockMvc.perform(json(post(BASE + "/folders"), Map.of("name", "Networking", "parentId", "missing")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KNOWLEDGE_BASE_ITEM_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Parent folder not found: missing"));
     }
 
@@ -707,12 +710,12 @@ class KnowledgeBaseControllerTest {
 
     @Test
     void deleteNonEmptyFolderWithoutChildrenActionIs400FromTheDomain() throws Exception {
-        doThrow(new IllegalArgumentException("Folder has children — childrenAction (MOVE or ARCHIVE) is required."))
+        doThrow(new ValidationException("Folder has children — childrenAction (MOVE or ARCHIVE) is required."))
                 .when(knowledgeBaseService).deleteFolder("folder-1", null, null);
 
         mockMvc.perform(delete(BASE + "/folders/folder-1"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.message").value("Folder has children — childrenAction (MOVE or ARCHIVE) is required."));
     }
 
@@ -915,14 +918,14 @@ class KnowledgeBaseControllerTest {
     }
 
     @Test
-    void createArticleUnderUnknownParentIs400FromTheDomain() throws Exception {
+    void createArticleUnderUnknownParentIs404FromTheDomain() throws Exception {
         when(principalResolver.resolve(ExternalApiMockMvc.USER_ID)).thenReturn(owner());
         when(knowledgeBaseService.createArticle(eq(OWNER_ID), any()))
-                .thenThrow(new IllegalArgumentException("Parent folder not found: missing"));
+                .thenThrow(new NotFoundException(ErrorCode.KNOWLEDGE_BASE_ITEM_NOT_FOUND, "Parent folder not found: missing"));
 
         mockMvc.perform(json(post(BASE + "/articles"), Map.of("name", "VPN setup", "parentId", "missing")))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("KNOWLEDGE_BASE_ITEM_NOT_FOUND"))
                 .andExpect(jsonPath("$.message").value("Parent folder not found: missing"));
     }
 

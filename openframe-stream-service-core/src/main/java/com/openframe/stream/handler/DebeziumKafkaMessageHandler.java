@@ -1,27 +1,29 @@
 package com.openframe.stream.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.data.model.enums.Destination;
 import com.openframe.data.model.enums.EventHandlerType;
 import com.openframe.kafka.model.IntegratedToolEvent;
 import com.openframe.kafka.producer.retry.BaseRetryingKafkaProducer;
+import com.openframe.stream.mapping.LogEventMapper;
 import com.openframe.stream.model.fleet.debezium.DeserializedDebeziumMessage;
 import com.openframe.stream.model.fleet.debezium.IntegratedToolEnrichedData;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 public abstract class DebeziumKafkaMessageHandler
         extends DebeziumMessageHandler<IntegratedToolEvent, DeserializedDebeziumMessage> {
 
     protected final BaseRetryingKafkaProducer kafkaProducer;
     private final DebeziumEventValidator validator;
+    private final LogEventMapper logEventMapper;
 
     protected DebeziumKafkaMessageHandler(BaseRetryingKafkaProducer kafkaProducer,
                                           ObjectMapper objectMapper,
-                                          DebeziumEventValidator validator) {
+                                          DebeziumEventValidator validator,
+                                          LogEventMapper logEventMapper) {
         super(objectMapper);
         this.kafkaProducer = kafkaProducer;
         this.validator = validator;
+        this.logEventMapper = logEventMapper;
     }
 
     protected abstract String getTopic();
@@ -29,29 +31,7 @@ public abstract class DebeziumKafkaMessageHandler
     @Override
     protected IntegratedToolEvent transform(DeserializedDebeziumMessage debeziumMessage,
                                             IntegratedToolEnrichedData enrichedData) {
-        IntegratedToolEvent message = new IntegratedToolEvent();
-        try {
-            message.setToolEventId(debeziumMessage.getToolEventId());
-            message.setUserId(enrichedData.getUserId());
-            message.setDeviceId(enrichedData.getMachineId());
-            message.setHostname(enrichedData.getHostname());
-            message.setNickname(enrichedData.getNickname());
-            message.setOrganizationId(enrichedData.getOrganizationId());
-            message.setOrganizationName(enrichedData.getOrganizationName());
-            message.setIngestDay(debeziumMessage.getIngestDay());
-            message.setToolType(debeziumMessage.getIntegratedToolType().name());
-            message.setEventType(debeziumMessage.getUnifiedEventType().name());
-            message.setSeverity(debeziumMessage.getUnifiedEventType().getSeverity().name());
-            message.setSummary(debeziumMessage.getMessage() == null || debeziumMessage.getMessage().isBlank()
-                    ? debeziumMessage.getUnifiedEventType().getSummary()
-                    : debeziumMessage.getMessage());
-            message.setEventTimestamp(debeziumMessage.getEventTimestamp());
-            message.setTenantId(enrichedData.getTenantId());
-        } catch (Exception e) {
-            log.error("Error processing Kafka message", e);
-            throw e;
-        }
-        return message;
+        return logEventMapper.toIntegratedToolEvent(debeziumMessage, enrichedData);
     }
 
     protected void handleCreate(IntegratedToolEvent message) {

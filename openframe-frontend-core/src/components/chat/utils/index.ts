@@ -82,7 +82,8 @@ export { decideNewTab, type DecideNewTabInput, type NavSurface, type RuntimeMode
 
 // Pure content helpers
 export { flattenAssistantContent } from './flatten-assistant-content';
-export { SCROLL_ANCHOR, type ScrollAnchor, SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from './scroll-anchor';
+export { SCROLL_ANCHOR_WIRE_KEY, parseScrollAnchor } from './scroll-anchor';
+export { SCROLL_ANCHOR, type ScrollAnchor } from '../types/message.types';
 export {
   AUTO_CONTINUATION_DIRECTIVE_PREFIX,
   buildAutoContinuationDirective,
@@ -157,7 +158,8 @@ export {
 // Library icon resolver — `icons-v2-generated`-backed, shared by the chat
 // empty-state chips, the slash-command autocomplete, AND the admin icon picker
 // (`ICON_OPTIONS`), so picked icons always display.
-export { resolveIcon, ICON_ALIASES, ICON_OPTIONS, type IconComponent, type IconOption } from './icon-library';
+export { resolveIcon, findIcon, ICON_ALIASES, ICON_OPTIONS, type IconOption } from './icon-library';
+export { type IconComponent } from './icon-loading';
 export {
   SOURCE_ICON_NAMES,
   getSourceIconName,
@@ -165,7 +167,7 @@ export {
   getSourceLabel,
   DEFAULT_DOCUMENT_TYPE_TO_TABLE_ID,
   defaultTableIdForDocumentType,
-} from './source-icons';
+} from '../../../utils/source-icons';
 export {
   type SourceRowInput,
   type SourceRowContext,
@@ -176,7 +178,19 @@ export {
 
 // Post-fetch enrichment for the minimal ChatRef descriptor a
 // `[card://type:id]` marker produces (the wire ships no card metadata).
-export { resolveFetchedCardHref, readFetchedCardTitle, type FetchedCardHrefInput } from './resolve-fetched-card-href';
+export {
+  resolveCardDestination,
+  type CardDestination,
+  type CardDestinationEntry,
+  type CardDestinationInput,
+  type CardDestinationSource,
+} from './card-destination';
+export {
+  resolveFetchedCardHref,
+  readFetchedCardPath,
+  readFetchedCardTitle,
+  type FetchedCardHrefInput,
+} from './resolve-fetched-card-href';
 
 // The ONE "Ask Mingo" prompt builder — shared by the SSE adapter, the NATS
 // adapter, and hosts that inject their own Mingo state (openframe-frontend).

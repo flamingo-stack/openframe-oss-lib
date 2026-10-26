@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod';
 
 /**
  * Meeting-booking wire contracts + validation factory.
@@ -432,6 +432,17 @@ export function normalizeFormField(
   return normalized;
 }
 
+/**
+ * Whether the form asks a question the link declares: a required one always, an optional one when the host's
+ * `optionalFields` names it (or names none). THE rule; a host that answers a question outside the form reads it.
+ */
+export function bookingFormAsks(
+  field: { name: string; required?: boolean },
+  optionalFields: readonly string[] | undefined,
+): boolean {
+  return Boolean(field.required) || !optionalFields || optionalFields.includes(field.name);
+}
+
 /** The questions the native form draws and validates, in declared order. */
 export function normalizeFormFields(fields: readonly MeetingFormField[]): SupportedMeetingFormField[] {
   return fields.flatMap(f => normalizeFormField(f) ?? []);
@@ -699,6 +710,40 @@ export function makeDeferredBookingSchema(formFields: MeetingFormField[], legalC
   });
 }
 
+/**
+ * Email domains a host's form does not accept, with the message it shows when
+ * one is typed. The HOST owns the list (its own personal/free-provider rule)
+ * and re-checks on its own server — this is the answer at the point of typing,
+ * never the gate.
+ */
+export interface DeniedEmailDomains {
+  domains: readonly string[];
+  message: string;
+}
+
+/** The address's domain, lower-cased, matched WHOLE against the list — a
+ *  subdomain is a different domain, which is how a host's own list reads it. */
+export function emailDomainDenied(email: unknown, rule: DeniedEmailDomains): boolean {
+  if (typeof email !== 'string') return false;
+  const domain = email.split('@')[1]?.trim().toLowerCase();
+  if (domain === undefined || domain === '') return false;
+  return rule.domains.includes(domain);
+}
+
+/** `schema` refined to reject those domains ON the email field, so the message
+ *  lands under the control the visitor typed in rather than as a form error. */
+export function withDeniedEmailDomains(
+  schema: ReturnType<typeof makeDeferredBookingSchema>,
+  rule: DeniedEmailDomains | undefined,
+) {
+  if (!rule) return schema;
+  return schema.superRefine((values, ctx) => {
+    if (emailDomainDenied(values.email, rule)) {
+      ctx.addIssue({ code: 'custom', path: ['email'], message: rule.message });
+    }
+  });
+}
+
 /** The wire payload. Pinned to the STRICT builder — see above. */
 export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>>;
 
@@ -708,3 +753,65 @@ export type MeetingBookingPayload = z.infer<ReturnType<typeof makeBookingSchema>
  * the two survives only on TS's bivariant method-parameter check.
  */
 export type BookingFormValues = z.infer<ReturnType<typeof makeDeferredBookingSchema>>;
+
+// ---------------------------------------------------------------------------
+// Booking context
+// ---------------------------------------------------------------------------
+
+/**
+ * What the visitor told the host page BEFORE its form, beside the link's own
+ * questions: a labelled list ("Fix these first:" and the cards they picked).
+ * The form shows it as a summary of tags and sends it with the booking under
+ * `BOOKING_CONTEXT_FIELD`; it never depends on a question the link declares, so
+ * a page can carry it on any link. The host reads it on its server with
+ * `readBookingContext` and records it where the person running the call sees
+ * it (the hub: a note on the HubSpot contact). Never sent to the booking
+ * itself: the server schema strips it like any undeclared key.
+ */
+export interface BookingContext {
+  /** The summary's heading and the note's lead ("Fix these first:"). */
+  label: string;
+  /** One line each, in the order the visitor gave them. */
+  items: string[];
+}
+
+/**
+ * The space a form keeps for its context BEFORE any line is given: the page knows how many lines it can hold (the
+ * cards it lists), so the form reserves that many from its first paint, loading included, and the page never jumps
+ * when the visitor picks. Display only: never sent.
+ */
+export interface BookingContextSlot {
+  /** The block's heading, the context's own label ("Fix these first:"). */
+  label: string;
+  /** The most lines it can hold: the space reserved. */
+  slots: number;
+  /** Shown in that space while no line is given ("Nothing picked yet…"). */
+  emptyText: string;
+}
+
+/** The booking body's key for the context. */
+export const BOOKING_CONTEXT_FIELD = 'bookingContext';
+
+/** Bounds of a context the server accepts; a longer list or line is refused whole. */
+export const BOOKING_CONTEXT_LIMITS = { label: 120, items: 20, item: 400 } as const;
+
+const bookingContextSchema = z.object({
+  label: z.string().trim().min(1).max(BOOKING_CONTEXT_LIMITS.label),
+  items: z.array(z.string().trim().min(1).max(BOOKING_CONTEXT_LIMITS.item)).min(1).max(BOOKING_CONTEXT_LIMITS.items),
+});
+
+/** A context worth showing and sending: a label and at least one line. */
+export function hasBookingContext(context: BookingContext | null | undefined): context is BookingContext {
+  return Boolean(context && context.label.trim() && context.items.some(item => item.trim()));
+}
+
+/** The body fields that carry a context: none when there is nothing to send. */
+export function bookingContextFields(context: BookingContext | null | undefined): Record<string, BookingContext> {
+  return hasBookingContext(context) ? { [BOOKING_CONTEXT_FIELD]: context } : {};
+}
+
+/** The context a booking body carries (`BOOKING_CONTEXT_FIELD`), validated; null when absent or malformed. */
+export function readBookingContext(body: Record<string, unknown>): BookingContext | null {
+  const parsed = bookingContextSchema.safeParse(body[BOOKING_CONTEXT_FIELD]);
+  return parsed.success ? parsed.data : null;
+}

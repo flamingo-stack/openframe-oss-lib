@@ -452,6 +452,11 @@ impl Service {
         // Call the cross-platform service manager to install
         service.install().context("Failed to install service")?;
 
+        #[cfg(target_os = "windows")]
+        if let Err(e) = crate::platform::apps_entry::register(&Self::get_install_location()) {
+            warn!("Failed to register Apps & Features entry: {:#}", e);
+        }
+
         info!("OpenFrame service installed successfully");
         Ok(())
     }
@@ -591,6 +596,9 @@ impl Service {
         // Repair PATH registry type if corrupted by a previous version
         #[cfg(target_os = "windows")]
         crate::platform::windows_path_migration::run();
+
+        #[cfg(target_os = "windows")]
+        crate::platform::apps_entry::refresh(&Self::get_install_location());
 
         crate::platform::uninstall::remove_legacy_alias(&Self::get_install_location());
 
@@ -767,8 +775,7 @@ impl Service {
     /// Remove a directory from the Windows system PATH.
     /// Preserves the original registry value type (REG_EXPAND_SZ).
     #[cfg(target_os = "windows")]
-    #[allow(dead_code)] // retained for windows PATH cleanup; not currently called
-    fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
+    pub(crate) fn remove_from_windows_path(dir: &std::path::Path) -> Result<()> {
         use winreg::enums::*;
         use winreg::RegKey;
 

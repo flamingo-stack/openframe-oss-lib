@@ -51,6 +51,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { decodeNatsChunk } from '../../../chat-protocol/nats-decoder';
 import type { ChatRef } from '../chat-ref.types';
+import { CHAT_HISTORY_PAGE_SIZE } from '../mingo-chat-history';
 import { createChatDialogStore, DEFAULT_DIALOG_SIDE } from '../stream/chat-dialog-store';
 import { useChatStreamReducer } from '../stream/use-chat-stream-reducer';
 import type {
@@ -78,26 +79,6 @@ import { processHistoricalMessagesWithErrors } from '../utils/process-historical
 import { useChunkCatchup } from './use-chunk-catchup';
 import { useManagedDialogList } from './use-managed-dialog-list';
 import { useNatsDialogSubscription } from './use-nats-dialog-subscription';
-
-// Legacy public home of the pure message-mutation helpers ("exported for
-// host reuse"). Canonical implementation moved to the stream module in
-// Phase 3 — these re-exports keep the import path stable until Phase 4
-// migrates consumers.
-export {
-  appendToTrailingAssistant,
-  applyToolExecutionToMessages,
-  upsertTrailingCompaction,
-} from '../stream/message-mutations';
-
-// =============================================================================
-// Config + options
-// =============================================================================
-
-// `FetchDialogsParams` / `FetchDialogsResult` moved to the unified types
-// module (they are the host contract of the SHARED `useManagedDialogList`
-// hook, consumed by both adapters); re-exported here so the public import
-// path stays stable.
-export type { FetchDialogsParams, FetchDialogsResult } from '../types/unified-chat-state.types';
 
 /** Page-fetch parameters passed to `fetchDialogMessages`. */
 export interface FetchDialogMessagesParams {
@@ -422,7 +403,7 @@ export function useNatsChatAdapter(
     stopGeneration: stopGenerationCallback,
     assistantName = 'Mingo',
     chatTypeFilter,
-    dialogsPageSize = 20,
+    dialogsPageSize = CHAT_HISTORY_PAGE_SIZE,
     messagesPageSize = 50,
     modelProvider = null,
     modelLabel = null,

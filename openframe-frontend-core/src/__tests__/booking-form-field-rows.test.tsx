@@ -27,6 +27,27 @@ describe('BookingForm — host fieldRows', () => {
     expect(screen.getByLabelText(/^Job Title/)).toBeInTheDocument();
   });
 
+  it('leaves out an optional question the form does not name (optionalFields), required ones stay', () => {
+    mountBookingForm(availability, { optionalFields: [] });
+    expect(screen.queryByLabelText(/^Job Title/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^Company Name/)).toBeInTheDocument();
+  });
+
+  it('leaves it out even when a row places it', () => {
+    mountBookingForm(availability, { optionalFields: [], fieldRows: [[{ name: 'jobtitle' }]] });
+    expect(screen.queryByLabelText(/^Job Title/)).not.toBeInTheDocument();
+  });
+
+  it('asks an optional question the form names', () => {
+    mountBookingForm(availability, { optionalFields: ['jobtitle'] });
+    expect(screen.getByLabelText(/^Job Title/)).toBeInTheDocument();
+  });
+
+  it('asks every declared question when optionalFields is omitted', () => {
+    mountBookingForm(availability);
+    expect(screen.getByLabelText(/^Job Title/)).toBeInTheDocument();
+  });
+
   it('renders a name placed twice once and drops a row that resolves to nothing', () => {
     mountBookingForm(availability, {
       fieldRows: [

@@ -13,7 +13,10 @@ const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group;
 
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
+function DropdownMenuPortal({ container, ...props }: ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Portal>) {
+  const active = usePortalContainer();
+  return <DropdownMenuPrimitive.Portal container={container ?? active ?? undefined} {...props} />;
+}
 
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 

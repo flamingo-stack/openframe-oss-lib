@@ -1,5 +1,7 @@
 import type { ComponentType, SVGProps } from 'react';
-import { WindowsIcon, LinuxIcon, MacOSIcon } from '../components/icons';
+import { LinuxIcon } from '../components/icons-v2-generated/brand-logos/linux-icon';
+import { MacosIcon } from '../components/icons-v2-generated/brand-logos/macos-icon';
+import { WindowsClassicIcon } from '../components/icons-v2-generated/brand-logos/windows-classic-icon';
 
 // OS-level platforms (Windows, Linux, MacOS)
 
@@ -12,9 +14,9 @@ export interface OSPlatformOption {
 }
 
 export const OS_PLATFORMS: OSPlatformOption[] = [
-  { id: 'windows', name: 'Windows', icon: WindowsIcon },
+  { id: 'windows', name: 'Windows', icon: WindowsClassicIcon },
   { id: 'linux', name: 'Linux', icon: LinuxIcon },
-  { id: 'darwin', name: 'MacOS', icon: MacOSIcon },
+  { id: 'darwin', name: 'MacOS', icon: MacosIcon },
 ];
 
 export const DEFAULT_OS_PLATFORM: OSPlatformId = 'windows';

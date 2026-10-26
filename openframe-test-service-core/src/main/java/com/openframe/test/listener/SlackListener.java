@@ -6,6 +6,7 @@ import org.junit.platform.launcher.TestExecutionListener;
 import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,18 +23,40 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>{@code reported} is volatile because it is written by the thread running the test plan and read
  * by the pipeline thread that calls {@link #sendResults} — true before parallel execution as well.
+ *
+ * <p>Lines are accumulated as they happen and ordered only when the report is posted; see
+ * {@link Detail}.
  */
 @Slf4j
 public class SlackListener implements TestExecutionListener {
 
     private static final String ASSUMPTION_PREFIX = "Assumption failed: ";
 
+    private static final int RANK_FAILED = 0;
+    private static final int RANK_SKIPPED = 1;
+    private static final int RANK_PASSED = 2;
+
+    /**
+     * One detail line and where it belongs in the posted report.
+     *
+     * <p>Failures lead. The details go out as a threaded message someone scrolls, and an all-tests run is
+     * several hundred cases — in execution order, three red lines sit somewhere in the middle of the
+     * passes and the reader has to hunt for the thing they were pinged about. Skips come next, because
+     * "the tenant did not hold what this case needed" is the second thing worth acting on, and the passes
+     * last, where they serve as the inventory rather than the message.
+     *
+     * <p>Ordering at send time rather than on insert keeps the accumulation a single append under
+     * parallel execution, and lets the sort be stable so execution order still survives within a group.
+     */
+    private record Detail(int rank, String line) {
+    }
+
     private final SlackClient slackClient;
 
     private final AtomicInteger testsSucceeded = new AtomicInteger();
     private final AtomicInteger testsFailed = new AtomicInteger();
     private final AtomicInteger testsSkipped = new AtomicInteger();
-    private final List<String> testResults = new CopyOnWriteArrayList<>();
+    private final List<Detail> testResults = new CopyOnWriteArrayList<>();
     private volatile boolean reported = true;
 
     /** Held so a skipped or aborted class can say how many cases went with it. */
@@ -71,16 +94,19 @@ public class SlackListener implements TestExecutionListener {
             case SUCCESSFUL -> {
                 if (testIdentifier.isTest()) {
                     testsSucceeded.incrementAndGet();
-                    testResults.add(":white_check_mark: " + testIdentifier.getDisplayName());
+                    testResults.add(new Detail(RANK_PASSED,
+                            ":white_check_mark: " + testIdentifier.getDisplayName()));
                 }
             }
             case FAILED -> {
                 testsFailed.incrementAndGet();
-                testResults.add(":x: " + describe(testIdentifier) + ": " + failureMessage(testExecutionResult));
+                testResults.add(new Detail(RANK_FAILED,
+                        ":x: " + describe(testIdentifier) + ": " + failureMessage(testExecutionResult)));
             }
             case ABORTED -> {
                 testsSkipped.addAndGet(caseCount(testIdentifier));
-                testResults.add(":fast_forward: " + describe(testIdentifier) + ": " + abortReason(testExecutionResult));
+                testResults.add(new Detail(RANK_SKIPPED,
+                        ":fast_forward: " + describe(testIdentifier) + ": " + abortReason(testExecutionResult)));
             }
         }
     }
@@ -89,7 +115,8 @@ public class SlackListener implements TestExecutionListener {
     public void executionSkipped(TestIdentifier testIdentifier, String reason) {
         testsSkipped.addAndGet(caseCount(testIdentifier));
         String skipReason = truncateMessage(skipReason(reason));
-        testResults.add(":fast_forward: " + describe(testIdentifier) + ": " + skipReason);
+        testResults.add(new Detail(RANK_SKIPPED,
+                ":fast_forward: " + describe(testIdentifier) + ": " + skipReason));
         log.info("Skipped {}: {}", describe(testIdentifier), skipReason);
     }
 
@@ -172,9 +199,11 @@ public class SlackListener implements TestExecutionListener {
         StringBuilder details = new StringBuilder();
         if (!testResults.isEmpty()) {
             details.append("*Test Details:*\n");
-            for (String result : testResults) {
-                details.append(result).append("\n");
-            }
+            // Stable, so execution order survives inside each rank: a failure and the skips it cascaded
+            // into still read in the order they happened.
+            testResults.stream()
+                    .sorted(Comparator.comparingInt(Detail::rank))
+                    .forEach(detail -> details.append(detail.line()).append("\n"));
         } else {
             summary.append("\n :x: No test results\n");
         }

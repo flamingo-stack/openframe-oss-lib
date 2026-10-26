@@ -3,6 +3,8 @@
 import { forwardRef, type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { formatTime } from '../../utils/format-date';
+import { useChatAppearance } from './chat-appearance-context';
+import { CHAT_APPEARANCE } from './types/chat.types';
 
 export interface AiAssistantInfoProps extends HTMLAttributes<HTMLDivElement> {
   /** Rendered inside the standard 48px framed box (typically a 24px icon). */
@@ -34,11 +36,15 @@ export interface AiAssistantInfoProps extends HTMLAttributes<HTMLDivElement> {
  */
 const AiAssistantInfo = forwardRef<HTMLDivElement, AiAssistantInfoProps>(
   ({ className, icon, leading, title, body, timestamp, ...props }, ref) => {
+    // v2: on the page surface, content centered against the 48px icon, and
+    // the thread (not the card) owns the space below it.
+    const isV2 = useChatAppearance() === CHAT_APPEARANCE.V2;
     return (
       <div
         ref={ref}
         className={cn(
-          'mb-[var(--spacing-system-xsf)] flex items-start gap-[var(--spacing-system-s)] rounded-md border border-ods-border bg-ods-card p-[var(--spacing-system-s)]',
+          'flex gap-[var(--spacing-system-s)] rounded-md border border-ods-border p-[var(--spacing-system-s)]',
+          isV2 ? 'items-center bg-ods-bg' : 'mb-[var(--spacing-system-xsf)] items-start bg-ods-card',
           className,
         )}
         {...props}

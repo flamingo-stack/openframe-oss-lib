@@ -1,5 +1,6 @@
 package com.openframe.api.service.rmm.command;
 
+import com.openframe.api.service.rmm.TestRunPolicy;
 import com.openframe.data.document.rmm.command.CommandExecution;
 import com.openframe.data.document.rmm.script.ExecutionStatus;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
@@ -26,6 +27,7 @@ public class CommandExecutionService {
 
     private final CommandExecutionRepository commandExecutionRepository;
     private final TenantIdProvider tenantIdProvider;
+    private final TestRunPolicy testRunPolicy;
 
     /**
      * Bulk-persist one {@link ExecutionStatus#RUNNING} row per target machine under a
@@ -40,13 +42,14 @@ public class CommandExecutionService {
                                               Integer timeoutSeconds,
                                               String initiatedBy) {
         Instant now = Instant.now();
+        boolean testRun = testRunPolicy.isTestRun();
         List<CommandExecution> rows = machineIds.stream()
                 .map(machineId -> buildRunningRow(executionId, command, shell, machineId,
-                        privilegeLevel, timeoutSeconds, initiatedBy, now))
+                        privilegeLevel, timeoutSeconds, initiatedBy, now, testRun))
                 .toList();
         List<CommandExecution> saved = commandExecutionRepository.saveAll(rows);
-        log.info("Persisted batch command execution rows: executionId={} machineCount={} initiatedBy={} status=RUNNING",
-                executionId, machineIds.size(), initiatedBy);
+        log.info("Persisted batch command execution rows: executionId={} machineCount={} initiatedBy={} testRun={} status=RUNNING",
+                executionId, machineIds.size(), initiatedBy, testRun);
         return saved;
     }
 
@@ -72,7 +75,8 @@ public class CommandExecutionService {
                                              PrivilegeLevel privilegeLevel,
                                              Integer timeoutSeconds,
                                              String initiatedBy,
-                                             Instant now) {
+                                             Instant now,
+                                             boolean testRun) {
         return CommandExecution.builder()
                 .tenantId(tenantIdProvider.getTenantId())
                 .executionId(executionId)
@@ -85,6 +89,7 @@ public class CommandExecutionService {
                 .status(ExecutionStatus.RUNNING)
                 .dispatchedAt(now)
                 .statusChangedAt(now)
+                .testRun(testRun)
                 .build();
     }
 }

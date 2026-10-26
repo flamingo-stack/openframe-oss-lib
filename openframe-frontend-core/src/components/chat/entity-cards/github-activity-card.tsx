@@ -4,7 +4,7 @@
  * GitHub Activity Card — unified visual for commits, PRs, and PR reviews.
  *
  * PURE PRESENTATION (no internal nav, no internal data fetching). The card
- * receives the structured `<a>` prop bundle via `anchorProps` (composed by
+ * receives the structured `<Link>` prop bundle via `anchorProps` (composed by
  * the caller from a runtime hook) and renders the rest from the
  * `GitHubActivityItem` shape directly.
  *
@@ -18,8 +18,11 @@
 
 import { GitPullRequest, Eye, ExternalLink } from 'lucide-react';
 import React from 'react';
+import Link from '../../../embed-shims/next-link';
 import { formatDateUTC as formatDate } from '../../../utils/format';
-import { GitHubIcon } from '../../icons/github-icon';
+import { GithubClassicIcon } from '../../icons-v2-generated/brand-logos/github-classic-icon';
+import { UnifiedSkeleton } from '../../loading/unified-skeleton';
+import { useLoadingScope } from '../../ui/loading-scope';
 import type { GitHubActivityItem, GitHubActivityKind, PrReviewState } from '../types/entities/github-activity';
 import {
   COMPACT_CARD_ICON_SLOT,
@@ -28,14 +31,13 @@ import {
   COMPACT_CARD_OUTER,
   COMPACT_CARD_OUTER_STATIC,
   COMPACT_CARD_ROW_FILLER,
-  COMPACT_CARD_SKELETON_IMAGE_SLOT,
-  COMPACT_CARD_SKELETON_OUTER,
   COMPACT_CARD_SUMMARY,
   COMPACT_CARD_TEXT_COL,
   COMPACT_CARD_TITLE,
   COMPACT_CARD_TITLE_ROW,
   safeHref,
 } from '../utils/compact-card-classes';
+import { ActivityRowSkeleton, CompactCardSkeleton } from '../utils/compact-card-skeleton';
 
 /** Extract owner/repo from a GitHub URL. */
 function parseRepoFromUrl(url: string | null | undefined): string | null {
@@ -59,7 +61,7 @@ function kindIcon(kind: GitHubActivityKind, className = 'h-4 w-4') {
       return <Eye className={`${className} shrink-0`} />;
     case 'commit':
     default:
-      return <GitHubIcon className={`${className} shrink-0`} />;
+      return <GithubClassicIcon className={`${className} shrink-0`} />;
   }
 }
 
@@ -180,12 +182,13 @@ export interface GitHubActivityCardProps {
   item: GitHubActivityItem;
   variant?: 'row' | 'compact';
   className?: string;
-  /** Pre-composed `<a>` prop bundle (typically from a `useNavLink` hook in
-   *  the consumer). When provided, the outer renders as a real `<a>`. */
+  /** Pre-composed `<Link>` prop bundle (typically from a `useNavLink` hook in
+   *  the consumer). When provided, the outer renders as a real `<Link>`. */
   anchorProps?: GitHubActivityCardAnchorProps;
 }
 
 export function GitHubActivityCard({ item, variant = 'compact', className, anchorProps }: GitHubActivityCardProps) {
+  if (useLoadingScope()) return <GitHubActivityCardSkeleton variant={variant} className={className} />;
   const kind = item.kind ?? 'commit';
   const repo = item.repo ?? parseRepoFromUrl(item.url) ?? '';
   const dateText = formatDate(item.dateUpdated, { fallback: '', timezone: 'local' });
@@ -269,15 +272,15 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
   );
   if (anchorProps) {
     return (
-      <a {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+      <Link {...anchorProps} className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
         {body}
-      </a>
+      </Link>
     );
   }
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
+    <Link href={href} target="_blank" rel="noopener noreferrer" className={`${COMPACT_CARD_OUTER} ${className ?? ''}`}>
       {body}
-    </a>
+    </Link>
   ) : (
     <span className={`${COMPACT_CARD_OUTER_STATIC} ${className ?? ''}`} aria-label="No link available">
       {body}
@@ -285,7 +288,7 @@ export function GitHubActivityCard({ item, variant = 'compact', className, ancho
   );
 }
 
-export function GitHubActivityCardSkeleton({
+function GitHubActivityCardSkeleton({
   variant = 'compact',
   className,
 }: {
@@ -294,34 +297,17 @@ export function GitHubActivityCardSkeleton({
 }) {
   if (variant === 'row') {
     return (
-      <div className={`flex min-w-0 animate-pulse items-center gap-3 ${className ?? ''}`}>
-        <div className="flex w-28 shrink-0 items-center gap-2">
-          <div className="h-3.5 w-3.5 rounded bg-ods-bg" />
-          <div className="h-3 w-16 rounded bg-ods-bg" />
-        </div>
-        <div className="h-3 w-2/3 flex-1 rounded bg-ods-bg" />
-        <div className="h-3 w-40 shrink-0 rounded bg-ods-bg/60" />
-        <div className="h-3 w-20 shrink-0 rounded bg-ods-bg/60" />
-      </div>
+      <ActivityRowSkeleton
+        lead={
+          <div className="flex w-28 shrink-0 items-center gap-2">
+            <UnifiedSkeleton className="h-3.5 w-3.5 rounded" />
+            <UnifiedSkeleton className="h-3 w-16 rounded" />
+          </div>
+        }
+        trailingWidths={['w-40', 'w-20']}
+        className={className}
+      />
     );
   }
-  return (
-    <span className={`${COMPACT_CARD_SKELETON_OUTER} ${className ?? ''}`}>
-      <span className={COMPACT_CARD_SKELETON_IMAGE_SLOT} />
-      <span className={COMPACT_CARD_TEXT_COL}>
-        <span className={COMPACT_CARD_TITLE_ROW}>
-          <span className="h-3.5 w-2/3 rounded bg-ods-bg" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className="h-3 w-1/2 rounded bg-ods-bg/70" />
-        </span>
-        <span className={COMPACT_CARD_META_ROW_BOX}>
-          <span className={COMPACT_CARD_SUMMARY}>{COMPACT_CARD_ROW_FILLER}</span>
-        </span>
-      </span>
-      <span className="flex h-5 shrink-0 items-center self-start">
-        <span className="h-3.5 w-3.5 rounded bg-ods-bg" />
-      </span>
-    </span>
-  );
+  return <CompactCardSkeleton titleWidth="w-2/3" rows={[{ width: 'w-1/2' }, {}]} trailingIcon className={className} />;
 }

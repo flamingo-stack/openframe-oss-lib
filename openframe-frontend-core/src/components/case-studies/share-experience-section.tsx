@@ -3,7 +3,11 @@
 import type React from 'react';
 import { RESCUE_FORMS } from '../../utils/form-rescue';
 import { ContactForm, type ContactFormProps } from '../contact';
-import { G2Icon, CapterraIcon, TrustpilotIcon, GetAppIcon } from '../icons';
+import { CapterraIcon } from '../icons-v2-generated/brand-logos/capterra-icon';
+import { G2Icon } from '../icons-v2-generated/brand-logos/g2-icon';
+import { GetappIcon } from '../icons-v2-generated/brand-logos/getapp-icon';
+import { TrustpilotIcon } from '../icons-v2-generated/brand-logos/trustpilot-icon';
+import { accentSentenceMarks, HeadingLines } from '../layout/page-heading';
 import { BenefitCard, BenefitCardGrid } from '../ui';
 
 /**
@@ -52,11 +56,14 @@ export interface ShareExperienceSectionProps {
 }
 
 const DEFAULT_TITLE: React.ReactNode = (
-  <>
-    Share Your Experience
-    <br />
-    with Fellow MSPs<span className="text-ods-accent">:</span>
-  </>
+  <HeadingLines>
+    {[
+      'Share Your Experience',
+      <>
+        with Fellow MSPs<span className="text-ods-accent">:</span>
+      </>,
+    ]}
+  </HeadingLines>
 );
 
 const DEFAULT_SUBTITLE: React.ReactNode = (
@@ -108,7 +115,7 @@ export function ShareExperienceSection({
   return (
     <section className={`flex flex-col gap-10${className ? ` ${className}` : ''}`}>
       <div className="text-ods-text-primary">
-        <h2 className="text-ods-text-primary text-h1">{title}</h2>
+        <h2 className="text-ods-text-primary text-h1">{accentSentenceMarks(title)}</h2>
         <p className="mt-6 max-w-[765px] text-h4">{subtitle}</p>
       </div>
 
@@ -123,7 +130,7 @@ export function ShareExperienceSection({
             <BenefitCard
               icon={
                 <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
-                  <G2Icon width={24} height={24} />
+                  <G2Icon color="var(--social-g2)" size={24} />
                 </div>
               }
               title="G2"
@@ -133,7 +140,7 @@ export function ShareExperienceSection({
             <BenefitCard
               icon={
                 <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
-                  <CapterraIcon width={24} height={24} />
+                  <CapterraIcon size={24} />
                 </div>
               }
               title="Capterra"
@@ -143,7 +150,7 @@ export function ShareExperienceSection({
             <BenefitCard
               icon={
                 <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
-                  <TrustpilotIcon width={24} height={24} />
+                  <TrustpilotIcon size={24} />
                 </div>
               }
               title="TrustPilot"
@@ -153,7 +160,7 @@ export function ShareExperienceSection({
             <BenefitCard
               icon={
                 <div className="flex h-12 w-12 items-center justify-center rounded-md border border-ods-border bg-ods-bg p-2">
-                  <GetAppIcon width={24} height={24} />
+                  <GetappIcon size={24} />
                 </div>
               }
               title="GetApp"

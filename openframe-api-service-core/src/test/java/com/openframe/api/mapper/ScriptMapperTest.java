@@ -5,6 +5,7 @@ import com.openframe.api.dto.rmm.script.ScriptEnvVarInput;
 import com.openframe.api.dto.rmm.script.ScriptResponse;
 import com.openframe.api.dto.rmm.script.UpdateScriptInput;
 import com.openframe.data.document.rmm.script.PrivilegeLevel;
+import com.openframe.data.document.rmm.script.ScriptCreationSource;
 import com.openframe.data.document.rmm.script.Script;
 import com.openframe.data.document.rmm.script.ScriptEnvVar;
 import com.openframe.data.document.rmm.script.OsType;
@@ -263,6 +264,34 @@ class ScriptMapperTest {
         ScriptResponse response = mapper.toResponse(entity);
 
         assertThat(response.getStatus()).isEqualTo(ACTIVE);
+    }
+
+    @Test
+    @DisplayName("toResponse: a null creationSource (script created before the field existed) reads as MANUAL so the non-null schema field is never violated")
+    void toResponse_nullCreationSource_fallsBackToManual() {
+        // setup
+        Script entity = fullyPopulated();
+        entity.setCreationSource(null);
+
+        // execution
+        ScriptResponse response = mapper.toResponse(entity);
+
+        // verifications
+        assertThat(response.getCreationSource()).isEqualTo(ScriptCreationSource.MANUAL);
+    }
+
+    @Test
+    @DisplayName("toResponse: carries the stored creationSource through")
+    void toResponse_mapsCreationSource() {
+        // setup
+        Script entity = fullyPopulated();
+        entity.setCreationSource(ScriptCreationSource.AI_ASSISTANT);
+
+        // execution
+        ScriptResponse response = mapper.toResponse(entity);
+
+        // verifications
+        assertThat(response.getCreationSource()).isEqualTo(ScriptCreationSource.AI_ASSISTANT);
     }
 
     private static Script fullyPopulated() {

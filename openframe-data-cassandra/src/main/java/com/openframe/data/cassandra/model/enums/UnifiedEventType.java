@@ -61,6 +61,9 @@ public enum UnifiedEventType {
     REMOTE_RECORDING_COMPLETED(Severity.INFO, "Remote session recording completed"),
     REMOTE_SESSION_EVENT(Severity.INFO, "Remote session event"),
     REMOTE_SESSION_STATS_UPDATED(Severity.INFO, "Remote session stats updated"),
+    REMOTE_SESSION_DELETED(Severity.INFO, "Remote session deleted"),
+    REMOTE_CLIPBOARD_COPIED(Severity.INFO, "Clipboard copied from the remote device"),
+    REMOTE_CLIPBOARD_PASTED(Severity.INFO, "Clipboard pasted to the remote device"),
 
     // Monitoring and alerting events
     ALERT_TRIGGERED(Severity.INFO, "Alert triggered"),

@@ -2,8 +2,9 @@
 
 import type React from 'react';
 import { cn } from '../../utils/cn';
-import { MingoIcon } from '../icons';
+import { AgentMark } from '../agent-mark';
 import { XmarkIcon } from '../icons-v2-generated';
+import { Button } from '../ui/button';
 
 export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Active/pressed state — set to `true` while the Mingo drawer is open. */
@@ -12,6 +13,9 @@ export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLB
    *  control collapses to a square `HeaderButton`-sized affordance on narrow
    *  viewports). Defaults to `false`. */
   iconOnly?: boolean;
+  /** Show the close "X" while active with the wordmark too, not only in
+   *  `iconOnly` mode. Defaults to `false`. */
+  closeWhenActive?: boolean;
   className?: string;
 }
 
@@ -25,29 +29,31 @@ export interface HeaderMingoButtonProps extends React.ButtonHTMLAttributes<HTMLB
  *
  * Figma: 7532:222103 — `button-full`.
  */
-export function HeaderMingoButton({ isActive = false, iconOnly = false, className, ...props }: HeaderMingoButtonProps) {
+export function HeaderMingoButton({
+  isActive = false,
+  iconOnly = false,
+  closeWhenActive = false,
+  className,
+  ...props
+}: HeaderMingoButtonProps) {
+  const showClose = isActive && (iconOnly || closeWhenActive);
   return (
-    <button
+    <Button
+      variant="cell"
       type="button"
-      aria-label={iconOnly && isActive ? 'Close Mingo AI' : 'Mingo AI'}
+      aria-label={showClose ? 'Close Mingo AI' : 'Mingo AI'}
       aria-pressed={isActive}
       className={cn(
-        'flex h-full shrink-0 items-center gap-2 px-4',
         // Fixed 140px cell from md, so the header's right-hand cluster has a
         // known width and a loading placeholder can reserve it exactly
         // (`AppHeaderProps.loadingActionCells` → `'wide'`). Content-width below
         // md, and in `iconOnly` mode, where the control is a square affordance.
-        !iconOnly && 'md:w-[140px] md:justify-center',
-        'transition-colors duration-200',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ods-accent',
-        // Transparent at rest so the cell inherits the bar's background
-        // (TopNavigation `backgroundClassName` can differ per platform).
-        'bg-transparent text-ods-text-primary hover:bg-ods-bg-hover',
+        !iconOnly && 'md:w-[140px]',
         className,
       )}
       {...props}
     >
-      {iconOnly && isActive ? (
+      {showClose ? (
         // Mobile, drawer open: the icon-only button doubles as the close
         // affordance, so swap the Mingo logo for an X. Match the other header
         // icons (e.g. notifications): secondary color, w-4 h-4 → md:w-6 h-6.
@@ -55,15 +61,10 @@ export function HeaderMingoButton({ isActive = false, iconOnly = false, classNam
       ) : (
         // Outer frame follows the button's text color (currentColor); the eyes
         // and corner block are ODS cyan.
-        <MingoIcon
-          color="currentColor"
-          eyesColor="var(--ods-flamingo-cyan-base)"
-          cornerColor="var(--ods-flamingo-cyan-base)"
-          className="h-6 w-6 shrink-0"
-        />
+        <AgentMark agent="mingo" className="h-6 w-6 shrink-0" />
       )}
       {!iconOnly && <span className="whitespace-nowrap font-bold tracking-[-0.36px] text-h3">Mingo AI</span>}
-    </button>
+    </Button>
   );
 }
 

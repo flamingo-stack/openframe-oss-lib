@@ -52,7 +52,6 @@ public class WingetCatalogFetcher {
         String name = indexEntry.getName();
         String moniker = indexEntry.getMoniker();
         List<String> aliases = moniker == null || moniker.isBlank() ? List.of() : List.of(moniker);
-        String blob = SearchBlob.of(id, name, null, aliases);
         return PackageCatalogEntry.builder()
                 .manager(PackageManagerType.WINGET)
                 .packageId(id)
@@ -61,7 +60,6 @@ public class WingetCatalogFetcher {
                 .publisher(publisherFromId(id))
                 .hashPrefix(indexEntry.getHashPrefix())
                 .aliases(aliases)
-                .searchBlob(blob)
                 .build();
     }
 

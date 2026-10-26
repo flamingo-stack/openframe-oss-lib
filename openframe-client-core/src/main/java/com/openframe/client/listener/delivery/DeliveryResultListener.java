@@ -1,9 +1,7 @@
 package com.openframe.client.listener.delivery;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.openframe.client.service.NatsTopicMachineIdExtractor;
-import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.nats.delivery.DeliveryResultMessage;
 import com.openframe.data.nats.listener.AbstractJetStreamPushListener;
 import com.openframe.delivery.metrics.DeliveryMetrics;
@@ -13,6 +11,7 @@ import io.nats.client.Connection;
 import io.nats.client.Message;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 
 import java.nio.charset.StandardCharsets;
 
@@ -85,7 +84,7 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
             }
             apply(machineId, report);
             message.ack();
-        } catch (JsonProcessingException | IllegalArgumentException permanentlyBad) {
+        } catch (JacksonException | IllegalArgumentException permanentlyBad) {
             metrics.recordResultRejected(REJECTED_MALFORMED);
             log.error("Delivery result rejected, malformed: subject={} payload={}", subject, payload, permanentlyBad);
             message.ack();
@@ -96,13 +95,10 @@ public class DeliveryResultListener extends AbstractJetStreamPushListener {
 
     private void apply(String machineId, DeliveryResultMessage report) {
         DeliveryRef delivery = report.getDelivery();
-        DeliveryType type = delivery.getType();
-        String targetId = delivery.getTargetId();
-        String dispatchId = delivery.getDispatchId();
         switch (report.getResult()) {
-            case ACKED -> deliveryTracker.acknowledge(type, targetId, machineId, dispatchId);
-            case DONE -> deliveryTracker.complete(type, targetId, machineId, dispatchId);
-            case FAILED -> deliveryTracker.fail(type, targetId, machineId, dispatchId, report.getError());
+            case ACKED -> deliveryTracker.acknowledge(delivery, machineId);
+            case DONE -> deliveryTracker.done(delivery, machineId);
+            case FAILED -> deliveryTracker.fail(delivery, machineId, report.getError());
         }
     }
 

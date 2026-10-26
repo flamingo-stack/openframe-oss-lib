@@ -61,6 +61,13 @@ export interface FieldWrapperProps {
   children: ReactNode;
 }
 
+/**
+ * The id `FieldWrapper` gives its label when it names a control (`htmlFor`), so
+ * a control that a `<label for>` cannot name (a group of chips) can point at it
+ * with `aria-labelledby`.
+ */
+export const fieldLabelId = (htmlFor: string): string => `${htmlFor}-label`;
+
 const errorVariantClasses = {
   error: 'text-ods-error',
   warning: 'text-ods-warning',
@@ -93,7 +100,12 @@ const FieldWrapper = forwardRef<HTMLDivElement, FieldWrapperProps>(
           // Field-wrapped controls with `label=`-prop controls showed two label
           // sizes side by side — the exact inconsistency the admin editors kept
           // reporting. One label scale, owned here and in Field together.
-          <Label className="mb-1" htmlFor={htmlFor} variant={labelVariant}>
+          <Label
+            id={htmlFor ? fieldLabelId(htmlFor) : undefined}
+            className="mb-1"
+            htmlFor={htmlFor}
+            variant={labelVariant}
+          >
             {label}
             {required && <RequiredMark />}
           </Label>

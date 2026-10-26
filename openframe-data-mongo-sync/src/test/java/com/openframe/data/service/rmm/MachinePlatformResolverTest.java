@@ -4,6 +4,7 @@ import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.script.OsType;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.service.TenantIdProvider;
+import com.openframe.data.service.rmm.software.PackageManagerAvailability;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,9 +27,10 @@ class MachinePlatformResolverTest {
 
     @Mock private MachineRepository machineRepository;
     @Mock private TenantIdProvider tenantIdProvider;
+    @Mock private PackageManagerAvailability packageManagerAvailability;
 
     private MachinePlatformResolver resolver() {
-        return new MachinePlatformResolver(machineRepository, tenantIdProvider);
+        return new MachinePlatformResolver(machineRepository, tenantIdProvider, packageManagerAvailability);
     }
 
     @Test
@@ -45,12 +47,28 @@ class MachinePlatformResolverTest {
         when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
         when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any()))
                 .thenReturn(List.of(machine("m1", OsType.MAC_OS), machine("m2", OsType.WINDOWS), machine("m3", null)));
+        when(packageManagerAvailability.isSoftwareManageable(any(Machine.class))).thenReturn(true);
 
         Map<String, OsType> result = resolver().osTypesByMachineId(List.of("m1", "m2", "m3"));
 
         assertThat(result).containsOnly(
                 Map.entry("m1", OsType.MAC_OS),
                 Map.entry("m2", OsType.WINDOWS));
+    }
+
+    @Test
+    @DisplayName("osTypesByMachineId: a machine without a usable package manager is dropped like an unknown-OS one")
+    void osTypes_dropsUnmanageable() {
+        Machine intelMac = machine("m-intel", OsType.MAC_OS);
+        Machine armMac = machine("m-arm", OsType.MAC_OS);
+        when(tenantIdProvider.getTenantId()).thenReturn(TENANT);
+        when(machineRepository.findByTenantIdAndMachineIdIn(eq(TENANT), any())).thenReturn(List.of(intelMac, armMac));
+        when(packageManagerAvailability.isSoftwareManageable(intelMac)).thenReturn(false);
+        when(packageManagerAvailability.isSoftwareManageable(armMac)).thenReturn(true);
+
+        Map<String, OsType> result = resolver().osTypesByMachineId(List.of("m-intel", "m-arm"));
+
+        assertThat(result).containsOnly(Map.entry("m-arm", OsType.MAC_OS));
     }
 
     @Test

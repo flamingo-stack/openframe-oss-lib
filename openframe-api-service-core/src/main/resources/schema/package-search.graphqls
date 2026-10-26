@@ -26,6 +26,15 @@ enum PackageManagerType {
     WINGET
 }
 
+"""PRESENT — installed. MISSING — installable, the platform bootstraps it. UNSUPPORTED — can never run on this
+device (architecture, edition, build or another OS). UNKNOWN — the agent's probe failed."""
+enum PackageManagerState {
+    PRESENT
+    MISSING
+    UNSUPPORTED
+    UNKNOWN
+}
+
 "BREW only — the same name can exist as both a formula and a cask; other managers ignore it."
 enum BrewPackageType {
     FORMULA

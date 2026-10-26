@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import static com.openframe.authz.web.AuthStateUtils.clearAuthState;
 import static com.openframe.authz.web.AuthStateUtils.clearOtherSsoFlowCookies;
 import static com.openframe.authz.web.Redirects.seeOther;
+import static com.openframe.core.exception.AuthErrorCode.INVITATION_FAILED;
 import static org.springframework.http.HttpStatus.OK;
 
 @Slf4j
@@ -54,8 +55,7 @@ public class InvitationRegistrationController {
 
             seeOther(httpResponse, init.redirectPath());
         } catch (Exception e) {
-            authErrorResponder.send(httpResponse, httpRequest, "sso-invitation-accept", e,
-                    "Invitation acceptance failed. Please try again.");
+            authErrorResponder.send(httpResponse, httpRequest, "sso-invitation-accept", e, INVITATION_FAILED);
         }
     }
 }

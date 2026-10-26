@@ -14,10 +14,6 @@
  * (+ pure formatters that operate on it) lives here.
  */
 
-export * from './blog';
-export * from './case-study';
-export * from './content-ref';
-export * from './customer-interview';
 export * from './data-room-doc';
 export * from './github-activity';
 export * from './hubspot-ticket';
@@ -26,3 +22,27 @@ export * from './onboarding-guide';
 export * from './program-types';
 export * from './roadmap-item';
 export * from './slack-message';
+export type {
+  BlogPost,
+  BlogPostSummary,
+  BlogPostPlatform,
+  BlogPostCategory,
+  BlogPostTag,
+  BlogCategory,
+  BlogTag,
+  BlogAuthor,
+  BlogMediaAsset,
+  BlogStatus,
+  BlogPagination,
+  BlogSearchParams,
+} from '../../../../types/blog';
+export type { CaseStudy, CaseStudyFilters, CaseStudyListResponse } from '../../../../types/case-study';
+export type { ContentRef, ContentRefWithReason } from '../../../../types/content-ref';
+export type {
+  CustomerInterview,
+  CustomerInterviewConfig,
+  CustomerInterviewFilters,
+  CustomerInterviewListResponse,
+} from '../../../../types/customer-interview';
+export { programItemToStripProfile } from '../../../features/video-bites-shared';
+export type { ProgramAuthorRef } from '../../../features/video-bites-shared';

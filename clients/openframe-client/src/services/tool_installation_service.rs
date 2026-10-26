@@ -1,4 +1,3 @@
-use crate::clients::tool_agent_file_client::ToolAgentFileClient;
 use crate::clients::tool_api_client::ToolApiClient;
 use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
@@ -11,6 +10,7 @@ use crate::services::agent_configuration_service::AgentConfigurationService;
 use crate::services::tool_connection_processing_manager::ToolConnectionProcessingManager;
 use crate::services::tool_connection_service::ToolConnectionService;
 use crate::services::tool_kill_service::ToolKillService;
+use crate::services::tool_ops::{ToolOpGuard, ToolOps};
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::GithubDownloadService;
 use crate::services::InstalledAgentMessagePublisher;
@@ -25,7 +25,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 /// Hard cap on how long an external install/uninstall command may run before we abort
 /// it. Prevents a hung installer from pinning the tool-op marker (and therefore the
@@ -37,13 +37,13 @@ const TOOL_COMMAND_TIMEOUT_SECS: u64 = 300;
 #[derive(Clone)]
 pub struct ToolInstallationService {
     github_download_service: GithubDownloadService,
-    tool_agent_file_client: ToolAgentFileClient,
     tool_api_client: ToolApiClient,
     command_params_resolver: ToolCommandParamsResolver,
     url_params_resolver: ToolUrlParamsResolver,
     installed_tools_service: InstalledToolsService,
     directory_manager: DirectoryManager,
     tool_run_manager: ToolRunManager,
+    tool_ops: ToolOps,
     tool_connection_processing_manager: ToolConnectionProcessingManager,
     config_service: AgentConfigurationService,
     installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -55,13 +55,13 @@ impl ToolInstallationService {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         github_download_service: GithubDownloadService,
-        tool_agent_file_client: ToolAgentFileClient,
         tool_api_client: ToolApiClient,
         command_params_resolver: ToolCommandParamsResolver,
         url_params_resolver: ToolUrlParamsResolver,
         installed_tools_service: InstalledToolsService,
         directory_manager: DirectoryManager,
         tool_run_manager: ToolRunManager,
+        tool_ops: ToolOps,
         tool_connection_processing_manager: ToolConnectionProcessingManager,
         config_service: AgentConfigurationService,
         installed_agent_publisher: InstalledAgentMessagePublisher,
@@ -75,13 +75,13 @@ impl ToolInstallationService {
 
         Self {
             github_download_service,
-            tool_agent_file_client,
             tool_api_client,
             command_params_resolver,
             url_params_resolver,
             installed_tools_service,
             directory_manager,
             tool_run_manager,
+            tool_ops,
             tool_connection_processing_manager,
             config_service,
             installed_agent_publisher,
@@ -93,12 +93,17 @@ impl ToolInstallationService {
     #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
     pub async fn install(&self, tool_installation_message: ToolInstallationMessage) -> Result<()> {
         let tool_agent_id = tool_installation_message.tool_agent_id.clone();
-        let tool_lock = self.tool_run_manager.tool_lock(&tool_agent_id).await;
-        let _guard = tool_lock.lock().await;
-        self.tool_run_manager.mark_updating(&tool_agent_id).await;
-        let result = self.install_inner(tool_installation_message).await;
-        self.tool_run_manager.clear_updating(&tool_agent_id).await;
-        result
+        let _op = self.tool_ops.lock(&tool_agent_id).await.mark_busy();
+        self.install_inner(tool_installation_message).await
+    }
+
+    #[tracing::instrument(skip_all, fields(tool_id = %tool_installation_message.tool_agent_id))]
+    pub async fn install_reserved(
+        &self,
+        tool_installation_message: ToolInstallationMessage,
+        _op: ToolOpGuard,
+    ) -> Result<()> {
+        self.install_inner(tool_installation_message).await
     }
 
     async fn install_inner(
@@ -120,12 +125,38 @@ impl ToolInstallationService {
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
 
-        // Check if tool is already installed
-        if let Some(installed_tool) = self
+        let installed_tool = self
             .installed_tools_service
             .get_by_tool_agent_id(tool_agent_id)
-            .await?
-        {
+            .await?;
+        // A repeated install of a present tool is a no-op and needs no download config
+        if let Some(installed_tool) = installed_tool.as_ref().filter(|_| !reinstall) {
+            let agent_path = self.directory_manager.get_tool_executable_path(
+                tool_agent_id,
+                installed_tool.installation.executable_path(),
+            );
+            let binary_present = self
+                .directory_manager
+                .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
+                .await;
+            if binary_present {
+                info!(
+                    "Tool {} is already installed with version {}, skipping installation",
+                    tool_agent_id, installed_tool.version
+                );
+                return Ok(());
+            }
+            warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
+        }
+
+        // Resolve the download before any destructive step
+        let resolved_config = self
+            .github_download_service
+            .find_config_for_current_os(&tool_installation_message.download_configurations)
+            .with_context(|| format!("No download config for current OS: {}", tool_agent_id))?
+            .with_version_override(&version_clone, &effective_version);
+
+        if let Some(installed_tool) = installed_tool {
             if reinstall {
                 info!(
                     "Reinstalling tool {} with version {}",
@@ -286,22 +317,6 @@ impl ToolInstallationService {
                     tool_agent_id
                 );
             } else {
-                let agent_path = self.directory_manager.get_tool_executable_path(
-                    tool_agent_id,
-                    installed_tool.installation.executable_path(),
-                );
-                let binary_present = self
-                    .directory_manager
-                    .tool_artifact_present(&agent_path, installed_tool.installation.is_gui_app())
-                    .await;
-                if binary_present {
-                    info!(
-                        "Tool {} is already installed with version {}, skipping installation",
-                        tool_agent_id, installed_tool.version
-                    );
-                    return Ok(());
-                }
-                warn!("Tool {} has a registry record (version {}) but its binary is missing at {} — repairing via install", tool_agent_id, installed_tool.version, agent_path.display());
                 if let Err(e) = self
                     .installed_tools_service
                     .set_state(tool_agent_id, ToolRecordState::Installing)
@@ -360,28 +375,11 @@ impl ToolInstallationService {
 
         let default_agent_path = self.directory_manager.get_agent_path(tool_agent_id);
 
-        let resolved_config = match &tool_installation_message.download_configurations {
-            Some(configs) => {
-                let config = self
-                    .github_download_service
-                    .find_config_for_current_os(configs)
-                    .with_context(|| {
-                        format!("No download config for current OS: {}", tool_agent_id)
-                    })?;
-                Some(config.with_version_override(&version_clone, &effective_version))
-            }
-            None => None,
-        };
-
         let stop_executable_path = default_agent_path.to_string_lossy().to_string();
-        let stop_installation = match resolved_config
-            .as_ref()
-            .map(|c| c.installation_type)
-            .unwrap_or(InstallationType::Standard)
-        {
+        let stop_installation = match resolved_config.installation_type {
             InstallationType::Service => resolved_config
-                .as_ref()
-                .and_then(|c| c.service_name.clone())
+                .service_name
+                .clone()
                 .or_else(|| tool_installation_message.service_name.clone())
                 .map(|service_name| Installation::Service {
                     service_name,
@@ -389,7 +387,7 @@ impl ToolInstallationService {
                 }),
             InstallationType::GuiApp => Some(Installation::GuiApp {
                 executable_path: stop_executable_path,
-                bundle_id: resolved_config.as_ref().and_then(|c| c.bundle_id.clone()),
+                bundle_id: resolved_config.bundle_id.clone(),
             }),
             InstallationType::Standard => Some(Installation::Standard {
                 executable_path: Some(stop_executable_path),
@@ -460,31 +458,17 @@ impl ToolInstallationService {
         }
 
         // Download and install the tool
-        let (executable_path, installation_type, bundle_id, config_service_name) =
-            match resolved_config {
-                Some(resolved_config) => {
-                    let exec_path = self
-                        .install_from_download_config(
-                            &resolved_config,
-                            tool_agent_id,
-                            &tool_folder_path,
-                            &default_agent_path,
-                        )
-                        .await?;
-
-                    (
-                        exec_path,
-                        resolved_config.installation_type,
-                        resolved_config.bundle_id.clone(),
-                        resolved_config.service_name.clone(),
-                    )
-                }
-                None => {
-                    self.download_from_artifactory(tool_agent_id, &default_agent_path)
-                        .await?;
-                    (None, InstallationType::Standard, None, None)
-                }
-            };
+        let executable_path = self
+            .install_from_download_config(
+                &resolved_config,
+                tool_agent_id,
+                &tool_folder_path,
+                &default_agent_path,
+            )
+            .await?;
+        let installation_type = resolved_config.installation_type;
+        let bundle_id = resolved_config.bundle_id.clone();
+        let config_service_name = resolved_config.service_name.clone();
 
         let file_path = self.resolve_executable_path(
             tool_agent_id,
@@ -541,15 +525,6 @@ impl ToolInstallationService {
                         }
                     }
                     let asset_bytes = match asset.source {
-                        AssetSource::Artifactory => {
-                            info!("Downloading artifactory asset: {}", asset.id);
-                            self.tool_agent_file_client
-                                .get_tool_agent_file(asset.id.clone())
-                                .await
-                                .with_context(|| {
-                                    format!("Failed to download artifactory asset: {}", asset.id)
-                                })?
-                        }
                         AssetSource::ToolApi => {
                             let path = asset.path.as_deref().with_context(|| {
                                 format!("No uri path for tool {} asset {}", tool_agent_id, asset.id)
@@ -687,7 +662,6 @@ impl ToolInstallationService {
                 .command_params_resolver
                 .process(tool_agent_id, command_args)
                 .context("Failed to process installation command params")?;
-            debug!("Processed args: {:?}", installation_command_args);
 
             info!(
                 "Stopping any existing processes for {} before installation",
@@ -804,7 +778,7 @@ impl ToolInstallationService {
                 .process(tool_agent_id, installed_tool.run_command_args.clone())
                 .unwrap_or_else(|_| installed_tool.run_command_args.clone());
             // For openframe-chat, add --background flag to start in tray
-            if tool_agent_id == "openframe-chat" {
+            if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
                 launch_args.push("--background".to_string());
             }
             let command_path = self
@@ -965,23 +939,6 @@ impl ToolInstallationService {
                 .directory_manager
                 .get_tool_executable_path(tool_agent_id, executable_path),
         }
-    }
-
-    async fn download_from_artifactory(&self, tool_agent_id: &str, path: &Path) -> Result<()> {
-        if path.exists() {
-            info!("Agent already exists at {}, skipping", path.display());
-            return Ok(());
-        }
-        info!("Downloading from Artifactory: {}", tool_agent_id);
-        let bytes = self
-            .tool_agent_file_client
-            .get_tool_agent_file(tool_agent_id.to_string())
-            .await
-            .with_context(|| format!("Failed to download: {}", tool_agent_id))?;
-        File::create(path).await?.write_all(&bytes).await?;
-        self.set_executable_permissions(path).await?;
-        info!("Saved to {}", path.display());
-        Ok(())
     }
 
     #[allow(unused_variables)] // path used only by unix permission set
