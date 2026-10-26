@@ -10,7 +10,7 @@ import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
 
-// enabled is read by ReconciliationConfiguration's condition and poll-interval by @Scheduled (default 30s), not here.
+// poll-interval is read by @Scheduled on ReconciliationJob.runAll, not here (default 30s).
 @Data
 @Validated
 @ConfigurationProperties(prefix = "openframe.events.jobs.reconciliation")
