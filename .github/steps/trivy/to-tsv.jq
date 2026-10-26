@@ -1,5 +1,4 @@
 .Results[]? as $r
-| $r.Vulnerabilities[]?
-| [.Severity, .PkgName, .InstalledVersion, (.FixedVersion // "-"), .VulnerabilityID,
-   (if $src == "" then $r.Target else $src end)]
+| (($r.Vulnerabilities // [])[] | [.Severity, .PkgName, .InstalledVersion, (.FixedVersion // "-"), .VulnerabilityID, (.PkgPath // $r.Target)]),
+  (($r.Misconfigurations // [])[] | [.Severity, .Title, "-", "-", .ID, $r.Target])
 | @tsv
