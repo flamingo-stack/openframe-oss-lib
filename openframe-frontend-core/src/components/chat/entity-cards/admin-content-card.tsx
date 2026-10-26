@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { useImageEdgeColor } from '../../../hooks/ui/use-image-edge-color';
 import { MEDIA_ASPECT } from '../../../styles/component-sizes';
+import { IMAGE_SLOT } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import { PlatformBadge } from '../../features/platform-badge';
 import { InteractiveSkeleton, TextLineSkeleton, UnifiedSkeleton } from '../../loading/unified-skeleton';
@@ -114,7 +115,7 @@ export function AdminContentCard({
               src={displayUrl}
               alt={title}
               fill
-              sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
+              sizes={IMAGE_SLOT.card}
               className={cn(
                 'object-contain object-center',
                 'transition-transform duration-500 ease-out',

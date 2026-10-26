@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform, useMotionValue, useSpring } from 'fram
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 
 interface ParallaxImageShowcaseProps {
   images: {
@@ -142,7 +143,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 alt={leftImage.alt}
                 width={800}
                 height={500}
-                sizes="(max-width: 768px) 100vw, 33vw"
+                sizes={IMAGE_SLOT.card}
                 className="h-auto w-full object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -163,7 +164,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 alt={centerImage.alt}
                 width={800}
                 height={500}
-                sizes="(max-width: 768px) 100vw, 33vw"
+                sizes={IMAGE_SLOT.card}
                 className="h-auto w-full object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -184,7 +185,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 alt={rightImage.alt}
                 width={800}
                 height={500}
-                sizes="(max-width: 768px) 100vw, 33vw"
+                sizes={IMAGE_SLOT.card}
                 className="h-auto w-full object-contain"
                 style={shadow ? { boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)' } : {}}
               />
@@ -214,7 +215,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 src={leftImage.src}
                 alt={leftImage.alt}
                 fill
-                sizes="50vw"
+                sizes={IMAGE_SLOT.half}
                 className="ods-card/50 border border-ods-border object-cover object-[left_top]"
               />
               <div className="absolute inset-0 shadow-2xl" />
@@ -231,7 +232,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
                 src={centerImage.src}
                 alt={centerImage.alt}
                 fill
-                sizes="50vw"
+                sizes={IMAGE_SLOT.half}
                 className="ods-card/50 border border-ods-border object-cover object-[left_top]"
               />
               <div className="absolute inset-0 shadow-2xl" />
@@ -259,7 +260,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             src={rightImage.src}
             alt={rightImage.alt}
             fill
-            sizes="(max-width: 1024px) 80vw, 120vw"
+            sizes={IMAGE_SLOT.full}
             className="object-contain"
           />
         </motion.div>
@@ -279,7 +280,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             src={centerImage.src}
             alt={centerImage.alt}
             fill
-            sizes="(max-width: 1024px) 75vw, 100vw"
+            sizes={IMAGE_SLOT.full}
             className="object-contain"
           />
         </motion.div>
@@ -299,7 +300,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             src={leftImage.src}
             alt={leftImage.alt}
             fill
-            sizes="(max-width: 1024px) 85vw, 110vw"
+            sizes={IMAGE_SLOT.full}
             className="object-contain"
           />
         </motion.div>

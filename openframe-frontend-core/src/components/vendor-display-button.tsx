@@ -1,6 +1,7 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
+import { IMAGE_FIXED_PX } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
@@ -47,8 +48,8 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
             <Image
               src={logoSrc}
               alt={`${vendor.title} logo`}
-              width={20}
-              height={20}
+              width={IMAGE_FIXED_PX.glyph}
+              height={IMAGE_FIXED_PX.glyph}
               className="h-full w-full object-cover"
             />
           </div>
@@ -69,7 +70,7 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
     <Button variant="chip" data-tone="accent" onClick={handleClick} className={VENDOR_DISPLAY_BUTTON_LAYOUT_CLASS}>
       {logoUrl ? (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-card')}>
-          <Image src={logoSrc} alt={`${vendor.title} logo`} width={20} height={20} className="rounded object-cover" />
+          <Image src={logoSrc} alt={`${vendor.title} logo`} width={IMAGE_FIXED_PX.glyph} height={IMAGE_FIXED_PX.glyph} className="rounded object-cover" />
         </div>
       ) : (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-border')}>

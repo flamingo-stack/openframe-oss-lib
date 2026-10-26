@@ -4,6 +4,7 @@ import { AlertTriangle, Eye, Package, Sparkles, TrendingUp, Wrench } from 'lucid
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import {
   CONTENT_CARD_FRAME_CLASS,
@@ -271,7 +272,7 @@ function LoadedProductReleaseCard({
                   src={coverImage}
                   alt={title}
                   fill
-                  sizes="(max-width: 768px) 100vw, 256px"
+                  sizes={IMAGE_SLOT.panel}
                   className="object-cover"
                   unoptimized
                 />
@@ -479,7 +480,7 @@ function LoadedProductReleaseCard({
             actually supplied (matches the catalog variant's overlay rule). */}
         <span className="relative flex aspect-square h-14 w-14 shrink-0 items-center justify-center self-start overflow-hidden rounded-md bg-ods-bg text-ods-accent">
           {coverImage ? (
-            <Image src={coverImage} alt={title} fill sizes="56px" className="object-contain" unoptimized />
+            <Image src={coverImage} alt={title} fill sizes={fixedImageSlot('tile')} className="object-contain" unoptimized />
           ) : (
             <Package className="h-5 w-5" />
           )}

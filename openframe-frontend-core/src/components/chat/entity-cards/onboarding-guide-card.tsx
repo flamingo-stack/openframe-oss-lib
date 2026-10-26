@@ -45,6 +45,7 @@ import { EntityPortraitCard } from './entity-portrait-card';
 /** The content-type chip a portrait guide shows (a static label). */
 const GUIDE_TYPE_LABEL = 'Guide';
 import { MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -281,7 +282,7 @@ function LoadedOnboardingGuideCard({
                     src={coverImage}
                     alt={guide.title}
                     fill
-                    sizes="(max-width: 768px) 100vw, 256px"
+                    sizes={IMAGE_SLOT.panel}
                     className="object-cover"
                     unoptimized
                   />
@@ -351,7 +352,7 @@ function LoadedOnboardingGuideCard({
       >
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
-            <Image src={compactCover} alt={guide.title} fill sizes="56px" className="object-contain" unoptimized />
+            <Image src={compactCover} alt={guide.title} fill sizes={fixedImageSlot('tile')} className="object-contain" unoptimized />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-ods-accent">
               <GraduationCap className="h-4 w-4" />

@@ -11,6 +11,7 @@ import Image from '../../../embed-shims/next-image';
  */
 import Link from '../../../embed-shims/next-link';
 import { useAuthedImageSrc } from '../../../hooks/use-authed-image-src';
+import { IMAGE_SLOT } from '../../../styles/image-sizes';
 import type { ResolveLinkResult } from '../../../types/doc-source';
 import { cn } from '../../../utils/cn';
 import { slugifyHeadingText } from '../../../utils/markdown-heading-id';
@@ -87,7 +88,7 @@ const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, al
       alt={alt ?? 'No image available'}
       width={400}
       height={400}
-      sizes="(max-width: 400px) 100vw, 400px"
+      sizes={IMAGE_SLOT.panel}
       className="h-auto max-h-[400px] w-auto max-w-full rounded-lg object-contain"
       style={{ width: 'auto', height: 'auto' }}
     />

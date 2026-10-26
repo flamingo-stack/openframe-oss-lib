@@ -34,6 +34,7 @@ import type { ReactNode } from 'react';
 import { useRequiredChatRuntime } from '../../../contexts/chat-runtime-context';
 import Image from '../../../embed-shims/next-image';
 import { useRouter } from '../../../embed-shims/next-navigation';
+import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import type { DesignDoc } from '../../../types/design-doc';
 import {
   TRUST_CENTER_DOCUMENT_TYPE,
@@ -1260,7 +1261,7 @@ function RoadmapChatCard({
   ) : logoUrl ? (
     // Contained (not full-bleed) so the integration logo keeps its aspect
     // ratio inside the bordered icon box — matches RoadmapCard.
-    <Image src={logoUrl} alt="" className="size-6 object-contain" width={24} height={24} unoptimized />
+    <Image src={logoUrl} alt="" className="size-6 object-contain" width={IMAGE_FIXED_PX.glyph} height={IMAGE_FIXED_PX.glyph} unoptimized />
   ) : (
     defaultIcon
   );

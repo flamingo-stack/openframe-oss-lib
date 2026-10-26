@@ -7,6 +7,7 @@ import Link from '../../embed-shims/next-link';
 import { useImageEdgeColor } from '../../hooks';
 import { useOgPlaceholderUrl } from '../../hooks/use-og-placeholder-url';
 import { ICON_SIZE, MEDIA_ASPECT, TILE_SIZE } from '../../styles/component-sizes';
+import { IMAGE_FIXED_PX, IMAGE_SLOT } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { TextLineSkeleton, UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from '../ui/loading-scope';
@@ -162,8 +163,8 @@ const Favicon = ({ src, size = 'w-6 h-6' }: { src: string; size?: string }) => (
     src={src}
     alt=""
     className={size}
-    width={24}
-    height={24}
+    width={IMAGE_FIXED_PX.glyph}
+    height={IMAGE_FIXED_PX.glyph}
     unoptimized
     onError={e => {
       const img = e.target as HTMLImageElement;
@@ -573,7 +574,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     if (!resolvedImageUrl) return null;
     if (isPlaceholder) {
       return (
-        <Image src={resolvedImageUrl} alt={title} className="rounded-md object-cover" fill sizes="100vw" unoptimized />
+        <Image src={resolvedImageUrl} alt={title} className="rounded-md object-cover" fill sizes={IMAGE_SLOT.full} unoptimized />
       );
     }
     if (isCuratedImage) {
@@ -594,7 +595,7 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
         alt={title}
         className="rounded-md object-contain transition-transform duration-300 group-hover:scale-105"
         fill
-        sizes="100vw"
+        sizes={IMAGE_SLOT.full}
         unoptimized
         onError={handleImageError}
       />
@@ -711,8 +712,8 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
               src={logoSrc}
               alt={publicationName || ''}
               className={cn(DEFAULT_LOGO_CLASS, 'object-contain')}
-              width={24}
-              height={24}
+              width={IMAGE_FIXED_PX.glyph}
+              height={IMAGE_FIXED_PX.glyph}
               unoptimized
               onError={e => {
                 const img = e.target as HTMLImageElement;

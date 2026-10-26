@@ -1,6 +1,7 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
+import { IMAGE_FIXED_PX, type ImageFixedSize } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import { getVendorLogo, type VendorWithMedia } from '../utils/vendor-media-stub';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
@@ -31,28 +32,26 @@ const sizeClasses = {
   xl: 'w-16 h-16',
 };
 
-const imageSizeMap = {
-  xs: { width: 16, height: 16 },
-  sm: { width: 20, height: 20 },
-  md: { width: 32, height: 32 },
-  lg: { width: 40, height: 40 },
-  l: { width: 38, height: 38 },
-  xl: { width: 40, height: 40 },
-};
-
 /**
- * Tile px per size (the `sizeClasses` box). With `showBackground={false}`
- * the image FILLS the tile (`h-full w-full`), so it must be requested at the
- * tile's size: requesting the padded `imageSizeMap` size there served a
- * 32px bitmap stretched over a 40-64px tile, blurry on every display.
+ * The picture's box per size, from the image-size table. On a background the logo sits padded inside the tile; with
+ * `showBackground={false}` it FILLS the tile (`h-full w-full`), so it is requested at the tile's size: requesting the
+ * padded size there served a 32px bitmap stretched over a 40-64px tile, blurry on every display.
  */
-const tilePxMap = {
-  xs: 24,
-  sm: 32,
-  md: 40,
-  lg: 48,
-  l: 56,
-  xl: 64,
+const PADDED_PICTURE: Record<NonNullable<VendorIconProps['size']>, ImageFixedSize> = {
+  xs: 'icon',
+  sm: 'glyph',
+  md: 'logo',
+  lg: 'logoLg',
+  l: 'logoLg',
+  xl: 'logoLg',
+};
+const TILE_PICTURE: Record<NonNullable<VendorIconProps['size']>, ImageFixedSize> = {
+  xs: 'glyph',
+  sm: 'logo',
+  md: 'logoLg',
+  lg: 'tile',
+  l: 'tile',
+  xl: 'thumb',
 };
 
 const backgroundClasses = {
@@ -94,7 +93,7 @@ export function VendorIcon({
   const loading = useLoadingScope() || !!loadingProp;
   const logoUrl = getVendorLogo(vendor);
   const logoSrc = useProxiedImageUrl(logoUrl, { directHttps: false });
-  const { width, height } = showBackground ? imageSizeMap[size] : { width: tilePxMap[size], height: tilePxMap[size] };
+  const picturePx = IMAGE_FIXED_PX[(showBackground ? PADDED_PICTURE : TILE_PICTURE)[size]];
 
   const containerClasses = cn(
     sizeClasses[size],
@@ -114,8 +113,8 @@ export function VendorIcon({
         <Image
           src={logoSrc}
           alt={`${vendor.title} logo`}
-          width={width}
-          height={height}
+          width={picturePx}
+          height={picturePx}
           className={cn('object-contain', showBackground ? 'p-1' : 'h-full w-full')}
         />
       ) : (

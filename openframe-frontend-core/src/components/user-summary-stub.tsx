@@ -1,6 +1,7 @@
 'use client';
 
 import Image from '../embed-shims/next-image';
+import { AVATAR_SIZE_PX } from '../styles/component-sizes';
 import { useProxiedImageUrl } from './chat/hooks/use-proxied-image-url';
 
 /**
@@ -38,7 +39,7 @@ interface Props {
   } | null;
   /** Compact mode (avatar + name row, used in comment headers) */
   compact?: boolean;
-  /** Avatar size in px for compact mode (defaults 40) */
+  /** Avatar size in px for compact mode (defaults to the avatar scale's `md`) */
   avatarSize?: number;
 
   /** NOT IMPLEMENTED in the stub. Would swap the avatar for ProfilePhotoUpload. */
@@ -88,7 +89,7 @@ export function UserSummary({
   showEditButton = false,
   mspPreview,
   compact = false,
-  avatarSize = 40,
+  avatarSize = AVATAR_SIZE_PX.md,
 }: Props) {
   const avatarSrc = useProxiedImageUrl(avatarUrl, { directHttps: false });
   const mspLogoSrc = useProxiedImageUrl(mspPreview?.logoUrl, { directHttps: false });
@@ -121,8 +122,8 @@ export function UserSummary({
             <Image
               src={mspLogoSrc}
               alt={mspPreview.name || 'MSP'}
-              width={24}
-              height={24}
+              width={AVATAR_SIZE_PX.xs}
+              height={AVATAR_SIZE_PX.xs}
               className="absolute -bottom-1 -right-1 z-10 size-6 select-none rounded-full object-cover"
             />
           )}
@@ -155,7 +156,7 @@ export function UserSummary({
         {/* Avatar with badge wrapper */}
         <div className="relative h-24 w-24 shrink-0 overflow-visible">
           {avatarUrl ? (
-            <Image src={avatarSrc} alt={name} width={96} height={96} className="rounded-full object-cover" />
+            <Image src={avatarSrc} alt={name} width={AVATAR_SIZE_PX.profile} height={AVATAR_SIZE_PX.profile} className="rounded-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center rounded-full border border-ods-border bg-ods-card font-heading text-3xl text-ods-text-secondary">
               {name.charAt(0).toUpperCase()}
@@ -169,8 +170,8 @@ export function UserSummary({
                 <Image
                   src={mspLogoSrc}
                   alt={mspPreview.name || 'MSP Logo'}
-                  width={40}
-                  height={40}
+                  width={AVATAR_SIZE_PX.md}
+                  height={AVATAR_SIZE_PX.md}
                   className="object-cover"
                 />
               ) : (

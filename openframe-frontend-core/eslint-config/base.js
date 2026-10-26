@@ -7,6 +7,7 @@ import tseslint from 'typescript-eslint';
 
 import { boxedPrimitivesPlugin } from './boxed-primitives.js';
 import { ignores } from './ignores.js';
+import { imageSizesPlugin } from './image-sizes.js';
 import { layoutVariantsPlugin } from './layout-variants.js';
 import { popupPortalPlugin } from './popup-portal.js';
 import { reExportsPlugin } from './re-exports.js';
@@ -18,6 +19,7 @@ export const flamingoPlugin = {
   rules: {
     ...webviewPerformancePlugin.rules,
     ...layoutVariantsPlugin.rules,
+    ...imageSizesPlugin.rules,
     ...boxedPrimitivesPlugin.rules,
     ...popupPortalPlugin.rules,
     ...reExportsPlugin.rules,

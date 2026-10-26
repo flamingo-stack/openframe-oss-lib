@@ -8,6 +8,7 @@
 
 import type React from 'react';
 import Image from '../../embed-shims/next-image';
+import { fixedImageSlot } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { nameInitials } from '../../utils/format';
 import { getOSLabel } from '../../utils/os-utils';
@@ -74,7 +75,7 @@ function InfoCell({ label, value, avatar, className }: InfoCellProps) {
       {avatar && (
         <div className="relative size-8 shrink-0 overflow-hidden rounded-full border border-ods-border bg-ods-bg">
           {avatar.photoUrl ? (
-            <Image src={avatar.photoUrl} alt={avatar.name} className="object-cover" fill sizes="32px" unoptimized />
+            <Image src={avatar.photoUrl} alt={avatar.name} className="object-cover" fill sizes={fixedImageSlot('logo')} unoptimized />
           ) : (
             <div className="flex size-full items-center justify-center text-ods-text-secondary text-h6">
               {avatar.initials || nameInitials(avatar.name)}
