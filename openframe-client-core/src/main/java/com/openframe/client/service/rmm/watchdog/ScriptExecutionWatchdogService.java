@@ -50,7 +50,8 @@ public class ScriptExecutionWatchdogService {
     private List<ScriptExecution> findStuckRunning(Instant now) {
         long coarseFloorSeconds = Math.min(graceSeconds, fallbackThresholdSeconds);
         return scriptExecutionRepository
-                .findByStatusAndDispatchedAtBefore(ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds))
+                .findByStatusAndDispatchedAtBeforeAndPackageUpdateRequestIdIsNull(
+                        ExecutionStatus.RUNNING, now.minusSeconds(coarseFloorSeconds))
                 .stream()
                 .filter(row -> isStuck(row, now))
                 .toList();
