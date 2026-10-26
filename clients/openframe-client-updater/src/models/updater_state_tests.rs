@@ -13,11 +13,8 @@ fn phase_serde_strings_match_client_probe_contract() {
         (UpdaterPhase::ReplacingBinary, "replacing_binary"),
         (UpdaterPhase::StartingService, "starting_service"),
         (UpdaterPhase::VerifyingBoot, "verifying_boot"),
-        (UpdaterPhase::Observing, "observing"),
         (UpdaterPhase::Completed, "completed"),
         (UpdaterPhase::Failed, "failed"),
-        (UpdaterPhase::RollingBack, "rolling_back"),
-        (UpdaterPhase::RolledBack, "rolled_back"),
     ];
     for (phase, s) in expected {
         assert_eq!(serde_json::to_string(&phase).unwrap(), format!("\"{}\"", s));
@@ -28,12 +25,8 @@ fn phase_serde_strings_match_client_probe_contract() {
 }
 
 #[test]
-fn only_completed_failed_and_rolled_back_are_terminal() {
-    let terminal = [
-        UpdaterPhase::Completed,
-        UpdaterPhase::Failed,
-        UpdaterPhase::RolledBack,
-    ];
+fn only_completed_and_failed_are_terminal() {
+    let terminal = [UpdaterPhase::Completed, UpdaterPhase::Failed];
     let non_terminal = [
         UpdaterPhase::Idle,
         UpdaterPhase::Downloading,
@@ -42,8 +35,6 @@ fn only_completed_failed_and_rolled_back_are_terminal() {
         UpdaterPhase::ReplacingBinary,
         UpdaterPhase::StartingService,
         UpdaterPhase::VerifyingBoot,
-        UpdaterPhase::Observing,
-        UpdaterPhase::RollingBack,
     ];
     for phase in terminal {
         let mut state = UpdaterState::new("1.0.0".to_string());

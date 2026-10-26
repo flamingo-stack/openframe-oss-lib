@@ -158,14 +158,6 @@ impl LastKnownGoodService {
         }
     }
 
-    /// Last modification time of the boot marker. Each client boot rewrites the
-    /// marker, so an mtime change during observation means the client restarted.
-    pub fn boot_marker_mtime(&self) -> Option<std::time::SystemTime> {
-        fs::metadata(&self.boot_marker_path)
-            .and_then(|m| m.modified())
-            .ok()
-    }
-
     /// Remove the boot marker so the next marker observed is from the new binary.
     pub fn clear_boot_marker(&self) -> Result<()> {
         if self.boot_marker_path.exists() {

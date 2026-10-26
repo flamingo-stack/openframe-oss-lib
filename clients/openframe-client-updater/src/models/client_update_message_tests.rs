@@ -20,17 +20,3 @@ fn deserializes_backend_camel_case() {
         "openframe-client.exe"
     );
 }
-
-#[test]
-fn rollback_defaults_to_false_when_absent() {
-    let json = r#"{"version": "1.0.0", "downloadConfigurations": []}"#;
-    let msg: ClientUpdateMessage = serde_json::from_str(json).unwrap();
-    assert!(!msg.rollback);
-}
-
-#[test]
-fn rollback_true_is_parsed() {
-    let json = r#"{"version": "1.0.0", "downloadConfigurations": [], "rollback": true}"#;
-    let msg: ClientUpdateMessage = serde_json::from_str(json).unwrap();
-    assert!(msg.rollback);
-}

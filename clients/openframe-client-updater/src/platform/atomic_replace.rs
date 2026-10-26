@@ -47,30 +47,6 @@ pub fn restore(backup: &Path, target: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Restores `source` to `target` by copy, leaving `source` in place.
-/// Used for the last-known-good reserve, which must survive the rollback.
-/// The copy lands in a synced temp sibling first, so a partial copy can never
-/// replace the target.
-pub fn restore_copy(source: &Path, target: &Path) -> Result<()> {
-    let bytes =
-        std::fs::read(source).with_context(|| format!("Failed to read {}", source.display()))?;
-    let temp_path = write_temp(&bytes, target)?;
-
-    if let Err(e) = rename_with_retry(&temp_path, target) {
-        let _ = std::fs::remove_file(&temp_path);
-        return Err(e).with_context(|| {
-            format!(
-                "Failed to restore {} to {}",
-                source.display(),
-                target.display()
-            )
-        });
-    }
-
-    info!("Restored reserve copy to: {}", target.display());
-    Ok(())
-}
-
 /// Writes bytes to a temp file in the same directory as `target` (same filesystem → atomic rename).
 pub fn write_temp(bytes: &[u8], target: &Path) -> Result<PathBuf> {
     let dir = target

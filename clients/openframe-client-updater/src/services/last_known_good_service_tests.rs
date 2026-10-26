@@ -95,14 +95,6 @@ fn boot_marker_version_trims_and_rejects_empty() {
 }
 
 #[test]
-fn boot_marker_mtime_tracks_the_file() {
-    let s = setup();
-    assert!(s.svc.boot_marker_mtime().is_none());
-    fs::write(s.secured.join("boot.marker"), b"1.0.0").unwrap();
-    assert!(s.svc.boot_marker_mtime().is_some());
-}
-
-#[test]
 fn clear_boot_marker_removes_and_tolerates_absence() {
     let s = setup();
     s.svc.clear_boot_marker().unwrap();

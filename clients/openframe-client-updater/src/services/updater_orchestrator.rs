@@ -234,7 +234,7 @@ impl UpdaterOrchestrator {
 
             UpdaterPhase::StoppingService | UpdaterPhase::ReplacingBinary => {
                 let report = self
-                    .restore_and_start(&state.backup_path, &target, version, lkg_service, false)
+                    .restore_and_start(&state.backup_path, &target, version)
                     .await;
                 state_service.clear()?;
                 Some(report)
@@ -246,9 +246,7 @@ impl UpdaterOrchestrator {
             // proves a *past* boot though — promotion additionally requires the
             // service to be running now (started here if needed). A state query
             // that keeps failing is "unknown", never grounds for a rollback.
-            UpdaterPhase::StartingService
-            | UpdaterPhase::VerifyingBoot
-            | UpdaterPhase::Observing => {
+            UpdaterPhase::StartingService | UpdaterPhase::VerifyingBoot => {
                 if ServiceManagerService::query_running(CLIENT_SERVICE_FULL_NAME).await
                     != Some(true)
                 {
@@ -265,7 +263,7 @@ impl UpdaterOrchestrator {
                     lkg_service.boot_marker_version().as_deref() == Some(version.as_str());
                 if !verified {
                     // Give the (possibly just-started) binary one marker window
-                    // before rolling back.
+                    // before restoring the backup.
                     let mut elapsed = 0u64;
                     while elapsed < BOOT_MARKER_WAIT_SECS {
                         if lkg_service.boot_marker_version().as_deref() == Some(version.as_str()) {
@@ -300,33 +298,17 @@ impl UpdaterOrchestrator {
                     }
                 } else {
                     warn!(
-                        "Crash recovery: not healthy (marker verified: {}, running: {:?}) — rolling back",
+                        "Crash recovery: not healthy (marker verified: {}, running: {:?}) — restoring the previous binary",
                         verified, running
                     );
-                    self.restore_and_start(&state.backup_path, &target, version, lkg_service, true)
+                    self.restore_and_start(&state.backup_path, &target, version)
                         .await
                 };
                 state_service.clear()?;
                 Some(report)
             }
 
-            // An interrupted rollback is NOT terminal (see `UpdaterState::is_terminal`):
-            // `rollback()` holds this phase across a service stop, up to six restore
-            // attempts and a boot-marker wait, so a reboot here would otherwise clear
-            // the state — losing the recorded backup path — and leave the client
-            // stopped on whatever binary the rollback had reached. Finish the rollback
-            // instead. The backup is preferred over the reserve: it is the pre-swap
-            // binary, so it cannot be the version that just failed.
-            UpdaterPhase::RollingBack => {
-                info!("Crash recovery: resuming an interrupted rollback of {version}");
-                let report = self
-                    .restore_and_start(&state.backup_path, &target, version, lkg_service, false)
-                    .await;
-                state_service.clear()?;
-                Some(report)
-            }
-
-            UpdaterPhase::Completed | UpdaterPhase::Failed | UpdaterPhase::RolledBack => {
+            UpdaterPhase::Completed | UpdaterPhase::Failed => {
                 info!("Crash recovery: clearing terminal state ({})", state.phase);
                 state_service.clear()?;
                 None
@@ -341,104 +323,61 @@ impl UpdaterOrchestrator {
         backup_path: &Option<String>,
         target: &Path,
         version: &str,
-        lkg_service: &LastKnownGoodService,
-        prefer_reserve: bool,
     ) -> RecoveryReport {
-        let backup = backup_path
+        let Some(backup) = backup_path
             .as_ref()
             .map(PathBuf::from)
-            .filter(|p| p.exists());
-        let reserve = lkg_service.reserve_path().to_path_buf();
-        let reserve = reserve.exists().then_some(reserve);
-
-        // Restore sources in preference order. The reserve is copied (it must
-        // survive), the backup is renamed (consumed). After a failed boot the
-        // reserve is the stronger choice — it verified; the backup merely ran.
-        // Before the swap the backup is authoritative, and the reserve is only
-        // a last resort when the client binary itself is gone.
-        let mut candidates: Vec<(PathBuf, bool)> = Vec::new();
-        if prefer_reserve {
-            if let Some(r) = &reserve {
-                candidates.push((r.clone(), true));
-            }
-            if let Some(b) = &backup {
-                candidates.push((b.clone(), false));
-            }
-        } else {
-            if let Some(b) = &backup {
-                candidates.push((b.clone(), false));
-            }
-            if !target.exists() {
-                if let Some(r) = &reserve {
-                    candidates.push((r.clone(), true));
-                }
-            }
-        }
-
-        if candidates.is_empty() {
+            .filter(|p| p.exists())
+        else {
             if target.exists() {
-                info!("Crash recovery: client binary intact — ensuring service is running");
+                info!("Crash recovery: no backup left to restore — starting the client binary in place");
                 if let Err(e) = ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await {
                     error!("Crash recovery: failed to start service: {}", e);
                 }
                 return RecoveryReport::Failure {
                     phase: UpdaterPhase::Failed,
                     version: version.to_string(),
-                    reason: "Updater crashed mid-update; client binary untouched".to_string(),
+                    reason: "Updater crashed mid-update; client binary left in place".to_string(),
                     rolled_back: false,
                 };
             }
             return RecoveryReport::Failure {
                 phase: UpdaterPhase::Failed,
                 version: version.to_string(),
-                reason: "Updater crashed mid-update, no backup or reserve available".to_string(),
+                reason: "Updater crashed mid-update, no client binary and no backup available"
+                    .to_string(),
                 rolled_back: false,
             };
-        }
+        };
 
-        let mut restored = false;
-        for (source, is_reserve) in &candidates {
-            let (source_owned, target_owned, is_reserve) =
-                (source.clone(), target.to_path_buf(), *is_reserve);
-            let result = run_blocking(move || {
-                if is_reserve {
-                    atomic_replace::restore_copy(&source_owned, &target_owned)
-                } else {
-                    atomic_replace::restore(&source_owned, &target_owned)
-                }
-            })
-            .await;
-            match result {
-                Ok(()) => {
-                    info!(
-                        "Crash recovery: restored client binary from {}",
-                        source.display()
-                    );
-                    restored = true;
-                    break;
-                }
-                Err(e) => error!(
-                    "Crash recovery: restore from {} failed: {:#}",
-                    source.display(),
-                    e
-                ),
-            }
-        }
-
-        if !restored {
+        let restored = {
+            let (backup, target) = (backup.clone(), target.to_path_buf());
+            run_blocking(move || atomic_replace::restore(&backup, &target)).await
+        };
+        if let Err(e) = restored {
+            error!(
+                "Crash recovery: restore from {} failed: {:#}",
+                backup.display(),
+                e
+            );
             return RecoveryReport::Failure {
                 phase: UpdaterPhase::Failed,
                 version: version.to_string(),
-                reason: "Updater crashed mid-update and all restore attempts failed".to_string(),
+                reason: "Updater crashed mid-update and restoring the previous binary failed"
+                    .to_string(),
                 rolled_back: false,
             };
         }
+        info!(
+            "Crash recovery: restored client binary from {}",
+            backup.display()
+        );
 
         if let Err(e) = ServiceManagerService::start_async(CLIENT_SERVICE_FULL_NAME).await {
             error!("Crash recovery: failed to start restored service: {}", e);
         }
         RecoveryReport::Failure {
-            phase: UpdaterPhase::RolledBack,
+            phase: UpdaterPhase::Failed,
             version: version.to_string(),
             reason: "Updater crashed mid-update, previous binary restored".to_string(),
             rolled_back: true,

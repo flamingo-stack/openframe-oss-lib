@@ -17,7 +17,7 @@ pub const CLIENT_UPDATE_STREAM: &str = "CLIENT_UPDATE";
 /// Must comfortably exceed a normal update's time-to-ACK, i.e. DOWNLOAD_TOTAL_BUDGET_SECS
 /// plus tool-op quiesce wait, service stop, swap, start settle and boot-marker wait
 /// (roughly 360 + 60 + 30 + 10 + 3 + 90 = 553s). At 120s the same message was
-/// redelivered mid-update and killed the observation window right after boot.
+/// redelivered mid-update.
 pub const CLIENT_UPDATE_ACK_WAIT_SECS: u64 = 600;
 pub const CLIENT_UPDATE_MAX_DELIVER: i64 = 10;
 pub const RECONNECTION_DELAY_MS: u64 = 5000;
@@ -58,21 +58,10 @@ pub const BOOT_MARKER_POLL_INTERVAL_SECS: u64 = 2;
 pub const SERVICE_START_SETTLE_SECS: u64 = 3;
 /// Refuse update messages below the LKG anchor (flip to force a downgrade).
 pub const ALLOW_DOWNGRADE: bool = false;
-/// Attempts to restore a binary during rollback (file may be briefly locked).
-pub const ROLLBACK_RESTORE_ATTEMPTS: u32 = 3;
-/// Delay between rollback restore attempts.
-pub const ROLLBACK_RESTORE_RETRY_DELAY_SECS: u64 = 2;
-
-// Post-boot observation — automatic rollback when the new client degrades
-// after a verified boot (stops running, crash-loops). The anchor is promoted
-// only after the window passes, so a backend-pushed downgrade is never blocked
-// by a bad version that slipped past the boot check.
-/// How long to watch the new client after its boot marker verified.
-pub const POST_BOOT_OBSERVATION_SECS: u64 = 600;
-/// Poll interval during the observation window.
-pub const POST_BOOT_POLL_INTERVAL_SECS: u64 = 10;
-/// Client restarts (boot-marker rewrites) tolerated inside the window.
-pub const OBSERVATION_MAX_CLIENT_RESTARTS: u32 = 3;
+/// Attempts to put the pre-swap backup back after a failed swap (file may be briefly locked).
+pub const BACKUP_RESTORE_ATTEMPTS: u32 = 3;
+/// Delay between backup restore attempts.
+pub const BACKUP_RESTORE_RETRY_DELAY_SECS: u64 = 2;
 
 // Atomic binary replace: retries with backoff on Windows file locking
 pub const REPLACE_MAX_RETRIES: u32 = 10;

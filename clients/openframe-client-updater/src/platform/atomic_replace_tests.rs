@@ -97,24 +97,3 @@ fn restore_consumes_the_backup() {
     assert_eq!(read(&target), b"good");
     assert!(!backup.exists());
 }
-
-#[test]
-fn restore_copy_preserves_the_source() {
-    let dir = tempfile::tempdir().unwrap();
-    let target = dir.path().join("openframe-client");
-    let reserve = dir.path().join("openframe-client.lkg");
-    std::fs::write(&target, b"broken").unwrap();
-    std::fs::write(&reserve, b"known-good").unwrap();
-
-    restore_copy(&reserve, &target).unwrap();
-
-    assert_eq!(read(&target), b"known-good");
-    assert_eq!(read(&reserve), b"known-good", "reserve must survive");
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mode = std::fs::metadata(&target).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o755, "restored binary must be executable");
-    }
-}
