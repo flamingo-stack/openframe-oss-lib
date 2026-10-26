@@ -65,6 +65,7 @@ public class ReconciliationRunner {
         List<Mismatch> mismatches = confirm(projection, suspects);
         logMismatches(projection, mismatches);
         republishSources(projection, job, mismatches);
+        applyMissedDeletes(projection, mismatches);
 
         T lastItem = projectedItems.getLast();
         String batchLastId = itemRepository.resolveId(lastItem);
@@ -90,9 +91,11 @@ public class ReconciliationRunner {
     }
 
     // The repair: the sources' current state is published again, and the projection re-applies it, as the version store applies
-    // an equal version. A source that is gone has nothing to publish. The run still counts the mismatches it found.
+    // an equal version. A source that is gone has nothing to publish (see applyMissedDeletes). The run still counts the
+    // mismatches it found.
     private void republishSources(Projection<?, ?> projection, EventJob job, List<Mismatch> mismatches) {
         List<String> mismatchedSourceIds = mismatches.stream()
+                .filter(mismatch -> !mismatch.isSourceGone())
                 .map(Mismatch::getSourceId)
                 .filter(Objects::nonNull)
                 .distinct()
@@ -104,6 +107,21 @@ public class ReconciliationRunner {
         String type = specRegistry.resolveType(projection);
         publishedAggregates.publishCurrent(type, sourceIds);
         log.info("Reconciliation of {} published {} {} source(s) again to repair them", projection.name(), sourceIds.size(), type);
+    }
+
+    // A confirmed mismatch whose source is gone: its delete event was lost, so the projection's delete is applied now.
+    private void applyMissedDeletes(Projection<?, ?> projection, List<Mismatch> mismatches) {
+        List<Mismatch> goneSources = mismatches.stream()
+                .filter(Mismatch::isSourceGone)
+                .toList();
+        for (Mismatch goneSource : goneSources) {
+            String tenantId = goneSource.getTenantId();
+            String sourceId = goneSource.getSourceId();
+            projection.applyDelete(tenantId, sourceId);
+        }
+        if (!goneSources.isEmpty()) {
+            log.info("Reconciliation of {} applied the missed delete of {} source(s)", projection.name(), goneSources.size());
+        }
     }
 
     private List<String> keepNotRepublished(Projection<?, ?> projection, EventJob job, List<String> sourceIds) {

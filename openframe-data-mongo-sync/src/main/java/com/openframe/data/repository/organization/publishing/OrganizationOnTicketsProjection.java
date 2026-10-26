@@ -88,7 +88,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         Map<TenantScopedId, Organization> organizations = findOrganizations(withOrganization);
 
         List<Mismatch> mismatches = withOrganization.stream()
-            .map(ticket -> mismatchOf(ticket, organizations))
+            .map(ticket -> toMismatch(ticket, organizations))
             .filter(Objects::nonNull)
             .toList();
         return new ReconciliationResult(mismatches);
@@ -114,14 +114,15 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         return new TenantScopedId(tenantId, organizationId);
     }
 
-    private static Mismatch mismatchOf(TicketOrganizationView ticket, Map<TenantScopedId, Organization> organizations) {
+    private static Mismatch toMismatch(TicketOrganizationView ticket, Map<TenantScopedId, Organization> organizations) {
         String tenantId = ticket.getTenantId();
         String organizationId = ticket.getOrganizationId();
         String ticketId = ticket.getId();
         TenantScopedId key = new TenantScopedId(tenantId, organizationId);
         Organization organization = organizations.get(key);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
         if (organization == null) {
-            return new Mismatch(tenantId, ticketId, null, "organization " + organizationId + " is gone");
+            return null;
         }
         String sourceName = organization.getName();
         String copiedName = ticket.getOrganizationName();

@@ -45,7 +45,7 @@ class OrganizationOnTicketsProjectionTest {
     }
 
     @Test
-    void aTicketWithAnOldName_andATicketWhoseOrganizationIsGone_areMismatches() {
+    void aTicketWithAnOldName_isAMismatch_butATicketWhoseOrganizationIsGoneKeepsItsCopy() {
         // setup
         when(organizationRepository.findByTenantIdInAndOrganizationIdIn(Set.of("tenant-a"), Set.of("org-1", "org-gone")))
                 .thenReturn(List.of(organization("tenant-a", "org-1", "New name")));
@@ -56,11 +56,10 @@ class OrganizationOnTicketsProjectionTest {
                 ticket("t2", "tenant-a", "org-gone", "Gone")));
 
         // verifications
-        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t1", "t2");
-        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-org-1", null);
+        assertThat(result.getMismatches()).extracting(Mismatch::getProjectedItemId).containsExactly("t1");
+        assertThat(result.getMismatches()).extracting(Mismatch::getSourceId).containsExactly("doc-org-1");
         assertThat(result.getMismatches()).extracting(Mismatch::getTenantId).containsOnly("tenant-a");
         assertThat(result.getMismatches().get(0).getReason()).contains("Old name").contains("New name");
-        assertThat(result.getMismatches().get(1).getReason()).contains("org-gone").contains("gone");
     }
 
     @Test
