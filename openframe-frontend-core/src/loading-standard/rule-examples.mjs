@@ -231,7 +231,7 @@ export function L({ loading }: { loading: boolean }) { return loading ? <Wait />
     },
     pass: {
       'components/su.tsx':
-        'export function Su() { return <LoadingSuspense label="Loading X" fallback={<XView x={null} />}><X /></LoadingSuspense>; }\n',
+        'function XReader() { return <X />; }\nexport function Su() { return <LoadingSuspense label="Loading X"><XReader /></LoadingSuspense>; }\n',
     },
   },
   {
@@ -244,7 +244,7 @@ export function L({ loading }: { loading: boolean }) { return loading ? <Wait />
       'components/raw.tsx': `export function Raw() {
   return (
     <>
-      <LoadingSuspense label="Loading X" fallback={<XView x={null} />}><X /></LoadingSuspense>
+      <X />
       {/* loading-standard-ok(SUSPENSE_FALLBACK): structured data for crawlers, nothing is drawn */}
       <Suspense fallback={null}><StructuredData /></Suspense>
     </>
@@ -275,11 +275,43 @@ export function L({ loading }: { loading: boolean }) { return loading ? <Wait />
   return (
     <>
       <DevicesHeading />
+      <DevicesTable />
+    </>
+  );
+}
+`,
+    },
+  },
+  {
+    rule: 'BOUNDARY_OWNER',
+    fail: {
+      'components/devices-view.tsx': `import { DevicesTable } from './devices-table';
+export function DevicesView() {
+  return (
+    <div>
+      <DevicesHeading />
       <LoadingSuspense label="Loading the devices">
         <DevicesTable />
       </LoadingSuspense>
-    </>
+    </div>
   );
+}
+`,
+      'components/run-view.tsx':
+        'function RunReader() { return <Run />; }\nexport function RunView() { return <LoadingSuspense label="Loading the run" fallback={<RunSkeleton />}><RunReader /></LoadingSuspense>; }\n',
+    },
+    pass: {
+      'components/devices-table.tsx': `/** The table, with its own boundary: in the scope the reader draws its own rows. */
+export function DevicesTable(props: { search: string }) {
+  return (
+    <LoadingSuspense label="Loading the devices">
+      <DevicesTableReader {...props} />
+    </LoadingSuspense>
+  );
+}
+function DevicesTableReader({ search }: { search: string }) {
+  const loading = useLoadingScope();
+  return <Table rows={loading ? [] : useDevices(search)} loading={loading} />;
 }
 `,
     },

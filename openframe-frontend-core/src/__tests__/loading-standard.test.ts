@@ -182,7 +182,13 @@ describe('loading-standard engine: the hub config and a host boundary', () => {
   });
 
   it('runs only the boundary rules on the hub', () => {
-    expect(CONFIGS.hub.rules.sort()).toEqual(['HAND_PAIR', 'PAGE_BOUNDARY', 'RAW_SUSPENSE', 'SUSPENSE_FALLBACK']);
+    expect(CONFIGS.hub.rules.sort()).toEqual([
+      'BOUNDARY_OWNER',
+      'HAND_PAIR',
+      'PAGE_BOUNDARY',
+      'RAW_SUSPENSE',
+      'SUSPENSE_FALLBACK',
+    ]);
   });
 });
 
