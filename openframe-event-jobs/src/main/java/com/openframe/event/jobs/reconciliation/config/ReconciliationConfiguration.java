@@ -11,33 +11,37 @@ import com.openframe.event.jobs.reconciliation.service.ReconciliationMetrics;
 import com.openframe.event.jobs.reconciliation.service.ReconciliationRunner;
 import com.openframe.event.jobs.reconciliation.service.ReconciliationService;
 import com.openframe.publishing.api.spec.Projection;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.registry.PublishedAggregates;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 
-// Its own switch inside the module; it reconciles every projection of the service's aggregate specs.
+// It reconciles the projections of the types switched on in this service.
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBooleanProperty(name = "openframe.events.jobs.reconciliation.enabled")
 @Import(ProjectedItemRepository.class)
 public class ReconciliationConfiguration {
 
     @Bean
-    public ReconciliationMetrics reconciliationMetrics(MeterRegistry meterRegistry, AggregateSpecRegistry specRegistry) {
-        List<Projection<?, ?>> projections = specRegistry.projections();
+    public ReconciliationMetrics reconciliationMetrics(MeterRegistry meterRegistry, AggregateSpecRegistry specRegistry,
+                                                       PublishedAggregateTopics publishedTopics) {
+        List<Projection<?, ?>> projections = projectionsOfEnabledTypes(specRegistry, publishedTopics);
         return new ReconciliationMetrics(meterRegistry, projections);
     }
 
     @Bean
     public ReconciliationRunner reconciliationRunner(ReconciliationProperties properties, ProjectedItemRepository itemRepository,
                                                      EventJobService jobService, EventJobTicker<EventJob> ticker,
-                                                     ReconciliationMetrics metrics) {
-        return new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics);
+                                                     ReconciliationMetrics metrics, AggregateSpecRegistry specRegistry,
+                                                     PublishedAggregates publishedAggregates) {
+        return new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics, specRegistry,
+                publishedAggregates);
     }
 
     @Bean
@@ -49,8 +53,22 @@ public class ReconciliationConfiguration {
 
     @Bean
     public ReconciliationJob reconciliationJob(ReconciliationProperties properties, AggregateSpecRegistry specRegistry,
-                                               EventJobLock jobLock, ReconciliationService reconciliationService) {
-        List<Projection<?, ?>> projections = specRegistry.projections();
+                                               PublishedAggregateTopics publishedTopics, EventJobLock jobLock,
+                                               ReconciliationService reconciliationService) {
+        List<Projection<?, ?>> projections = projectionsOfEnabledTypes(specRegistry, publishedTopics);
         return new ReconciliationJob(properties, projections, jobLock, reconciliationService);
+    }
+
+    // A type switched off has no running projections: its copies are still the aspects', so they are not checked.
+    private static List<Projection<?, ?>> projectionsOfEnabledTypes(AggregateSpecRegistry specRegistry,
+                                                                    PublishedAggregateTopics publishedTopics) {
+        List<Projection<?, ?>> projections = new ArrayList<>();
+        for (String type : specRegistry.types()) {
+            if (publishedTopics.isPublishing(type)) {
+                List<? extends Projection<?, ?>> typeProjections = specRegistry.specOf(type).projections();
+                projections.addAll(typeProjections);
+            }
+        }
+        return projections;
     }
 }

@@ -12,6 +12,8 @@ import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.api.spec.PublishedEvent;
+import com.openframe.publishing.registry.AggregateSpecRegistry;
+import com.openframe.publishing.registry.PublishedAggregates;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -27,10 +29,13 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,6 +49,8 @@ class ReconciliationRunnerTest {
     private final ProjectedItemRepository itemRepository = mock(ProjectedItemRepository.class);
     private final EventJobRepository jobRepository = mock(EventJobRepository.class);
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+    private final AggregateSpecRegistry specRegistry = mock(AggregateSpecRegistry.class);
+    private final PublishedAggregates publishedAggregates = mock(PublishedAggregates.class);
     @SuppressWarnings("unchecked")
     private final Projection<PublishedEvent, Item> projection = mock(Projection.class);
 
@@ -59,12 +66,14 @@ class ReconciliationRunnerTest {
         when(projection.reconcile(any())).thenReturn(ReconciliationResult.allMatch());
         when(jobRepository.save(any(EventJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(itemRepository.collectionExists(ItemDocument.class)).thenReturn(true);
-        when(itemRepository.idOf(any())).thenAnswer(invocation -> invocation.<Item>getArgument(0).getId());
+        when(itemRepository.resolveId(any())).thenAnswer(invocation -> invocation.<Item>getArgument(0).getId());
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         EventJobService jobService = new EventJobService(jobRepository, clock);
         EventJobTicker<EventJob> ticker = new EventJobTicker<>(jobService, new EventJobShutdown(), clock);
         ReconciliationMetrics metrics = new ReconciliationMetrics(meterRegistry, List.of(projection));
-        runner = new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics);
+        when(specRegistry.resolveType(projection)).thenReturn("organizations");
+        runner = new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics, specRegistry,
+                publishedAggregates);
     }
 
     @Test
@@ -86,6 +95,88 @@ class ReconciliationRunnerTest {
         assertThat(done.getStatus()).isEqualTo(EventJobStatus.DONE);
         assertThat(done.getProcessed()).isEqualTo(3);
         assertThat(done.getLastMismatches()).isEqualTo(1);
+        verify(publishedAggregates).publishCurrent("organizations", List.of("org-of-t3"));
+    }
+
+    @Test
+    void theSourcesOfTheConfirmedMismatches_arePublishedAgain_eachOnce() {
+        // setup
+        List<Item> batch = List.of(new Item("t1"), new Item("t2"));
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(batch);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t2", 3)).thenReturn(List.of());
+        ReconciliationResult sameSource = result(new Mismatch("tenant-a", "t1", "org-1", "name differs"),
+                new Mismatch("tenant-a", "t2", "org-1", "name differs"));
+        when(projection.reconcile(batch)).thenReturn(sameSource);
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1", "t2"))).thenReturn(batch);
+
+        // execution
+        runner.checkBatches(projection, running(null));
+
+        // verifications
+        verify(publishedAggregates).publishCurrent("organizations", List.of("org-1"));
+        assertThat(lastSaved().getLastMismatches()).isEqualTo(2);
+    }
+
+    @Test
+    void aSourceWhoseItemsSpanManyBatches_isPublishedAgainOncePerRun() {
+        // setup
+        List<Item> first = List.of(new Item("t1"), new Item("t2"), new Item("t3"));
+        List<Item> second = List.of(new Item("t4"), new Item("t5"));
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(first);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t3", 3)).thenReturn(second);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t5", 3)).thenReturn(List.of());
+        when(projection.reconcile(first)).thenReturn(result(new Mismatch("tenant-a", "t1", "org-1", "name differs")));
+        when(projection.reconcile(second)).thenReturn(result(new Mismatch("tenant-a", "t4", "org-1", "name differs"),
+                new Mismatch("tenant-a", "t5", "org-2", "name differs")));
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1"))).thenReturn(first);
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t4", "t5"))).thenReturn(second);
+
+        // execution
+        runner.checkBatches(projection, running(null));
+
+        // verifications
+        verify(publishedAggregates).publishCurrent("organizations", List.of("org-1"));
+        verify(publishedAggregates).publishCurrent("organizations", List.of("org-2"));
+        assertThat(lastSaved().getLastMismatches()).isEqualTo(3);
+    }
+
+    @Test
+    void aNewRun_publishesTheSourceAgain_evenAfterAFailedRunThatPublishedIt() {
+        // setup
+        List<Item> batch = List.of(new Item("t1"), new Item("t2"), new Item("t3"));
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(batch);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t3", 3))
+                .thenThrow(new IllegalStateException("bad query"))
+                .thenReturn(List.of());
+        when(projection.reconcile(batch)).thenReturn(result(new Mismatch("tenant-a", "t1", "org-1", "name differs")));
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1"))).thenReturn(batch);
+        EventJob failing = running(null, "run-1");
+        failing.setFailures(2);
+
+        // execution
+        runner.checkBatches(projection, failing);
+        runner.checkBatches(projection, running(null, "run-2"));
+
+        // verifications
+        verify(publishedAggregates, times(2)).publishCurrent("organizations", List.of("org-1"));
+    }
+
+    @Test
+    void aMismatchWhoseSourceIsGone_isReported_butNothingIsPublished() {
+        // setup
+        List<Item> batch = List.of(new Item("t1"));
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(batch);
+        when(itemRepository.findAfter(ItemDocument.class, Item.class, "t1", 3)).thenReturn(List.of());
+        ReconciliationResult gone = result(Mismatch.buildForGoneSource("tenant-a", "t1", "org-9", "organization org-9 is gone"));
+        when(projection.reconcile(batch)).thenReturn(gone);
+        when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1"))).thenReturn(batch);
+
+        // execution
+        runner.checkBatches(projection, running(null));
+
+        // verifications
+        assertThat(lastSaved().getLastMismatches()).isEqualTo(1);
+        verify(publishedAggregates, never()).publishCurrent(anyString(), anyCollection());
     }
 
     @Test
@@ -100,6 +191,7 @@ class ReconciliationRunnerTest {
         // verifications
         assertThat(lastSaved().getLastMismatches()).isZero();
         verify(itemRepository, never()).findByIds(any(), any(), any());
+        verify(publishedAggregates, never()).publishCurrent(anyString(), anyCollection());
     }
 
     @Test
@@ -152,7 +244,11 @@ class ReconciliationRunnerTest {
     }
 
     private static EventJob running(String lastId) {
-        EventJob job = EventJob.neverRun(JOB).startRun("run-1", NOW);
+        return running(lastId, "run-1");
+    }
+
+    private static EventJob running(String lastId, String runId) {
+        EventJob job = EventJob.neverRun(JOB).startRun(runId, NOW);
         job.setLastId(lastId);
         return job;
     }
@@ -162,7 +258,7 @@ class ReconciliationRunnerTest {
     }
 
     private static Mismatch mismatch(String itemId) {
-        return new Mismatch("tenant-a", itemId, "name differs");
+        return new Mismatch("tenant-a", itemId, "org-of-" + itemId, "name differs");
     }
 
     // The document whose collection holds the items.

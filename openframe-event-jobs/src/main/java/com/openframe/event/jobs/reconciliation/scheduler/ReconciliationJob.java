@@ -11,7 +11,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.time.Duration;
 import java.util.List;
 
-// Reconciles every projection with its source and reports the projected items that differ; it repairs nothing.
+// Reconciles each projection it is given with its source and reports the projected items that differ; it repairs nothing.
 @Slf4j
 @RequiredArgsConstructor
 public class ReconciliationJob {
