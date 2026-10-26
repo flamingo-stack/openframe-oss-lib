@@ -7,6 +7,7 @@ import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import com.openframe.data.repository.user.publishing.UserAggregateSpec;
 import com.openframe.data.repository.user.publishing.UserOnTicketsProjection;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.config.OutboxIndexAutoConfiguration;
 import com.openframe.publishing.persistence.OutboxEvent;
@@ -129,7 +130,7 @@ class UserPublishingIT {
 
     // Only what a service gets from these modules: not @EnableAutoConfiguration, which would also load MongoSyncConfig.
     @SpringBootConfiguration
-    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class,
+    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class,
             OutboxAutoConfiguration.class, OutboxIndexAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = {UserRepository.class, AuthUserRepository.class})
     @Import({UserAggregateSpec.class, UserOnTicketsProjection.class, TicketProjectionRepository.class})

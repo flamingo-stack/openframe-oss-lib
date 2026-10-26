@@ -2,7 +2,7 @@ package com.openframe.publishing.registry;
 
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
-import com.openframe.publishing.config.EventsConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.PublishedAggregateStartupCheck;
 import com.openframe.publishing.fixture.Widgets.UnversionedWidgetSpec;
 import com.openframe.publishing.fixture.Widgets.Widget;
@@ -26,7 +26,7 @@ class AggregateSpecRegistryTest {
     @Test
     void aContextWithoutAnySpec_starts() {
         new ApplicationContextRunner()
-                .withUserConfiguration(EventsConfiguration.class, AggregateSpecRegistry.class,
+                .withUserConfiguration(EventsAutoConfiguration.class, AggregateSpecRegistry.class,
                         PublishedAggregateStartupCheck.class)
                 .run(context -> assertThat(context).hasNotFailed());
     }

@@ -10,6 +10,7 @@ import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.spec.AggregateSpec;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -246,7 +247,7 @@ class EventProcessingKafkaIT {
     @SpringBootConfiguration
     @ImportAutoConfiguration({PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
             EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class, EventTopicsAutoConfiguration.class,
-            AggregateSpecAutoConfiguration.class})
+            AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class})
     static class TestApplication {
 
         @Bean

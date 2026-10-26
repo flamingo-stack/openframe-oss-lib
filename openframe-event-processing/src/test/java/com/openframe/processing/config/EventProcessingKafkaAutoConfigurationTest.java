@@ -5,6 +5,7 @@ import com.openframe.processing.exception.MongoUnavailableException;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
@@ -39,7 +40,7 @@ class EventProcessingKafkaAutoConfigurationTest {
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                     EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-            .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+            .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
             .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
             .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
             .withPropertyValues("openframe.events.enabled=true",
@@ -107,7 +108,7 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
                 .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
@@ -145,7 +146,7 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class, KafkaAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
                 .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
@@ -167,7 +168,7 @@ class EventProcessingKafkaAutoConfigurationTest {
         new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(PropertyPlaceholderAutoConfiguration.class,
                         EventProcessingAutoConfiguration.class, EventProcessingKafkaAutoConfiguration.class))
-                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class))
+                .withConfiguration(AutoConfigurations.of(AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class))
                 .withPropertyValues("spring.data.mongodb.enabled=true", "openframe.events.topics.organizations.enabled=true")
                 .withBean(WidgetSpec.class, EventProcessingKafkaAutoConfigurationTest::widgetSpec)
                 .withPropertyValues("openframe.events.enabled=true",
