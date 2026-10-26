@@ -97,6 +97,43 @@ class DeliveryPropertiesTest {
         assertThat(resolved.getOfflineBehavior()).isEqualTo(DeliveryOfflineBehavior.SKIP);
     }
     @Test
+    void resolve_typeOverridesMaxRuns_rerunsBoundedByItAndTheDefaultIsOneRun() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setMaxRuns(3);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.hasRunsLeft(0)).isTrue();
+        assertThat(resolved.hasRunsLeft(1)).isTrue();
+        assertThat(resolved.hasRunsLeft(2)).isFalse();
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(10_800L);
+        assertThat(other.getMaxRuns()).isEqualTo(1);
+        assertThat(other.hasRunsLeft(0)).isFalse();
+    }
+
+    @Test
+    void resolve_typeOverridesRerunAfterSeconds_overrideWinsAndTheRestStaysDefault() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setRerunAfterSeconds(120L);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(120L);
+        assertThat(resolved.getMaxRuns()).isEqualTo(DeliveryTestPolicies.SINGLE_RUN);
+        assertThat(other.getRerunAfterSeconds()).isEqualTo(DeliveryTestPolicies.RERUN_AFTER);
+    }
+
+    @Test
     void fastTypes_noTypeAskingForTheFastPass_empty() {
         // setup
         properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
