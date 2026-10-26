@@ -13,10 +13,12 @@ public class PublishedAggregateTopics {
 
     public PublishedAggregateTopics(EventsProperties properties) {
         Map<String, EventsProperties.Topic> topics = properties.getTopics();
-        this.publishing = topics.entrySet().stream()
-                .filter(entry -> entry.getValue().isPublish())
+        Set<String> enabledTypes = topics.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
                 .map(Map.Entry::getKey)
                 .collect(toUnmodifiableSet());
+        // A type counts only with the feature on, so an aspect never stops while nothing is published.
+        this.publishing = properties.isEnabled() ? enabledTypes : Set.of();
     }
 
     public boolean isPublishing(String type) {

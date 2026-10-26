@@ -16,36 +16,37 @@ class PublishedAggregateConfigurationTest {
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(EventsConfiguration.class, AggregateSpecRegistry.class,
-                    PublishedAggregateStartupCheck.class, PublishedAggregateTopics.class);
+                    PublishedAggregateStartupCheck.class, PublishedAggregateTopics.class)
+            .withPropertyValues("openframe.events.enabled=true");
 
     @Test
-    void aMistypedTopicKeyWithPublishOn_stopsTheServiceFromStarting() {
+    void aMistypedTopicKeySwitchedOn_stopsTheServiceFromStarting() {
         runner.withBean(WidgetSpec.class)
-                .withPropertyValues("openframe.events.topics.organisations.publish=true")
+                .withPropertyValues("openframe.events.topics.organisations.enabled=true")
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().hasMessageContaining("[organisations]").hasMessageContaining("[organizations]"));
     }
 
     @Test
-    void aMistypedTopicKeyWithPublishOff_logsAWarn_butStarts_soARolledBackImageStillRuns(CapturedOutput output) {
+    void aMistypedTopicKeySwitchedOff_logsAWarn_butStarts_soARolledBackImageStillRuns(CapturedOutput output) {
         runner.withBean(WidgetSpec.class)
-                .withPropertyValues("openframe.events.topics.organisations.publish=false")
+                .withPropertyValues("openframe.events.topics.organisations.enabled=false")
                 .run(context -> assertThat(context).hasNotFailed());
 
         assertThat(output).contains("WARN").contains("openframe.events.topics names [organisations]");
     }
 
     @Test
-    void publishOnForATypeWithoutASpec_stopsTheServiceFromStarting() {
-        runner.withPropertyValues("openframe.events.topics.organizations.publish=true")
+    void aTypeSwitchedOnWithoutASpec_stopsTheServiceFromStarting() {
+        runner.withPropertyValues("openframe.events.topics.organizations.enabled=true")
                 .run(context -> assertThat(context).hasFailed()
                         .getFailure().hasMessageContaining("organizations"));
     }
 
     @Test
-    void publishOnForATypeWithASpec_starts() {
+    void aTypeSwitchedOnWithASpec_isPublishing() {
         runner.withBean(WidgetSpec.class)
-                .withPropertyValues("openframe.events.topics.organizations.publish=true")
+                .withPropertyValues("openframe.events.topics.organizations.enabled=true")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
@@ -54,9 +55,9 @@ class PublishedAggregateConfigurationTest {
     }
 
     @Test
-    void publishOff_orNotConfigured_isNotPublishing() {
+    void aTypeSwitchedOff_orNotConfigured_isNotPublishing() {
         runner.withBean(WidgetSpec.class)
-                .withPropertyValues("openframe.events.topics.organizations.publish=false")
+                .withPropertyValues("openframe.events.topics.organizations.enabled=false")
                 .run(context -> {
                     PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
                     assertThat(topics.isPublishing("organizations")).isFalse();
@@ -68,12 +69,22 @@ class PublishedAggregateConfigurationTest {
     }
 
     @Test
-    void thePublishFlags_areCopiedAtStartup_soARebindOfThePropertiesDoesNotChangeThem() {
+    void aTypeSwitchedOn_withTheFeatureOff_isNotPublishing_soTheAspectsKeepRunning() {
         runner.withBean(WidgetSpec.class)
-                .withPropertyValues("openframe.events.topics.organizations.publish=false")
+                .withPropertyValues("openframe.events.enabled=false", "openframe.events.topics.organizations.enabled=true")
+                .run(context -> {
+                    PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
+                    assertThat(topics.isPublishing("organizations")).isFalse();
+                });
+    }
+
+    @Test
+    void theTypeSwitches_areCopiedAtStartup_soARebindOfThePropertiesDoesNotChangeThem() {
+        runner.withBean(WidgetSpec.class)
+                .withPropertyValues("openframe.events.topics.organizations.enabled=false")
                 .run(context -> {
                     EventsProperties properties = context.getBean(EventsProperties.class);
-                    properties.getTopics().get("organizations").setPublish(true);
+                    properties.getTopics().get("organizations").setEnabled(true);
 
                     PublishedAggregateTopics topics = context.getBean(PublishedAggregateTopics.class);
                     assertThat(topics.isPublishing("organizations")).isFalse();
