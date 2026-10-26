@@ -49,7 +49,7 @@ const TILE_PICTURE: Record<NonNullable<VendorIconProps['size']>, ImageFixedSize>
   xs: 'glyph',
   sm: 'logo',
   md: 'logoLg',
-  lg: 'tile',
+  lg: 'logoXl',
   l: 'tile',
   xl: 'thumb',
 };

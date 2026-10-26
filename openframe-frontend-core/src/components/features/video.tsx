@@ -118,7 +118,15 @@ const PosterBox = forwardRef<
       style={fill ? { width: '100%', height: '100%' } : undefined}
     >
       {poster ? (
-        <Image src={poster} alt="" fill sizes={IMAGE_SLOT.full} priority={priority} unoptimized className="object-cover" />
+        <Image
+          src={poster}
+          alt=""
+          fill
+          sizes={IMAGE_SLOT.full}
+          priority={priority}
+          unoptimized
+          className="object-cover"
+        />
       ) : null}
     </div>
   );

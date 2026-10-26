@@ -88,7 +88,7 @@ const MarkdownContentImage: React.FC<{ src: string; alt?: string }> = ({ src, al
       alt={alt ?? 'No image available'}
       width={400}
       height={400}
-      sizes={IMAGE_SLOT.panel}
+      sizes={IMAGE_SLOT.inline}
       className="h-auto max-h-[400px] w-auto max-w-full rounded-lg object-contain"
       style={{ width: 'auto', height: 'auto' }}
     />

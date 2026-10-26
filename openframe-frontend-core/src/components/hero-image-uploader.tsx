@@ -173,7 +173,14 @@ export function HeroImageUploader({
           className="group relative flex aspect-square h-auto w-full items-center justify-center overflow-hidden md:aspect-auto md:h-full"
           style={{ height: heightStyle }}
         >
-          <Image src={imageUrl} className={`object-${objectFit}`} alt="Cover" fill sizes={IMAGE_SLOT.full} unoptimized />
+          <Image
+            src={imageUrl}
+            className={`object-${objectFit}`}
+            alt="Cover"
+            fill
+            sizes={IMAGE_SLOT.full}
+            unoptimized
+          />
           <div className="absolute inset-0 flex items-center justify-center gap-4 rounded-lg bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
             {showReplaceButton && (
               <Button

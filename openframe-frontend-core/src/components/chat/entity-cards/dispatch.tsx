@@ -1261,7 +1261,14 @@ function RoadmapChatCard({
   ) : logoUrl ? (
     // Contained (not full-bleed) so the integration logo keeps its aspect
     // ratio inside the bordered icon box — matches RoadmapCard.
-    <Image src={logoUrl} alt="" className="size-6 object-contain" width={IMAGE_FIXED_PX.glyph} height={IMAGE_FIXED_PX.glyph} unoptimized />
+    <Image
+      src={logoUrl}
+      alt=""
+      className="size-6 object-contain"
+      width={IMAGE_FIXED_PX.glyph}
+      height={IMAGE_FIXED_PX.glyph}
+      unoptimized
+    />
   ) : (
     defaultIcon
   );

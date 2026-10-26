@@ -256,13 +256,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             rotate: rotate,
           }}
         >
-          <Image
-            src={rightImage.src}
-            alt={rightImage.alt}
-            fill
-            sizes={IMAGE_SLOT.full}
-            className="object-contain"
-          />
+          <Image src={rightImage.src} alt={rightImage.alt} fill sizes={IMAGE_SLOT.full} className="object-contain" />
         </motion.div>
       )}
 
@@ -276,13 +270,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             rotate: rotate,
           }}
         >
-          <Image
-            src={centerImage.src}
-            alt={centerImage.alt}
-            fill
-            sizes={IMAGE_SLOT.full}
-            className="object-contain"
-          />
+          <Image src={centerImage.src} alt={centerImage.alt} fill sizes={IMAGE_SLOT.full} className="object-contain" />
         </motion.div>
       )}
 
@@ -296,13 +284,7 @@ export const ParallaxImageShowcase: React.FC<ParallaxImageShowcaseProps> = ({
             rotate: rotate,
           }}
         >
-          <Image
-            src={leftImage.src}
-            alt={leftImage.alt}
-            fill
-            sizes={IMAGE_SLOT.full}
-            className="object-contain"
-          />
+          <Image src={leftImage.src} alt={leftImage.alt} fill sizes={IMAGE_SLOT.full} className="object-contain" />
         </motion.div>
       )}
     </div>

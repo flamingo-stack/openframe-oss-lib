@@ -52,6 +52,10 @@ export const IMAGE_SLOT = {
   wall: '(min-width: 1024px) 25vw, 50vw',
   /** A fixed column up to 400 px (a side panel, a preview). */
   panel: '(max-width: 768px) 100vw, 400px',
+  /** A picture in running text, up to 400 px (a markdown image), the whole width only on the narrowest phones. */
+  inline: '(max-width: 400px) 100vw, 400px',
+  /** A cover beside text, up to 256 px (a release card's cover), the whole width on a phone. */
+  aside: '(max-width: 768px) 100vw, 256px',
   /** A wide column up to 768 px (a modal's media, a reading column). */
   column: '(max-width: 768px) 100vw, 768px',
 } as const;
@@ -67,6 +71,7 @@ export const IMAGE_FIXED_PX = {
   glyph: 20,
   logo: 32,
   logoLg: 40,
+  logoXl: 48,
   tile: 56,
   thumb: 64,
   mark: 96,

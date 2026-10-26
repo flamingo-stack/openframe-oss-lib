@@ -70,7 +70,13 @@ export function VendorDisplayButton({ vendor, onClick, variant = 'default', exte
     <Button variant="chip" data-tone="accent" onClick={handleClick} className={VENDOR_DISPLAY_BUTTON_LAYOUT_CLASS}>
       {logoUrl ? (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-card')}>
-          <Image src={logoSrc} alt={`${vendor.title} logo`} width={IMAGE_FIXED_PX.glyph} height={IMAGE_FIXED_PX.glyph} className="rounded object-cover" />
+          <Image
+            src={logoSrc}
+            alt={`${vendor.title} logo`}
+            width={IMAGE_FIXED_PX.glyph}
+            height={IMAGE_FIXED_PX.glyph}
+            className="rounded object-cover"
+          />
         </div>
       ) : (
         <div className={cn(VENDOR_DISPLAY_BUTTON_LOGO_CLASS, 'border border-ods-border bg-ods-border')}>

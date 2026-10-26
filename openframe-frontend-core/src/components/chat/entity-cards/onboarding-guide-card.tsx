@@ -352,7 +352,14 @@ function LoadedOnboardingGuideCard({
       >
         <span className={COMPACT_CARD_IMAGE_SLOT}>
           {compactCover ? (
-            <Image src={compactCover} alt={guide.title} fill sizes={fixedImageSlot('tile')} className="object-contain" unoptimized />
+            <Image
+              src={compactCover}
+              alt={guide.title}
+              fill
+              sizes={fixedImageSlot('tile')}
+              className="object-contain"
+              unoptimized
+            />
           ) : (
             <span className="flex h-full w-full items-center justify-center text-ods-accent">
               <GraduationCap className="h-4 w-4" />

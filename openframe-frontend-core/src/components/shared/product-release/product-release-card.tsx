@@ -272,7 +272,7 @@ function LoadedProductReleaseCard({
                   src={coverImage}
                   alt={title}
                   fill
-                  sizes={IMAGE_SLOT.panel}
+                  sizes={IMAGE_SLOT.aside}
                   className="object-cover"
                   unoptimized
                 />
@@ -480,7 +480,14 @@ function LoadedProductReleaseCard({
             actually supplied (matches the catalog variant's overlay rule). */}
         <span className="relative flex aspect-square h-14 w-14 shrink-0 items-center justify-center self-start overflow-hidden rounded-md bg-ods-bg text-ods-accent">
           {coverImage ? (
-            <Image src={coverImage} alt={title} fill sizes={fixedImageSlot('tile')} className="object-contain" unoptimized />
+            <Image
+              src={coverImage}
+              alt={title}
+              fill
+              sizes={fixedImageSlot('tile')}
+              className="object-contain"
+              unoptimized
+            />
           ) : (
             <Package className="h-5 w-5" />
           )}

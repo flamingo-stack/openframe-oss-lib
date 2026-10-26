@@ -156,7 +156,13 @@ export function UserSummary({
         {/* Avatar with badge wrapper */}
         <div className="relative h-24 w-24 shrink-0 overflow-visible">
           {avatarUrl ? (
-            <Image src={avatarSrc} alt={name} width={AVATAR_SIZE_PX.profile} height={AVATAR_SIZE_PX.profile} className="rounded-full object-cover" />
+            <Image
+              src={avatarSrc}
+              alt={name}
+              width={AVATAR_SIZE_PX.profile}
+              height={AVATAR_SIZE_PX.profile}
+              className="rounded-full object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center rounded-full border border-ods-border bg-ods-card font-heading text-3xl text-ods-text-secondary">
               {name.charAt(0).toUpperCase()}

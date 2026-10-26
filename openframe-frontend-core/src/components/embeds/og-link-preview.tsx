@@ -574,7 +574,14 @@ export const OGLinkPreview: React.FC<OGLinkPreviewProps> = ({
     if (!resolvedImageUrl) return null;
     if (isPlaceholder) {
       return (
-        <Image src={resolvedImageUrl} alt={title} className="rounded-md object-cover" fill sizes={IMAGE_SLOT.full} unoptimized />
+        <Image
+          src={resolvedImageUrl}
+          alt={title}
+          className="rounded-md object-cover"
+          fill
+          sizes={IMAGE_SLOT.full}
+          unoptimized
+        />
       );
     }
     if (isCuratedImage) {

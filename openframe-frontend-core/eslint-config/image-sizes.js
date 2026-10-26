@@ -8,9 +8,15 @@
 /** The per-component maps the table replaced; declaring one again is a second table. */
 const RETIRED_MAPS = new Set([
   // the lib's
-  'PHOTO_WIDTH_STEPS_PX', 'imageSizeMap', 'tilePxMap', 'MARK_IMAGE_SIZES',
+  'PHOTO_WIDTH_STEPS_PX',
+  'imageSizeMap',
+  'tilePxMap',
+  'MARK_IMAGE_SIZES',
   // a host's (the hub turns this rule on too)
-  'IMAGE_PRESETS', 'PROGRAM_COVER_SIZES', 'HERO_WALL_SIZES', 'PERSON_PHOTO_PX',
+  'IMAGE_PRESETS',
+  'PROGRAM_COVER_SIZES',
+  'HERO_WALL_SIZES',
+  'PERSON_PHOTO_PX',
 ]);
 
 /** A string the attribute states outright: `"..."`, `{'...'}` or a template with no expressions. */

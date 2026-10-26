@@ -440,7 +440,15 @@ function ProgramEditorialCard({
       <ContentCardFrame as="a" href={href} target={target} rel={rel} className={cn(EDITORIAL_ROW_GRID, className)}>
         <span className={cn(EDITORIAL_ROW_THUMB, 'bg-ods-bg')}>
           {cover && (
-            <Image src={cover} alt="" fill sizes={fixedImageSlot('feature')} className="object-cover" priority={priority} unoptimized />
+            <Image
+              src={cover}
+              alt=""
+              fill
+              sizes={fixedImageSlot('feature')}
+              className="object-cover"
+              priority={priority}
+              unoptimized
+            />
           )}
           {playable && cover && <CardHoverPlay size="md" />}
         </span>
