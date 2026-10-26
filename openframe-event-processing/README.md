@@ -33,7 +33,7 @@ events.organizations ──> PublishedTypeListener             one per spec type
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
-- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L27) runs each projection on its own, in name order: a
+- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L29) runs each projection on its own, in name order: a
   failed projection does not stop the others.
 - Versions: before a projection runs, the runner reads the version it last stored for that projection, tenant and
   aggregate in `event_projection_versions`. An older event is skipped; an equal or newer one is applied (so a backfill, which
@@ -69,8 +69,7 @@ openframe:
           initial-interval: 1s
           multiplier: 2
           max-interval: 30s
-        topics:                         # needs enabled: true too; see Topics
-          create: false                 # default; creates every published type's topic and DLT at startup
+        topics:                         # see Topics
           events:                       # used only when a topic is created
             partitions: 1
             replication-factor: 2
@@ -94,7 +93,7 @@ openframe:
 ## Topics
 
 With `openframe.events.enabled: true`,
-[`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L31) creates
+[`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L32) creates
 `<topic-prefix><type>` and `<topic-prefix><type>-dlt` at startup, before the listeners start, for every spec whose
 `openframe.events.topics.<type>.enabled` is on in this service's own config: a type switched off gets no topic and no
 listener. The rollout switches a type on in the stream before the tenant services, so its topics exist before the
@@ -146,7 +145,7 @@ registered from the spec at startup.
 
 | What fails | What happens |
 |---|---|
-| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L24), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
+| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L15), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
 | A projection: any other exception, a write conflict too, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The other projections still run. The record then goes to `<topic>-dlt` once. |
 | An unreadable value, or a `schemaVersion` newer than this build | The record goes to `<topic>-dlt` without reaching a projection. |
 
@@ -215,6 +214,6 @@ logging:
 mvn test -pl openframe-event-processing -am -Dintegration.tests=true
 ```
 
-[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L76) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
+[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L78) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
 its topics, and checks the whole listener path, the retry and the DLT.
-[`EventTopicCreatorIT`](src/test/java/com/openframe/processing/topic/EventTopicCreatorIT.java#L41) checks the created topics' settings and that an existing topic is left alone.
+[`EventTopicCreatorIT`](src/test/java/com/openframe/processing/topic/EventTopicCreatorIT.java#L44) checks the created topics' settings and that an existing topic is left alone.
