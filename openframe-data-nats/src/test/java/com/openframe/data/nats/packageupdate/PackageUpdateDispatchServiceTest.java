@@ -97,7 +97,7 @@ class PackageUpdateDispatchServiceTest {
         verify(deliveryDispatcher, times(2)).dispatch(seed.capture());
         PackageUpdateDeliverySeed s1 = seed.getAllValues().get(0);
         assertThat(s1.getRequestId()).isEqualTo(requestId);
-        assertThat(s1.getMode()).isEqualTo(UpdateMode.WAIT);
+        assertThat(s1.getMode()).isEqualTo(PackageUpdateMode.WAIT);
         assertThat(s1.getCountdownSeconds()).isNull();                       // WAIT carries no countdown
         assertThat(s1.getSource().getKind()).isEqualTo(UpdateSource.Kind.MANUAL);
         assertThat(s1.getSource().getOrigin()).isEqualTo(UpdateSource.Origin.ADMIN);
@@ -188,7 +188,7 @@ class PackageUpdateDispatchServiceTest {
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
         verify(deliveryDispatcher).dispatch(seed.capture());
         PackageUpdateDeliverySeed s = seed.getValue();
-        assertThat(s.getMode()).isEqualTo(UpdateMode.FORCE);
+        assertThat(s.getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(s.getCountdownSeconds()).isEqualTo(120);
         assertThat(s.getSource().getKind()).isEqualTo(UpdateSource.Kind.AUTO);
         assertThat(s.getSource().getOrigin()).isNull();                      // AUTO carries no origin

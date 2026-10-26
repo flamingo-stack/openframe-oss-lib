@@ -7,7 +7,6 @@ import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
-import com.openframe.data.nats.packageupdate.UpdateMode;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import com.openframe.delivery.dispatch.DeliveryDispatcher;
@@ -78,7 +77,7 @@ class PackageUpdateClockServiceTest {
 
         ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
         verify(deliveryDispatcher).dispatch(seed.capture());
-        assertThat(seed.getValue().getMode()).isEqualTo(UpdateMode.FORCE);
+        assertThat(seed.getValue().getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(seed.getValue().getCountdownSeconds()).isEqualTo(300);
         assertThat(seed.getValue().getMachineId()).isEqualTo("m1");
 

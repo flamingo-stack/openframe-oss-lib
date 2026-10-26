@@ -1,5 +1,7 @@
 package com.openframe.data.nats.packageupdate;
 
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
+
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
@@ -26,7 +28,7 @@ class PackageUpdateWireFormatTest {
                 .kind(UpdateSource.Kind.MANUAL).origin(UpdateSource.Origin.ADMIN).build());
         order.setPackageRef(PackageReference.builder()
                 .manager(PackageManagerType.WINGET).id("Google.Chrome").build());
-        order.setMode(UpdateMode.FORCE);
+        order.setMode(PackageUpdateMode.FORCE);
         order.setCountdownSeconds(300);
 
         JsonNode json = mapper.readTree(mapper.writeValueAsString(order));
@@ -52,7 +54,7 @@ class PackageUpdateWireFormatTest {
         order.setSource(UpdateSource.builder().kind(UpdateSource.Kind.AUTO).build());
         order.setPackageRef(PackageReference.builder()
                 .manager(PackageManagerType.BREW).kind(BrewPackageType.CASK).name("postman").build());
-        order.setMode(UpdateMode.WAIT);
+        order.setMode(PackageUpdateMode.WAIT);
 
         JsonNode json = mapper.readTree(mapper.writeValueAsString(order));
 

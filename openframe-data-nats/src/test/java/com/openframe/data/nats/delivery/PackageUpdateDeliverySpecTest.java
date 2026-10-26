@@ -4,7 +4,7 @@ import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.nats.packageupdate.PackageReference;
 import com.openframe.data.nats.packageupdate.PackageUpdateMessage;
-import com.openframe.data.nats.packageupdate.UpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.nats.packageupdate.UpdateSource;
 import com.openframe.delivery.spec.DeliveryRequest;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class PackageUpdateDeliverySpecTest {
                         .kind(UpdateSource.Kind.MANUAL).origin(UpdateSource.Origin.ADMIN).build())
                 .packageRef(PackageReference.builder()
                         .manager(PackageManagerType.WINGET).id("Google.Chrome").build())
-                .mode(UpdateMode.FORCE)
+                .mode(PackageUpdateMode.FORCE)
                 .countdownSeconds(300)
                 .build();
 
@@ -43,7 +43,7 @@ class PackageUpdateDeliverySpecTest {
         assertThat(request.getMachineId()).isEqualTo("m-1");
         PackageUpdateMessage payload = request.getPayload();
         assertThat(payload.getRequestId()).isEqualTo("req-1");
-        assertThat(payload.getMode()).isEqualTo(UpdateMode.FORCE);
+        assertThat(payload.getMode()).isEqualTo(PackageUpdateMode.FORCE);
         assertThat(payload.getCountdownSeconds()).isEqualTo(300);
         assertThat(payload.getSource().getKind()).isEqualTo(UpdateSource.Kind.MANUAL);
         assertThat(payload.getPackageRef().getId()).isEqualTo("Google.Chrome");

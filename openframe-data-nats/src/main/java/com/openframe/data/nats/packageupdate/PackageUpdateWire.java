@@ -18,10 +18,6 @@ public class PackageUpdateWire {
         };
     }
 
-    public UpdateMode mode(PackageUpdateMode mode) {
-        return mode == PackageUpdateMode.FORCE ? UpdateMode.FORCE : UpdateMode.WAIT;
-    }
-
     public PackageReference reference(PackageManagerType manager, String packageName, BrewPackageType brewPackageType) {
         PackageReference.PackageReferenceBuilder ref = PackageReference.builder().manager(manager);
         if (manager == PackageManagerType.BREW) {
@@ -33,14 +29,13 @@ public class PackageUpdateWire {
     public PackageUpdateDeliverySeed seed(String machineId, String requestId, PackageUpdateSource source,
                                           PackageManagerType manager, String packageName, BrewPackageType brewPackageType,
                                           PackageUpdateMode mode, Integer forceCountdownSeconds) {
-        UpdateMode wireMode = mode(mode);
         return PackageUpdateDeliverySeed.builder()
                 .machineId(machineId)
                 .requestId(requestId)
                 .source(source(source))
                 .packageRef(reference(manager, packageName, brewPackageType))
-                .mode(wireMode)
-                .countdownSeconds(wireMode == UpdateMode.FORCE ? forceCountdownSeconds : null)
+                .mode(mode)
+                .countdownSeconds(mode == PackageUpdateMode.FORCE ? forceCountdownSeconds : null)
                 .build();
     }
 }

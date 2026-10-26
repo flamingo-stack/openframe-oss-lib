@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.openframe.delivery.spec.DeliveryPayload;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,7 +24,7 @@ public class PackageUpdateMessage implements DeliveryPayload {
     @JsonProperty("package")
     private PackageReference packageRef;
 
-    private UpdateMode mode;
+    private PackageUpdateMode mode;
 
     private Integer countdownSeconds;
 }
