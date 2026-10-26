@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { LoadingSuspense } from '../loading-fallback';
 
@@ -51,5 +51,64 @@ describe('LoadingSuspense', () => {
       </LoadingSuspense>,
     );
     expect(screen.getByTestId('bar')).toBeTruthy();
+  });
+
+  it('live: draws the wait in a bare scope (no inert region), announced once, with a plain control still usable', () => {
+    const never = new Promise<void>(() => {});
+    const Reader = () => {
+      throw never;
+    };
+    render(
+      <LoadingSuspense
+        live
+        label="Loading the run"
+        fallback={
+          <>
+            <Value read={() => 'unused'} />
+            <button type="button">Back</button>
+          </>
+        }
+      >
+        <Reader />
+      </LoadingSuspense>,
+    );
+    expect(screen.getByTestId('bar')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('Loading the run');
+    // An inert region is hidden from the accessibility tree, so a reachable button proves the wait is live.
+    expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
+  });
+
+  it('gated: draws the waiting view and never renders the reader until the gate opens', () => {
+    const rendered = vi.fn();
+    const Reader = () => {
+      rendered();
+      return <span>read</span>;
+    };
+    const view = <Value read={() => 'unused'} />;
+    const { rerender } = render(
+      <LoadingSuspense gated label="Loading usage" fallback={view}>
+        <Reader />
+      </LoadingSuspense>,
+    );
+    expect(screen.getByTestId('bar')).toBeTruthy();
+    expect(rendered).not.toHaveBeenCalled();
+
+    rerender(
+      <LoadingSuspense gated={false} label="Loading usage" fallback={view}>
+        <Reader />
+      </LoadingSuspense>,
+    );
+    expect(screen.getByText('read')).toBeTruthy();
+    expect(rendered).toHaveBeenCalled();
+  });
+
+  it('gated + bare: the gate window draws the scope only, with no region element', () => {
+    render(
+      <LoadingSuspense gated bare label="Loading setup" fallback={<Value read={() => 'unused'} />}>
+        <span>read</span>
+      </LoadingSuspense>,
+    );
+    expect(screen.getByTestId('bar')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

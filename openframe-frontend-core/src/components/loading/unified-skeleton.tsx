@@ -179,6 +179,48 @@ export function TextLineSkeleton({ type, lines = 1, as = 'div', width, className
   );
 }
 
+/** The lines a text run takes per breakpoint: on a phone, from `content-md`, and from `content-lg`. */
+export interface TextLinesByBreakpoint {
+  phone: number;
+  md: number;
+  lg: number;
+}
+
+/**
+ * A text run whose line count changes with the width (a heading or a paragraph that wraps): `TextLineSkeleton` at
+ * the typical lines of each step of the content area. Exactly one of the three bars is shown at any width, so the
+ * loaded text takes its place at every breakpoint.
+ */
+export function TextLinesByBreakpointSkeleton({
+  lines,
+  type = 'inherit',
+  as = 'div',
+  className,
+}: {
+  lines: TextLinesByBreakpoint;
+  type?: TextLineType;
+  as?: 'div' | 'span';
+  className?: string;
+}) {
+  return (
+    <>
+      <TextLineSkeleton type={type} as={as} lines={lines.phone} className={cn('w-full content-md:hidden', className)} />
+      <TextLineSkeleton
+        type={type}
+        as={as}
+        lines={lines.md}
+        className={cn('hidden w-full content-md:flex content-lg:hidden', className)}
+      />
+      <TextLineSkeleton
+        type={type}
+        as={as}
+        lines={lines.lg}
+        className={cn('hidden w-full content-lg:flex', className)}
+      />
+    </>
+  );
+}
+
 /**
  * Text skeleton variants at fixed heights. A skeleton that must take exactly
  * the space of the text it stands for (a card whose loaded and loading boxes
