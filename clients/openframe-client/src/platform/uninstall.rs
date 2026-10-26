@@ -16,8 +16,12 @@ const DESCRIPTION: &str = "OpenFrame client service for remote management and mo
 /// CLI subcommand the detached process runs to remove the client.
 const UNINSTALL_SUBCOMMAND: &str = "uninstall";
 
+/// Name prefix of the binary openframe-client-updater stages next to this one.
+const UPDATER_STAGED_PREFIX: &str = ".openframe-client-update-";
+
 /// Removes the copies the update flow leaves next to the binary: `<exe>.lkg`,
-/// `<exe>.prev`, `<exe>.old`, `<exe>.bad`, `<exe>.bak`, `<exe>.backup.<ts>`.
+/// `<exe>.prev`, `<exe>.old`, `<exe>.bad`, `<exe>.bak`, `<exe>.backup.<ts>`,
+/// and the binary openframe-client-updater stages there before a swap.
 /// Matched by prefix on purpose: every sibling written next to the binary is
 /// an update artefact, and an enumerated list would leave the next suffix
 /// behind on uninstall again.
@@ -37,11 +41,42 @@ fn remove_binary_siblings(install_path: &Path) {
         return;
     };
     for entry in entries.flatten() {
-        if !entry.file_name().to_string_lossy().starts_with(&prefix) {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let staged_by_updater = name.starts_with(UPDATER_STAGED_PREFIX) && name.ends_with(".tmp");
+        if !name.starts_with(&prefix) && !staged_by_updater {
             continue;
         }
         let path = entry.path();
         match std::fs::remove_file(&path) {
+            Ok(()) => info!("Removed update leftover: {}", path.display()),
+            Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
+        }
+    }
+}
+
+/// Temp-dir leftovers of the script updater earlier clients ran
+/// (`openframe-update-*` staging dirs, `openframe-updater-*.ps1|.sh`); an
+/// uninstall removes them whatever their age.
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn remove_update_temp_files() {
+    let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        let leftover = name.starts_with("openframe-update-")
+            || (name.starts_with("openframe-updater-")
+                && (name.ends_with(".ps1") || name.ends_with(".sh")));
+        if !leftover {
+            continue;
+        }
+        let path = entry.path();
+        let removed = if path.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
+        };
+        match removed {
             Ok(()) => info!("Removed update leftover: {}", path.display()),
             Err(e) => warn!("Failed to remove update leftover {}: {}", path.display(), e),
         }
@@ -446,6 +481,7 @@ pub async fn uninstall_windows(
     }
 
     remove_binary_siblings(install_path);
+    remove_update_temp_files();
 
     if let Err(e) = crate::platform::apps_entry::unregister() {
         warn!("Failed to remove Apps & Features entry: {:#}", e);
@@ -579,6 +615,7 @@ pub async fn uninstall_macos(
     }
 
     remove_binary_siblings(install_path);
+    remove_update_temp_files();
 
     // Final chance to report the uninstall now that the wipe is done.
     if let Some(deregistration_service) = &deregistration_service {

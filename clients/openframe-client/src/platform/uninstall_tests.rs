@@ -27,6 +27,7 @@ fn removes_update_leftovers_next_to_windows_binary() {
         "openframe-client.exe.bak",
         "openframe-client.exe.bad",
         "openframe-client.exe.backup.1700000000",
+        ".openframe-client-update-3f2a.tmp",
         "openframe-client-updater.exe",
         "openframe-client-updater.exe.lkg",
         "openframe.cmd",
