@@ -42,7 +42,7 @@ public class EventTopicCreator implements SmartInitializingSingleton {
         EventProcessingKafkaProperties.Kafka kafka = properties.getKafka();
         List<String> bootstrapServers = kafka.getBootstrapServers();
         if (bootstrapServers.isEmpty()) {
-            throw new IllegalStateException("openframe.events.processing.kafka.bootstrap-servers is required when topic creation is on");
+            throw new IllegalStateException("openframe.events.processing.kafka.bootstrap-servers is required when openframe.events.enabled is on");
         }
         String topicPrefix = EventTopicNames.requireTopicPrefix(kafka);
         Map<String, Object> adminProperties = kafka.buildAdminProperties();

@@ -49,8 +49,11 @@ events.organizations ──> PublishedTypeListener             one per spec type
 ```yaml
 openframe:
   events:
+    enabled: false                      # the whole feature (default false); a change needs a pod restart
+    topics:
+      organizations:
+        enabled: false                  # per type: its topics, listener and projections in this service
     processing:
-      enabled: false                    # the whole module (default false); a change needs a pod restart
       kafka:                            # Spring's KafkaProperties keys, for the processing cluster only
         bootstrap-servers: ${spring.saas.kafka.bootstrap-servers}               # required, no localhost default
         topic-prefix: ${SHARED_DOMAIN:}events.                                   # required, no default
@@ -87,12 +90,12 @@ openframe:
 - A topic is `topic-prefix` + the type name (`events.organizations`), its DLT is the topic + `-dlt`, and its group
   is `group-prefix` + the type name. Each service names its own group: two services in one group would split the
   events, and each would miss half of them.
-- The config is read at startup. A config refresh (the AI agent's `ContextRefresher`) does not change the modes of a
-  running pod.
+- The config is read at startup. A config refresh (the AI agent's `ContextRefresher`) does not switch a type on or
+  off in a running pod.
 
 ## Topics
 
-With `enabled: true` and `kafka.topics.create: true`,
+With `openframe.events.enabled: true`,
 [`EventTopicCreator`](src/main/java/com/openframe/processing/topic/EventTopicCreator.java#L31) creates
 `<topic-prefix><type>` and `<topic-prefix><type>-dlt` for every spec at startup, before the listeners start, so a new
 published type needs no topic config. With processing off, nothing is created: off means no infrastructure. So the
@@ -107,20 +110,13 @@ exist before the connector writes.
 - A plain `AdminClient`, not `NewTopic` beans: every `KafkaAdmin` in the context would create those too, on its own
   cluster.
 
-## Modes
+## Switching a type
 
-The mode says who updates a projection: the old aspect in the tenant services, or the projection's `apply`.
-
-| Mode | Aspect | Projection |
-|---|---|---|
-| `aspect` (default) | writes | skipped |
-| `both` | writes | writes |
-| `events` | skipped | writes |
-
-Switch in two steps, each a config change plus a pod restart: `aspect` → `both`, and once every pod runs `both`,
-`both` → `events`. Roll back the same way. In `both` someone always writes, whatever the order of the stream's and
-the tenant services' configs inside a step. The cost: a projection that is behind can write an older value over the
-aspect's newer one, until it reads the newer event. The aspects read the mode from stage 6 on.
+A type moves with all its projections. Switch it on in the stream's config first, then in the tenant services'
+configs, each a config change plus a pod restart; roll back in the reverse order. While only the stream has it on, the
+aspects still write and the stream gets no events of that type; once the tenant services have it on, they publish it
+and their aspect cascades from it stop. A type on in the tenant services but off in the stream leaves the copies
+stale: reconciliation and the consumer lag alert show it.
 
 ## Add a projection
 
@@ -134,7 +130,7 @@ aspect's newer one, until it reads the newer event. The aspects read the mode fr
    }
    ```
 
-   - `name()` is unique. It is the key of its mode, its metrics tag, and its name in logs and DLT messages.
+   - `name()` is unique. It is its metrics tag, and its name in logs and DLT messages.
    - `apply` gets the whole envelope, never a delete.
    - It writes through its own repository, never `MongoTemplate`, with a version guard.
    - The guard writes an item unless its stored version is the same as or newer than the event's
@@ -142,8 +138,8 @@ aspect's newer one, until it reads the newer event. The aspects read the mode fr
    - The guard makes duplicates, replays and out-of-order events harmless.
    - It retries its own write conflicts (`@RetryOnOptimisticLockingFailure`). A conflict that reaches the runner
      sends the record to the DLT.
-2. Add its mode under `openframe.events.processing.projections`, with `mode: aspect`, and switch it per environment
-   (see [Modes](#modes)).
+2. It runs as soon as its type is switched on in the stream (see [Switching a type](#switching-a-type)). The aspect
+   that writes the same copy skips its cascade while `PublishedAggregateTopics.isPublishing(<type>)` is true.
 
 A new published type needs only its spec: the listener of its topic is registered from the spec at startup.
 
@@ -186,13 +182,9 @@ The service does not start when:
 | Problem | Fix |
 |---|---|
 | Two projections have the same `name()` | Rename one (checked by `AggregateSpecRegistry`). |
-| A `mode` is not `aspect`, `both` or `events` | Fix the value. |
 | `bootstrap-servers`, `topic-prefix` or `group-prefix` is missing | Set all three. |
-| Topic creation is on and Kafka cannot be reached | Check `bootstrap-servers` and the network. |
+| Kafka cannot be reached to create the topics | Check `bootstrap-servers` and the network. |
 | A listener's topic does not exist | Create the topics first (`missing-topics-fatal`). |
-
-A name under `projections` that matches no projection only logs an ERROR: an image rolled back under a newer config
-must still start. That projection, if it exists, stays on `aspect`.
 
 ## Metrics
 
@@ -211,7 +203,6 @@ logging:
 | Line | Meaning |
 |---|---|
 | `Registered N published aggregate spec(s): [...]` (INFO, at startup) | The specs, and so the topics, this service listens to. |
-| `Projection X skipped: mode aspect` | The aspect still does the work for X. |
 | `Projection X applied <id> version V of tenant T` | Applied. |
 | `Projection X failed for <id> version V of tenant T` (WARN, with the stack trace) | That projection failed; the record goes to the DLT after the others ran. |
 | `Record <id> of <topic>-<partition> at offset O goes to <topic>-dlt` (ERROR) | Sent to the DLT. |
