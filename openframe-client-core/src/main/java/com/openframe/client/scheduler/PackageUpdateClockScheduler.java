@@ -28,16 +28,4 @@ public class PackageUpdateClockScheduler {
             log.error("Package-update deadline-force sweep failed", e);
         }
     }
-
-    @Scheduled(fixedDelayString = "${openframe.rmm.software.package-update.retry.interval}")
-    @SchedulerLock(name = "packageUpdateAutoRetry",
-            lockAtMostFor = "${openframe.rmm.software.package-update.retry.lock-at-most-for}",
-            lockAtLeastFor = "${openframe.rmm.software.package-update.retry.lock-at-least-for}")
-    public void retryFailedAutoUpdates() {
-        try {
-            clockService.retryFailedAutoUpdates();
-        } catch (Exception e) {
-            log.error("Package-update AUTO-retry sweep failed", e);
-        }
-    }
 }
