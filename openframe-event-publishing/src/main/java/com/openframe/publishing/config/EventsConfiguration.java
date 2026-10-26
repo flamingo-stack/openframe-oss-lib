@@ -1,14 +1,12 @@
 package com.openframe.publishing.config;
 
 import com.openframe.publishing.transaction.MongoTransactionRunner;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 
 @Configuration
-@EnableConfigurationProperties(EventsProperties.class)
 public class EventsConfiguration {
 
     // Lazy: created on the first published write, so an app with publish off never needs it.
