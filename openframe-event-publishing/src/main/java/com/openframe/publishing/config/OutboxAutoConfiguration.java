@@ -14,7 +14,7 @@ import org.springframework.context.annotation.Import;
 // Listed, not scanned (the specs are the services' own beans); switched off, every repository is plain Spring Data.
 @AutoConfiguration(after = AggregateSpecAutoConfiguration.class)
 @ConditionalOnBooleanProperty(name = {"spring.data.mongodb.enabled", "openframe.events.enabled"})
-@Import({EventsConfiguration.class, PublishedAggregateTopics.class, PublishedAggregateStartupCheck.class, OutboxPublisher.class,
+@Import({EventsConfiguration.class, PublishedAggregateStartupCheck.class, OutboxPublisher.class,
         PublishedAggregates.class, PublishingRepositoryStartupCheck.class})
 public class OutboxAutoConfiguration {
 
