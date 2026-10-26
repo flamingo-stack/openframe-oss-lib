@@ -5,7 +5,7 @@ Two scheduled jobs around the published events:
 - the **backfill** writes the current state of every document of a published type to the outbox, so its compacted
   topic holds the latest event of each one;
 - the **reconciliation** asks every projection, such as the organization name on tickets, which of its projected items
-  differ from their source, and reports them. It repairs nothing; a new backfill run does.
+  differ from their source, reports them and publishes their sources again to repair them.
 
 They run in `openframe-saas-stream` only. They do nothing until you switch them on.
 
@@ -66,7 +66,7 @@ openframe:
 
 The type keys are the specs' `getType()` names; a key no spec has stops the service.
 
-Only `openframe-saas-stream` has this module, so `openframe.events.enabled` runs all three jobs there. It also provides:
+Only `openframe-saas-stream` has this module, so `openframe.events.enabled` runs both jobs there. It also provides:
 
 - `@EnableScheduling`; the module does not switch scheduling on for every service that adds it;
 - a ShedLock `LockProvider` bean;
@@ -123,7 +123,7 @@ The job reads the collection of the projection's `projectedClass()` in `_id` bat
 decides what a mismatch is, for example [`OrganizationOnTicketsProjection`](../openframe-data-mongo-sync/src/main/java/com/openframe/data/repository/organization/publishing/OrganizationOnTicketsProjection.java#L54)
 (a ticket whose organization name differs, or whose organization is gone). The items it returns are read again from the
 primary and reconciled again before they count
-([`confirm`](src/main/java/com/openframe/event/jobs/reconciliation/service/ReconciliationRunner.java#L61)), so an item updated
+([`confirm`](src/main/java/com/openframe/event/jobs/reconciliation/service/ReconciliationRunner.java#L78)), so an item updated
 meanwhile is not drift.
 
 A run that checked no items logs a WARN, or an ERROR when the collection of `projectedClass()` does not exist. When a
@@ -136,10 +136,10 @@ Reconciliation of organization-on-tickets in tenant <id>: 3 mismatch(es), for ex
 ```
 
 **Repair** is automatic: after the second read, the job publishes the current state of each confirmed mismatch's source
-again (`PublishedAggregates.publishCurrent`, each source once per batch), and the projection re-applies it, since the
-version store applies an equal version. The run still counts what it found, so the gauge shows the drift before the
-repair, and the next run should find none. A mismatch whose source is gone (`sourceId` null) has nothing to publish. A
-new backfill run of the type is still the way to repair everything at once.
+again (`PublishedAggregates.publishCurrent`, each source at most once per run), for the projection to apply. The run
+still counts what it found, so the gauge shows the drift before the repair, and the next run should find none. A
+mismatch whose source is gone is not published again. A new backfill run of the type is still the way to repair
+everything at once.
 
 **Add a projection**: return it from its spec's `projections()` and implement `reconcile`; the job picks it up at the
 next start. Its `name()` is the job id (`reconciliation:<name>`) and the metric tag.
