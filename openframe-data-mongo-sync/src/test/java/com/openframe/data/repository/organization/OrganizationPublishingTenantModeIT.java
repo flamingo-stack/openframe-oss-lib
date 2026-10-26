@@ -5,6 +5,7 @@ import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.organization.publishing.OrganizationAggregateSpec;
 import com.openframe.data.repository.organization.publishing.OrganizationOnTicketsProjection;
 import com.openframe.publishing.config.AggregateSpecAutoConfiguration;
+import com.openframe.publishing.config.EventsAutoConfiguration;
 import com.openframe.publishing.config.OutboxAutoConfiguration;
 import com.openframe.publishing.persistence.OutboxEvent;
 import org.bson.Document;
@@ -108,7 +109,7 @@ class OrganizationPublishingTenantModeIT {
     }
 
     @SpringBootConfiguration
-    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, OutboxAutoConfiguration.class})
+    @ImportAutoConfiguration({MongoAutoConfiguration.class, DataMongoAutoConfiguration.class, AggregateSpecAutoConfiguration.class, EventsAutoConfiguration.class, OutboxAutoConfiguration.class})
     @EnableMongoRepositories(basePackageClasses = OrganizationRepository.class)
     @Import({OrganizationAggregateSpec.class, OrganizationOnTicketsProjection.class})
     static class TestApplication {
