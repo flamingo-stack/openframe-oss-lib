@@ -168,7 +168,7 @@ class ReconciliationRunnerTest {
         List<Item> batch = List.of(new Item("t1"));
         when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(batch);
         when(itemRepository.findAfter(ItemDocument.class, Item.class, "t1", 3)).thenReturn(List.of());
-        ReconciliationResult gone = result(new Mismatch("tenant-a", "t1", "org-9", true, "organization org-9 is gone"));
+        ReconciliationResult gone = result(Mismatch.buildForGoneSource("tenant-a", "t1", "org-9", "organization org-9 is gone"));
         when(projection.reconcile(batch)).thenReturn(gone);
         when(itemRepository.findByIds(ItemDocument.class, Item.class, List.of("t1"))).thenReturn(batch);
 

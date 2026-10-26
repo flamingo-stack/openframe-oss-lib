@@ -25,8 +25,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-// Checks one tick of a run: projected items in _id batches, each batch reconciled by its projection, its mismatches repaired
-// and its count saved.
+// Checks one tick of a run: projected items in _id batches, each reconciled, its mismatches repaired and its count saved.
 @Slf4j
 @RequiredArgsConstructor
 public class ReconciliationRunner {
@@ -40,8 +39,7 @@ public class ReconciliationRunner {
     private final ReconciliationMetrics metrics;
     private final AggregateSpecRegistry specRegistry;
     private final PublishedAggregates publishedAggregates;
-    // Per projection: a source whose items span many batches is published again once per run, not once per batch. Expires an hour
-    // after its last batch on this pod, so a run that failed or finished on another pod leaves nothing behind.
+    // Per projection and run: each source is published again once per run; expires an hour after the pod's last batch.
     private final Cache<String, RunSources> republishedSources = Caffeine.newBuilder()
             .expireAfterAccess(REPUBLISHED_SOURCES_TTL)
             .build();
@@ -90,9 +88,7 @@ public class ReconciliationRunner {
         return confirmed.getMismatches();
     }
 
-    // The repair: the sources' current state is published again, and the projection re-applies it, as the version store applies
-    // an equal version. A source that is gone has nothing to publish (see applyMissedDeletes). The run still counts the
-    // mismatches it found.
+    // The repair: the sources are published again, and the projection applies them, as an equal version passes.
     private void republishSources(Projection<?, ?> projection, EventJob job, List<Mismatch> mismatches) {
         List<String> mismatchedSourceIds = mismatches.stream()
                 .filter(mismatch -> !mismatch.isSourceGone())
