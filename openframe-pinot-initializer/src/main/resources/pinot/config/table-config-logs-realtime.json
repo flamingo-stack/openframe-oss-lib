@@ -7,7 +7,7 @@
     "replication": "${pinot.tables.logs.replication}",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "30"
+    "retentionTimeValue": "${pinot.tables.logs.retention-days:30}"
   },
   "instanceAssignmentConfigMap": {
     "CONSUMING": {
