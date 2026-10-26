@@ -3,17 +3,13 @@ package com.openframe.client.listener.packageupdate;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
-import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
-import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Failed;
-import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage.Waiting;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +18,7 @@ import java.util.List;
 
 /**
  * Orchestrates one package-update status event: load state, drop duplicates/stale events,
- * reduce the device state, record history, notify the user, and roll the request status up.
+ * reduce the device state, record history, and roll the request status up.
  */
 @Slf4j
 @Component
@@ -34,7 +30,6 @@ public class PackageUpdateStatusProcessor {
     private final PackageUpdateDeviceStateRepository deviceStateRepository;
     private final PackageUpdateRequestRepository requestRepository;
     private final PackageUpdateExecutionRecorder executionRecorder;
-    private final ObjectProvider<PackageUpdateNotifier> notifier;
 
     public void process(String machineId, PackageUpdateStatusMessage event) {
         Machine machine = machineRepository.findByMachineId(machineId).orElse(null);
@@ -72,7 +67,6 @@ public class PackageUpdateStatusProcessor {
                 state.getRebootRequired(), state.getRelaunched(), state.getFailedReason(), state.getExitCode(),
                 state.getFailedMessage(), state.getDeadlineAt());
 
-        notify(request, state, event);
         rollUp(tenantId, requestId, request);
     }
 
@@ -90,34 +84,6 @@ public class PackageUpdateStatusProcessor {
 
     private boolean isStale(PackageUpdateDeviceState state, PackageUpdateStatusMessage event) {
         return state.getLastEventAt() != null && event.getAt() != null && event.getAt().isBefore(state.getLastEventAt());
-    }
-
-    private void notify(PackageUpdateRequest request, PackageUpdateDeviceState state, PackageUpdateStatusMessage event) {
-        PackageUpdateNotifier bound = notifier.getIfAvailable();
-        if (bound == null || request == null) {
-            return;
-        }
-        switch (event.getState()) {
-            case WAITING -> {
-                Waiting.Phase phase = event.getWaiting() == null ? null : event.getWaiting().getPhase();
-                if (phase == Waiting.Phase.PROMPT) {
-                    bound.prompt(request, state);
-                } else if (phase == Waiting.Phase.COUNTDOWN) {
-                    bound.countdown(request, state);
-                }
-            }
-            case FAILED -> {
-                if (event.getFailed() != null && event.getFailed().getReason() == Failed.Reason.SUPERSEDED) {
-                    return;   // a newer request carries on; no card
-                }
-                if (request.getSource() == PackageUpdateSource.AUTO) {
-                    bound.autoUpdateFailed(request, state);
-                } else {
-                    bound.updateFailed(request, state);
-                }
-            }
-            case DONE -> { /* "Up to date" is driven by inventory, not a card */ }
-        }
     }
 
     private void rollUp(String tenantId, String requestId, PackageUpdateRequest request) {

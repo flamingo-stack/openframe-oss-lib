@@ -15,7 +15,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,8 +37,6 @@ class PackageUpdateStatusProcessorTest {
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
     @Mock private PackageUpdateRequestRepository requestRepository;
     @Mock private PackageUpdateExecutionRecorder executionRecorder;
-    @Mock private ObjectProvider<PackageUpdateNotifier> notifierProvider;
-    @Mock private PackageUpdateNotifier notifier;
 
     @InjectMocks private PackageUpdateStatusProcessor processor;
 
@@ -237,27 +234,6 @@ class PackageUpdateStatusProcessorTest {
                 PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
 
         assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
-    }
-
-    @Test
-    void failedAuto_notifiesAdmins_failedManual_notifiesRequester_supersededSilent() {
-        machineResolves();
-        when(notifierProvider.getIfAvailable()).thenReturn(notifier);
-
-        // AUTO failure -> admins
-        PackageUpdateDeviceState a = state(SoftwareActionStatus.WAITING);
-        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(a));
-        PackageUpdateRequest auto = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, null);
-        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(auto));
-        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(a));
-
-        processor.process("m1", failed("e1", PackageUpdateStatusMessage.Failed.Reason.MANAGER_ERROR));
-        verify(notifier).autoUpdateFailed(auto, a);
-
-        // SUPERSEDED -> no card
-        a.setLastEventId("e1");
-        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.SUPERSEDED));
-        verify(notifier, never()).updateFailed(any(), any());
     }
 
     @Test
