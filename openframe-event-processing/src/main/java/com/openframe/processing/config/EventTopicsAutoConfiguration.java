@@ -9,9 +9,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProp
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 
-// Only with processing on: off means no infrastructure, so processing is switched on (all on aspect) before the connector.
+// The stream creates a type's topics when the type is switched on there, before the tenant services publish it.
 @AutoConfiguration(after = AggregateSpecAutoConfiguration.class)
-@ConditionalOnBooleanProperty(name = {"openframe.events.processing.enabled", "openframe.events.processing.kafka.topics.create"})
+@ConditionalOnBooleanProperty(name = "openframe.events.enabled")
 @EnableConfigurationProperties(EventProcessingKafkaProperties.class)
 public class EventTopicsAutoConfiguration {
 

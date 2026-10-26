@@ -34,7 +34,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-// Through EventProcessingAutoConfiguration: real spec registry, modes and metrics; projections that record what reached them.
+// Through EventProcessingAutoConfiguration: real spec registry and metrics; projections that record what reached them.
 class ProjectionRunnerTest {
 
     private static final String ORGANIZATIONS = "organizations";
@@ -45,8 +45,8 @@ class ProjectionRunnerTest {
     private final RecordingProjection onIndex = new RecordingProjection(ON_INDEX);
 
     @Test
-    void anEvent_reachesEveryProjectionOnEvents_withTheEnvelopesTenantAndVersion() {
-        runnerWith(onTickets, onIndex).withPropertyValues(onEvents(ON_TICKETS), onEvents(ON_INDEX)).run(context -> {
+    void anEvent_reachesEveryProjection_withTheEnvelopesTenantAndVersion() {
+        runnerWith(onTickets, onIndex).run(context -> {
             process(context, record(false));
 
             assertThat(onTickets.records).singleElement().satisfies(applied -> {
@@ -58,28 +58,8 @@ class ProjectionRunnerTest {
     }
 
     @Test
-    void aProjectionOnAspect_isSkipped() {
-        runnerWith(onTickets, onIndex).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
-            process(context, record(false));
-
-            assertThat(onTickets.records).hasSize(1);
-            assertThat(onIndex.records).isEmpty();
-        });
-    }
-
-    @Test
-    void aProjectionOnBoth_runs() {
-        runnerWith(onTickets).withPropertyValues("openframe.events.processing.projections." + ON_TICKETS + ".mode=both")
-                .run(context -> {
-                    process(context, record(false));
-
-                    assertThat(onTickets.records).hasSize(1);
-                });
-    }
-
-    @Test
     void aDelete_reachesNoProjection() {
-        runnerWith(onTickets, onIndex).withPropertyValues(onEvents(ON_TICKETS), onEvents(ON_INDEX)).run(context -> {
+        runnerWith(onTickets, onIndex).run(context -> {
             process(context, record(true));
 
             assertThat(onTickets.records).isEmpty();
@@ -93,7 +73,6 @@ class ProjectionRunnerTest {
             throw new IllegalStateException("bug");
         });
         runnerWith(onTickets, onIndex, failing)
-                .withPropertyValues(onEvents(ON_TICKETS), onEvents(ON_INDEX), onEvents("widget-failing"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -118,7 +97,6 @@ class ProjectionRunnerTest {
             throw second;
         });
         runnerWith(failingFirst, failingSecond)
-                .withPropertyValues(onEvents("widget-first"), onEvents("widget-second"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -140,7 +118,6 @@ class ProjectionRunnerTest {
             throw new OptimisticLockingFailureException("write conflict");
         });
         runnerWith(onTickets, conflict)
-                .withPropertyValues(onEvents(ON_TICKETS), onEvents("widget-conflict"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -158,7 +135,6 @@ class ProjectionRunnerTest {
             throw new DataAccessResourceFailureException("Mongo unavailable");
         });
         runnerWith(mongoDown)
-                .withPropertyValues(onEvents("widget-mongo-down"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -177,7 +153,6 @@ class ProjectionRunnerTest {
             throw new UncategorizedMongoDbException("not primary", notPrimary);
         });
         runnerWith(failover)
-                .withPropertyValues(onEvents("widget-failover"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -191,7 +166,6 @@ class ProjectionRunnerTest {
             throw new StackOverflowError("deep");
         });
         runnerWith(onTickets, overflow)
-                .withPropertyValues(onEvents(ON_TICKETS), onEvents("widget-overflow"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -205,7 +179,7 @@ class ProjectionRunnerTest {
 
     @Test
     void aSchemaVersionNewerThanThisBuild_isRefused_beforeAnyProjectionRuns() {
-        runnerWith(onTickets).withPropertyValues(onEvents(ON_TICKETS)).run(context -> {
+        runnerWith(onTickets).run(context -> {
             PublishedRecord<WidgetEvent> record = PublishedRecord.<WidgetEvent>builder()
                     .tenantId("tenant-1")
                     .version(3L)
@@ -231,7 +205,6 @@ class ProjectionRunnerTest {
             throw alpha;
         });
         runnerWith(zuluProjection, alphaProjection)
-                .withPropertyValues(onEvents("widget-zulu"), onEvents("widget-alpha"))
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
@@ -321,7 +294,7 @@ class ProjectionRunnerTest {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
                 .withUserConfiguration(AggregateSpecRegistry.class)
-                .withPropertyValues("openframe.events.processing.enabled=true")
+                .withPropertyValues("openframe.events.enabled=true")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .withBean(WidgetSpec.class, () -> new WidgetSpec(specProjections));
     }
@@ -338,10 +311,6 @@ class ProjectionRunnerTest {
                 .tag("outcome", outcome)
                 .timer()
                 .count();
-    }
-
-    private static String onEvents(String projectionName) {
-        return "openframe.events.processing.projections." + projectionName + ".mode=events";
     }
 
     private static PublishedRecord<WidgetEvent> record(boolean deleted) {
