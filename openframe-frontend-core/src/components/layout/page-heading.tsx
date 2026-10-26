@@ -393,8 +393,10 @@ function SectionHeadingSkeleton({
   const layout = SECTION_HEADING_LAYOUT[level];
   const introByBreakpoint = typeof intro === 'object' ? intro : null;
   const introLines = typeof intro === 'number' ? intro : intro === true ? 2 : 0;
+  // The bars have no width of their own: a section's stack fills up to its own cap (640px), the width a real title and
+  // intro take, so an action at the far end wraps under it exactly where it does once loaded.
   const stack = (
-    <div className={layout.stack} aria-hidden>
+    <div className={level === 'section' ? `${layout.stack} w-full` : layout.stack} aria-hidden>
       {eyebrow ? (
         <SectionEyebrow platform={platform} tone={tone}>
           {eyebrow}
