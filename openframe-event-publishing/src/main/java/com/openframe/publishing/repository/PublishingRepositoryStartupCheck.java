@@ -2,6 +2,7 @@ package com.openframe.publishing.repository;
 
 import com.openframe.publishing.api.PublishedDocuments;
 import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
 
     private final ListableBeanFactory beanFactory;
     private final AggregateSpecRegistry specRegistry;
+    private final PublishedAggregateTopics publishedTopics;
 
     @Override
     public void afterSingletonsInstantiated() {
@@ -72,14 +74,19 @@ public class PublishingRepositoryStartupCheck implements SmartInitializingSingle
     }
 
     // The interceptor publishes writes through the repository; none means nothing is published, two means two places to watch.
-    private static void requireOneRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
+    private void requireOneRepository(AggregateSpec<?, ?> spec, Map<Class<?>, List<String>> repositoriesByDocument) {
         Class<?> documentClass = PublishedDocuments.classOf(spec);
         List<String> repositories = repositoriesByDocument.getOrDefault(documentClass, List.of());
         if (repositories.size() != 1) {
             throw new IllegalStateException("The spec of " + spec.getType() + " publishes " + documentClass.getName()
                     + ", which must have exactly one repository, found " + repositories);
         }
-        log.info("{} publishes {}", repositories.getFirst(), spec.getType());
+        String type = spec.getType();
+        if (!publishedTopics.isPublishing(type)) {
+            log.info("{} publish no {} writes: openframe.events.topics.{}.enabled is off", repositories, type, type);
+            return;
+        }
+        log.info("{} publish {}", repositories, type);
     }
 
     private void check(RepositoryFactoryInformation<?, ?> factory, RepositoryInformation information) {
