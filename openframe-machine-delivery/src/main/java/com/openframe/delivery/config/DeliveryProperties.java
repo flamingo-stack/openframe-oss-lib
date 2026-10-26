@@ -120,13 +120,13 @@ public class DeliveryProperties {
         // for the regular one, for a type a human waits on, whose ack-threshold is seconds
         private boolean fastSweep;
 
-        // runs of one row before EXHAUSTED, TIMEOUT or a failure reported by the agent is final: 1 = the first run is
-        // the only one; more = the row goes back to PENDING after rerun-after-seconds and is published as a new dispatch
+        // 1 = one run; more = EXHAUSTED, TIMEOUT, ERROR or an agent failure re-runs the row as a new dispatch, OFFLINE never
         @Min(1)
-        private int maxRuns = 1;
+        private int maxRuns;
 
+        // the wait between a run's end and the next run's publish
         @Positive
-        private long rerunAfterSeconds = 10_800;
+        private long rerunAfterSeconds;
 
         public boolean hasRunsLeft(int reruns) {
             return reruns + 1 < maxRuns;

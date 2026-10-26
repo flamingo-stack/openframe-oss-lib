@@ -30,11 +30,14 @@ public class DeliveryCloser {
         Policy policy = properties.resolve(type);
         String id = delivery.getId();
         Instant dispatchedAt = delivery.getDispatchedAt();
-        if (canRerun(failure) && policy.hasRunsLeft(delivery.getReruns())) {
+        int reruns = delivery.getReruns();
+        if (isRerunDue(failure, policy, reruns)) {
             Instant dueAt = rerunAt(policy, now);
-            boolean scheduled = repository.scheduleRerun(id, from, dispatchedAt, dueAt);
+            boolean scheduled = repository.scheduleRerun(id, from, dispatchedAt, reruns, dueAt);
             if (scheduled) {
                 rerunScheduled(delivery, failure, dueAt);
+            } else {
+                log.debug("Delivery moved on before its re-run could be scheduled: id={}", id);
             }
             return;
         }
@@ -58,15 +61,9 @@ public class DeliveryCloser {
     public void failReported(DeliveryType type, String targetId, String machineId, String dispatchId, String error, Instant now) {
         String id = DeliveryId.of(type, targetId, machineId);
         Policy policy = properties.resolve(type);
-        Optional<MachineDelivery> current = repository.findByIdOnPrimary(id);
-        if (current.isPresent() && policy.hasRunsLeft(current.get().getReruns())) {
-            Instant dueAt = rerunAt(policy, now);
-            boolean scheduled = repository.scheduleRerun(id, dispatchId, DeliveryStatus.OPEN, dueAt);
-            if (scheduled) {
-                MachineDelivery delivery = current.get();
-                delivery.setError(error);
-                rerunScheduled(delivery, DeliveryFailure.AGENT_ERROR, dueAt);
-            }
+        Optional<MachineDelivery> rerunnable = findRerunnable(id, policy);
+        rerunnable.ifPresent(delivery -> scheduleAgentRerun(delivery, policy, dispatchId, error, now));
+        if (rerunnable.isPresent()) {
             return;
         }
         Instant expiresAt = expiresAt(type, now);
@@ -92,20 +89,49 @@ public class DeliveryCloser {
         }
     }
 
+    // the primary is read only when the policy allows a second run at all
+    private Optional<MachineDelivery> findRerunnable(String id, Policy policy) {
+        if (isSingleRun(policy)) {
+            return Optional.empty();
+        }
+        return repository.findByIdOnPrimary(id).filter(delivery -> policy.hasRunsLeft(delivery.getReruns()));
+    }
+
+    private void scheduleAgentRerun(MachineDelivery delivery, Policy policy, String dispatchId, String error, Instant now) {
+        String id = delivery.getId();
+        int reruns = delivery.getReruns();
+        Instant dueAt = rerunAt(policy, now);
+        boolean scheduled = repository.scheduleRerun(id, dispatchId, DeliveryStatus.OPEN, reruns, dueAt);
+        if (!scheduled) {
+            log.debug("Delivery failure from agent ignored, no published row of this dispatch: id={} dispatchId={}", id, dispatchId);
+            return;
+        }
+        delivery.setError(error);
+        rerunScheduled(delivery, DeliveryFailure.AGENT_ERROR, dueAt);
+    }
+
     private void rerunScheduled(MachineDelivery delivery, DeliveryFailure failure, Instant dueAt) {
         DeliveryType type = delivery.getType();
-        int run = delivery.getReruns() + 2;
+        int reruns = delivery.getReruns() + 1;
+        int run = reruns + 1;
         delivery.setStatus(DeliveryStatus.PENDING);
         delivery.setAttempts(0);
-        delivery.setReruns(delivery.getReruns() + 1);
+        delivery.setReruns(reruns);
         delivery.setDueAt(dueAt);
         metrics.recordRerun(type, failure);
         log.warn("Delivery re-run scheduled: type={} targetId={} machineId={} reason={} error={} run={} dueAt={}",
                 type, delivery.getTargetId(), delivery.getMachineId(), failure, delivery.getError(), run, dueAt);
     }
 
-    // an offline machine never had the run: the reconnect window is the decision, and it is counted from the
-    // dispatchedAt a scheduled rerun keeps, so the next tick would only fail the row again
+    private static boolean isRerunDue(DeliveryFailure failure, Policy policy, int reruns) {
+        return canRerun(failure) && policy.hasRunsLeft(reruns);
+    }
+
+    private static boolean isSingleRun(Policy policy) {
+        return policy.getMaxRuns() <= 1;
+    }
+
+    // an offline machine never had the run: the reconnect window, counted from the kept dispatchedAt, is the decision
     private static boolean canRerun(DeliveryFailure failure) {
         return failure != DeliveryFailure.OFFLINE;
     }

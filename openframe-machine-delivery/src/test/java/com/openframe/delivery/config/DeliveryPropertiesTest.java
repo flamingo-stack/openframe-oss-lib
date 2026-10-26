@@ -117,6 +117,23 @@ class DeliveryPropertiesTest {
     }
 
     @Test
+    void resolve_typeOverridesRerunAfterSeconds_overrideWinsAndTheRestStaysDefault() {
+        // setup
+        PolicyOverride install = new PolicyOverride();
+        install.setRerunAfterSeconds(120L);
+        properties.setTypes(Map.of(DeliveryType.TOOL_INSTALLATION, install));
+
+        // execution
+        Policy resolved = properties.resolve(DeliveryType.TOOL_INSTALLATION);
+        Policy other = properties.resolve(DeliveryType.CLIENT_UNINSTALL);
+
+        // verifications
+        assertThat(resolved.getRerunAfterSeconds()).isEqualTo(120L);
+        assertThat(resolved.getMaxRuns()).isEqualTo(DeliveryTestPolicies.SINGLE_RUN);
+        assertThat(other.getRerunAfterSeconds()).isEqualTo(DeliveryTestPolicies.RERUN_AFTER);
+    }
+
+    @Test
     void fastTypes_noTypeAskingForTheFastPass_empty() {
         // setup
         properties.setEnabled(Map.of(DeliveryType.TOOL_INSTALLATION, true));
