@@ -4,11 +4,12 @@ Three scheduled jobs around the published events:
 
 - the **backfill** writes the current state of every document of a published type to the outbox, so its compacted
   topic holds the latest event of each one;
-- the **reconciliation** asks every projection, such as the organization name on tickets, which of its projected items
-  differ from their source, and reports them. It repairs nothing; a new backfill run does;
+- the **reconciliation** asks every projection of a type switched on, such as the organization name on tickets,
+  which of its projected items differ from their source, reports them, and publishes those sources again to repair them;
 - the **projection tasks** apply the large updates of a projection, for example a new organization name on 50,000
-  tickets, in batches instead of inside one Kafka record. One task per projection, tenant and source document, in
-  `projection_tasks`; a newer event of that source starts its task again from the first item.
+  tickets, in batches instead of inside one Kafka record. One document per run in `event_projection_tasks`, with at most
+  one current run per projection, tenant and source document; a newer event of that source closes the current run and opens a
+  new one from the first item.
 
 They run in `openframe-saas-stream` only. They do nothing until you switch them on.
 
@@ -44,15 +45,18 @@ EventJobService ──> event_job_runs              one document per run: run id
 
 ### Projection tasks
 
-- Every tick lists the RUNNING tasks and works each under its own lock `projection-task:<task id>`, so several pods
+- Every tick lists the RUNNING runs and works each under its own lock `projection-task:<run id>`, so several pods
   share them. Under the lock the task is read again, then `EventJobTicker` runs its batches: the projection's
   `applyBatch` after the saved `lastId`, until it returns `null`.
-- [`ProjectionTask`](src/main/java/com/openframe/event/jobs/task/persistence/ProjectionTask.java#L22) has `@Version`. A newer event bumps it, so a worker
-  busy with the older event fails its next save and stops; the next tick starts the task again with the newer event.
-  A finished task is deleted only if its version did not change.
+- [`ProjectionTask`](src/main/java/com/openframe/event/jobs/task/persistence/ProjectionTask.java#L22) is one run, `_id: "<key>:<event version>:<started ms>"`, with
+  `key` = `<projection>:<tenantId>:<sourceId>` and `current` while RUNNING or FAILED. A newer event closes the current run (a
+  RUNNING one ends REPLACED, a FAILED one stays FAILED) and inserts a new one; a unique index on `key` among current runs
+  ([`ProjectionTaskIndexInitializer`](src/main/java/com/openframe/event/jobs/task/persistence/ProjectionTaskIndexInitializer.java)) allows only one. The runs have `@Version`, so a worker busy
+  with the closed run fails its next save and stops; the next tick works the new run.
+- A finished run is kept DONE, as the tasks' history; runs are never deleted.
 - The task keeps the event's envelope as the outbox payload and reads it back into the spec's event class.
-- `maxFailures` in a row set the task FAILED. It stays in `projection_tasks`; the next event of its source starts it
-  again.
+- `maxFailures` in a row set the run FAILED. It stays current, so the events of its source still go to the tasks; the next
+  one opens a new run.
 - Metrics, per `projection`: `openframe.events.projection.tasks.open` and `...oldest.age` (seconds since the oldest
   RUNNING task started), and the counter `openframe.events.projection.tasks.failed`.
 
@@ -80,7 +84,6 @@ openframe:
         max-failures: 3
         sample-size: 5                  # sample ids per ERROR line
       projection-tasks:
-        enabled: false                  # its own switch (default false); needs the module switch too
         batch-size: 1000
         pause: 200ms
         poll-interval: 10s

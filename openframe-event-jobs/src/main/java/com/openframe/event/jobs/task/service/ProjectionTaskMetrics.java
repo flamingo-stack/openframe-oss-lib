@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
-// Per projection: gauges of its RUNNING tasks and the oldest one's age, set from projection_tasks on every tick, and a FAILED counter.
+// Per projection: gauges of its RUNNING tasks and the oldest one's age, set from event_projection_tasks on every tick, and a FAILED counter.
 public class ProjectionTaskMetrics {
 
     private static final String OPEN_GAUGE = "openframe.events.projection.tasks.open";

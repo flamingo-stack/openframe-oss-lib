@@ -85,17 +85,17 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
             return ReconciliationResult.allMatch();
         }
 
-        Map<TenantScopedId, String> organizationNames = organizationNames(withOrganization);
+        Map<TenantScopedId, Organization> organizations = findOrganizations(withOrganization);
 
         List<Mismatch> mismatches = withOrganization.stream()
-            .map(ticket -> mismatchOf(ticket, organizationNames))
+            .map(ticket -> toMismatch(ticket, organizations))
             .filter(Objects::nonNull)
             .toList();
         return new ReconciliationResult(mismatches);
     }
 
-    // The current name of every organization of the batch, in one query.
-    private Map<TenantScopedId, String> organizationNames(List<TicketOrganizationView> tickets) {
+    // Every organization of the batch, in one query: its name to compare, its _id to publish again.
+    private Map<TenantScopedId, Organization> findOrganizations(List<TicketOrganizationView> tickets) {
         Set<String> tenantIds = tickets.stream().map(TicketOrganizationView::getTenantId).collect(toSet());
         Set<String> organizationIds = tickets.stream().map(TicketOrganizationView::getOrganizationId).collect(toSet());
 
@@ -104,7 +104,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         return organizations.stream()
             .collect(
                 HashMap::new,
-                (acc, org) -> acc.put(buildTenantOrganization(org), org.getName()),
+                (acc, org) -> acc.put(buildTenantOrganization(org), org),
                 HashMap::putAll);
     }
 
@@ -114,19 +114,23 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         return new TenantScopedId(tenantId, organizationId);
     }
 
-    private static Mismatch mismatchOf(TicketOrganizationView ticket, Map<TenantScopedId, String> organizationNames) {
+    private static Mismatch toMismatch(TicketOrganizationView ticket, Map<TenantScopedId, Organization> organizations) {
         String tenantId = ticket.getTenantId();
         String organizationId = ticket.getOrganizationId();
         String ticketId = ticket.getId();
         TenantScopedId key = new TenantScopedId(tenantId, organizationId);
-        if (!organizationNames.containsKey(key)) {
-            return new Mismatch(tenantId, ticketId, null, "organization " + organizationId + " is gone");
+        Organization organization = organizations.get(key);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
+        if (organization == null) {
+            return null;
         }
-        String sourceName = organizationNames.get(key);
+        String sourceName = organization.getName();
         String copiedName = ticket.getOrganizationName();
         if (Objects.equals(sourceName, copiedName)) {
             return null;
         }
-        return new Mismatch(tenantId, ticketId, null, "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
+        String sourceId = organization.getId();
+        return new Mismatch(tenantId, ticketId, sourceId,
+            "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
     }
 }
