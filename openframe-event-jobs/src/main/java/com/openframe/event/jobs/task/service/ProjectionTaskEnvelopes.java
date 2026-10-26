@@ -32,7 +32,7 @@ public class ProjectionTaskEnvelopes {
         Map<String, JavaType> recordTypes = new HashMap<>();
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String type = spec.getType();
-            Class<?> eventClass = PublishedDocuments.eventClassOf(spec);
+            Class<?> eventClass = PublishedDocuments.resolveEventClass(spec);
             JavaType recordType = ENVELOPE_MAPPER.getTypeFactory().constructParametricType(PublishedRecord.class, eventClass);
             recordTypes.put(type, recordType);
         }
