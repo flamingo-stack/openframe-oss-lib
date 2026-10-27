@@ -24,6 +24,8 @@ import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.verify;
@@ -103,6 +105,22 @@ class DeliveryDispatchListenerTest {
         assertThat(request.getMachineId()).isEqualTo(MACHINE_ID);
         assertThat(request.getPayload()).isInstanceOf(ToolInstallationMessage.class);
         assertThat(request.getPayload().getDelivery().getDispatchId()).isEqualTo(DISPATCH_ID);
+        assertThat(request.getDueAt()).isNull();
+    }
+
+    @Test
+    void onDispatch_scheduledCommand_momentCarriedIntoTheRequest() {
+        // setup
+        Instant dueAt = Instant.parse("2026-11-01T10:00:00Z");
+        doReturn(spec).when(registry).require(DeliveryType.TOOL_INSTALLATION);
+        doReturn(ToolInstallationMessage.class).when(spec).getPayloadClass();
+
+        // execution
+        listener.onDispatch(new DeliveryDispatchMessage(DeliveryAudience.MACHINE, MACHINE_ID, command, dueAt));
+
+        // verifications
+        verify(sink).accept(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getDueAt()).isEqualTo(dueAt);
     }
 
     @Test

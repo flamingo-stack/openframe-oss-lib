@@ -9,8 +9,10 @@ import lombok.Builder;
 import lombok.Getter;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class PackageUpdateDeliverySeed implements DeliverySeed {
+
+    private static final String DEADLINE_SUFFIX = ":deadline";
 
     private final String machineId;
     private final String requestId;
@@ -18,6 +20,11 @@ public class PackageUpdateDeliverySeed implements DeliverySeed {
     private final PackageReference packageRef;
     private final PackageUpdateMode mode;
     private final Integer countdownSeconds;
+    private final boolean deadlineForce;
+
+    public static String deadlineTargetId(String requestId) {
+        return requestId + DEADLINE_SUFFIX;
+    }
 
     @Override
     public DeliveryType getType() {
@@ -26,7 +33,7 @@ public class PackageUpdateDeliverySeed implements DeliverySeed {
 
     @Override
     public String getTargetId() {
-        return requestId;
+        return deadlineForce ? deadlineTargetId(requestId) : requestId;
     }
 
     @Override

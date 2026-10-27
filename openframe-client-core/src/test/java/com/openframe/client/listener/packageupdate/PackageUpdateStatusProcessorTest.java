@@ -1,17 +1,24 @@
 package com.openframe.client.listener.packageupdate;
 
+import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.device.Machine;
 import com.openframe.data.document.rmm.software.PackageUpdateDeviceState;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.document.rmm.software.SoftwareActionStatus;
+import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import com.openframe.data.nats.packageupdate.PackageUpdateStatusMessage;
 import com.openframe.data.repository.device.MachineRepository;
 import com.openframe.data.repository.rmm.PackageUpdateDeviceStateRepository;
 import com.openframe.data.repository.rmm.PackageUpdateRequestRepository;
+import com.openframe.delivery.dispatch.DeliveryDispatcher;
+import com.openframe.delivery.track.DeliveryTracker;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -37,6 +45,10 @@ class PackageUpdateStatusProcessorTest {
     @Mock private PackageUpdateDeviceStateRepository deviceStateRepository;
     @Mock private PackageUpdateRequestRepository requestRepository;
     @Mock private PackageUpdateExecutionRecorder executionRecorder;
+    @Mock private DeliveryDispatcher deliveryDispatcher;
+    @Mock private DeliveryTracker deliveryTracker;
+
+    @Captor private ArgumentCaptor<PackageUpdateDeliverySeed> seedCaptor;
 
     @InjectMocks private PackageUpdateStatusProcessor processor;
 
@@ -131,6 +143,7 @@ class PackageUpdateStatusProcessorTest {
 
         verify(requestRepository).save(any());                   // rolled up to WAITING
         verify(executionRecorder).record(any(), eq("m1"), any()); // mirrored onto the history row
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker); // no deadline, no force
     }
 
     @Test
@@ -218,15 +231,17 @@ class PackageUpdateStatusProcessorTest {
         assertThat(st.getRebootRequired()).isTrue();
         assertThat(st.getWaitingReason()).isNull();              // stale waiting detail cleared
         assertThat(st.getHolders()).isNull();
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker); // no deadline, nothing to withdraw
     }
 
     @Test
-    void firstAppRunningWaiting_armsDeadline_whenPolicyHasOne() {
+    void firstAppRunningWaiting_armsDeadline_andSchedulesTheForceForItBeforeTheStateIsSaved() {
         machineResolves();
         PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L);
+        req.setForceCountdownSeconds(300);
         when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
-        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
-                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(Optional.of(req));
         when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(st));
 
         processor.process("m1", waiting("e1", T,
@@ -234,6 +249,81 @@ class PackageUpdateStatusProcessorTest {
                 PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
 
         assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
+        InOrder order = inOrder(deliveryDispatcher, deviceStateRepository);
+        order.verify(deliveryDispatcher).schedule(seedCaptor.capture(), eq(T.plusSeconds(3600)));
+        order.verify(deviceStateRepository).save(st);
+        PackageUpdateDeliverySeed seed = seedCaptor.getValue();
+        assertThat(seed.getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(seed.getCountdownSeconds()).isEqualTo(300);
+        assertThat(seed.getMachineId()).isEqualTo("m1");
+        assertThat(seed.getRequestId()).isEqualTo("req-1");              // the agent finds the request by it
+        assertThat(seed.getTargetId()).isEqualTo("req-1:deadline");      // a row of its own, the WAIT keeps its row
+        verifyNoInteractions(deliveryTracker);
+    }
+
+    @Test
+    void waitingAgain_deadlineArmedEarlier_forceNotScheduledTwice() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(T.plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", waiting("e2", T.plusSeconds(60),
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT));
+
+        assertThat(st.getDeadlineAt()).isEqualTo(T.plusSeconds(3600));
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void doneBeforeTheDeadline_withdrawsTheScheduledForce() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().plusSeconds(3600));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", base("e2", T, PackageUpdateStatusMessage.State.DONE));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.COMPLETED);
+        verify(deliveryTracker).cancel(eq(DeliveryType.PACKAGE_UPDATE), eq("req-1:deadline"), eq("m1"), any());
+        verifyNoInteractions(deliveryDispatcher);
+    }
+
+    @Test
+    void failedPastTheDeadline_forceAlreadyOut_leftAlone() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.WAITING);
+        st.setDeadlineAt(Instant.now().minusSeconds(60));
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+
+        processor.process("m1", failed("e2", PackageUpdateStatusMessage.Failed.Reason.TIMEOUT));
+
+        assertThat(st.getStatus()).isEqualTo(SoftwareActionStatus.FAILED);
+        verifyNoInteractions(deliveryDispatcher, deliveryTracker);
+    }
+
+    @Test
+    void schedulingTheForceFails_stateIsNotSaved_soTheRedeliveryArmsTheDeadlineAgain() {
+        machineResolves();
+        PackageUpdateDeviceState st = state(SoftwareActionStatus.SCHEDULED);
+        when(deviceStateRepository.findByTenantIdAndRequestIdAndMachineId("t1", "req-1", "m1")).thenReturn(Optional.of(st));
+        when(requestRepository.findByTenantIdAndRequestId("t1", "req-1"))
+                .thenReturn(Optional.of(request(PackageUpdateSource.AUTO, PackageUpdateMode.WAIT, 3600L)));
+        doThrow(new IllegalStateException("mongo down")).when(deliveryDispatcher).schedule(any(), any());
+
+        assertThatThrownBy(() -> processor.process("m1", waiting("e1", T,
+                PackageUpdateStatusMessage.Waiting.Reason.APP_RUNNING,
+                PackageUpdateStatusMessage.Waiting.Phase.PROMPT)))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(deviceStateRepository, never()).save(any());
     }
 
     @Test
