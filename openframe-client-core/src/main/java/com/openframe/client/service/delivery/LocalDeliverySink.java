@@ -54,23 +54,16 @@ public class LocalDeliverySink implements DeliverySink {
         switch (outcome) {
             case RECORDED -> publish(request);
             case HELD -> hold(request);
-            case SCHEDULED -> defer(request);
             default -> skip(request, outcome);
         }
     }
 
-    private void defer(DeliveryRequest<? extends DeliveryPayload> request) {
-        DeliveryType type = request.getType();
-        metrics.recordDispatchScheduled(type);
-        log.info("Delivery scheduled, the sweep publishes it once due: type={} targetId={} machineId={} notBefore={}",
-                type, request.getTargetId(), request.getMachineId(), request.getNotBefore());
-    }
-
+    // the machine is not online or the delivery is due later: the sweep publishes it once both hold
     private void hold(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         metrics.recordDispatchHeld(type);
-        log.info("Delivery held until the machine is online, the sweep publishes it: type={} targetId={} machineId={}",
-                type, request.getTargetId(), request.getMachineId());
+        log.info("Delivery held, the sweep publishes it: type={} targetId={} machineId={} dueAt={}",
+                type, request.getTargetId(), request.getMachineId(), request.getDueAt());
     }
 
     // replayed = the hand-off was repeated; outranked = a newer dispatch of the same key holds the row

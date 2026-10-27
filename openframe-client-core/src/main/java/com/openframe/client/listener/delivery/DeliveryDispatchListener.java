@@ -76,7 +76,7 @@ public class DeliveryDispatchListener {
                 .machineId(message.getMachineId())
                 .audience(message.getAudience())
                 .payload(payload)
-                .notBefore(message.getNotBefore())
+                .dueAt(message.getDueAt())
                 .build();
         sink.accept(request);
     }

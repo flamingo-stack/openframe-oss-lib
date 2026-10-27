@@ -4,8 +4,7 @@ import com.netflix.graphql.dgs.DgsComponent;
 import com.netflix.graphql.dgs.DgsQuery;
 import com.netflix.graphql.dgs.DgsQueryExecutor;
 import com.netflix.graphql.dgs.springgraphql.autoconfig.DgsSpringGraphQLAutoConfiguration;
-import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
-import com.openframe.api.dto.rmm.script.ScriptResponse;
+import com.openframe.api.dto.invitation.InvitationResponse;
 import com.openframe.api.dto.user.UserResponse;
 import com.openframe.graphql.relay.RelayAutoConfiguration;
 import com.openframe.graphql.relay.RelayIdCodec;
@@ -13,42 +12,44 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
+import org.springframework.boot.graphql.autoconfigure.GraphQlAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
-import static com.openframe.graphql.relay.NodeType.SCRIPT;
+import static com.openframe.graphql.relay.NodeType.INVITATION;
+import static com.openframe.graphql.relay.NodeType.USER;
 import static org.assertj.core.api.Assertions.assertThat;
 
+/** User and Invitation ids are Relay global ids, wired like every other Node id. */
 @SpringBootTest(
-        classes = UserIdDataFetcherDgsTest.RelayUserNodeGraphQlApp.class,
+        classes = UserNodeIdDgsTest.RelayUserNodeGraphQlApp.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE,
         properties = "dgs.graphql.schema-locations=classpath:test-schema/relay-user-node.graphqls")
-class UserIdDataFetcherDgsTest {
+class UserNodeIdDgsTest {
 
-    private static final String USER_ID = "user-1";
-    private static final String SCRIPT_ID = "script-1";
+    private static final String USER_ID = "3f0c2a52-8a51-4d55-9c3b-0f6b7c9d2e11";
+    private static final String INVITATION_ID = "01595181-34a4-40b4-bf5b-a45bdcae07db";
 
     @Autowired
     private DgsQueryExecutor queryExecutor;
 
     @Test
-    void userId_staysRaw() {
+    void userId_isAGlobalId() {
         String id = queryExecutor.executeAndExtractJsonPath("{ user { id } }", "data.user.id");
 
-        assertThat(id).isEqualTo(USER_ID);
+        assertThat(id).isEqualTo(new RelayIdCodec().encode(USER, USER_ID));
     }
 
     @Test
-    void scriptId_nextToTheRawUserId_isAGlobalId() {
-        String id = queryExecutor.executeAndExtractJsonPath("{ script { id } }", "data.script.id");
+    void invitationId_isAGlobalId() {
+        String id = queryExecutor.executeAndExtractJsonPath("{ invitation { id } }", "data.invitation.id");
 
-        String expected = new RelayIdCodec().encode(SCRIPT, SCRIPT_ID);
-        assertThat(id).isEqualTo(expected);
+        assertThat(id).isEqualTo(new RelayIdCodec().encode(INVITATION, INVITATION_ID));
     }
 
     @SpringBootConfiguration
     @ImportAutoConfiguration({GraphQlAutoConfiguration.class, DgsSpringGraphQLAutoConfiguration.class, RelayAutoConfiguration.class})
-    @Import({UserIdDataFetcher.class, RelayUserNodeQueries.class})
+    @Import(RelayUserNodeQueries.class)
     static class RelayUserNodeGraphQlApp {
     }
 
@@ -61,8 +62,8 @@ class UserIdDataFetcherDgsTest {
         }
 
         @DgsQuery
-        ScriptResponse script() {
-            return ScriptResponse.builder().id(SCRIPT_ID).build();
+        InvitationResponse invitation() {
+            return InvitationResponse.builder().id(INVITATION_ID).build();
         }
     }
 }

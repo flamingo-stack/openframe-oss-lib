@@ -145,10 +145,10 @@ class DeliveryRecorderTest {
     }
 
     @Test
-    void record_scheduledLater_rowAnchoredAtItsMomentWithoutAskingIfTheMachineIsOnline() {
+    void record_dueLater_heldAndAnchoredAtItsMomentWithoutAskingIfTheMachineIsOnline() {
         // setup
-        Instant notBefore = Instant.now().plusSeconds(TTL * 2);
-        DeliveryRequest<TestPayload> scheduled = request.toBuilder().notBefore(notBefore).build();
+        Instant dueAt = Instant.now().plusSeconds(TTL * 2);
+        DeliveryRequest<TestPayload> scheduled = request.toBuilder().dueAt(dueAt).build();
         when(sequences.next()).thenReturn(SEQUENCE);
         when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);
 
@@ -156,22 +156,22 @@ class DeliveryRecorderTest {
         DeliveryRecordOutcome outcome = recorder.record(scheduled);
 
         // verifications
-        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.SCHEDULED);
+        assertThat(outcome).isEqualTo(DeliveryRecordOutcome.HELD);
         verifyNoInteractions(onlineStatus);
         verify(repository).upsertPending(deliveryCaptor.capture());
         MachineDelivery saved = deliveryCaptor.getValue();
         assertThat(saved.getStatus()).isEqualTo(DeliveryStatus.PENDING);
         assertThat(saved.getAttempts()).isZero();
         // the reconnect window and the ttl run from the moment, so a far moment is neither failed offline nor expired
-        assertThat(saved.getDispatchedAt()).isEqualTo(notBefore);
-        assertThat(saved.getDueAt()).isEqualTo(notBefore);
-        assertThat(saved.getExpiresAt()).isEqualTo(notBefore.plusSeconds(TTL));
+        assertThat(saved.getDispatchedAt()).isEqualTo(dueAt);
+        assertThat(saved.getDueAt()).isEqualTo(dueAt);
+        assertThat(saved.getExpiresAt()).isEqualTo(dueAt.plusSeconds(TTL));
     }
 
     @Test
     void record_scheduledMomentAlreadyPast_recordedTheOrdinaryWay() {
         // setup
-        DeliveryRequest<TestPayload> late = request.toBuilder().notBefore(Instant.now().minusSeconds(60)).build();
+        DeliveryRequest<TestPayload> late = request.toBuilder().dueAt(Instant.now().minusSeconds(60)).build();
         when(sequences.next()).thenReturn(SEQUENCE);
         when(onlineStatus.isOnline(MACHINE_ID)).thenReturn(true);
         when(repository.upsertPending(any(MachineDelivery.class))).thenReturn(true);

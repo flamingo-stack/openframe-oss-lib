@@ -18,9 +18,9 @@ public class DeliveryDispatchMessage {
     private String machineId;
     // the command as the agent will receive it; its delivery block carries type, targetId and dispatchId
     private JsonNode payload;
-    // the earliest the command may reach the machine; absent = at once. A client-service older than this field
-    // ignores it and publishes at once, so it is deployed before any service schedules over Kafka
-    private Instant notBefore;
+    // when the command is due to reach the machine; absent = at once. A client-service older than this field ignores
+    // it and publishes at once, so it is deployed before any service schedules over Kafka
+    private Instant dueAt;
 
     public DeliveryDispatchMessage(DeliveryAudience audience, String machineId, JsonNode payload) {
         this(audience, machineId, payload, null);

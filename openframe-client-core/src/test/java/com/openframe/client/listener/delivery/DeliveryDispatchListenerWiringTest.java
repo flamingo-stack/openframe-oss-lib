@@ -80,7 +80,7 @@ class DeliveryDispatchListenerWiringTest {
             DeliveryDispatchMessage message = (DeliveryDispatchMessage) read;
             assertThat(message.getMachineId()).isEqualTo("mach-42");
             assertThat(message.getPayload().get("delivery").get("type").asString()).isEqualTo("CLIENT_FEATURE_FLAGS");
-            assertThat(message.getNotBefore()).isNull();
+            assertThat(message.getDueAt()).isNull();
         });
     }
 
@@ -93,16 +93,16 @@ class DeliveryDispatchListenerWiringTest {
             @SuppressWarnings("unchecked")
             Deserializer<Object> values = (Deserializer<Object>) consumerFactory.getValueDeserializer();
             values.configure(consumerFactory.getConfigurationProperties(), false);
-            Instant notBefore = Instant.parse("2026-11-01T10:00:00.123Z");
+            Instant dueAt = Instant.parse("2026-11-01T10:00:00.123Z");
             DeliveryDispatchMessage scheduled = handOff();
-            scheduled.setNotBefore(notBefore);
+            scheduled.setDueAt(dueAt);
 
             Headers headers = new RecordHeaders();
             byte[] record = KafkaJsonSerdes.valueSerializer().serialize(TOPIC, headers, scheduled);
             Object read = values.deserialize(TOPIC, headers, record);
 
             assertThat(read).isInstanceOf(DeliveryDispatchMessage.class);
-            assertThat(((DeliveryDispatchMessage) read).getNotBefore()).isEqualTo(notBefore);
+            assertThat(((DeliveryDispatchMessage) read).getDueAt()).isEqualTo(dueAt);
         });
     }
 
