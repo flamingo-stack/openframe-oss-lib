@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import Image from '../../../embed-shims/next-image';
 import { ICON_SIZE } from '../../../styles/component-sizes';
+import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import { cn } from '../../../utils/cn';
 import { formatTicketRelativeTime } from '../../../utils/date-utils';
 import { CheckCircleIcon } from '../../icons-v2-generated/signs-and-symbols/check-circle-icon';
@@ -207,8 +208,8 @@ function LoadedNotificationTile({
                 alt=""
                 onError={() => setFailedImageUrl(image)}
                 className="size-4 rounded-[2px] object-cover"
-                width={16}
-                height={16}
+                width={IMAGE_FIXED_PX.icon}
+                height={IMAGE_FIXED_PX.icon}
                 unoptimized
               />
             ) : (

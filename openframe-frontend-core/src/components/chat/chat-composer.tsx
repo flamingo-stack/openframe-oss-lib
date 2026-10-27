@@ -75,6 +75,8 @@ export interface ChatComposerProps {
   contextLeading?: ReactNode;
   /** Drop one entity from the context memory (dropdown row ×). */
   onRemoveContextMemoryItem?: (item: ChatContextItem) => void;
+  /** The host is reading a record it will add to the context memory: the empty strip draws its loading form. */
+  contextMemoryPending?: boolean;
   /** Controlled picker open state. */
   contextPickerOpen?: boolean;
   /** Open the picker (the `+` menu's "Assign Item"). */
@@ -131,6 +133,7 @@ export function ChatComposer({
   contextMemoryItems,
   contextLeading,
   onRemoveContextMemoryItem,
+  contextMemoryPending,
   contextPickerOpen = false,
   onOpenContextPicker,
   onCloseContextPicker,
@@ -257,6 +260,7 @@ export function ChatComposer({
       <ChatContextMemoryBar
         items={memory}
         onRemove={onRemoveContextMemoryItem}
+        pending={contextMemoryPending}
         resolveIcon={resolveContextIcon}
         disabled={sending || locked}
         leading={contextLeading}

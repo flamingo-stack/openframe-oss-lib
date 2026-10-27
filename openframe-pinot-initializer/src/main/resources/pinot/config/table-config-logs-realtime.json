@@ -124,7 +124,8 @@
     "instanceSelectorType": "strictReplicaGroup"
   },
   "upsertConfig": {
-    "mode": "FULL"
+    "mode": "FULL",
+    "hashFunction": "MD5"
   },
   "tenants": {
     "broker": "DefaultTenant",
