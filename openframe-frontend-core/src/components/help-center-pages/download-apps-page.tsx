@@ -45,6 +45,7 @@ import {
   DOWNLOADS_MOBILE_TITLE,
   DOWNLOADS_TAGLINE,
   DOWNLOADS_TITLE,
+  OPEN_APP_LABEL,
   type AppDownload,
   type DownloadActionEvent,
   type DownloadsPublic,
@@ -58,6 +59,7 @@ import { CommandBox } from '../features/command-box';
 import { AppleLogoIcon } from '../icons-v2-generated/brand-logos/apple-logo-icon';
 import { WindowsLogoGreyIcon } from '../icons-v2-generated/brand-logos/windows-logo-grey-icon';
 import { Download01Icon } from '../icons-v2-generated/interface/download-01-icon';
+import { ExternalLinkIcon } from '../icons-v2-generated/interface/external-link-icon';
 import { PageShell } from '../layout/article-detail-layout';
 import { PageLayout } from '../layout/page-layout';
 import { LoadingRegion } from '../loading/loading-region';
@@ -88,6 +90,13 @@ export interface DownloadAppsPageProps {
   openStoresInNewTab?: boolean;
   /** Called when a visitor downloads an installer or copies an install command (the host's analytics). */
   onDownloadAction?: (event: DownloadActionEvent) => void;
+  /**
+   * Once an installer is downloaded, the link that opens the app it installs, which then stands in
+   * for that row's download button ("Open the app"); nothing keeps the download. The host decides
+   * both, as it is the one that knows a download happened (the website tags each click with the
+   * id the link carries). Absent: every installer stays a download.
+   */
+  openAppHref?: (download: AppDownload) => string | null | undefined;
   /** The closing card, under the mobile app: using OpenFrame without installing anything. Default: none. */
   web?: DownloadAppsWebOption;
   /**
@@ -184,9 +193,11 @@ function installerLabel(download: AppDownload, siblings: number): string {
 function SystemCard({
   system,
   onDownloadAction,
+  openAppHref,
 }: {
   system: SystemRows;
   onDownloadAction?: DownloadAppsPageProps['onDownloadAction'];
+  openAppHref?: DownloadAppsPageProps['openAppHref'];
 }) {
   const { copy } = useCopyToClipboard({
     successTitle: 'Copied',
@@ -204,18 +215,30 @@ function SystemCard({
       />
       {system.installers.length > 0 && (
         <div className={BUTTONS_CLASS}>
-          {system.installers.map((download, index) => (
-            <Button
-              key={download.id}
-              variant={index === 0 ? 'accent' : 'outline'}
-              href={download.url ?? undefined}
-              download
-              leftIcon={<Download01Icon className="h-5 w-5" />}
-              onClick={() => report('installer', download)}
-            >
-              {installerLabel(download, system.installers.length)}
-            </Button>
-          ))}
+          {system.installers.map((download, index) => {
+            const openApp = openAppHref?.(download);
+            return openApp ? (
+              <Button
+                key={download.id}
+                variant={index === 0 ? 'accent' : 'outline'}
+                href={openApp}
+                leftIcon={<ExternalLinkIcon className="h-5 w-5" />}
+              >
+                {OPEN_APP_LABEL}
+              </Button>
+            ) : (
+              <Button
+                key={download.id}
+                variant={index === 0 ? 'accent' : 'outline'}
+                href={download.url ?? undefined}
+                download
+                leftIcon={<Download01Icon className="h-5 w-5" />}
+                onClick={() => report('installer', download)}
+              >
+                {installerLabel(download, system.installers.length)}
+              </Button>
+            );
+          })}
         </div>
       )}
       {system.commands.length > 0 && (
@@ -348,6 +371,7 @@ export function DownloadAppsPage({
   showDesktop = true,
   openStoresInNewTab = true,
   onDownloadAction,
+  openAppHref,
   web,
   faq,
 }: DownloadAppsPageProps) {
@@ -386,7 +410,12 @@ export function DownloadAppsPage({
           <Section id="download-desktop" title="Desktop app">
             <div className={cardsGridClass(systems.length)}>
               {systems.map(system => (
-                <SystemCard key={system.os} system={system} onDownloadAction={onDownloadAction} />
+                <SystemCard
+                  key={system.os}
+                  system={system}
+                  onDownloadAction={onDownloadAction}
+                  openAppHref={openAppHref}
+                />
               ))}
             </div>
           </Section>

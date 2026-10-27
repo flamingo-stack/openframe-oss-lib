@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_FIXED_PX } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { Video } from '../features/video';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -90,8 +91,9 @@ export function MediaGalleryStrip({ items, className }: MediaGalleryStripProps) 
                     src={mediaItem.media_url}
                     alt={mediaItem.title || `Media ${index + 1}`}
                     className="h-full w-full object-cover"
-                    width={240}
-                    height={200}
+                    // The tile's 240x200 box: the image-size table's `cover` width at the tile's ratio.
+                    width={IMAGE_FIXED_PX.cover}
+                    height={(IMAGE_FIXED_PX.cover * 5) / 6}
                     unoptimized
                   />
                 </span>

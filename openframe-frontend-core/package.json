@@ -152,6 +152,12 @@
       "require": "./dist/platform-domains.cjs",
       "default": "./dist/platform-domains.js"
     },
+    "./image-sizes": {
+      "types": "./dist/styles/image-sizes.d.ts",
+      "import": "./dist/styles/image-sizes.js",
+      "require": "./dist/styles/image-sizes.cjs",
+      "default": "./dist/styles/image-sizes.js"
+    },
     "./chat-protocol": {
       "types": "./dist/chat-protocol/index.d.ts",
       "import": "./dist/chat-protocol/index.js",
@@ -290,6 +296,12 @@
       "require": "./dist/utils/csv.cjs",
       "default": "./dist/utils/csv.js"
     },
+    "./utils/clickup-drop-down": {
+      "types": "./dist/utils/clickup-drop-down.d.ts",
+      "import": "./dist/utils/clickup-drop-down.js",
+      "require": "./dist/utils/clickup-drop-down.cjs",
+      "default": "./dist/utils/clickup-drop-down.js"
+    },
     "./utils/common": {
       "types": "./dist/utils/common.d.ts",
       "import": "./dist/utils/common.js",
@@ -340,7 +352,6 @@
       "default": "./dist/assets/index.js"
     },
     "./tailwind.config.ts": {
-      "types": "./dist/tailwind.config.d.ts",
       "default": "./tailwind.config.ts"
     },
     "./components/icons-v2": {
@@ -351,6 +362,7 @@
     },
     "./eslint-config": "./eslint-config/index.js",
     "./eslint-config/base": "./eslint-config/base.js",
+    "./eslint-config/image-sizes": "./eslint-config/image-sizes.js",
     "./eslint-config/next": "./eslint-config/next.js",
     "./eslint-config/react": "./eslint-config/react.js",
     "./eslint-config/relay": "./eslint-config/relay.js",

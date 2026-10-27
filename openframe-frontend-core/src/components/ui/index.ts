@@ -117,6 +117,19 @@ export * from './compliance-badge';
 export * from './feature-card';
 export * from './feature-list';
 export { FloatingTooltip } from './floating-tooltip';
+export {
+  Trendline,
+  TrendHistory,
+  TREND_TONES,
+  formatTrendChange,
+  trendlinePoints,
+  trendTone,
+  trendToneClass,
+  type TrendTone,
+  type TrendlineProps,
+  type TrendHistoryProps,
+  type TrendHistoryColumn,
+} from './trendline';
 export { SourceTooltip, type SourceTooltipProps, type SourceRef } from './source-tooltip';
 export { TruncateText, type TruncateTextProps } from './truncate-text';
 export * from './highlight-card';
@@ -134,6 +147,7 @@ export * from './deleted-user-avatar';
 export * from './square-avatar';
 // THE sizes of the library's components (avatars, icons, tiles, media, text rows).
 export * from '../../styles/component-sizes';
+export * from '../../styles/image-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';
