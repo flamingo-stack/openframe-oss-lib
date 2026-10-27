@@ -65,8 +65,6 @@ public class PackageUpdateStatusProcessor {
         PackageUpdateRequest request = requestRepository.findByTenantIdAndRequestId(tenantId, requestId).orElse(null);
         Instant deadlineBefore = state.getDeadlineAt();
         PackageUpdateDeviceStateReducer.apply(state, request, event);
-        // before the save: a failed write leaves the event unacked, its redelivery arms the deadline again and the
-        // force scheduled under the same key replaces its row. After the save the redelivery would read as a duplicate
         driveDeadlineForce(state, request, deadlineBefore, machineId);
         executionRecorder.record(request, machineId, event);
         deviceStateRepository.save(state);
@@ -81,11 +79,7 @@ public class PackageUpdateStatusProcessor {
         rollUp(tenantId, requestId, request);
     }
 
-    // the server's half of a WAIT's deadline: the force is scheduled for the deadline the moment it is armed, and
-    // withdrawn if the update finishes before it is due. A device leaves WAITING only to COMPLETED or FAILED, so the
-    // force reaches exactly the device still waiting at its deadline
-    private void driveDeadlineForce(PackageUpdateDeviceState state, PackageUpdateRequest request, Instant deadlineBefore,
-                                    String machineId) {
+    private void driveDeadlineForce(PackageUpdateDeviceState state, PackageUpdateRequest request, Instant deadlineBefore, String machineId) {
         Instant deadlineAt = state.getDeadlineAt();
         if (deadlineAt == null) {
             return;
@@ -97,7 +91,6 @@ public class PackageUpdateStatusProcessor {
                     requestId, machineId, deadlineAt);
             return;
         }
-        // past its deadline the force is out already: withdrawing it would only close its delivery as cancelled
         if (isTerminal(state) && Instant.now().isBefore(deadlineAt)) {
             deliveryTracker.cancel(DeliveryType.PACKAGE_UPDATE, PackageUpdateDeliverySeed.deadlineTargetId(requestId),
                     machineId, "update finished before its deadline");

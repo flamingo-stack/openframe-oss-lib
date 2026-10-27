@@ -20,8 +20,6 @@ public class PackageUpdateDeliverySeed implements DeliverySeed {
     private final PackageReference packageRef;
     private final PackageUpdateMode mode;
     private final Integer countdownSeconds;
-    // the force a WAIT escalates to at its deadline: scheduled while the WAIT still runs on the machine, so it takes a
-    // delivery row of its own and the WAIT's row keeps its result, its re-run and its watchdog
     private final boolean deadlineForce;
 
     public static String deadlineTargetId(String requestId) {
