@@ -179,8 +179,8 @@ run before.
 ## Rebuild and replay
 
 These are offset resets with the standard Kafka tools, not jobs of this module. See
-[Replay](../openframe-event-processing/README.md#replay) in `openframe-event-processing`: reset a group
-`--to-earliest` to re-apply a whole topic, or `--to-offset` from a DLT record's `kafka_dlt-original-offset` header.
+[Replay](../openframe-event-processing/README.md#replay) in `openframe-event-processing`: reset one projection's group
+`--to-earliest` to re-apply a whole topic to it, or `--to-offset` from a DLT record's `kafka_dlt-original-offset` header.
 Never copy a DLT record back to its topic.
 
 ## Tests
