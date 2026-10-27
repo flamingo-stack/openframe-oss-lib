@@ -550,8 +550,8 @@ export interface EmbeddableChatProps {
    *    portal; the composer stays here.
    *  - `null`: no header and no thread at all — the composer alone.
    * Either of the last two implies `rail="none"`, and the header is the page
-   * one (`MingoChatHeader variant="page"`): no close, collapse or list control,
-   * no Compact (it belongs in `composerMenuItems`). The composer never remounts
+   * one (`MingoChatHeader variant="page"`): no close, collapse or list control.
+   * Its ⋯ is the chat's, Compact included. The composer never remounts
    * when this changes, so the draft, staged context, picker and uploads
    * survive it; the thread remounts in each new container and opens on the
    * latest message (its data is the host's `mingoState`). Meant for
@@ -2641,18 +2641,12 @@ function EmbeddableChatInner({
     });
   };
   const cancelInlineRename = () => setInlineRenameId(null);
-  // The v2 header's ⋯: the split header's, with the inline rename when asked.
+  // The v2 header's ⋯, and the page header's (`threadContainer`): the split
+  // header's, with the inline rename when asked.
   const mingoHeaderMenuItems = chatDialogMenuItems({
     onCopyLink: headerOnCopyLink,
     onRename: mingoHeaderOnRename,
     onCompact: headerOnCompact,
-    onArchive: headerOnArchive,
-  });
-  // The page header's ⋯ (`threadContainer`): no Compact — in that layout it
-  // lives in the composer's own ⋯ (`composerMenuItems`).
-  const pageHeaderMenuItems = chatDialogMenuItems({
-    onCopyLink: headerOnCopyLink,
-    onRename: mingoHeaderOnRename,
     onArchive: headerOnArchive,
   });
 
@@ -3484,7 +3478,7 @@ function EmbeddableChatInner({
       // Over the archive the header is the archive's (see the v2 header).
       title={archiveOpen ? 'Chat Archive' : headerShowBack || isGuideEmpty ? headerTitle : freshConversationTitle}
       meta={archiveOpen || !hasConversation ? undefined : [headerPersonName, chatDayLabel(activeDialog?.timestamp)]}
-      menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? pageHeaderMenuItems : []}
+      menuItems={headerShowBack && !isViewingArchived && !archiveOpen ? mingoHeaderMenuItems : []}
       extraMenuItems={isViewingArchived || archiveOpen ? undefined : chatMenuExtraItems}
       onRestore={isViewingArchived && !archiveOpen ? headerOnRestore : undefined}
       renaming={inlineRenaming && !archiveOpen}

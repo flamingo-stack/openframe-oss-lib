@@ -214,23 +214,25 @@ describe('EmbeddableChat split: thread portalled into the page', () => {
     }
   });
 
-  it("keeps Compact out of the header's ⋯ and puts the host's items in the composer's", () => {
+  it("puts Compact in the header's ⋯, before Archive, and the host's items in the composer's", () => {
     const page = pageNode();
     const compact = vi.fn();
+    const hostItem = vi.fn();
     renderChat(createState(), {
       threadContainer: page,
-      mingoDialogCapabilities: { canRename: true, canArchive: true, compactDialog: vi.fn() },
-      composerMenuItems: [{ id: 'compact', label: 'Compact Chat Memory', onClick: compact }],
+      mingoDialogCapabilities: { canRename: true, canArchive: true, compactDialog: compact },
+      composerMenuItems: [{ id: 'host', label: 'Host Action', onClick: hostItem }],
     });
 
     openMenu('Chat actions');
     const headerItems = screen.getAllByRole('menuitem').map(item => item.textContent);
-    expect(headerItems).toEqual(['Rename Chat', 'Archive Chat']);
-    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(headerItems).toEqual(['Rename Chat', 'Compact Chat Memory', 'Archive Chat']);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Compact Chat Memory' }));
+    expect(compact).toHaveBeenCalledWith(expect.objectContaining({ id: 'd-1' }));
 
     openMenu('Composer actions');
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Compact Chat Memory' }));
-    expect(compact).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Host Action' }));
+    expect(hostItem).toHaveBeenCalledTimes(1);
   });
 });
 
