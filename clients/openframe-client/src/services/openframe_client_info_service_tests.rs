@@ -1,14 +1,9 @@
 use super::*;
+use crate::test_support::directories;
 use tempfile::TempDir;
 
 fn service_in(dir: &TempDir) -> OpenFrameClientInfoService {
-    let root = dir.path();
-    OpenFrameClientInfoService::new(DirectoryManager::with_custom_dirs(
-        root.join("logs"),
-        root.join("app_support"),
-        root.join("secured"),
-    ))
-    .unwrap()
+    OpenFrameClientInfoService::new(directories(dir)).unwrap()
 }
 
 fn write_info(dir: &TempDir, contents: &[u8]) {

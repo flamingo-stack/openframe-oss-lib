@@ -1,15 +1,10 @@
 use super::*;
 use crate::models::update_state::UpdatePhase;
+use crate::test_support::directories;
 use tempfile::TempDir;
 
 fn service_in(dir: &TempDir) -> UpdateStateService {
-    let root = dir.path();
-    UpdateStateService::new(DirectoryManager::with_custom_dirs(
-        root.join("logs"),
-        root.join("app_support"),
-        root.join("secured"),
-    ))
-    .unwrap()
+    UpdateStateService::new(directories(dir)).unwrap()
 }
 
 #[tokio::test]

@@ -1,14 +1,9 @@
 use super::*;
+use crate::test_support::directories;
 use tempfile::TempDir;
 
 fn service_in(dir: &TempDir) -> ToolConnectionService {
-    let root = dir.path();
-    ToolConnectionService::new(DirectoryManager::with_custom_dirs(
-        root.join("logs"),
-        root.join("app_support"),
-        root.join("secured"),
-    ))
-    .unwrap()
+    ToolConnectionService::new(directories(dir)).unwrap()
 }
 
 fn file_in(dir: &TempDir) -> PathBuf {

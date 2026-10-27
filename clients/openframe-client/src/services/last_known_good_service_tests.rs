@@ -1,14 +1,9 @@
 use super::*;
+use crate::test_support::directories;
 use tempfile::TempDir;
 
 fn service_in(dir: &TempDir) -> LastKnownGoodService {
-    let root = dir.path();
-    LastKnownGoodService::new(DirectoryManager::with_custom_dirs(
-        root.join("logs"),
-        root.join("app_support"),
-        root.join("secured"),
-    ))
-    .unwrap()
+    LastKnownGoodService::new(directories(dir)).unwrap()
 }
 
 #[tokio::test]
