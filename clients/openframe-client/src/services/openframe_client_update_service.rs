@@ -11,6 +11,7 @@ use crate::services::tool_ops::ToolOps;
 use crate::services::tool_run_manager::ToolRunManager;
 use crate::services::update_handler_service::UpdateHandlerService;
 use crate::services::update_state_service::UpdateStateService;
+use crate::utils::fs::JsonFile;
 use crate::utils::version_comparator;
 use anyhow::{anyhow, Context, Result};
 use semver::Version;
@@ -413,15 +414,16 @@ impl OpenFrameClientUpdateService {
             }
         }
 
-        let mut state = match self.update_state_service.load().await {
-            Ok(Some(state)) => state,
-            Ok(None) => {
+        let mut state = match self.update_state_service.read_state().await {
+            Ok(JsonFile::Parsed(state)) => state,
+            Ok(JsonFile::Missing) => {
                 warn!(
                     "Updater for {} exited early and the update state is gone (client uninstalled?), nothing to finish",
                     target_version
                 );
                 return;
             }
+            Ok(JsonFile::Corrupt) => UpdateState::new(target_version.to_string()),
             Err(e) => {
                 warn!(
                     "Updater for {} exited early and the update state is unreadable: {:#}",
