@@ -1,7 +1,7 @@
 'use client';
 
 import { type ElementType, type ReactNode, Suspense } from 'react';
-import { AnnouncedLoadingScope } from '../ui/loading-scope';
+import { AnnouncedLoadingScope, LoadingStatus, LoadingWhen, useLoadingScope } from '../ui/loading-scope';
 
 /**
  * A Suspense fallback drawn by the components themselves: the SAME component the boundary waits on, rendered in a
@@ -39,12 +39,18 @@ export function LoadingFallback({
 }
 
 /**
- * The one Suspense boundary whose fallback is its own children in a loading scope: what every screen wrote out as
- * `<Suspense fallback={<LoadingFallback label={…}>{x}</LoadingFallback>}>{x}</Suspense>`, with the child twice.
+ * THE boundary (the loading standard's one Suspense: `src/loading-standard/engine.mjs`, rules RAW_SUSPENSE and
+ * PAGE_BOUNDARY). It wraps only the component that waits on a read; its fallback is that component (or `fallback`, its
+ * view with no data) drawn in a loading scope, where every part draws its own loading form, so nothing jumps when the
+ * content arrives. Sections that share one read, or would look broken arriving one by one, share one boundary. A page's
+ * static frame (heading, copy, back link, cached content) renders at once, outside every boundary; a component that reads
+ * in the browser keeps its own loading state (`LoadingWhen`, `useLoadingScope`) and needs none.
  *
  *   <LoadingSuspense label="Loading the tenants"><TenantList /></LoadingSuspense>
  *   <LoadingSuspense label="Loading the script" fallback={<ScriptView script={null} />}><ScriptReader /></LoadingSuspense>
  *   <LoadingSuspense status={false} as="span"><MentionChip id={id} /></LoadingSuspense>
+ *   <LoadingSuspense live label="Loading the run" fallback={<RunView run={null} />}><RunReader /></LoadingSuspense>
+ *   <LoadingSuspense gated={!flagReady} label="Loading usage" fallback={<UsageScreen data={null} />}><UsageReader /></LoadingSuspense>
  */
 export function LoadingSuspense({
   label,
@@ -52,6 +58,9 @@ export function LoadingSuspense({
   as,
   className,
   fallback,
+  live = false,
+  gated = false,
+  bare = false,
   children,
 }: {
   label?: string;
@@ -65,17 +74,48 @@ export function LoadingSuspense({
    * children.
    */
   fallback?: ReactNode;
+  /**
+   * The wait leaves the view usable: it is drawn in a BARE loading scope (no inert region) with the same status, so
+   * every part still draws its own loading form and every control that reads the scope still locks itself, while one
+   * that does not (Back, a plain `Button`, a search field) stays live. A body whose controls act on the record keeps
+   * the default (inert).
+   */
+  live?: boolean;
+  /**
+   * A gate the read depends on (a feature flag, a role, a test mode) has not answered: draw the waiting view and send
+   * nothing (the children are not rendered). The same view stands in for both waits, so no page spells the two branches.
+   */
+  gated?: boolean;
+  /**
+   * The gate's window draws the scope only (no region element of its own), and the scope stays mounted across the gate,
+   * so the view is not remounted: for a view inside a surface that already announces its load, or whose layout an extra
+   * element would break.
+   */
+  bare?: boolean;
   children: ReactNode;
 }) {
+  const view = fallback ?? children;
+  const waiting = live ? (
+    <LiveWait label={label} status={status}>
+      {view}
+    </LiveWait>
+  ) : (
+    <LoadingFallback label={label} status={status} as={as} className={className}>
+      {view}
+    </LoadingFallback>
+  );
+  const boundary = <Suspense fallback={waiting}>{children}</Suspense>;
+  if (bare) return <LoadingWhen loading={gated}>{gated ? view : boundary}</LoadingWhen>;
+  return gated ? waiting : boundary;
+}
+
+/** A `live` wait: the view in a bare loading scope, announced once (silent inside an outer scope, which has said it). */
+function LiveWait({ label, status = true, children }: { label?: string; status?: boolean; children: ReactNode }) {
+  const outer = useLoadingScope();
   return (
-    <Suspense
-      fallback={
-        <LoadingFallback label={label} status={status} as={as} className={className}>
-          {fallback ?? children}
-        </LoadingFallback>
-      }
-    >
-      {children}
-    </Suspense>
+    <>
+      <LoadingWhen loading>{children}</LoadingWhen>
+      {status && !outer && <LoadingStatus label={label ?? 'Loading the page'} />}
+    </>
   );
 }

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.TransientDataAccessResourceException;
 import org.springframework.data.mongodb.UncategorizedMongoDbException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -51,12 +52,12 @@ class MongoTransactionRunnerTest {
     }
 
     @Test
-    void anotherTransientError_suchAsAFailover_reachesTheCallerUnchanged() {
+    void anotherTransientError_suchAsAFailover_reachesTheCallerAsTransient_soItIsRetriedButNotA409() {
         UncategorizedMongoDbException failure = transientError(10107, "NotWritablePrimary");
 
         assertThatThrownBy(() -> runner.run(() -> {
             throw failure;
-        })).isSameAs(failure);
+        })).isExactlyInstanceOf(TransientDataAccessResourceException.class).hasCause(failure);
     }
 
     @Test

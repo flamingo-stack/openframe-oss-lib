@@ -2,7 +2,7 @@ use crate::clients::tool_api_client::ToolApiClient;
 use crate::models::download_configuration::{DownloadConfiguration, InstallationType};
 use crate::models::tool_installation_message::AssetSource;
 use crate::models::ToolInstallationMessage;
-use crate::models::{FirstRunState, Installation, InstalledTool, ToolRecordState};
+use crate::models::{Installation, InstalledTool, ToolRecordState};
 #[cfg(target_os = "windows")]
 use crate::platform::file_lock::log_file_lock_info;
 use crate::platform::DirectoryManager;
@@ -124,11 +124,6 @@ impl ToolInstallationService {
         // Create tool-specific directory
         let base_folder_path = self.directory_manager.app_support_dir();
         let tool_folder_path = base_folder_path.join(tool_agent_id);
-        let mut first_run = if tool_agent_id == crate::models::CHAT_TOOL_AGENT_ID {
-            FirstRunState::Pending
-        } else {
-            FirstRunState::Done
-        };
 
         let installed_tool = self
             .installed_tools_service
@@ -162,7 +157,6 @@ impl ToolInstallationService {
             .with_version_override(&version_clone, &effective_version);
 
         if let Some(installed_tool) = installed_tool {
-            first_run = installed_tool.first_run;
             if reinstall {
                 info!(
                     "Reinstalling tool {} with version {}",
@@ -769,7 +763,6 @@ impl ToolInstallationService {
             installation,
             assets: Vec::new(),
             state: ToolRecordState::Installed,
-            first_run,
         };
 
         self.installed_tools_service

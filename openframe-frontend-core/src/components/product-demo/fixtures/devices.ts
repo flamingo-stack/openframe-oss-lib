@@ -1,6 +1,6 @@
 import type { DeviceFilters, DeviceRow } from '../../features/devices';
 import type { DemoCast } from '../cast';
-import { DEMO_DEVICES, demoMinutesAgo } from './shared';
+import { type DEMO_DEVICES, DEMO_FLEET, DEMO_FLEET_SEARCH_OS, demoMinutesAgo } from './shared';
 
 type DemoDevice = (typeof DEMO_DEVICES)[keyof typeof DEMO_DEVICES];
 
@@ -48,16 +48,9 @@ export interface DevicesFixture {
 
 /** The fleet of the three demo customers on an ordinary morning: a mix of states, one desktop offline since last night. */
 export function buildDevicesFixture(cast: DemoCast): DevicesFixture {
-  const devices: DeviceRow[] = [
-    device(cast, DEMO_DEVICES.frontDesk, 'laptop', 'ONLINE', 2),
-    device(cast, DEMO_DEVICES.reception, 'desktop', 'OFFLINE', 190),
-    device(cast, DEMO_DEVICES.mayaAir, 'laptop', 'ONLINE', 1),
-    device(cast, DEMO_DEVICES.buildServer, 'server', 'ONLINE', 1),
-    device(cast, DEMO_DEVICES.leoThinkPad, 'laptop', 'OFFLINE', 64),
-    device(cast, DEMO_DEVICES.samT14, 'laptop', 'ONLINE', 3),
-    device(cast, DEMO_DEVICES.jenSurface, 'laptop', 'ONLINE', 6),
-    device(cast, DEMO_DEVICES.priyaXps, 'laptop', 'ONLINE', 2),
-  ];
+  const devices: DeviceRow[] = DEMO_FLEET.map(entry =>
+    device(cast, entry.device, entry.type, entry.status, entry.lastSeenMinutesAgo),
+  );
   const deviceFilters: DeviceFilters = {
     statuses: countBy(devices, row => row.status),
     deviceTypes: countBy(devices, row => row.type),
@@ -75,7 +68,7 @@ export function buildDevicesFixture(cast: DemoCast): DevicesFixture {
 /** The fleet narrowed to its Windows devices, the way the list answers that search. */
 export function buildWindowsDevicesFixture(cast: DemoCast): DevicesFixture {
   const fleet = buildDevicesFixture(cast);
-  const devices = fleet.devices.filter(row => row.osType === 'WINDOWS');
+  const devices = fleet.devices.filter(row => row.osType === DEMO_FLEET_SEARCH_OS);
   return {
     devices,
     deviceFilters: { ...fleet.deviceFilters, filteredCount: devices.length },
