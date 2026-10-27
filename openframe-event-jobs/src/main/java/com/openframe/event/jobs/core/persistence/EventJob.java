@@ -1,5 +1,6 @@
 package com.openframe.event.jobs.core.persistence;
 
+import com.openframe.event.jobs.core.service.EventJobProgress;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,7 +19,7 @@ import java.time.Instant;
 @AllArgsConstructor
 @FieldNameConstants
 @Document(collection = "event_job_runs")
-public class EventJob {
+public class EventJob implements EventJobProgress {
 
     // <jobId>:<runId>, so a second pod that starts the same run fails its insert.
     @Id

@@ -69,7 +69,7 @@ class ReconciliationRunnerTest {
         when(itemRepository.resolveId(any())).thenAnswer(invocation -> invocation.<Item>getArgument(0).getId());
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         EventJobService jobService = new EventJobService(jobRepository, clock);
-        EventJobTicker ticker = new EventJobTicker(jobService, new EventJobShutdown(), clock);
+        EventJobTicker<EventJob> ticker = new EventJobTicker<>(jobService, new EventJobShutdown(), clock);
         ReconciliationMetrics metrics = new ReconciliationMetrics(meterRegistry, List.of(projection));
         when(specRegistry.resolveType(projection)).thenReturn("organizations");
         runner = new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics, specRegistry,

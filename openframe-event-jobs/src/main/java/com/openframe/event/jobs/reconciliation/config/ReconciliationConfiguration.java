@@ -1,6 +1,7 @@
 package com.openframe.event.jobs.reconciliation.config;
 
 import com.openframe.event.jobs.core.lock.EventJobLock;
+import com.openframe.event.jobs.core.persistence.EventJob;
 import com.openframe.event.jobs.core.service.EventJobService;
 import com.openframe.event.jobs.core.service.EventJobTicker;
 import com.openframe.event.jobs.reconciliation.config.properties.ReconciliationProperties;
@@ -36,7 +37,7 @@ public class ReconciliationConfiguration {
 
     @Bean
     public ReconciliationRunner reconciliationRunner(ReconciliationProperties properties, ProjectedItemRepository itemRepository,
-                                                     EventJobService jobService, EventJobTicker ticker,
+                                                     EventJobService jobService, EventJobTicker<EventJob> ticker,
                                                      ReconciliationMetrics metrics, AggregateSpecRegistry specRegistry,
                                                      PublishedAggregates publishedAggregates) {
         return new ReconciliationRunner(properties, itemRepository, jobService, ticker, metrics, specRegistry,

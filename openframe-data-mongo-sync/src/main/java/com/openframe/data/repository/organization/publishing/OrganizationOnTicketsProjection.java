@@ -3,6 +3,7 @@ package com.openframe.data.repository.organization.publishing;
 import com.openframe.data.document.organization.Organization;
 import com.openframe.data.document.ticket.Ticket;
 import com.openframe.data.repository.organization.OrganizationRepository;
+import com.openframe.data.repository.ticket.TicketProjectionRepository;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult.Mismatch;
 import com.openframe.publishing.api.model.ReconciliationResult;
@@ -11,6 +12,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -21,7 +23,8 @@ import java.util.Set;
 
 import static java.util.stream.Collectors.toSet;
 
-// The organization name every ticket keeps in organizationName, written today by TicketCascadeAspect.
+// The organization name every ticket keeps in organizationName; TicketCascadeAspect writes it until the mode is events.
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class OrganizationOnTicketsProjection implements Projection<OrganizationEvent, TicketOrganizationView> {
@@ -29,6 +32,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
     private static final String NAME = "organization-on-tickets";
 
     private final OrganizationRepository organizationRepository;
+    private final TicketProjectionRepository ticketProjectionRepository;
 
     @Override
     public String name() {
@@ -37,7 +41,30 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
 
     @Override
     public void apply(PublishedRecord<OrganizationEvent> record) {
-        throw new UnsupportedOperationException(NAME + " applies events from stage 6; its mode must stay aspect");
+        String tenantId = record.getTenantId();
+        OrganizationEvent event = record.getEvent();
+        String organizationId = event.getOrganizationId();
+        String name = event.getName();
+        long updated = ticketProjectionRepository.updateOrganizationName(tenantId, organizationId, name);
+        log.debug("{} set the name of organization {} on {} ticket(s) of tenant {}", NAME, organizationId, updated, tenantId);
+    }
+
+    @Override
+    public long countChanges(PublishedRecord<OrganizationEvent> record, int limit) {
+        String tenantId = record.getTenantId();
+        OrganizationEvent event = record.getEvent();
+        String organizationId = event.getOrganizationId();
+        String name = event.getName();
+        return ticketProjectionRepository.countOutdatedOrganizationNames(tenantId, organizationId, name, limit);
+    }
+
+    @Override
+    public String applyBatch(PublishedRecord<OrganizationEvent> record, String lastId, int batchSize) {
+        String tenantId = record.getTenantId();
+        OrganizationEvent event = record.getEvent();
+        String organizationId = event.getOrganizationId();
+        String name = event.getName();
+        return ticketProjectionRepository.updateOrganizationNameBatch(tenantId, organizationId, name, lastId, batchSize);
     }
 
     @Override
@@ -60,17 +87,17 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
             return ReconciliationResult.allMatch();
         }
 
-        Map<TenantOrganization, String> organizationNames = organizationNames(withOrganization);
+        Map<TenantOrganization, Organization> organizations = findOrganizations(withOrganization);
 
         List<Mismatch> mismatches = withOrganization.stream()
-            .map(ticket -> mismatchOf(ticket, organizationNames))
+            .map(ticket -> toMismatch(ticket, organizations))
             .filter(Objects::nonNull)
             .toList();
         return new ReconciliationResult(mismatches);
     }
 
-    // The current name of every organization of the batch, in one query.
-    private Map<TenantOrganization, String> organizationNames(List<TicketOrganizationView> tickets) {
+    // Every organization of the batch, in one query: its name to compare, its _id to publish again.
+    private Map<TenantOrganization, Organization> findOrganizations(List<TicketOrganizationView> tickets) {
         Set<String> tenantIds = tickets.stream().map(TicketOrganizationView::getTenantId).collect(toSet());
         Set<String> organizationIds = tickets.stream().map(TicketOrganizationView::getOrganizationId).collect(toSet());
 
@@ -79,7 +106,7 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         return organizations.stream()
             .collect(
                 HashMap::new,
-                (acc, org) -> acc.put(buildTenantOrganization(org), org.getName()),
+                (acc, org) -> acc.put(buildTenantOrganization(org), org),
                 HashMap::putAll);
     }
 
@@ -89,20 +116,24 @@ public class OrganizationOnTicketsProjection implements Projection<OrganizationE
         return new TenantOrganization(tenantId, organizationId);
     }
 
-    private static Mismatch mismatchOf(TicketOrganizationView ticket, Map<TenantOrganization, String> organizationNames) {
+    private static Mismatch toMismatch(TicketOrganizationView ticket, Map<TenantOrganization, Organization> organizations) {
         String tenantId = ticket.getTenantId();
         String organizationId = ticket.getOrganizationId();
         String ticketId = ticket.getId();
         TenantOrganization key = new TenantOrganization(tenantId, organizationId);
-        if (!organizationNames.containsKey(key)) {
-            return new Mismatch(tenantId, ticketId, null, "organization " + organizationId + " is gone");
+        Organization organization = organizations.get(key);
+        // The copy is kept when its source is deleted, so a source that is gone leaves no mismatch.
+        if (organization == null) {
+            return null;
         }
-        String sourceName = organizationNames.get(key);
+        String sourceName = organization.getName();
         String copiedName = ticket.getOrganizationName();
         if (Objects.equals(sourceName, copiedName)) {
             return null;
         }
-        return new Mismatch(tenantId, ticketId, null, "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
+        String sourceId = organization.getId();
+        return new Mismatch(tenantId, ticketId, sourceId,
+            "name \"" + copiedName + "\" differs from organization's \"" + sourceName + "\"");
     }
 
     // A tenant's organization: an organizationId is unique only inside its tenant.

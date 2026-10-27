@@ -35,7 +35,7 @@ public class ReconciliationRunner {
     private final ReconciliationProperties properties;
     private final ProjectedItemRepository itemRepository;
     private final EventJobService jobService;
-    private final EventJobTicker ticker;
+    private final EventJobTicker<EventJob> ticker;
     private final ReconciliationMetrics metrics;
     private final AggregateSpecRegistry specRegistry;
     private final PublishedAggregates publishedAggregates;
