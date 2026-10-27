@@ -3,6 +3,7 @@ package com.openframe.data.nats.packageupdate;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
 import com.openframe.data.document.rmm.software.PackageUpdateMode;
+import com.openframe.data.document.rmm.software.PackageUpdateRequest;
 import com.openframe.data.document.rmm.software.PackageUpdateSource;
 import com.openframe.data.nats.delivery.PackageUpdateDeliverySeed;
 import lombok.experimental.UtilityClass;
@@ -36,6 +37,18 @@ public class PackageUpdateWire {
                 .packageRef(reference(manager, packageName, brewPackageType))
                 .mode(mode)
                 .countdownSeconds(mode == PackageUpdateMode.FORCE ? forceCountdownSeconds : null)
+                .build();
+    }
+
+    public PackageUpdateDeliverySeed deadlineForce(String machineId, PackageUpdateRequest request) {
+        return PackageUpdateDeliverySeed.builder()
+                .machineId(machineId)
+                .requestId(request.getRequestId())
+                .source(source(request.getSource()))
+                .packageRef(reference(request.getPackageManager(), request.getPackageName(), request.getBrewPackageType()))
+                .mode(PackageUpdateMode.FORCE)
+                .countdownSeconds(request.getForceCountdownSeconds())
+                .deadlineForce(true)
                 .build();
     }
 }
