@@ -49,6 +49,8 @@ type SoftwareActionRun {
     version: String
     "INSTALL or UPDATE."
     action: SoftwareAction!
+    "The ACTION column: Install / Update / Auto-update / Adopt."
+    kind: SoftwareActionKind!
     "Package manager engine — BREW / WINGET / CHOCO."
     engine: PackageManagerType!
     status: SoftwareActionStatus!
@@ -70,6 +72,17 @@ type SoftwareActionRun {
     scheduleId: String
 }
 
+"""What a software action did, as the ACTION column shows it."""
+enum SoftwareActionKind {
+    INSTALL
+    "An update an admin started (now or scheduled)."
+    UPDATE
+    "An update started by an auto-update policy when a new version came out."
+    AUTO_UPDATE
+    "A manually installed copy reinstalled with a package manager."
+    ADOPT
+}
+
 enum SoftwareActionStatus {
     SCHEDULED
     IN_PROGRESS
@@ -85,6 +98,8 @@ type SoftwareActionDevice {
     hostname: String
     organizationId: String
     organizationName: String
+    "What ran on this device: UPDATE, or ADOPT for a device that had the title installed manually."
+    kind: SoftwareActionKind
     "Device connectivity (ONLINE / OFFLINE / ...), for the online dot."
     deviceStatus: DeviceStatus
     "Last time the device was seen, shown while it is offline."
@@ -121,6 +136,8 @@ type SoftwareActionRunEdge {
 input SoftwareActionFilterInput {
     statuses: [SoftwareActionStatus!]
     actions: [SoftwareAction!]
+    "The ACTION dropdown (Install / Update / Auto-update / Adopt)."
+    kinds: [SoftwareActionKind!]
     engines: [PackageManagerType!]
 }
 
@@ -129,6 +146,7 @@ input SoftwareActionFilterInput {
 type SoftwareActionFilters {
     statuses: [ScriptFilterOption!]!
     actions: [ScriptFilterOption!]!
+    kinds: [ScriptFilterOption!]!
     engines: [ScriptFilterOption!]!
     filteredCount: Int!
 }
