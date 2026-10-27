@@ -164,13 +164,13 @@ type Software {
     """Kind of software — the Type field on the detail page (e.g. "Application")."""
     type: SoftwareType
 
-    """AUTO-UPDATE column and the detail page's "Turn Off Auto-Update" button. ON = an auto-update policy
-    keeps this title updated, OFF = a package manager installed it but no policy does. Null ("–") = no device
-    has it from a package manager, so there is nothing to auto-update."""
+    """AUTO-UPDATE column and the detail page's "Turn Off Auto-Update" button (shown while ON).
+    Filterable with the same values (SoftwareFilterInput.autoUpdateStatuses). Null = unknown."""
     autoUpdate: SoftwareAutoUpdateStatus
 
     """Devices that have this title installed manually (installedBy UNMANAGED) and can be adopted — the
-    ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner.
+    ADOPTION column and the "N devices have … installed manually" banner with Adopt. Null or 0 = "–", no banner;
+    always 0 when autoUpdate is NO_PACKAGE (nothing to adopt with).
     Sortable as adoptionCount."""
     adoptionCount: Int
 }
@@ -196,7 +196,8 @@ type SoftwareOnDevice {
     Null = no adoption."""
     adoption: SoftwareAdoption
 
-    """AUTO-UPDATE column for this device: ON / OFF. Null ("–") = installed manually, nothing to auto-update."""
+    """AUTO-UPDATE column for this device. Filterable with the same values
+    (SoftwareOnDeviceFilterInput.autoUpdateStatuses). Null = unknown."""
     autoUpdate: SoftwareAutoUpdateStatus
 }
 
@@ -254,10 +255,16 @@ enum SoftwareType {
     OTHER
 }
 
-"""Whether an auto-update policy keeps software updated."""
+"""Whether software can be and is kept updated automatically — the AUTO-UPDATE column and its filter."""
 enum SoftwareAutoUpdateStatus {
+    "An auto-update policy keeps it updated (the ON tag)."
     ON
+    "A package manager installed it, but no auto-update policy covers it (the OFF tag)."
     OFF
+    "No package manager has a package for this app, so it can't be auto-updated or adopted (\"No package found\")."
+    NO_PACKAGE
+    "Installed by hand: it needs adoption first (\"–\")."
+    NEEDS_ADOPTION
 }
 
 enum SoftwareAdoptionStatus {
@@ -318,7 +325,7 @@ type SoftwareFilters {
     sources: [SoftwareFilterOption!]!
     versionStatuses: [SoftwareFilterOption!]!
     severities: [SoftwareFilterOption!]!
-    "AUTO-UPDATE dropdown: ON / OFF."
+    "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
     autoUpdateStatuses: [SoftwareFilterOption!]!
 }
 
@@ -326,8 +333,12 @@ type SoftwareOnDeviceFilters {
     statuses: [SoftwareFilterOption!]!
     "INSTALLED BY dropdown: WINGET / CHOCOLATEY / BREW / UNMANAGED (Manually)."
     installedBy: [SoftwareFilterOption!]!
-    "AUTO-UPDATE dropdown: ON / OFF."
+    "AUTO-UPDATE dropdown: ON / OFF / NO_PACKAGE / NEEDS_ADOPTION."
     autoUpdateStatuses: [SoftwareFilterOption!]!
+    "CUSTOMER dropdown of the Adopt device picker: value = organizationId, label = its name."
+    organizations: [SoftwareFilterOption!]!
+    "STATUS dropdown of the Adopt device picker: the device statuses."
+    deviceStatuses: [SoftwareFilterOption!]!
 }
 
 type SoftwareFilterOption {
@@ -349,8 +360,10 @@ input SoftwareFilterInput {
 input SoftwareOnDeviceFilterInput {
     statuses: [SoftwareOnDeviceStatus!]
     deviceTagIds: [ID!]
-    "The Customer filter of the Adopt device picker."
+    "The CUSTOMER filter of the Adopt device picker."
     organizationIds: [ID!]
+    "The STATUS filter of the Adopt device picker (the device's own status, e.g. ACTIVE = Managed)."
+    deviceStatuses: [DeviceStatus!]
     installedBy: [SoftwareSource!]
     autoUpdateStatuses: [SoftwareAutoUpdateStatus!]
 }
@@ -468,8 +481,13 @@ extend type Mutation {
 input AdoptSoftwareInput {
     "The software title (Software.id) to adopt."
     softwareId: ID!
-    "Selected devices (Machine global ids). Each must have the title installed manually. 1..100."
-    machineIds: [ID!]!
+    """Selected devices (Machine global ids), 1..100. Devices that do not have the title installed manually are
+    skipped. Null = every device matching filter + search ("Add All Devices")."""
+    machineIds: [ID!]
+    """With machineIds null: the devices to adopt, as the picker's softwareDevices(softwareId, filter, search) lists
+    them. Always narrowed to installedBy UNMANAGED. Ignored when machineIds is set."""
+    filter: SoftwareOnDeviceFilterInput
+    search: String
     "Package Manager for Windows. macOS devices always adopt with Brew."
     windowsPackageManager: SoftwareAdoptionWindowsManager! = MATCH_CUSTOMER
 }

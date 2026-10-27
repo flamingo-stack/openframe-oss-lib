@@ -120,6 +120,7 @@ organizationIds is the Customer filter."""
 input SoftwareActionDeviceFilterInput {
     statuses: [SoftwareActionStatus!]
     organizationIds: [ID!]
+    deviceTagIds: [ID!]
 }
 
 type SoftwareActionRunConnection {
