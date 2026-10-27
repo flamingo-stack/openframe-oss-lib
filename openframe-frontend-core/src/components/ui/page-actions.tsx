@@ -34,6 +34,7 @@ export type PageActionButton = {
     | 'chip'
     | 'card'
     | 'cell'
+    | 'stepper'
   >;
   disabled?: boolean;
   /**

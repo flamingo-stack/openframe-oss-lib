@@ -48,6 +48,7 @@ export default defineConfig([
       'utils/search-params': 'src/utils/search-params.ts',
       'utils/ods-spacing': 'src/utils/ods-spacing.ts',
       'utils/csv': 'src/utils/csv.ts',
+      'utils/clickup-drop-down': 'src/utils/clickup-drop-down.ts',
       'utils/common': 'src/utils/common.ts',
       'utils/social-platforms': 'src/utils/social-platforms.ts',
       // Bite element identity — pure + isomorphic (no React, no browser
