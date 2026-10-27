@@ -12,11 +12,12 @@ packages are internal.
 ## How it works
 
 ```
-events.organizations ──> PublishedTypeListener             one per spec type (PublishedEventListeners), group <group-prefix>organizations
+events.organizations ──> ProjectionListener                one per projection (PublishedEventListeners),
+                           │                               group <group-prefix>organizations.<projection>
                            │  (a tombstone, the second record of a delete, is skipped here)
                            ▼
                          ProjectionRunner                  a delete envelope is skipped: no projection handles deletes yet
-                           │  for each projection of the type's spec
+                           │  for this listener's projection
                            ▼
                          projection.apply(record)          writes its projected items through its own repository
                            │
@@ -26,18 +27,19 @@ events.organizations ──> PublishedTypeListener             one per spec type
 
 - A record's Kafka key is the aggregate's Mongo `_id` (the outbox `aggregateId`), not a business id such as
   `organizationId`. The listener passes it to the runner for the logs.
-- [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L15)
-  registers one listener per spec type at startup, so a new published type needs no listener class.
+- [`PublishedEventListeners`](src/main/java/com/openframe/processing/listener/PublishedEventListeners.java#L16)
+  registers one listener per projection of each spec at startup, all on the type's topic, so a new projection needs no
+  listener class. Each has its own consumer group: a failing, slow or replayed projection never holds back the others.
 - The value is the `PublishedRecord` envelope: `tenantId`, `version`, `deleted`, `schemaVersion` and `event`. It is
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
-- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L29) runs each projection on its own, in name order: a
-  failed projection does not stop the others.
+- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L21) applies the record
+  to the listener's projection.
 - Versions: each projection runs in one Mongo transaction. The runner reads the version it last stored for that
   projection, tenant and aggregate in `event_projection_versions`; an older event is skipped. Otherwise it first stores
   the event's version with a `$max` upsert, then applies the event (an equal version too, so a backfill, which sends the
-  current version, still repairs drift). A failed apply rolls the version back. Two consumers of one aggregate, after a
+  current version, still repairs drift). A failed apply rolls the version back. Two consumers of one projection and aggregate, after a
   rebalance, conflict on that version document: the loser waits and tries again (up to 5 attempts, 750 ms in all), and its
   retry skips the older event. A conflict that lasts longer is retried by the error handler, like Mongo down, so the
   newer event waits instead of going to the DLT. A delete stores its version too. An event handed over to a projection
@@ -86,8 +88,8 @@ openframe:
 
 - `kafka` is separate from `spring.kafka` and from the stream's `spring.saas.kafka`. The module adds its own Kafka
   beans and replaces none.
-- A topic is `topic-prefix` + the type name (`events.organizations`), its DLT is the topic + `-dlt`, and its group
-  is `group-prefix` + the type name. Each service names its own group: two services in one group would split the
+- A topic is `topic-prefix` + the type name (`events.organizations`), its DLT is the topic + `-dlt`, and a projection's
+  group is `group-prefix` + the type name + `.` + the projection name (`...processing-organizations.organization-on-tickets`). Each service names its own group: two services in one group would split the
   events, and each would miss half of them.
 - The config is read at startup. A config refresh (the AI agent's `ContextRefresher`) does not switch a type on or
   off in a running pod.
@@ -140,31 +142,32 @@ feature off leaves the copies stale: reconciliation and the consumer lag alert s
 2. It runs on every event of its type once the feature is on in the stream (see [Switching a type](#switching-a-type)). The aspect
    that writes the same copy skips its cascade while `PublishedAggregateTopics.isPublishing(<type>)` is true.
 
-A new published type needs only its spec: the listener of its topic is registered from the spec at startup.
+A new published type needs only its spec: the listeners of its projections are registered from the spec at startup.
 
 ## Errors and the DLT
 
 | What fails | What happens |
 |---|---|
-| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L15), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. The topic waits, then continues in order. |
+| Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L15), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. This projection's listener waits, then continues in order; the other projections' listeners go on. |
 | A write conflict that lasts past the runner's 5 attempts: another consumer of the same aggregate is still writing | Retried like Mongo down, without limit, until the other consumer commits; then the older event is skipped. |
-| A projection: any other exception, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The other projections still run. The record then goes to `<topic>-dlt` once. |
+| A projection: any other exception, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The record goes to `<topic>-dlt` once, for this projection only; the other projections, in their own groups, are not affected. |
 | An unreadable value, or a `schemaVersion` newer than this build | The record goes to `<topic>-dlt` without reaching a projection. |
 
 A record goes to the DLT unchanged: same key, same value bytes. Every such record logs one ERROR line with its key
 and the exception, and Spring's headers carry the exception: `kafka_dlt-exception-message` names the failed
-projections, and `kafka_dlt-exception-stacktrace` holds every failure's stack trace (the first as the cause, the
-others as suppressed).
+projection, and `kafka_dlt-exception-stacktrace` holds its stack trace. When several projections fail on one record,
+each sends its own copy to the DLT.
 
 ## Replay
 
 There is no replay tool; use the standard Kafka tools.
 
-- **Re-apply a whole topic** (after a projection bug): stop the consumers, then reset the group to the start of the
-  compacted topic, which holds the latest event of every aggregate:
+- **Re-apply a whole topic to one projection** (after a bug in it): stop the consumers, then reset that projection's
+  group to the start of the compacted topic, which holds the latest event of every aggregate. The other projections of
+  the type are not touched:
 
   ```bash
-  kafka-consumer-groups.sh --bootstrap-server <kafka> --group <group-prefix>organizations \
+  kafka-consumer-groups.sh --bootstrap-server <kafka> --group <group-prefix>organizations.<projection> \
     --topic <topic-prefix>organizations --reset-offsets --to-earliest --execute
   ```
 
@@ -172,8 +175,8 @@ There is no replay tool; use the standard Kafka tools.
   affected items: the guard matches a missing field.
 - **Re-apply DLT records** (after the fix is deployed): do not copy them back to the topic. A re-sent old event
   would become the newest record for its key, and compaction would keep it, so a new group would read stale state.
-  Instead reset the group to the failed record's offset, from its `kafka_dlt-original-offset` header, with
-  `--to-offset`. Everything after it is applied again, which the version guard makes harmless.
+  Instead reset the group of the projection named in its `kafka_dlt-exception-message` header to the failed record's
+  offset, from its `kafka_dlt-original-offset` header, with `--to-offset`. Everything after it is applied again, which the version guard makes harmless.
 
 ## Startup checks
 
@@ -204,7 +207,7 @@ logging:
 |---|---|
 | `Registered N published aggregate spec(s): [...]` (INFO, at startup) | The specs, and so the topics, this service listens to. |
 | `Projection X applied <id> version V of tenant T` | Applied. |
-| `Projection X failed for <id> version V of tenant T` (WARN, with the stack trace) | That projection failed; the record goes to the DLT after the others ran. |
+| `Projection X failed for <id> version V of tenant T` (WARN, with the stack trace) | That projection failed; the record goes to the DLT for it. |
 | `Record <id> of <topic>-<partition> at offset O goes to <topic>-dlt` (ERROR) | Sent to the DLT. |
 | `Delete of ... skipped` / `Tombstone of ... skipped` | A delete; no projection handles deletes yet. |
 | `Created the event topic <name>` (INFO, at startup) | The topic did not exist; it now has the configured settings. |

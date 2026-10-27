@@ -167,7 +167,7 @@ class EventProcessingKafkaIT {
 
         ConsumerRecord<String, byte[]> deadLetter = deadLetterOf(aggregateId);
         assertThat(deadLetter.value()).isEqualTo(value);
-        assertThat(headerOf(deadLetter, KafkaHeaders.DLT_EXCEPTION_STACKTRACE)).contains("PublishedTypeListener");
+        assertThat(headerOf(deadLetter, KafkaHeaders.DLT_EXCEPTION_STACKTRACE)).contains("ProjectionListener");
         assertThat(output).contains("Record " + aggregateId + " of " + TOPIC).contains("goes to " + DEAD_LETTER_TOPIC);
     }
 

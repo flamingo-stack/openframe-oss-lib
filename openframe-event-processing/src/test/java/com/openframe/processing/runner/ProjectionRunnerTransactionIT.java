@@ -64,7 +64,7 @@ class ProjectionRunnerTransactionIT {
             recreateCollections(context);
 
             // execution
-            assertThatThrownBy(() -> runner.process(TYPE, AGGREGATE_ID, record(9)))
+            assertThatThrownBy(() -> runner.process(TYPE, projection, AGGREGATE_ID, record(9)))
                     .isInstanceOf(EventProcessingFailedException.class);
 
             // verifications
@@ -84,9 +84,11 @@ class ProjectionRunnerTransactionIT {
             recreateCollections(context);
 
             // execution
-            CompletableFuture<Void> older = CompletableFuture.runAsync(() -> runner.process(TYPE, AGGREGATE_ID, record(7)));
+            CompletableFuture<Void> older = CompletableFuture.runAsync(
+                    () -> runner.process(TYPE, projection, AGGREGATE_ID, record(7)));
             assertThat(projection.paused.await(10, TimeUnit.SECONDS)).isTrue();
-            CompletableFuture<Void> newer = CompletableFuture.runAsync(() -> runner.process(TYPE, AGGREGATE_ID, record(8)));
+            CompletableFuture<Void> newer = CompletableFuture.runAsync(
+                    () -> runner.process(TYPE, projection, AGGREGATE_ID, record(8)));
             Thread.sleep(150);
             projection.resume.countDown();
             older.get(10, TimeUnit.SECONDS);

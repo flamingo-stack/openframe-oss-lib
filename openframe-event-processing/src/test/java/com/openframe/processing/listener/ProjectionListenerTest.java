@@ -4,6 +4,7 @@ import com.openframe.data.repository.organization.publishing.OrganizationEvent;
 import com.openframe.processing.config.EventProcessingKafkaAutoConfiguration;
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.publishing.api.model.PublishedRecord;
+import com.openframe.publishing.api.spec.Projection;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -21,13 +22,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 // What a record does in the listener, without a broker.
-class PublishedTypeListenerTest {
+class ProjectionListenerTest {
 
     private static final String ORGANIZATIONS = "organizations";
 
     private final ProjectionRunner runner = mock(ProjectionRunner.class);
+    private final Projection<?, ?> projection = mock(Projection.class);
     private final JsonMapper envelopeMapper = EventProcessingKafkaAutoConfiguration.buildEnvelopeMapper();
-    private final PublishedTypeListener listener = new PublishedTypeListener(ORGANIZATIONS, OrganizationEvent.class,
+    private final ProjectionListener listener = new ProjectionListener(ORGANIZATIONS, projection, OrganizationEvent.class,
             envelopeMapper, runner);
 
     @Test
@@ -75,7 +77,7 @@ class PublishedTypeListenerTest {
         listener.onMessage(tombstone);
 
         // verifications
-        verify(runner, never()).process(any(), any(), any());
+        verify(runner, never()).process(any(), any(), any(), any());
     }
 
     @Test
@@ -85,13 +87,13 @@ class PublishedTypeListenerTest {
 
         // execution and verifications
         assertThatThrownBy(() -> listener.onMessage(record)).isInstanceOf(JacksonException.class);
-        verify(runner, never()).process(any(), any(), any());
+        verify(runner, never()).process(any(), any(), any(), any());
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private PublishedRecord<?> processedEnvelope() {
         ArgumentCaptor<PublishedRecord> envelope = ArgumentCaptor.forClass(PublishedRecord.class);
-        verify(runner).process(eq(ORGANIZATIONS), eq("organization-document-1"), envelope.capture());
+        verify(runner).process(eq(ORGANIZATIONS), eq(projection), eq("organization-document-1"), envelope.capture());
         return envelope.getValue();
     }
 

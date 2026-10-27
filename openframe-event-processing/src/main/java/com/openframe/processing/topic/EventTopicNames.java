@@ -2,7 +2,7 @@ package com.openframe.processing.topic;
 
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
 
-// The one place that names a published type's topic and its DLT; the listeners, the DLT recoverer and the topic creator use it.
+// The one place that names a published type's topic, its DLT and its projections' listeners; the listeners, the DLT recoverer and the topic creator use it.
 public final class EventTopicNames {
 
     private static final String DEAD_LETTER_SUFFIX = "-dlt";
@@ -12,6 +12,11 @@ public final class EventTopicNames {
 
     public static String topicOf(String topicPrefix, String typeName) {
         return topicPrefix + typeName;
+    }
+
+    // <type>.<projection>: the listener's id and group suffix; a type has no dot, so two never collide.
+    public static String buildListenerName(String typeName, String projectionName) {
+        return typeName + "." + projectionName;
     }
 
     public static String deadLetterTopicOf(String topic) {
