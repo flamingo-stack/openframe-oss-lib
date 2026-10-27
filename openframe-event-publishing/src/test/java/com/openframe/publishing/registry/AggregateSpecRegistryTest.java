@@ -122,6 +122,21 @@ class AggregateSpecRegistryTest {
     }
 
     @Test
+    void aProjectionNameWithAColon_failsAtStartup_soTwoVersionIdsCannotBeTheSame() {
+        WidgetSpec colonNamed = new WidgetSpec() {
+            @Override
+            public List<Projection<WidgetEvent, ?>> projections() {
+                return List.of(new WidgetProjection("widget:copies"));
+            }
+        };
+
+        assertThatThrownBy(() -> new AggregateSpecRegistry(provider(colonNamed)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("\"widget:copies\"")
+                .hasMessageContaining("lower case letters, digits and dashes");
+    }
+
+    @Test
     void types_listsTheTypeOfEverySpec() {
         AggregateSpecRegistry registry = new AggregateSpecRegistry(provider(new WidgetSpec()));
 

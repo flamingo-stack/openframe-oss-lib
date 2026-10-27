@@ -4,6 +4,9 @@ import com.openframe.data.repository.organization.publishing.OrganizationEvent;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
 import com.openframe.processing.config.EventProcessingKafkaAutoConfiguration;
 import com.openframe.processing.config.EventTopicsAutoConfiguration;
+import com.openframe.processing.fixture.Transactions;
+import com.openframe.processing.version.ProjectionVersionRepository;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.model.ReconciliationResult;
 import com.openframe.publishing.api.spec.AggregateSpec;
@@ -56,6 +59,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 // A real broker: the module creates its topics, then record -> listener -> runner -> projection, and the error handler's retry and DLT.
 @SpringBootTest(classes = EventProcessingKafkaIT.TestApplication.class,
@@ -124,16 +130,15 @@ class EventProcessingKafkaIT {
     }
 
     @Test
-    void aWriteConflict_goesToTheDlt_once_insteadOfBlockingThePartition() throws Exception {
+    void aWriteConflictThatOutlastsTheRunner_isRetriedByTheErrorHandler_untilItApplies_insteadOfTheDlt() throws Exception {
         String organizationId = newOrganizationId();
         String aggregateId = newAggregateId();
         byte[] value = envelope(organizationId, CONFLICT, 1);
 
         send(aggregateId, value);
 
-        ConsumerRecord<String, byte[]> deadLetter = deadLetterOf(aggregateId);
-        assertThat(deadLetter.value()).isEqualTo(value);
-        assertThat(projection.attempts.get(organizationId)).hasValue(1);
+        await().atMost(WAIT).until(() -> projection.applied.containsKey(organizationId));
+        assertThat(projection.attempts.get(organizationId)).hasValue(RecordingProjection.CONFLICT_ATTEMPTS + 1);
     }
 
     @Test
@@ -250,6 +255,19 @@ class EventProcessingKafkaIT {
             return new SimpleMeterRegistry();
         }
 
+        // The IT has no Mongo: every event is newer than a version never stored.
+        @Bean
+        ProjectionVersionRepository projectionVersionRepository() {
+            ProjectionVersionRepository versions = mock(ProjectionVersionRepository.class);
+            when(versions.findStoredVersion(any(), any(), any())).thenReturn(ProjectionVersionRepository.NO_VERSION);
+            return versions;
+        }
+
+        @Bean
+        MongoTransactionRunner projectionTransactionRunner() {
+            return Transactions.buildPassThrough();
+        }
+
         @Bean
         RecordingProjection recordingProjection() {
             return new RecordingProjection();
@@ -286,10 +304,12 @@ class EventProcessingKafkaIT {
         }
     }
 
-    // Fails on the name FAILING, conflicts on CONFLICT; on MONGO_DOWN, throws Mongo down for its first attempts, then applies.
+    // Fails on the name FAILING; on CONFLICT and MONGO_DOWN, fails its first attempts, then applies.
     static class RecordingProjection implements Projection<OrganizationEvent, Object> {
 
         static final int MONGO_DOWN_ATTEMPTS = 2;
+        // More than the runner's 5, so the error handler has to retry the record.
+        static final int CONFLICT_ATTEMPTS = 7;
 
         final Map<String, List<PublishedRecord<OrganizationEvent>>> applied = new ConcurrentHashMap<>();
         final Map<String, AtomicInteger> attempts = new ConcurrentHashMap<>();
@@ -307,7 +327,7 @@ class EventProcessingKafkaIT {
             if (FAILING.equals(event.getName())) {
                 throw new IllegalStateException("Widget write failed");
             }
-            if (CONFLICT.equals(event.getName())) {
+            if (CONFLICT.equals(event.getName()) && attempt <= CONFLICT_ATTEMPTS) {
                 throw new OptimisticLockingFailureException("Write conflict");
             }
             if (MONGO_DOWN.equals(event.getName()) && attempt <= MONGO_DOWN_ATTEMPTS) {

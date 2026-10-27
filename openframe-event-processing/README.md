@@ -34,8 +34,19 @@ events.organizations ──> ProjectionListener                one per projectio
   read into the spec's event class. Unknown fields are ignored, and an enum value the consumer does not know
   is read as `null`, so a newer producer does not send events to the DLT. A `schemaVersion` newer than
   `PublishedRecord.CURRENT_SCHEMA_VERSION` is refused and goes to the DLT, for a newer consumer to replay.
-- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L16) applies the record
+- [`ProjectionRunner`](src/main/java/com/openframe/processing/runner/ProjectionRunner.java#L21) applies the record
   to the listener's projection.
+- Versions: each projection runs in one Mongo transaction. The runner reads the version it last stored for that
+  projection, tenant and aggregate in `event_projection_versions`; an older event is skipped. Otherwise it first stores
+  the event's version with a `$max` upsert, then applies the event (an equal version too, so a backfill, which sends the
+  current version, still repairs drift). A failed apply rolls the version back. Two consumers of one projection and aggregate, after a
+  rebalance, conflict on that version document: the loser waits and tries again (up to 5 attempts, 750 ms in all), and its
+  retry skips the older event. A conflict that lasts longer is retried by the error handler, like Mongo down, so the
+  newer event waits instead of going to the DLT. A delete stores its version too. An event handed over to a projection
+  task stores its version first; the task is opened after the commit, unless a newer version was stored meanwhile. A
+  hand-over that keeps conflicting is retried like any conflict; any other failure sends the record to the DLT, and its
+  replay passes the equal stored version. This makes the backfill race, a connector re-snapshot, a DLT replay and a group
+  reset harmless.
 - Large updates: the runner first asks the projection's `countChanges`, up to the inline limit. Below it, `apply`
   writes inline. At the limit, or while the source already has a task, the event goes to a projection task of
   `openframe-event-jobs` (`ProjectionTaskService`), and the record is done once the task is saved. Without that
@@ -146,7 +157,8 @@ kafka-consumer-groups.sh --bootstrap-server <kafka> --delete --group <group-pref
 | What fails | What happens |
 |---|---|
 | Mongo down: a network error, no server to select, a primary stepping down or recovering, or an error Mongo labels transient ([`MongoUnavailability`](../openframe-event-publishing/src/main/java/com/openframe/publishing/api/util/MongoUnavailability.java#L15), retried as [`MongoUnavailableException`](src/main/java/com/openframe/processing/exception/MongoUnavailableException.java#L4)) | The record is retried without limit, with the back-off. This projection's listener waits, then continues in order; the other projections' listeners go on. |
-| A projection: any other exception, a write conflict too, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The record goes to `<topic>-dlt` once, for this projection only; the other projections, in their own groups, are not affected. |
+| A write conflict that lasts past the runner's 5 attempts: another consumer of the same aggregate is still writing | Retried like Mongo down, without limit, until the other consumer commits; then the older event is skipped. |
+| A projection: any other exception, and any `Error` but a broken JVM (`OutOfMemoryError`, `InternalError`) | The record goes to `<topic>-dlt` once, for this projection only; the other projections, in their own groups, are not affected. |
 | An unreadable value, or a `schemaVersion` newer than this build | The record goes to `<topic>-dlt` without reaching a projection. |
 
 A record goes to the DLT unchanged: same key, same value bytes. Every such record logs one ERROR line with its key
@@ -189,7 +201,7 @@ The service does not start when:
 
 | Metric | Tags | Meaning |
 |---|---|---|
-| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it. The count is the number of events, the total the time spent. |
+| `openframe.events.processing.apply` (timer) | `projection`, `outcome`: `applied`, `handed_over`, `skipped`, `delete_stored`, `failed`, `mongo_unavailable` | One per event and projection; `handed_over` means a projection task took it, `skipped` that a newer version was already stored. The count is the number of events, the total the time spent. |
 
 ## Debugging
 
@@ -215,6 +227,6 @@ logging:
 mvn test -pl openframe-event-processing -am -Dintegration.tests=true
 ```
 
-[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L73) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
+[`EventProcessingKafkaIT`](src/test/java/com/openframe/processing/EventProcessingKafkaIT.java#L77) needs Docker: it starts a Kafka broker with Testcontainers, lets the module create
 its topics, and checks the whole listener path, the retry and the DLT.
 [`EventTopicCreatorIT`](src/test/java/com/openframe/processing/topic/EventTopicCreatorIT.java#L41) checks the created topics' settings and that an existing topic is left alone.

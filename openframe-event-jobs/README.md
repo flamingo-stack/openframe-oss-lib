@@ -163,10 +163,10 @@ Reconciliation of organization-on-tickets in tenant <id>: 3 mismatch(es), for ex
 ```
 
 **Repair** is automatic: after the second read, the job publishes the current state of each confirmed mismatch's source
-again (`PublishedAggregates.publishCurrent`, each source at most once per run), for the projection to apply. The run
-still counts what it found, so the gauge shows the drift before the repair, and the next run should find none. A
-mismatch whose source is gone is not published again. A new backfill run of the type is still the way to repair
-everything at once.
+again (`PublishedAggregates.publishCurrent`, each source at most once per run), and the projection re-applies it, since
+the version store applies an equal version. The run still counts what it found, so the gauge shows the drift before
+the repair, and the next run should find none. A mismatch whose source is gone is not published again. A new backfill
+run of the type is still the way to repair everything at once.
 
 **Add a projection**: return it from its spec's `projections()` and implement `reconcile`; the job picks it up at the
 next start. Its `name()` is the job id (`reconciliation:<name>`) and the metric tag.

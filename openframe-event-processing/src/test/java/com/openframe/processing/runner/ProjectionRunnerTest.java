@@ -6,9 +6,13 @@ import com.openframe.event.jobs.task.service.ProjectionTaskService;
 import com.openframe.processing.config.EventProcessingAutoConfiguration;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
+import com.openframe.processing.exception.ProjectionConflictException;
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetEvent;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
+import com.openframe.processing.fixture.Transactions;
+import com.openframe.processing.version.ProjectionVersionRepository;
+import com.openframe.publishing.transaction.MongoTransactionRunner;
 import com.openframe.publishing.api.model.PublishedRecord;
 import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
@@ -24,11 +28,16 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mongodb.UncategorizedMongoDbException;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -41,6 +50,9 @@ class ProjectionRunnerTest {
     private static final String ON_TICKETS = "widget-on-tickets";
 
     private final RecordingProjection onTickets = new RecordingProjection(ON_TICKETS);
+    private final ProjectionVersionRepository versions = mock(ProjectionVersionRepository.class);
+    private final AtomicBoolean transactionOpen = new AtomicBoolean();
+    private final MongoTransactionRunner transactions = Transactions.buildPassThrough(transactionOpen);
 
     @Test
     void anEvent_reachesItsProjection_withTheEnvelopesTenantAndVersion() {
@@ -83,18 +95,36 @@ class ProjectionRunnerTest {
     }
 
     @Test
-    void aWriteConflict_isAFailureOfItsProjection_notMongoDown() {
+    void aWriteConflictThatLasts_isRethrown_soTheErrorHandlerRetriesTheRecord() {
+        AtomicInteger attempts = new AtomicInteger();
         RecordingProjection conflict = new RecordingProjection("widget-conflict", event -> {
+            attempts.incrementAndGet();
             throw new OptimisticLockingFailureException("write conflict");
         });
         runnerWith(conflict)
                 .run(context -> {
                     PublishedRecord<WidgetEvent> record = record(false);
 
-                    assertThatThrownBy(() -> process(context, conflict, record))
-                            .isInstanceOf(EventProcessingFailedException.class)
-                            .hasMessageContaining("widget-conflict");
-                    assertThat(timerCount(context, "widget-conflict", EventProcessingMetrics.OUTCOME_FAILED)).isEqualTo(1);
+                    assertThatThrownBy(() -> process(context, conflict, record)).isInstanceOf(ProjectionConflictException.class);
+                    assertThat(attempts).hasValue(5);
+                    assertThat(timerCount(context, "widget-conflict", EventProcessingMetrics.OUTCOME_FAILED)).isZero();
+                });
+    }
+
+    @Test
+    void aWriteConflictThatEnds_isRetriedInTheRunner_andTheEventIsApplied() {
+        AtomicInteger attempts = new AtomicInteger();
+        RecordingProjection conflict = new RecordingProjection("widget-conflict", event -> {
+            if (attempts.incrementAndGet() < 3) {
+                throw new OptimisticLockingFailureException("write conflict");
+            }
+        });
+        runnerWith(conflict)
+                .run(context -> {
+                    process(context, conflict, record(false));
+
+                    assertThat(conflict.records).hasSize(1);
+                    assertThat(attempts).hasValue(3);
                 });
     }
 
@@ -236,15 +266,145 @@ class ProjectionRunnerTest {
                         .hasStackTraceContaining("inlineLimit"));
     }
 
+    @Test
+    void anEventOlderThanTheStoredVersion_isSkipped() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
+        runnerWith(onTickets).run(context -> {
+            process(context, onTickets, record(false));
+
+            assertThat(onTickets.records).isEmpty();
+            verify(versions, never()).saveVersionIfHigher(any(), any(), any(), anyLong());
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_SKIPPED)).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void anEventWithTheStoredVersion_isAppliedAgain_soABackfillRepairsDrift() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(3L);
+        runnerWith(onTickets).run(context -> {
+            process(context, onTickets, record(false));
+
+            assertThat(onTickets.records).hasSize(1);
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+        });
+    }
+
+    @Test
+    void aNewerEvent_storesItsVersion_andIsApplied() {
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1"))
+                .thenReturn(ProjectionVersionRepository.NO_VERSION);
+        runnerWith(onTickets).run(context -> {
+            process(context, onTickets, record(false));
+
+            assertThat(onTickets.records).hasSize(1);
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+        });
+    }
+
+    @Test
+    void aFailedApply_throwsInsideItsTransaction_afterTheVersionWrite() {
+        RecordingProjection failing = new RecordingProjection("widget-failing", event -> {
+            throw new IllegalStateException("bug");
+        });
+        runnerWith(failing).run(context -> {
+            assertThatThrownBy(() -> process(context, failing, record(false))).isInstanceOf(EventProcessingFailedException.class);
+
+            verify(transactions).run(any());
+            verify(versions).saveVersionIfHigher("widget-failing", "tenant-1", "organization-document-1", 3L);
+        });
+    }
+
+    @Test
+    void anEventHandedOverToATask_storesItsVersion() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> {
+                    process(context, onTickets, record(false));
+
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                    verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+                });
+    }
+
+    @Test
+    void aHandedOverEvent_opensItsTask_onlyAfterTheTransactionCommitted() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        AtomicBoolean submittedInsideTheTransaction = new AtomicBoolean();
+        doAnswer(invocation -> {
+            submittedInsideTheTransaction.set(transactionOpen.get());
+            return null;
+        }).when(tasks).submit(any(), any(), any(), any());
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> {
+                    process(context, onTickets, record(false));
+
+                    verify(tasks).submit(eq(ON_TICKETS), eq(ORGANIZATIONS), eq("organization-document-1"), any());
+                    assertThat(submittedInsideTheTransaction).isFalse();
+                });
+    }
+
+    @Test
+    void aNewerVersionStoredBeforeTheHandOver_keepsTheOlderEventFromOpeningATask() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1"))
+                .thenReturn(ProjectionVersionRepository.NO_VERSION, 4L);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> {
+                    process(context, onTickets, record(false));
+
+                    verify(tasks, never()).submit(any(), any(), any(), any());
+                    assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_SKIPPED)).isEqualTo(1);
+                });
+    }
+
+    @Test
+    void aHandOverThatKeepsConflicting_isRetriedLikeAnyConflict() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        doThrow(new OptimisticLockingFailureException("task changed")).when(tasks).submit(any(), any(), any(), any());
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> assertThatThrownBy(() -> process(context, onTickets, record(false)))
+                        .isInstanceOf(ProjectionConflictException.class));
+    }
+
+    @Test
+    void anOlderEvent_neverReachesATask() {
+        onTickets.changes = 5000;
+        ProjectionTaskService tasks = mock(ProjectionTaskService.class);
+        when(tasks.hasTask(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(true);
+        when(versions.findStoredVersion(ON_TICKETS, "tenant-1", "organization-document-1")).thenReturn(4L);
+        runnerWith(onTickets).withBean(ProjectionTaskService.class, () -> tasks)
+                .run(context -> {
+                    process(context, onTickets, record(false));
+
+                    verify(tasks, never()).submit(any(), any(), any(), any());
+                });
+    }
+
+    @Test
+    void aDelete_storesItsVersion_soALateOlderEventIsSkipped() {
+        runnerWith(onTickets).run(context -> {
+            process(context, onTickets, record(true));
+
+            verify(versions).saveVersionIfHigher(ON_TICKETS, "tenant-1", "organization-document-1", 3L);
+            assertThat(timerCount(context, ON_TICKETS, EventProcessingMetrics.OUTCOME_DELETE_STORED)).isEqualTo(1);
+        });
+    }
+
     @SafeVarargs
-    private static ApplicationContextRunner runnerWith(Projection<WidgetEvent, ?>... projections) {
+    private ApplicationContextRunner runnerWith(Projection<WidgetEvent, ?>... projections) {
         List<Projection<WidgetEvent, ?>> specProjections = List.of(projections);
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
                 .withUserConfiguration(AggregateSpecRegistry.class)
                 .withPropertyValues("openframe.events.enabled=true")
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-                .withBean(WidgetSpec.class, () -> new WidgetSpec(specProjections));
+                .withBean(WidgetSpec.class, () -> new WidgetSpec(specProjections))
+                .withBean(ProjectionVersionRepository.class, () -> versions)
+                .withBean(MongoTransactionRunner.class, () -> transactions);
     }
 
     private static void process(AssertableApplicationContext context, Projection<WidgetEvent, ?> projection,
