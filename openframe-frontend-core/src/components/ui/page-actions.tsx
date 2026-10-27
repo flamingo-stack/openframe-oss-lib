@@ -9,6 +9,7 @@ import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
 import { InertWhileLoading, useLoadingScope } from './loading-scope';
+import { useReportMobileActionBar } from './mobile-action-bar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
@@ -516,11 +517,15 @@ function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageA
   const loading = useLoadingScope() || loadingProp;
   // Over the composer dock where the layout has one.
   const dockHeight = useComposerDockHeight();
+  // Its height, for the chrome that stays clear of it (`useMobileActionBarHeight`).
+  const barRef = React.useRef<HTMLDivElement>(null);
+  useReportMobileActionBar(barRef);
   // The placeholder for an action set nobody knows yet: only when the caller says so (`loading`), never because a
   // loading scope is on (a page that knows its actions draws them, an empty set included).
   const unknownSet = !!loadingProp;
   return (
     <div
+      ref={barRef}
       style={dockHeight > 0 ? { bottom: dockHeight } : undefined}
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50 md:hidden',
