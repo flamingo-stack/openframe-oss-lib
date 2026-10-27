@@ -5,6 +5,7 @@ import com.openframe.data.repository.rmm.CustomScriptRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomScriptScheduleRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomScheduleScriptExecutionRepositoryImpl;
 import com.openframe.data.repository.rmm.CustomScriptExecutionRepositoryImpl;
+import com.openframe.data.repository.rmm.SoftwareActionAggregationRepositoryImpl;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Import;
@@ -33,7 +34,8 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         CustomScriptRepositoryImpl.class,
         CustomScriptScheduleRepositoryImpl.class,
         CustomScheduleScriptExecutionRepositoryImpl.class,
-        CustomScriptExecutionRepositoryImpl.class
+        CustomScriptExecutionRepositoryImpl.class,
+        SoftwareActionAggregationRepositoryImpl.class
 })
 public class RmmIntegrationTestApplication {
 }

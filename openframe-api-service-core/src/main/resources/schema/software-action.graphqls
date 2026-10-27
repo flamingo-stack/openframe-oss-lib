@@ -45,6 +45,8 @@ type SoftwareActionRun {
     executionId: String!
     "Package name (the SOFTWARE column)."
     software: String!
+    "Version the action installs or updates to. Null = latest."
+    version: String
     "INSTALL or UPDATE."
     action: SoftwareAction!
     "Package manager engine — BREW / WINGET / CHOCO."
@@ -54,6 +56,8 @@ type SoftwareActionRun {
     totalMachineCount: Int!
     "Devices that have finished (X in X / Y)."
     respondedMachineCount: Int!
+    "Devices whose update waits on the device — a user prompt or an open app (the N WAITING chip)."
+    waitingMachineCount: Int!
     "When a SCHEDULED action will fire. Null once dispatched / for NOW."
     scheduledAt: Instant
     "When the action was dispatched. Null while SCHEDULED."
@@ -69,6 +73,8 @@ type SoftwareActionRun {
 enum SoftwareActionStatus {
     SCHEDULED
     IN_PROGRESS
+    "A package update waits on the device: a user prompt or an open app. Any waiting device makes the action WAITING."
+    WAITING
     COMPLETED
     FAILED
 }
@@ -79,6 +85,10 @@ type SoftwareActionDevice {
     hostname: String
     organizationId: String
     organizationName: String
+    "Device connectivity (ONLINE / OFFLINE / ...), for the online dot."
+    deviceStatus: DeviceStatus
+    "Last time the device was seen, shown while it is offline."
+    lastSeen: Instant
     status: SoftwareActionStatus!
     exitCode: Int
     stdout: String
