@@ -228,7 +228,7 @@ export function useJetStreamDialogSubscription({
     const lifecycle = startConnectionLifecycle({
       conn: sharedConn,
       wsUrl,
-      onBeforeReconnect: () => onBeforeReconnectRef.current?.(),
+      onBeforeReconnect: ctx => onBeforeReconnectRef.current?.(ctx),
       backoff: reconnectionBackoffRef.current,
       getFreshUrl: () => getNatsWsUrlRef.current(),
       // JetStream emits 'error' for protocol-level failures (e.g. -ERR Permissions
