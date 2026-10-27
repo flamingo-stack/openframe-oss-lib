@@ -404,3 +404,43 @@ type SoftwareDispatchResult {
     packageName: String!
     executionId: String!
 }
+
+# ────────── Update settings (Update Software → "Update Settings" / "Auto-update") ──────────
+
+"""What an update does on a device where the app is running."""
+enum PackageUpdateMode {
+    "Wait & notify: the user gets Update now or Ask later; once they close the app, it updates."
+    WAIT
+    "Force install: the user gets a short countdown, then the app closes and updates."
+    FORCE
+}
+
+"""How an update behaves on a device where the app is running. UPDATE only."""
+type PackageUpdateSettings {
+    mode: PackageUpdateMode!
+    "WAIT only: seconds after the first try before the countdown starts. Null = no deadline, the update waits."
+    deadlineSeconds: Long
+    "Seconds of countdown before the app is closed: after the deadline (WAIT) or right away (FORCE)."
+    countdownSeconds: Int!
+}
+
+input PackageUpdateSettingsInput {
+    mode: PackageUpdateMode!
+    "WAIT only, up to 2592000 (30 days); ignored for FORCE. Null = no deadline (\"Countdown after the deadline\" off)."
+    deadlineSeconds: Long
+    "Up to 3600 (1 hour)."
+    countdownSeconds: Int!
+}
+
+"""Keep it auto-updated: after this update, every new version is installed on the same devices. UPDATE only."""
+type SoftwareAutoUpdate {
+    enabled: Boolean!
+    "The settings the auto-updates run with. Null = the update's own (\"Same settings for auto-update\")."
+    settings: PackageUpdateSettings
+}
+
+input SoftwareAutoUpdateInput {
+    enabled: Boolean!
+    "Null = the update's own settings (\"Same settings for auto-update\"). Ignored while enabled is false."
+    settings: PackageUpdateSettingsInput
+}

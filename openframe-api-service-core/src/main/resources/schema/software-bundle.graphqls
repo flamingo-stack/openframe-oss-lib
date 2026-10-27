@@ -67,9 +67,14 @@ input SubmitSoftwareBundleInput {
     packages: [SoftwarePackageInput!]!
     """Null: run now (Device-Online). Set: create a software schedule."""
     schedule: SoftwareBundleScheduleInput
+    """UPDATE only, rejected for INSTALL. Null: wait & notify, a countdown 7 days after the first try, 5 minutes long."""
+    updateSettings: PackageUpdateSettingsInput
+    """UPDATE only, rejected for INSTALL. Null: no auto-update."""
+    autoUpdate: SoftwareAutoUpdateInput
 }
 
-"""Same fields and rules as CreateSoftwareScheduleInput, minus action / packages / machineIds."""
+"""Same fields and rules as CreateSoftwareScheduleInput, minus action / packages / machineIds / updateSettings /
+autoUpdate (those come with the submit itself)."""
 input SoftwareBundleScheduleInput {
     """Null: the server names it, e.g. "Install jq, wget"."""
     name: String
@@ -92,6 +97,10 @@ type SoftwareBundle implements Node {
     mode: SoftwareBundleMode
     "Empty while PENDING; set by submit."
     packages: [SoftwareBundlePackage!]!
+    "How the update behaves on a device. Null for INSTALL and while PENDING."
+    updateSettings: PackageUpdateSettings
+    "Keep it auto-updated. Null for INSTALL and while PENDING."
+    autoUpdate: SoftwareAutoUpdate
 
     "Number of assigned devices."
     deviceCount: Int!
