@@ -41,15 +41,6 @@ export default defineConfig([
   ]),
 
   {
-    // A picture's size, width and quality come from the image-size table (see ./eslint-config/image-sizes.js).
-    name: 'openframe-frontend-core/image-sizes',
-    files: ['src/**/*.{js,jsx,ts,tsx}'],
-    ignores: ['**/*.{test,spec}.{js,jsx,ts,tsx}', '**/__tests__/**', '**/*.stories.{js,jsx,ts,tsx}'],
-    plugins: { flamingo: flamingoPlugin },
-    rules: { 'flamingo/no-ad-hoc-image-size': 'error' },
-  },
-
-  {
     // A module exports what it declares; only an index barrel re-exports (see ./eslint-config/re-exports.js).
     name: 'openframe-frontend-core/no-re-export',
     files: ['src/**/*.{js,jsx,mjs,ts,tsx}'],

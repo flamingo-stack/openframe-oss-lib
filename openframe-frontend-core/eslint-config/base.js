@@ -333,6 +333,16 @@ export const base = [
     rules: { 'flamingo/no-mixed-layout-variants': 'error' },
   },
 
+  // A picture's `sizes` and quality come from the lib's image-size table — see ./image-sizes.js. Tests and stories
+  // draw no picture a reader waits on.
+  {
+    name: 'flamingo/base/image-sizes',
+    files: ['**/*.{js,mjs,jsx,ts,mts,tsx}'],
+    ignores: ['**/*.{test,spec}.{js,mjs,jsx,ts,mts,tsx}', '**/__tests__/**', '**/*.stories.{js,jsx,ts,tsx,mdx}'],
+    plugins: { flamingo: flamingoPlugin },
+    rules: { 'flamingo/no-ad-hoc-image-size': 'error' },
+  },
+
   // Type declaration files describe other people's shapes; most of the base
   // rules are noise there.
   {
