@@ -88,7 +88,7 @@ public class DeliveryMetrics {
         meterRegistry.counter(DISPATCH_DUPLICATE_COUNTER, TAG_TYPE, typeTag).increment();
     }
 
-    // recorded for a machine that is not online, nothing published: the sweep sends it when the machine shows up
+    // recorded, nothing published now: the machine is not online or the delivery is due later, the sweep sends it
     public void recordDispatchHeld(DeliveryType type) {
         String typeTag = tagValue(type.name());
         meterRegistry.counter(DISPATCH_HELD_COUNTER, TAG_TYPE, typeTag).increment();
