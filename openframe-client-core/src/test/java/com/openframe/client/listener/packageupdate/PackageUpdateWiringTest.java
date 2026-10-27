@@ -55,10 +55,7 @@ class PackageUpdateWiringTest {
     void packageUpdateOn_withClockKeys_allOfItRuns() {
         runner.withPropertyValues(
                         "openframe.rmm.software.package-update.enabled=true",
-                        "openframe.rmm.software.package-update.deadline.batch-size=500",
-                        "openframe.rmm.software.package-update.retry.batch-size=500",
-                        "openframe.rmm.software.package-update.retry.max-attempts=3",
-                        "openframe.rmm.software.package-update.retry.backoff-seconds=21600")
+                        "openframe.rmm.software.package-update.deadline.batch-size=500")
                 .run(context -> {
                     assertThat(context).hasSingleBean(PackageUpdateStatusListener.class);
                     assertThat(context).hasSingleBean(PackageUpdateStatusProcessor.class);
