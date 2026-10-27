@@ -12,12 +12,18 @@ import { type RefObject, useEffect, useSyncExternalStore } from 'react';
 const heights = new Map<Element, number>();
 const listeners = new Set<() => void>();
 let tallest = 0;
+/** How many surfaces drawn over the page (a chat sheet) cover the bar now. */
+let covers = 0;
+
+function notify() {
+  for (const listener of listeners) listener();
+}
 
 function publish() {
   const next = Math.max(0, ...heights.values());
   if (next === tallest) return;
   tallest = next;
-  for (const listener of listeners) listener();
+  notify();
 }
 
 function subscribe(listener: () => void) {
@@ -43,6 +49,32 @@ export function useReportMobileActionBar(ref: RefObject<HTMLElement | null>): vo
       publish();
     };
   }, [ref]);
+}
+
+/**
+ * While `active`, the page's action bar steps aside for a surface drawn over the page
+ * (a chat sheet over it): the bar is the page's, and would otherwise split that surface
+ * from the composer under it. It keeps its room, so the page under the scrim stays put.
+ */
+export function useCoverMobileActionBar(active: boolean): void {
+  useEffect(() => {
+    if (!active) return undefined;
+    covers += 1;
+    notify();
+    return () => {
+      covers -= 1;
+      notify();
+    };
+  }, [active]);
+}
+
+/** Whether a surface over the page covers the action bar now. */
+export function useMobileActionBarCovered(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => covers > 0,
+    () => false,
+  );
 }
 
 /** The window-pinned action bar's height, 0 while no page draws one. */

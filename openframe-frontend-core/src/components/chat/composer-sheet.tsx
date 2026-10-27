@@ -4,6 +4,7 @@ import { type ReactNode, useRef, useState } from 'react';
 import { useIsomorphicLayoutEffect } from '../../hooks/ui/use-isomorphic-layout-effect';
 import { cn } from '../../utils/cn';
 import { useComposerDockHeight } from '../navigation/app-layout-context';
+import { useCoverMobileActionBar } from '../ui/mobile-action-bar';
 import { PanelResizeHandle } from '../ui/panel-resize-handle';
 
 /** The sheet's floor: a header and a few lines of thread. */
@@ -95,6 +96,8 @@ export function ComposerSheet({
   const [layerHeight, setLayerHeight] = useState(0);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dockHeight = useComposerDockHeight();
+  // Over the page, the page's action bar steps aside: the sheet and the composer are one chat.
+  useCoverMobileActionBar(open);
 
   useIsomorphicLayoutEffect(() => {
     if (!layer) return undefined;

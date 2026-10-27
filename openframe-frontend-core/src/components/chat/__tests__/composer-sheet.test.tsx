@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ComposerDockHeightContext } from '../../navigation/app-layout-context';
+import { useMobileActionBarCovered } from '../../ui/mobile-action-bar';
 import { ChatContextMemoryBar } from '../chat-context-memory-bar';
 import { ComposerSheet, type ComposerSheetProps } from '../composer-sheet';
 import { MingoChatHeader } from '../mingo-chat-header';
@@ -20,7 +21,30 @@ function sheet(props: Partial<ComposerSheetProps> = {}) {
   );
 }
 
+function CoveredProbe() {
+  return <span data-testid="covered">{String(useMobileActionBarCovered())}</span>;
+}
+
 describe('ComposerSheet', () => {
+  it("covers the page's action bar while open, and only then", () => {
+    const { rerender } = render(
+      <>
+        <CoveredProbe />
+        {sheet({ open: false })}
+      </>,
+    );
+    expect(screen.getByTestId('covered')).toHaveTextContent('false');
+    rerender(
+      <>
+        <CoveredProbe />
+        {sheet()}
+      </>,
+    );
+    expect(screen.getByTestId('covered')).toHaveTextContent('true');
+    rerender(<CoveredProbe />);
+    expect(screen.getByTestId('covered')).toHaveTextContent('false');
+  });
+
   it('draws nothing while closed', () => {
     render(sheet({ open: false }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

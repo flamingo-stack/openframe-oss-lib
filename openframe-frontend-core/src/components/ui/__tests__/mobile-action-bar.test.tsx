@@ -1,11 +1,16 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useMobileActionBarHeight } from '../mobile-action-bar';
+import { useCoverMobileActionBar, useMobileActionBarHeight } from '../mobile-action-bar';
 import { PageActions } from '../page-actions';
 
 /** jsdom ships no ResizeObserver: this one reports on demand, at the height a test sets. */
 const observers = new Set<() => void>();
 let barHeight = 0;
+
+function Cover({ active }: { active: boolean }) {
+  useCoverMobileActionBar(active);
+  return null;
+}
 
 function Probe() {
   return <span data-testid="height">{useMobileActionBarHeight()}</span>;
@@ -71,5 +76,26 @@ describe('useMobileActionBarHeight', () => {
     resize(96);
     rerender(<Probe />);
     expect(height()).toBe(0);
+  });
+
+  it('steps aside while a surface over the page covers it, keeping its room', () => {
+    const page = (active: boolean) => (
+      <>
+        <Probe />
+        <Cover active={active} />
+        <PageActions variant="primary-buttons" actions={[{ label: 'Save', variant: 'accent', onClick: vi.fn() }]} />
+      </>
+    );
+    const { rerender } = render(page(false));
+    resize(96);
+    const bar = () => screen.getByTestId('mobile-action-bar');
+    expect(bar()).not.toHaveClass('invisible');
+
+    rerender(page(true));
+    expect(bar()).toHaveClass('invisible');
+    expect(height()).toBe(96);
+
+    rerender(page(false));
+    expect(bar()).not.toHaveClass('invisible');
   });
 });

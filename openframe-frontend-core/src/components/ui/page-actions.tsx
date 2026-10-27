@@ -9,7 +9,7 @@ import { ActionsMenuDropdown, type ActionsMenuGroup, type ActionsMenuItem } from
 import type { ButtonProps, SplitButtonIconAction } from './button';
 import { Button, SplitButton } from './button';
 import { InertWhileLoading, useLoadingScope } from './loading-scope';
-import { useReportMobileActionBar } from './mobile-action-bar';
+import { useMobileActionBarCovered, useReportMobileActionBar } from './mobile-action-bar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 export type PageActionButton = {
@@ -520,16 +520,20 @@ function MobileBottomActions({ actions, loading: loadingProp }: { actions: PageA
   // Its height, for the chrome that stays clear of it (`useMobileActionBarHeight`).
   const barRef = React.useRef<HTMLDivElement>(null);
   useReportMobileActionBar(barRef);
+  // Out of sight under a surface over the page (a chat sheet), keeping its room.
+  const covered = useMobileActionBarCovered();
   // The placeholder for an action set nobody knows yet: only when the caller says so (`loading`), never because a
   // loading scope is on (a page that knows its actions draws them, an empty set included).
   const unknownSet = !!loadingProp;
   return (
     <div
       ref={barRef}
+      data-testid="mobile-action-bar"
       style={dockHeight > 0 ? { bottom: dockHeight } : undefined}
       className={cn(
         'fixed bottom-0 left-0 right-0 z-50 md:hidden',
         'border-t border-ods-border bg-ods-card',
+        covered && 'invisible',
         // `lf` (24px at every breakpoint), NOT `l` — this bar is `md:hidden`, so the
         // only value it ever uses is the MOBILE one, and `l` is 16px there. The
         // fixed variant is what keeps the 24px the bar has always had.
