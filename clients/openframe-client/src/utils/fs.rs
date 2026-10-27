@@ -32,28 +32,38 @@ pub fn atomic_write(path: &Path, contents: impl AsRef<[u8]>) -> Result<()> {
     Ok(())
 }
 
-/// Read `path` as JSON: `None` when it is missing, and also when it doesn't parse, after the bad
-/// file is moved aside to `<name>.corrupt` so the next write starts fresh.
-pub fn read_json_or_quarantine<T: DeserializeOwned>(path: &Path) -> Result<Option<T>> {
-    Ok(read_json_bytes_or_quarantine(path)?.map(|(value, _)| value))
+/// How a JSON file read back.
+#[derive(Debug, PartialEq)]
+pub enum JsonFile<T> {
+    Missing,
+    /// Didn't parse; already logged and moved aside.
+    Corrupt,
+    Parsed(T),
 }
 
-/// Same as [`read_json_or_quarantine`], also returning the file's text for callers that log it.
-pub fn read_json_text_or_quarantine<T: DeserializeOwned>(
-    path: &Path,
-) -> Result<Option<(T, String)>> {
-    Ok(read_json_bytes_or_quarantine(path)?
-        .map(|(value, bytes)| (value, String::from_utf8_lossy(&bytes).into_owned())))
+impl<T> JsonFile<T> {
+    /// The parsed value; a missing or corrupt file reads as `None`.
+    pub fn parsed(self) -> Option<T> {
+        match self {
+            JsonFile::Parsed(value) => Some(value),
+            JsonFile::Missing | JsonFile::Corrupt => None,
+        }
+    }
 }
 
-fn read_json_bytes_or_quarantine<T: DeserializeOwned>(path: &Path) -> Result<Option<(T, Vec<u8>)>> {
-    let bytes = match std::fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e).with_context(|| format!("failed to read {}", path.display())),
-    };
-    let parse_error = match serde_json::from_slice(&bytes) {
-        Ok(value) => return Ok(Some((value, bytes))),
+/// Read `path` as JSON, moving a file that doesn't parse aside (see [`parse_json_or_quarantine`]).
+pub fn read_json_or_quarantine<T: DeserializeOwned>(path: &Path) -> Result<JsonFile<T>> {
+    match std::fs::read(path) {
+        Ok(bytes) => Ok(parse_json_or_quarantine(path, &bytes)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(JsonFile::Missing),
+        Err(e) => Err(e).with_context(|| format!("failed to read {}", path.display())),
+    }
+}
+
+/// Parse `bytes` read from `path`; on failure log it and rename the file to `<name>.corrupt` so the next write starts fresh.
+pub fn parse_json_or_quarantine<T: DeserializeOwned>(path: &Path, bytes: &[u8]) -> JsonFile<T> {
+    let parse_error = match serde_json::from_slice(bytes) {
+        Ok(value) => return JsonFile::Parsed(value),
         Err(e) => e,
     };
 
@@ -77,7 +87,7 @@ fn read_json_bytes_or_quarantine<T: DeserializeOwned>(path: &Path) -> Result<Opt
             parse_error
         ),
     }
-    Ok(None)
+    JsonFile::Corrupt
 }
 
 fn quarantine_path(path: &Path) -> PathBuf {

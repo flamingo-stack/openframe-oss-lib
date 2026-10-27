@@ -1,5 +1,5 @@
 use crate::platform::directories::DirectoryManager;
-use crate::utils::fs::{atomic_write, read_json_or_quarantine};
+use crate::utils::fs::{atomic_write, read_json_or_quarantine, JsonFile};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -47,20 +47,20 @@ impl LastKnownGoodService {
     }
 
     pub async fn load(&self) -> Result<Option<String>> {
-        let anchor: Option<LastKnownGood> = read_json_or_quarantine(&self.anchor_file_path)
+        let anchor: JsonFile<LastKnownGood> = read_json_or_quarantine(&self.anchor_file_path)
             .with_context(|| {
                 format!(
                     "Failed to read last-known-good file: {:?}",
                     self.anchor_file_path
                 )
             })?;
-        if anchor.is_none() {
+        if matches!(anchor, JsonFile::Missing) {
             debug!(
                 "No last-known-good file found at: {}",
                 self.anchor_file_path.display()
             );
         }
-        Ok(anchor.map(|anchor| anchor.version))
+        Ok(anchor.parsed().map(|anchor| anchor.version))
     }
 
     fn copy_running_to_reserve(&self) -> Result<()> {
@@ -105,7 +105,13 @@ impl LastKnownGoodService {
 
     pub async fn seed_if_missing(&self) -> Result<()> {
         let running_version = env!("OPENFRAME_VERSION");
-        let anchor = self.load().await.unwrap_or(None);
+        let anchor = self.load().await.unwrap_or_else(|e| {
+            warn!(
+                "Failed to load last-known-good anchor, treating it as missing: {:#}",
+                e
+            );
+            None
+        });
 
         match anchor {
             Some(ref anchor_version) if self.reserve_path.exists() => {

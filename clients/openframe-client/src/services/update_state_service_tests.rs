@@ -40,3 +40,19 @@ async fn a_corrupt_state_loads_as_no_update_in_progress() {
         .join("update_state.json.corrupt")
         .exists());
 }
+
+#[tokio::test]
+async fn read_state_tells_a_corrupt_file_from_a_missing_one() {
+    let dir = TempDir::new().unwrap();
+    let service = service_in(&dir);
+    assert!(matches!(
+        service.read_state().await.unwrap(),
+        JsonFile::Missing
+    ));
+
+    std::fs::write(&service.state_file_path, b"{\"target_version\": \"1.3").unwrap();
+    assert!(matches!(
+        service.read_state().await.unwrap(),
+        JsonFile::Corrupt
+    ));
+}

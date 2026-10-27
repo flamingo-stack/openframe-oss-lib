@@ -1,6 +1,6 @@
 use crate::models::update_state::UpdateState;
 use crate::platform::directories::DirectoryManager;
-use crate::utils::fs::{atomic_write, read_json_text_or_quarantine};
+use crate::utils::fs::{atomic_write, parse_json_or_quarantine, JsonFile};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::PathBuf;
@@ -23,33 +23,44 @@ impl UpdateStateService {
     }
 
     pub async fn load(&self) -> Result<Option<UpdateState>> {
+        Ok(self.read_state().await?.parsed())
+    }
+
+    /// Like `load`, but tells a corrupt file from a missing one, which the updater reads as uninstalled.
+    pub async fn read_state(&self) -> Result<JsonFile<UpdateState>> {
         info!(
             "Checking for update state file at: {}",
             self.state_file_path.display()
         );
 
-        let state: Option<(UpdateState, String)> =
-            read_json_text_or_quarantine(&self.state_file_path).with_context(|| {
-                format!(
-                    "Failed to read update state file: {:?}",
-                    self.state_file_path
-                )
-            })?;
-        let Some((state, json_content)) = state else {
+        if !self.state_file_path.exists() {
             info!(
                 "No update state file found at: {}",
                 self.state_file_path.display()
             );
-            return Ok(None);
-        };
+            return Ok(JsonFile::Missing);
+        }
 
-        info!("Read update state file content: {}", json_content);
+        let content = fs::read(&self.state_file_path).with_context(|| {
+            format!(
+                "Failed to read update state file: {:?}",
+                self.state_file_path
+            )
+        })?;
 
         info!(
-            "Loaded update state for version: {}, phase: {:?}",
-            state.target_version, state.phase
+            "Read update state file content: {}",
+            String::from_utf8_lossy(&content)
         );
-        Ok(Some(state))
+
+        let file: JsonFile<UpdateState> = parse_json_or_quarantine(&self.state_file_path, &content);
+        if let JsonFile::Parsed(state) = &file {
+            info!(
+                "Loaded update state for version: {}, phase: {:?}",
+                state.target_version, state.phase
+            );
+        }
+        Ok(file)
     }
 
     pub async fn save(&self, state: &UpdateState) -> Result<()> {

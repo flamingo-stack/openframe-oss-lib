@@ -49,7 +49,7 @@ impl ToolConnectionService {
         let list = read_json_or_quarantine(&self.file_path).with_context(|| {
             format!("Failed to read tool connections file: {:?}", self.file_path)
         })?;
-        Ok(list.unwrap_or_default())
+        Ok(list.parsed().unwrap_or_default())
     }
 
     /// Delete a tool connection by its tool_agent_id

@@ -1,6 +1,6 @@
 use crate::models::openframe_client_info::OpenFrameClientInfo;
 use crate::platform::directories::DirectoryManager;
-use crate::utils::fs::{atomic_write, read_json_or_quarantine};
+use crate::utils::fs::{atomic_write, read_json_or_quarantine, JsonFile};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 use tracing::{debug, info};
@@ -27,10 +27,10 @@ impl OpenFrameClientInfoService {
         let info = read_json_or_quarantine(&self.info_file_path).with_context(|| {
             format!("Failed to read client info file: {:?}", self.info_file_path)
         })?;
-        if info.is_none() {
+        if matches!(info, JsonFile::Missing) {
             debug!("OpenFrame client info file doesn't exist, returning default");
         }
-        Ok(info.unwrap_or_default())
+        Ok(info.parsed().unwrap_or_default())
     }
 
     pub async fn save(&self, info: &OpenFrameClientInfo) -> Result<()> {

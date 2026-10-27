@@ -42,10 +42,10 @@ struct Sample {
 }
 
 #[test]
-fn read_json_or_quarantine_returns_none_for_a_missing_file() {
+fn read_json_or_quarantine_reports_a_missing_file() {
     let dir = tempfile::tempdir().unwrap();
-    let read: Option<Sample> = read_json_or_quarantine(&dir.path().join("absent.json")).unwrap();
-    assert_eq!(read, None);
+    let read: JsonFile<Sample> = read_json_or_quarantine(&dir.path().join("absent.json")).unwrap();
+    assert_eq!(read, JsonFile::Missing);
 }
 
 #[test]
@@ -54,9 +54,9 @@ fn read_json_or_quarantine_parses_a_valid_file_and_leaves_it_in_place() {
     let path = dir.path().join("ok.json");
     std::fs::write(&path, br#"{"a":7}"#).unwrap();
 
-    let read: Option<Sample> = read_json_or_quarantine(&path).unwrap();
+    let read: JsonFile<Sample> = read_json_or_quarantine(&path).unwrap();
 
-    assert_eq!(read, Some(Sample { a: 7 }));
+    assert_eq!(read, JsonFile::Parsed(Sample { a: 7 }));
     assert!(path.exists());
     assert!(!dir.path().join("ok.json.corrupt").exists());
 }
@@ -66,9 +66,9 @@ fn assert_quarantined(contents: &[u8]) {
     let path = dir.path().join("bad.json");
     std::fs::write(&path, contents).unwrap();
 
-    let read: Option<Sample> = read_json_or_quarantine(&path).unwrap();
+    let read: JsonFile<Sample> = read_json_or_quarantine(&path).unwrap();
 
-    assert_eq!(read, None);
+    assert_eq!(read, JsonFile::Corrupt);
     assert!(!path.exists());
     assert_eq!(
         std::fs::read(dir.path().join("bad.json.corrupt")).unwrap(),
@@ -103,25 +103,11 @@ fn read_json_or_quarantine_replaces_an_older_quarantined_copy() {
     std::fs::write(dir.path().join("bad.json.corrupt"), b"old").unwrap();
     std::fs::write(&path, b"new garbage").unwrap();
 
-    let read: Option<Sample> = read_json_or_quarantine(&path).unwrap();
+    let read: JsonFile<Sample> = read_json_or_quarantine(&path).unwrap();
 
-    assert_eq!(read, None);
+    assert_eq!(read, JsonFile::Corrupt);
     assert_eq!(
         std::fs::read(dir.path().join("bad.json.corrupt")).unwrap(),
         b"new garbage"
-    );
-}
-
-#[test]
-fn read_json_text_or_quarantine_returns_the_file_text() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("state.json");
-    std::fs::write(&path, "{\n  \"a\": 3\n}").unwrap();
-
-    let read: Option<(Sample, String)> = read_json_text_or_quarantine(&path).unwrap();
-
-    assert_eq!(
-        read,
-        Some((Sample { a: 3 }, "{\n  \"a\": 3\n}".to_string()))
     );
 }
