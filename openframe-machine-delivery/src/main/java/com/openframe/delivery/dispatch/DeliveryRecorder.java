@@ -30,7 +30,7 @@ public class DeliveryRecorder {
     private final DeliveryPayloadJson payloadJson;
     private final MachineOnlineStatus onlineStatus;
 
-    public DeliveryRecordOutcome record(DeliveryRequest<?> request) {
+    public DeliveryRecordOutcome record(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         if (request.isForEveryMachine()) {
             throw new IllegalArgumentException("A wildcard is not a machine, the type is not rolled out: " + type);
@@ -77,7 +77,8 @@ public class DeliveryRecorder {
     // core NATS keeps nothing: a publish before the agent subscribes is lost. A machine that is not online gets its
     // row due at once, and the sweep publishes on its first tick after the machine shows up. A scheduled row runs at
     // its moment, not now: due then, with its reconnect window and ttl counted from then
-    private MachineDelivery pendingRow(DeliveryRequest<?> request, String id, boolean online, Instant runAt) {
+    private MachineDelivery pendingRow(DeliveryRequest<? extends DeliveryPayload> request, String id, boolean online,
+                                       Instant runAt) {
         DeliveryType type = request.getType();
         DeliveryPayload payload = request.getPayload();
         DeliveryRef delivery = payload.getDelivery();

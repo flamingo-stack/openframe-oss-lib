@@ -56,7 +56,7 @@ public class DeliveryDispatcher {
         sink.getObject().accept(request);
     }
 
-    private static boolean isWildcardOnASingleMachineType(DeliveryRequest<?> request, DeliverySpec<?, ?> spec) {
+    private static boolean isWildcardOnASingleMachineType(DeliveryRequest<? extends DeliveryPayload> request, DeliverySpec<?, ?> spec) {
         return request.isForEveryMachine() && !spec.canDeliverToEveryMachine();
     }
 }

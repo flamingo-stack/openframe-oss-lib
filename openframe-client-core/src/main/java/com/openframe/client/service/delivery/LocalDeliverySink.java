@@ -32,7 +32,7 @@ public class LocalDeliverySink implements DeliverySink {
     private final DeliveryMetrics metrics;
 
     @Override
-    public void accept(DeliveryRequest<?> request) {
+    public void accept(DeliveryRequest<? extends DeliveryPayload> request) {
         if (isRollout(request)) {
             rollouts.record(request);
         } else {
@@ -41,7 +41,7 @@ public class LocalDeliverySink implements DeliverySink {
     }
 
     // every machine, of a type that may be rolled out; anything else goes the ordinary way and fails there if it must
-    private boolean isRollout(DeliveryRequest<?> request) {
+    private boolean isRollout(DeliveryRequest<? extends DeliveryPayload> request) {
         if (!request.isForEveryMachine()) {
             return false;
         }
@@ -49,7 +49,7 @@ public class LocalDeliverySink implements DeliverySink {
         return spec.canDeliverToEveryMachine();
     }
 
-    private void dispatchToMachine(DeliveryRequest<?> request) {
+    private void dispatchToMachine(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryRecordOutcome outcome = recorder.record(request);
         switch (outcome) {
             case RECORDED -> publish(request);
@@ -59,14 +59,14 @@ public class LocalDeliverySink implements DeliverySink {
         }
     }
 
-    private void defer(DeliveryRequest<?> request) {
+    private void defer(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         metrics.recordDispatchScheduled(type);
         log.info("Delivery scheduled, the sweep publishes it once due: type={} targetId={} machineId={} notBefore={}",
                 type, request.getTargetId(), request.getMachineId(), request.getNotBefore());
     }
 
-    private void hold(DeliveryRequest<?> request) {
+    private void hold(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         metrics.recordDispatchHeld(type);
         log.info("Delivery held until the machine is online, the sweep publishes it: type={} targetId={} machineId={}",
@@ -74,7 +74,7 @@ public class LocalDeliverySink implements DeliverySink {
     }
 
     // replayed = the hand-off was repeated; outranked = a newer dispatch of the same key holds the row
-    private void skip(DeliveryRequest<?> request, DeliveryRecordOutcome outcome) {
+    private void skip(DeliveryRequest<? extends DeliveryPayload> request, DeliveryRecordOutcome outcome) {
         DeliveryType type = request.getType();
         if (outcome == DeliveryRecordOutcome.REPLAYED) {
             metrics.recordDispatchDuplicate(type);
@@ -86,7 +86,7 @@ public class LocalDeliverySink implements DeliverySink {
     }
 
     // the row is the source of truth: a publish that fails here is retried by the sweep, never by the caller or Kafka
-    private void publish(DeliveryRequest<?> request) {
+    private void publish(DeliveryRequest<? extends DeliveryPayload> request) {
         DeliveryType type = request.getType();
         String machineId = request.getMachineId();
         DeliverySpec<DeliverySeed, DeliveryPayload> spec = registry.require(type);
