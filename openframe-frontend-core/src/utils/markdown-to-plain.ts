@@ -61,6 +61,25 @@ const NOT_PROSE = new Set(['pre', 'img']);
 
 const TABLE_SECTIONS = new Set(['thead', 'tbody', 'tfoot']);
 
+const element = (tagName: string, children: Element['children']): Element => ({
+  type: 'element',
+  tagName,
+  properties: {},
+  children,
+});
+
+/** Whether `toText` already breaks between a table's sections (current `hast-util-to-text` does; an older one ran
+ *  the header row into the first body row). Asked once, of a one-cell header over a one-cell body. */
+let sectionsBreak: boolean | undefined;
+function toTextBreaksBetweenSections(): boolean {
+  if (sectionsBreak === undefined) {
+    const row = (text: string) => element('tr', [element('td', [{ type: 'text', value: text }])]);
+    const table = element('table', [element('thead', [row('a')]), element('tbody', [row('b')])]);
+    sectionsBreak = toText({ type: 'root', children: [table] }).includes('\n');
+  }
+  return sectionsBreak;
+}
+
 /** The renderer's steps, as functions: markdown (GFM) → line breaks → HTML tree with raw HTML parsed. */
 function htmlTree(markdown: string): Root {
   const mdast = fromMarkdown(markdown, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] });
@@ -75,10 +94,10 @@ function proseTree(markdown: string): Root {
       parent.children.splice(index, 1);
       return [SKIP, index];
     }
-    // `innerText` breaks between rows of the same `thead` / `tbody` only, so the last header row
-    // ran into the first body row ("What it buysEnthusiast"). A section followed by another ends
-    // its last row with a line break.
-    if (TABLE_SECTIONS.has(node.tagName) && parent && index !== undefined) {
+    // An older `innerText` broke between rows of the same `thead` / `tbody` only, so the last header
+    // row ran into the first body row ("What it buysEnthusiast"). There, a section followed by
+    // another ends its last row with a line break; a current one breaks there itself.
+    if (TABLE_SECTIONS.has(node.tagName) && parent && index !== undefined && !toTextBreaksBetweenSections()) {
       const followedBySection = parent.children
         .slice(index + 1)
         .some(sibling => sibling.type === 'element' && TABLE_SECTIONS.has(sibling.tagName));

@@ -58,6 +58,25 @@
  *                       `LoadingFallback` drawing nothing.
  * HAND_PAIR             A hand-built `<Suspense fallback={<LoadingFallback>…}>` (use `LoadingSuspense`), or a hand
  *                       `<LoadingRegion>` around a `<LoadingScope>` / `<LoadingWhen>` (use `LoadingFallback`).
+ * RAW_SUSPENSE          A `Suspense` / `React.Suspense` with a fallback of its own. The ONE boundary is `LoadingSuspense`
+ *                       (or a host's own boundary built on it, `config.boundaries`): its fallback is the component it
+ *                       waits on, drawn in a loading scope, so nothing jumps when the content arrives. A boundary that
+ *                       draws nothing on purpose (structured data, a crawler-only body) opts out with its reason.
+ * PAGE_BOUNDARY         A page's or a layout's whole output inside one boundary (`Suspense`, `LoadingSuspense`, a
+ *                       configured host boundary): the root element a route file's default export returns, a fragment
+ *                       holding only it, or a slot of the object it hands a render helper. A boundary wraps only the
+ *                       component that waits on a read; sections that share one read, or would look broken arriving one
+ *                       by one, share one boundary; the page's static frame (heading, copy, back link, cached content)
+ *                       renders at once, outside every boundary. A component that reads in the browser keeps its own
+ *                       loading state (`LoadingWhen`, `useLoadingScope`) and needs no boundary.
+ * BOUNDARY_OWNER        A `LoadingSuspense` placed AROUND a component instead of BY it. The boundary is the whole output
+ *                       of the component that waits (the root element it returns), wrapping exactly one component
+ *                       declared in the same file (its reader), with no `fallback`: the reader draws its own loading form
+ *                       in the scope the boundary opens (`useLoadingScope()`, the skeletons inside the component). A
+ *                       parent renders the component and never wraps it; a fallback built beside the reader, a boundary
+ *                       around an imported component, around markup or an expression, or in the middle of a layout,
+ *                       each puts a component's loading state outside the component. A host's own boundary built on it
+ *                       (`config.boundaries`) opts out where it is defined.
  * WHOLE_VIEW_SKELETON   A component declared or rendered as `*PageSkeleton`, `*ScreenSkeleton`, `*DetailSkeleton`,
  *                       `*ArticleSkeleton`, `*ViewSkeleton`, `*HomeSkeleton`, `*DeckSkeleton`, `*EditorSkeleton`,
  *                       `*CenterSkeleton`, `*CatalogSkeleton`, `*FormSkeleton`, `*LayoutSkeleton`,
@@ -132,16 +151,38 @@
  * `/* … *\/`), at the end of the finding's line or alone on the line directly above it. It lifts that one rule on
  * that one line, and an opt-out that lifts nothing is itself a finding (OPT_OUT).
  *
- * CONFIG: `CONFIGS.lib` and `CONFIGS.frontend` hold each repository's rule set, reported trees, page code and
- * exemptions, declared once here.
+ * CONFIG: `CONFIGS.lib`, `CONFIGS.frontend` and `CONFIGS.hub` hold each repository's rule set, reported trees, page
+ * code, boundaries and exemptions, declared once here. `boundaries` names a host's own boundary components (built on
+ * `LoadingSuspense`) and the attribute that makes one render directly, with no boundary (`{ StreamedSection: 'cached' }`):
+ * bare or with any value but the literal `false`.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, relative, resolve } from 'node:path';
 
-// The compiler is the HOST's (a dev dependency of every repository that runs the gate), resolved from where this
-// module is installed: the lib does not ship TypeScript to its consumers.
-const ts = createRequire(import.meta.url)('typescript');
+// The compiler is the HOST's (a dev dependency of every repository that runs the gate): resolved from the directory the
+// gate runs in (the host's root), and only then from where this module is installed. The lib does not ship TypeScript,
+// but a host's install can still nest one inside the lib's folder for another package's peer range (a TypeScript 7
+// there has no JavaScript compiler API), which resolving from this module's location would pick first.
+const ts = loadTypeScript();
+
+/**
+ * The first TypeScript with a compiler API, resolved from each place in order (a file or URL to resolve from).
+ * Exported for its test.
+ */
+export function loadTypeScript(from = [join(process.cwd(), 'package.json'), import.meta.url]) {
+  const tried = [];
+  for (const place of from) {
+    try {
+      const candidate = createRequire(place)('typescript');
+      if (candidate?.SyntaxKind && typeof candidate.createSourceFile === 'function') return candidate;
+      tried.push(`${place}: typescript ${candidate?.version ?? '?'} has no compiler API`);
+    } catch (error) {
+      tried.push(`${place}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  throw new Error(`loading-standard engine: no TypeScript compiler API to read with (${tried.join('; ')})`);
+}
 
 /** Every rule id, with the reason a finding of it prints. */
 export const RULES = {
@@ -156,6 +197,11 @@ export const RULES = {
   OWN_PULSE: 'a pulse or skeleton colour of its own (use the lib skeletons)',
   SUSPENSE_FALLBACK: 'a Suspense with no fallback (use LoadingSuspense / LoadingFallback)',
   HAND_PAIR: 'a hand-built loading pair (use the lib wrapper)',
+  RAW_SUSPENSE: 'a raw Suspense (use LoadingSuspense: its fallback is the component it waits on, in a loading scope)',
+  PAGE_BOUNDARY:
+    'a boundary around a whole page (wrap only the component that waits on a read; the static frame renders at once)',
+  BOUNDARY_OWNER:
+    'a boundary placed around a component (the component that waits returns <LoadingSuspense><Reader /></LoadingSuspense>, the reader draws its own loading form)',
   WHOLE_VIEW_SKELETON: 'a whole-view skeleton (the view itself in a loading scope is its loading state)',
   FOLD_PROP: 'a `fold` prop (a skeleton draws its full count: skeletonCount)',
   DEPRECATED_SKELETON: 'deprecated in the lib (render the component in a loading scope)',
@@ -175,6 +221,8 @@ const ALL_RULES = Object.keys(RULES);
 /** The files a host's PAGE CODE is (its route files, every file of a route folder, its screens, its `lib/`). */
 const ROUTE_FILE = /(?:^|\/)(?:page|layout|loading|template|not-found|error)\.tsx$/;
 const SCREEN_FILE = /-page(?:-ssr|-client)?\.tsx$/;
+/** A route file whose output is a whole page or layout (PAGE_BOUNDARY). */
+const PAGE_OR_LAYOUT_FILE = /(?:^|\/)(?:page|layout)\.tsx$/;
 
 /**
  * Each repository's rule set and exemptions. `trees` are the folders reported (relative to the tree's root; all when
@@ -204,6 +252,17 @@ export const CONFIGS = {
     },
     exempt: [],
   },
+  /**
+   * The hub (multi-platform-hub) runs the BOUNDARY rules from this engine; its own gate (`check-page-skeletons.mjs`)
+   * still holds its older skeleton checks. Its server boundary is `StreamedSection` (a read, drawn from a placeholder in
+   * a loading scope until it answers), which renders directly when told `cached`.
+   */
+  hub: {
+    rules: ['SUSPENSE_FALLBACK', 'HAND_PAIR', 'RAW_SUSPENSE', 'PAGE_BOUNDARY', 'BOUNDARY_OWNER'],
+    trees: ['app', 'components', 'lib'],
+    boundaries: { StreamedSection: 'cached' },
+    exempt: [],
+  },
   lib: {
     rules: ALL_RULES,
     exempt: [
@@ -211,7 +270,14 @@ export const CONFIGS = {
         why: "the lib's own loading primitives: the one pulse, the scope, the fallback and the Suspense wrapper are built here",
         files:
           /(?:^|\/)components\/(?:loading\/(?:loading-fallback|loading-region|unified-skeleton)|ui\/(?:loading-scope|skeleton[\w-]*|text-line-skeleton))\.tsx?$/,
-        rules: ['OWN_PULSE', 'HAND_PAIR', 'SUSPENSE_FALLBACK', 'NOTHING_WHILE_LOADING'],
+        rules: [
+          'OWN_PULSE',
+          'HAND_PAIR',
+          'SUSPENSE_FALLBACK',
+          'RAW_SUSPENSE',
+          'NOTHING_WHILE_LOADING',
+          'BOUNDARY_OWNER',
+        ],
       },
       {
         why: "the loaders themselves (declared, never a screen state in the lib), the Button's own action progress, and the chat registry's card loader (a card read by id, drawn by the card's own skeleton)",
@@ -257,9 +323,13 @@ const LOADERS = new Set([
   'OpenmspHeartbeatLoader',
   'Spinner',
 ]);
-/** The lib's skeleton parts: what a `*Skeleton` (or a component's own loading branch) is built from. */
+/**
+ * The lib's skeleton parts: what a `*Skeleton` (or a component's own loading branch) is built from.
+ * `TextLinesByBreakpointSkeleton` is `TextLineSkeleton` at a line count per width (a wrapping title or paragraph):
+ * bars with no component of their own, like the rest of the list.
+ */
 const PRIMITIVE =
-  /^(?:UnifiedSkeleton|TextLineSkeleton|FieldValueSkeleton|TextHold|LayoutHold|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
+  /^(?:UnifiedSkeleton|TextLineSkeleton|TextLinesByBreakpointSkeleton|FieldValueSkeleton|TextHold|LayoutHold|Skeleton)$|^(?:TextSkeleton|MediaSkeleton|InteractiveSkeleton)\./;
 /** The lib's loading wrappers (not loading states of a component). */
 const LOADING_WRAPPER = /^(?:Loading(?:Items|When|Fallback|Suspense|Scope|Region)|InertWhileLoading)$/;
 const WHOLE_VIEW =
@@ -1694,9 +1764,12 @@ function loadedListBeside(listNode, model) {
  * `exempt` lifting rules from files, and `files` (absolute paths) narrowing the run.
  *
  * @param {Project} project
- * @param {{ rules?: string[], trees?: string[], pageCode?: Function, exempt?: Array<{ why?: string, files: RegExp, rules: string[] }>, files?: string[] }} [config]
+ * @param {{ rules?: string[], trees?: string[], pageCode?: Function, boundaries?: Record<string, string>, exempt?: Array<{ why?: string, files: RegExp, rules: string[] }>, files?: string[] }} [config]
  */
-export function analyzeProject(project, { rules = ALL_RULES, trees, pageCode, exempt = [], files } = {}) {
+export function analyzeProject(
+  project,
+  { rules = ALL_RULES, trees, pageCode, boundaries = {}, exempt = [], files } = {},
+) {
   const enabled = new Set(rules);
   const findings = [];
   const paths = files ?? [...project.text.keys()].filter(path => project.treeOf.get(path)?.report);
@@ -1708,13 +1781,16 @@ export function analyzeProject(project, { rules = ALL_RULES, trees, pageCode, ex
     const active = new Set([...enabled].filter(r => !lifted.has(r)));
     if (!active.size) continue;
     const isFile = other => project.text.has(join(tree?.dir ?? '', other)) || existsSync(join(tree?.dir ?? '', other));
-    findings.push(...analyzeFile(project, path, active, rel, pageCode?.(rel, isFile) ?? null));
+    findings.push(...analyzeFile(project, path, active, rel, pageCode?.(rel, isFile) ?? null, boundaries));
   }
   return findings;
 }
 
-/** Every finding in one file (see `analyzeProject`); `page` is the file's page-code setting, or null. */
-function analyzeFile(project, path, active, rel, page) {
+/**
+ * Every finding in one file (see `analyzeProject`); `page` is the file's page-code setting, or null; `boundaries` the
+ * host's own boundary components.
+ */
+function analyzeFile(project, path, active, rel, page, boundaries = {}) {
   const model = project.model(path);
   const findings = [];
   const seen = new Set();
@@ -2237,13 +2313,14 @@ function analyzeFile(project, path, active, rel, page) {
     const leaf = tag.split('.').pop();
     skeletonRender(opening, opening.tagName);
     if (LOADERS.has(leaf)) report('LOADER_COMPONENT', opening, RULES.LOADER_COMPONENT);
-    if (leaf === 'StreamedPage') {
+    if (leaf === 'StreamedPage' || leaf === 'StreamedSection') {
       for (const a of opening.attributes.properties) {
         if (ts.isJsxAttribute(a) && /^(?:skeleton|memory|remember)$/.test(a.name.getText()))
-          report('RETIRED_API', a, `StreamedPage \`${a.name.getText()}\` (it takes a placeholder)`);
+          report('RETIRED_API', a, `${leaf} \`${a.name.getText()}\` (it takes a placeholder)`);
       }
     }
     if (leaf === 'Suspense' || leaf === 'LoadingSuspense') checkFallback(opening, leaf);
+    if (leaf === 'LoadingSuspense') checkBoundaryOwner(opening);
     if (leaf === 'LoadingFallback' && ts.isJsxOpeningElement(opening)) {
       const children = opening.parent.children.filter(c => !(ts.isJsxText(c) && !c.text.trim()));
       if (children.every(c => (ts.isJsxExpression(c) ? !c.expression || isBlank(c.expression) : isBlank(c))))
@@ -2290,6 +2367,35 @@ function analyzeFile(project, path, active, rel, page) {
     }
   }
 
+  /**
+   * BOUNDARY_OWNER: the boundary is the root element its component returns, around one component declared in this file,
+   * with no fallback of its own.
+   */
+  function checkBoundaryOwner(opening) {
+    const problems = [];
+    if (attribute(opening, 'fallback'))
+      problems.push('it takes a fallback (the component it wraps draws its own loading form in the scope)');
+    const el = ts.isJsxOpeningElement(opening) ? opening.parent : opening;
+    const kids = ts.isJsxElement(el) ? el.children.filter(c => !(ts.isJsxText(c) && !c.text.trim())) : [];
+    const only = kids.length === 1 && !ts.isJsxExpression(kids[0]) ? openingOf(kids[0]) : null;
+    const name = only ? dottedName(only.tagName) : '';
+    const decl = name && isComponentName(name) && !name.includes('.') ? model.lookup(name, el) : null;
+    if (!decl || decl.kind === 'import' || decl.kind === 'namespace' || decl.kind === 'param')
+      problems.push(
+        name && isComponentName(name)
+          ? `it wraps ${name}, which is not declared in this file (move the boundary into ${name})`
+          : 'it does not wrap exactly one component declared in this file',
+      );
+    let at = el.parent;
+    while (at && ts.isParenthesizedExpression(at)) at = at.parent;
+    const fn = nearestFunction(el);
+    const isRoot = !!fn && (ts.isReturnStatement(at) ? nearestFunction(at) === fn : at === fn && fn.body === el);
+    if (!isRoot || !isComponentName(functionName(fn)))
+      problems.push("it is not the whole output of the component it is written in (make it that component's root)");
+    if (problems.length)
+      report('BOUNDARY_OWNER', opening, `a boundary placed around a component, not by it: ${problems.join('; ')}`);
+  }
+
   /** A `Suspense` / `LoadingSuspense` fallback that draws nothing (LoadingSuspense's own default is its children). */
   function checkFallback(opening, leaf) {
     const fallback = attribute(opening, 'fallback');
@@ -2309,8 +2415,10 @@ function analyzeFile(project, path, active, rel, page) {
     }
     const root = rootElement(value);
     const rootOpening = root && openingOf(root);
-    if (leaf === 'Suspense' && rootOpening && model.resolveName(rootOpening.tagName) === 'LoadingFallback')
+    if (leaf !== 'Suspense') return;
+    if (rootOpening && model.resolveName(rootOpening.tagName) === 'LoadingFallback')
       report('HAND_PAIR', opening, 'a hand Suspense + LoadingFallback pair (use LoadingSuspense)');
+    else report('RAW_SUSPENSE', opening, RULES.RAW_SUSPENSE);
   }
 
   /**
@@ -3061,6 +3169,77 @@ function analyzeFile(project, path, active, rel, page) {
   // ---- page code (a host's route files and screens; see `CONFIGS.frontend.pageCode`) ---------------------------------
   if (page) checkPageCode(page);
 
+  // ---- a boundary around a whole page (a route file's page or layout) ------------------------------------------------
+  if (isTsx && PAGE_OR_LAYOUT_FILE.test(rel)) checkPageBoundary();
+
+  /** The boundary a JSX root is, by name (`Suspense`, `LoadingSuspense`, a host boundary not told to render directly). */
+  function boundaryOf(el) {
+    const opening = el && openingOf(el);
+    if (!opening) return null;
+    const leaf = model.resolveName(opening.tagName).split('.').pop();
+    if (leaf === 'Suspense' || leaf === 'LoadingSuspense') return { opening, leaf };
+    const direct = boundaries[leaf];
+    if (direct === undefined) return null;
+    const flag = attribute(opening, direct);
+    const value = flag && attributeExpression(flag);
+    // Bare (`cached`) or any value but the literal `false` (`cached={isCached}` included) turns the boundary off.
+    const off = flag && (!flag.initializer || !value || value.kind !== ts.SyntaxKind.FalseKeyword);
+    return off ? null : { opening, leaf };
+  }
+
+  /** The element a page's output is: its root, or the only element of a root fragment. */
+  function pageRoot(expr) {
+    let el = rootElement(expr);
+    while (el && ts.isJsxFragment(el)) {
+      const kids = el.children.filter(c => !(ts.isJsxText(c) && !c.text.trim()));
+      if (kids.length !== 1) return null;
+      el = ts.isJsxExpression(kids[0]) ? rootElement(kids[0].expression) : kids[0];
+    }
+    return el;
+  }
+
+  function checkPageBoundary() {
+    const fn = defaultExportFunction(model);
+    if (!fn) return;
+    const outputs = [];
+    const collect = expr => {
+      const n = strip(expr);
+      if (!n) return;
+      if (ts.isConditionalExpression(n)) {
+        collect(n.whenTrue);
+        collect(n.whenFalse);
+        return;
+      }
+      // A render helper handed the page (`renderPlatformPage({ slots: { x: <Page /> } })`): each slot is the output.
+      if (ts.isCallExpression(n)) {
+        for (const arg of n.arguments)
+          walk(arg, m => {
+            if (isFunctionLike(m)) return false;
+            if (ts.isPropertyAssignment(m) && isJsx(strip(m.initializer))) outputs.push(m.initializer);
+            return undefined;
+          });
+        return;
+      }
+      outputs.push(n);
+    };
+    if (fn.body && !ts.isBlock(fn.body)) collect(fn.body);
+    else if (fn.body)
+      walk(fn.body, n => {
+        if (isFunctionLike(n)) return false;
+        if (ts.isReturnStatement(n) && n.expression) collect(n.expression);
+        return undefined;
+      });
+    for (const out of outputs) {
+      const hit = boundaryOf(pageRoot(out));
+      if (hit)
+        report(
+          'PAGE_BOUNDARY',
+          hit.opening,
+          `<${hit.leaf}> around the whole ${/layout\.tsx$/.test(rel) ? 'layout' : 'page'} (wrap only the component that waits on a read; the static frame renders at once)`,
+        );
+    }
+  }
+
   function checkPageCode({ components: componentSkeletons }) {
     if (/(?:^|\/)loading\.tsx$/.test(rel) && rel.startsWith('app/'))
       report('PAGE_CODE', model.sf, 'a route-level loading.tsx (the page draws itself in a loading scope)');
@@ -3102,6 +3281,34 @@ function analyzeFile(project, path, active, rel, page) {
   }
 
   return findings;
+}
+
+/** The function a module exports as its default (`export default function`, or `export default Name`), or null. */
+function defaultExportFunction(model) {
+  for (const st of model.sf.statements) {
+    const mods = ts.canHaveModifiers?.(st) ? (ts.getModifiers(st) ?? []) : (st.modifiers ?? []);
+    const isDefault = mods.some(m => m.kind === ts.SyntaxKind.DefaultKeyword);
+    if (ts.isFunctionDeclaration(st) && isDefault) return st;
+    if (ts.isExportAssignment(st) && !st.isExportEquals) {
+      const e = strip(st.expression);
+      if (isFunctionLike(e)) return e;
+      if (ts.isIdentifier(e)) {
+        for (const other of model.sf.statements) {
+          if (ts.isFunctionDeclaration(other) && other.name?.text === e.text) return other;
+          if (ts.isVariableStatement(other))
+            for (const d of other.declarationList.declarations)
+              if (
+                ts.isIdentifier(d.name) &&
+                d.name.text === e.text &&
+                d.initializer &&
+                isFunctionLike(strip(d.initializer))
+              )
+                return strip(d.initializer);
+        }
+      }
+    }
+  }
+  return null;
 }
 
 /** Whether `model`'s module renders `<component />` from a function that is not a skeleton. */

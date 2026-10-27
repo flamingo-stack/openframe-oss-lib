@@ -12,6 +12,7 @@ import {
   useInteractions,
   FloatingPortal,
   useHover,
+  useFocus,
   safePolygon,
   arrow,
 } from '@floating-ui/react';
@@ -148,10 +149,12 @@ export function FloatingTooltip({
     delay: { open: delayDuration, close: 0 },
     handleClose: safePolygon(),
   });
+  // Keyboard users reach it too: a focusable trigger opens it on focus (keyboard focus only, never a mouse click).
+  const focus = useFocus(context, { enabled: !disabled, visibleOnly: true });
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: 'tooltip' });
 
-  const { getReferenceProps, getFloatingProps } = useInteractions([hover, dismiss, role]);
+  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, dismiss, role]);
 
   // Destructured once: reaching for `refs.setFloating` inside the JSX is a
   // property read on floating-ui's ref bag on every render, which the compiler

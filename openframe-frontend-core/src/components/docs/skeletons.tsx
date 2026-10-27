@@ -43,8 +43,14 @@ export function MarkdownSkeleton({
             <TextLineSkeleton type="inherit" as="span" className="w-1/3" />
           </h2>
         ) : (
+          // The last block ends the body with no margin, like the rendered one. Its own `last:mb-0` does not apply here:
+          // the region's status line follows the blocks, so the paragraph is not the last child.
           // biome-ignore lint/suspicious/noArrayIndexKey: skeleton blocks never reorder
-          <p key={i} className={MARKDOWN_SKELETON_P_CLASS} aria-hidden>
+          <p
+            key={i}
+            className={cn(MARKDOWN_SKELETON_P_CLASS, i === MARKDOWN_SKELETON_BLOCKS.length - 1 && 'mb-0')}
+            aria-hidden
+          >
             <TextLineSkeleton type="inherit" as="span" lines={block.lines} className="w-full" />
           </p>
         ),

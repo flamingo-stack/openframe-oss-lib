@@ -10,7 +10,7 @@
  * default branch.
  */
 
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Globe, Lock, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { useState } from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
@@ -24,6 +24,7 @@ import { Button } from '../../ui/button/button';
 import { ImageGalleryModal } from '../../ui/image-gallery-modal';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge, generationTierFromLabel } from '../../ui/status-badge';
+import { Tag } from '../../ui/tag';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
 import type { RoadmapItem } from '../types/entities/roadmap-item';
 import { getStatusColorScheme } from '../utils/agent-status-message';
@@ -64,6 +65,21 @@ const ROADMAP_CARD_SUMMARY_ROW = `flex items-center text-h4 ${TEXT_LINES_MIN[3]}
 const ROADMAP_CARD_FOOTER = 'flex w-full items-center justify-between';
 const ROADMAP_CARD_VOTES = 'flex h-[48px] overflow-hidden rounded-[6px]';
 const ROADMAP_CARD_FOOTER_END = 'flex min-w-0 items-center gap-2';
+
+/** What a card says about its visibility when its reader states it (`RoadmapItem.isPublic`). */
+export const ROADMAP_VISIBILITY_LABEL = { public: 'Public', internal: 'Team only' } as const;
+
+/** Public or team only, when the item states it: a team-only plan is never read as announced. */
+function RoadmapVisibilityTag({ isPublic }: { isPublic: boolean }) {
+  return (
+    <Tag
+      data-loading-optional
+      variant="outline"
+      icon={isPublic ? <Globe className="h-4 w-4" aria-hidden /> : <Lock className="h-4 w-4" aria-hidden />}
+      label={isPublic ? ROADMAP_VISIBILITY_LABEL.public : ROADMAP_VISIBILITY_LABEL.internal}
+    />
+  );
+}
 
 /**
  * A roadmap card while it is read. `default`, in the card's own boxes: the 64px icon box, the title as two `text-h3`
@@ -385,6 +401,7 @@ function LoadedRoadmapCard({
         )}
 
         <div className={ROADMAP_CARD_FOOTER_END}>
+          {typeof item.isPublic === 'boolean' ? <RoadmapVisibilityTag isPublic={item.isPublic} /> : null}
           {item.assignees && item.assignees.length > 0 ? (
             <AvatarStack size="xs" people={assigneePeople(item.assignees)} className="shrink-0" />
           ) : null}
