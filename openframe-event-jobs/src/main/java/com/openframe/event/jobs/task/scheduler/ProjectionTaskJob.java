@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.time.Duration;
 import java.util.List;
 
-// Works every RUNNING task, each under its own lock, so several pods share them; a task continues from its lastId.
+// Works every RUNNING task under its source's lock, so several pods share them; a task continues from its lastId.
 @Slf4j
 @RequiredArgsConstructor
 public class ProjectionTaskJob {
@@ -42,10 +42,10 @@ public class ProjectionTaskJob {
         }
     }
 
-    // One task's error, Mongo down included, does not skip the other tasks of the tick.
+    // Locked per source, so a replaced run still writing keeps the newer run waiting; one task's error skips no other.
     private void runLocked(ProjectionTask task) {
         String taskId = task.getId();
-        String lockId = LOCK_PREFIX + taskId;
+        String lockId = LOCK_PREFIX + task.getKey();
         Duration lockAtMostFor = properties.getLockAtMostFor();
         try {
             jobLock.runExclusively(lockId, lockAtMostFor, () -> runner.applyBatches(taskId));
