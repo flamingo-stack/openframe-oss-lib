@@ -8,6 +8,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +27,8 @@ class EventProcessingAutoConfigurationTest {
             .withUserConfiguration(AggregateSpecRegistry.class)
             .withPropertyValues("openframe.events.enabled=true")
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-            .withBean(MongoOperations.class, () -> mock(MongoOperations.class));
+            .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+            .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class));
 
     @Test
     void eventProcessing_isOffByDefault_soNoneOfItsBeansExist() {
@@ -34,6 +36,7 @@ class EventProcessingAutoConfigurationTest {
                 .withConfiguration(AutoConfigurations.of(EventProcessingAutoConfiguration.class))
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(context).hasNotFailed()
                         .doesNotHaveBean(ProjectionRunner.class)
                         .doesNotHaveBean(EventProcessingKafkaProperties.class));
@@ -45,6 +48,7 @@ class EventProcessingAutoConfigurationTest {
                 .withUserConfiguration(ScansEverything.class)
                 .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
                 .withBean(MongoOperations.class, () -> mock(MongoOperations.class))
+                .withBean(MongoDatabaseFactory.class, () -> mock(MongoDatabaseFactory.class))
                 .run(context -> assertThat(context).hasNotFailed()
                         .doesNotHaveBean(ProjectionRunner.class));
     }

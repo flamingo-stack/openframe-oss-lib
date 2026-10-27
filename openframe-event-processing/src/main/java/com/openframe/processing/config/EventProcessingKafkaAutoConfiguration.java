@@ -3,6 +3,7 @@ package com.openframe.processing.config;
 import com.openframe.processing.config.properties.EventProcessingKafkaProperties;
 import com.openframe.processing.exception.EventProcessingFailedException;
 import com.openframe.processing.exception.MongoUnavailableException;
+import com.openframe.processing.exception.ProjectionConflictException;
 import com.openframe.processing.listener.PublishedEventListeners;
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.processing.topic.EventTopicNames;
@@ -138,14 +139,14 @@ public class EventProcessingKafkaAutoConfiguration {
         map.from(listener::getAuthExceptionRetryInterval).to(container::setAuthExceptionRetryInterval);
     }
 
-    // Only Mongo down is retried, without limit; the wrapper is listed, so no processor's cause can make it retried.
+    // Only Mongo down and a conflict with another consumer are retried, without limit; the wrapper is never retried.
     private DefaultErrorHandler buildErrorHandler(EventProcessingKafkaProperties.BackOff backOff,
                                                   KafkaTemplate<String, byte[]> eventProcessingKafkaTemplate) {
         ConsumerAwareRecordRecoverer deadLetters = buildDeadLetterRecoverer(eventProcessingKafkaTemplate);
         ExponentialBackOff retryBackOff = buildExponentialBackOff(backOff);
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(deadLetters, retryBackOff);
         errorHandler.defaultFalse();
-        errorHandler.addRetryableExceptions(MongoUnavailableException.class);
+        errorHandler.addRetryableExceptions(MongoUnavailableException.class, ProjectionConflictException.class);
         errorHandler.addNotRetryableExceptions(EventProcessingFailedException.class);
         return errorHandler;
     }
