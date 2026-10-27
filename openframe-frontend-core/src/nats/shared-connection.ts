@@ -10,6 +10,7 @@ export const NATS_DEFAULTS = {
   RETRY_MULTIPLIER: 2,
   /** Failed dials in a row after which the lifecycle stops dialling for a while. */
   PAUSE_AFTER_FAILURES: 5,
+  /** Length of a pause, plus up to 20% jitter so clients paused by one outage do not wake together. */
   PAUSE_MS: 300_000,
   /** A pause ignores visibility/online resume triggers for this long, so toggling tabs is not a retry button. */
   PAUSE_MIN_RESUME_MS: 30_000,
@@ -18,7 +19,8 @@ export const NATS_DEFAULTS = {
 /**
  * What `onBeforeReconnect` can decide about the connection, not just this attempt.
  * - `continue` (or returning nothing): dial.
- * - `pause`: no dials for at least `pauseMs`; ends early on the tab becoming visible or the browser coming back online.
+ * - `pause`: no dials for `PAUSE_MS` plus jitter; ends early (not within `PAUSE_MIN_RESUME_MS`) on the tab
+ *   becoming visible or the browser coming back online.
  * - `terminal`: the connection can never come back (e.g. the tenant is gone). No lifecycle dials it again until a fresh acquire.
  */
 export type NatsReconnectVerdict = 'continue' | 'pause' | 'terminal';
@@ -43,13 +45,6 @@ export interface NatsReconnectionBackoff {
   maxDelayMs?: number;
   /** Per-attempt multiplier during exponential phase. Default: RETRY_MULTIPLIER. */
   multiplier?: number;
-  /**
-   * Consecutive failed dials after which a `continue` verdict is overruled by a
-   * pause. Default: PAUSE_AFTER_FAILURES.
-   */
-  pauseAfterFailures?: number;
-  /** Length of a pause, before up to 20% jitter. Default: PAUSE_MS. */
-  pauseMs?: number;
 }
 
 export interface SharedConnection {
@@ -79,6 +74,8 @@ export interface SharedConnection {
    * mounts) continues the same backoff instead of restarting at the fast tier.
    */
   failedDials: number;
+  /** The rejection last counted into `failedDials`; see `countFailedDial`. */
+  lastDialError: unknown;
   /** Set by a `terminal` verdict. Cleared only by a fresh acquire (see {@link acquireClient}). */
   terminal: boolean;
   /** Set while dialling is suspended; `until` is a `Date.now()` timestamp. */
@@ -153,6 +150,7 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
       retryOwner: null,
       retrySchedulers: new Set(),
       failedDials: 0,
+      lastDialError: undefined,
       terminal: false,
       pause: null,
       terminalListeners: new Set(),
@@ -278,15 +276,14 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     conn.pause = null;
   }
 
-  function startPause(backoff: NatsReconnectionBackoff): void {
+  function startPause(): void {
     if (conn.pause) return;
-    const pauseMs = backoff.pauseMs ?? NATS_DEFAULTS.PAUSE_MS;
     const now = Date.now();
     // Spread over up to +20% so clients paused by the same outage do not all wake together.
-    const until = now + pauseMs * (1 + Math.random() * 0.2);
+    const until = now + NATS_DEFAULTS.PAUSE_MS * (1 + Math.random() * 0.2);
 
     const resume = () => {
-      if (conn.pause?.startedAt === undefined) return;
+      if (!conn.pause) return;
       if (Date.now() - conn.pause.startedAt < NATS_DEFAULTS.PAUSE_MIN_RESUME_MS) return;
       endPause();
       if (conn.terminal || conn.client.isConnected()) return;
@@ -307,8 +304,7 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     }
     // The next dial after an auto-pause is a single probe: one more failure and
     // the threshold is met again, instead of five more dials into a dead endpoint.
-    const threshold = backoff.pauseAfterFailures ?? NATS_DEFAULTS.PAUSE_AFTER_FAILURES;
-    conn.failedDials = Math.min(conn.failedDials, threshold - 1);
+    conn.failedDials = Math.min(conn.failedDials, NATS_DEFAULTS.PAUSE_AFTER_FAILURES - 1);
     conn.pause = {
       until,
       startedAt: now,
@@ -323,6 +319,17 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
   function markHealthy(): void {
     endPause();
     conn.failedDials = 0;
+  }
+
+  // Lifecycles that attach while a dial is in flight join it (`NatsClient.connect`
+  // shares one promise), so one refused dial rejects in every one of them — with
+  // the same error object. Counted per lifecycle, consumers mounting together
+  // turned one failure into several, skipped the fast tier and reached the pause
+  // threshold after a couple of real dials.
+  function countFailedDial(err: unknown): void {
+    if (err === conn.lastDialError) return;
+    conn.lastDialError = err;
+    conn.failedDials++;
   }
 
   function markTerminal(): void {
@@ -388,7 +395,7 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       attempt < fastRetries ? fastDelay : Math.min(baseDelay * multiplier ** (attempt - fastRetries), maxDelay);
     // A pause outranks the backoff: whoever arms the timer — the owner, or a
     // successor taking over mid-pause — waits out what is left of it.
-    const jitteredDelay = Math.max(delay * (0.5 + Math.random() * 0.5), conn.pause ? conn.pause.until - Date.now() : 0);
+    const wait = Math.max(delay * (0.5 + Math.random() * 0.5), conn.pause ? conn.pause.until - Date.now() : 0);
 
     // The retry body is a named async function rather than the timer callback
     // itself: `setTimeout` discards whatever its callback returns, so an async
@@ -431,8 +438,8 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
         markTerminal();
         return;
       }
-      if (verdict === 'pause' || conn.failedDials >= (cfg.pauseAfterFailures ?? NATS_DEFAULTS.PAUSE_AFTER_FAILURES)) {
-        startPause(cfg);
+      if (verdict === 'pause' || conn.failedDials >= NATS_DEFAULTS.PAUSE_AFTER_FAILURES) {
+        startPause();
       }
 
       const freshUrl = options.getFreshUrl();
@@ -469,9 +476,9 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
           markHealthy();
         }
-      } catch {
+      } catch (err) {
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
-          conn.failedDials++;
+          countFailedDial(err);
           scheduleRetry();
         }
       }
@@ -481,7 +488,7 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       runRetry().catch((err: unknown) => {
         console.warn('[nats] retry attempt threw:', err);
       });
-    }, jitteredDelay);
+    }, wait);
   }
 
   const shouldRetryOn = options.shouldRetryOn ?? defaultShouldRetryOn;
@@ -526,10 +533,10 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     void (async () => {
       try {
         await conn.client.connect();
-      } catch {
+      } catch (err) {
         if (closed) return;
 
-        conn.failedDials++;
+        countFailedDial(err);
         emitSynthetic('disconnected');
         scheduleRetry();
       }

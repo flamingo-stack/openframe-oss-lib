@@ -5,13 +5,13 @@
  * connection dials, which the end-to-end suite next to this one cannot pin
  * without waiting out real backoffs.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type { NatsClient, NatsStatusEvent } from '../nats';
 import type { ConnectionLifecycleOptions } from '../shared-connection';
 
 interface FakeClient {
-  connect: ReturnType<typeof vi.fn>;
-  close: ReturnType<typeof vi.fn>;
+  connect: Mock<() => Promise<void>>;
+  close: Mock<() => Promise<void>>;
   isConnected: () => boolean;
   onStatus: (cb: (e: NatsStatusEvent) => void) => () => void;
 }
@@ -33,9 +33,10 @@ let url = '';
 
 function newFake(): FakeClient {
   return {
-    connect: vi.fn(async () => {
-      if (!dialsSucceed) throw new Error('refused');
+    connect: vi.fn(() => {
+      if (!dialsSucceed) return Promise.reject(new Error('refused'));
       connected = true;
+      return Promise.resolve();
     }),
     close: vi.fn(async () => {}),
     isConnected: () => connected,
@@ -74,7 +75,7 @@ describe('shared connection verdicts', () => {
   describe('terminal', () => {
     it('stops dialling for every lifecycle and reports it, including to a late attacher', async () => {
       const onTerminal = vi.fn();
-      const before = vi.fn(async () => 'terminal' as const);
+      const before = vi.fn(() => Promise.resolve('terminal' as const));
       const conn = acquireClient(url);
       attach({ onBeforeReconnect: before, onTerminal }, conn);
       await advance(1_000);
@@ -154,7 +155,7 @@ describe('shared connection verdicts', () => {
 
   describe('auto-pause', () => {
     it('pauses after five failed dials while the callback keeps saying continue', async () => {
-      const before = vi.fn(async () => 'continue' as const);
+      const before = vi.fn(() => Promise.resolve('continue' as const));
       attach({ onBeforeReconnect: before });
       await advance(2 * MIN);
       const dials = fake.connect.mock.calls.length;
@@ -168,7 +169,7 @@ describe('shared connection verdicts', () => {
     });
 
     it('dials a single probe after the pause and pauses again if it fails', async () => {
-      attach({ onBeforeReconnect: vi.fn(async () => 'continue' as const) });
+      attach({ onBeforeReconnect: vi.fn(() => Promise.resolve('continue' as const)) });
       await advance(2 * MIN);
       const dials = fake.connect.mock.calls.length;
 
@@ -205,6 +206,25 @@ describe('shared connection verdicts', () => {
       await advance(300); // a fresh counter would dial within the 200ms fast tier
       expect(fake.connect).toHaveBeenCalledTimes(dials);
       expect(conn.failedDials).toBe(failures);
+    });
+
+    it('counts a dial once when several lifecycles joined it', async () => {
+      // Like `NatsClient.connect`: concurrent callers share the dial in flight.
+      let inFlight: Promise<void> | null = null;
+      fake.connect.mockImplementation(() => {
+        inFlight ??= Promise.reject(new Error('refused')).finally(() => {
+          inFlight = null;
+        });
+        return inFlight;
+      });
+      const conn = acquireClient(url);
+      attach({}, conn);
+      attach({}, acquireClient(url));
+      attach({}, acquireClient(url));
+      await advance(1);
+
+      expect(fake.connect).toHaveBeenCalledTimes(3);
+      expect(conn.failedDials).toBe(1);
     });
 
     it('resets when the connection comes up', async () => {
