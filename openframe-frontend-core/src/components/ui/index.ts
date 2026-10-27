@@ -147,6 +147,7 @@ export * from './deleted-user-avatar';
 export * from './square-avatar';
 // THE sizes of the library's components (avatars, icons, tiles, media, text rows).
 export * from '../../styles/component-sizes';
+export * from '../../styles/image-sizes';
 export * from './tab-selector';
 export * from './tag';
 export * from './title-content-block';

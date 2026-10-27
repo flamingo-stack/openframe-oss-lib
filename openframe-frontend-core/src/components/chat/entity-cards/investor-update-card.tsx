@@ -30,6 +30,7 @@ import { EntityPortraitCard } from './entity-portrait-card';
 
 /** The content-type chip a portrait investor update shows (a static label). */
 const INVESTOR_UPDATE_TYPE_LABEL = 'Investor Update';
+import { fixedImageSlot } from '../../../styles/image-sizes';
 import { useEntityCardLink } from './use-entity-card-link';
 import { useEntityCardPlaceholder } from './use-entity-card-placeholder';
 
@@ -148,7 +149,7 @@ function LoadedInvestorUpdateCard({
               alt={update.title ?? 'Investor update'}
               className="object-contain"
               fill
-              sizes="56px"
+              sizes={fixedImageSlot('tile')}
               unoptimized
               onError={e => {
                 const img = e.currentTarget;

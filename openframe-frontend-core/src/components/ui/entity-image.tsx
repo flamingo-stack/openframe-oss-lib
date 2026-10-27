@@ -4,6 +4,7 @@ import React from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
 import { TILE_SIZE } from '../../styles/component-sizes';
+import { IMAGE_FIXED_PX } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -79,8 +80,8 @@ export function EntityImage({ src, alt, fallbackText, sizeClassName, className }
       // Intrinsic hint only — the responsive `size-*` classes above own the
       // rendered box. `unoptimized` because `useAuthedImageSrc` hands back a
       // `blob:` URL under bearer-token hosts, which no image optimizer can fetch.
-      width={60}
-      height={60}
+      width={IMAGE_FIXED_PX.thumb}
+      height={IMAGE_FIXED_PX.thumb}
       unoptimized
     />
   );
