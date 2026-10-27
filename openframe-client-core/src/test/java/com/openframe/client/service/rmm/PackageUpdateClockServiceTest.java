@@ -44,9 +44,6 @@ class PackageUpdateClockServiceTest {
     @BeforeEach
     void config() {
         ReflectionTestUtils.setField(service, "deadlineBatchSize", 500);
-        ReflectionTestUtils.setField(service, "retryBatchSize", 500);
-        ReflectionTestUtils.setField(service, "maxAttempts", 3);
-        ReflectionTestUtils.setField(service, "backoffSeconds", 21600L);
     }
 
     private PackageUpdateDeviceState device(String machineId, SoftwareActionStatus status) {
@@ -97,65 +94,5 @@ class PackageUpdateClockServiceTest {
 
         verifyNoInteractions(deliveryDispatcher);
         verify(deviceStateRepository, never()).save(any());
-    }
-
-    // --- bounded AUTO retry ---
-
-    @Test
-    void retry_belowCap_backoffElapsed_resendsOnlyFailedDevices_andBumpsAttempts() {
-        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, 1, Instant.now().minusSeconds(25_000));
-        when(requestRepository.findBySourceAndStatus(eq(PackageUpdateSource.AUTO),
-                eq(SoftwareActionStatus.FAILED), any(Pageable.class))).thenReturn(List.of(req));
-        PackageUpdateDeviceState m1 = device("m1", SoftwareActionStatus.FAILED);
-        PackageUpdateDeviceState m2 = device("m2", SoftwareActionStatus.COMPLETED);
-        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(m1, m2));
-
-        service.retryFailedAutoUpdates();
-
-        ArgumentCaptor<PackageUpdateDeliverySeed> seed = ArgumentCaptor.forClass(PackageUpdateDeliverySeed.class);
-        verify(deliveryDispatcher).dispatch(seed.capture());          // only the failed device
-        assertThat(seed.getValue().getMachineId()).isEqualTo("m1");
-        assertThat(m1.getStatus()).isEqualTo(SoftwareActionStatus.SCHEDULED);
-        assertThat(m1.getLastEventId()).isNull();
-        verify(deviceStateRepository).save(m1);
-        assertThat(req.getAttempts()).isEqualTo(2);
-        assertThat(req.getStatus()).isEqualTo(SoftwareActionStatus.SCHEDULED);
-        verify(requestRepository).save(req);
-    }
-
-    @Test
-    void retry_attemptsExhausted_skips() {
-        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, 3, Instant.now().minusSeconds(25_000));
-        when(requestRepository.findBySourceAndStatus(any(), any(), any(Pageable.class))).thenReturn(List.of(req));
-
-        service.retryFailedAutoUpdates();
-
-        verifyNoInteractions(deliveryDispatcher);
-        verify(requestRepository, never()).save(any());
-    }
-
-    @Test
-    void retry_withinBackoff_skips() {
-        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, 1, Instant.now());  // just updated
-        when(requestRepository.findBySourceAndStatus(any(), any(), any(Pageable.class))).thenReturn(List.of(req));
-
-        service.retryFailedAutoUpdates();
-
-        verifyNoInteractions(deliveryDispatcher);
-        verify(requestRepository, never()).save(any());
-    }
-
-    @Test
-    void retry_onlySupersededDevices_notRetried() {
-        PackageUpdateRequest req = request(PackageUpdateSource.AUTO, 1, Instant.now().minusSeconds(25_000));
-        when(requestRepository.findBySourceAndStatus(any(), any(), any(Pageable.class))).thenReturn(List.of(req));
-        PackageUpdateDeviceState superseded = device("m1", SoftwareActionStatus.FAILED);
-        superseded.setFailedReason("SUPERSEDED");
-        when(deviceStateRepository.findByTenantIdAndRequestId("t1", "req-1")).thenReturn(List.of(superseded));
-
-        service.retryFailedAutoUpdates();
-
-        verifyNoInteractions(deliveryDispatcher);
-        verify(requestRepository, never()).save(any());
     }
 }
