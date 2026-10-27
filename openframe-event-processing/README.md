@@ -133,6 +133,14 @@ feature off leaves the copies stale: reconciliation and the consumer lag alert s
 
 A new published type needs only its spec: the listeners of its projections are registered from the spec at startup.
 
+A renamed projection gets a new group, which reads the whole compacted topic again; the version guard makes that
+harmless. The old group stays on Kafka, and its lag grows with every event until the Kafka lag alert fires. Once the
+release runs everywhere, delete the group of a renamed or removed projection:
+
+```bash
+kafka-consumer-groups.sh --bootstrap-server <kafka> --delete --group <group-prefix><type>.<old-name>
+```
+
 ## Errors and the DLT
 
 | What fails | What happens |
