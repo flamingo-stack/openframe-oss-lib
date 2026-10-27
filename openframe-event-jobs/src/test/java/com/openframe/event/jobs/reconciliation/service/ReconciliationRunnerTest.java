@@ -114,6 +114,7 @@ class ReconciliationRunnerTest {
 
         // verifications
         verify(publishedAggregates).publishCurrent("organizations", List.of("org-1"));
+        verify(projection, never()).applyDelete(anyString(), anyString());
         assertThat(lastSaved().getLastMismatches()).isEqualTo(2);
     }
 
@@ -162,7 +163,7 @@ class ReconciliationRunnerTest {
     }
 
     @Test
-    void aMismatchWhoseSourceIsGone_isReported_butNothingIsPublished() {
+    void aMismatchWhoseSourceIsGone_isReported_andTheMissedDeleteApplied_butNothingIsPublished() {
         // setup
         List<Item> batch = List.of(new Item("t1"));
         when(itemRepository.findAfter(ItemDocument.class, Item.class, null, 3)).thenReturn(batch);
@@ -177,6 +178,7 @@ class ReconciliationRunnerTest {
         // verifications
         assertThat(lastSaved().getLastMismatches()).isEqualTo(1);
         verify(publishedAggregates, never()).publishCurrent(anyString(), anyCollection());
+        verify(projection).applyDelete("tenant-a", "org-9");
     }
 
     @Test

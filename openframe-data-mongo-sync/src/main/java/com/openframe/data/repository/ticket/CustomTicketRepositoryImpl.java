@@ -7,10 +7,14 @@ import com.openframe.data.document.ticket.filter.TicketActivityFilter;
 import com.openframe.data.document.ticket.filter.TicketQueryFilter;
 import com.openframe.data.mongo.TenantAwareMongoTemplate;
 import com.openframe.data.repository.TenantAwareRepositorySupport;
+import com.openframe.data.repository.ticket.publishing.TicketAggregateSpec;
+import com.openframe.publishing.api.OutboxPublisher;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -29,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 import static org.springframework.util.StringUtils.hasText;
@@ -86,8 +91,15 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
             FIELD_ORDER
     );
 
-    public CustomTicketRepositoryImpl(TenantAwareMongoTemplate mongoTemplate) {
+    // Present only while publishing is on: a title written here must reach the projections like a TicketRepository save.
+    private final ObjectProvider<OutboxPublisher> outboxPublisher;
+    private final ObjectProvider<TicketAggregateSpec> ticketSpec;
+
+    public CustomTicketRepositoryImpl(TenantAwareMongoTemplate mongoTemplate, ObjectProvider<OutboxPublisher> outboxPublisher,
+                                      ObjectProvider<TicketAggregateSpec> ticketSpec) {
         super(mongoTemplate);
+        this.outboxPublisher = outboxPublisher;
+        this.ticketSpec = ticketSpec;
     }
 
     @Override
@@ -460,7 +472,21 @@ public class CustomTicketRepositoryImpl extends TenantAwareRepositorySupport imp
                 .set(FIELD_TITLE, title)
                 .set(FIELD_UPDATED_AT, Instant.now());
 
-        mongoTemplate.updateFirst(query, update, Ticket.class);
+        FindAndModifyOptions returnNew = FindAndModifyOptions.options().returnNew(true);
+        Supplier<Ticket> write = () -> mongoTemplate.findAndModify(query, update, returnNew, Ticket.class);
+        OutboxPublisher publisher = outboxPublisher.getIfAvailable();
+        TicketAggregateSpec spec = ticketSpec.getIfAvailable();
+        if (publisher == null || spec == null) {
+            write.get();
+            return;
+        }
+        try {
+            publisher.publishChanged(spec, write);
+        } catch (OptimisticLockingFailureException conflict) {
+            // A ticket save committed during the transaction; the title is a plain $set, so writing it again is safe.
+            log.info("Title write of ticket {} met a concurrent save, writing it again", ticketId);
+            publisher.publishChanged(spec, write);
+        }
     }
 
     @Override

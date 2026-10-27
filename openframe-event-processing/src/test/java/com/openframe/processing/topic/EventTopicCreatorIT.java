@@ -4,6 +4,8 @@ import com.openframe.processing.config.properties.EventProcessingKafkaProperties
 import com.openframe.processing.fixture.Widgets.RecordingProjection;
 import com.openframe.processing.fixture.Widgets.WidgetSpec;
 import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.config.EventsProperties;
+import com.openframe.publishing.config.PublishedAggregateTopics;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -26,6 +28,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -103,7 +106,32 @@ class EventTopicCreatorIT {
         creator.afterSingletonsInstantiated();
     }
 
+    @Test
+    void aTypeSwitchedOff_getsNoTopic() throws Exception {
+        // setup
+        String prefix = newPrefix();
+        EventsProperties events = new EventsProperties();
+        PublishedAggregateTopics nothingPublished = new PublishedAggregateTopics(events);
+
+        // execution
+        creator(prefix, nothingPublished).afterSingletonsInstantiated();
+
+        // verifications
+        Set<String> topics = admin.listTopics().names().get(30, TimeUnit.SECONDS);
+        assertThat(topics).doesNotContain(prefix + "organizations", prefix + "organizations-dlt");
+    }
+
     private static EventTopicCreator creator(String prefix) {
+        EventsProperties events = new EventsProperties();
+        events.setEnabled(true);
+        EventsProperties.Topic organizations = new EventsProperties.Topic();
+        organizations.setEnabled(true);
+        events.getTopics().put("organizations", organizations);
+        PublishedAggregateTopics organizationsPublished = new PublishedAggregateTopics(events);
+        return creator(prefix, organizationsPublished);
+    }
+
+    private static EventTopicCreator creator(String prefix, PublishedAggregateTopics publishedTopics) {
         EventProcessingKafkaProperties properties = new EventProcessingKafkaProperties();
         EventProcessingKafkaProperties.Kafka kafka = properties.getKafka();
         kafka.setBootstrapServers(List.of(KAFKA.getBootstrapServers()));
@@ -114,7 +142,7 @@ class EventTopicCreatorIT {
         WidgetSpec spec = new WidgetSpec(List.of(new RecordingProjection("widget-on-organizations")));
         List<AggregateSpec<?, ?>> specs = List.of(spec);
         when(specRegistry.specs()).thenReturn(specs);
-        return new EventTopicCreator(specRegistry, properties);
+        return new EventTopicCreator(specRegistry, publishedTopics, properties);
     }
 
     private static Config configOf(String topic) throws Exception {

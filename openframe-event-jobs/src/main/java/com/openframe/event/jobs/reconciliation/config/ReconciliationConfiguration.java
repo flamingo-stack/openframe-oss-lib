@@ -65,7 +65,7 @@ public class ReconciliationConfiguration {
         List<Projection<?, ?>> projections = new ArrayList<>();
         for (String type : specRegistry.types()) {
             if (publishedTopics.isPublishing(type)) {
-                List<? extends Projection<?, ?>> typeProjections = specRegistry.specOf(type).projections();
+                List<Projection<?, ?>> typeProjections = specRegistry.getProjections(type);
                 projections.addAll(typeProjections);
             }
         }
