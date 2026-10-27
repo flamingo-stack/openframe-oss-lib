@@ -73,9 +73,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
             "lastSeen"
     );
     private static final String DEFAULT_SORT_FIELD = "_id";
-    // Sorting by status follows this explicit order, never the alphabetical one; DESC is its exact reverse.
-    static final List<String> STATUS_SORT_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
+    // The order a DESC status sort returns (the frontends send DESC meaning "online first"); ASC is its exact reverse.
+    static final List<String> STATUS_DESC_ORDER = List.of("ONLINE", "OFFLINE", "PENDING", "PENDING_DELETION");
     private static final String STATUS_RANK_FIELD = "_statusRank";
+    private static final int UNKNOWN_STATUS_RANK = 0;
 
     private static final String TENANT_ID_FIELD = "tenantId";
 
@@ -269,10 +270,11 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     private static AggregationOperation statusRankAddFieldsStage() {
         String statusRef = "$" + STATUS_FIELD;
-        Document known = new Document("$in", List.of(statusRef, STATUS_SORT_ORDER));
-        Document index = new Document("$indexOfArray", List.of(STATUS_SORT_ORDER, statusRef));
-        int unknownRank = STATUS_SORT_ORDER.size();
-        Document rank = new Document("$cond", List.of(known, index, unknownRank));
+        Document known = new Document("$in", List.of(statusRef, STATUS_DESC_ORDER));
+        Document index = new Document("$indexOfArray", List.of(STATUS_DESC_ORDER, statusRef));
+        int topRank = STATUS_DESC_ORDER.size();
+        Document knownRank = new Document("$subtract", List.of(topRank, index));
+        Document rank = new Document("$cond", List.of(known, knownRank, UNKNOWN_STATUS_RANK));
         Document addFields = new Document("$addFields", new Document(STATUS_RANK_FIELD, rank));
         return ctx -> addFields;
     }
@@ -308,10 +310,10 @@ public class CustomMachineRepositoryImpl implements CustomMachineRepository {
 
     static int statusRank(DeviceStatus status) {
         if (status == null) {
-            return STATUS_SORT_ORDER.size();
+            return UNKNOWN_STATUS_RANK;
         }
-        int index = STATUS_SORT_ORDER.indexOf(status.name());
-        return index < 0 ? STATUS_SORT_ORDER.size() : index;
+        int index = STATUS_DESC_ORDER.indexOf(status.name());
+        return index < 0 ? UNKNOWN_STATUS_RANK : STATUS_DESC_ORDER.size() - index;
     }
 
     private List<Machine> findAvailableForScheduleWithCursor(Query baseQuery, Collection<String> assignedMachineIds,
