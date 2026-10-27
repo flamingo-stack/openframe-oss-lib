@@ -17,6 +17,8 @@ public final class DeliveryTestPolicies {
     public static final long RECONNECT_WINDOW = 86_400L;
     public static final long RESULT_TIMEOUT = 600L;
     public static final long TTL = 604_800L;
+    public static final int SINGLE_RUN = 1;
+    public static final long RERUN_AFTER = 10_800L;
 
     private DeliveryTestPolicies() {
     }
@@ -34,6 +36,8 @@ public final class DeliveryTestPolicies {
         defaults.setReconnectWindowSeconds(RECONNECT_WINDOW);
         defaults.setResultTimeoutSeconds(RESULT_TIMEOUT);
         defaults.setTtlSeconds(TTL);
+        defaults.setMaxRuns(SINGLE_RUN);
+        defaults.setRerunAfterSeconds(RERUN_AFTER);
         Sweep sweep = new Sweep();
         sweep.setInterval(SWEEP_INTERVAL_MILLIS);
         sweep.setBatchSize(BATCH_SIZE);

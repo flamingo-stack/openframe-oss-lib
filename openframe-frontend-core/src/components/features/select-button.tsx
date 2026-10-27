@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_FIXED_PX } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { CheckCircleIcon } from '../icons-v2-generated/signs-and-symbols/check-circle-icon';
 import { Button } from '../ui/button';
@@ -69,8 +70,8 @@ export const SelectButton = React.forwardRef<HTMLButtonElement, SelectButtonProp
               src={image.src}
               alt={image.alt}
               className="size-full object-cover"
-              width={40}
-              height={40}
+              width={IMAGE_FIXED_PX.logoLg}
+              height={IMAGE_FIXED_PX.logoLg}
               unoptimized
             />
           </span>

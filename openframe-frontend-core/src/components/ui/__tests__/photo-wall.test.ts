@@ -69,17 +69,17 @@ describe('arrangePhotoWall', () => {
 });
 
 describe('photoWallRequestWidth', () => {
-  it('asks for the first step that covers the column on this screen', () => {
-    expect(photoWallRequestWidth(176, 1)).toBe(240);
-    expect(photoWallRequestWidth(176, 2)).toBe(360);
-    expect(photoWallRequestWidth(274, 2)).toBe(640);
+  it('asks for the first width of the image-size ladder that covers the column on this screen', () => {
+    expect(photoWallRequestWidth(176, 1)).toBe(640);
+    expect(photoWallRequestWidth(400, 2)).toBe(828);
+    expect(photoWallRequestWidth(500, 2)).toBe(1200);
   });
 
   it('never counts a screen denser than twice', () => {
-    expect(photoWallRequestWidth(176, 3)).toBe(360);
+    expect(photoWallRequestWidth(500, 3)).toBe(1200);
   });
 
-  it('leaves the url alone when no step covers the column', () => {
-    expect(photoWallRequestWidth(600, 2)).toBeNull();
+  it('asks for the widest width when no width covers the column', () => {
+    expect(photoWallRequestWidth(1200, 2)).toBe(1920);
   });
 });
