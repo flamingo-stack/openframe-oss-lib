@@ -8,8 +8,8 @@ import { Select, SelectTrigger, SelectValue } from '../select';
 import { Textarea } from '../textarea';
 
 /**
- * A label-less FieldWrapper is `display: contents` until `error` is set and a
- * box afterwards, and the parent's spacing lands on the box but not on
+ * A label-less FieldWrapper draws no element at all until `error` is set and a
+ * box afterwards (it used to be a `display: contents` wrapper), and the parent's spacing lands on the box but not on
  * `contents` — so the control jumped by that spacing whenever a message came
  * or went. `errorSlot` renders the box from the first render, and the controls
  * derive it from whether the caller wrote an `error` attribute at all. These
@@ -23,16 +23,19 @@ const BOX = 'relative';
 const TRANSPARENT = 'contents';
 
 const wrapperOf = (control: Element | null) => control?.parentElement ?? null;
+/** A FieldWrapper element around the control: its box, or the old `contents` one. */
+const isFieldWrapper = (element: Element | null) =>
+  !!element && (element.classList.contains(BOX) || element.classList.contains(TRANSPARENT));
 const inputWrapper = () => wrapperOf(screen.getByLabelText('Name').closest('label'));
 
 describe('FieldWrapper errorSlot', () => {
-  it('stays layout-transparent without a label, a message or a slot', () => {
+  it('draws no wrapper without a label, a message or a slot', () => {
     render(
       <FieldWrapper>
         <input aria-label="n" />
       </FieldWrapper>,
     );
-    expect(wrapperOf(screen.getByLabelText('n'))).toHaveClass(TRANSPARENT);
+    expect(isFieldWrapper(wrapperOf(screen.getByLabelText('n')))).toBe(false);
   });
 
   it('is a box from the first render when the slot is reserved, and stays one', () => {
@@ -53,9 +56,9 @@ describe('FieldWrapper errorSlot', () => {
 });
 
 describe('the controls reserve the slot when an error attribute is written', () => {
-  it('Input without the attribute stays transparent', () => {
+  it('Input without the attribute draws no wrapper', () => {
     render(<Input aria-label="Name" />);
-    expect(inputWrapper()).toHaveClass(TRANSPARENT);
+    expect(isFieldWrapper(inputWrapper())).toBe(false);
   });
 
   it('Input with error={undefined} is a box before any message, and stays one', () => {
@@ -92,9 +95,9 @@ describe('the controls reserve the slot when an error attribute is written', () 
 describe('ScheduleIntervalInput forwards the slot only when its caller wires one', () => {
   const noop = () => {};
 
-  it('stays transparent without an error attribute (Stop Retry after)', () => {
+  it('draws no wrapper without an error attribute (Stop Retry after)', () => {
     render(<ScheduleIntervalInput aria-label="Name" value={30} onChange={noop} />);
-    expect(inputWrapper()).toHaveClass(TRANSPARENT);
+    expect(isFieldWrapper(inputWrapper())).toBe(false);
   });
 
   it('is a box with error={undefined} (Repeat in)', () => {
