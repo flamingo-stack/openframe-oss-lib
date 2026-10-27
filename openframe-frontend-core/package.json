@@ -290,6 +290,12 @@
       "require": "./dist/utils/csv.cjs",
       "default": "./dist/utils/csv.js"
     },
+    "./utils/clickup-drop-down": {
+      "types": "./dist/utils/clickup-drop-down.d.ts",
+      "import": "./dist/utils/clickup-drop-down.js",
+      "require": "./dist/utils/clickup-drop-down.cjs",
+      "default": "./dist/utils/clickup-drop-down.js"
+    },
     "./utils/common": {
       "types": "./dist/utils/common.d.ts",
       "import": "./dist/utils/common.js",
