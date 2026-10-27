@@ -60,6 +60,7 @@
         <module>openframe-event-publishing</module>
         <module>openframe-data-mongo-sync</module>
         <module>openframe-event-processing</module>
+        <module>openframe-event-jobs</module>
         <module>openframe-agent-key</module>
         <module>openframe-machine-delivery</module>
         <module>openframe-data-mongo-reactive</module>
@@ -141,6 +142,11 @@
             <dependency>
                 <groupId>com.openframe.oss</groupId>
                 <artifactId>openframe-event-processing</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.openframe.oss</groupId>
+                <artifactId>openframe-event-jobs</artifactId>
                 <version>${revision}</version>
             </dependency>
             <dependency>
