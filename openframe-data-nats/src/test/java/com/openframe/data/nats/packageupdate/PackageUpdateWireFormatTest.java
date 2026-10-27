@@ -5,7 +5,11 @@ import com.openframe.data.document.rmm.software.PackageUpdateMode;
 import com.openframe.data.document.delivery.DeliveryType;
 import com.openframe.data.document.packagesearch.BrewPackageType;
 import com.openframe.data.document.packagesearch.PackageManagerType;
+import com.openframe.data.document.rmm.software.PackageUpdateRequest;
+import com.openframe.data.document.rmm.software.PackageUpdateSource;
+import com.openframe.data.nats.delivery.PackageUpdateDeliverySpec;
 import com.openframe.delivery.spec.DeliveryRef;
+import com.openframe.delivery.spec.DeliveryRequest;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -64,6 +68,26 @@ class PackageUpdateWireFormatTest {
         assertThat(json.get("package").get("kind").asText()).isEqualTo("CASK");
         assertThat(json.get("package").get("name").asText()).isEqualTo("postman");
         assertThat(json.get("package").has("id")).isFalse();          // brew: no winget id
+    }
+
+    @Test
+    void deadlineForce_deliveryRowOfItsOwn_sameRequestForTheAgent() {
+        PackageUpdateRequest request = PackageUpdateRequest.builder()
+                .requestId("req-1").source(PackageUpdateSource.AUTO)
+                .packageManager(PackageManagerType.WINGET).packageName("Google.Chrome")
+                .forceCountdownSeconds(300).build();
+        PackageUpdateDeliverySpec spec = new PackageUpdateDeliverySpec();
+
+        DeliveryRequest<PackageUpdateMessage> force = spec.request(PackageUpdateWire.deadlineForce("m1", request));
+        DeliveryRequest<PackageUpdateMessage> wait = spec.request(PackageUpdateWire.seed("m1", "req-1",
+                PackageUpdateSource.AUTO, PackageManagerType.WINGET, "Google.Chrome", null, PackageUpdateMode.WAIT, 300));
+
+        assertThat(force.getTargetId()).isEqualTo("req-1:deadline");     // never takes over the WAIT's row
+        assertThat(wait.getTargetId()).isEqualTo("req-1");
+        assertThat(force.getMachineId()).isEqualTo("m1");
+        assertThat(force.getPayload().getRequestId()).isEqualTo("req-1"); // the agent finds the request by it
+        assertThat(force.getPayload().getMode()).isEqualTo(PackageUpdateMode.FORCE);
+        assertThat(force.getPayload().getCountdownSeconds()).isEqualTo(300);
     }
 
     @Test
