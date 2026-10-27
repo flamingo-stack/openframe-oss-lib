@@ -2,6 +2,7 @@
 
 import type { ReactElement } from 'react';
 import Image from '../embed-shims/next-image';
+import { IMAGE_FIXED_PX } from '../styles/image-sizes';
 import { cn } from '../utils/cn';
 import { AGENT_GLYPH_COLOR, AGENT_PICTURE_CLASS, useAgentIdentityIcon } from './agent-identity';
 import { resolveIcon } from './chat/utils/icon-library';
@@ -32,7 +33,7 @@ export interface EntityIconValue {
  */
 export function EntityIcon({
   icon,
-  size = 20,
+  size = IMAGE_FIXED_PX.glyph,
   className,
 }: {
   icon?: EntityIconValue | null;

@@ -25,9 +25,9 @@
  * Usage: node scripts/check-publish-manifest.mjs [path/to/package.json]
  */
 
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
 
 const SHIPPED_FIELDS = ['dependencies', 'peerDependencies', 'optionalDependencies'];
 /** Specs that only resolve on the machine they were written on. */
@@ -64,6 +64,21 @@ for (const [subpath, file] of requireTargets(manifest.exports)) {
   }
 }
 
+/**
+ * Every file an `exports` condition names must exist: `require` is loaded above, but a missing `import` or `types` file
+ * fails only in a consumer (an ESM config, a type check). 0.0.804 shipped `./image-sizes` with only its `.cjs`: the ESM
+ * and declaration builds mirror `src/`, so they wrote `dist/styles/image-sizes.*` while the map named `dist/`.
+ */
+const packageDir = dirname(manifestPath);
+for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+  if (typeof target !== 'object' || target === null) continue;
+  for (const [condition, file] of Object.entries(target)) {
+    if (typeof file !== 'string' || file.includes('*')) continue;
+    if (!existsSync(resolve(packageDir, file)))
+      problems.push(`exports["${subpath}"].${condition} (${file}) is not built`);
+  }
+}
+
 if (problems.length > 0) {
   console.error(`Refusing to publish ${manifest.name}@${manifest.version} (${manifestPath}):`);
   for (const problem of problems) console.error(`  - ${problem}`);
@@ -74,5 +89,5 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `Publish manifest OK: ${manifest.name}@${manifest.version} carries no local dependency specs, and every CommonJS entry loads.`,
+  `Publish manifest OK: ${manifest.name}@${manifest.version} carries no local dependency specs, every file its exports name is built, and every CommonJS entry loads.`,
 );

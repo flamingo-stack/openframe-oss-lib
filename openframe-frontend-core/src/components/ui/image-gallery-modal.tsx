@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from '../../embed-shims/next-image';
+import { IMAGE_SLOT } from '../../styles/image-sizes';
 import { Button } from './button';
 import { Modal } from './modal';
 
@@ -122,7 +123,7 @@ export function ImageGalleryModal({ images, isOpen, onClose, initialIndex = 0 }:
               alt={`Screenshot ${selectedImageIndex + 1}`}
               fill
               className="object-contain"
-              sizes="90vw"
+              sizes={IMAGE_SLOT.full}
               priority={true}
               unoptimized
               onError={e => {
