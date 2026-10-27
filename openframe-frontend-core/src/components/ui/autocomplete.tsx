@@ -17,7 +17,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
+import { MEASURE_LAYER_CLASS, useAutoLimitTags } from '../../hooks/ui/use-auto-limit-tags';
 import { useKeyboardCollisionPadding } from '../../hooks/ui/use-keyboard-collision-padding';
 import { cn } from '../../utils/cn';
 import { Chevron02DownIcon } from '../icons-v2-generated/arrows/chevron-02-down-icon';
@@ -908,19 +908,11 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
 
         {/* Off-screen measurement containers for auto-limit */}
         {multiple && (
-          <>
-            <span
-              ref={textMeasureRef}
-              aria-hidden="true"
-              className="pointer-events-none invisible absolute left-0 top-0 -z-10 whitespace-nowrap text-h4"
-            >
+          <div aria-hidden="true" className={MEASURE_LAYER_CLASS}>
+            <span ref={textMeasureRef} aria-hidden="true" className="whitespace-nowrap text-h4">
               {inputPlaceholder}
             </span>
-            <div
-              ref={measureRef}
-              aria-hidden="true"
-              className="pointer-events-none invisible absolute left-0 top-0 -z-10 flex gap-2"
-            >
+            <div ref={measureRef} aria-hidden="true" className="flex w-max gap-2">
               {selectedOptions.map(option => (
                 <Tag
                   key={`m-${String(option.value)}`}
@@ -931,7 +923,7 @@ function AutocompleteInner<T = string>(props: AutocompleteProps<T>, ref: Forward
                 />
               ))}
             </div>
-          </>
+          </div>
         )}
       </div>
     </FieldWrapper>

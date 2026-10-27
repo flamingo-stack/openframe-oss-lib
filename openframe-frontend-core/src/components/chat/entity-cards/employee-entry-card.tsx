@@ -1,6 +1,7 @@
 import type React from 'react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
+import { IMAGE_FIXED_PX } from '../../../styles/image-sizes';
 import { useLoadingScope } from '../../ui/loading-scope';
 import { StatusBadge, type StatusBadgeProps } from '../../ui/status-badge';
 import { useProxiedImageUrl } from '../hooks/use-proxied-image-url';
@@ -132,8 +133,8 @@ function LoadedEmployeeEntryCard({
                 // One line of the meta row tall (16px on a phone, 20px from md), so the
                 // row is exactly the line the skeleton reserves.
                 className="h-[1lh] w-[1lh] shrink-0 rounded-full object-cover"
-                width={20}
-                height={20}
+                width={IMAGE_FIXED_PX.glyph}
+                height={IMAGE_FIXED_PX.glyph}
                 unoptimized
               />
             ) : null}
