@@ -153,10 +153,10 @@
       "default": "./dist/platform-domains.js"
     },
     "./image-sizes": {
-      "types": "./dist/image-sizes.d.ts",
-      "import": "./dist/image-sizes.js",
-      "require": "./dist/image-sizes.cjs",
-      "default": "./dist/image-sizes.js"
+      "types": "./dist/styles/image-sizes.d.ts",
+      "import": "./dist/styles/image-sizes.js",
+      "require": "./dist/styles/image-sizes.cjs",
+      "default": "./dist/styles/image-sizes.js"
     },
     "./chat-protocol": {
       "types": "./dist/chat-protocol/index.d.ts",
@@ -352,7 +352,6 @@
       "default": "./dist/assets/index.js"
     },
     "./tailwind.config.ts": {
-      "types": "./dist/tailwind.config.d.ts",
       "default": "./tailwind.config.ts"
     },
     "./components/icons-v2": {
