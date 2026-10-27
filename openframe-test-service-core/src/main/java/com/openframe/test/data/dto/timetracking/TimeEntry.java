@@ -10,8 +10,8 @@ import lombok.NoArgsConstructor;
 /**
  * A time entry as exposed by the time-tracking GraphQL API (openframe-api-service-core
  * {@code time-tracking.graphqls}). {@code state} is RUNNING | PAUSED | COMPLETED, {@code source} is
- * TIMER | MANUAL. {@code userId} and {@code user.id} are both the raw user id; {@code createTimeEntry} /
- * {@code updateTimeEntry} and the employee filters expect the Relay global form instead
+ * TIMER | MANUAL. {@code userId} is the raw user id and {@code user.id} the Relay global one;
+ * {@code createTimeEntry} / {@code updateTimeEntry} and the employee filters expect the global form
  * ({@code RelayIds.userId(rawId)}).
  */
 @Data

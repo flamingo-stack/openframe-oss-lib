@@ -211,20 +211,3 @@ input DeleteFolderInput {
     childrenAction: FolderChildrenAction
     moveTargetFolderId: ID
 }
-
-# Minimal User type for KB author resolution.
-# TODO: Extract to shared schema or replace after user management module.
-type User implements Node @key(fields: "id") @shareable {
-    id: ID!
-    firstName: String
-    lastName: String
-    email: String
-    "ACTIVE, DELETED or SELF_DELETED"
-    status: String
-    image: UserImage
-}
-
-type UserImage @shareable {
-    imageUrl: String
-    hash: String
-}
