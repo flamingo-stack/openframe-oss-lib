@@ -3,7 +3,7 @@
 import { type HTMLAttributes, memo, forwardRef } from 'react';
 import Image from '../../embed-shims/next-image';
 import { useAuthedImageSrc } from '../../hooks/use-authed-image-src';
-import { AVATAR_SIZE, AVATAR_SIZE_PX } from '../../styles/component-sizes';
+import { AVATAR_SIZE, AVATAR_SIZE_PX, type AvatarSize } from '../../styles/component-sizes';
 import { cn } from '../../utils/cn';
 import { personInitials } from '../../utils/format';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
@@ -13,7 +13,7 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
   /** A step of the shared avatar scale (`AVATAR_SIZE`). */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  size?: AvatarSize;
   /** Exact pixel size (width & height). Overrides the `size` bucket dimensions —
    *  for callers with a numeric-px API (e.g. UserDisplay/MSPDisplay). */
   sizePx?: number;
@@ -23,6 +23,8 @@ interface SquareAvatarProps extends HTMLAttributes<HTMLDivElement> {
    * crest, whose round border cover slices off.
    */
   fit?: 'cover' | 'contain';
+  /** A `contain` picture kept off the frame's edges (a logo on its tile). */
+  padded?: boolean;
   fallback?: string;
   variant?: 'square' | 'round';
   /** Override the initials-fallback styling (font size/color). Merged over the
@@ -50,6 +52,7 @@ const SquareAvatar = memo(
         size = 'md',
         sizePx,
         fit = 'cover',
+        padded = false,
         fallback,
         variant = 'square',
         initialsClassName,
@@ -118,7 +121,7 @@ const SquareAvatar = memo(
                 'absolute max-w-none',
                 fit === 'contain'
                   ? // A LOGO or crest must fit whole; cover would slice its edges.
-                    'inset-0 h-full w-full object-contain'
+                    cn('inset-0 h-full w-full object-contain', padded && 'p-1')
                   : // A portrait fills the frame; the 1px overscan hides edge seams.
                     '-inset-px h-[calc(100%+2px)] w-[calc(100%+2px)] object-cover',
               )}
