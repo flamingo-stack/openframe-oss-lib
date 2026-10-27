@@ -121,6 +121,11 @@ aspects still write and the stream gets no events of that type; once the tenant 
 and their aspect cascades from it stop. A type on in the tenant services but off in the stream leaves the copies
 stale: reconciliation and the consumer lag alert show it.
 
+While the tenant pods restart one by one, a pod that still runs the aspect writes a newer value with no event, and an
+older event applied later can put the old value back. So once every tenant pod has restarted, set a new backfill run id
+for the type in the stream's config and restart the stream: the backfill publishes the current state again and repairs
+those copies within minutes, not at the nightly reconciliation.
+
 ## Add a projection
 
 1. Return it from its spec's `projections()` and implement `apply`:
