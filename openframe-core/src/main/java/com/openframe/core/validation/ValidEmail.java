@@ -22,7 +22,10 @@ public @interface ValidEmail {
 
     Class<? extends Payload>[] payload() default {};
 
-    String regex() default "^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$";
+    /** The default pattern, for code that checks an address without bean validation. */
+    String DEFAULT_REGEX = "^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$";
+
+    String regex() default DEFAULT_REGEX;
 }
 
 
