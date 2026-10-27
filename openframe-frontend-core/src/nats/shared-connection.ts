@@ -165,7 +165,8 @@ export function acquireClient(url: string, opts?: AcquireClientOptions): SharedC
     // surface mounting would otherwise undo a terminal verdict.
     conn.failedDials = 0;
     conn.terminal = false;
-    endPause(conn);
+    conn.pause?.dispose();
+    conn.pause = null;
   }
 
   conn.refCount += 1;
@@ -195,7 +196,8 @@ export function releaseClient(url: string, opts?: ReleaseClientOptions): void {
       clearTimeout(conn.retryTimer);
       conn.retryTimer = null;
     }
-    endPause(conn);
+    conn.pause?.dispose();
+    conn.pause = null;
     void conn.client.close().catch(() => {});
   }, delay);
 }
@@ -267,44 +269,47 @@ function handOffRetry(conn: SharedConnection): void {
   }
 }
 
-function endPause(conn: SharedConnection): void {
-  conn.pause?.dispose();
-  Object.assign(conn, { pause: null });
-}
+export function startConnectionLifecycle(options: ConnectionLifecycleOptions): ConnectionLifecycleHandle {
+  const { conn, wsUrl } = options;
+  let closed = false;
 
-function startPause(conn: SharedConnection, backoff: NatsReconnectionBackoff): void {
-  if (conn.pause) return;
-  const pauseMs = backoff.pauseMs ?? NATS_DEFAULTS.PAUSE_MS;
-  const now = Date.now();
-  // Spread over up to +20% so clients paused by the same outage do not all wake together.
-  const until = now + pauseMs * (1 + Math.random() * 0.2);
-
-  const resume = () => {
-    if (conn.pause?.startedAt === undefined) return;
-    if (Date.now() - conn.pause.startedAt < NATS_DEFAULTS.PAUSE_MIN_RESUME_MS) return;
-    endPause(conn);
-    if (conn.terminal || conn.client.isConnected()) return;
-    if (conn.retryTimer) {
-      clearTimeout(conn.retryTimer);
-      Object.assign(conn, { retryTimer: null });
-    }
-    if (conn.retryOwner) conn.retryOwner();
-    else handOffRetry(conn);
-  };
-  const onVisibility = () => {
-    if (document.visibilityState === 'visible') resume();
-  };
-  const hasDom = typeof document !== 'undefined' && typeof window !== 'undefined';
-  if (hasDom) {
-    document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('online', resume);
+  function endPause(): void {
+    conn.pause?.dispose();
+    conn.pause = null;
   }
-  // The next dial after an auto-pause is a single probe: one more failure and
-  // the threshold is met again, instead of five more dials into a dead endpoint.
-  const threshold = backoff.pauseAfterFailures ?? NATS_DEFAULTS.PAUSE_AFTER_FAILURES;
-  Object.assign(conn, {
-    failedDials: Math.min(conn.failedDials, threshold - 1),
-    pause: {
+
+  function startPause(backoff: NatsReconnectionBackoff): void {
+    if (conn.pause) return;
+    const pauseMs = backoff.pauseMs ?? NATS_DEFAULTS.PAUSE_MS;
+    const now = Date.now();
+    // Spread over up to +20% so clients paused by the same outage do not all wake together.
+    const until = now + pauseMs * (1 + Math.random() * 0.2);
+
+    const resume = () => {
+      if (conn.pause?.startedAt === undefined) return;
+      if (Date.now() - conn.pause.startedAt < NATS_DEFAULTS.PAUSE_MIN_RESUME_MS) return;
+      endPause();
+      if (conn.terminal || conn.client.isConnected()) return;
+      if (conn.retryTimer) {
+        clearTimeout(conn.retryTimer);
+        conn.retryTimer = null;
+      }
+      if (conn.retryOwner) conn.retryOwner();
+      else handOffRetry(conn);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') resume();
+    };
+    const hasDom = typeof document !== 'undefined' && typeof window !== 'undefined';
+    if (hasDom) {
+      document.addEventListener('visibilitychange', onVisibility);
+      window.addEventListener('online', resume);
+    }
+    // The next dial after an auto-pause is a single probe: one more failure and
+    // the threshold is met again, instead of five more dials into a dead endpoint.
+    const threshold = backoff.pauseAfterFailures ?? NATS_DEFAULTS.PAUSE_AFTER_FAILURES;
+    conn.failedDials = Math.min(conn.failedDials, threshold - 1);
+    conn.pause = {
       until,
       startedAt: now,
       dispose: () => {
@@ -312,31 +317,28 @@ function startPause(conn: SharedConnection, backoff: NatsReconnectionBackoff): v
         document.removeEventListener('visibilitychange', onVisibility);
         window.removeEventListener('online', resume);
       },
-    },
-  });
-}
+    };
+  }
 
-function markHealthy(conn: SharedConnection): void {
-  endPause(conn);
-  Object.assign(conn, { failedDials: 0 });
-}
+  function markHealthy(): void {
+    endPause();
+    conn.failedDials = 0;
+  }
 
-function markTerminal(conn: SharedConnection): void {
-  endPause(conn);
-  if (conn.retryTimer) clearTimeout(conn.retryTimer);
-  Object.assign(conn, { terminal: true, retryOwner: null, retryTimer: null });
-  for (const listener of conn.terminalListeners) listener();
-}
-
-export function startConnectionLifecycle(options: ConnectionLifecycleOptions): ConnectionLifecycleHandle {
-  const { conn, wsUrl } = options;
-  let closed = false;
+  function markTerminal(): void {
+    endPause();
+    if (conn.retryTimer) clearTimeout(conn.retryTimer);
+    conn.terminal = true;
+    conn.retryOwner = null;
+    conn.retryTimer = null;
+    for (const listener of conn.terminalListeners) listener();
+  }
 
   function emitSynthetic(status: NatsStatus) {
     if (closed) return;
     options.onStatusChange?.(status, { status });
     if (status === 'connected') {
-      markHealthy(conn);
+      markHealthy();
     }
   }
 
@@ -406,13 +408,13 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       // is a token refresh in the real callers, so it must not run on a
       // connection that came back on its own.
       if (conn.client.isConnected()) {
-        markHealthy(conn);
+        markHealthy();
         return;
       }
 
       // The pause that armed this timer is over. A pause lifted early has
       // already cleared it, so this only fires for one that ran its course.
-      if (conn.pause && conn.pause.until <= Date.now()) endPause(conn);
+      if (conn.pause && conn.pause.until <= Date.now()) endPause();
 
       let verdict: NatsReconnectVerdict | void = undefined;
       try {
@@ -426,11 +428,11 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       // lifecycle is the one leaving: the successor inherits it.
       if (conn.terminal) return;
       if (verdict === 'terminal') {
-        markTerminal(conn);
+        markTerminal();
         return;
       }
       if (verdict === 'pause' || conn.failedDials >= (cfg.pauseAfterFailures ?? NATS_DEFAULTS.PAUSE_AFTER_FAILURES)) {
-        startPause(conn, cfg);
+        startPause(cfg);
       }
 
       const freshUrl = options.getFreshUrl();
@@ -465,7 +467,7 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
       try {
         await conn.client.connect();
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
-          markHealthy(conn);
+          markHealthy();
         }
       } catch {
         if (!closed && getSharedConnectionFor(wsUrl) === conn) {
@@ -488,7 +490,7 @@ export function startConnectionLifecycle(options: ConnectionLifecycleOptions): C
     if (closed) return;
     options.onStatusChange?.(evt.status, evt);
     if (evt.status === 'connected') {
-      markHealthy(conn);
+      markHealthy();
     }
     if (shouldRetryOn(evt.status)) {
       scheduleRetry();
