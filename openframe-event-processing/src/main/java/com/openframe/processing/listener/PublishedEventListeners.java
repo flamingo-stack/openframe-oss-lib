@@ -4,6 +4,7 @@ import com.openframe.processing.config.properties.EventProcessingKafkaProperties
 import com.openframe.processing.runner.ProjectionRunner;
 import com.openframe.processing.topic.EventTopicNames;
 import com.openframe.publishing.api.spec.AggregateSpec;
+import com.openframe.publishing.api.spec.Projection;
 import com.openframe.publishing.registry.AggregateSpecRegistry;
 import org.springframework.core.ResolvableType;
 import org.springframework.kafka.annotation.KafkaListenerConfigurer;
@@ -12,7 +13,7 @@ import org.springframework.kafka.config.KafkaListenerEndpointRegistrar;
 import org.springframework.util.ClassUtils;
 import tools.jackson.databind.json.JsonMapper;
 
-// One listener per published type with a spec, on <topic-prefix><type> in the group <group-prefix><type>; a new spec needs no listener class.
+// One listener per projection of a published type, on <topic-prefix><type> in the group <group-prefix><type>.<projection>; no listener class to write.
 public class PublishedEventListeners implements KafkaListenerConfigurer {
 
     private static final String LISTENER_ID_PREFIX = "event-processing-";
@@ -42,11 +43,14 @@ public class PublishedEventListeners implements KafkaListenerConfigurer {
         for (AggregateSpec<?, ?> spec : specRegistry.specs()) {
             String type = spec.getType();
             Class<?> eventClass = resolveEventClass(spec);
-            PublishedTypeListener listener = new PublishedTypeListener(type, eventClass, envelopeMapper, runner);
             String topic = EventTopicNames.topicOf(topicPrefix, type);
-            PublishedTypeEndpoint endpoint = new PublishedTypeEndpoint(LISTENER_ID_PREFIX + type, groupPrefix + type, topic,
-                    listener);
-            registrar.registerEndpoint(endpoint, containerFactory);
+            for (Projection<?, ?> projection : spec.projections()) {
+                String listenerName = EventTopicNames.buildListenerName(type, projection.name());
+                ProjectionListener listener = new ProjectionListener(type, projection, eventClass, envelopeMapper, runner);
+                ProjectionEndpoint endpoint = new ProjectionEndpoint(LISTENER_ID_PREFIX + listenerName,
+                        groupPrefix + listenerName, topic, listener);
+                registrar.registerEndpoint(endpoint, containerFactory);
+            }
         }
     }
 
