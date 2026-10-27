@@ -21,7 +21,8 @@
 import { Eye } from 'lucide-react';
 import Image from '../../../embed-shims/next-image';
 import Link from '../../../embed-shims/next-link';
-import { AVATAR_SIZE, MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
+import { AVATAR_SIZE, AVATAR_SIZE_PX, MEDIA_ASPECT, TEXT_LINES_MIN } from '../../../styles/component-sizes';
+import { IMAGE_SLOT, fixedImageSlot } from '../../../styles/image-sizes';
 import type { BlogPostSummary } from '../../../types/blog';
 import { cn } from '../../../utils/cn';
 import { formatDateWithTimezone } from '../../../utils/format';
@@ -198,7 +199,7 @@ function LoadedBlogCard({
               src={displayImage}
               alt={post.title}
               fill
-              sizes="56px"
+              sizes={fixedImageSlot('tile')}
               className="object-contain"
               unoptimized
               onError={onImageError}
@@ -264,9 +265,8 @@ function LoadedBlogCard({
               alt={post.title}
               fill
               priority={priority}
-              quality={priority ? 85 : 75}
               className={cn('object-cover object-center', 'duration-400 transition-all ease-out', 'hover:scale-[1.02]')}
-              sizes="(max-width: 768px) 100vw, (max-width: 1519px) 50vw, 33vw"
+              sizes={IMAGE_SLOT.card}
               unoptimized
               onError={onImageError}
             />
@@ -297,8 +297,8 @@ function LoadedBlogCard({
                 <Image
                   src={post.author_avatar}
                   alt={post.author_name || ''}
-                  width={32}
-                  height={32}
+                  width={AVATAR_SIZE_PX.sm}
+                  height={AVATAR_SIZE_PX.sm}
                   className={BLOG_CARD_AVATAR}
                   unoptimized
                 />

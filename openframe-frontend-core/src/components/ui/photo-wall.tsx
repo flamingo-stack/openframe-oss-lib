@@ -18,6 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image, { resizedImageUrl } from '../../embed-shims/next-image';
+import { imageWidthFor } from '../../styles/image-sizes';
 import { cn } from '../../utils/cn';
 import { UnifiedSkeleton } from '../loading/unified-skeleton';
 import { useLoadingScope } from './loading-scope';
@@ -55,20 +56,15 @@ const EAGER_PHOTOS_PER_COLUMN = 2;
 // A column is repeated until it is this much taller than the wall.
 const FILL_FACTOR = 1.25;
 const MAX_REPEATS = 8;
-/**
- * The widths a wall photo is asked for. A column is a fraction of the wall, so a
- * photo is requested at the first step that covers its column on this screen
- * (at most twice the column, for dense screens), never at the caller's one size
- * for every viewport. Steps, not the exact width, so a resize by a few pixels
- * asks for nothing new.
- */
-const PHOTO_WIDTH_STEPS_PX = [240, 360, 480, 640, 960] as const;
 const MAX_PIXEL_DENSITY = 2;
 
-/** The width to ask a photo at for a column `columnWidth` wide; `null` when no step covers it (the caller's url is used). */
-export function photoWallRequestWidth(columnWidth: number, pixelDensity: number): number | null {
-  const needed = columnWidth * Math.min(Math.max(1, pixelDensity), MAX_PIXEL_DENSITY);
-  return PHOTO_WIDTH_STEPS_PX.find(step => step >= needed) ?? null;
+/**
+ * The width to ask a photo at for a column `columnWidth` wide: the first width of the image-size table's ladder that
+ * covers the column on this screen (at most twice the column, for dense screens), so a wall photo is the same cached
+ * file every `srcset` picture of that width asks for, and a resize by a few pixels asks for nothing new.
+ */
+export function photoWallRequestWidth(columnWidth: number, pixelDensity: number): number {
+  return imageWidthFor(columnWidth * Math.min(Math.max(1, pixelDensity), MAX_PIXEL_DENSITY));
 }
 
 export function photoOrientation(naturalWidth: number, naturalHeight: number): PhotoOrientation {
@@ -182,7 +178,7 @@ export interface PhotoWallProps {
   /** The pictures are still being fetched: show the wall's own placeholder frames. */
   loading?: boolean;
   /**
-   * The width a column is drawn at, as an image `sizes` value (e.g. `(min-width: 1024px) 25vw, 50vw`). With it, and a
+   * The width a column is drawn at, as an image `sizes` value from the image-size table (`IMAGE_SLOT.wall`). With it, and a
    * size on every picture, the wall is laid out at once, on the server too, and each picture is drawn with the host's
    * `srcset`: the first frames are in the HTML and fetched before any script runs, instead of after the wall has been
    * measured in the browser (CU-17tkuw5xp4q: the careers hero's largest paint waited for that). Two walls given the
@@ -245,7 +241,7 @@ export function PhotoWall({
   // Each picture is measured at the url it is drawn from (the boxed `Image`'s
   // `optimizedWidth`: the host's resizer at the column's width), so it is downloaded once.
   // Laid out up front, a picture is drawn from its own url with the host's `srcset` (`sizes`), on the server too.
-  const drawnWidth = sizedUpFront ? undefined : (requestWidth ?? undefined);
+  const drawnWidth = sizedUpFront ? undefined : requestWidth;
   const drawnUrl = useCallback((url: string) => (drawnWidth ? resizedImageUrl(url, drawnWidth) : url), [drawnWidth]);
   // A picture whose size the host stated has its orientation now; only the others are measured.
   const known = useMemo(() => {
